@@ -10117,7 +10117,7 @@ can be sent before the crash is reproduced.
 **Privacy.** droidtop sends nothing about the device, the library or the
 person anywhere. The complete list of hosts it talks to, each for one job
 the person asked for: GitHub releases (§10b, its own and enginehost's update
-check: an unauthenticated fetch of one small file); the droidtop-platforms
+check: an unauthenticated fetch of one small file, or with the person's own GitHub token when they added one for plugin sources, §12a); the droidtop-platforms
 repository on GitHub (§7e2, database refresh); GitLab's ES-DE theme index
 and the theme repositories a person chooses to download (§7f); the scraper
 a person selected, with credentials the person entered (§7h); the OCI
@@ -10610,6 +10610,27 @@ the secondary path for sources that publish no key.
   ("third-party source, not official — droidtop has not vetted it"),
   and the user confirms once. https only: a plaintext fetch would make
   the TOFU step itself the attack.
+- **The user's own GitHub token for plugin sources (owner, 2026-09-28,
+  Droidtop/tracker#16).** Accounts and sources has a "GitHub token" row: the
+  person pastes a fine-grained or classic token themselves (droidtop never
+  creates, fetches or fills one). It lifts GitHub's unauthenticated request
+  limit for update checks and reaches plugin sources in private repositories:
+  the source key file, the catalog index and the bundle download. Stored
+  AES-256-GCM under a non-exportable Android Keystore key in a private
+  preferences file of its own (`GitHubTokenStore`), so it is never in the
+  shared settings preferences and therefore never in the settings backup or
+  in Share diagnostics; shown masked (last four characters), removable, and
+  testable (the Test row asks api.github.com/user for the login and the
+  request allowance). `GitHubAuth` is the one place that decides where it may
+  go: an `Authorization: Bearer` header on https requests to `api.github.com`,
+  `github.com` and `raw.githubusercontent.com` only, decided again on every
+  redirect hop (redirects are followed by hand). `objects.githubusercontent.com`
+  is deliberately NOT on the list: a private release asset (the
+  `api.github.com/.../releases/assets/<id>` URL, sent with
+  `Accept: application/octet-stream`) redirects to a pre-signed URL there, and
+  that host rejects a request carrying both the signature and a token. No token
+  set means exactly the unauthenticated request of before; the token is never
+  logged and never in a URL.
 - **The key file format plugin authors publish** — the whole contract,
   deliberately two fields:
   `{ "origin": "acme", "key": "<base64 of a P-256 public key as X.509 SubjectPublicKeyInfo — the same SPKI shape the official pinned key uses>" }`

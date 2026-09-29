@@ -1287,6 +1287,7 @@ object AppSettingsCatalogs {
 
         val activeIntegrations = IntegrationStore.available(context).size
         val installedPlugins = PluginStore.installed(context)
+        val githubTokenLabel = if (dev.droidtop.pluginhost.GitHubTokenStore.isSet(context)) "Set" else "Not set"
         val pluginsValueLabel = when {
             installedPlugins.isEmpty() -> "none"
             installedPlugins.any { it.trust == PluginTrustState.PENDING } ->
@@ -1419,6 +1420,13 @@ object AppSettingsCatalogs {
                         icon = CatalogIcon.INTEGRATIONS,
                     ),
                     NestedScreenItem(
+                        id = "accounts_github_token",
+                        title = "GitHub token",
+                        subtitle = "Your own token: lifts GitHub's request limit for plugin updates and reaches plugin sources in private repositories",
+                        inline = githubTokenScreen(),
+                        valueLabel = { githubTokenLabel },
+                    ),
+                    NestedScreenItem(
                         id = "accounts_jobs_screen",
                         title = "Jobs",
                         subtitle = "Plugin downloads and long-running actions, with progress and cancel",
@@ -1504,6 +1512,74 @@ object AppSettingsCatalogs {
                             onChange = { c, v -> ScraperPrefs.set(c, ScraperPrefs.clientId(c), v.trim()) },
                         ),
                     ),
+                ),
+            )
+        },
+    )
+
+    /**
+     * The user's own GitHub token for plugin sources (docs/SPEC.md 12a
+     * "GitHub token"). Pasted by the person, never created or filled by
+     * droidtop; stored Keystore-encrypted, never in the settings backup,
+     * shown masked, removable, and testable against api.github.com.
+     */
+    private fun githubTokenScreen() = CatalogScreen(
+        id = "accounts_github_token_edit",
+        title = "GitHub token",
+        subtitle = "Sent only to api.github.com, github.com and raw.githubusercontent.com, only for plugin sources",
+        groups = { context ->
+            val (token, stored) = withContext(Dispatchers.IO) {
+                dev.droidtop.pluginhost.GitHubTokenStore.get(context) to dev.droidtop.pluginhost.GitHubTokenStore.isSet(context)
+            }
+            listOf(
+                CatalogGroup(
+                    id = "accounts_github_token_fields",
+                    title = null,
+                    items = buildList {
+                        add(
+                            TextInputItem(
+                                id = "github_token_value",
+                                title = "Token",
+                                subtitle = when {
+                                    token != null -> "Stored encrypted on this device: ${dev.droidtop.pluginhost.GitHubTokenStore.masked(token)}"
+                                    stored -> "A token is stored but can no longer be read on this device; paste it again"
+                                    else -> "A fine-grained token with read access to the plugin repositories, or a classic token with repo scope for private ones"
+                                },
+                                // Never shows the stored value back: the field is for pasting a new one.
+                                value = "",
+                                secret = true,
+                                onChange = { c, v ->
+                                    if (v.isNotBlank()) {
+                                        withContext(Dispatchers.IO) { dev.droidtop.pluginhost.GitHubTokenStore.set(c, v) }
+                                    }
+                                },
+                            ),
+                        )
+                        if (token != null) {
+                            add(
+                                AsyncActionItem(
+                                    id = "github_token_test",
+                                    title = "Test",
+                                    subtitle = "Asks api.github.com who this token is and how many requests it allows",
+                                    run = { _, onStatus ->
+                                        onStatus("Asking GitHub...")
+                                        dev.droidtop.pluginhost.GitHubTokenStore.test(token)
+                                    },
+                                ),
+                            )
+                        }
+                        if (stored) {
+                            add(
+                                ActionItem(
+                                    id = "github_token_remove",
+                                    title = "Remove token",
+                                    subtitle = "Plugin sources go back to unauthenticated requests",
+                                    confirmTitle = "Remove the GitHub token from this device?",
+                                    run = { ctx -> dev.droidtop.pluginhost.GitHubTokenStore.clear(ctx) },
+                                ),
+                            )
+                        }
+                    },
                 ),
             )
         },
@@ -2359,7 +2435,7 @@ object AppSettingsCatalogs {
     private fun fetchSourceKey(context: Context, url: String, onStatus: (String) -> Unit): String {
         if (url.isBlank()) return "Type the source's address first"
         onStatus("Fetching $url...")
-        return when (val fetched = PluginSourceKeys.fetchKey(url)) {
+        return when (val fetched = PluginSourceKeys.fetchKey(url, dev.droidtop.pluginhost.GitHubTokenStore.get(context))) {
             is PluginSourceKeys.FetchResult.Failed -> fetched.reason
             is PluginSourceKeys.FetchResult.Fetched -> {
                 val published = fetched.key

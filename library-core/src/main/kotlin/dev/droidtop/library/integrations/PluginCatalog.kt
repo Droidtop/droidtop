@@ -3,6 +3,8 @@ package dev.droidtop.library.integrations
 import android.content.Context
 import dev.droidtop.library.consoles.PlatformDatabaseSource
 import dev.droidtop.library.consoles.PlatformDatabaseTransport
+import dev.droidtop.pluginhost.GitHubAuth
+import dev.droidtop.pluginhost.GitHubTokenStore
 import dev.droidtop.pluginhost.PluginBundleInstaller
 import dev.droidtop.pluginhost.PluginInstallResult
 import dev.droidtop.pluginhost.PluginRecord
@@ -12,7 +14,6 @@ import dev.droidtop.pluginhost.PluginTrustState
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
-import java.net.URL
 import java.security.MessageDigest
 import kotlin.math.sign
 import kotlinx.coroutines.Dispatchers
@@ -183,7 +184,7 @@ object PluginCatalog {
     ): String = withContext(Dispatchers.IO) {
         val tmp = File.createTempFile("plugin-catalog-", ".droidplugin.tar.xz", context.cacheDir)
         try {
-            when (val download = download(release.bundle, tmp) { bytesRead, totalBytes ->
+            when (val download = download(release.bundle, tmp, GitHubTokenStore.get(context)) { bytesRead, totalBytes ->
                 onStatus(
                     if (totalBytes > 0) "Downloading... ${bytesRead * 100 / totalBytes}%" else "Downloading... ${bytesRead / 1024 / 1024} MB",
                 )
@@ -248,7 +249,7 @@ object PluginCatalog {
 
     /** Fetches the index fresh and replaces the cached copy only after it parsed (the platform databases' own validate-before-replace contract). */
     private fun fetchAndCache(context: Context): PluginCatalogIndex {
-        val text = PlatformDatabaseTransport.get(indexUrl(context))
+        val text = PlatformDatabaseTransport.get(indexUrl(context), GitHubTokenStore.get(context))
         val parsed = PluginCatalogIndexParser.parse(text)
             ?: error("the catalog index at ${indexUrl(context)} no longer has a format this build of droidtop reads")
         val dir = cacheFile(context).parentFile
@@ -263,14 +264,12 @@ object PluginCatalog {
     }
 
     /** Streams [bundle] into [dest] (created fresh), enforcing the size cap and reporting progress; answers the file's own SHA-256. */
-    private fun download(bundle: PluginCatalogBundle, dest: File, onProgress: (Long, Long) -> Unit): Download {
+    private fun download(bundle: PluginCatalogBundle, dest: File, token: String?, onProgress: (Long, Long) -> Unit): Download {
         val connection: HttpURLConnection = try {
-            URL(bundle.url).openConnection() as HttpURLConnection
+            GitHubAuth.open(bundle.url, token, CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS)
         } catch (failure: Exception) {
             return Download.Failed("the connection failed (${failure.message ?: "no network"})")
         }
-        connection.connectTimeout = CONNECT_TIMEOUT_MS
-        connection.readTimeout = READ_TIMEOUT_MS
         return try {
             when (val code = connection.responseCode) {
                 200 -> {

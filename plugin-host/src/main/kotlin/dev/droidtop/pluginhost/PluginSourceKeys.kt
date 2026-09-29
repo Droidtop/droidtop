@@ -85,7 +85,11 @@ object PluginSourceKeys {
      * publishing origin "droidtop" is the "may not claim the official
      * id" attack and is refused before it ever reaches a prompt.
      */
-    fun fetchKey(sourceUrl: String, httpGet: (String) -> ByteArray? = ::httpGet): FetchResult {
+    fun fetchKey(
+        sourceUrl: String,
+        token: String? = null,
+        httpGet: (String) -> ByteArray? = { fetchBytes(it, token) },
+    ): FetchResult {
         val candidates = keyUrlsFor(sourceUrl)
         if (candidates.isEmpty()) {
             return FetchResult.Failed(
@@ -121,13 +125,9 @@ object PluginSourceKeys {
         )
     }
 
-    /** The one real network leg: [PythonRuntimeManager]/[FlutterRuntimeManager]'s HttpURLConnection shape, capped at 64 KiB (a key file is well under 1 KiB). */
-    private fun httpGet(url: String): ByteArray? = runCatching {
-        val connection = (java.net.URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 30_000
-            readTimeout = 30_000
-        }
-        connection.connect()
+    /** The one real network leg: [GitHubAuth.open] (the user's GitHub token, on GitHub hosts only), capped at 64 KiB (a key file is well under 1 KiB). */
+    private fun fetchBytes(url: String, token: String?): ByteArray? = runCatching {
+        val connection = GitHubAuth.open(url, token, 30_000, 30_000)
         if (connection.responseCode != HttpURLConnection.HTTP_OK) return@runCatching null
         connection.inputStream.use { input ->
             val out = ByteArrayOutputStream()

@@ -1,9 +1,8 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
+import dev.droidtop.pluginhost.GitHubAuth
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.security.MessageDigest
 
 /**
@@ -24,13 +23,13 @@ internal object PlatformDatabaseTransport {
     private const val READ_TIMEOUT_MS = 30_000
 
     /** Fetches [url], throwing with a readable message on any non-200. */
-    fun get(url: String): String = getOrNull(url) ?: error("HTTP 404 from $url")
+    fun get(url: String, token: String? = null): String = getOrNull(url, token) ?: error("HTTP 404 from $url")
 
     /** Fetches [url], or null when the server says the file is not there. */
-    fun getOrNull(url: String): String? {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = CONNECT_TIMEOUT_MS
-        connection.readTimeout = READ_TIMEOUT_MS
+    fun getOrNull(url: String, token: String? = null): String? {
+        // [token] is the user's own GitHub token, given only by the plugin
+        // catalog; GitHubAuth attaches it to GitHub hosts and no others.
+        val connection = GitHubAuth.open(url, token, CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS)
         return try {
             when (val code = connection.responseCode) {
                 200 -> connection.inputStream.bufferedReader().use { it.readText() }
