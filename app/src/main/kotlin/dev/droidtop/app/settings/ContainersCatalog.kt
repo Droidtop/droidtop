@@ -304,7 +304,12 @@ object ContainersCatalog {
                             out.use { runtime.exportData(container, it) }
                         }
                         "Saved."
-                    }.getOrElse { "Not saved: ${it.message}" }
+                    }.getOrElse {
+                        // The picker already made the file; a half-written archive
+                        // that looks like a backup is worse than none.
+                        runCatching { android.provider.DocumentsContract.deleteDocument(ctx.contentResolver, uri) }
+                        "Not saved: ${it.message}"
+                    }
                 },
             ),
             DocumentPickItem(

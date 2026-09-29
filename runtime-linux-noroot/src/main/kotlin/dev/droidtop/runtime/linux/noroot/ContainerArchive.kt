@@ -4,6 +4,15 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE
+import java.nio.file.attribute.PosixFilePermission.OWNER_READ
 
 /**
  * Export and import of one proot container's rootfs as a tar stream
@@ -19,26 +28,11 @@ import java.io.OutputStream
 internal object ContainerArchive {
     private const val TAR = "/system/bin/tar"
 
-    /**
-     * Files the runtime writes itself at every session start and binds over
-     * the image's own (ProotRuntime.writeNetworkFiles), so they carry
-     * nothing worth keeping. The image's copy can also be unreadable to the
-     * app (tar stopped on "can't open ./etc/resolv.conf: Permission
-     * denied", Droidtop/tracker#81), which would fail the whole backup.
-     * Toybox matches --exclude against the member name as tar spells it,
-     * "./etc/resolv.conf" with the "." root used here.
-     */
-    private val RUNTIME_OWNED = listOf("etc/resolv.conf", "etc/hosts")
-
     /** Writes [rootfs] to [out] as a tar archive, entries relative to the rootfs root. */
     fun export(rootfs: File, out: OutputStream, errorLog: File) {
         require(rootfs.isDirectory) { "no rootfs at $rootfs" }
-        val command = buildList {
-            add(TAR); add("-cf"); add("-")
-            RUNTIME_OWNED.forEach { add("--exclude=./$it") }
-            add("-C"); add(rootfs.absolutePath); add(".")
-        }
-        val process = ProcessBuilder(command)
+        makeOwnerReadable(rootfs)
+        val process = ProcessBuilder(TAR, "-cf", "-", "-C", rootfs.absolutePath, ".")
             .redirectError(errorLog)
             .start()
         process.inputStream.use { it.copyTo(out) }
@@ -64,14 +58,39 @@ internal object ContainerArchive {
             // tar stopped reading: its own message says why
         }
         check(process.waitFor() == 0) { "tar failed: ${errorLog.readText().trim().take(400)}" }
-        // The session binds these over the guest's files, and proot needs
-        // the guest path to exist: an archive made without them still
-        // restores to a rootfs that starts.
-        if (File(into, "etc").isDirectory) {
-            for (name in RUNTIME_OWNED) {
-                val file = File(into, name)
-                if (!file.exists()) runCatching { file.createNewFile() }
+    }
+
+    /**
+     * proot makes an empty placeholder, with no permissions at all, at every
+     * bind target the image lacks (`/etc/resolv.conf`, `/run/droidtop-sockets`
+     * and the other binds of ProotRuntime), and a guest running as its
+     * fake root can chmod anything it owns. Toybox tar stops with "can't
+     * open ...: Permission denied" on the first such entry and fails the
+     * whole backup (Droidtop/tracker#81). Everything under [root] is the
+     * app's own, so give the owner back read (and search, for a directory)
+     * where it is missing; the archive then holds the placeholders as empty
+     * entries, which the binds cover again at the next start.
+     */
+    private fun makeOwnerReadable(root: File) {
+        Files.walkFileTree(root.toPath(), object : SimpleFileVisitor<Path>() {
+            override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                ownerAccess(dir, OWNER_READ, OWNER_EXECUTE)
+                return FileVisitResult.CONTINUE
             }
+
+            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                if (attrs.isRegularFile) ownerAccess(file, OWNER_READ)
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+        })
+    }
+
+    private fun ownerAccess(path: Path, vararg needed: PosixFilePermission) {
+        runCatching {
+            val have = Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS)
+            if (!have.containsAll(needed.toList())) Files.setPosixFilePermissions(path, have + needed)
         }
     }
 

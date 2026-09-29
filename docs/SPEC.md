@@ -2051,10 +2051,11 @@ the `ContainerRuntime` interface that already exists (§3):
   / `importData` stream the rootfs as a tar archive (`ContainerArchive`, via
   Android's own toybox `tar`, so symlinks and modes survive and there is no
   tar writer in the app; ownership is not carried, every file is the app's).
-  `/etc/resolv.conf` and `/etc/hosts` are left out: the session writes both
-  at every start and binds them over the image's, and the image's copy can be
-  unreadable to the app, which failed the whole backup; a restore recreates
-  them empty so the bind has its target.
+  proot leaves a permissionless placeholder at every bind target the image lacks
+  (`/etc/resolv.conf`, `/run/droidtop-sockets`, the shared-storage and extra-mount
+  paths) and toybox tar stops on the first unreadable entry, so the export first gives
+  the owner read (and search) where it is missing (`ContainerArchive.makeOwnerReadable`);
+  the placeholders are archived as the empty entries they are.
   The container must be stopped (the rows say so while it runs). A restore
   unpacks beside the container, refuses an archive with no `/etc` and `/usr`,
   and only then swaps it in, so a bad or truncated archive leaves the
