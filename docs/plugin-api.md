@@ -1531,6 +1531,18 @@ into the v2 shape at parse time, so the host has one model internally.
 - **The shim is deleted** together with contract 1 support. A later
   contract bump is announced in advance (§7).
 
+**As built (P0-2, #54).** `PLUGIN_CONTRACT_VERSION` is 2 and means "the
+highest manifest contract this build reads"; the v2 call envelope is not
+served yet, so a v2 plugin is reached through the v1 capability its
+`provides` maps to (`LegacyManifest.CAPABILITY_POINTS`), and a v2 plugin
+whose points map to none installs and is simply not called. Every v1
+plugin is derived `host.full_trust`, `apps.check(*)`, `apps.launch` and
+`apps.intents.out(any)` on top of the table's rows, because
+`PluginContext` and its own sockets give it all of that today, and that is
+what makes the approval screen say "Full access (older plugin)". A v1
+record re-derives its v2 set on every read; a v2 record stores the five
+arrays under the manifest's own keys (`V2Declarations`).
+
 **Compatibility promises:**
 
 1. Every v1 bundle that installs and runs today installs and runs after

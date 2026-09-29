@@ -3,8 +3,16 @@ package dev.droidtop.pluginhost
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** The plugin API/ABI contract version this build of droidtop speaks. Bump when [PluginApi] changes in a way an old plugin couldn't safely run against. */
-const val PLUGIN_CONTRACT_VERSION = 1
+/**
+ * The highest plugin contract version this build of droidtop reads
+ * (docs/plugin-api.md 7): 1 is today's capabilities and [PluginApi], 2
+ * adds the manifest fields in [V2Declarations]. A contract 1 manifest is
+ * translated to the 2 shape by [LegacyManifest.toV2], so both install and
+ * run; the v2 call envelope itself is not served yet, so v2 plugins are
+ * reached through the capabilities their `provides` maps to. Bump when
+ * [PluginApi] changes in a way an old plugin couldn't safely run against.
+ */
+const val PLUGIN_CONTRACT_VERSION = 2
 
 /** One payload file's declared hash (trust-boundary checklist point 1: every file, always, no "no hash recorded" skip). */
 data class PluginPayloadFile(val path: String, val sha256: String)
@@ -97,6 +105,13 @@ data class PluginManifest(
      * changes, which is most plugins.
      */
     val subscribedEvents: Set<String> = emptySet(),
+    /**
+     * The contract 2 fields: provides, permissions, subscribes, exports,
+     * requires. For a contract 1 manifest this is derived by
+     * [LegacyManifest.toV2] at parse time (never read from the manifest),
+     * so everything above the parser sees one model.
+     */
+    val v2: V2Declarations = V2Declarations.EMPTY,
 ) {
     companion object {
         private val REQUIRED_ABIS = setOf("arm64-v8a", "x86_64")
@@ -128,9 +143,13 @@ data class PluginManifest(
                     PluginCapability.fromId(capsJson.optString(i))?.let { add(it) }
                 }
             }
-            if (capabilities.isEmpty()) return null
             val contractVersion = json.optInt("contractVersion", -1)
             if (contractVersion < 0) return null
+            val declaredV2 = if (contractVersion >= 2) V2Declarations.fromJson(json) else V2Declarations.EMPTY
+            // A v2 plugin may declare only `provides`; the capabilities they map to are served like declared ones.
+            val allCapabilities = capabilities + LegacyManifest.capabilitiesFor(declaredV2.provides)
+            // A v2 plugin whose points map to no capability (a tray item) is still installable.
+            if (allCapabilities.isEmpty() && declaredV2.provides.isEmpty()) return null
             val payloadJson = json.optJSONArray("payload") ?: JSONArray()
             val payload = buildList {
                 for (i in 0 until payloadJson.length()) {
@@ -151,14 +170,14 @@ data class PluginManifest(
             val boundServiceTargets = buildSet { for (i in 0 until boundTargetsJson.length()) add(boundTargetsJson.optString(i)) }
             val subscribedEventsJson = json.optJSONArray("subscribedEvents") ?: JSONArray()
             val subscribedEvents = buildSet { for (i in 0 until subscribedEventsJson.length()) add(subscribedEventsJson.optString(i)) }
-            return PluginManifest(
+            val manifest = PluginManifest(
                 id = id,
                 origin = origin,
                 label = json.optString("label").ifBlank { id },
                 description = optNullableString(json, "description"),
                 version = json.optString("version").ifBlank { "0" },
                 kind = kind,
-                capabilities = capabilities,
+                capabilities = allCapabilities,
                 contractVersion = contractVersion,
                 requestsRoot = json.optBoolean("requestsRoot", false),
                 abis = abis,
@@ -167,9 +186,14 @@ data class PluginManifest(
                 payload = payload,
                 boundServiceTargets = boundServiceTargets,
                 subscribedEvents = subscribedEvents,
+                v2 = declaredV2,
             )
+            return manifest.withDerivedV2()
         }
     }
+
+    /** A contract 1 manifest gets its v2 declarations derived; a contract 2 one keeps what it declared. */
+    fun withDerivedV2(): PluginManifest = if (contractVersion >= 2) this else copy(v2 = LegacyManifest.toV2(this))
 
     /**
      * Structural problems [PluginBundleInstaller] refuses on, beyond the

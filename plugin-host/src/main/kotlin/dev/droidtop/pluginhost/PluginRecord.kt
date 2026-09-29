@@ -60,6 +60,8 @@ data class PluginRecord(
         // NO plugin's event hook could ever fire, regardless of what its
         // manifest declared.
         put("subscribedEvents", JSONArray(manifest.subscribedEvents.toList()))
+        // Contract 2 fields: the same keys the manifest uses, so PluginManifest and the record share one parser (V2Declarations).
+        manifest.v2.putInto(this)
         put(
             "payload",
             JSONArray(
@@ -127,7 +129,8 @@ data class PluginRecord(
                 payload = payload,
                 boundServiceTargets = boundServiceTargets,
                 subscribedEvents = subscribedEvents,
-            )
+                v2 = V2Declarations.fromJson(json),
+            ).withDerivedV2()
             val trust = runCatching { PluginTrustState.valueOf(json.optString("trust")) }.getOrNull() ?: PluginTrustState.PENDING
             return PluginRecord(
                 manifest = manifest,
