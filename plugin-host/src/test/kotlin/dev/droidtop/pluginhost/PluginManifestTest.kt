@@ -65,6 +65,30 @@ class PluginManifestTest {
     }
 
     @Test
+    fun `the app-bridge capabilities are in the closed set and parse round-trip`() {
+        // docs/SPEC.md 12a "App-bridge plugin contracts": a manifest
+        // declaring any of the four app-bridge capabilities parses, and
+        // each id round-trips through fromId -- the same closed-set
+        // membership the rejection test above guards from the other side.
+        val ids = listOf("sync_status", "input_profile", "app_updates", "presence")
+        ids.forEach { id ->
+            assertEquals(id, PluginCapability.fromId(id)!!.id)
+        }
+        val manifest = PluginManifest.fromJson(manifestJson(capabilities = ids))
+        assertNotNull(manifest)
+        assertEquals(
+            setOf(
+                PluginCapability.SYNC_STATUS,
+                PluginCapability.INPUT_PROFILE,
+                PluginCapability.APP_UPDATES,
+                PluginCapability.PRESENCE,
+            ),
+            manifest!!.capabilities,
+        )
+        assertTrue(manifest.structuralProblems().isEmpty())
+    }
+
+    @Test
     fun `rejects a payload entry with no hash`() {
         val json = manifestJson()
         val payload = json.getJSONArray("payload")

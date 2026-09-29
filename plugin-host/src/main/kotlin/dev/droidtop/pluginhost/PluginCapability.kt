@@ -52,6 +52,80 @@ enum class PluginCapability(val id: String, val display: String) {
      * "holds a live connection to that app" case).
      */
     APP_STATUS("app_status", "App status"),
+
+    /**
+     * A file-synchronization app's view of one folder (docs/SPEC.md 12a
+     * "App-bridge plugin contracts"; Syncthing reading its own local
+     * REST API is the named case -- all of that is plugin-side, droidtop
+     * never speaks the REST API itself). droidtop calls
+     * `invoke(SYNC_STATUS, {"action": "status", "path": <a real folder>})`
+     * before launching a game that lives in that folder, and warns when
+     * the answer carries conflicts. The answer's values, all optional
+     * but `conflicts` being the one that gates the warning:
+     * - `state` -- one short word (idle/syncing/error/...); droidtop
+     *   shows it, it never parses it;
+     * - `progress` -- 0-100;
+     * - `conflicts` -- a count; anything non-zero warns before launch,
+     *   exactly as droidtop's own built-in fallback (a
+     *   `*.sync-conflict-*` file scan) already does when no
+     *   sync_status plugin is installed;
+     * - `details` -- one complete sentence, the same convention
+     *   [SETTINGS_ROWS] fixed.
+     */
+    SYNC_STATUS("sync_status", "Sync status"),
+
+    /**
+     * Applies a per-game input/key-remapping profile (docs/SPEC.md 12a
+     * "App-bridge plugin contracts"; a Key Mapper app is the named
+     * case -- talking to it is plugin-side, via
+     * [PluginContext.launchAppWithExtras] or a service declared in
+     * [PluginManifest.boundServiceTargets]). droidtop fires
+     * `invoke(INPUT_PROFILE, {"action": "apply", "gameId", "title",
+     * "kind", "systemId", "path"})` on EVERY launch path -- from
+     * [Library.launch][dev.droidtop.library.Library.launch], so
+     * launcher pins, the Gaming shell, Desktop and deep links behave
+     * identically -- fire-and-forget on background IO, never blocking
+     * the launch on a binder call, and `{"action": "clear", ...same
+     * facts}` when the shell gains foreground again (the game session
+     * ended). droidtop's own built-in fallback is its per-game
+     * controller notes (shown to the player instead of applied); this
+     * capability is the automated equivalent.
+     */
+    INPUT_PROFILE("input_profile", "Input profile"),
+
+    /**
+     * An update tracker's view of installed apps' pending updates
+     * (docs/SPEC.md 12a "App-bridge plugin contracts"; Obtainium
+     * reading its own tracked-apps data is the named case).
+     * `invoke(APP_UPDATES, {"action": "updates"})` answers
+     * `values["updates"]` = a JSON array string of objects
+     * `{package, installed, latest, url?}`. droidtop filters that to
+     * the packages its players database names and shows the rest as
+     * rows in its one Settings area and on a system's Player choice
+     * screen -- the whole answer is untrusted input like any plugin
+     * result (12a trust point 5): displayed, size-capped, never used as
+     * a path or intent target beyond a plain browser `url`. When no
+     * app_updates plugin is installed, droidtop's own built-in
+     * fallback checks the known-repo emulators against GitHub's
+     * releases/latest API itself.
+     */
+    APP_UPDATES("app_updates", "App updates"),
+
+    /**
+     * Sets and clears a "Playing \<game\>" presence on a chat platform
+     * (docs/SPEC.md 12a "App-bridge plugin contracts"; Discord is the
+     * named case, and the plugin is expected to reach the Discord APP
+     * where the owner's "where possible" holds -- e.g. the official
+     * Social SDK route SPEC §7e already records, or the app's own
+     * surfaces). droidtop fires `invoke(PRESENCE, {"action": "set",
+     * "game": <title>})` on every launch and `invoke(PRESENCE,
+     * {"action": "clear"})` on return to the shell, from the same
+     * fire-and-forget path [INPUT_PROFILE] uses. droidtop's own
+     * built-in fallback (a user-signed-in Discord session and the
+     * documented gateway protocol, off by default) runs when no
+     * presence plugin is installed.
+     */
+    PRESENCE("presence", "Presence"),
     ;
 
     companion object {
