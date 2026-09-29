@@ -207,6 +207,17 @@ data class LibraryEntry(
      * One folder cannot know this; the game can.
      */
     val availableUpdate: String? = null,
+    /**
+     * Set only on Switch rows, by [SwitchGameGrouping.fold]: what this
+     * game's update and DLC files add up to (docs/SPEC.md 7m, "Switch
+     * content"), or -- [SwitchGameFacts.loose] -- that this row is
+     * itself an update/DLC whose base game is not in the library. Null
+     * for everything that is not Switch content, including a Switch
+     * file classification had nothing verifiable to say about. A
+     * display fact, not a scan fact: it is re-derived from the files on
+     * every fold, never persisted.
+     */
+    val switchFacts: SwitchGameFacts? = null,
     // The rest of a game's scraped flavour (docs/SPEC.md 7h), read back
     // by withScrapedMetadata like the ES-DE fields above: its series, its
     // links, and which source each field came from.

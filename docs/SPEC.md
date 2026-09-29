@@ -9801,6 +9801,63 @@ a split on the store row's own options). `LibraryGrouping` and
 `Library.mergeGames` stay the one mechanism for it; there is no second
 grouping. Two folds are not the person's to split: the shared store id of
 a folder that is a store's install, and a shared F95 thread.
+### Switch content: an update and a DLC are parts of one game (2026-09-29)
+
+A Switch library is not folders but packages, and a package knows what it
+is without being opened: a title ID is 16 hex characters whose LAST THREE
+say what the content is -- `...000` the base game, `...800` its update,
+anything else an add-on (DLC) whose own index that suffix is. The base
+game all three belong to is the ID with its suffix replaced by `000`.
+`0100123456789000` is therefore the base, `0100123456789800` its update
+and `0100123456789001` its first add-on.
+
+`SwitchContent` reads that ID from exactly two places, both outside the
+crypto, in this order:
+
+1. a `[TitleID]` tag in the filename (the `[TitleID][vN][DLC]`
+   convention scene release names carry), which also yields the `[vN]`
+   version tag;
+2. the ticket's NAME inside a PFS0 container (.nsp/.nsz): a ticket is
+   named `<rights id>.tik` and a rights id is the title ID followed by
+   its master-key revision, so the first 16 characters of the name are
+   the title ID. Only the PFS0 file TABLE (a few KB at the head of the
+   file) is read to learn the name. The ticket's own BYTES are never
+   opened -- they are the one part of a Switch package that carries key
+   material, and droidtop never reads, writes or ships console keys.
+
+Past those two, only the file's own nature: a cartridge dump (.xci/.xcz)
+is base content; an explicit `[DLC]` tag without a title ID says DLC and
+nothing more. An .nsp/.nsz with no tag and no readable ticket says
+NOTHING -- it stays its own row exactly as before this section existed,
+rather than becoming a pretend base game.
+
+What the answer is FOR is the fold, `SwitchGameGrouping`: an update and
+a DLC are parts of ONE game and never games of their own. The fold keys
+on the title ID alone, never on a name -- `Zelda [01007ef00011e800]` and
+`Breath of the Wild [01007ef00011e000]` are the same game under two
+names, so no naming rule may be allowed to match them. One row per base
+game carries `SwitchGameFacts` (its update and which version tag the
+filename carried, how many ADD-ON PACKAGES it has -- by index, not by
+file count -- and where those files are); the update and DLC files fold
+away. A part whose base game is not in the library stays its own row,
+marked `loose`: droidtop has nowhere to put it and hiding a file the
+person owns is not an option. The gaming shell draws the folded list
+(every gamelist and collection resolves against it, one fold for all
+surfaces, computed off the main thread like the PC fold; per-file
+classification is cached by modification time so a re-fold costs a stat,
+not a header read), and the base game's detail says what its files add
+up to -- "Update v131072 · 2 DLC" -- in `SwitchGameFacts.line()`.
+
+Three gamelist filters read the same facts (`GamelistFilter`): **Has
+DLC**, **Missing update** (a base game with no update beside it -- the
+row that can honestly say so, since an unidentifiable file claims
+nothing), and **DLC without base game** (the loose rows).
+
+Two honest boundaries: droidtop's platforms database decides which
+extensions scan as Switch content at all, so a format it does not list
+never reaches this fold; and the classification says nothing about a
+base game it cannot identify, so updates for such a file read as loose
+rather than folding by guesswork.
 
 ## 8. Licensing
 

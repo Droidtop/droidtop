@@ -56,12 +56,20 @@ enum class GamelistSort(val label: String) {
  * Which games a gamelist shows (the GuiGamelistFilter idea, kept to the
  * states droidtop actually stores per game). Persisted per group like
  * the sort order, so a filtered list stays filtered on the way back.
+ *
+ * The last three read [LibraryEntry.switchFacts] (docs/SPEC.md 7m,
+ * "Switch content"), so on a non-Switch gamelist they simply match
+ * nothing -- the same honest nothing a "Favorites" filter says on a
+ * list with no favourites.
  */
 enum class GamelistFilter(val label: String) {
     ALL("All games"),
     FAVORITES("Favorites"),
     COMPLETED("Completed"),
     UNPLAYED("Never played"),
+    HAS_DLC("Has DLC"),
+    MISSING_UPDATE("Missing update"),
+    LOOSE_DLC("DLC without base game"),
     ;
 
     fun matches(entry: LibraryEntry): Boolean = when (this) {
@@ -69,6 +77,12 @@ enum class GamelistFilter(val label: String) {
         FAVORITES -> entry.favorite
         COMPLETED -> entry.completed
         UNPLAYED -> entry.lastPlayedEpochMs == null
+        HAS_DLC -> entry.switchFacts?.let { it.dlcCount > 0 } == true
+        // A Switch game classification could say nothing about is not
+        // "missing" anything -- only a row known to be a base game
+        // without an update beside it is.
+        MISSING_UPDATE -> entry.switchFacts?.let { !it.loose && !it.hasUpdate } == true
+        LOOSE_DLC -> entry.switchFacts?.loose == true
     }
 }
 
