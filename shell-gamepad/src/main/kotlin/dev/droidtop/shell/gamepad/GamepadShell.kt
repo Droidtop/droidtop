@@ -208,6 +208,22 @@ fun GamepadShell(
     val processAppEntries by appScanState.collectAsStateWithLifecycle()
     var gameEntries by remember { mutableStateOf<List<LibraryEntry>?>(processGameEntries) }
     var appEntries by remember { mutableStateOf<List<LibraryEntry>?>(processAppEntries) }
+    // The games every surface of this shell draws, with Switch updates
+    // and DLC folded into their base game's row (docs/SPEC.md 7m,
+    // "Switch content"): the gamelist draws one card per game, the
+    // detail of the base game is the row that knows what its parts
+    // are, and no surface can disagree with another because there is
+    // ONE fold, not one per screen. Off the main thread like the PC
+    // fold inside GamesSection, because classification reads each
+    // container's file table; null until the first fold is done, so
+    // Games draws its spinner rather than updates standing briefly as
+    // games of their own.
+    val foldedGameEntries by produceState<List<LibraryEntry>?>(initialValue = null, gameEntries) {
+        val games = gameEntries ?: return@produceState
+        value = withContext(Dispatchers.Default) {
+            dev.droidtop.library.SwitchGameGrouping.fold(games)
+        }
+    }
     // Bumped by the real, user-facing "Rescan library" Settings action --
     // included in both LaunchedEffect keys below so bumping it restarts
     // both collections against Library.rescanKindsProgressive instead of
@@ -275,9 +291,15 @@ fun GamepadShell(
     // open and the scan says what that entry is. An entry a rescan no
     // longer finds closes its own detail instead of showing a game that
     // is not there any more.
-    val detailEntry = remember(nav.detailId, gameEntries, appEntries) {
+    val detailEntry = remember(nav.detailId, gameEntries, appEntries, foldedGameEntries) {
         nav.detailId?.let { id ->
-            gameEntries.orEmpty().firstOrNull { it.id == id } ?: appEntries.orEmpty().firstOrNull { it.id == id }
+            // The folded row first: for a Switch base game it is the row
+            // that knows the game's update and DLC; its id is the base
+            // file's own, so the raw lookup behind it still finds the
+            // same game when the fold has not run or said nothing.
+            foldedGameEntries.orEmpty().firstOrNull { it.id == id }
+                ?: gameEntries.orEmpty().firstOrNull { it.id == id }
+                ?: appEntries.orEmpty().firstOrNull { it.id == id }
         }
     }
     // What A does on the open detail's focused element, reported by the
@@ -896,7 +918,7 @@ fun GamepadShell(
                         // own window arrives. Checked FIRST so it covers the
                         // detail screen the launch was triggered from.
                         screensaverOn -> {
-                            Screensaver(gameEntries.orEmpty()) {
+                            Screensaver(foldedGameEntries.orEmpty()) {
                                 screensaverOn = false
                                 lastInputMs.value = android.os.SystemClock.elapsedRealtime()
                             }
@@ -956,11 +978,11 @@ fun GamepadShell(
                         // gameEntries/appEntries' own comment) -- Games' spinner no
                         // longer has anything to do with whether Apps is ready, and
                         // vice versa.
-                        shownSection == GamingSection.GAMES && gameEntries == null -> CircularProgressIndicator(color = MenuTokens.OnSurface)
+                        shownSection == GamingSection.GAMES && (gameEntries == null || foldedGameEntries == null) -> CircularProgressIndicator(color = MenuTokens.OnSurface)
                         shownSection == GamingSection.APPS && appEntries == null -> CircularProgressIndicator(color = MenuTokens.OnSurface)
                         else -> when (shownSection) {
                             GamingSection.GAMES -> GamesSection(
-                                entries = gameEntries.orEmpty().let { all ->
+                                entries = foldedGameEntries.orEmpty().let { all ->
                                     if (uiMode.kidGamesOnly) all.filter { it.kidGame } else all
                                 },
                                 library = library,
@@ -1246,6 +1268,13 @@ private fun EntryDetailScreen(
         }
         if (entry.playtimeSeconds > 0) {
             Text("Played ${entry.playtimeSeconds / 60} min", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
+        }
+        // What this game's Switch files add up to -- "Update v131072 ·
+        // 2 DLC", or, for a row that is itself an update/DLC whose base
+        // game is missing, that fact. Empty (and so drawn not at all)
+        // for a base game with nothing beside it.
+        entry.switchFacts?.line()?.takeIf { it.isNotEmpty() }?.let {
+            Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
         }
         val detailScope = rememberCoroutineScope()
         // Scrolls rather than clipping: on a phone the chips outgrow the
