@@ -1318,7 +1318,7 @@ object AppSettingsCatalogs {
     private fun accountsAndSourcesScreen() = CatalogScreen(
         id = SCREEN_ACCOUNTS_AND_SOURCES,
         title = "Accounts and sources",
-        subtitle = "Every account, scraper, plugin and integration droidtop can use -- one row per source, its status and its actions",
+        subtitle = "Every account, scraper, plugin and integration droidtop can use — one row per source, its status and its actions",
         groups = { context -> accountsAndSourcesGroups(context) },
     )
 
@@ -1737,7 +1737,7 @@ object AppSettingsCatalogs {
     private fun pluginsScreen() = CatalogScreen(
         id = SCREEN_PLUGINS,
         title = "Plugins",
-        subtitle = "Real code, run in its own process and approved by you -- for crash containment, not as a security sandbox",
+        subtitle = "Real code, run in its own process and approved by you — for crash containment, not as a security sandbox",
         groups = { context -> pluginsGroups(context) },
     )
 
@@ -1785,9 +1785,13 @@ object AppSettingsCatalogs {
                             add(
                                 ActionItem(
                                     id = "plugins_updates_status",
-                                    title = if (updates.isEmpty()) "Up to date" else "${updates.size} update${if (updates.size == 1) "" else "s"} available",
+                                    title = when {
+                                        cachedIndex == null -> "Catalog not fetched yet"
+                                        updates.isEmpty() -> "Up to date"
+                                        else -> "${updates.size} update${if (updates.size == 1) "" else "s"} available"
+                                    },
                                     subtitle = if (cachedIndex == null) {
-                                        "Catalog not fetched yet -- open Add to check"
+                                        "Open Add > Browse catalog to check"
                                     } else {
                                         updates.joinToString { (record, release) -> "${record.manifest.label} -> ${release.version}" }
                                             .ifEmpty { "Every installed plugin matches the catalog's latest stable release" }
@@ -1877,7 +1881,7 @@ object AppSettingsCatalogs {
             id = "plugin_${m.id}",
             title = m.label,
             subtitle = pluginSummary(m) + " - " + trustBadge,
-            inline = pluginDetailScreen(m.id),
+            inline = pluginDetailScreen(m.id, m.label),
             valueLabel = { state },
         )
     }
@@ -1887,11 +1891,11 @@ object AppSettingsCatalogs {
      * what it does, its trust and running state, approve/deny/enable,
      * what a python/flutter-kind plugin still needs before it can run,
      * its version and any catalog update, and Uninstall -- with the
-     * fingerprint-and-digest technical fields set apart under "Details"
-     * rather than mixed into the status line. Permission grant/revoke
-     * per plugin is agent pluginapi's model landing separately
-     * (docs/plugin-api.md); this page has the seam (the "What it can
-     * do" group below) but no controls yet -- nothing here should invent
+     * id, origin and digest technical fields behind the page's own
+     * Advanced fold at the bottom, off the page's face. Permission
+     * grant/revoke per plugin is agent pluginapi's model landing separately
+     * (docs/plugin-api.md); this page has the seam (the "What it
+     * provides" group below) but no controls yet -- nothing here should invent
      * a permissions UI ahead of that data actually existing.
      *
      * `groups` re-reads [PluginStore] and the cached catalog index fresh
@@ -1900,9 +1904,9 @@ object AppSettingsCatalogs {
      * back always shows the current record, never one captured when the
      * parent list was built.
      */
-    private fun pluginDetailScreen(pluginId: String) = CatalogScreen(
+    private fun pluginDetailScreen(pluginId: String, label: String) = CatalogScreen(
         id = "plugin_detail_$pluginId",
-        title = pluginId,
+        title = label,
         groups = { context ->
             withContext(Dispatchers.IO) {
                 val record = PluginStore.installed(context).firstOrNull { it.manifest.id == pluginId }
@@ -2055,8 +2059,7 @@ object AppSettingsCatalogs {
             add(
                 ActionItem(
                     id = "plugin_${m.id}_provides",
-                    title = "What it provides",
-                    subtitle = pluginSummary(m),
+                    title = pluginSummary(m),
                     run = {},
                 ),
             )
@@ -2160,7 +2163,7 @@ object AppSettingsCatalogs {
             )
         }
 
-        val detailsGroup = listOf(
+        val advancedGroup = listOf(
             ActionItem(id = "plugin_${m.id}_id", title = "Plugin id", subtitle = m.id, run = {}),
             ActionItem(id = "plugin_${m.id}_origin", title = "Origin", subtitle = m.origin, run = {}),
             ActionItem(id = "plugin_${m.id}_digest", title = "Archive digest", subtitle = record.archiveDigest, run = {}),
@@ -2173,7 +2176,6 @@ object AppSettingsCatalogs {
             CatalogGroup(id = "plugin_${m.id}_provides_group", title = "What it provides", items = providesGroup),
             if (runtimeGroup.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_runtime_group", title = "Runtime", items = runtimeGroup),
             CatalogGroup(id = "plugin_${m.id}_update_group", title = "Version", items = updateGroup),
-            CatalogGroup(id = "plugin_${m.id}_details_group", title = "Details", items = detailsGroup),
             CatalogGroup(
                 id = "plugin_${m.id}_uninstall_group",
                 title = null,
@@ -2186,6 +2188,7 @@ object AppSettingsCatalogs {
                     ),
                 ),
             ),
+            CatalogGroup(id = "plugin_${m.id}_advanced_group", title = "Advanced", items = advancedGroup),
         )
     }
 
@@ -2386,7 +2389,7 @@ object AppSettingsCatalogs {
         )
     }
 
-    /** What a plugin adds, in plain words, for the installed-list row. */
+    /** What a plugin adds, in plain words, for the installed-list row and the detail page's provides row. */
     private fun pluginSummary(m: dev.droidtop.pluginhost.PluginManifest): String =
         m.v2.provides.mapNotNull { ExtensionPoints.find(it.point)?.label }.distinct().joinToString()
             .ifEmpty { m.capabilities.joinToString { it.display } }
