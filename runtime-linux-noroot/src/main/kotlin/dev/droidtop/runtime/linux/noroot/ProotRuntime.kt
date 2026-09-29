@@ -770,12 +770,9 @@ class ProotRuntime(
          * rootfs.
          */
         private const val BWRAP_SHIM =
-            "#!/bin/sh
-" +
-                "echo 'bwrap: No permissions to create a new namespace (proot cannot give one)' >&2
-" +
-                "exit 1
-"
+            "#!/bin/sh\n" +
+                "echo 'bwrap: No permissions to create a new namespace (proot cannot give one)' >&2\n" +
+                "exit 1\n"
 
         /**
          * Every guest process's starting environment. `env -i` means
