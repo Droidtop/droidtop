@@ -2536,7 +2536,14 @@ object AppSettingsCatalogs {
                             id = "plugin_keys_manual_key",
                             title = "Public key",
                             subtitle = "Base64 of the P-256 public key (X.509 SubjectPublicKeyInfo), as its author publishes it",
-                            value = pendingKeyManualKey,
+                            // The value column beside a row's title is narrow:
+                            // the whole ~124-char base64 squeezed this row's
+                            // title and description out of the row once one
+                            // was saved (the Origin id row above kept both,
+                            // Droidtop/tracker#51), so the row shows a
+                            // truncated prefix and the buffer keeps the full
+                            // key "Add this key" below reads.
+                            value = pendingKeyManualKey.take(16) + if (pendingKeyManualKey.length > 16) "…" else "",
                             multiline = true,
                             onChange = { _, v -> pendingKeyManualKey = v.trim() },
                         ),
