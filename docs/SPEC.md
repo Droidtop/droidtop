@@ -5553,6 +5553,18 @@ otherwise it changes nothing for anyone who has already scanned.
 `game_metadata` and the collection tables are preserved -- favorites,
 completed flags and collection membership are real user data.
 
+That preservation is not a claim but a walked path: `RomDatabaseMigrationTest`
+(`:library-core`) builds a database exactly as a real v3 install had it, puts a
+favourite-and-completed row in `game_metadata`, and runs every real migration
+object from `MIGRATION_3_4` through `MIGRATION_10_11` forward over it, ending
+with Room's own post-migration schema validation against the current entities.
+The row must arrive with its values and the six `MIGRATION_9_10` columns
+(series, links, field_sources, hero_path, logo_path, icon_path) must arrive
+present, nullable, and null. A version bump extends that walk in the same
+change or CI goes red: since `RomDatabase` falls back to a destructive wipe
+when a bump has no migration path, this test is the only thing standing
+between a missed bump and a user's library edits.
+
 ## 7e3. Lutris install-script integration (directed 2026-08-30, scoped and built 2026-09-25)
 
 Beyond cover art (§7h's Lutris scraper source), lutris.net's real public
