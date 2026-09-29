@@ -262,9 +262,7 @@ object DroidtopWideSettings {
      * device supports more than one user and a Settings activity answers.
      */
     private fun usersItem(context: Context): ActionItem? {
-        if (android.os.Build.VERSION.SDK_INT >= 31 &&
-            !android.os.UserManager.supportsMultipleUsers()
-        ) return null
+        if (!android.os.UserManager.supportsMultipleUsers()) return null
         val intent = Intent("android.settings.USER_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (context.packageManager.resolveActivity(intent, 0) == null) return null
         return ActionItem(
