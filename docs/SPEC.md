@@ -9959,6 +9959,26 @@ holding both; ABI splits also build an `x86_64`-only APK, uploaded but not
 published, for x86 devices whose package manager installs the universal
 APK as arm64 under ARM translation (`app/build.gradle.kts`, `splits`).
 
+**Dependency versions.** One version source per dependency: module
+build files name catalog aliases, never inline version strings.
+droidtop's own modules read the `libs` catalog
+(`gradle/libs.versions.toml`); the trees compiled out of `vendor/` keep
+the fork's own catalog (`vendor/gamenative/gradle/libs.versions.toml`,
+registered as the second catalog `gn` in `settings.gradle.kts`) so
+their versions track the fork through the ordinary vendor sync instead
+of a hand-maintained duplicate that drifts. A deliberate divergence
+from a vendored version is a settings-level override next to that
+registration (`version("dagger-hilt", "2.57.2")`), never an edit under
+`vendor/`. The build's one SNAPSHOT dependency is
+`io.github.joshuatam:javasteam` (the vendored JavaSteam tree,
+`:runtime-windows`), and it stays one by decision (2026-09-26): the
+fork (github.com/joshuatam/JavaSteam, branch `gamenative-latest`) has
+published no tag and no release, and Maven Central holds nothing
+under `io.github.joshuatam`, so the artifact exists only in Sonatype's
+`maven-snapshots` repository, which `settings.gradle.kts` declares
+for exactly that dependency. The pin moves onto a fixed artifact when
+the fork cuts a real tag; no guessing a version meanwhile.
+
 ## 10b. Releases and updates (directed 2026-09-02)
 
 Distribution is three different problems wearing one word, and each gets the
