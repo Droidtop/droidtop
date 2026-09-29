@@ -118,6 +118,7 @@ import dev.droidtop.shell.gamepad.theme.esDeTransitionContext
 import dev.droidtop.shell.gamepad.theme.esDeTransitionKind
 import dev.droidtop.shell.gamepad.theme.esDeViewTransition
 import dev.droidtop.shell.gamepad.theme.ThemePrefs
+import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -313,6 +314,12 @@ fun GamepadShell(
     // Real user-visible launch-failure state -- see launchError's render
     // site. A failed launch must inform, never kill.
     var launchError by remember { mutableStateOf<String?>(null) }
+    // Live setup progress for the same launch path (Droidtop/tracker#140):
+    // what a Windows setup is fetching and how far along it is. A
+    // different state from launchError because it is not a failure --
+    // painted as one, the system-files download read as an error the
+    // person never asked for. Cleared when the attempt ends either way.
+    var launchProgress by remember { mutableStateOf<String?>(null) }
     // The fixable half of a launch failure: which system had no
     // emulator, so the banner can offer to go get one.
     var missingEmulator by remember {
@@ -403,6 +410,39 @@ fun GamepadShell(
         )
     }
 
+    // The Windows system-files offer's pending answer
+    // (Droidtop/tracker#140): non-null while the offer is on screen, and
+    // calling it IS the answer -- it resumes the consent ask
+    // PcRunnerOptions.runAction is suspended on. The same
+    // registered-hook shape as LaunchDisplay.chooser above, for the same
+    // reason: library-core cannot reach a dialog, so the shell leaves a
+    // hook here and renders the question itself. Installed only while
+    // this composition is live; a process with no shell keeps the gate
+    // open, because its callers (Settings' setup row, the Steam
+    // sign-in's button) are themselves the explicit ask.
+    var windowsSetupAnswer by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        dev.droidtop.library.PcRunnerOptions.windowsSetupConsent = {
+            kotlinx.coroutines.suspendCancellableCoroutine { ask ->
+                windowsSetupAnswer = { download ->
+                    windowsSetupAnswer = null
+                    // The isActive guard is LauncherSearch's rule: the
+                    // answer fires once, and a second activation (or an
+                    // answer racing the composition going away) must not
+                    // resume a continuation that is no longer suspended.
+                    if (ask.isActive) ask.resume(download)
+                }
+            }
+        }
+        onDispose { dev.droidtop.library.PcRunnerOptions.windowsSetupConsent = null }
+    }
+    windowsSetupAnswer?.let { answer ->
+        WindowsSetupOfferDialog(
+            onDownload = { answer(true) },
+            onNotNow = { answer(false) },
+        )
+    }
+
     // The actual dispatch: unchanged for every entry, PC and engine games
     // included -- once something has decided this game IS ready, it
     // launches exactly the same way a console ROM does.
@@ -444,12 +484,22 @@ fun GamepadShell(
         if (entry.isPcOrEngineGame) {
             scope.launch {
                 launchError = null
+                launchProgress = null
                 dev.droidtop.library.PcRunnerOptions.resolveAndPlay(
                     context = context,
                     entry = entry,
                     onLaunch = { dispatchLaunch(entry) },
-                    onStatus = { message -> launchError = message },
+                    // Progress, not failure: the setup's own live lines,
+                    // which stay until the attempt ends. A successful
+                    // Windows setup ends with nothing more to say -- the
+                    // next A press launches, exactly as the offer said.
+                    onStatus = { message -> launchProgress = message },
+                    onFailure = { message ->
+                        launchProgress = null
+                        launchError = message
+                    },
                 )
+                launchProgress = null
             }
         } else {
             dispatchLaunch(entry)
@@ -777,6 +827,24 @@ fun GamepadShell(
                 onSelect = selectSection,
                 onQuickMenu = { quickMenuOpen = true },
                 sections = sectionsFor(uiMode),
+            )
+        }
+        // Live setup progress (Droidtop/tracker#140): the launch path's
+        // own lines about what a Windows setup is fetching, drawn as
+        // chrome rather than as the failure banner below -- a
+        // several-minute download painted red is exactly how the
+        // system-files setup came to read as an error nobody asked for.
+        // No self-dismiss: the line stays honest for as long as the
+        // attempt runs, and onLaunch clears it when the attempt ends.
+        launchProgress?.let { message ->
+            Text(
+                message,
+                color = MenuTokens.OnSurface,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MenuTokens.HintBar)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
         // Launch-failure banner (see onLaunch's crash boundary): visible,

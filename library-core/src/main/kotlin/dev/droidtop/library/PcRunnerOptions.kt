@@ -21,6 +21,25 @@ import java.io.File
 object PcRunnerOptions {
 
     /**
+     * The shell's consent gate for the one setup action that downloads
+     * hundreds of megabytes ([RunnerAction.SET_UP_WINDOWS_GAMES], which
+     * provisions Wine and the Windows base system). The launch path
+     * pressing a game into readiness must stop on an offer that names
+     * what will be fetched and lets the person decline -- a download is
+     * not something A on a game row may start on its own
+     * (Droidtop/tracker#140).
+     *
+     * A suspend function because the answer is a person's: [runAction]
+     * cannot proceed until it comes back. Null in a process with no
+     * shell installed means the caller was itself the explicit ask --
+     * the Settings row states the cost in its subtitle before it runs,
+     * the Steam sign-in's setup button likewise -- so the gate stays
+     * open and provision runs as it always did.
+     */
+    @Volatile
+    var windowsSetupConsent: (suspend () -> Boolean)? = null
+
+    /**
      * The folder this entry's runners work on: an engine entry IS its
      * folder, and a store or folder-scanned entry carries its install
      * directory in [PcInfo]. Null when a store game is not installed --
@@ -101,11 +120,16 @@ object PcRunnerOptions {
         RunnerAction.INSTALL_ENGINEHOST_PLUGIN, RunnerAction.CHOOSE_ENGINE_VERSION -> configureWithEnginehost(context, entry)
         RunnerAction.SET_UP_WINDOWS_GAMES -> {
             val runtime = PcGameRuntimeRegistry.runtime
-            if (runtime == null) {
-                "droidtop's PC runtime isn't registered in this process."
-            } else {
-                val result = runtime.provision(GamesRoots.current(context), onStatus)
-                if (result.succeeded) null else result.detail
+            when {
+                runtime == null ->
+                    "droidtop's PC runtime isn't registered in this process."
+                // Declined is not a failure: nothing was fetched, and the
+                // offer's own going away is the whole answer.
+                windowsSetupConsent?.invoke() == false -> null
+                else -> {
+                    val result = runtime.provision(GamesRoots.current(context), onStatus)
+                    if (result.succeeded) null else result.detail
+                }
             }
         }
     }
@@ -121,6 +145,15 @@ object PcRunnerOptions {
      * here rather than duplicated, now that A on the gamelist needs it
      * too and the fixed detail screen it used to live on alone is gone.
      *
+     * The two callbacks are separate because they are not the same kind
+     * of line: [onStatus] carries the setup action's live progress (the
+     * Windows system-files download naming what it is fetching and how
+     * far along it is), [onFailure] the one line that ends a failed
+     * attempt. Rendering progress as failure is how the system-files
+     * download used to look like an error the person never asked for
+     * (Droidtop/tracker#140); the default keeps them together for any
+     * caller that has one slot.
+     *
      * Touches the filesystem/PM ([forEntry]), so callers already call
      * this off the main thread or from a coroutine that does.
      */
@@ -129,6 +162,7 @@ object PcRunnerOptions {
         entry: LibraryEntry,
         onLaunch: () -> Unit,
         onStatus: (String) -> Unit = {},
+        onFailure: (String) -> Unit = onStatus,
     ) {
         val runner = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             resolvedFor(context, entry, forEntry(context, entry))
@@ -138,9 +172,9 @@ object PcRunnerOptions {
             runner?.option?.state == RunnerState.READY -> onLaunch()
             setupAction != null -> {
                 val failure = runAction(context, entry, setupAction, onStatus)
-                if (failure != null) onStatus(failure)
+                if (failure != null) onFailure(failure)
             }
-            else -> onStatus(runner?.option?.reason ?: "No runner on this device offers this game")
+            else -> onFailure(runner?.option?.reason ?: "No runner on this device offers this game")
         }
     }
 

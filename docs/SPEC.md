@@ -8455,6 +8455,21 @@ from this:
   (`PcRunnerOptions.resolveAndPlay`, called from `GamepadShell`'s
   `onLaunch`) rather than inside a screen of its own, so the gamelist's A
   and `PcGameMenu`'s own "Play"/"Set up" row can never disagree.
+  **One exception (2026-09-29, Droidtop/tracker#140):** the Windows
+  system-files setup is the one action that downloads several hundred
+  megabytes, so the press alone never starts it. Both implicit routes --
+  A on a not-yet-set-up Windows game, and the menu's own "Set up" row --
+  stop on an offer that names what would be fetched (Wine and the
+  Windows base system) and its size, and declines cleanly
+  (`PcRunnerOptions.windowsSetupConsent`, installed by the shell the
+  same way `LaunchDisplay.chooser` is; a process with no shell keeps the
+  gate open, because its callers — Settings' setup row, the Steam
+  sign-in's button — state the cost before the press). Once accepted,
+  the setup's own progress lines render as chrome, not as the red
+  launch-failure banner they used to share: a multi-minute download
+  painted as an error is what made the silent start read as a crash
+  (rig, build 1101: "Installing Windows system files... 0%" on a red
+  banner, no prompt — verify-2026-09-29/bst/w1.png).
 - **The PC gamelist is an EXPANDED themed view, not a plain one.** It is
   still the active theme's own gamelist -- its element positions, sizes,
   variants, aspect ratios, fonts and colours, exactly as any console
