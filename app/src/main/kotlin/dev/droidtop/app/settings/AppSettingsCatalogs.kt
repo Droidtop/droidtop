@@ -187,14 +187,20 @@ object AppSettingsCatalogs {
     // Console systems: per-folder system/player/scrape management.
     // ------------------------------------------------------------------
 
-    private fun consoleSystemsScreen() = CatalogScreen(
+    private fun consoleSystemsScreen(systemId: String? = null) = CatalogScreen(
         id = SCREEN_CONSOLE_SYSTEMS,
         title = "Console systems",
         subtitle = "Each folder's system comes from its name; open a folder to change it",
-        groups = { context -> consoleSystemsGroups(context) },
+        groups = { context -> consoleSystemsGroups(context, systemId) },
+        // The per-system deep link the gamelist options menu's "System
+        // settings" row opens (docs/SPEC.md "One consistent way into
+        // Settings"): the SAME builder re-opened with the system id the
+        // menu was opened from -- one screen, parameterized, never a
+        // second folder/emulator picker.
+        forDeepLink = { deepLinkedSystemId -> consoleSystemsScreen(deepLinkedSystemId) },
     )
 
-    private suspend fun consoleSystemsGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+    private suspend fun consoleSystemsGroups(context: Context, systemId: String? = null): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         // The library's own answer (SystemFolders), not a second walk:
         // the folders it scans as console systems, plus the ones the person
@@ -208,6 +214,27 @@ object AppSettingsCatalogs {
         val classifiedFolders = mutableListOf<Pair<File, FolderKind>>()
         for (folder in rawFolders) {
             classifiedFolders += folder to classifyFolder(context, folder, systemsById)
+        }
+        // The per-system deep link (docs/SPEC.md "One consistent way
+        // into Settings"): the gamelist options menu's "System settings"
+        // row re-opens this screen with the system id it was opened
+        // from, so the folder section below lands on that one system's
+        // rows instead of the top of the whole list -- the same targeted
+        // deep link that menu's "Get games" row already uses
+        // (AcquireContentSources.systemScreen). A system with no folder
+        // here (a group whose id matches no console system, or one whose
+        // folders live outside every games root) resolves to no rows and
+        // the screen falls back to the full list rather than a dead
+        // end; "Choose a system for another folder" is for folders whose
+        // names are NOT a system's, so it stands down while one
+        // system's config is what is on screen.
+        val deepLinkedSystem = systemId?.let { systemsById[it] }
+        val deepLinkedRows: List<CatalogItem>? = deepLinkedSystem?.let { system ->
+            classifiedFolders.mapNotNull { (folder, kind) ->
+                (kind as? FolderKind.ConsoleSystem)
+                    ?.takeIf { it.resolvedSystem?.id == system.id }
+                    ?.let { consoleFolderRow(context, folder, it) }
+            }.takeIf { rows -> rows.isNotEmpty() }
         }
         listOf(
             // Regrouped from one flat run of five unrelated rows into
@@ -280,8 +307,10 @@ object AppSettingsCatalogs {
             ),
             CatalogGroup(
                 id = "console_systems_folders",
-                title = "System folders",
-                items = (if (classifiedFolders.isEmpty()) {
+                title = if (deepLinkedRows != null) deepLinkedSystem?.displayName else "System folders",
+                items = (if (deepLinkedRows != null) {
+                    deepLinkedRows
+                } else if (classifiedFolders.isEmpty()) {
                     listOf<CatalogItem>(
                         ActionItem(
                             id = "console_systems_no_folders",
@@ -313,58 +342,67 @@ object AppSettingsCatalogs {
                                     valueLabel = { gameText },
                                 )
                             }
-                            is FolderKind.ConsoleSystem -> {
-                                val resolved = kind.resolvedSystem
-                                // Resolved ONCE here, on IO, like every other
-                                // read this loop makes -- resolvePlayer walks
-                                // every known player and calls the
-                                // PackageManager per candidate
-                                // (isPackageInstalled), so a valueLabel that
-                                // called it again from inside its own lambda
-                                // ran that same PackageManager walk on the
-                                // MAIN thread on every recomposition of this
-                                // row (every scroll frame that brought it on
-                                // screen, every selection change) instead of
-                                // once per real library change. The settings
-                                // scrolling jank the owner reported traced
-                                // to exactly this on Console systems, which
-                                // can list dozens of these rows at once.
-                                val player = resolved?.let { resolvePlayer(context, it) }
-                                NestedScreenItem(
-                                    id = "console_folder_${folder.absolutePath}",
-                                    title = folder.name,
-                                    subtitle = when {
-                                        resolved == null -> "Not set: open to choose its system"
-                                        player == null -> "${resolved.displayName}: no emulator installed yet"
-                                        else -> resolved.displayName
-                                    },
-                                    inline = folderScreen(folder, kind),
-                                    valueLabel = { player?.name ?: "" },
-                                    accent = resolved?.let { SystemThemeColors.forSystem(context, it.id) },
-                                )
-                            }
+                            is FolderKind.ConsoleSystem -> consoleFolderRow(context, folder, kind)
                         }
                     }
-                }) + FolderPickItem(
-                    id = "console_systems_choose_folder",
-                    title = "Choose a system for another folder",
-                    subtitle = "For a folder whose name is not a system's",
-                    onPicked = { ctx, uri: Uri ->
-                        val picked = GamesRootPrefs.resolveStoragePath(uri)
-                        val roots = GamesRootPrefs.gamesRootPaths(ctx).map { it.trimEnd('/') + "/" }
-                        when {
-                            picked == null -> "Couldn't resolve that folder to a real path on this device"
-                            roots.none { picked.absolutePath.startsWith(it) } -> "That folder is not inside one of your game folders"
-                            else -> {
-                                if (SystemOverridePrefs.get(ctx, picked.absolutePath) == null) {
-                                    SystemOverridePrefs.set(ctx, picked.absolutePath, SystemOverridePrefs.NOT_SET)
+                }) + if (deepLinkedRows == null) {
+                    listOf(
+                        FolderPickItem(
+                            id = "console_systems_choose_folder",
+                            title = "Choose a system for another folder",
+                            subtitle = "For a folder whose name is not a system's",
+                            onPicked = { ctx, uri: Uri ->
+                                val picked = GamesRootPrefs.resolveStoragePath(uri)
+                                val roots = GamesRootPrefs.gamesRootPaths(ctx).map { it.trimEnd('/') + "/" }
+                                when {
+                                    picked == null -> "Couldn't resolve that folder to a real path on this device"
+                                    roots.none { picked.absolutePath.startsWith(it) } -> "That folder is not inside one of your game folders"
+                                    else -> {
+                                        if (SystemOverridePrefs.get(ctx, picked.absolutePath) == null) {
+                                            SystemOverridePrefs.set(ctx, picked.absolutePath, SystemOverridePrefs.NOT_SET)
+                                        }
+                                        null
+                                    }
                                 }
-                                null
-                            }
-                        }
-                    },
-                ),
+                            },
+                        ),
+                    )
+                } else {
+                    emptyList()
+                },
             ),
+        )
+    }
+
+    /**
+     * One console-system folder row of the Console systems screen --
+     * shared by the full list and the per-system deep link so both
+     * routes show the same row, built the same way. [resolvePlayer] walks
+     * every known player and calls the PackageManager per candidate
+     * (isPackageInstalled), so it runs ONCE here, on IO (this is called
+     * from inside consoleSystemsGroups' own IO block), and never from
+     * the valueLabel on the main thread: when this row's valueLabel
+     * called it again from inside its own lambda, that same PackageManager
+     * walk ran on EVERY recomposition of the row (every scroll frame,
+     * every selection change) instead of once per real library change --
+     * the settings scrolling jank the owner reported traced to exactly
+     * this on Console systems, which can list dozens of these rows at
+     * once (settings polish pass, 2026-09-28).
+     */
+    private fun consoleFolderRow(context: Context, folder: File, kind: FolderKind.ConsoleSystem): CatalogItem {
+        val resolved = kind.resolvedSystem
+        val player = resolved?.let { resolvePlayer(context, it) }
+        return NestedScreenItem(
+            id = "console_folder_${folder.absolutePath}",
+            title = folder.name,
+            subtitle = when {
+                resolved == null -> "Not set: open to choose its system"
+                player == null -> "${resolved.displayName}: no emulator installed yet"
+                else -> resolved.displayName
+            },
+            inline = folderScreen(folder, kind),
+            valueLabel = { player?.name ?: "" },
+            accent = resolved?.let { SystemThemeColors.forSystem(context, it.id) },
         )
     }
 
