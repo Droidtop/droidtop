@@ -1223,12 +1223,11 @@ private fun EsDeThemedText(
         "manual" -> selectedGame?.let { if (it.manualUri != null) "yes" else "no" }
         "altemulator" -> selectedGame?.altEmulator
         // Real ES-DE format (File::getPlayTimeString): "Xh Ym", or "Never
-        // played" for zero -- same real convention droidtop's own
-        // EntryDetailScreen already uses ("Played N min"), transcribed
-        // here to match the theme-bound case too.
-        "playtime" -> selectedGame?.playtimeSeconds?.let { seconds ->
-            if (seconds <= 0) "Never played" else "${seconds / 3600}h ${(seconds % 3600) / 60}m"
-        }
+        // played" for zero. droidtop records launches (last played, count)
+        // but not session length, so playtime stays 0 for a game that has
+        // been launched: that reads "Played", never "Never played"
+        // (Droidtop/tracker#82 console pass).
+        "playtime" -> selectedGame?.let { playtimeLabel(it.playtimeSeconds, it.lastPlayedEpochMs, it.playCount) }
         else -> null
     }
     // Real `systemdata` binding, transcribed from SystemView.cpp:913-947
@@ -4387,3 +4386,10 @@ private fun esDeResampledTile(
 }
 
 private const val ES_DE_MAX_TILE_PX = 4096
+
+/** The theme `playtime` text: real time when known, "Played" when launches are recorded without a duration. */
+internal fun playtimeLabel(seconds: Long, lastPlayedEpochMs: Long?, playCount: Int): String = when {
+    seconds > 0 -> "${seconds / 3600}h ${(seconds % 3600) / 60}m"
+    lastPlayedEpochMs != null || playCount > 0 -> "Played"
+    else -> "Never played"
+}

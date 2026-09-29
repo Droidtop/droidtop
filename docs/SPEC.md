@@ -2184,6 +2184,12 @@ the `ContainerRuntime` interface that already exists (§3):
   both and reports `Ended` only when it removed a task; for an emulator it can neither end nor
   confirm it says so and names Recents as the way out. Nothing here claims an end it did not see.
   PC/engine games and native apps return `NotEnded` by default.
+- **Playtime label**: droidtop records launches (last played, count) but not session length, so a
+  launched game's `playtime` theme binding reads "Played", never "Never played" (console pass,
+  2026-09-28).
+- **First tap on a pad button**: `padSelectable` reads its current `onPress` instead of keying
+  the tap detector on it, because a recomposition that swapped the lambda cancelled a tap whose
+  DOWN had landed (Droidtop/tracker#42, the secondary buttons of onboarding and the tutorial).
 - **Display reinit + parked displays (directed 2026-08-30)**: Android
   silently MIRRORS a second display nothing presents on (confirmed live
   on the addon) — droidtop's answer is that some droidtop surface owns
