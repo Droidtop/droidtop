@@ -8067,7 +8067,8 @@ the same care as the art.
   "you"; that is what makes "a rescrape keeps your edits" true for text, not only for
   favourites.
 - **A refusal on the way is reported, not swallowed.** A source asked by identity that
-  refuses is not asked again in that pass once it rejected its key (401, 403) or refused five
+  refuses is not asked again in that pass once it rejected its key (401, 403, or the
+  Twitch sign-in's 400 for a wrong IGDB Client ID or Secret) or refused five
   times in a row, and the pass's summary (and a manual match's result) names it with its own
   sentence and, for a key, the setting to fix. The game is still written with what the
   other sources gave.
@@ -8137,7 +8138,11 @@ Library > Scraper > the source's group) and the sources that need none,
 before any folder is walked or any request made; every ROM and PC pass, the
 manual match and the picker ask it. A 401 or 403 from a source that takes a
 key or an account adds that same setting to the refusal
-(`ScraperReadiness.credentialFix`); any other refusal (a quota, an outage)
+(`ScraperReadiness.credentialFix`), and so does the one 400 that means a
+rejected credential: Twitch's token endpoint answers a wrong IGDB Client ID
+or Secret with HTTP 400, not 401/403 (observed, review of 64d6547d,
+2026-09-29), and that refusal names the IGDB setting and silences the source
+for the pass like any rejected key. Any other refusal (a quota, an outage)
 is not presented as the person's to fix. A refusal is counted per request,
 apart from what else then found the game: a ROM the source refused but the
 keyless thumbnails gave a cover is found AND refused, and a source that

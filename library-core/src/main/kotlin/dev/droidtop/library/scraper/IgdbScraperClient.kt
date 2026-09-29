@@ -72,6 +72,14 @@ data class IgdbGameMetadata(
  */
 object IgdbScraperClient {
     /**
+     * How the token endpoint names itself in a refusal: the sign-in is the
+     * one part of IGDB that rejects a wrong Client ID or Secret, and it
+     * answers HTTP 400 (Twitch's own OAuth2 endpoint, not 401/403), so
+     * [ScraperReadiness] recognises a rejected credential by this name.
+     */
+    const val SIGNIN_SOURCE = "IGDB (Twitch sign-in)"
+
+    /**
      * The bearer token, cached until shortly before it expires.
      *
      * Twitch's client-credentials tokens last around 60 days, and every
@@ -107,7 +115,7 @@ object IgdbScraperClient {
             // Named as what the user configured, so the summary reads
             // "IGDB (Twitch sign-in) refused ... invalid client secret".
             return ScrapeRefusals.refused(
-                "IGDB (Twitch sign-in)",
+                SIGNIN_SOURCE,
                 connection,
                 status,
                 listOf(clientId, clientSecret),
