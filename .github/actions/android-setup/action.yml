@@ -177,8 +177,11 @@ runs:
         # runtime-linux-noroot/src/main/jniLibs; v9 put
         # build-scripts/proot-patches into the key; v10 added
         # hev-socks5-tunnel into app/src/main/jniLibs; v11 added PulseAudio 13.0,
-        # libsndfile and libltdl for x86_64 (runtime-windows/src/main).
-        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', '.git/modules/vendor/pulseaudio/HEAD', '.git/modules/vendor/libsndfile/HEAD', 'build-scripts/proot-patches/**', 'build-scripts/pulseaudio-patches/**') }}-v11
+        # libsndfile and libltdl for x86_64 (runtime-windows/src/main); v12
+        # rebuilt it because the cached x86_64 modules asset predated
+        # module-pipe-source (Droidtop/tracker#80): the script had gained the
+        # module but the key had not moved, so releases kept the old asset.
+        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', '.git/modules/vendor/pulseaudio/HEAD', '.git/modules/vendor/libsndfile/HEAD', 'build-scripts/proot-patches/**', 'build-scripts/pulseaudio-patches/**') }}-v12
 
     - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel, PulseAudio)
       if: steps.deps-cache.outputs.cache-hit != 'true'

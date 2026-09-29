@@ -19,10 +19,26 @@ import java.io.OutputStream
 internal object ContainerArchive {
     private const val TAR = "/system/bin/tar"
 
+    /**
+     * Files the runtime writes itself at every session start and binds over
+     * the image's own (ProotRuntime.writeNetworkFiles), so they carry
+     * nothing worth keeping. The image's copy can also be unreadable to the
+     * app (tar stopped on "can't open ./etc/resolv.conf: Permission
+     * denied", Droidtop/tracker#81), which would fail the whole backup.
+     * Toybox matches --exclude against the member name as tar spells it,
+     * "./etc/resolv.conf" with the "." root used here.
+     */
+    private val RUNTIME_OWNED = listOf("etc/resolv.conf", "etc/hosts")
+
     /** Writes [rootfs] to [out] as a tar archive, entries relative to the rootfs root. */
     fun export(rootfs: File, out: OutputStream, errorLog: File) {
         require(rootfs.isDirectory) { "no rootfs at $rootfs" }
-        val process = ProcessBuilder(TAR, "-cf", "-", "-C", rootfs.absolutePath, ".")
+        val command = buildList {
+            add(TAR); add("-cf"); add("-")
+            RUNTIME_OWNED.forEach { add("--exclude=./$it") }
+            add("-C"); add(rootfs.absolutePath); add(".")
+        }
+        val process = ProcessBuilder(command)
             .redirectError(errorLog)
             .start()
         process.inputStream.use { it.copyTo(out) }
@@ -48,6 +64,15 @@ internal object ContainerArchive {
             // tar stopped reading: its own message says why
         }
         check(process.waitFor() == 0) { "tar failed: ${errorLog.readText().trim().take(400)}" }
+        // The session binds these over the guest's files, and proot needs
+        // the guest path to exist: an archive made without them still
+        // restores to a rootfs that starts.
+        if (File(into, "etc").isDirectory) {
+            for (name in RUNTIME_OWNED) {
+                val file = File(into, name)
+                if (!file.exists()) runCatching { file.createNewFile() }
+            }
+        }
     }
 
     /** A rootfs has these; an archive without them is not one, whatever it is. */

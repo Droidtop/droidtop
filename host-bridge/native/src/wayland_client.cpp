@@ -84,6 +84,10 @@ struct WaylandGlobals {
     // above: absent means the taskbar simply has no window list, not a
     // broken connection.
     zwlr_foreign_toplevel_manager_v1* toplevel_manager = nullptr;
+    // The state the manager's events land in, made by connect() before the
+    // registry is read so registry_global can attach the listener at bind
+    // time (see there).
+    struct ToplevelState* toplevel_state = nullptr;
 
     // MVP: track only the first wl_output seen — matches the current
     // single-merged-desktop default (DisplayOutput.kt / SPEC.md §4). A real
@@ -597,8 +601,17 @@ void registry_global(void* data, wl_registry* registry, uint32_t name,
         uint32_t bound = version < 3 ? version : 3;
         globals->toplevel_manager = static_cast<zwlr_foreign_toplevel_manager_v1*>(
             wl_registry_bind(registry, name, &zwlr_foreign_toplevel_manager_v1_interface, bound));
-        // The listener is added in connect(), once WaylandClient's own
-        // ToplevelState exists to be its data — see there.
+        // The listener goes on at bind time, not later in connect(): the
+        // compositor answers a bind with one `toplevel` event per window
+        // that is already open, and those arrive during connect()'s
+        // registry round trips. Events for a proxy with no listener are
+        // dropped, so a listener added after them left every window that
+        // was open before this connection (a desktop re-entered with apps
+        // running) out of the taskbar for good (Droidtop/tracker#94).
+        if (globals->toplevel_state) {
+            zwlr_foreign_toplevel_manager_v1_add_listener(
+                globals->toplevel_manager, &kToplevelManagerListener, globals->toplevel_state);
+        }
     }
 }
 
@@ -1271,6 +1284,8 @@ bool WaylandClient::connect(const char* socketPath) {
     }
 
     globals_ = new WaylandGlobals();
+    if (!toplevels_) toplevels_ = new ToplevelState();
+    globals_->toplevel_state = toplevels_;
     registry_ = wl_display_get_registry(display_);
     wl_registry_add_listener(registry_, &kRegistryListener, globals_);
 
@@ -1345,10 +1360,8 @@ bool WaylandClient::connect(const char* socketPath) {
     // Windows. Non-fatal when absent, same reasoning as clipboard above: a
     // compositor without wlr-foreign-toplevel-management still gives a
     // usable desktop, just one whose taskbar has no window list.
-    if (!toplevels_) toplevels_ = new ToplevelState();
-    if (globals_->toplevel_manager) {
-        zwlr_foreign_toplevel_manager_v1_add_listener(globals_->toplevel_manager, &kToplevelManagerListener, toplevels_);
-    } else {
+    // The listener is already attached (registry_global); this only reports.
+    if (!globals_->toplevel_manager) {
         LOGW("compositor advertised no zwlr_foreign_toplevel_manager_v1 — the taskbar will have "
              "no window list (is vendor/sway built with wlr-foreign-toplevel-management?)");
     }

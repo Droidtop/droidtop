@@ -765,6 +765,14 @@ class ProotRuntime(
             "TERM" to "xterm-256color",
             "LANG" to "C.UTF-8",
             "TMPDIR" to "/tmp",
+            // glycin, the image loader current GTK (and so PCManFM) loads
+            // every PNG and icon through, runs its decoders under bwrap.
+            // bubblewrap needs user namespaces and mounts, which proot
+            // cannot give: the loader exits at once and GTK aborts on its
+            // first icon (Droidtop/tracker#96). This is glycin's own switch
+            // for that case; decoding then runs in the app's process, which
+            // is already the guest's only privilege boundary on this backend.
+            "GLYCIN_DISABLE_SANDBOX" to "i-know-the-risks",
         )
 
         /** The PRIMARY's boot process, by container id, shared by every instance in this app process. */

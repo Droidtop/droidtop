@@ -1885,6 +1885,12 @@ the `ContainerRuntime` interface that already exists (§3):
   and re-provisioned on an existing one (the plan changed), never an image of ours. Its
   `.desktop` entry puts it in the Start menu; it browses the shared-storage folder (§4b), so
   Android files can be opened, copied and moved with a pointer rather than `cd` and `ls`.
+  On the proot backend every guest process gets `GLYCIN_DISABLE_SANDBOX=i-know-the-risks`
+  (`ProotRuntime.baseGuestEnvironment`): GTK loads its icons and images through glycin, which
+  runs its decoders under bubblewrap, and bubblewrap needs namespaces and mounts that proot
+  cannot give, so PCManFM aborted on its first icon (Droidtop/tracker#96). Glycin's own switch
+  runs the decoders in the process instead; proot is not a security boundary here, and the
+  droidspaces backend is unchanged.
 - **A real terminal into any container** — a computer the user can't
   open a shell on isn't a computer. **Decided and built 2026-09-02, the
   other way round from this section's original sketch**: droidtop does
@@ -2026,8 +2032,10 @@ the `ContainerRuntime` interface that already exists (§3):
   visible (or runs a microphone foreground service, which the desktop
   service is not), so it works while droidtop is on screen, which is where
   Desktop mode is; a recording started with droidtop in the background
-  gets silence. The x86_64 modules asset now includes `module-pipe-source`;
-  the arm64 asset is upstream gamenative's prebuilt set, and where it lacks
+  gets silence. The x86_64 modules asset now includes `module-pipe-source`
+  (the CI dependency cache key had to move for a release to carry it: a
+  cache hit skips the script, so a module added to the script alone ships
+  the old asset); the arm64 asset is upstream gamenative's prebuilt set, and where it lacks
   that module the desktop log says "microphone not bridged" and audio out
   is unaffected. plugin-api D9's refusal of `audio.record` to plugins is a
   different question and stands.
@@ -2041,6 +2049,10 @@ the `ContainerRuntime` interface that already exists (§3):
   / `importData` stream the rootfs as a tar archive (`ContainerArchive`, via
   Android's own toybox `tar`, so symlinks and modes survive and there is no
   tar writer in the app; ownership is not carried, every file is the app's).
+  `/etc/resolv.conf` and `/etc/hosts` are left out: the session writes both
+  at every start and binds them over the image's, and the image's copy can be
+  unreadable to the app, which failed the whole backup; a restore recreates
+  them empty so the bind has its target.
   The container must be stopped (the rows say so while it runs). A restore
   unpacks beside the container, refuses an archive with no `/etc` and `/usr`,
   and only then swaps it in, so a bad or truncated archive leaves the
@@ -4437,7 +4449,11 @@ app-drawer icon or a floating switcher button:
   the row (and un-minimizes it first if needed), a second tap on the
   already-activated row minimizes it, and its long-press menu offers
   Restore/Minimize and Close (`zwlr_foreign_toplevel_handle_v1`'s
-  activate/set_minimized/unset_minimized/close requests). **Not built**:
+  activate/set_minimized/unset_minimized/close requests). The manager's
+  listener is attached in the registry callback at bind time: the compositor
+  answers a bind with one `toplevel` event per window already open, and a
+  listener added after connect()'s round trips lost those, so a desktop
+  re-entered with apps running showed no rows (Droidtop/tracker#94). **Not built**:
   which container a toplevel came from (there is only ever one primary
   container today, so nothing distinguishes this yet), moving a toplevel to
   another output (the protocol itself has no such request — only
