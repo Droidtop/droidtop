@@ -196,6 +196,20 @@ object SystemControls {
     fun bluetoothSettingsIntent(): Intent =
         Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+    /** The system's own Battery Saver screen (ACTION_BATTERY_SAVER_SETTINGS, API 22). */
+    fun batterySaverSettingsIntent(): Intent =
+        Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** Whether the system's Battery Saver is on (PowerManager.isPowerSaveMode, no permission). */
+    fun powerSaveOn(context: Context): Boolean =
+        (context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager)?.isPowerSaveMode == true
+
+    /** The battery tile's value: "83%", "83%, charging", plus ", saver on". Pure so it is testable. */
+    fun batteryValue(percent: Int?, charging: Boolean, saverOn: Boolean): String {
+        val level = percent?.let { "$it%" } ?: "Unknown"
+        return level + (if (charging) ", charging" else "") + (if (saverOn) ", saver on" else "")
+    }
+
     fun allSettingsIntent(): Intent =
         Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 

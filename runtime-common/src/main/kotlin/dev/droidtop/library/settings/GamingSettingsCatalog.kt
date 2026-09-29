@@ -53,6 +53,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_gaming_system_brightness_grant"
     const val ID_SYSTEM_BLUETOOTH = "pref_gaming_system_bluetooth"
     const val ID_SYSTEM_VPN = "pref_gaming_system_vpn"
+    const val ID_SYSTEM_BATTERY = "pref_gaming_system_battery"
     const val ID_SYSTEM_LEAVE_UI_MODE = "pref_gaming_system_leave_ui_mode"
     const val ID_SYSTEM_SWITCH_MODE = "pref_gaming_system_switch_mode"
     const val ID_SYSTEM_OPEN_SETTINGS = "pref_gaming_system_open_settings"
@@ -583,6 +584,21 @@ object GamingSettingsCatalog {
                                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                             )
                         },
+                    ),
+                )
+                // Battery: the live level and Android's own Battery Saver
+                // state, with the press opening the system Battery Saver
+                // screen. Apps cannot switch power-save mode themselves
+                // (PowerManager.setPowerSaveModeEnabled is signature-only),
+                // so like Network and Bluetooth this opens the real control
+                // rather than faking one (Droidtop/tracker#84).
+                add(
+                    ActionItem(
+                        id = ID_SYSTEM_BATTERY,
+                        title = "Battery",
+                        subtitle = "Opens the system Battery Saver screen",
+                        value = controls.batteryValue(status.batteryPercent, status.charging, controls.powerSaveOn(context)),
+                        run = { ctx -> ctx.startActivity(controls.batterySaverSettingsIntent()) },
                     ),
                 )
                 add(

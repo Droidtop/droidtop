@@ -27,7 +27,7 @@ import dev.droidtop.library.settings.ToggleItem
  */
 enum class QuickGlyph {
     NETWORK, VOLUME, BRIGHTNESS, MOON, ROTATE, TIMER, BLUETOOTH, VPN,
-    DISPLAY, GAMEPAD, SWAP, UPDATE, ANDROID, EXIT, SETTINGS, GENERIC,
+    DISPLAY, GAMEPAD, SWAP, UPDATE, ANDROID, EXIT, SETTINGS, BATTERY, GENERIC,
 }
 
 /**
@@ -137,6 +137,7 @@ object QuickTiles {
         GamingSettingsCatalog.ID_SYSTEM_TIMEOUT -> QuickGlyph.TIMER
         GamingSettingsCatalog.ID_SYSTEM_BLUETOOTH -> QuickGlyph.BLUETOOTH
         GamingSettingsCatalog.ID_SYSTEM_VPN -> QuickGlyph.VPN
+        GamingSettingsCatalog.ID_SYSTEM_BATTERY -> QuickGlyph.BATTERY
         GamingSettingsCatalog.ID_SYSTEM_UPDATES -> QuickGlyph.UPDATE
         GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS -> QuickGlyph.ANDROID
         GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE -> QuickGlyph.EXIT

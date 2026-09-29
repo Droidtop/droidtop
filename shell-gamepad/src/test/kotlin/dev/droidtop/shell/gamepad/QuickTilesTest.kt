@@ -214,4 +214,17 @@ class QuickTilesTest {
             QuickTiles.describeControllers(listOf("Retroid Pocket 5", "8BitDo Ultimate")),
         )
     }
+
+    @Test
+    fun `the battery row gets its own glyph and reads level, charging and saver state`() {
+        assertEquals(
+            QuickGlyph.BATTERY,
+            QuickTiles.glyphFor(ActionItem(id = GamingSettingsCatalog.ID_SYSTEM_BATTERY, title = "Battery", run = {})),
+        )
+        val controls = dev.droidtop.runtime.systemstatus.SystemControls
+        assertEquals("83%", controls.batteryValue(83, charging = false, saverOn = false))
+        assertEquals("83%, charging", controls.batteryValue(83, charging = true, saverOn = false))
+        assertEquals("12%, saver on", controls.batteryValue(12, charging = false, saverOn = true))
+        assertEquals("Unknown", controls.batteryValue(null, charging = false, saverOn = false))
+    }
 }

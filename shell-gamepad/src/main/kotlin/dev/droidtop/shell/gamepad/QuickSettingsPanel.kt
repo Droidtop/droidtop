@@ -634,6 +634,11 @@ internal fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier =
                 }
                 dot(12f, 12f, 1.8f)
             }
+            QuickGlyph.BATTERY -> {
+                drawRoundRect(tint, p(3f, 7f), Size(16f * u, 10f * u), androidx.compose.ui.geometry.CornerRadius(2f * u), style = stroke)
+                drawRect(tint, p(19.5f, 10f), Size(2f * u, 4f * u))
+                drawRect(tint, p(5.5f, 9.5f), Size(8f * u, 5f * u))
+            }
             QuickGlyph.GENERIC -> {
                 ring(12f, 12f, 8f)
                 dot(12f, 12f, 2.2f)

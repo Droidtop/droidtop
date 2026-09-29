@@ -6617,13 +6617,25 @@ one mechanism.
 
 **Where things live.** Settings is configuration. Live device state and
 one-shot device actions — network, volume, brightness, Do Not Disturb,
-VPN, Bluetooth, Swap screens, Reinitialize displays — are rendered by
+VPN, Bluetooth, Battery, Swap screens, Reinitialize displays — are rendered by
 the Quick Menu's System tab only: the catalog's System group carries a
 `quickOnly` flag and every Settings renderer skips it
 (`GamingSettingsCatalog.settingsGroups`), keeping under System just
 Screens (main screen, game launch target, second-screen roles), Software
 updates and Android settings. The Quick Menu shows those configuration
-rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items. One-shot library actions live in
+rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items.
+
+**Battery tile (Droidtop/tracker#84).** The System tab's Battery row shows the
+live level, "charging" and Android's Battery Saver state ("83%, charging",
+"12%, saver on"), from the same `BatteryManager` sticky broadcast the themed
+`systemstatus` element reads, plus `PowerManager.isPowerSaveMode` (no
+permission). Pressing it opens the system's own Battery Saver screen, the same
+way Network and Bluetooth open theirs: an app cannot switch power-save mode
+(`setPowerSaveModeEnabled` is signature-only), so droidtop does not fake a
+toggle. It is one more catalog item in the one QuickTiles mechanism. Not
+built: estimated remaining playtime (Android exposes no non-privileged
+estimate) and a governor or performance-mode control (needs root or a vendor
+API, and root is never the standard path). One-shot library actions live in
 the options menu of the list they act on and on the folder pages —
 Rescan library, Scrape all systems and Find orphaned media in the Games
 section's options menu (and Rescan on Game folders, the same item by id;
