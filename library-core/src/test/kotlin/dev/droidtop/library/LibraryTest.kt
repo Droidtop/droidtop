@@ -117,6 +117,25 @@ class LibraryTest {
     }
 
     @Test
+    fun `a launch reaches a list the shell is already showing, without a rescan`() = runBlocking {
+        val nativeProvider = FakeProvider(LibraryEntryKind.NATIVE_ANDROID_APP, listOf(nativeEntry))
+        val playHistory = FakePlayHistoryStore()
+        val library = Library(listOf(nativeProvider), playHistory)
+
+        // The list is on screen (published) before the launch, as it is
+        // when a game is launched from its own detail page: the recorded
+        // play must reach that list at once or the detail still reads
+        // "Never played" over the running game (Droidtop/tracker#82).
+        library.rescanNow(setOf(LibraryEntryKind.NATIVE_ANDROID_APP))
+        library.launch(nativeEntry)
+        val published = library.backgroundScanState(setOf(LibraryEntryKind.NATIVE_ANDROID_APP)).value ?: emptyList()
+
+        val played = published.single { it.id == nativeEntry.id }
+        assertEquals(1, played.playCount)
+        assertTrue(played.lastPlayedEpochMs != null)
+    }
+
+    @Test
     fun `a failed launch is never recorded as a real play`() = runBlocking {
         val failingProvider = FakeProvider(LibraryEntryKind.NATIVE_ANDROID_APP, listOf(nativeEntry), failLaunch = true)
         val playHistory = FakePlayHistoryStore()

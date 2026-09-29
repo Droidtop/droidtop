@@ -1620,6 +1620,12 @@ class Library(
             }
             playHistory.recordPlay(entry.id, System.currentTimeMillis())
             changedFactIds += entry.id
+            // The play just recorded is a fact the lists the shell is
+            // already showing read -- the detail's "Played" label
+            // (Droidtop/tracker#82). Publish it now, or the label keeps
+            // its pre-launch "Never played" until some unrelated walk
+            // republishes.
+            republish()
         }
     }
 

@@ -2413,7 +2413,10 @@ the `ContainerRuntime` interface that already exists (§3):
   PC/engine games and native apps return `NotEnded` by default.
 - **Playtime label**: droidtop records launches (last played, count) but not session length, so a
   launched game's `playtime` theme binding reads "Played", never "Never played" (console pass,
-  2026-09-28).
+  2026-09-28). The launch itself republishes the lists the shell is already showing, like an F95
+  link or a folded replacement does: the 2026-09-29 rig pass caught the detail still reading
+  "Never played" over the running game because the recorded play waited for the next rescan to
+  reach a published list.
 - **First tap on a pad button**: `padSelectable` reads its current `onPress` instead of keying
   the tap detector on it, because a recomposition that swapped the lambda cancelled a tap whose
   DOWN had landed (Droidtop/tracker#42, the secondary buttons of onboarding and the tutorial).
