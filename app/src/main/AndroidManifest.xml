@@ -19,6 +19,8 @@
          explicitly here now that no other droidtop module happens to carry
          it transitively. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Only the desktop's own Microphone row asks for it (docs/SPEC.md 3d). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- In-app self-update (see app/.../update/AppSelfUpdate.kt): opening a
          PackageInstaller session for droidtop's own APK needs the
@@ -305,6 +307,11 @@
           launches use component/action names elsewhere. Not exported:
           droidtop-internal surface.
         -->
+        <activity
+            android:name="dev.droidtop.app.MicrophonePermissionActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name="dev.droidtop.app.ContainersActivity"
             android:exported="false">

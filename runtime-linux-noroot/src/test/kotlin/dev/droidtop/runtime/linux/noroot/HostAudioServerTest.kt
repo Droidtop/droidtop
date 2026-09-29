@@ -39,4 +39,16 @@ class HostAudioServerTest {
             config,
         )
     }
+
+    @Test
+    fun `the microphone adds a pipe source and makes it the default`() {
+        val config = HostAudioServer.defaultPaConfig("/s/audio.sock", "/w/mic.pipe")
+        assertEquals(
+            "load-module module-native-protocol-unix auth-anonymous=1 auth-cookie-enabled=false socket=\"/s/audio.sock\"\n" +
+                "load-module module-aaudio-sink\n" +
+                "load-module module-pipe-source source_name=droidtop_mic file=\"/w/mic.pipe\" format=s16le rate=48000 channels=1\n" +
+                "set-default-source droidtop_mic\n",
+            config,
+        )
+    }
 }

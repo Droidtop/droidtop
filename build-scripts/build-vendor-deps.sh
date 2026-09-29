@@ -452,7 +452,7 @@ if [ "$ABI" = "x86_64" ]; then (
         ax_cv_PTHREAD_PRIO_INHERIT=no ac_cv_header_glob_h=no ac_cv_header_execinfo_h=no
     make -C src -j"$(nproc)" \
         libpulsecommon-13.0.la libpulse.la libpulsecore-13.0.la pulseaudio pactl \
-        libprotocol-native.la module-native-protocol-unix.la module-aaudio-sink.la
+        libprotocol-native.la module-native-protocol-unix.la module-aaudio-sink.la module-pipe-source.la
 
     PA_LIBS="$REPO_ROOT/runtime-windows/src/main/jniLibs/$ABI"
     PA_ASSET="$PA_WORK/asset"
@@ -461,7 +461,7 @@ if [ "$ABI" = "x86_64" ]; then (
     cp -L src/.libs/libpulse.so src/.libs/libpulsecommon-13.0.so src/.libs/libpulsecore-13.0.so "$PA_LIBS/"
     cp -L src/.libs/pulseaudio "$PA_LIBS/libpulseaudio.so"
     cp -L src/.libs/libprotocol-native.so src/.libs/module-native-protocol-unix.so \
-        src/.libs/module-aaudio-sink.so "$PA_ASSET/modules/"
+        src/.libs/module-aaudio-sink.so src/.libs/module-pipe-source.so "$PA_ASSET/modules/"
     cp -L src/.libs/pactl "$PA_ASSET/pactl"
     for elf in "$PA_LIBS"/libltdl.so "$PA_LIBS"/libsndfile.so "$PA_LIBS"/libpulse*.so \
         "$PA_ASSET"/modules/*.so "$PA_ASSET/pactl"; do

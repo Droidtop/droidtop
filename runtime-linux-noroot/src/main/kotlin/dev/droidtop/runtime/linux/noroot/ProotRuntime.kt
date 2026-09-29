@@ -82,6 +82,8 @@ class ProotRuntime(
     private val context: Context,
     private val imageStore: OciImageStore,
     private val cachePolicy: ImageCachePolicy,
+    /** Whether the person opted into the microphone; read at each desktop start (docs/SPEC.md 3d). */
+    private val microphoneEnabled: () -> Boolean = { false },
 ) : ContainerRuntime {
     override val backend: ContainerBackend = ContainerBackend.PROOT
 
@@ -201,8 +203,9 @@ class ProotRuntime(
             // inside the container (ContainerLayout.primaryInitScript,
             // dq-desk2-01): a program that dials PULSE_SERVER before this
             // is up just finds nothing listening, same as CUPS off.
-            audioServer.start(File(socketsDir, ContainerLayout.AUDIO_SOCKET).absolutePath)
+            audioServer.start(File(socketsDir, ContainerLayout.AUDIO_SOCKET).absolutePath, microphoneEnabled())
                 ?.let { log.line("${container.id}: audio bridge did not start: $it") }
+            audioServer.microphoneNote?.let { log.line("${container.id}: microphone not bridged: $it") }
         }
 
         val script = ContainerLayout.primaryInitScript(plan)
@@ -300,6 +303,8 @@ class ProotRuntime(
 
     /** Real now (Droidtop/tracker#95): see [HostAudioServer]. */
     override val audioSharingUnavailableReason: String? = null
+
+    override val microphoneUnavailableReason: String? = null
 
     override suspend fun extraMounts(container: Container): List<ExtraMount> = withContext(Dispatchers.IO) {
         readExtraMounts(container.id)

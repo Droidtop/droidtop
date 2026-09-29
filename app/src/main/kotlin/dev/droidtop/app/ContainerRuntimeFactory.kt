@@ -46,7 +46,7 @@ object ContainerRuntimeFactory {
                 cachePolicy = policy,
             )
         } else {
-            ProotRuntime(app, store, policy)
+            ProotRuntime(app, store, policy) { DesktopSetupPrefs.microphone(app) }
         }
     }
 }

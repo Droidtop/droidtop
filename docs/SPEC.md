@@ -1956,8 +1956,31 @@ the `ContainerRuntime` interface that already exists (§3):
   here. The proot audio bridge itself is unverified on a live device too
   (needs a rig check, see the commit that landed it): the AAudio sink and
   the extracted-modules path are new here, not proven on-device the way
-  the rest of gamenative's own PulseAudio use is. Still not built: Start
-  with droidtop (autostart with the session).
+  the rest of gamenative's own PulseAudio use is.
+  **Microphone (Droidtop/tracker#80, 2026-09-28).** The device microphone
+  is a source on that same server, not a second mechanism: with the
+  Sockets group's "Microphone" switch on (off by default; one switch for
+  the whole desktop, since every container that shares audio reaches the
+  same server; proot backend only, droidspaces' own bridge is its to
+  extend) and RECORD_AUDIO granted, `HostAudioServer` also loads
+  PulseAudio's stock `module-pipe-source` on a FIFO and makes
+  `droidtop_mic` the default source, and `MicrophonePump` fills the FIFO
+  from `AudioRecord` (48 kHz mono s16le). A write that would block is
+  dropped, because PulseAudio stops reading a pipe source while nothing
+  records and a queued backlog would play into the next recording. The
+  permission is asked once, when the switch is turned on, by
+  `MicrophonePermissionActivity`, after the row's own text gave the reason
+  (7b's rule); a refusal leaves the switch off. It applies from the
+  desktop's next start. Android only lets an app record while it is
+  visible (or runs a microphone foreground service, which the desktop
+  service is not), so it works while droidtop is on screen, which is where
+  Desktop mode is; a recording started with droidtop in the background
+  gets silence. The x86_64 modules asset now includes `module-pipe-source`;
+  the arm64 asset is upstream gamenative's prebuilt set, and where it lacks
+  that module the desktop log says "microphone not bridged" and audio out
+  is unaffected. plugin-api D9's refusal of `audio.record` to plugins is a
+  different question and stands.
+  Still not built: Start with droidtop (autostart with the session).
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend

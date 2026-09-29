@@ -214,6 +214,15 @@ interface ContainerRuntime {
      */
     val audioSharingUnavailableReason: String?
 
+    /**
+     * Why this backend cannot bridge the device microphone into a container;
+     * null when it can (docs/SPEC.md 3d Sockets row, Droidtop/tracker#80).
+     * The proot backend can, as a source on the same PulseAudio server that
+     * carries audio out; droidspaces' own bridge is droidspaces' to extend.
+     */
+    val microphoneUnavailableReason: String?
+        get() = "Only the non-root desktop bridges the microphone"
+
     /** Extra host folders bound into [container] beyond the standard shared-storage set (docs/SPEC.md 3d Mounts row). */
     suspend fun extraMounts(container: Container): List<ExtraMount>
 

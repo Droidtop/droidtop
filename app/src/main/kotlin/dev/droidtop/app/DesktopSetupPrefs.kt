@@ -17,6 +17,7 @@ object DesktopSetupPrefs {
     private const val KEY_PRIMARY_IMAGE_ID = "droidtop_desktop_primary_image_id"
     private const val KEY_PRIMARY_CREATED_FROM = "droidtop_desktop_primary_created_from"
     private const val KEY_PRINTING = "droidtop_desktop_printing"
+    private const val KEY_MICROPHONE = "droidtop_desktop_microphone"
 
     /** Whether the primary's provisioning plan includes CUPS (docs/SPEC.md 4b). */
     fun printing(context: Context): Boolean =
@@ -24,6 +25,14 @@ object DesktopSetupPrefs {
 
     fun setPrinting(context: Context, on: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_PRINTING, on).apply()
+    }
+
+    /** Whether the person opted into bridging the device microphone into the desktop (docs/SPEC.md 3d). */
+    fun microphone(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_MICROPHONE, false)
+
+    fun setMicrophone(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_MICROPHONE, on).apply()
     }
 
     fun preferredPrimaryImageId(context: Context): String? =

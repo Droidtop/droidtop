@@ -1,6 +1,7 @@
 package dev.droidtop.runtime.linux.noroot
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import io.airlift.compress.tar.TarInputStream
@@ -42,6 +43,12 @@ import kotlin.concurrent.thread
  * ([dev.droidtop.runtime.ContainerLayout.clientEnvironment]) exactly the
  * way it would reach a real Linux desktop's PulseAudio.
  *
+ * The microphone (Droidtop/tracker#80) rides the same server: with the
+ * person's opt-in and the RECORD_AUDIO grant, [start] also loads PulseAudio's
+ * stock `module-pipe-source` on a FIFO that [MicrophonePump] fills from
+ * `AudioRecord`, and makes it the default source. Programs see a normal
+ * PulseAudio microphone; nothing else changes for audio out.
+ *
  * A daemon never holds up the desktop ([ContainerLayout.primaryInitScript]'s
  * own rule for in-container daemons, dq-desk2-01): [start] never throws,
  * it returns why it could not start, and a caller logs that and keeps
@@ -52,16 +59,28 @@ internal class HostAudioServer(private val context: Context) {
     private val workingDir = File(context.filesDir, "audio-bridge")
     private val modulesDir = File(workingDir, "modules")
 
+    private val micPipe = File(workingDir, MIC_PIPE)
+    private val micPump = MicrophonePump(micPipe)
+
     @Volatile private var process: Process? = null
+
+    /**
+     * Why the last [start] left the microphone out, or null when it is in
+     * (or was not asked for). Soft, like the daemon rule above: the desktop
+     * comes up with audio out either way.
+     */
+    @Volatile var microphoneNote: String? = null
+        private set
 
     val running: Boolean get() = process?.isAlive == true
 
     /**
      * Starts the server listening on the Unix socket at [socketPath],
      * stopping any previous instance first. Returns null on success, or
-     * why it could not start.
+     * why it could not start. [microphone] asks for the device microphone
+     * too; whether it could be provided is in [microphoneNote].
      */
-    fun start(socketPath: String): String? {
+    fun start(socketPath: String, microphone: Boolean = false): String? {
         stop()
         val nativeLibraryDir = context.applicationInfo.nativeLibraryDir
         val binary = File(nativeLibraryDir, BINARY_NAME)
@@ -76,11 +95,23 @@ internal class HostAudioServer(private val context: Context) {
         }
 
         workingDir.mkdirs()
+        microphoneNote = if (microphone) microphoneProblem() else null
+        val micPath = if (microphone && microphoneNote == null) {
+            try {
+                micPump.prepare()
+                micPipe.absolutePath
+            } catch (e: Exception) {
+                microphoneNote = "could not create the microphone pipe: ${e.message}"
+                null
+            }
+        } else {
+            null
+        }
         // A cookie from a previous run would be for a socket that no
         // longer exists.
         File(workingDir, ".config").deleteRecursively()
         File(socketPath).delete()
-        File(workingDir, CONFIG_FILE).writeText(defaultPaConfig(socketPath))
+        File(workingDir, CONFIG_FILE).writeText(defaultPaConfig(socketPath, micPath))
 
         val builder = ProcessBuilder(
             binary.absolutePath,
@@ -113,11 +144,22 @@ internal class HostAudioServer(private val context: Context) {
                 // the process went away; the stream closing is the normal end
             }
         }
+        if (micPath != null) micPump.start()
         return null
+    }
+
+    /** What stops the microphone being offered on this device right now, or null. */
+    private fun microphoneProblem(): String? = when {
+        context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ->
+            "the microphone permission is not granted"
+        !File(modulesDir, PIPE_SOURCE_MODULE).isFile ->
+            "this build's PulseAudio modules have no $PIPE_SOURCE_MODULE"
+        else -> null
     }
 
     /** Stops the server, if one is running. Never throws. */
     fun stop() {
+        micPump.stop()
         val current = process ?: return
         process = null
         current.destroy()
@@ -126,7 +168,13 @@ internal class HostAudioServer(private val context: Context) {
 
     /** Unpacks the modules asset into [modulesDir] once; a no-op once they are there. */
     private fun extractModulesIfNeeded(abi: String) {
-        if (File(modulesDir, AAUDIO_SINK_MODULE).isFile) return
+        // Re-extracted after an app update: the modules asset can gain modules
+        // (the microphone's pipe source did), and an old extraction lacks them.
+        val installed = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime.toString()
+        }.getOrDefault("")
+        val marker = File(modulesDir, EXTRACTED_MARKER)
+        if (File(modulesDir, AAUDIO_SINK_MODULE).isFile && marker.isFile && marker.readText() == installed) return
         val assets = context.assets
         val assetName = assetNameFor(assets.list("").orEmpty().toList(), abi)
             ?: throw IOException("no PulseAudio modules asset packaged for $abi")
@@ -146,12 +194,16 @@ internal class HostAudioServer(private val context: Context) {
                 }
             }
         }
+        marker.writeText(installed)
     }
 
     companion object {
         private const val TAG = "droidtop.audiobridge"
         private const val BINARY_NAME = "libpulseaudio.so"
         private const val CONFIG_FILE = "default.pa"
+        private const val MIC_PIPE = "mic.pipe"
+        private const val EXTRACTED_MARKER = ".extracted-for"
+        private const val PIPE_SOURCE_MODULE = "module-pipe-source.so"
         private const val AAUDIO_SINK_MODULE = "module-aaudio-sink.so"
         private const val STOP_GRACE_S = 2L
 
@@ -184,8 +236,13 @@ internal class HostAudioServer(private val context: Context) {
          * (build-scripts/pulseaudio-patches) exists for. Pure so it is
          * testable without touching a filesystem.
          */
-        internal fun defaultPaConfig(socketPath: String): String =
+        internal fun defaultPaConfig(socketPath: String, micPipePath: String? = null): String =
             "load-module module-native-protocol-unix auth-anonymous=1 auth-cookie-enabled=false socket=\"$socketPath\"\n" +
-                "load-module module-aaudio-sink\n"
+                "load-module module-aaudio-sink\n" +
+                (micPipePath?.let {
+                    "load-module module-pipe-source source_name=droidtop_mic file=\"$it\" " +
+                        "format=s16le rate=${MicrophonePump.RATE} channels=1\n" +
+                        "set-default-source droidtop_mic\n"
+                } ?: "")
     }
 }

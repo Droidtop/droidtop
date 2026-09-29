@@ -13,6 +13,7 @@ import dev.droidtop.app.DesktopSessionState
 import dev.droidtop.app.DesktopSetupPrefs
 import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.MainActivity
+import dev.droidtop.app.MicrophonePermissionActivity
 import dev.droidtop.app.vpn.DroidtopVpnService
 import dev.droidtop.app.vpn.VpnPrefs
 import dev.droidtop.app.vpn.VpnState
@@ -259,7 +260,7 @@ object ContainersCatalog {
         if (primary) groups += CatalogGroup(id = "printing", title = "Printing", items = printingItems(context, runtime, desktopUp))
         groups += CatalogGroup(id = "vpn", title = "VPN", items = vpnItems(context, runtime, info))
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
-        groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(runtime, info))
+        groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
         groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info))
         groups += CatalogGroup(id = "delete", title = null, items = listOf(deleteItem(info, runtime, running)))
         return groups
@@ -320,7 +321,7 @@ object ContainersCatalog {
 
     // ---- sockets (docs/SPEC.md 3d) ----
 
-    private suspend fun socketItems(runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
+    private suspend fun socketItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
         val container = info.container
         val sockets = runCatching { runtime.sockets(container) }.getOrDefault(ContainerSockets())
         return buildList {
@@ -354,8 +355,37 @@ object ContainersCatalog {
                         },
                     ),
                 )
+                if (runtime.microphoneUnavailableReason == null) add(microphoneItem(context))
             }
         }
+    }
+
+    /**
+     * The device microphone as a source on the audio bridge (Droidtop/tracker#80).
+     * One switch for the whole desktop, not per container: every container that
+     * shares audio reaches the same PulseAudio server. Off by default, and the
+     * row itself is the reason asked before Android's own prompt.
+     */
+    private fun microphoneItem(context: Context): CatalogItem {
+        val granted = context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        return ToggleItem(
+            id = "container_socket_microphone",
+            title = "Microphone",
+            subtitle = "Lets programs in the desktop record from the device's microphone, for voice chat and calls. " +
+                "Applies from the desktop's next start, and works while droidtop is on screen",
+            current = DesktopSetupPrefs.microphone(context) && granted,
+            onToggle = { ctx, on ->
+                val allowed = ctx.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                when {
+                    !on -> DesktopSetupPrefs.setMicrophone(ctx, false)
+                    allowed -> DesktopSetupPrefs.setMicrophone(ctx, true)
+                    // The activity records the choice once Android has answered.
+                    else -> ctx.startActivity(
+                        Intent(ctx, MicrophonePermissionActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
+        )
     }
 
     // ---- mounts (docs/SPEC.md 3d) ----
