@@ -3089,16 +3089,21 @@ private fun GamesSection(
                         // "switch system at the edge" convention instead of
                         // hijacking every keypress.
                         //
-                        // Up at the TOP row is answered true and left there,
-                        // never `focusManager.moveFocus(FocusDirection.Up)`:
-                        // that used to walk straight out of the grid onto the
-                        // section tab bar above it, so a D-pad press meant for
-                        // "stop, I'm at the top" instead reassigned Left/Right/A
-                        // to switching Games/Apps/Settings (owner, 2026-09-25:
-                        // "don't let dpad up navigate to the top menu, it needs
-                        // to be separate"). The tab bar has its own control,
-                        // L1/R1 (SectionTabBar's `ShoulderGlyph`), which never
-                        // routes through focus at all.
+                        // Up at the TOP row no longer answers true either:
+                        // it leaves on both edges exactly like Left/
+                        // Right at a real edge, so Compose's own focus
+                        // search runs. That search once walked straight
+                        // out of the grid onto the section tab bar above
+                        // it, which is why Up was swallowed here -- but
+                        // the top bar can no longer take focus at all
+                        // (SectionTabBar, docs/SPEC.md 7k), so the
+                        // swallow protected nothing while cutting the
+                        // pad off from the real rows above this grid:
+                        // the filter chips first, and in safe mode the
+                        // banner's action behind them (docs/SPEC.md
+                        // 10c). L1/R1 (SectionTabBar's
+                        // `ShoulderGlyph`) remain the section route and
+                        // never route through focus.
                         modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding)
                             .onKeyEvent { event ->
                                 val direction = when (GamepadKeyMap.actionFor(event.key)) {
@@ -3118,7 +3123,7 @@ private fun GamesSection(
                                 // doc comment) so the UP edge can answer
                                 // the identical true/false without moving
                                 // a second card.
-                                handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, pad.canMove(direction) || direction == FocusDirection.Up) {
+                                handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, pad.canMove(direction)) {
                                     pad.move(direction)
                                 }
                             },

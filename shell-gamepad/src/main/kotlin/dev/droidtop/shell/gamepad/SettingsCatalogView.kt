@@ -449,8 +449,20 @@ fun CatalogNavigator(
                             true
                         }
                         Key.DirectionUp -> {
-                            setSelected((selected - 1).coerceAtLeast(0))
-                            true
+                            // Owned only while the selection can really
+                            // move: at the first row an unhandled Up
+                            // reaches Compose's focus search, which in
+                            // safe mode finds the banner's action above
+                            // (docs/SPEC.md 10c) and otherwise finds
+                            // nothing -- the top bar cannot take focus
+                            // (docs/SPEC.md 7k) -- instead of being
+                            // swallowed as a no-op.
+                            if (selected > 0) {
+                                setSelected(selected - 1)
+                                true
+                            } else {
+                                false
+                            }
                         }
                         Key.DirectionLeft -> {
                             rows.getOrNull(selected)?.let { adjust(it.item, -1) }
