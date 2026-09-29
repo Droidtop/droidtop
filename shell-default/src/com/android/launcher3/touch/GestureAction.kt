@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
 import app.murinelauncher.receiver.ScreenOffAdminReceiver
 import app.murinelauncher.service.MurineAccessibilityService
 import app.murinelauncher.settings.SettingsHomeFragment
@@ -97,10 +98,10 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
                     launcher.getString(R.string.pref_accessibility_disclosure_desc),
                 ) {
                     LauncherPrefs.get(launcher).put(LauncherPrefs.ACCESSIBILITY_DISCLOSURE_ACCEPTED, true)
-                    SettingsHomeFragment.requestAccessibilityPermission(launcher)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) SettingsHomeFragment.requestAccessibilityPermission(launcher)
                 }
             } else {
-                SettingsHomeFragment.requestAccessibilityPermission(launcher)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) SettingsHomeFragment.requestAccessibilityPermission(launcher)
             }
         }
 
