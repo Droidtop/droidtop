@@ -9110,7 +9110,10 @@ somewhere real, and Up at the very first row of a list now does nothing
 (`FocusManager.moveFocus` returns false, same as it already did at a
 grid's left/right edge, section 7f's "System → Game" drill-down) rather
 than escaping the screen -- the list simply does not scroll further, it
-does not jump anywhere. Because the shell still needs *something*
+does not jump anywhere. The one thing Up can ever find above a list is
+the safe-mode banner's action (§10c), which is the point of that
+follow-up: it is focusable only while safe mode is on, and the tab bar
+it covers is not. Because the shell still needs *something*
 focused before any real content loads (an empty library, or the very
 first frame -- see `GamepadShell`'s own comment on `tabBarFocus`), the
 initial-focus anchor moved off the tab bar entirely, onto an invisible,
@@ -10333,9 +10336,19 @@ unthemed Gaming shell rather than settings again. Safe mode is
 `ThemeSafeMode`: `ThemeAssets` resolves no active theme while it is on, which
 is the state the shell already draws its unthemed surface for. The banner and
 its "Use the theme again" action are drawn by `MainActivity` over the Gaming
-shell and are reached by touch; the pad does not reach the top of the screen
-(§7k). The Standard launcher entry is not routed through this: it does not
-render themes.
+shell. The action is droidtop's own pad-first button (`PadButton` on
+`padSelectable`, the idiom the rest of droidtop's chrome uses), not a Material
+button, which never answers the pad's A. And reachability needed the same
+treatment the rest of the pad's range already had: the system carousel, the
+unthemed game grid and the settings catalog no longer swallow Up at their
+true top edge, so the pad walks Up through the real rows above each list --
+the filter chips, a "Continue Playing" card -- and ends on the banner's
+action, the topmost row while safe mode is on; the tab bar it covers stays
+unfocusable (§7k), so Up still finds nothing above any list when no banner
+is up. A, Enter and a touch all press the action. Sub-screens that own
+their whole surface (Settings' choice pickers and search results) keep
+their own edges. The Standard launcher entry is not routed through this:
+it does not render themes.
 
 **Share diagnostics** is one action in Global settings > Data. It zips the
 logs folder, the settings export (§7 Data, with every `droidtop_*`
