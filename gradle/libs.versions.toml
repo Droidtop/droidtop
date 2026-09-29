@@ -92,6 +92,8 @@ posthog-android = "3.8.0"
 jwtdecode = "2.0.2"
 json-20240303 = "20240303"
 xz = "1.9"
+# https://github.com/RikkaApps/Shizuku-API (Apache-2.0): the client the Shizuku provider plugin runs on, see plugin-host
+shizuku = "13.1.5"
 javax-inject = "1"
 fragment = "1.8.9"
 collection-ktx = "1.6.0-beta01"
@@ -219,6 +221,8 @@ posthog-android = { module = "com.posthog:posthog-android", version.ref = "posth
 jwtdecode = { module = "com.auth0.android:jwtdecode", version.ref = "jwtdecode" }
 json-v20240303 = { module = "org.json:json", version.ref = "json-20240303" }
 xz = { module = "org.tukaani:xz", version.ref = "xz" }
+shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
+shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javax-inject" }
 
 [plugins]

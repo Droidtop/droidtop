@@ -10,66 +10,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BrokerCoreTest {
-    /** Droidtop's side, in memory: records, grants, the sheet's answer and every effect the broker causes. */
-    private class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
-        var now = 1_000_000L
-        val records = records.associateBy { it.manifest.id }.toMutableMap()
-        val states = mutableMapOf<String, MutableMap<String, GrantState>>()
-        val wanted = mutableListOf<Pair<String, String>>()
-        val audits = mutableListOf<Pair<String, AuditEntry>>()
-        val prompts = mutableListOf<GrantPromptRequest>()
-        var answer = GrantAnswer.ALLOW
-        var user = false
-        var remaining: Long? = null
-        var chain: List<String> = emptyList()
-        val installed = mutableSetOf<String>()
-        val launched = mutableListOf<Triple<String, Map<String, String>, String?>>()
-        val forwards = mutableListOf<Pair<String, PluginCall>>()
-        var forwardReply: PluginReply = PluginReply.ok(obj("done" to true))
-        var jobId: String? = "job-1"
-        var choice: String? = null
-
-        override fun nowMs() = now
-        override fun record(pluginId: String) = records[pluginId]
-        override fun resolution() = PluginApiResolver.resolve(records.values.toList())
-        override fun providerChoice(api: String) = choice
-        override fun grants(pluginId: String) = PluginGrants.Snapshot(states[pluginId].orEmpty())
-        override fun setGrant(pluginId: String, permission: String, state: GrantState) {
-            states.getOrPut(pluginId) { mutableMapOf() }[permission] = state
-        }
-        override fun noteWanted(pluginId: String, permission: String) {
-            wanted += pluginId to permission
-        }
-        override fun audit(pluginId: String, entry: AuditEntry) {
-            audits += pluginId to entry
-        }
-        override fun userInitiated(pluginId: String) = user
-        override fun remainingMs(pluginId: String) = remaining
-        override fun prompt(request: GrantPromptRequest): GrantAnswer {
-            prompts += request
-            return answer
-        }
-        override fun isOfficial(origin: String) = origin == "droidtop"
-        override fun trustBadge(origin: String) = if (origin == "droidtop") "Official" else "Added by you"
-        override fun installId(pluginId: String) = "install-$pluginId"
-        override fun hostFacts(): JSONObject = obj("droidtopVersion" to "0.2.0", "mode" to "gaming")
-        override fun appInstalled(packageName: String) = packageName in installed
-        override fun launchApp(packageName: String) = packageName in installed
-        override fun launchAppWithExtras(packageName: String, extras: Map<String, String>, action: String?): Boolean {
-            launched += Triple(packageName, extras, action)
-            return packageName in installed
-        }
-        override fun chainServedBy(pluginId: String) = chain
-        override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply {
-            forwards += provider.manifest.id to call
-            lastTimeout = timeoutMs
-            return forwardReply
-        }
-        var lastTimeout = 0L
-        override fun startBrokeredJob(caller: PluginRecord, provider: PluginRecord, call: PluginCall) = jobId
-        override fun brokeredJobStatus(caller: PluginRecord, jobId: String) = PluginReply.error(PluginErrorCode.NOT_FOUND, "no such job")
-    }
-
     private fun request(api: String, op: String, args: JSONObject = JSONObject(), version: Int = 1) =
         obj("api" to api, "version" to version, "op" to op, "args" to args).toString()
 

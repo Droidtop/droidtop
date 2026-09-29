@@ -10597,6 +10597,16 @@ of what is built. The decisions, briefly:
   - A context action whose plugin answers `enabled: false` is not offered
     at all, rather than shown greyed. One that does not answer in 500 ms is
     offered.
+  - Root and Shizuku stay provider plugins, but the Shizuku binder has to
+    arrive at an app-declared provider, so `:plugin-host` declares Shizuku's
+    own `ShizukuProvider` in `:pluginhost` and carries its client library as
+    transport. Only the official Shizuku provider plugin uses it; other
+    plugins get privilege through `priv.*` with their own grant.
+  - Quit to Library asks a `priv.packages` provider to force-stop the
+    emulator when one is installed, and otherwise keeps the honest fallback
+    (Android 13 gives a non-privileged app no way to end another app's
+    game). droidtop's running-game state still clears only when the game
+    really ended.
 
 The catalogue has 89 entries across ten areas (library and content,
 launch and runtime, UI, system and device, desktop, other apps,

@@ -52,6 +52,13 @@ dependencies {
     // classpath itself to read the xz codec, so it is declared here too.
     implementation(libs.commons.compress)
     implementation(libs.xz)
+    // Shizuku's client library and its binder-receiving provider (docs/plugin-api.md 2.7): the
+    // provider is declared in this module's manifest, in :pluginhost, so a Shizuku binder arrives
+    // in the process a provider plugin runs in. A plugin's DexClassLoader delegates to this
+    // module's loader first, so a plugin that only references rikka.shizuku.* shares this copy
+    // (and its binder) instead of bundling its own.
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
     // docs/SPEC.md 12a, flutter_embed kind: the Flutter embedding's own
     // Java classes (FlutterEngine/FlutterJNI/FlutterLoader/MethodChannel),
     // pinned to the EXACT engine version

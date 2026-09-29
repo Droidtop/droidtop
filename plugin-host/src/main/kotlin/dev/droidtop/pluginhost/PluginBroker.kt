@@ -202,6 +202,84 @@ object HostApis {
 }
 
 /**
+ * Why [provider] may not serve [api] right now, or null. A `priv.*` or `root.*` API from a source droidtop has not checked
+ * needs the provider's own `plugins.export_privileged` grant (docs/plugin-api.md 2.7, 2.8); an official provider does not.
+ */
+internal fun privilegedExportBlock(env: BrokerEnvironment, provider: PluginRecord, api: String): String? {
+    val privileged = api.startsWith("priv.") || api.startsWith("root.")
+    if (!privileged || env.isOfficial(provider.manifest.origin)) return null
+    val granted = PluginGrants.stateOf(provider, env.grants(provider.manifest.id), "plugins.export_privileged") == GrantState.GRANTED
+    return if (granted) null else "${provider.manifest.label} has not been allowed to give other plugins system access"
+}
+
+/**
+ * droidtop's own code calling a provider plugin (docs/plugin-api.md 2.4), for a feature that is the user's own action
+ * inside droidtop: Quit to Library force-stopping an emulator, for one. There is no caller plugin, so no caller grant is
+ * checked; everything about the provider still is: it must be running, its export switched on, and a privileged API
+ * from an unchecked source needs its `plugins.export_privileged` grant. The call carries `caller: {kind: "host"}` and
+ * the provider's side is audited. Only quick ops: a job op is refused here.
+ */
+class HostApiCaller(private val env: BrokerEnvironment) {
+    /** True when a running plugin provides [api] at [version], so a caller can tell "no helper installed" from "the helper failed". */
+    fun hasProvider(api: String, version: Int): Boolean =
+        PluginApiResolver.providerFor(env.resolution(), "", RequiredApi(api, "$version.0", optional = true), env.providerChoice(api)) != null
+
+    fun call(api: String, version: Int, op: String, args: JSONObject): PluginReply {
+        val required = RequiredApi(api, "$version.0", optional = true)
+        val provider = PluginApiResolver.providerFor(env.resolution(), "", required, env.providerChoice(api))
+            ?: return PluginReply.error(PluginErrorCode.PROVIDER_UNAVAILABLE, "no plugin provides $api")
+        val exportedOp = provider.export.ops.firstOrNull { it.op == op }
+            ?: return PluginReply.error(PluginErrorCode.UNSUPPORTED, "$api has no op $op")
+        if (exportedOp.job) return PluginReply.error(PluginErrorCode.UNSUPPORTED, "$api $op is a job and cannot be called from here")
+        val record = env.record(provider.plugin.manifest.id)?.takeIf { it.runnable() }
+            ?: return PluginReply.error(PluginErrorCode.PROVIDER_UNAVAILABLE, "${provider.plugin.manifest.label} is not running")
+        privilegedExportBlock(env, record, api)?.let { return PluginReply.error(PluginErrorCode.PROVIDER_UNAVAILABLE, it) }
+        val timeout = PluginRunner.CALL_TIMEOUT_MS - BrokerCore.PROVIDER_MARGIN_MS
+        val call = PluginCall(
+            callId = "c-" + UUID.randomUUID().toString().take(8),
+            deadlineMs = timeout,
+            point = "api:$api",
+            version = version,
+            op = op,
+            caller = JSONObject().put("kind", "host"),
+            args = args,
+        )
+        val reply = env.forward(record, call, timeout)
+        val permission = PluginPermissions.find(exportedOp.permission)
+        if (permission == null || permission.tier != PermissionTier.NORMAL) {
+            env.audit(
+                record.manifest.id,
+                AuditEntry(env.nowMs(), exportedOp.permission, api, "served $op for droidtop", args.optString("package"), emptyList(), if (reply.ok) "ok" else (reply.code?.name ?: "FAILED")),
+            )
+        }
+        return reply
+    }
+}
+
+/** Quit to Library's second way (docs/plugin-api.md 2.7): ask a `priv.packages` provider to force-stop a package. */
+object ForceStop {
+    sealed interface Result {
+        /** The provider ended the package. */
+        data object Stopped : Result
+
+        /** No running plugin provides `priv.packages`: nothing was tried. */
+        data object NoProvider : Result
+
+        /** A provider tried and could not, or refused: [message] is what it said. */
+        data class Failed(val message: String) : Result
+    }
+
+    private val packageName = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+\$")
+
+    fun request(caller: HostApiCaller, target: String): Result {
+        if (!packageName.matches(target)) return Result.Failed("$target is not a package name")
+        if (!caller.hasProvider("priv.packages", 1)) return Result.NoProvider
+        val reply = caller.call("priv.packages", 1, "force_stop", JSONObject().put("package", target))
+        return if (reply.ok && reply.data.optBoolean("stopped", true)) Result.Stopped else Result.Failed(reply.message.orEmpty().ifBlank { "it did not say why" })
+    }
+}
+
+/**
  * The broker for ONE plugin (docs/plugin-api.md 1.4). [pluginId] is fixed at
  * construction: the binder object handed to that plugin's process is the
  * only thing that names the caller, and nothing in a request can. The
@@ -362,12 +440,7 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
             if (providerRecord == null || !providerRecord.runnable()) {
                 throw BrokerException(PluginErrorCode.PROVIDER_UNAVAILABLE, "$providerName is not running")
             }
-            val privileged = request.api.startsWith("priv.") || request.api.startsWith("root.")
-            if (privileged && !env.isOfficial(providerRecord.manifest.origin) &&
-                PluginGrants.stateOf(providerRecord, env.grants(providerRecord.manifest.id), "plugins.export_privileged") != GrantState.GRANTED
-            ) {
-                throw BrokerException(PluginErrorCode.PROVIDER_UNAVAILABLE, "$providerName has not been allowed to give other plugins system access")
-            }
+            privilegedExportBlock(env, providerRecord, request.api)?.let { throw BrokerException(PluginErrorCode.PROVIDER_UNAVAILABLE, it) }
             // The chain is attributed and limited: at most three plugins, no repeats.
             if (providerRecord.manifest.id in chain) throw BrokerException(PluginErrorCode.INVALID_ARGS, "a plugin cannot call itself through a provider")
             if (chain.size + 1 > MAX_CHAIN) throw BrokerException(PluginErrorCode.INVALID_ARGS, "calls between plugins are limited to $MAX_CHAIN deep")

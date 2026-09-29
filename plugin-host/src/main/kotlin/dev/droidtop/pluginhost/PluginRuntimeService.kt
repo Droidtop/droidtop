@@ -430,6 +430,13 @@ class PluginRuntimeService : Service() {
     private fun checkShizukuAccess(context: Context): Boolean {
         val installed = checkPackageInstalled(context, SHIZUKU_MANAGER_PACKAGE)
         if (!installed) return false
+        // Shizuku's own client answers once its binder has arrived (the provider in this module's
+        // manifest receives it): the server is running and droidtop was allowed in Shizuku.
+        val viaBinder = runCatching {
+            rikka.shizuku.Shizuku.pingBinder() &&
+                rikka.shizuku.Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }.getOrNull()
+        if (viaBinder != null) return viaBinder
         return runCatching {
             context.checkSelfPermission(SHIZUKU_PERMISSION) == android.content.pm.PackageManager.PERMISSION_GRANTED
         }.getOrDefault(false)
@@ -464,6 +471,6 @@ class PluginRuntimeService : Service() {
         // hasShizukuAccess doc comment): the permission Shizuku's manager
         // grants once the user pairs and approves it there.
         private const val SHIZUKU_MANAGER_PACKAGE = "moe.shizuku.privileged.api"
-        private const val SHIZUKU_PERMISSION = "moe.shizuku.privileged.api.permission.API_V23"
+        private const val SHIZUKU_PERMISSION = "moe.shizuku.manager.permission.API_V23"
     }
 }

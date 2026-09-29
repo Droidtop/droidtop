@@ -1565,10 +1565,13 @@ arrays under the manifest's own keys (`V2Declarations`).
     `launchAppWithExtras`, which are now broker calls, so a contract 1
     plugin is served by the same code and holds the grants it was
     derived (no new prompts).
-  - Not moved onto the broker: `privateDataDir`, `libraryFolderPath` and
-    `hasRootApproval` are local answers with no host effect, and
-    `hasShizukuAccess` stays the local permission probe until the Shizuku
-    provider (P1-16) answers `plugins.available` for `priv.shell`.
+  - Not moved onto the broker: `privateDataDir`, `libraryFolderPath`,
+    `hasRootApproval` and `hasShizukuAccess` are local answers with no host
+    effect. `hasShizukuAccess` asks Shizuku's own client (its binder has
+    arrived and droidtop is allowed), and falls back to the permission
+    check. It used to test a permission name Shizuku never defines
+    (`moe.shizuku.privileged.api.permission.API_V23` instead of
+    `moe.shizuku.manager.permission.API_V23`), so it always answered false.
   - `PluginContext.call(api, version, op, argsJson)` is `host.call` for a
     `native_bundle` plugin. **The `python` and `flutter_embed` adapters do
     not expose `host.call` yet**, so the parity of §1.3 has this known gap
@@ -1689,6 +1692,44 @@ arrays under the manifest's own keys (`V2Declarations`).
     `action` otherwise. A contract 1 `status_tile` appears as a read-only
     tile through the same path. The Standard and Desktop surfaces of C2 and
     C3 are not built.
+
+**As built (P1-16 in part, #72, and #82's real fix).**
+
+- **Two standard interfaces are specified** for the first provider:
+  - `priv.packages@1`, op `force_stop {package} -> {stopped: true}`,
+    permission `priv.packages` (critical). The op runs
+    `am force-stop <package>` as the ADB-level user.
+  - `priv.shell@1` (attribute `level`: `adb`), op
+    `exec {argv: [string], timeoutMs?} -> {exit, stdout, stderr}`,
+    permission `priv.shell.adb` (critical). `argv` is executed directly, not
+    through a shell, and each stream is capped at 64 KiB.
+  The other `priv.packages` ops of §2.2 (install, uninstall, grant, appop)
+  are not specified or built.
+- **The transport.** Shizuku's server pushes its binder to a content
+  provider named `<applicationId>.shizuku` in each app the user allowed.
+  `:plugin-host` declares Shizuku's own `ShizukuProvider` under that name in
+  `:pluginhost`, the process plugins run in, and depends on Shizuku's client
+  library (`dev.rikka.shizuku:api` and `:provider` 13.1.5, Apache-2.0). The
+  plugin's class loader delegates to the host's first, so the provider
+  plugin references `rikka.shizuku.Shizuku` without bundling it and shares
+  the binder. This is transport only: no other plugin is offered Shizuku,
+  privilege reaches a plugin only through `priv.*` with its own grant, and
+  `hasShizukuAccess` is the one read-only probe. (A full-trust plugin could
+  still call the class directly, as it can anything droidtop's UID can;
+  that is the tier's honest limit, §5.)
+- **The host as a caller.** `HostApiCaller` lets droidtop's own code call a
+  provider for a user's action inside droidtop, with `caller: {kind: "host"}`
+  and no caller grant. It still requires the provider to be running, its
+  export switched on, and `plugins.export_privileged` for a privileged API
+  from a source droidtop has not checked, and it audits the provider's side.
+  Quit to Library uses it through `ForceStop`: a `priv.packages` provider
+  ends the emulator's package; with none installed the row keeps the honest
+  answer of §12a (Android 13 gives droidtop no way to end another app's game)
+  and now says the Shizuku plugin can. A provider that fails says why, and
+  droidtop's running-game state clears only on `Ended` as before.
+- The provider plugin itself is `Droidtop/droidtop-plugin-shizuku`
+  (`droidtop-plugin/`): a contract 2 manifest exporting both interfaces,
+  full-trust, with the existing status tile and app_status surfaces.
 
 **Compatibility promises:**
 

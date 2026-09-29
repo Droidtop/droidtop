@@ -226,6 +226,9 @@ object PluginBrokers {
     fun binderFor(context: Context, pluginId: String): IPluginHostBroker =
         binders.getOrPut(pluginId) { PluginHostBroker(BrokerCore(pluginId, environmentFor(context))) }
 
+    /** droidtop's own calls to provider plugins (Quit to Library's force-stop, for one): see [HostApiCaller]. */
+    fun hostCaller(context: Context): HostApiCaller = HostApiCaller(environmentFor(context))
+
     fun forget(pluginId: String) {
         binders.remove(pluginId)
         active.remove(pluginId)

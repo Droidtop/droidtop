@@ -158,11 +158,10 @@ interface PluginContext {
      * full root don't each reimplement the pairing/permission handshake
      * (cross-cutting need surfaced 2026-09-25 by more than one real
      * plugin design). Best-effort and read-only: checks whether
-     * Shizuku's manager app is installed and whether its
-     * `moe.shizuku.privileged.api.permission.API_V23` permission is
-     * currently granted to droidtop -- the same lightweight check apps
-     * commonly make without depending on Shizuku's own client library --
-     * and returns false rather than throwing when Shizuku is absent,
+     * Shizuku's manager app is installed and whether Shizuku's own client
+     * reports its binder present with droidtop allowed, falling back to
+     * the `moe.shizuku.manager.permission.API_V23` permission being
+     * granted to droidtop, and returns false rather than throwing when Shizuku is absent,
      * unpaired, or the permission was revoked. A plugin still declares
      * [PluginManifest.requestsRoot] or [PluginManifest.boundServiceTargets]
      * for what it actually wants to do; this method only answers whether

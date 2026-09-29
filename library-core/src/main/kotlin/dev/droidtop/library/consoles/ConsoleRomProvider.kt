@@ -978,11 +978,21 @@ class ConsoleRomProvider(
             ?: return QuitResult.Unresolvable("Couldn't resolve a console system for ${entry.id}; the game may have been uninstalled")
         val player = resolvePlayer(context, system, entry.altEmulator)
             ?: return QuitResult.Unresolvable("No emulator is installed for ${system.displayName}, so ${entry.title} can't be ended")
+        // The one thing that really ends another app's game on Android 13: a privileged helper. A plugin
+        // that provides priv.packages (the official Shizuku one) force-stops the package for us; with none
+        // installed this falls through to what a non-privileged app can do, with its honest message.
+        val forced = dev.droidtop.pluginhost.ForceStop.request(dev.droidtop.pluginhost.PluginBrokers.hostCaller(context), player.packageName)
+        if (forced == dev.droidtop.pluginhost.ForceStop.Result.Stopped) return QuitResult.Ended
         killPackageProcessesBestEffort(player.packageName)
-        return if (endLaunchedTaskBestEffort(player.packageName)) QuitResult.Ended
-        else QuitResult.NotEnded(
-            "Asked ${player.name} to close, but Android doesn't let droidtop end or confirm another app's game. " +
-                "Close it from Recents.",
+        if (endLaunchedTaskBestEffort(player.packageName)) return QuitResult.Ended
+        return QuitResult.NotEnded(
+            when (forced) {
+                is dev.droidtop.pluginhost.ForceStop.Result.Failed ->
+                    "The privileged helper couldn't end ${player.name}: ${forced.message}. Close it from Recents."
+                else ->
+                    "Asked ${player.name} to close, but Android doesn't let droidtop end or confirm another app's game. " +
+                        "Close it from Recents, or install the Shizuku plugin so droidtop can end it.",
+            },
         )
     }
 
