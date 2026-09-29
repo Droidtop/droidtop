@@ -4666,6 +4666,31 @@ Android 9 with NoSuchMethodError (dq-onboard-01). A library method the running A
 failed download, never a crash (`ThemeDownloader` catches `LinkageError`). The browser has its own
 hint row.
 
+**The theme index is fetched as one raw HTTPS file, not cloned (decided 2026-09-29).** The index
+(`gitlab.com/es-de/themes/themes-list.git`) used to be a full JGit clone: JGit 5.13 has no
+`CloneCommand.setDepth` (a JGit 6.4 addition), a shallow clone is what real ES-DE asks libgit2
+for, and the full-history clone measured about four minutes on the rig. Bumping JGit to get
+`setDepth` is not safe: 6.4.0, the first line with it (confirmed by reading the real jar's
+`CloneCommand`), still cannot run on minSdk 26 -- its own clone/checkout path (`DirCacheCheckout`)
+calls `InputStream.transferTo` and its `StringUtils`/`CommitConfig` call `String.strip`/
+`stripTrailing`, all Android API 33 additions; the latest `desugar_jdk_libs` (2.1.5) bridges
+`transferTo` but ships no shim for the String methods, and the build carries no core-library
+desugaring anyway -- and 7.x is the line that crashed dq-onboard-01 above (its
+`InputStream.readNBytes`). So the pin stays and the index changed
+route instead: `ThemeDownloader.syncThemesList` downloads `themes.json` alone, from GitLab's
+raw-file endpoint of the same repo (master, its own default branch; 153 KB measured), validates
+it as JSON before it replaces the old list, reports UP_TO_DATE when the bytes did not change, and
+feeds real byte counts into the same `withStallWatchdog` progress/stall wiring the clones use --
+one progress and stall mechanism for both routes. The git clone path stays for the per-theme
+downloads and the theme patches, where git semantics (fast-forward-only, divergence reporting) are
+actually needed; nothing clones the index anymore, so no second index mechanism exists. Two
+follow-ons fall out of the same route: the downloaded file's own mtime is now what "a week old"
+reads (the clone's `FETCH_HEAD` used to), and the browser's screenshot previews stream from the
+index repo's raw endpoint on demand through Coil (`coil-network-okhttp`, the network fetcher
+coil3 does not bundle; disk-cached after first view) instead of arriving with the index -- a
+one-time cleanup drops an old install's index-clone `.git` history and `screenshots/` tree after
+its first successful raw fetch.
+
 **Onboarding survives becoming Home (decided 2026-09-25).** droidtop is a Home candidate from the
 moment it is installed, and a person may make it the Home app before or during setup: in Android's
 chooser, in Settings > Default apps, or through the Home screen step itself. So every droidtop entry
@@ -5650,10 +5675,11 @@ summary):
   folder is a valid theme iff it has `capabilities.xml`; the active
   theme is a stored name falling back to the first theme alphabetically,
   never a hardcoded folder name) and a real JGit-based theme downloader
-  (`ThemeDownloader`, clones the real `gitlab.com/es-de/themes/
-  themes-list.git` index the same way real ES-DE's own
-  `GuiThemeDownloader` does) with a real browse/download UI
-  (`ThemeBrowserScreen`, including real per-theme screenshot previews).
+  (`ThemeDownloader`: each theme repo cloned the same way real ES-DE's
+  own `GuiThemeDownloader` does; the `themes-list` index itself fetched
+  as one raw HTTPS file, §7b's raw-file decision) with a real
+  browse/download UI (`ThemeBrowserScreen`, including real per-theme
+  screenshot previews, streamed from the index repo on demand).
 - Real per-system (`carousel`/`grid`/`textlist` list-widget positioning/
   scale/animation, ported from `CarouselComponent.h`/`GridComponent.h`)
   AND per-game gamelist rendering — ONE real, generic render path
@@ -6780,10 +6806,10 @@ controller family) are what these rows write, and the renderer reads
 them.
 
 **Browse themes** opens on the index and, when the index is empty or
-older than a week (its clone's `FETCH_HEAD`), fetches it in place first
-(a git fetch reports no count while it runs, so the screen says it is
-fetching, then shows the list; a failed fetch with no list says so and A
-retries); there is no separate "Sync theme index" row, and the screen uses
+older than a week (the downloaded `themes.json`'s own mtime), fetches it
+in place first (the raw-file fetch reports real byte counts while it
+runs; a failed fetch with no list says so and A retries); there is no
+separate "Sync theme index" row, and the screen uses
 the shell's gutter and palette tokens like every other screen.
 
 **Gamelists are flat, by decision.** ES-DE lets a gamelist enter
