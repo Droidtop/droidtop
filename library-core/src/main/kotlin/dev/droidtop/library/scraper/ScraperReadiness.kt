@@ -66,12 +66,25 @@ object ScraperReadiness {
             "$SCRAPER_SETTINGS > SteamGridDB > API key. Lutris needs no account at all if you would rather not."
 
     /**
-     * What to change when [refusal] is a source rejecting the credentials it
-     * was sent (HTTP 401 or 403 from a source that takes a key or an
-     * account); null for any other refusal, which is not the person's to fix.
+     * Whether [refusal] is the server rejecting the credentials the source
+     * was sent: a 401 or 403, and the one 400 that is one -- IGDB's Twitch
+     * sign-in answers a wrong Client ID or Secret with HTTP 400, not
+     * 401/403 (Twitch's own OAuth2 token endpoint, observed in the review
+     * of 64d6547d, 2026-09-29). Such a refusal will be identical on the
+     * next request, so [PcFlavour] silences the source for the pass and
+     * [credentialFix] names the setting.
+     */
+    fun rejectedCredentials(refusal: ScrapeLookup.Refused): Boolean =
+        refusal.httpStatus == 401 || refusal.httpStatus == 403 ||
+            (refusal.httpStatus == 400 && refusal.source == IgdbScraperClient.SIGNIN_SOURCE)
+
+    /**
+     * What to change when [refusal] is a source rejecting the credentials
+     * it was sent (see [rejectedCredentials]); null for any other refusal,
+     * which is not the person's to fix.
      */
     fun credentialFix(refusal: ScrapeLookup.Refused): String? {
-        if (refusal.httpStatus != 401 && refusal.httpStatus != 403) return null
+        if (!rejectedCredentials(refusal)) return null
         return when {
             refusal.source == "TheGamesDB" ->
                 "Check the API key under $SCRAPER_SETTINGS > TheGamesDB > API key."
