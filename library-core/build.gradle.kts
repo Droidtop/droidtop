@@ -135,6 +135,14 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
+    // RomDatabaseMigrationTest walks the game_metadata migration chain over
+    // a real SQLite file and opens the migrated file with Room itself; a
+    // plain JVM test cannot do either (android.jar's SQLiteDatabase is a
+    // throwing stub, and Room's builder needs a working Context). Robolectric
+    // -- the version the catalog already pins -- supplies the real framework
+    // SQLite and the real Context, so the test's check is Room's own
+    // post-migration schema validation, not a reimplementation of it.
+    testImplementation(libs.robolectric)
     // The registry parser (EngineRegistryParser) runs in JVM unit tests
     // against the real shipped seed JSON; android.jar's org.json is a
     // throwing stub there, so the real library backs the tests.
