@@ -991,7 +991,7 @@ class ConsoleRomProvider(
                     "The privileged helper couldn't end ${player.name}: ${forced.message}. Close it from Recents."
                 else ->
                     "Asked ${player.name} to close, but Android doesn't let droidtop end or confirm another app's game. " +
-                        "Close it from Recents, or install the Shizuku plugin so droidtop can end it.",
+                        "Close it from Recents, or install the Shizuku plugin so droidtop can end it."
             },
         )
     }
