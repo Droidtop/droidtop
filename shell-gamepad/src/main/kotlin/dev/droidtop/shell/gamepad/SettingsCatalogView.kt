@@ -538,14 +538,15 @@ fun CatalogNavigator(
  * The settings navigator's screen stack as one savable value: the live
  * [CatalogScreen]s carry builder lambdas and cannot go into saved state,
  * so the stack saves as its screens' ids and re-resolves the pushed ones
- * through [SettingsScreenRegistry] on the way out. Every screen the
- * Settings tab itself can push is a registered one -- the root catalogs
- * reference them by registryId precisely so this module does not depend
- * on their data -- and an id that resolves to nothing (a screen some
- * surface pushed inline, or one whose owner no longer registers it)
- * ends the restore at the last resolvable screen rather than dropping
- * the whole stack. The root always comes from the caller, never from the
- * saved ids, so a call site that changed its root keeps its new one.
+ * through [SettingsScreenRegistry.resolveStack] on the way out -- the one
+ * definition of that restore, shared with the Preference surface's
+ * navigator. Every screen the Settings tab itself can push is a
+ * registered one -- the root catalogs reference them by registryId
+ * precisely so this module does not depend on their data -- and an id
+ * that resolves to nothing ends the restore at the last resolvable
+ * screen rather than dropping the whole stack. The root always comes
+ * from the caller, never from the saved ids, so a call site that changed
+ * its root keeps its new one.
  */
 internal fun catalogStackSaver(root: CatalogScreen): Saver<SnapshotStateList<CatalogScreen>, Any> = listSaver(
     save = { screens -> screens.map { it.id } },
@@ -553,12 +554,7 @@ internal fun catalogStackSaver(root: CatalogScreen): Saver<SnapshotStateList<Cat
         if (ids.firstOrNull() != root.id) {
             null
         } else {
-            mutableStateListOf(root).apply {
-                for (id in ids.drop(1)) {
-                    val screen = SettingsScreenRegistry.get(id) ?: break
-                    add(screen)
-                }
-            }
+            mutableStateListOf(root).apply { addAll(SettingsScreenRegistry.resolveStack(ids.drop(1))) }
         }
     },
 )

@@ -3,6 +3,7 @@ package app.murinelauncher.settings.common
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -21,6 +22,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceGroup
+import androidx.preference.PreferenceGroupAdapter
 import androidx.preference.SwitchPreferenceCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -36,6 +38,7 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.SettingsSearchIndex
 import dev.droidtop.library.settings.SettingsSearchResult
 import dev.droidtop.library.settings.SliderItem
@@ -92,9 +95,32 @@ class CatalogPreferenceNavigator(
     private val enableSearch: Boolean = false,
     private val rootScreenId: String = "root",
     private val rootTitle: String = "",
+    /**
+     * The fragment's saved instance state, so the recreate a Text size
+     * change triggers (AccessibilityPrefs, Droidtop/tracker#139)
+     * restores this navigator's place instead of rebuilding it from the
+     * root: the pushed screen stack, saved as its screens' registry ids,
+     * and the focused row's key, refocused on the rebuilt screen.
+     */
+    savedState: Bundle? = null,
 ) {
     private val stack = ArrayDeque<CatalogScreen>()
     private var focusRingAttached = false
+
+    /**
+     * The row to refocus after the restore, consumed by the rows' attach
+     * listener (see [applyRestoreFocus]): the first rebuild runs before
+     * the fragment view exists, so there is no list to scroll or focus
+     * until the rebuilt screen's rows start attaching.
+     */
+    private var restoreFocusKey: String? = null
+
+    /**
+     * The row the user last activated. In touch mode a tapped row holds
+     * no focus, so the focused view alone cannot name the row a
+     * value-pick recreated from; this is the fallback [saveState] saves.
+     */
+    private var activatedKey: String? = null
 
     // Last outcome per async item id, so the rebuild that follows an
     // AsyncActionItem keeps its result on the row (the gamepad renderer's
@@ -139,9 +165,101 @@ class CatalogPreferenceNavigator(
 
     init {
         fragment.requireActivity().onBackPressedDispatcher.addCallback(fragment, backCallback)
+        // The recreate restore: pushed screens come back as their registry
+        // ids, resolved through the same registry that resolves pushes,
+        // stopping at the first id nothing registers (the same rule the
+        // Gaming shell's saver applies, Droidtop/tracker#87) so the
+        // restore ends at the last screen that still resolves rather
+        // than dropping the stack.
+        savedState?.getStringArray(KEY_STACK)?.let { ids ->
+            stack.addAll(SettingsScreenRegistry.resolveStack(ids.toList()))
+        }
+        savedState?.getString(KEY_FOCUS_ROW)?.takeIf { it.isNotEmpty() }?.let { key ->
+            restoreFocusKey = key
+            // Applied once the view exists; see [applyRestoreFocus].
+            fragment.viewLifecycleOwnerLiveData.observe(fragment) { owner ->
+                if (owner != null) applyRestoreFocus()
+            }
+        }
+    }
+
+    /**
+     * Saves this navigator's place for the recreate the Text size
+     * setting triggers (Droidtop/tracker#139): the pushed screens as
+     * their registry ids, and the row to refocus -- the focused row, or
+     * in touch mode (where a tapped row holds no focus) the row last
+     * activated. Colour vision needs none of this: it recolours the live
+     * window without a recreate.
+     */
+    fun saveState(outState: Bundle) {
+        outState.putStringArray(KEY_STACK, stack.map { it.id }.toTypedArray())
+        (focusedRowKey() ?: activatedKey)?.let { key -> outState.putString(KEY_FOCUS_ROW, key) }
+    }
+
+    /**
+     * The focused row's preference key, or null when no row holds focus
+     * (a list nobody drove with a pad or keyboard -- touch mode).
+     */
+    private fun focusedRowKey(): String? {
+        val list = try { fragment.listView } catch (_: RuntimeException) { null } ?: return null
+        val focused = list.focusedChild ?: return null
+        val position = list.getChildAdapterPosition(focused)
+        if (position < 0) return null
+        val adapter = list.adapter as? PreferenceGroupAdapter ?: return null
+        return adapter.getItem(position)?.key
+    }
+
+    /**
+     * The restore's focus half, once the fragment view exists: attaches
+     * the rows' focus listener BEFORE the first layout, so the rows take
+     * focusability from it as they attach (the first rebuild ran too
+     * early to), and schedules the scroll that brings the saved row in.
+     * The focus itself is taken by [focusRowIfRestored] as that row
+     * attaches -- a posted requestFocus would race the layout pass that
+     * has to create the row's view holder first. Idempotent and called
+     * both when the view appears (the observer [init] registers) and at
+     * the end of every rebuild: a screen whose groups suspend (a pushed
+     * management screen reading Room or the filesystem) is only built
+     * once the view already existed, so the first call found no adapter
+     * and left the key pending.
+     */
+    private fun applyRestoreFocus() {
+        val key = restoreFocusKey ?: return
+        val list = try { fragment.listView } catch (_: RuntimeException) { null } ?: return
+        // No adapter yet: the restored screen is not built. Leave the key
+        // pending for the rebuild that is building it.
+        val adapter = list.adapter as? PreferenceGroup.PreferencePositionCallback ?: return
+        val position = adapter.getPreferenceAdapterPosition(key)
+        if (position < 0) {
+            // The restored screen no longer has the saved row: no focus
+            // to restore, and nothing to wait for either.
+            restoreFocusKey = null
+            return
+        }
+        ensureFocusRing()
+        list.scrollToPosition(position)
+    }
+
+    /**
+     * Gives the restored row focus the moment it attaches, in touch mode
+     * too: the attach listener has just made the row
+     * focusable-in-touch-mode, without which requestFocus is dropped.
+     */
+    private fun focusRowIfRestored(view: View) {
+        val key = restoreFocusKey ?: return
+        val list = try { fragment.listView } catch (_: RuntimeException) { null } ?: return
+        val position = list.getChildAdapterPosition(view)
+        if (position < 0) return
+        val adapter = list.adapter as? PreferenceGroupAdapter ?: return
+        if (adapter.getItem(position)?.key != key) return
+        restoreFocusKey = null
+        view.requestFocus()
     }
 
     fun rebuild(focusKey: String? = null) {
+        // An explicit focus target (search navigation) supersedes any
+        // restore still pending.
+        if (focusKey != null) restoreFocusKey = null
         val context = fragment.preferenceManager.context
         fragment.lifecycleScope.launch {
             val screen = stack.lastOrNull()
@@ -320,6 +438,7 @@ class CatalogPreferenceNavigator(
                 // row reached by a tap rather than at screen-open time.
                 view.isFocusableInTouchMode = true
                 view.foreground = ContextCompat.getDrawable(view.context, R.drawable.catalog_row_focus_ring)
+                focusRowIfRestored(view)
             }
             override fun onChildViewDetachedFromWindow(view: View) {}
         })
@@ -370,6 +489,16 @@ class CatalogPreferenceNavigator(
             summary = listOfNotNull(item.currentLabel()?.takeIf { it.isNotBlank() }, item.subtitle)
                 .joinToString("  ·  ")
                 .ifBlank { null }
+            // Remember the row was used: picking a value from this row's
+            // dialog is the one catalog action that recreates the
+            // foreground activity (Text size, Droidtop/tracker#139), and
+            // in touch mode the row holds no focus for the save to read,
+            // so the activated row is what the restore refocuses.
+            // Returning false lets the framework open the dialog.
+            setOnPreferenceClickListener {
+                activatedKey = item.id
+                false
+            }
             setOnPreferenceChangeListener { _, newValue ->
                 item.onSelect(context, newValue as String)
                 rebuild()
@@ -512,6 +641,12 @@ class CatalogPreferenceNavigator(
             // via SettingsActivity's own onPreferenceStartFragment.
             this.fragment = item.fragmentClassName
         }
+    }
+
+    private companion object {
+        /** Saved-state keys: the pushed screens' registry ids, and the row to refocus. */
+        const val KEY_STACK = "catalog_nav_stack"
+        const val KEY_FOCUS_ROW = "catalog_nav_focus_row"
     }
 }
 

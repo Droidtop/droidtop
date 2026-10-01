@@ -342,6 +342,26 @@ object SettingsScreenRegistry {
         screens[id]?.let { screen ->
             if (deepLink == null) screen else screen.forDeepLink?.invoke(deepLink) ?: screen
         }
+
+    /**
+     * Rebuilds a pushed screen stack from the ids a renderer saved across
+     * an Activity recreate (the one the Text size setting triggers,
+     * Droidtop/tracker#87 and #139): live [CatalogScreen]s carry builder
+     * lambdas and cannot go into saved state, so what is saved is the
+     * ids. Resolves them in order and stops at the first id nothing
+     * registers -- a screen some surface pushed inline, or one its owner
+     * no longer registers -- so the restore ends at the last screen that
+     * still resolves rather than dropping the whole stack. The one
+     * definition both renderers that save a stack restore through
+     * (:shell-gamepad's `catalogStackSaver`, :shell-default's
+     * `CatalogPreferenceNavigator`).
+     */
+    fun resolveStack(ids: List<String>): List<CatalogScreen> = buildList {
+        for (id in ids) {
+            val screen = get(id) ?: break
+            add(screen)
+        }
+    }
 }
 
 /** Shared helpers for catalogs storing into the launcher prefs file. */

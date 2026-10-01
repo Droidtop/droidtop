@@ -36,4 +36,34 @@ class SettingsScreenRegistryTest {
         assertNull(SettingsScreenRegistry.get("registry_test_missing"))
         assertNull(SettingsScreenRegistry.get("registry_test_missing", "n64"))
     }
+
+    @Test
+    fun `a saved stack resolves back to its screens`() {
+        SettingsScreenRegistry.register(screen("registry_test_stack_a", "Accounts"))
+        SettingsScreenRegistry.register(screen("registry_test_stack_b", "Updates"))
+
+        val resolved = SettingsScreenRegistry.resolveStack(
+            listOf("registry_test_stack_a", "registry_test_stack_b"),
+        )
+
+        assertEquals(listOf("registry_test_stack_a", "registry_test_stack_b"), resolved.map { it.id })
+    }
+
+    @Test
+    fun `a saved stack resolves until an id nothing registers`() {
+        SettingsScreenRegistry.register(screen("registry_test_stack_a", "Accounts"))
+
+        val resolved = SettingsScreenRegistry.resolveStack(
+            listOf("registry_test_stack_a", "registry_test_missing", "registry_test_stack_c"),
+        )
+
+        // The restore ends at the last screen that still resolves rather
+        // than dropping the whole stack.
+        assertEquals(listOf("registry_test_stack_a"), resolved.map { it.id })
+    }
+
+    @Test
+    fun `a stack whose first id is gone resolves to nothing`() {
+        assertEquals(emptyList<CatalogScreen>(), SettingsScreenRegistry.resolveStack(listOf("registry_test_missing")))
+    }
 }

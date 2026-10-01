@@ -9896,7 +9896,15 @@ opts in.
   row (`CatalogNavigator`'s savers, pushed screens re-resolved through
   `SettingsScreenRegistry` by id, so no live builder goes into saved state), are saveable and
   restored across it; and MainActivity applies Gaming deep-link extras only on a fresh
-  create, because a recreate is not a new delivery (onNewIntent still is). Colour vision
+  create, because a recreate is not a new delivery (onNewIntent still is). The Standard
+  shell's settings screens keep their place across the same recreate
+  (Droidtop/tracker#139): Android itself rebuilds the hosting fragment, and
+  `CatalogPreferenceNavigator` saves its pushed screen stack (as registry ids) and the row
+  to refocus -- the focused row, or in touch mode the row last activated -- into the
+  fragment's saved state, restores the stack through the one shared
+  `SettingsScreenRegistry.resolveStack`, and refocuses the saved row as it attaches to the
+  rebuilt list, after the rows' own attach listener has made it focusable, so the focus
+  takes in touch mode too. Colour vision
   needs none of this: its filter recolours the live window without a recreate.
   Themed views follow it only where the theme's own sizes use the Density (they are the
   theme author's, as above). Layout at 1.5 is not rig-verified: the one-row-height rule was
