@@ -58,7 +58,7 @@ class PcContainerConfigActivity : AppCompatActivity() {
         val entryId = intent.getStringExtra(EXTRA_ENTRY_ID)
         val title = intent.getStringExtra(EXTRA_TITLE)
         setContent {
-            DroidtopTheme(darkTheme = true) {
+            DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 ContainerConfig(entryId = entryId, gameTitle = title, onClose = { finish() })
             }
         }

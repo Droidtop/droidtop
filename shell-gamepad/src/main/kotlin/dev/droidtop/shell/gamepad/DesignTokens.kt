@@ -253,69 +253,79 @@ object ChromeColors {
 /**
  * The shell's own colour palette, and the only one its menus may use.
  *
- * These are ABSOLUTE values against [OverlaySurface], not a theme-aware
- * scheme: the fills are white at low alpha and the text is white, which
- * is legible over this surface and over nothing else. So any surface
- * that hosts them has to be painted from this same object -- a panel
- * painted with `MaterialTheme.colorScheme.surface` is white wherever the
- * platform is in a light colour state, and these tokens then render
- * white on white (the Quick Menu's System tab did exactly that; see
- * QuickMenu.kt). One palette for the shell, not a platform scheme
- * underneath a hand-picked one.
+ * Every role here is a getter on the live [GamingTheme] palette: while a
+ * Gaming surface is on screen the palette is the active ES-DE theme's
+ * (`GamingThemeMapping`, docs/SPEC.md "Gaming theming"), read from the
+ * theme's own declared colours and held to WCAG AA, and otherwise it is
+ * droidtop's own values, which are the ones this file used to hold as
+ * literals. A screen reads the role and never knows which; because the
+ * palette is snapshot state, a theme change redraws every reader.
+ *
+ * The roles are RELATED, not independent: the fills are the text ink at
+ * low alpha and the cards are the ground mixed toward that ink, so a set
+ * is legible together over [OverlaySurface] and [Ground] and over nothing
+ * else. Any surface that hosts them therefore paints from this same
+ * object -- a panel painted with `MaterialTheme.colorScheme.surface` is
+ * white wherever the platform is in a light colour state, and these
+ * tokens then render white on white (the Quick Menu's System tab did
+ * exactly that; see QuickMenu.kt). One palette for the shell, not a
+ * platform scheme underneath a hand-picked one.
  *
  * The shell's own PAGES -- the game grid and a game's detail, the PC
  * surface, the editors and pickers the shell opens full-screen -- are the
- * same family on a different ground: they sit on [Ground], and their
- * cards, plates and text are the roles below [Ground]. Every one of them
- * is absolute too, and `MenuTokensContrastTest` holds each text role to a
- * floor over every surface it is drawn on.
+ * same family on a different ground: they sit on [Ground] (painted with
+ * `Modifier.groundBackground()`, which also lays the theme's own texture
+ * where it has one), and their cards, plates and text are the roles below
+ * [Ground]. `MenuTokensContrastTest` holds each text role to a floor over
+ * every surface it is drawn on, for droidtop's own palette, and
+ * `GamingThemeMappingTest` does the same for a theme's.
  */
 object MenuTokens {
-    val Surface = Color(0x0DFFFFFF)
-    val SurfaceSelected = Color(0x2BFFFFFF)
-    val OverlaySurface = Color(0xFF1C2027)
-    val OnSurface = Color.White
-    val OnSurfaceMuted = Color(0xFF8A93A1)
-    val Value = Color(0xFFAEB7C4)
-    val Placeholder = Color(0xFF6B7480)
-    val Accent = Color(0xFF8AB4FF)
-    val Danger = Color(0xFFFFB4AB)
+    val Surface: Color get() = GamingTheme.palette.rowFill
+    val SurfaceSelected: Color get() = GamingTheme.palette.rowFillSelected
+    val OverlaySurface: Color get() = GamingTheme.palette.overlaySurface
+    val OnSurface: Color get() = GamingTheme.palette.onSurface
+    val OnSurfaceMuted: Color get() = GamingTheme.palette.onSurfaceMuted
+    val Value: Color get() = GamingTheme.palette.value
+    val Placeholder: Color get() = GamingTheme.palette.placeholder
+    val Accent: Color get() = GamingTheme.palette.accent
+    val Danger: Color get() = GamingTheme.palette.danger
     /** "This is on / included" -- the one affirmative in the menus. */
-    val Affirmative = Color(0xFF7FE08A)
-    val SectionLabel = Color(0xFF7D8794)
+    val Affirmative: Color get() = GamingTheme.palette.affirmative
+    val SectionLabel: Color get() = GamingTheme.palette.sectionLabel
 
     /** Behind every page the shell draws: the grid, a detail, the PC surface. */
-    val Ground = Color.Black
+    val Ground: Color get() = GamingTheme.palette.ground
     /** A card or plate on [Ground]: a game card, a detail's artwork plate. */
-    val Card = Color(0xFF1A1A1A)
+    val Card: Color get() = GamingTheme.palette.card
     /** The brightened card: the one selection idiom on a page. */
-    val CardFocused = Color(0xFF2A2A2A)
+    val CardFocused: Color get() = GamingTheme.palette.cardFocused
     /** A row sunk into a page (a detail's action rows, the runner picker). */
-    val CardInset = Color(0xFF141414)
+    val CardInset: Color get() = GamingTheme.palette.cardInset
     /** The hairline edge of a card that is not focused; focused, it is [Accent]. */
-    val CardOutline = Color(0x1FFFFFFF)
+    val CardOutline: Color get() = GamingTheme.palette.cardOutline
     /** A chosen chip or tab, drawn solid, and the label on it. */
-    val Selected = Color.White
-    val OnSelected = Color.Black
+    val Selected: Color get() = GamingTheme.palette.selected
+    val OnSelected: Color get() = GamingTheme.palette.onSelected
     /** Under text laid over artwork: the gradient's dark end. */
-    val Scrim = Color(0xCC000000)
+    val Scrim: Color get() = GamingTheme.palette.scrim
     /** The favourite mark. */
-    val Favourite = Color(0xFFFFD700)
+    val Favourite: Color get() = GamingTheme.palette.favourite
     /** The plate behind a [Danger] message that sits over the page. */
-    val DangerPlate = Color(0xCC330E0B)
+    val DangerPlate: Color get() = GamingTheme.palette.dangerPlate
     /** The one primary action on a detail (Play), and its states. */
-    val Launch = Color(0xFF2B5C3C)
-    val LaunchFocused = Color(0xFF3D7A52)
-    val LaunchDisabled = Color(0xFF232323)
+    val Launch: Color get() = GamingTheme.palette.launch
+    val LaunchFocused: Color get() = GamingTheme.palette.launchFocused
+    val LaunchDisabled: Color get() = GamingTheme.palette.launchDisabled
     /** The supporting line on [Launch]. */
-    val OnLaunchMuted = Color(0xFFD7E6DC)
+    val OnLaunchMuted: Color get() = GamingTheme.palette.onLaunchMuted
     /**
      * Every label on a control that is not available, its title and its
      * supporting line alike. Faded by the one value droidtop's chrome
      * fades by, never by a grey of its own; a faded [Value] falls under
      * 3:1 on [CardFocused], which is where a disabled row is looked at.
      */
-    val OnSurfaceDisabled = OnSurface.copy(alpha = ChromeColors.DisabledAlpha)
+    val OnSurfaceDisabled: Color get() = GamingTheme.palette.onSurfaceDisabled
     /**
      * The hint bar's own plate, where it has one, and a hint pill's
      * outline. It has none over a themed view: real ES-DE's HelpComponent
@@ -323,8 +333,8 @@ object MenuTokens {
      * an opaque strip there covers the plate the theme drew for exactly
      * this row (rig, build 548).
      */
-    val HintBar = Color(0xFF111111)
-    val HintPillOutline = Color(0x33FFFFFF)
+    val HintBar: Color get() = GamingTheme.palette.hintBar
+    val HintPillOutline: Color get() = GamingTheme.palette.hintPillOutline
 
     val RowShape = RoundedCornerShape(10.dp)
     val OverlayShape = RoundedCornerShape(14.dp)
@@ -388,7 +398,7 @@ object MenuTokens {
      */
     val FrameBarHeight = 44.dp
     val FrameBarHeightTouch = 52.dp
-    val FrameHairline = CardOutline
+    val FrameHairline: Color get() = CardOutline
 
     /** The selected tab's pill, and the L1/R1 badges beside the tabs, share this height. */
     val TabPillHeight = 32.dp

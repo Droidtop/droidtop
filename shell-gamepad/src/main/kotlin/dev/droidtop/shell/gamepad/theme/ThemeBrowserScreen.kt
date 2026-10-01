@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.theme
 
+import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -169,7 +170,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
     BackHandler { onDismiss() }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(MenuTokens.Ground)
+        modifier = Modifier.fillMaxSize().groundBackground()
             .onPad { press ->
                 if (press.action == GamepadAction.B) {
                     onDismiss()

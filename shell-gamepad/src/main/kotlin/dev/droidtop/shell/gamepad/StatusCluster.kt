@@ -129,7 +129,7 @@ private fun NetworkGlyph(status: SystemStatusSnapshot) {
     }
     val tint = if (kind == NetworkKind.NONE || !status.validated) attention else normal
     Canvas(Modifier.size(width = 18.dp, height = 14.dp)) {
-        val dim = Color(0x40FFFFFF)
+        val dim = normal.copy(alpha = 0.3f)
         if (kind == NetworkKind.WIFI || kind == NetworkKind.NONE) {
             // Three arcs over a dot, centred on the bottom middle.
             val cx = size.width / 2f

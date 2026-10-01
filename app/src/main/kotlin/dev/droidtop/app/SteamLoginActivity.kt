@@ -65,7 +65,7 @@ class SteamLoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            DroidtopTheme(darkTheme = true) {
+            DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 Scaffold { padding ->
                     Column(
                         modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp),

@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import dev.droidtop.shell.gamepad.groundBackground
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -206,7 +207,13 @@ class OnboardingActivity : AppCompatActivity() {
             // to follow the system setting, so a device in light mode got
             // a white first run that dropped into an always-dark Gaming
             // shell at the end of it (SPEC 7b).
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+            dev.droidtop.app.ui.DroidtopTheme(
+                darkTheme = true,
+                // Entered from Gaming (a step re-opened from its Settings)
+                // the screens wear the Gaming theme; a first run is
+                // still choosing one.
+                gamingThemed = onboardingRun.startStep != null && dev.droidtop.app.ui.rememberGamingThemed(),
+            ) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     dev.droidtop.shell.gamepad.LocalShellWindow provides currentShellWindow(),
                 ) {
@@ -1869,7 +1876,7 @@ private fun AppearanceStep(
         }
         // The same Back as every other onboarding page, top left; the
         // browser is shared with Settings and has none of its own.
-        Column(Modifier.fillMaxSize().background(MenuTokens.Ground).systemBarsPadding()) {
+        Column(Modifier.fillMaxSize().groundBackground().systemBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = currentShellWindow().edgePadding, vertical = Space.Lg)) {
                 PadButton("Back", closeBrowser)
             }

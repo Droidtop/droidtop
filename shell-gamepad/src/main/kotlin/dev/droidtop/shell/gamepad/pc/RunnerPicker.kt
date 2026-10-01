@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -159,7 +160,7 @@ private fun PickerPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MenuTokens.Ground)
+            .groundBackground()
             .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
             .onPad { press ->
                 if (press.action == GamepadAction.B) {

@@ -48,7 +48,7 @@ internal fun LaunchScreen(entry: LibraryEntry, via: String? = null) {
         label = "launch-pulse-alpha",
     )
 
-    Box(Modifier.fillMaxSize().background(MenuTokens.Ground), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().groundBackground(), contentAlignment = Alignment.Center) {
         entry.artworkUri?.let { art ->
             AsyncImage(
                 model = art,

@@ -66,7 +66,7 @@ class PcStoreActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         val entryId = intent.getStringExtra(EXTRA_ENTRY_ID)
         setContent {
-            DroidtopTheme(darkTheme = true) {
+            DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 if (entryId == null) {
                     DownloadsQueue(onBack = { finish() })
                 } else {

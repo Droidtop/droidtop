@@ -79,7 +79,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
     }
 
     val current = loaded ?: run {
-        Column(modifier = Modifier.fillMaxSize().background(MenuTokens.Ground).padding(LocalShellWindow.current.edgePadding)) {
+        Column(modifier = Modifier.fillMaxSize().groundBackground().padding(LocalShellWindow.current.edgePadding)) {
             Text("Loading...", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
         }
         return
@@ -100,7 +100,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MenuTokens.Ground)
+            .groundBackground()
             .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
             .onPad { press ->
                 if (press.action == GamepadAction.B) {
@@ -321,7 +321,7 @@ private fun ControllerPicker(current: String?, onPick: (String?) -> Unit, onDism
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MenuTokens.Ground)
+            .groundBackground()
             .padding(LocalShellWindow.current.edgePadding)
             .onPad { press ->
                 if (press.action == GamepadAction.B) {

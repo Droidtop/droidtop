@@ -46,6 +46,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [7i. The PC surface — droidtop's own actions, on the theme's own layout (REDECIDED 2026-09-26)](#7i-the-pc-surface--droidtops-own-actions-on-the-themes-own-layout-redecided-2026-09-26)
 - [7j. Portrait and touch-first chrome (directed 2026-09-10)](#7j-portrait-and-touch-first-chrome-directed-2026-09-10)
 - [7k. The design system: one spacing scale, one type scale, one colour source](#7k-the-design-system-one-spacing-scale-one-type-scale-one-colour-source)
+- [7k2. Gaming theming: the active ES-DE theme as droidtop's own design tokens (owner direction 2026-10-01, Droidtop/tracker#185)](#7k2-gaming-theming-the-active-es-de-theme-as-droidtops-own-design-tokens-owner-direction-2026-10-01-droidtoptracker185)
 - [7m. One game, its versions and its segments (directed 2026-09-16)](#7m-one-game-its-versions-and-its-segments-directed-2026-09-16)
 - [8. Licensing](#8-licensing)
 - [9. Module map](#9-module-map)
@@ -254,8 +255,8 @@ system dark/light setting through one shared Material theme
 every screen hardcoded its palette, and no light mode existed at all).
 Two deliberate exceptions stay always-dark regardless of the system
 setting: surfaces living inside the Gaming shell's world (Console
-systems opens from Gaming's Settings tab and matches its plain-black
-ground) and ambient second-screen companion surfaces; ES-DE-themed
+systems opens from Gaming's Settings tab and takes the Gaming theme,
+section 7k2) and ambient second-screen companion surfaces; ES-DE-themed
 Gaming views take every color from the active ES-DE theme (§7f) and
 are outside Material theming entirely.
 
@@ -9687,7 +9688,7 @@ mechanism per job).
 ## 7k. The design system: one spacing scale, one type scale, one colour source
 
 droidtop draws two kinds of surface. A **themed view** takes every colour, typeface and
-measurement from the active ES-DE theme (section 7f) and is out of scope here. Everything
+measurement from the active ES-DE theme (section 7f) and is out of scope here. In Gaming, droidtop's own chrome wears that theme's colours and fonts too (section 7k2); the spacing, type scale and anatomy below are droidtop's own either way. Everything
 else — onboarding, the shell's chrome and menus, the settings catalog, the Quick Menu, a
 PC game's detail screen, the desktop panels — is **droidtop's own chrome**, and all of it obeys
 one system. A PC/engine gamelist is a themed view like any console system's (§7i, redecided
@@ -10089,6 +10090,83 @@ even." The rule, in the shared components (`MenuRow`, `SettingsCatalogView`):
 - *Status readout* (`StatusCluster`): clock in the system's 12 or 24 hour format, a connectivity glyph (Wi-Fi arcs scaled by signal, bars for wired and mobile, a slash for none, tinted `Danger` when there is no connection or no internet) and a battery glyph with the percentage (tinted `Affirmative` while charging, `Danger` at 15% or less). One muted colour otherwise, no plate, no notification icons, no SSID: it is three facts, not an Android status bar. It reads the same `SystemStatus` source as the Quick Menu and the companion (off the main thread), ticks on the minute boundary, speaks as one line to a screen reader, and a tap opens the Quick Menu. It is not a focus target, like the rest of the top bar.
 - *Section headings* ("Apps", a games row's title) leave the room to the bar above them (`SectionListTopGap` 8dp, `SectionHeadingTopGap` 4dp) and sit `SectionHeadingGap` (16dp) clear of what they head.
 
+
+## 7k2. Gaming theming: the active ES-DE theme as droidtop's own design tokens (owner direction 2026-10-01, Droidtop/tracker#185)
+
+Owner: "We can probably borrow theme coloration and assets from the selected ESDE theme. It
+should be theming the entire game mode right now, I hate that it doesn't do anything to the
+settings or app displays." Until this, only the themed gamelist and carousel views followed the
+theme; Settings, Apps, the Quick Menu, menus and dialogs, the header and hint row drew droidtop's
+own fixed palette over it. Now every surface Gaming draws wears the active theme. Layout stays
+droidtop's own (section 7k); only the look follows.
+
+**One mapping.** `GamingThemeMapping.map(EsDeTheme?)` (`:runtime-common`,
+`library/theme/GamingThemeMapping.kt`) turns the already-parsed active theme into one
+`GamingThemeColors`, the whole set of colour roles plus the theme's typefaces and background
+texture. Its input is the same parse the themed views use, so the theme's selected variant,
+colour scheme, font size and aspect ratio (and the live screen shape) are already applied: there
+is no second theme reader and no per-surface rule. What it reads, in order:
+
+- *Ground*: an `image` named `background` that declares a colour (Art Book Next, Slate), else an
+  opaque full-screen `image` colour, else the theme's own `backgroundColor` or
+  `systemBackgroundColor` variable. A translucent overlay is not a ground.
+- *Text*: the colour of the `clock`, `systemstatus`, carousel text and `text` elements of the
+  system view, which is text the theme draws straight on its ground, then the help row's, then a
+  gamelist's. *Secondary text*: the `helpsystem` `textColor`. *Menu surface*: the `helpsystem`
+  `backgroundColor` (the plate ES-DE draws menus and hints on), flattened onto the ground.
+- *Accent and the focus ring*: the first declared colour with real chroma (saturation 0.35 or
+  more) among the help icons, the list's selected and selector colours, the carousel, clock and
+  text colours; a theme with only greys gets its text colour as the accent, a neutral ring.
+- *Fonts*: the help row's `fontPath` for UI text, the carousel's (else the first title text's) for
+  headings; only a file that exists counts. *Texture*: a tiled `image_background` path that
+  exists.
+
+What the theme does not declare keeps droidtop's own value, and the rest of the set is DERIVED
+from what was declared so it stays coherent (cards are the ground mixed toward the text ink,
+row fills and outlines are the ink at low alpha, which is why a light theme works). A theme that
+declares none of the above, or no theme at all, is droidtop's own palette untouched
+(`GamingThemeColors.DEFAULT`, the values `MenuTokens` held as literals before).
+
+**Contrast is a guarantee, not a hope.** Every text role (text, muted, value, placeholder,
+section label, accent, danger, affirmative, favourite) is forced to WCAG AA, 4.5:1, over every
+surface it is drawn on (ground, menu surface, each card, the hint bar, a chosen row's tile), and a
+disabled label to 3:1. A failing colour moves toward white or black, whichever reaches the floor
+with the smaller change, keeping its hue (`ThemeColorMath.ensure`). The launch button is a fill
+under a fixed label, so it is the fill that moves. A theme whose text equals its ground is
+therefore readable, and `GamingThemeMappingTest` holds this for declared, derived and
+contrast-fixed cases.
+
+**One delivery mechanism.** `MenuTokens` (section 7k) is the Gaming palette API; every role in it
+is a getter on `GamingTheme.palette`, which is snapshot state. A screen reads `MenuTokens.Accent`
+exactly as before and is redrawn when the theme changes, so Settings, Apps, the Quick Menu, every
+`MenuPanel` and dialog, the header (`ChromeBar`), the hint row, the PC Games tab and the pages the
+shell opens full-screen all follow without a per-screen change; "no screen defines a colour
+inline" is what makes that true, so a literal in a Gaming screen is now a theming bug as well as a
+design one. Code that reads `MaterialTheme` gets the same palette as a light or dark scheme and
+the theme's typefaces on droidtop's own type scale (`GamingTheme`, the composable, wraps
+`GamepadShell`). Pages paint their ground with `Modifier.groundBackground()`, never
+`background(MenuTokens.Ground)`, which also lays the theme's tiled texture (modulated by the
+ground colour as ES-DE tints an image, at 0.6 strength; the contrast guarantee is against the flat
+ground). The PC Games tab (Droidtop/tracker#183) consumes the same tokens and needs nothing of
+its own.
+
+**Scope.** The palette applies only while a Gaming surface is started: `GamingTheme` holds it
+between the host's start and stop, so the standard launcher and the desktop, which share the
+tokens' code, draw droidtop's own palette. Screens Gaming opens (Console systems, the container
+and store screens, onboarding re-entered from Gaming's Settings) wrap in
+`DroidtopTheme(gamingThemed = rememberGamingThemed())`, true when Gaming was the last mode; a
+first run is still choosing a theme and stays droidtop's own. A themed gamelist or carousel view
+still owns its own surface (section 7f) and is untouched.
+
+**Performance and live change.** The theme is mapped once per (theme, colour scheme, variant,
+aspect ratio, screen shape) on a background thread and cached, with fonts and the texture decoded
+there too; the main thread only reads the finished palette. Changing the theme, its colour scheme
+or variant in Settings recomputes and every surface follows live. A failed parse is not cached.
+
+**Known limits.** A theme's per-system artwork and per-system colours stay in the themed views;
+droidtop's own screens use the theme's global look. A texture that is not tiled is not drawn (a
+hero image behind a view is not a ground). Android `Preference` screens that `:shell-default` can
+still draw are outside Compose and unthemed.
 
 ## 7m. One game, its versions and its segments (directed 2026-09-16)
 

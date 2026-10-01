@@ -161,6 +161,31 @@ import kotlinx.coroutines.withContext
 fun GamepadShell(
     library: Library,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit = {},
+    onEntriesChanged: (List<LibraryEntry>) -> Unit = {},
+    deepLinkToken: Int = 0,
+    startSectionName: String? = null,
+    triggerRescan: Boolean = false,
+    triggerBrowseThemes: Boolean = false,
+) {
+    // The whole Gaming shell, its overlays and its dialogs draw in the
+    // active ES-DE theme (docs/SPEC.md "Gaming theming").
+    GamingTheme {
+        GamepadShellBody(
+            library = library,
+            onFocusedEntryChanged = onFocusedEntryChanged,
+            onEntriesChanged = onEntriesChanged,
+            deepLinkToken = deepLinkToken,
+            startSectionName = startSectionName,
+            triggerRescan = triggerRescan,
+            triggerBrowseThemes = triggerBrowseThemes,
+        )
+    }
+}
+
+@Composable
+private fun GamepadShellBody(
+    library: Library,
+    onFocusedEntryChanged: (LibraryEntry?) -> Unit = {},
     /**
      * The scanned game list, published so a second-screen companion can
      * show ambient artwork without running its own scan (docs/SPEC.md
@@ -713,7 +738,7 @@ fun GamepadShell(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MenuTokens.Ground)
+            .groundBackground()
             // Shoulder-button section switching -- a standard console-UI
             // pattern (Daijishō and most console launchers use L1/R1 to
             // cycle top-level tabs) that works regardless of what currently

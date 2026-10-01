@@ -84,7 +84,7 @@ internal fun Screensaver(entries: List<LibraryEntry>, onDismiss: () -> Unit) {
         // menu burning in, but say why it is empty instead of showing a
         // black rectangle that looks like a crash.
         Box(
-            Modifier.fillMaxSize().background(MenuTokens.Ground).then(dismissModifier),
+            Modifier.fillMaxSize().groundBackground().then(dismissModifier),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -106,7 +106,7 @@ internal fun Screensaver(entries: List<LibraryEntry>, onDismiss: () -> Unit) {
     }
     val entry = withArt[index.coerceIn(withArt.indices)]
 
-    Box(Modifier.fillMaxSize().background(MenuTokens.Ground).then(dismissModifier)) {
+    Box(Modifier.fillMaxSize().groundBackground().then(dismissModifier)) {
         Crossfade(targetState = entry, animationSpec = tween(1200), label = "screensaver-slide") { shown ->
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AsyncImage(

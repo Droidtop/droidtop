@@ -54,7 +54,7 @@ internal fun MediaViewer(title: String, media: List<Pair<String, String>>, onClo
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MenuTokens.Ground)
+            .groundBackground()
             .focusRequester(focus)
             .focusable()
             .onPad { press ->

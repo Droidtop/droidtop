@@ -69,7 +69,7 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MenuTokens.Ground)
+            .groundBackground()
             .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
             .onPad { press ->
                 if (press.action == GamepadAction.B) {

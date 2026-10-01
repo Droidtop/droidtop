@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.groundBackground
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -101,7 +102,7 @@ internal fun PcGamePage(
             modifier = Modifier
                 .fillMaxSize()
                 .ownPadButtons(onBack = onClose)
-                .background(MenuTokens.Ground)
+                .groundBackground()
                 .padding(start = window.edgePadding, end = window.edgePadding, top = 20.dp, bottom = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {

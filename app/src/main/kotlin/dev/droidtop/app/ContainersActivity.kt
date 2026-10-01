@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import dev.droidtop.shell.gamepad.groundBackground
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
@@ -43,9 +44,9 @@ class ContainersActivity : AppCompatActivity() {
         val screen = SettingsScreenRegistry.get(ContainersCatalog.SCREEN_ID)!!
         setContent {
             val session by DesktopSessionService.state.collectAsState()
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
-                    Column(Modifier.fillMaxSize().background(MenuTokens.Ground)) {
+                    Column(Modifier.fillMaxSize().groundBackground()) {
                         Box(Modifier.weight(1f)) {
                             CatalogNavigator(
                                 root = screen,

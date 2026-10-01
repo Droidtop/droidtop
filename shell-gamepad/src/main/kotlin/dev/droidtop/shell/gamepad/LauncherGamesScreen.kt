@@ -75,7 +75,7 @@ fun LauncherGamesScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MenuTokens.Ground)
+                .groundBackground()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 // The shell owns the pad here as everywhere: B is the back
                 // dispatcher, which leaves this screen or closes Game folders.
