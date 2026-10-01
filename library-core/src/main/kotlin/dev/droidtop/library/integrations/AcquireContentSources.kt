@@ -1,6 +1,8 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
+import dev.droidtop.library.consoles.ConsoleSystemsRepository
+import dev.droidtop.library.consoles.SystemFolders
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -13,6 +15,7 @@ import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
+import dev.droidtop.pluginhost.PluginTrustState
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -128,7 +131,32 @@ class AcquireContentJob internal constructor(
     fun close() {}
 }
 
+/** An installed plugin that offers downloads but cannot answer right now, and why, in words a person reads. */
+data class UnavailableSource(val label: String, val reason: String)
+
 object AcquireContentSources {
+    /** The registered settings screen id of Accounts and sources > Plugins: where "no source" and "needs approval" lead. */
+    const val PLUGINS_SCREEN_ID = "plugins"
+
+    /** The registered settings screen id of Accounts and sources > App integrations. */
+    const val INTEGRATIONS_SCREEN_ID = "integrations"
+
+    /** Installed plugins that declare ACQUIRE_CONTENT but are not runnable (waiting for approval, denied, turned off, disabled after a failure). Reads the plugin store: off the main thread. */
+    fun unavailablePlugins(context: Context): List<UnavailableSource> =
+        PluginStore.installed(context)
+            .filter { PluginCapability.ACQUIRE_CONTENT in it.manifest.capabilities && !it.runnable() }
+            .map { record ->
+                UnavailableSource(
+                    record.manifest.label,
+                    when {
+                        record.trust == PluginTrustState.PENDING -> "is waiting for your approval"
+                        record.trust == PluginTrustState.DENIED -> "was denied"
+                        record.disabledReason != null -> "is disabled: ${record.disabledReason}"
+                        else -> "is turned off"
+                    },
+                )
+            }
+
     /** Every available source for a "Get games" surface: installed+approved plugins declaring ACQUIRE_CONTENT, plus JSON integrations of the same capability. Plugins first -- a real result list beats a one-way launch. */
     fun available(context: Context): List<AcquireContentSource> =
         PluginStore.runnableFor(context, PluginCapability.ACQUIRE_CONTENT).map { AcquireContentSource.Plugin(it) } +
@@ -154,21 +182,7 @@ object AcquireContentSources {
             withContext(Dispatchers.IO) {
                 val sources = available(context)
                 if (sources.isEmpty()) {
-                    listOf(
-                        CatalogGroup(
-                            id = "acquire_empty",
-                            title = null,
-                            items = listOf(
-                                ActionItem(
-                                    id = "acquire_empty_$systemId",
-                                    title = "No acquire_content source is installed",
-                                    subtitle = "Add a JSON integration (Settings > App integrations) " +
-                                        "or install a plugin declaring acquire_content",
-                                    run = {},
-                                ),
-                            ),
-                        ),
-                    )
+                    listOf(noSourceGroup(context, systemId))
                 } else {
                     listOf(
                         CatalogGroup(
@@ -183,6 +197,90 @@ object AcquireContentSources {
                                         inline = searchScreen(source, systemId, systemName, systemFolder),
                                     )
                                     is AcquireContentSource.Json -> jsonSourceItem(source, systemId, systemName, systemFolder)
+                                }
+                            },
+                        ),
+                    )
+                }
+            }
+        },
+    )
+
+    /**
+     * What a "Get games" screen says when no source can answer: in plain words whether nothing is
+     * installed or something is installed but waiting (approval, turned off), and a way to Plugins and
+     * App integrations from right there. Reads the plugin store: call off the main thread.
+     */
+    private fun noSourceGroup(context: Context, key: String): CatalogGroup {
+        val waiting = unavailablePlugins(context)
+        return CatalogGroup(
+            id = "acquire_empty",
+            title = null,
+            items = listOf(
+                ActionItem(
+                    id = "acquire_empty_$key",
+                    title = if (waiting.isEmpty()) "No download source is installed" else "No download source is ready",
+                    subtitle = if (waiting.isEmpty()) {
+                        "A download source is a plugin or an app integration that finds games for you."
+                    } else {
+                        waiting.joinToString("\n") { "${it.label} ${it.reason}" }
+                    },
+                    run = {},
+                ),
+                NestedScreenItem(
+                    id = "acquire_empty_plugins_$key",
+                    title = "Plugins",
+                    subtitle = "Install a plugin that offers downloads, or approve one you already added",
+                    registryId = PLUGINS_SCREEN_ID,
+                ),
+                NestedScreenItem(
+                    id = "acquire_empty_integrations_$key",
+                    title = "App integrations",
+                    subtitle = "Hook another installed app in as a download source",
+                    registryId = INTEGRATIONS_SCREEN_ID,
+                ),
+            ),
+        )
+    }
+
+    /**
+     * "Get games" from a list that is not one console system (All games, the PC list): asks which
+     * system to download for, then opens that system's own [systemScreen]. With no source it says so
+     * and leads to Plugins instead of an empty list of systems.
+     */
+    fun chooseSystemScreen(): CatalogScreen = CatalogScreen(
+        id = "acquire_choose_system",
+        title = "Get games",
+        subtitle = "Pick the system to download for",
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                if (available(context).isEmpty()) {
+                    listOf(noSourceGroup(context, "all"))
+                } else {
+                    val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+                    val targets = SystemFolders.all(context, systemsById)
+                        .distinctBy { (_, system) -> system.id }
+                        .sortedBy { (_, system) -> system.displayName.lowercase() }
+                    listOf(
+                        CatalogGroup(
+                            id = "acquire_choose_systems",
+                            title = null,
+                            items = if (targets.isEmpty()) {
+                                listOf(
+                                    ActionItem(
+                                        id = "acquire_choose_none",
+                                        title = "No system folders yet",
+                                        subtitle = "Downloads go into a system's own folder. Add a games folder under Settings > Game folders first.",
+                                        run = {},
+                                    ),
+                                )
+                            } else {
+                                targets.map { (folder, system) ->
+                                    NestedScreenItem(
+                                        id = "acquire_pick_${system.id}",
+                                        title = system.displayName,
+                                        inline = systemScreen(system.id, system.displayName, folder),
+                                    )
                                 }
                             },
                         ),

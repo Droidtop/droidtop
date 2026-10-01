@@ -222,6 +222,7 @@ internal fun GamelistOptionsMenu(
     val actions = buildList {
         if (libraryScope) {
             // The library-wide actions that used to live in Settings.
+            add("Get games")
             add("Rescan library")
             add("Scrape all systems")
             add(orphansLabel)
@@ -245,8 +246,10 @@ internal fun GamelistOptionsMenu(
                 add(SYSTEM_SETTINGS)
                 add("Scrape this system")
                 add("Import gamelist.xml")
-                add("Get games")
             }
+            // Wherever games are listed, not only one console system: All games and the PC list ask
+            // which system to download for (rig, 2026-09-30: the entry was unreachable from the Games tab).
+            add("Get games")
             // Offered wherever PC or engine games are actually on
             // screen, which is the same "act on what you are looking
             // at" placement every other action here uses. Those groups
@@ -472,7 +475,11 @@ internal fun GamelistOptionsMenu(
             }
             "Get games" -> {
                 if (busy) return
-                val id = systemId ?: return
+                val id = systemId
+                if (id == null || id == PC_SYSTEM_ID) {
+                    acquireScreen = AcquireContentSources.chooseSystemScreen()
+                    return
+                }
                 busy = true
                 scope.launch {
                     val folder = withContext(Dispatchers.IO) { consoleFoldersFor(id).firstOrNull() }

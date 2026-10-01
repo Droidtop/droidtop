@@ -50,16 +50,46 @@ class PluginSearchAggregatorTest {
         }
 
     @Test
-    fun `merge keeps source order and each source's own result order`() {
-        val a = fakeSource("A")
-        val b = fakeSource("B")
-        val bySource = linkedMapOf(
-            a to listOf(result("a1"), result("a2")),
-            b to listOf(result("b1")),
-        )
-        val hits = PluginSearchAggregator.merge(bySource)
+    fun `outcomes keep source order and each source's own result order`() = runBlocking {
+        val a = fakeSource("A", delayMs = 30, results = listOf(result("a1"), result("a2")))
+        val b = fakeSource("B", results = listOf(result("b1")))
+        val outcomes = PluginSearchAggregator.fanOutOutcomes(listOf(a, b)) { it.search(mockContext(), "q", null) }
+        assertEquals(listOf(a, b), outcomes.map { it.source })
+        val hits = outcomes.hits()
         assertEquals(listOf("a1", "a2", "b1"), hits.map { it.result.id })
         assertEquals(listOf(a, a, b), hits.map { it.source })
+    }
+
+    @Test
+    fun `a failing source is reported with its reason, not folded into no results`() = runBlocking {
+        val ok = fakeSource("OK", results = listOf(result("ok1")))
+        val broken = fakeSource("Broken", throws = true)
+        val outcomes = PluginSearchAggregator.fanOutOutcomes(listOf(ok, broken)) { it.search(mockContext(), "q", null) }
+        assertEquals(null, outcomes[0].failure)
+        assertEquals("Broken failed", outcomes[1].failure)
+        assertEquals(emptyList<AcquireContentResult>(), outcomes[1].results)
+    }
+
+    @Test
+    fun `a source that answers with an empty list is a real answer, not a failure`() = runBlocking {
+        val none = fakeSource("None")
+        val outcomes = PluginSearchAggregator.fanOutOutcomes(listOf(none)) { it.search(mockContext(), "q", null) }
+        assertEquals(null, outcomes.single().failure)
+        assertEquals(emptyList<AcquireContentResult>(), outcomes.single().results)
+    }
+
+    @Test
+    fun `a source slower than the timeout is reported as not answering in time`() = runBlocking {
+        val slow = fakeSource("Slow", delayMs = 200, results = listOf(result("slow1")))
+        val outcomes = PluginSearchAggregator.fanOutOutcomes(listOf(slow), timeoutMs = 40) { it.search(mockContext(), "q", null) }
+        assertTrue(outcomes.single().failure!!.contains("did not answer in time"))
+    }
+
+    @Test
+    fun `a failure with no message still gets a readable sentence`() {
+        assertEquals("IllegalStateException", PluginSearchAggregator.describe(IllegalStateException()))
+        val long = PluginSearchAggregator.describe(RuntimeException("x".repeat(500)))
+        assertEquals(200, long.length)
     }
 
     @Test
@@ -114,7 +144,7 @@ class PluginSearchAggregatorTest {
         val calls = AtomicInteger(0)
         val source = fakeSourceCounting(calls)
         val hits = PluginSearchAggregator.searchAll(mockContext(), listOf(source), query = "  ", platform = null)
-        assertEquals(emptyList<SourceHit>(), hits)
+        assertEquals(emptyList<SourceOutcome>(), hits)
         assertEquals(0, calls.get())
     }
 

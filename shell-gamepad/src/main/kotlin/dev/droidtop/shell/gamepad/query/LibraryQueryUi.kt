@@ -37,9 +37,17 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.integrations.AcquireContentOption
+import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.GameSources
 import dev.droidtop.library.integrations.PluginSearchAggregator
 import dev.droidtop.library.integrations.SourceHit
+import dev.droidtop.library.integrations.SourceOutcome
+import dev.droidtop.library.integrations.UnavailableSource
+import dev.droidtop.library.integrations.hits
+import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.SettingsScreenRegistry
+import dev.droidtop.pluginhost.PluginRuntimeNeeds
+import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.MenuHint
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
@@ -51,8 +59,10 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** One flattened row of the filter dialog: a section marker or a selectable row. */
 private sealed interface FilterEntry {
@@ -270,25 +280,37 @@ internal fun LibrarySearchDialog(
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var sourceHits by remember { mutableStateOf<List<SourceHit>>(emptyList()) }
+    // One outcome per source (docs/SPEC.md 12a "Search fan-out"): its results, or why it could not answer.
+    var outcomes by remember { mutableStateOf<List<SourceOutcome>>(emptyList()) }
+    // Plugins that are installed but cannot answer (waiting for approval, disabled), so "no source" is never said for them.
+    var unavailable by remember { mutableStateOf<List<UnavailableSource>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
     var pickedHit by remember { mutableStateOf<SourceHit?>(null) }
     var statusLine by remember { mutableStateOf<String?>(null) }
+    // Bumped to search again after the person fixed something (installed a runtime, approved a plugin).
+    var searchTick by remember { mutableIntStateOf(0) }
+    var pluginsScreen by remember { mutableStateOf<CatalogScreen?>(null) }
+    val sourceHits = remember(outcomes) { outcomes.hits() }
 
     // Debounced fan-out: a keystroke doesn't itself trigger a plugin round
     // trip, only the text settling for a beat does -- the same reasoning
     // every existing debounced search in droidtop uses.
-    LaunchedEffect(text, systemId) {
+    LaunchedEffect(text, systemId, searchTick) {
         val q = text.trim()
         if (q.isBlank()) {
-            sourceHits = emptyList()
+            outcomes = emptyList()
+            unavailable = emptyList()
             searching = false
             return@LaunchedEffect
         }
         delay(350)
         searching = true
-        val sources = GameSources.plugins(context)
-        sourceHits = if (sources.isEmpty()) emptyList() else PluginSearchAggregator.searchAll(context, sources, q, systemId)
+        // Reading the plugin store and calling a plugin are disk and binder work: never on the main thread.
+        val (sources, notRunnable) = withContext(Dispatchers.IO) {
+            GameSources.plugins(context) to AcquireContentSources.unavailablePlugins(context)
+        }
+        unavailable = notRunnable
+        outcomes = if (sources.isEmpty()) emptyList() else PluginSearchAggregator.searchAll(context, sources, q, systemId)
         searching = false
     }
 
@@ -368,14 +390,56 @@ internal fun LibrarySearchDialog(
                 }
             }
             if (text.isNotBlank()) {
-                MenuSectionLabel(if (searching) "Get more (searching…)" else "Get more (${sourceHits.size})")
-                if (!searching && sourceHits.isEmpty()) {
-                    Text(
-                        "No matching source has this",
-                        color = MenuTokens.OnSurfaceMuted,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(vertical = 4.dp),
-                    )
+                MenuSectionLabel(
+                    when {
+                        searching -> "Get more (searching…)"
+                        outcomes.isEmpty() -> "Get more"
+                        else -> "Get more (${sourceHits.size})"
+                    },
+                )
+                if (!searching) {
+                    val openPlugins = { pluginsScreen = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID) }
+                    if (outcomes.isEmpty()) {
+                        // No source answered because none can: say which of the two cases it is.
+                        if (unavailable.isEmpty()) {
+                            SourceNote("No download source is installed.")
+                            MenuRow(
+                                title = "Install a download source",
+                                subtitle = "Opens Settings > Accounts and sources > Plugins",
+                                onClick = openPlugins,
+                            )
+                        } else {
+                            unavailable.forEach { SourceNote("${it.label} ${it.reason}") }
+                            MenuRow(title = "Open Plugins", subtitle = "Approve or turn on a download source", onClick = openPlugins)
+                        }
+                    }
+                    outcomes.forEach { outcome ->
+                        when {
+                            outcome.failure != null -> {
+                                SourceNote("${outcome.source.label}: ${outcome.failure}")
+                                outcome.runtimeNeed?.let { need ->
+                                    MenuRow(
+                                        title = need.actionLabel,
+                                        subtitle = "Then the search runs again by itself",
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                val error = withContext(Dispatchers.IO) {
+                                                    PluginRuntimeNeeds.install(context, need) { statusLine = it }
+                                                }
+                                                if (error == null) {
+                                                    statusLine = null
+                                                    searchTick++
+                                                } else {
+                                                    statusLine = "The ${need.runtime} runtime could not be installed: $error"
+                                                }
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+                            outcome.results.isEmpty() -> SourceNote("${outcome.source.label}: no match")
+                        }
+                    }
                 }
                 sourceHits.forEach { hit ->
                     MenuRow(
@@ -400,6 +464,14 @@ internal fun LibrarySearchDialog(
         }
     }
 
+    pluginsScreen?.let { screen ->
+        val close = {
+            pluginsScreen = null
+            searchTick++
+        }
+        Dialog(onDismissRequest = close) { CatalogNavigator(root = screen, onExit = close) }
+    }
+
     pickedHit?.let { hit ->
         SourceOptionsDialog(
             hit = hit,
@@ -412,6 +484,17 @@ internal fun LibrarySearchDialog(
             onDismiss = { pickedHit = null },
         )
     }
+}
+
+/** One muted line of the "Get more" group: a source's outcome when it has no rows to show. */
+@Composable
+private fun SourceNote(text: String) {
+    Text(
+        text,
+        color = MenuTokens.OnSurfaceMuted,
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(vertical = 4.dp),
+    )
 }
 
 /**
