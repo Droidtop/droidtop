@@ -5,6 +5,8 @@ import org.xmlpull.v1.XmlPullParser
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.io.File
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -45,8 +47,8 @@ data class ScreenScraperGameMetadata(
  * lookup, not just filename search). Confirmed real API shape via
  * screenscraper.fr's own webapi2 docs AND ES-DE's own real client source:
  * `GET jeuInfos.php` with `systemeid`/`romnom`/`romtaille`/`crc` (or
- * `md5`/`sha1`)/`output`, plus developer credentials (`devid`/
- * `devpassword`) and a per-user account (`ssid`/`sspassword`).
+ * `md5`/`sha1`)/`output`; this client uses the anonymous tier and sends no
+ * developer or user credentials.
  *
  * Uses `output=xml`, matching ES-DE's own real, confirmed-working request
  * -- not `output=json`: this session has no real devid/devpassword
@@ -57,30 +59,12 @@ data class ScreenScraperGameMetadata(
  * already-confirmed source, rather than guessing at an unverifiable JSON
  * schema.
  *
- * **Credentials are real but optional, not a hard blocker**: `devid`/
- * `devpassword` are ES-DE's own app-level developer credentials (a single
- * pair the project's maintainer registers once via ScreenScraper's forum
- * and bakes into the whole app -- not something each end user obtains),
- * and `ssid`/`sspassword` are an optional real per-user ScreenScraper
- * account for a higher personal rate limit. ScreenScraper's real public
- * API also accepts requests with these left blank entirely (a real,
- * documented anonymous mode, just under much lower daily rate limits) --
- * all four are optional here for exactly that reason, defaulting to
- * blank rather than requiring registration before this client can be
- * used at all. droidtop now has its own registered devid/devpassword pair,
- * shipped XOR-scrambled in [ScreenScraperDevCredentials] the way ES-DE ships
- * its own. That pair is what lets the client reach the API rather than a
- * quota tier -- the scraping limit is a property of the user's own account.
- *
- * **If everything comes back HTTP 403, read [refusalHint] before touching
- * anything in here.** A whole-library pass on 2026-09-01 was refused 46
- * times out of 46 with those credentials verified present and correct; the
- * two candidate causes -- an application pair still awaiting manual
- * approval, and `softname` needing to match the registered application
- * name -- are written down there, because only the person who registered
- * the application can decide between them.
+ * The anonymous tier has a low quota, so this client serializes and paces
+ * requests, backs off after quota responses and caches every response.
  */
 object ScreenScraperClient {
+
+    private val anonymousPacing = ScreenScraperPacing()
 
     private val WANTED_MEDIA = setOf(
         "box-2D", "ss", "sstitle", "wheel", "wheel-hd", "support-2D", "fanart", "video", "video-normalized",
@@ -122,27 +106,21 @@ object ScreenScraperClient {
         systemeId: String,
         romName: String,
         romSizeBytes: Long,
-        devId: String = "",
-        devPassword: String = "",
+        devId: String = ScreenScraperDevCredentials.devId,
+        devPassword: String = ScreenScraperDevCredentials.devPassword,
         userId: String = "",
         userPassword: String = "",
         region: String = "wor",
         language: String = "en",
         md5: String = "",
+        responseCacheDir: File? = null,
     ): ScrapeLookup<ScreenScraperGameMetadata> {
         val url = URL(
             "https://www.screenscraper.fr/api2/jeuInfos.php?" +
                 "devid=${URLEncoder.encode(devId, "UTF-8")}" +
                 "&devpassword=${URLEncoder.encode(devPassword, "UTF-8")}" +
-                // Deliberately NOT changed while chasing the 2026-09-01
-                // 403s: see this object's own doc comment and
-                // [refusalHint]. ScreenScraper matches softname against
-                // the registered application name, and only the person
-                // who registered the application knows what they
-                // registered it as.
-                "&softname=$SOFTNAME" +
-                "&ssid=${URLEncoder.encode(userId, "UTF-8")}" +
-                "&sspassword=${URLEncoder.encode(userPassword, "UTF-8")}" +
+                "&softname=droidtop" +
+                (if (userId.isNotBlank() && userPassword.isNotBlank()) "&ssid=${URLEncoder.encode(userId, "UTF-8")}&sspassword=${URLEncoder.encode(userPassword, "UTF-8")}" else "") +
                 "&output=xml" +
                 "&systemeid=$systemeId" +
                 "&romnom=${URLEncoder.encode(romName, "UTF-8")}" +
@@ -153,8 +131,34 @@ object ScreenScraperClient {
                 // a local file's size drifts from the reference dump.
                 (if (md5.isNotBlank()) "&md5=$md5&romtaille=$romSizeBytes" else ""),
         )
-        val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        val status = connection.responseCode
+        val cacheFile = responseCacheDir?.let { dir ->
+            val key = MessageDigest.getInstance("SHA-256").digest(url.toString().toByteArray())
+                .joinToString("") { "%02x".format(it) }
+            File(dir, "screenscraper/$key.json")
+        }
+        val cached = cacheFile?.takeIf { it.isFile }?.let { runCatching { org.json.JSONObject(it.readText()) }.getOrNull() }
+            ?.takeIf { System.currentTimeMillis() - it.optLong("at") < cacheTtlMs(it.optInt("status"), it.optString("body")) }
+        val connection: HttpURLConnection?
+        val status: Int
+        var responseBody: String
+        if (cached != null) {
+            connection = null
+            status = cached.optInt("status")
+            responseBody = cached.optString("body")
+        } else {
+            synchronized(anonymousPacing) {
+                val delay = anonymousPacing.delayBeforeRequest(System.currentTimeMillis())
+                if (delay > 0) Thread.sleep(delay)
+                anonymousPacing.requestStarted(System.currentTimeMillis())
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 10_000
+                    readTimeout = 20_000
+                }
+                status = connection.responseCode
+            }
+            responseBody = ""
+        }
         if (status != 200) {
             // The API refused outright. Read the server's OWN reason out
             // of the error body: ScreenScraper answers a non-200 with a
@@ -164,24 +168,24 @@ object ScreenScraperClient {
             // answer to "why did this fail". It used to be dropped on the
             // floor, which is what turned the 2026-09-01 outage into an
             // overnight investigation instead of one log line.
-            val refusal = ScrapeRefusals.refused(
+            val refusal = if (connection == null) {
+                ScrapeLookup.Refused("ScreenScraper", status, responseBody.ifBlank { null })
+            } else ScrapeRefusals.refused(
                 source = "ScreenScraper",
                 connection = connection,
                 status = status,
-                secrets = listOf(devPassword, userPassword, devId, userId),
+                secrets = emptyList(),
                 subject = romName,
             )
-            // Credentials themselves are never logged -- only whether
-            // they are present.
-            android.util.Log.w(
-                "droidtop.Scraper",
-                "ScreenScraper credentials: dev ${if (devId.isBlank()) "MISSING" else "present"}," +
-                    " user account ${if (userId.isBlank()) "not set" else "set"}",
-            )
-            refusalHint(status)?.let { android.util.Log.w("droidtop.Scraper", it) }
+            responseBody = refusal.reason.orEmpty()
+            if (connection != null) anonymousPacing.response(status, responseBody, System.currentTimeMillis())
+            cacheFile?.let { writeCached(it, status, responseBody) }
             return refusal
         }
-        val xmlText = connection.inputStream.bufferedReader().readText()
+        val xmlText = if (connection == null) responseBody else connection.inputStream.bufferedReader().readText().also {
+            anonymousPacing.response(status, it, System.currentTimeMillis())
+            cacheFile?.let { file -> writeCached(file, status, it) }
+        }
         val parsed = parseGameXml(xmlText, region.lowercase(), language.lowercase())
         if (parsed == null) {
             android.util.Log.i(
@@ -194,41 +198,19 @@ object ScreenScraperClient {
         return ScrapeLookup.Found(parsed)
     }
 
-    /** The application name this client identifies itself with (`softname`). See [refusalHint]. */
-    const val SOFTNAME: String = "droidtop"
+    private fun cacheTtlMs(status: Int, body: String): Long = when {
+        status == 429 || status == 430 || body.contains("quota", ignoreCase = true) -> 15 * 60_000L
+        status in 200..299 -> 7 * 24 * 60 * 60_000L
+        else -> 60 * 60_000L
+    }
 
-    /**
-     * The one refusal status worth annotating, annotated only with what
-     * is actually known rather than a guessed status-code table.
-     *
-     * 2026-09-01, on the user's own hardware: 46 of 46 requests across 11
-     * systems came back HTTP 403. droidtop's registered developer
-     * credentials were present and correct (verified in the installed
-     * APK, verified to descramble to clean ASCII) and the personal
-     * ssid/sspassword were configured; requests were paced ~11s apart, so
-     * this was not a rate limit, and 403 is not ScreenScraper's quota
-     * code. Two candidate causes, neither of which this code may decide
-     * on its own:
-     *
-     *  1. A freshly registered ScreenScraper application pair is approved
-     *     by hand and is not necessarily live the moment it is issued.
-     *  2. ScreenScraper expects `softname` to match the *registered
-     *     application name*. This client sends [SOFTNAME]. If the
-     *     application was registered under a different name that is a
-     *     one-word fix -- but only the person who registered it knows
-     *     that name, so it is surfaced here rather than changed
-     *     speculatively.
-     *
-     * The server's own error body (see [ScrapeRefusals.summarizeErrorBody]) is the
-     * authority; this hint only tells a reader where to look.
-     */
-    internal fun refusalHint(status: Int): String? = if (status == 403) {
-        "ScreenScraper HTTP 403 with credentials present usually means the registered application " +
-            "is not (yet) authorised: a newly registered devid/devpassword pair is approved manually " +
-            "and may not be live yet, and softname=\"" + SOFTNAME + "\" must match the registered " +
-            "application name. Check both on screenscraper.fr before assuming the credentials are wrong."
-    } else {
-        null
+    private fun writeCached(file: File, status: Int, body: String) {
+        runCatching {
+            file.parentFile?.mkdirs()
+            val temp = File(file.parentFile, file.name + ".tmp")
+            temp.writeText(org.json.JSONObject().put("at", System.currentTimeMillis()).put("status", status).put("body", body).toString())
+            if (!temp.renameTo(file)) { file.delete(); temp.renameTo(file) }
+        }
     }
 
     /**

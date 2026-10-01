@@ -628,7 +628,7 @@ class ConsoleRomProvider(
                     ?: system.id
                 LibraryEntry(
                     id = romFile.absolutePath,
-                    title = romFile.nameWithoutExtension,
+                    title = dev.droidtop.library.GameNaming.displayName(romFile.nameWithoutExtension),
                     kind = LibraryEntryKind.CONSOLE_ROM,
                     systemId = effectiveSystemId,
                     // Three media lookups per ROM, each answered from
@@ -1031,5 +1031,4 @@ class ConsoleRomProvider(
         }
     }
 }
-
 

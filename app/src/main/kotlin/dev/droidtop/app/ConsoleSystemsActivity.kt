@@ -16,7 +16,6 @@ import dev.droidtop.library.consoles.GameMetadataEntity
 import dev.droidtop.library.scraper.ScraperSource
 import dev.droidtop.library.scraper.ScraperSourcePrefs
 import dev.droidtop.library.scraper.ScreenScraperClient
-import dev.droidtop.library.scraper.ScreenScraperPrefs
 import dev.droidtop.library.scraper.ScreenScraperSystemIds
 import dev.droidtop.library.scraper.TheGamesDbClient
 import dev.droidtop.library.scraper.TheGamesDbPrefs

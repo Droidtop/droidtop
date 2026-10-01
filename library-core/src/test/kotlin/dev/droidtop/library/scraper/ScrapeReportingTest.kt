@@ -179,16 +179,6 @@ class ScrapeReportingTest {
         assertTrue(summary.endsWith("..."))
     }
 
-    @Test
-    fun `the 403 hint names both candidate causes and no others`() {
-        val hint = ScreenScraperClient.refusalHint(403)!!
-        assertTrue(hint, hint.contains("approved manually"))
-        assertTrue(hint, hint.contains("softname=\"droidtop\""))
-        // No invented status-code table: only 403 has anything known.
-        assertNull(ScreenScraperClient.refusalHint(429))
-        assertNull(ScreenScraperClient.refusalHint(500))
-    }
-
     // ---- one DLC folder is not twelve games ------------------------------
 
     @Test

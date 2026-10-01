@@ -18,6 +18,14 @@ class GameNamingTest {
 
     private fun derive(path: String) = GameNaming.derive(path)
 
+    @Test
+    fun `display cleanup replaces filename slugs without changing normal titles`() {
+        assertEquals("Anomalous Coffee Machine 2", GameNaming.displayName("Anomalous_Coffee_Machine_2"))
+        assertEquals("LUST ACADEMY BOOK1", GameNaming.displayName("LUST-ACADEMY-BOOK1"))
+        assertEquals("Half-Life", GameNaming.displayName("Half-Life"))
+        assertEquals("Far Cry 5", GameNaming.displayName("Far Cry 5"))
+    }
+
     // --- what one folder name says --------------------------------------
 
     @Test

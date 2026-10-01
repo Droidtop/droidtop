@@ -31,14 +31,7 @@ object ScraperReadiness {
      */
     fun romSourceProblem(context: Context): String? = when (ScraperSourcePrefs.get(context)) {
         ScraperSource.THEGAMESDB -> if (TheGamesDbPrefs.isConfigured(context)) null else THEGAMESDB_KEY_MISSING
-        ScraperSource.SCREENSCRAPER -> if (
-            ScreenScraperPrefs.devId(context).isBlank() || ScreenScraperPrefs.devPassword(context).isBlank()
-        ) {
-            "ScreenScraper cannot be asked: this build carries no application credentials for it. Choose the " +
-                "libretro database under $SCRAPER_SETTINGS, which needs no account."
-        } else {
-            null
-        }
+        ScraperSource.SCREENSCRAPER -> null
         ScraperSource.LIBRETRO -> null
     }
 
@@ -92,8 +85,6 @@ object ScraperReadiness {
                 "Check the Client ID and Client Secret under $SCRAPER_SETTINGS > IGDB."
             refusal.source == SteamGridDbScraperClient.SOURCE ->
                 "Check the API key under $SCRAPER_SETTINGS > SteamGridDB > API key."
-            refusal.source == "ScreenScraper" ->
-                "Check the ScreenScraper account under $SCRAPER_SETTINGS, or choose the libretro database there."
             else -> null
         }
     }

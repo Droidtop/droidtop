@@ -8458,14 +8458,22 @@ draws an action's result as wrapped text under the actions, in a panel
 that scrolls, never as a row cut to a line, because the fix is the last
 sentence.
 
-**Not decided here, deliberately:** the cause of the 2026-09-01 403s.
-Credentials were verified present, verified to descramble, and the
-personal account was configured. The two candidates — a newly registered
-ScreenScraper application pair still awaiting manual approval, and
-`softname` needing to match the *registered application name* — are
-documented in `ScreenScraperClient.refusalHint` and printed on a 403.
-`softname` is **not** changed speculatively: only the person who
-registered the application knows what it was registered as.
+The 2026-09-01 credentialed 403 investigation is historical. The 2026-10-01
+direction below makes anonymous ScreenScraper access the default while
+preserving optional user credentials and account-entry UI.
+
+**Keyless default and quota discipline (directed 2026-10-01, tracker #174).**
+ROM scraping uses ScreenScraper's anonymous tier by default, with droidtop's application
+credentials and no user account credentials. A user may enter their own ScreenScraper
+username and password under Settings > Accounts and sources > ScreenScraper; when present,
+those credentials request that account's higher daily limits. The account fields remain
+optional. Requests are serialized and
+paced at least eleven seconds apart, with exponential backoff after HTTP 429/430 or a quota
+response. Each HTTP response is cached under a hash of its request URL (never the URL or any
+credential as a filename); successful and empty responses are reusable for seven days, refusals
+for an hour, and quota responses for fifteen minutes. A later pass therefore continues from
+cached answers instead of repeating completed lookups. Before a ROM has metadata, its row still
+uses `GameNaming.displayName` to turn filename slugs into readable display text.
 
 ### PC and engine games: what the scrape asks, and of whom
 

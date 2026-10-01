@@ -79,10 +79,6 @@ suspend fun scrapeSystemArtwork(
     val screenScraperSystemId = if (source == ScraperSource.SCREENSCRAPER) ScreenScraperSystemIds.forSystemId(system.id) else null
     val gamesDbSystemId = if (source == ScraperSource.THEGAMESDB) TheGamesDbSystemIds.forSystemId(system.id) else null
     val gamesDbApiKey = TheGamesDbPrefs.apiKey(context)
-    val devId = ScreenScraperPrefs.devId(context)
-    val devPassword = ScreenScraperPrefs.devPassword(context)
-    val userId = ScreenScraperPrefs.userId(context)
-    val userPassword = ScreenScraperPrefs.userPassword(context)
     if (source == ScraperSource.SCREENSCRAPER && screenScraperSystemId == null) {
         return@withContext "${system.displayName}: ScreenScraper has no platform id for this system."
     }
@@ -148,11 +144,12 @@ suspend fun scrapeSystemArtwork(
                     systemeId = it.toString(),
                     romName = romFile.name,
                     romSizeBytes = romFile.length(),
-                    devId = devId,
-                    devPassword = devPassword,
-                    userId = userId,
-                    userPassword = userPassword,
+                    devId = ScreenScraperPrefs.devId(context),
+                    devPassword = ScreenScraperPrefs.devPassword(context),
+                    userId = ScreenScraperPrefs.userId(context),
+                    userPassword = ScreenScraperPrefs.userPassword(context),
                     md5 = localMd5.orEmpty(),
+                    responseCacheDir = File(context.filesDir, "scraper-response-cache"),
                 )
             }
             val gamesDbLookup = gamesDbSystemId?.let {
