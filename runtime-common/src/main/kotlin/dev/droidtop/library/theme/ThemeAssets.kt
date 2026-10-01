@@ -333,7 +333,6 @@ object ThemeAssets {
             discoveredThemes = null
             systemThemeCache.clear()
             capabilitiesCache.clear()
-            pcGroupFolderCache.clear()
         }
     }
 
