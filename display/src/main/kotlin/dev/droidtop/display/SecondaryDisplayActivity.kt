@@ -67,6 +67,14 @@ class SecondaryDisplayActivity : ComponentActivity() {
         render()
     }
 
+    /** See SecondScreenPresentation.dispatchTouchEvent: the same one-line probe for the idle surface. */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            android.util.Log.d("droidtop.SecondScreen", "SecondaryDisplayActivity touch on display ${displayIdCompat()} at ${ev.x.toInt()},${ev.y.toInt()}")
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
     override fun onResume() {
         super.onResume()
         // The mode can change while this sits on the other screen (the

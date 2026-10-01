@@ -2772,8 +2772,9 @@ different questions:
 Two things the Activity alone cannot do, which is why droidtop keeps
 both: a `SECONDARY_HOME` activity is placed only while droidtop holds the
 HOME role, so droidtop run as an ordinary app would show no companion at
-all; and being a real Activity it can take input focus, which a
-Presentation window never does. The handoff is the shell's own
+all; and being a real Activity it takes input focus, which droidtop's
+Presentation is made not to (a Presentation is focusable unless told
+otherwise: see "Second display: a Presentation takes no focus", below). The handoff is the shell's own
 foreground state — `onStop` drops the live window, `onStart` re-asserts
 it — which is what `temporaryPresentationDisabled` encodes upstream.
 
@@ -2947,6 +2948,57 @@ display (`displayId ?: Display.DEFAULT_DISPLAY`) and always passes
 `ActivityOptions.setLaunchDisplayId` -- the launch, and `parkedDisplayId`,
 now always land where droidtop actually asked, never wherever Android's
 ambient default happens to be.
+
+### Second display: a Presentation takes no focus, the IME follows visibility (2026-09-30)
+
+Owner, 2026-09-30: "most things on the second display aren't touchable"
+(Droidtop/tracker#155) and "apps we launch on the second display can't get
+keyboard" (#156). Diagnosed from the code and Android's input model; the
+console was not reachable from this session, so the touch half is NOT
+proven and the keyboard half is a code-level cause, both needing the rig
+check below.
+
+What is true on Android, and what this section corrects in the text above:
+
+- A `Presentation` is an ordinary FOCUSABLE `Dialog` window (type
+  `TYPE_PRESENTATION`) layered above every activity on its display. The
+  earlier statement that it "never takes input focus" was wrong. A
+  hardware key or gamepad press goes to the focused window of the
+  top-focused display, and touching a focusable window on another display
+  makes that display the top-focused one. So a companion Presentation left
+  focusable (a) took key focus away from an app launched onto the same
+  display (the app got no keyboard) and (b) flipped the whole system's
+  focus to the other screen on every tap on the companion, taking the
+  gamepad away from the shell. **Decision: the companion Presentation is
+  `FLAG_NOT_FOCUSABLE | FLAG_ALT_FOCUSABLE_IM`.** It is a touch-only surface
+  (no text field; the keyboard surface is a pure touch `View`), touch is
+  unaffected by the flags, and a Presentation never competes for key focus
+  again. This is what makes the Presentation-plus-SECONDARY_HOME split above
+  actually hold: the live surface adds no second focus holder.
+- An IME for an editor on a non-default presentation display is shown on the
+  default display (display IME policy `FALLBACK_DISPLAY`; changing it needs a
+  signature permission), so droidtop's IME being selected and allowed to draw
+  is what gives such an app a soft keyboard at all.
+  `SecondScreenKeyboard.attached` suppresses the IME's own view while the
+  second-screen keyboard surface is up. It counted ATTACHED surfaces, and a
+  stopped Activity's views stay attached, so the idle `SECONDARY_HOME` cover
+  left underneath an app launched onto that display kept the IME suppressed
+  for the app's own text fields. **Decision: the count follows window
+  visibility** (`onWindowVisibilityChanged`, GONE once the Activity stops), so
+  only a keyboard surface that is actually on screen suppresses it.
+- The Standard second screen's quick-launch row started apps with no launch
+  display, which resolves against whichever display is ambiently current (the
+  ambiguity `LaunchDisplay.startOn` already documents). It now pins the display
+  the tap was on.
+- Probe for the touch report: the Presentation and `SecondaryDisplayActivity`
+  log one `droidtop.SecondScreen` debug line per touch-down with the display
+  id. If a tap on the second screen produces no line, the touch never reached
+  droidtop's window (the panel's touch device is not associated with that
+  display, which no app can change without a signature permission); if it
+  produces a line and the control does not react, the fault is in the surface.
+
+**Needs a rig check** (real dual-screen console; nothing here could be run
+from the build environment): see the commit message for the steps.
 
 ### G6 status: store consolidated, relocation logic still in `:app` (2026-09-25)
 

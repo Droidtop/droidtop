@@ -174,18 +174,42 @@ class SecondScreenInputView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        // Tells the IME to stop putting a keyboard over the primary
-        // display; see LatinIME.onEvaluateInputViewShown.
-        SecondScreenKeyboard.setAttached(true)
         // Built on attach rather than cached, so a desktop session that
         // connected after this view was created is picked up, and one that
         // went away leaves no sink pointing at a dead bridge.
         trackpad.engine = TrackpadGestureEngine(trackpadOutput())
         status.text = statusText()
+        syncImeSuppression()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        syncImeSuppression()
+    }
+
+    private var countedForIme = false
+
+    /**
+     * Tells the IME to stop putting a keyboard over the primary display
+     * (see LatinIME.onEvaluateInputViewShown) for exactly as long as this
+     * surface is ON SCREEN. Attached is not on screen: a stopped Activity's
+     * views stay attached, so the idle SECONDARY_HOME cover left underneath
+     * an app launched onto the same display kept the IME suppressed for
+     * that app's own text fields (Droidtop/tracker#156). Window visibility
+     * goes to GONE when the Activity stops, which is the signal used here.
+     */
+    private fun syncImeSuppression() {
+        val shouldCount = isAttachedToWindow && windowVisibility == View.VISIBLE
+        if (shouldCount == countedForIme) return
+        countedForIme = shouldCount
+        SecondScreenKeyboard.setAttached(shouldCount)
     }
 
     override fun onDetachedFromWindow() {
-        SecondScreenKeyboard.setAttached(false)
+        if (countedForIme) {
+            countedForIme = false
+            SecondScreenKeyboard.setAttached(false)
+        }
         keyboardListener?.releaseEverything()
         metaState = 0
         trackpad.engine = null

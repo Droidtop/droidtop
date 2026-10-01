@@ -150,8 +150,15 @@ private fun QuickLaunchIcon(app: QuickLaunchApp) {
     Column(
         modifier = Modifier.width(76.dp).clickable {
             runCatching {
+                // On the screen the tap was on. Without an explicit display
+                // a NEW_TASK launch from a non-Activity context resolves
+                // against whichever display is ambiently current, which put
+                // the app on the other screen (the same ambiguity
+                // LaunchDisplay.startOn documents).
+                val displayId = displayIdOf(context)
                 context.startActivity(
                     Intent().setComponent(app.component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    android.app.ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle(),
                 )
             }
         },
@@ -171,6 +178,14 @@ private fun QuickLaunchIcon(app: QuickLaunchApp) {
         )
     }
 }
+
+@Suppress("DEPRECATION") // Display via WindowManager is the only route below API 30
+private fun displayIdOf(context: android.content.Context): Int =
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+        context.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
+    } else {
+        context.getSystemService(android.view.WindowManager::class.java).defaultDisplay.displayId
+    }
 
 // A row on a companion-sized panel; more than this just scrolls off anyway.
 private const val MAX_QUICK_LAUNCH = 12

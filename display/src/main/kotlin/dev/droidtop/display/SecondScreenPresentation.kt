@@ -3,6 +3,7 @@ package dev.droidtop.display
 import android.content.Context
 import android.os.Bundle
 import android.view.Display
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,8 +45,10 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
  * Two concrete things the Activity alone cannot do, which is why this is
  * back: a `SECONDARY_HOME` activity is only placed when droidtop holds
  * the HOME role, so droidtop used as an ordinary app would show no
- * companion at all; and being a real Activity it can take input focus,
- * which this window never does.
+ * companion at all; and being a real Activity it takes input focus, which
+ * this window is made NOT to (FLAG_NOT_FOCUSABLE in [onCreate]). A
+ * Presentation is a focusable Dialog unless told otherwise, so that
+ * property is enforced rather than assumed.
  */
 class SecondScreenPresentation(outerContext: Context, display: Display) : android.app.Presentation(outerContext, display) {
     private val lifecycleOwner = object : LifecycleOwner {
@@ -61,6 +64,19 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A Presentation is an ordinary focusable Dialog window layered ABOVE
+        // every activity on its display. Left focusable it takes key focus
+        // from whatever is underneath it (an app launched onto this display
+        // got no keyboard, Droidtop/tracker#156) and, because touching a
+        // focusable window on another display moves the system's top-focused
+        // display, every tap on the companion pulled the gamepad away from
+        // the shell on the other screen. This surface is touch-only (no text
+        // fields, the keyboard surface is a pure touch View), so it asks for
+        // no focus and no input method; touch is unaffected by the flag.
+        window?.addFlags(
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM,
+        )
         savedStateOwner.controller.performRestore(null)
         lifecycleOwner.registry.currentState = Lifecycle.State.CREATED
 
@@ -91,6 +107,19 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
             }
         }
         setContentView(composeView)
+    }
+
+    /**
+     * One log line per touch-down, so a device check can tell "the touch
+     * never reached this window" (an input-association problem, nothing in
+     * droidtop can fix that) from "it arrived and the UI ignored it"
+     * (Droidtop/tracker#155) with `logcat -s droidtop.SecondScreen`.
+     */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            android.util.Log.d("droidtop.SecondScreen", "Presentation touch on display ${display.displayId} at ${ev.x.toInt()},${ev.y.toInt()}")
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     override fun onStart() {
