@@ -38,7 +38,7 @@ class PluginCrashPolicy(
             return
         }
         Log.w("droidtop.plugin", "$pluginId disabled: $reason")
-        PluginStore.disableWithReason(context, pluginId, reason)
+        PluginStore.disableWithReason(context, pluginId, PluginLoadErrorMessage.userMessage(reason))
     }
 
     /**
@@ -178,8 +178,10 @@ class PluginCrashPolicy(
         withContext(Dispatchers.IO) { PluginRuntimeNeeds.missing(context, record.manifest) }
 
     /** The reason [runner]'s last load of [record] failed (docs/SPEC.md 12a); never the bare "failed to load" when the host knows more. */
-    private fun loadFailure(record: PluginRecord): String =
-        runner.loadFailure(record.manifest.id) ?: "plugin failed to load"
+    private fun loadFailure(record: PluginRecord): String {
+        val raw = runner.loadFailure(record.manifest.id) ?: "plugin failed to load"
+        return PluginLoadErrorMessage.userMessage(raw)
+    }
 
     override fun cancelJob(pluginId: String, jobId: String) {
         runner.cancelJob(pluginId, jobId)

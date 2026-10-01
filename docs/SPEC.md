@@ -12890,6 +12890,10 @@ without its runtime said "Running". Decisions:
   returns it instead of the fixed "plugin failed to load" for `invoke`,
   `handle` and the job path. `PluginCrashPolicy.onCrash` logs the reason it
   disables a plugin with. The plugin page shows `disabledReason` as before.
+  `PluginLoadErrorMessage` (plugin-host) maps each raw reason to a plain user
+  sentence in one place (Droidtop/tracker#167): missing runtime, didn't signal
+  ready (needs an update from its developer), timed out, crashed, and
+  incompatible API version -- technical detail stays in logcat (`droidtop.plugin`).
 - **A slow first start is not a crash.** The load budget
   (`PluginRunner.CALL_TIMEOUT_MS`) runs the blocking binder call on the IO
   dispatcher so it can fire at all, and when it fires the plugin is NOT
