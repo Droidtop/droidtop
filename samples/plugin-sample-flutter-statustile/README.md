@@ -57,6 +57,13 @@ shape. The settings view returns a document (`view: 1`, `sections`,
 in memory; `greet` reads `args.values.name` (defaulting to `'there'`)
 and returns a message reply.
 
+- `ui.main` (docs/plugin-api.md 1.7): the manifest declares
+  `{"point":"ui.main","entrypoint":"mainUi"}` and `lib/main.dart` has the
+  matching `@pragma('vm:entry-point') void mainUi()` that calls `runApp`
+  with a one-screen widget. droidtop shows "Open <plugin name>" on the
+  plugin's page and runs that function full-screen in the plugin's process;
+  Back returns to droidtop. Only `flutter_embed` plugins can declare it.
+
 - `args.query == "force-crash"` calls Dart's `exit()` to kill
   `:pluginhost` outright -- the crash-containment test this sample needs
   that a caught Dart exception would NOT give (Flutter's own dispatcher

@@ -39,6 +39,7 @@ object ExtensionPoints {
         ExtensionPoint("input.mapping", "Controller mapping", PointRisk.MEDIUM),
         ExtensionPoint("perf.source", "Performance readings", PointRisk.LOW),
         ExtensionPoint("ui.settings", "Settings", PointRisk.LOW),
+        ExtensionPoint("ui.main", "Its own full-screen app", PointRisk.LOW),
         ExtensionPoint("ui.quick_tile", "Quick Menu tiles", PointRisk.LOW),
         ExtensionPoint("ui.status_tile", "Status tiles and widgets", PointRisk.LOW),
         ExtensionPoint("ui.context_action", "Context actions", PointRisk.MEDIUM),

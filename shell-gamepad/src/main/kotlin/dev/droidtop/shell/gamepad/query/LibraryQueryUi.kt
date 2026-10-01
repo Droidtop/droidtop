@@ -422,6 +422,19 @@ internal fun LibrarySearchDialog(
                             }
                             outcome.results.isEmpty() -> SourceNote("${outcome.source.label}: no match")
                         }
+                        // A source whose plugin has a full screen of its own offers it here too (ui.main, docs/plugin-api.md 1.7).
+                        if (outcome.source.hasMainUi) {
+                            MenuRow(
+                                title = "Open ${outcome.source.label}",
+                                subtitle = "Its own screen. Back returns here",
+                                onClick = {
+                                    coroutineScope.launch {
+                                        val problem = withContext(Dispatchers.IO) { outcome.source.openMainUi(context) }
+                                        statusLine = problem
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
                 sourceHits.forEach { hit ->

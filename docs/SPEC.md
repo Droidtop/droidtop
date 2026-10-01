@@ -11556,6 +11556,17 @@ of what is built. The decisions, briefly:
     plugin content in Gaming appears only on droidtop's own surfaces
     (Quick Menu, game page, options menus, Settings), never inside a
     themed view, until the frame-only render declares a region for it.
+  - A plugin with a full UI of its own may declare the optional extension
+    point `ui.main` (docs/plugin-api.md 1.7, Droidtop/tracker#187) in
+    addition to its views: `flutter_embed` only, with the Dart `entrypoint`
+    it starts. droidtop runs it full-screen in the plugin's own process
+    (`PluginMainActivity` in `:pluginhost`, a second `FlutterEngine` on the
+    plugin's `libapp.so`), input goes to it natively and Back returns to
+    droidtop. It is one approvable item like any other point, and "Open
+    <plugin name>" is a row on the plugin's page in every mode and on the
+    source's row in Gaming. `native_bundle` and `python` cannot declare it
+    (no activity droidtop can name, no UI toolkit); the manifest check says
+    so.
   - Approving a plugin grants every extension point it lists under Adds,
     high-risk ones included; a later update's new high-risk point still
     waits. Before, a contract 2 source was approved and then refused on

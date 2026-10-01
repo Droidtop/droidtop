@@ -55,8 +55,13 @@
           "targets": { "type": "array", "items": { "enum": ["game", "app", "file", "folder", "system", "container", "window"] } },
           "systems": { "type": "array", "items": { "type": "string" } },
           "packages": { "type": "array", "items": { "type": "string" } },
-          "job": { "type": "boolean" }
-        }
+          "job": { "type": "boolean" },
+          "entrypoint": { "type": "string", "minLength": 1, "description": "ui.main only (flutter_embed): the Dart function started on the hosted engine; annotate it @pragma('vm:entry-point')." },
+          "library": { "type": "string", "description": "ui.main only: the library URI of entrypoint when it is not the root library." }
+        },
+        "allOf": [
+          { "if": { "properties": { "point": { "const": "ui.main" } }, "required": ["point"] }, "then": { "required": ["entrypoint"] } }
+        ]
       }
     },
     "permissions": {

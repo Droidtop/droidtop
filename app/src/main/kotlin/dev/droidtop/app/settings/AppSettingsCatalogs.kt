@@ -38,6 +38,7 @@ import dev.droidtop.library.GameEngineDetector
 import dev.droidtop.library.EnginesDatabase
 import dev.droidtop.library.ScanPrune
 import dev.droidtop.pluginhost.PluginStore
+import dev.droidtop.pluginhost.PluginMainUi
 import dev.droidtop.pluginhost.ApiResolution
 import dev.droidtop.pluginhost.GrantState
 import dev.droidtop.pluginhost.PluginApiResolver
@@ -2143,6 +2144,17 @@ object AppSettingsCatalogs {
                         ),
                     )
                 }
+            }
+            // The plugin's own full-screen app (ui.main, docs/plugin-api.md 1.7), the same row in every mode.
+            if (PluginMainUi.offered(record)) {
+                add(
+                    AsyncActionItem(
+                        id = "plugin_${m.id}_open_main",
+                        title = "Open ${m.label}",
+                        subtitle = "Its own screen, full-screen. Back returns here",
+                        run = { ctx, _ -> PluginMainUi.open(ctx, record) ?: "Opened" },
+                    ),
+                )
             }
             if (record.runnable() && PluginCapability.SETTINGS_ROWS in m.capabilities) {
                 add(

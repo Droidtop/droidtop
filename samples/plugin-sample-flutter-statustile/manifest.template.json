@@ -10,7 +10,8 @@
   "requestsRoot": false,
   "provides": [
     {"point":"ui.status_tile","version":1,"id":"state","label":"Sample tile (Flutter)","surfaces":["gaming.quick_menu"]},
-    {"point":"ui.settings","version":1,"target":"plugin"}
+    {"point":"ui.settings","version":1,"target":"plugin"},
+    {"point":"ui.main","version":1,"entrypoint":"mainUi"}
   ],
   "abis": ["arm64-v8a", "x86_64"]
 }

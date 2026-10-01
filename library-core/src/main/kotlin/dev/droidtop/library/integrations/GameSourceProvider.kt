@@ -70,6 +70,11 @@ interface GameSourceProvider {
 
     fun settingsScreen(): CatalogScreen? = null
 
+    /** Whether this source's plugin has a full screen of its own to open (`ui.main`, docs/plugin-api.md 1.7). Cheap: no I/O. */
+    val hasMainUi: Boolean get() = false
+
+    /** Opens that screen. Null once it started, otherwise why not, as a sentence. Does I/O: call off the main thread. */
+    fun openMainUi(context: Context): String? = "${label} has no screen of its own"
 }
 
 /**
@@ -125,6 +130,10 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
             onJobDone = { ctx, outcome -> if (outcome.ok) dev.droidtop.library.settings.LibraryRescan.run(ctx) {} },
         )
     }
+
+    override val hasMainUi: Boolean get() = dev.droidtop.pluginhost.PluginMainUi.offered(source.record)
+
+    override fun openMainUi(context: Context): String? = dev.droidtop.pluginhost.PluginMainUi.open(context, source.record)
 
     override fun settingsScreen(): CatalogScreen? {
         val m = source.record.manifest

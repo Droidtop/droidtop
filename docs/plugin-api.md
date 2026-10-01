@@ -514,6 +514,61 @@ a contract 1 plugin keeps the legacy translation.
 
 ---
 
+### 1.7 A plugin's own full-screen UI: `ui.main`
+
+*Decided 2026-10-01 (Droidtop/tracker#187). Owner: "we need a 'view plugin
+interface' menu in settings that'll launch the plugin's main UI to let us
+configure stuff or etc."*
+
+The views of 1.6 are how a plugin adds rows and pages to droidtop's own
+screens, and they stay that. A plugin that is also a whole app with a user
+interface of its own (a browser for its content, a configuration screen
+with more than inputs and buttons) declares the optional extension point
+`ui.main@1`, and droidtop opens that UI **full-screen, in the plugin's own
+process**, the one its runner already lives in. It is in addition to 1.6,
+never instead of it: a plugin with `ui.main` still draws its settings page
+and rows through views.
+
+```json
+{ "point": "ui.main", "version": 1, "entrypoint": "mainUi" }
+```
+
+- **`entrypoint`** (required): the name of the plugin's own start function.
+  **`library`** (optional): the library URI that function lives in, when it
+  is not the root library of the plugin's build target.
+- **Kinds.** Only `flutter_embed` can host one. droidtop starts a
+  `FlutterActivity` (`PluginMainActivity`, in `:pluginhost`) over a second
+  `FlutterEngine` built from the plugin's own `libapp.so` and runs
+  `entrypoint` on it; the function must be annotated
+  `@pragma('vm:entry-point')` so the AOT build keeps it, and it normally
+  just calls `runApp`. `native_bundle` cannot: its code is loaded from dex
+  and droidtop's manifest cannot name a plugin's activity, so a hosted
+  Android activity is not offered. `python` has no UI toolkit. A manifest of
+  either kind that declares `ui.main` is refused at install with that
+  reason, so no row ever does nothing.
+- **Input.** The plugin UI is the foreground activity, so the keyboard and
+  controller keys reach it natively through Flutter's own handling; droidtop
+  does not translate them. Back pops the plugin's own routes and, with none
+  left, closes it and returns to droidtop.
+- **Approval.** `ui.main` is one more approvable item (4.2, #164): it is
+  listed under Adds with its own box, and a plugin whose box is unticked
+  gets the sentence "has not been allowed to open its own screen" instead
+  of a launch. The launch also needs the plugin approved and on, its
+  runtime installed, and its payload to pass the same signature and hash
+  check every call does. The UI's own host calls are made through the same
+  broker and grants as the headless engine's.
+- **Where it appears.** Every plugin's page under Accounts and sources
+  gets an "Open <plugin name>" row when it declares `ui.main`, in all three
+  modes (the settings catalog is the one renderer, 1.6). In Gaming the same
+  row is in the "Get more" group under each download source that has one
+  (Gaming shows plugins only on droidtop's own surfaces, never in a themed
+  view).
+- **Process.** The main UI shares `:pluginhost`, and so its fate, with the
+  plugin's headless engine: a crash of either is a crash of the plugin
+  (`PluginCrashPolicy`).
+
+---
+
 ## 2. Plugin-provided APIs
 
 *Added at the owner's direction on 2026-09-28: "the shizuku and magisk
@@ -1312,6 +1367,17 @@ Risk medium.
   (the second screen is part of the desktop there).
 - **Permission:** none.
 - **Status:** not built (§7e has built-in now-playing and Discord).
+
+**C16 A plugin's own full-screen UI.** EP `ui.main@1`. Risk low.
+- **For:** a plugin that has a complete UI of its own to configure and use
+  (1.7).
+- **What the plugin supplies:** `entrypoint` (and optionally `library`),
+  the Dart function started on the hosted engine.
+- **Surfaces:** G, S, D: an "Open <plugin name>" row on the plugin's page;
+  G: also on the download source's row in the Gaming search.
+- **Kinds:** `flutter_embed` only (1.7).
+- **Permission:** none beyond the approval of the point itself.
+- **Status:** built (2026-10-01).
 
 ### D. System and device
 

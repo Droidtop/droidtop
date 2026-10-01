@@ -26,6 +26,21 @@
           The permission is the one Shizuku's own documentation asks for: only
           the Shizuku server (the shell or root) holds it.
         -->
+        <!--
+          A plugin's own full-screen UI (ui.main, docs/plugin-api.md 1.7),
+          hosted in the plugin's process. Not exported: only droidtop starts
+          it, after checking approval and the signature. It takes the
+          configuration changes itself, as every Flutter activity does.
+        -->
+        <activity
+            android:name="dev.droidtop.pluginhost.PluginMainActivity"
+            android:process=":pluginhost"
+            android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" />
+
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"

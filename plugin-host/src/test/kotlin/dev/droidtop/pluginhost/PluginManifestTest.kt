@@ -162,6 +162,65 @@ class PluginManifestTest {
         assertTrue(manifest.structuralProblems().any { it.contains("flutter_assets") })
     }
 
+    private fun withMainUi(kind: String, point: JSONObject): PluginManifest {
+        val json = if (kind == "flutter_embed") {
+            manifestJson(
+                kind = kind,
+                capabilities = emptyList(),
+                entryClass = null,
+                runtimeVersion = "af7e796e161ae0bb1ff0758c71a7105418bd9ded",
+                payload = listOf(
+                    "lib/arm64-v8a/libapp.so" to "a".repeat(64),
+                    "lib/x86_64/libapp.so" to "b".repeat(64),
+                    "flutter_assets/AssetManifest.bin" to "c".repeat(64),
+                ),
+            )
+        } else {
+            manifestJson(kind = kind, capabilities = emptyList(), payload = listOf("plugin.py" to "a".repeat(64)), entryClass = null)
+        }
+        json.put("provides", JSONArray(listOf(point)))
+        return PluginManifest.fromJson(json)!!
+    }
+
+    @Test
+    fun `reads a ui main entry with its entrypoint and library`() {
+        val m = withMainUi("flutter_embed", JSONObject().put("point", "ui.main").put("version", 1).put("entrypoint", "mainUi").put("library", "package:app/ui.dart"))
+        assertTrue(m.structuralProblems().isEmpty())
+        assertEquals(PluginMainUi.Entry("mainUi", "package:app/ui.dart"), PluginMainUi.declared(m))
+    }
+
+    @Test
+    fun `a ui main entry without a library starts in the root library`() {
+        val m = withMainUi("flutter_embed", JSONObject().put("point", "ui.main").put("entrypoint", "mainUi"))
+        assertEquals(PluginMainUi.Entry("mainUi", null), PluginMainUi.declared(m))
+    }
+
+    @Test
+    fun `flags a ui main entry that names no entrypoint`() {
+        val m = withMainUi("flutter_embed", JSONObject().put("point", "ui.main"))
+        assertNull(PluginMainUi.declared(m))
+        assertTrue(m.structuralProblems().any { it.contains("ui.main must name") })
+    }
+
+    @Test
+    fun `a python plugin cannot declare ui main`() {
+        val m = withMainUi("python", JSONObject().put("point", "ui.main").put("entrypoint", "mainUi"))
+        assertNull(PluginMainUi.declared(m))
+        assertTrue(m.structuralProblems().any { it.contains("ui.main is hosted for flutter_embed") })
+    }
+
+    @Test
+    fun `a plugin without ui main declares none`() {
+        val m = withMainUi("flutter_embed", JSONObject().put("point", "ui.settings").put("target", "plugin"))
+        assertNull(PluginMainUi.declared(m))
+        assertTrue(m.structuralProblems().isEmpty())
+    }
+
+    @Test
+    fun `ui main is a known extension point`() {
+        assertTrue(ExtensionPoints.supports("ui.main", 1))
+    }
+
     @Test
     fun `accepts a complete flutter_embed plugin`() {
         val json = manifestJson(

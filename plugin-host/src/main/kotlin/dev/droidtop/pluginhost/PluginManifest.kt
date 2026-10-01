@@ -235,6 +235,14 @@ data class PluginManifest(
         v2.requires.filter { (it.api.startsWith("priv.") || it.api.startsWith("root.")) && !it.optional }.forEach {
             add("requires \"${it.api}\" must be optional: privileged access is never something a plugin's core function depends on")
         }
+        // ui.main (docs/plugin-api.md 1.7): only a kind that can host a full screen may declare one, and it must say where it starts.
+        v2.provides.filter { it.point == PluginMainUi.POINT }.forEach {
+            if (kind != PluginKind.FLUTTER_EMBED) {
+                add("ui.main is hosted for flutter_embed plugins only; a ${kind.id} plugin cannot declare it")
+            } else if (PluginMainUi.entryOf(it) == null) {
+                add("ui.main must name the Dart entrypoint it starts (\"entrypoint\")")
+            }
+        }
         if (!PluginOriginKeys.isOfficial(origin)) {
             v2.permissions.filter { PluginPermissions.find(it.id)?.officialOnly == true }.forEach {
                 add("permission \"${it.id}\" is restricted to the official origin")

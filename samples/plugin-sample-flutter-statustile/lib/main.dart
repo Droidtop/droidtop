@@ -18,6 +18,38 @@ const MethodChannel _channel = MethodChannel(
 
 String _rememberedName = '';
 
+/// The sample's own full-screen UI (`ui.main` in manifest.template.json,
+/// docs/plugin-api.md 1.7). droidtop starts this function on a second engine
+/// in the plugin's process when the person taps "Open <plugin name>" on the
+/// plugin's page. `vm:entry-point` keeps it in the AOT build; `runApp` is the
+/// only thing it has to do. Back (which closes it) and the keyboard and
+/// controller keys are handled by Flutter, nothing here.
+@pragma('vm:entry-point')
+void mainUi() {
+  runApp(const _SampleApp());
+}
+
+class _SampleApp extends StatelessWidget {
+  const _SampleApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Directionality(
+      textDirection: TextDirection.ltr,
+      child: ColoredBox(
+        color: Color(0xFF101418),
+        child: Center(
+          child: Text(
+            'Sample plugin: its own screen. Back returns to droidtop.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFFFFFFFF), fontSize: 22),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 void main() {
   // Only the services/widgets binding is needed to get a
   // BinaryMessenger -- there is no view to attach and no runApp() call,
