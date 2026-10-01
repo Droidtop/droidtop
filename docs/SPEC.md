@@ -2981,7 +2981,16 @@ What is true on Android, and what this section corrects in the text above:
 - An IME for an editor on a non-default presentation display is shown on the
   default display (display IME policy `FALLBACK_DISPLAY`; changing it needs a
   signature permission), so droidtop's IME being selected and allowed to draw
-  is what gives such an app a soft keyboard at all.
+  is what gives such an app a soft keyboard at all. The second-screen input
+  surface sends key events and committed text to
+  `SecondScreenKeyboard.androidTarget`, the selected IME's current
+  `InputConnection`, so the focused app receives input while Android places
+  the IME window on the built-in display. The surface offers one explicit
+  “Use droidtop's keyboard for the second screen” action when droidtop is not
+  the running IME; it opens Android's keyboard picker and never selects an
+  IME itself. This uses the platform's permitted default-display fallback
+  rather than trying to move the IME window to a display droidtop cannot
+  control (Droidtop/tracker#156).
   `SecondScreenKeyboard.attached` suppresses the IME's own view while the
   second-screen keyboard surface is up. It counted ATTACHED surfaces, and a
   stopped Activity's views stay attached, so the idle `SECONDARY_HOME` cover

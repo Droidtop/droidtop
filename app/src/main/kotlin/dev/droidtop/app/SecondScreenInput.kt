@@ -2,10 +2,13 @@ package dev.droidtop.app
 
 import android.app.Activity
 import android.content.Context
+import android.content.Context.INPUT_METHOD_SERVICE
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.InputMethodManager
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.compose.foundation.layout.fillMaxSize
@@ -135,6 +138,7 @@ class SecondScreenInputView(
 
     private val trackpad = TrackpadView(context)
     private val status = TextView(context)
+    private val imePicker = Button(context)
     private var keyboardView: LatinKeyboardView? = null
     private var keyboardListener: SecondScreenKeyboardListener? = null
     private var functionLayer = false
@@ -169,6 +173,14 @@ class SecondScreenInputView(
         status.gravity = Gravity.CENTER
         addView(status, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
+        imePicker.text = "Use droidtop's keyboard for the second screen"
+        imePicker.gravity = Gravity.CENTER
+        imePicker.setOnClickListener {
+            (context.getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)
+                ?.showInputMethodPicker()
+        }
+        addView(imePicker, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+
         addView(trackpad, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
     }
 
@@ -179,12 +191,26 @@ class SecondScreenInputView(
         // went away leaves no sink pointing at a dead bridge.
         trackpad.engine = TrackpadGestureEngine(trackpadOutput())
         status.text = statusText()
+        syncImePicker()
         syncImeSuppression()
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
+        syncImePicker()
         syncImeSuppression()
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        syncImePicker()
+        status.text = statusText()
+    }
+
+    private fun syncImePicker() {
+        imePicker.visibility = if (
+            mode != SecondaryDisplayContent.Mode.DESKTOP && !SecondScreenKeyboard.imeRunning
+        ) View.VISIBLE else View.GONE
     }
 
     private var countedForIme = false
@@ -292,7 +318,7 @@ class SecondScreenInputView(
             }
 
         !SecondScreenKeyboard.imeRunning ->
-            "Swipe to navigate. Typing needs droidtop's keyboard picked in Android's keyboard switcher."
+            "Swipe to navigate. Choose droidtop's keyboard below to type on the second screen."
 
         !SecondScreenKeyboard.androidTargetAvailable() ->
             "Swipe to navigate. Typing goes to a text field once one is focused on the other screen."
