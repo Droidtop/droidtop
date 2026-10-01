@@ -37,7 +37,7 @@ internal fun providersOf(context: Context, point: String): List<Pair<PluginRecor
         }
 }
 
-private fun newCall(point: String, op: String, surfacePlace: String, args: JSONObject, deadlineMs: Long): PluginCall =
+internal fun newCall(point: String, op: String, surfacePlace: String, args: JSONObject, deadlineMs: Long): PluginCall =
     PluginCall(
         callId = "c-" + UUID.randomUUID().toString().take(8),
         deadlineMs = deadlineMs,

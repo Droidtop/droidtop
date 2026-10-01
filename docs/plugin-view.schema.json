@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Droidtop/droidtop/docs/plugin-view.schema.json",
+  "title": "droidtop plugin view, version 1",
+  "description": "A plugin's UI as data (docs/plugin-api.md 1.6). droidtop renders it with its own components in every mode; a plugin never draws. Unknown item types are skipped by the host, so this schema lists the types this version renders. Limits beyond the ones below (title and subtitle lengths, args size) are cut by the host, not refused.",
+  "type": "object",
+  "required": ["view", "sections"],
+  "properties": {
+    "view": { "const": 1 },
+    "title": { "type": ["string", "null"] },
+    "subtitle": { "type": ["string", "null"] },
+    "sections": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "$ref": "#/$defs/section" }
+    }
+  },
+  "$defs": {
+    "section": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": ["string", "null"] },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/item" } }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["kind", "op"],
+      "properties": {
+        "kind": { "enum": ["view", "call", "job"] },
+        "op": { "type": "string", "minLength": 1 },
+        "args": { "type": "object" },
+        "title": { "type": "string", "description": "A job's name in Jobs." }
+      }
+    },
+    "common": {
+      "type": "object",
+      "required": ["type", "id", "title"],
+      "properties": {
+        "type": { "type": "string" },
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "subtitle": { "type": ["string", "null"] }
+      }
+    },
+    "item": {
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "oneOf": [
+        { "properties": { "type": { "const": "info" }, "value": { "type": ["string", "null"] } } },
+        {
+          "properties": {
+            "type": { "const": "row" },
+            "columns": { "type": "array", "items": { "type": "string" } },
+            "badges": { "type": "array", "items": { "type": "string" } },
+            "value": { "type": ["string", "null"] },
+            "action": { "$ref": "#/$defs/action" }
+          }
+        },
+        {
+          "required": ["action"],
+          "properties": {
+            "type": { "const": "button" },
+            "value": { "type": ["string", "null"] },
+            "confirm": { "type": ["string", "null"], "description": "Asks the two-step confirm with this text." },
+            "action": { "$ref": "#/$defs/action" }
+          }
+        },
+        { "required": ["value"], "properties": { "type": { "const": "toggle" }, "value": { "type": "boolean" }, "action": { "$ref": "#/$defs/action" } } },
+        {
+          "required": ["options"],
+          "properties": {
+            "type": { "const": "choice" },
+            "options": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "required": ["value", "label"],
+                "properties": { "value": { "type": "string" }, "label": { "type": "string" } }
+              }
+            },
+            "value": { "type": ["string", "null"] },
+            "action": { "$ref": "#/$defs/action" }
+          }
+        },
+        {
+          "required": ["min", "max", "value"],
+          "properties": {
+            "type": { "const": "slider" },
+            "min": { "type": "integer" },
+            "max": { "type": "integer" },
+            "value": { "type": "integer" },
+            "action": { "$ref": "#/$defs/action" }
+          }
+        },
+        {
+          "properties": {
+            "type": { "const": "text" },
+            "value": { "type": ["string", "null"] },
+            "action": { "$ref": "#/$defs/action" }
+          },
+          "not": { "required": ["secret"] }
+        },
+        { "properties": { "type": { "const": "progress" }, "value": { "type": "integer", "minimum": -1, "maximum": 100 } } }
+      ]
+    }
+  }
+}

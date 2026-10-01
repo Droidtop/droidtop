@@ -202,8 +202,8 @@ The reply uses the same `{ok, data|error}` shape.
 | Kind | Host → plugin | Plugin → host | Jobs |
 | --- | --- | --- | --- |
 | `native_bundle` | `DroidtopPlugin.handle(call: PluginCall): PluginReply` (v2); v1 `invoke(capability, args)` still served via the legacy translation | `PluginHost.call(api, version, op, args)` handed to `onLoad(host)` | `startJob(jobId, call, progress)` / `cancelJob` (as today) |
-| `python` | module-level `handle(call: dict) -> dict`; v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args, version=1)`: a module the bootstrap injects before `plugin.py` is imported | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: **not built** (P1-8) |
-| `flutter_embed` | `MethodChannel("droidtop/plugin")` method `handle`, envelope as a JSON string | the same channel's `host.call`, envelope as a JSON string | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
+| `python` | module-level `handle(call_json) -> reply_json` (JSON text both ways, like `invoke`; called for a contract 2 manifest, built 2026-10-01); v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args, version=1)`: a module the bootstrap injects before `plugin.py` is imported | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: **not built** (P1-8) |
+| `flutter_embed` | the plugin's `MethodChannel("dev.droidtop.pluginhost/<plugin id>")`, method `handle`, envelope and reply as JSON strings (called for a contract 2 manifest, built 2026-10-01) | the same channel's `host.call`, envelope as a JSON string | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
 
 The rules that make this "no kind-specific features":
 
@@ -213,8 +213,12 @@ The rules that make this "no kind-specific features":
    Python module namespacing) is invisible above the adapter.
 2. **Parity is tested, not claimed.** One conformance script (the fake
    host, §3 I2) drives the same calls against each kind's sample, and a
-   kind that fails a case is a bug in that kind's adapter. Today the
-   known gap is `startJob` for `python` (P1-8).
+   kind that fails a case is a bug in that kind's adapter. The known gaps
+   (audit 2026-10-01): `startJob` for `python` (P1-8, #64), `host.call`
+   for `python` and `flutter_embed` (#127), and event delivery
+   (`onEvent`) for `python` and `flutter_embed`, which both still answer
+   every event with the default no-op. `handle` reaches all three kinds
+   since 2026-10-01 (§1.6).
 3. **A new kind is a new adapter plus a pass of the same conformance
    script,** and nothing else. This is what `PluginKind`'s own doc
    comment already asks for ("add a case and a matching runner").
@@ -258,12 +262,205 @@ each plugin:
 | Stage | What happens | Existing code |
 | --- | --- | --- |
 | **Install** | Picker or catalog download → `PluginBundleInstaller` checks: signature against the origin key, every payload hash, the manifest schema, the namespace, the ABIs, the contract version. **v2 adds:** every `provides`/`permissions`/`exports`/`requires` entry is checked against the host registries, and a `requires` on `priv.*` must be `optional` (§2.7). The record lands PENDING. No plugin code runs before approval, not even to describe itself. | `PluginBundleInstaller`, `PluginStore` |
-| **Approve** | The approval screen shows, in plain language: what the plugin adds and where (grouped by mode), what it can access (normal permissions as a short list; each dangerous permission and high-risk extension point as its own line), what it needs from other plugins, and its trust badge (Official / Added by you). Approve grants the normal permissions and any dangerous ones the user ticks. Unticked dangerous permissions stay at `ask` (§4.3). | the approval screen in `AppSettingsCatalogs.pluginsScreen` |
+| **Approve** | The approval screen shows, in plain language: what the plugin adds and where (grouped by mode), what it can access (normal permissions as a short list; each dangerous permission and high-risk extension point as its own line), what it needs from other plugins, and its trust badge (Official / Added by you). Approve grants the normal permissions, **every extension point listed under Adds** (decided 2026-10-01, §1.6 "Consent"), and any dangerous permissions the user ticks. Unticked dangerous permissions stay at `ask` (§4.3). | the approval screen in `AppSettingsCatalogs.pluginsScreen` |
 | **Enable** | An approved plugin is enabled by default. Disabling stops every call to it and hides its contributions everywhere, because `PluginStore.runnableFor` is the only iterator (checklist point 6). | `PluginStore.setEnabled` |
 | **Resolve** | On every install, approve, enable, disable, uninstall or crash, the `requires` graph is recomputed (§2.3). A plugin whose *required* API has no runnable provider is **Waiting**. It is not disabled, and it resumes by itself when a provider appears. | new: `PluginApiResolver` |
 | **Run** | Loading is lazy: a plugin is loaded on its first call, and after 60 s idle (proposed) it is unloaded unless it holds a job or a declared background service (§3 E7). A crash, an uncaught exception, a native crash, a timeout or process death disables that plugin with a reason, and the user re-enables it by hand (12a checklist point 6). **Kept as is:** crash containment is the one rule `PluginCrashPolicy` exists for. | `PluginCrashPolicy`, `NativePluginRunner` |
 | **Update** | Same key: approval carries over (12a "Trust over updates"). **v2 adds a permission diff.** An update that adds a dangerous permission, a high-risk extension point or a new `exports` entry keeps running with its *old* grants; the new items wait at `ask`, and the Plugins screen shows "Wants new access". An update never gains dangerous access silently. A different key, or a previously DENIED plugin, goes back to PENDING (unchanged). | `PluginStore`, `PluginRecord.approvedKeySha256` |
 | **Uninstall** | `onUnload` runs, and the payload, data directory, vault entries, grants and scheduled work are deleted. The audit log for the plugin is kept for 7 days (labelled "removed plugin") so that "what did it do" can still be answered. Dependents are re-resolved (§2.5). | `PluginStore.uninstall` |
+
+### 1.6 UI extensions: the view schema
+
+*Decided 2026-10-01 (Droidtop/tracker#164). Owner: "we've gotta make sure
+the plugin API is full featured ... also need plugins to expose their own
+UI extensions for it."*
+
+A plugin contributes UI as **data**: a *view* is a JSON document drawn from
+a closed set of node types, and droidtop renders it with its own
+components. A plugin never draws a native view, a WebView, a Flutter
+surface or a Compose tree into droidtop. This keeps every plugin screen
+themed like the rest of droidtop, D-pad navigable through the one input
+pipeline (`Modifier.onPad` / `PadGate`, #152), touch-equal, and unable to
+imitate droidtop's own screens (§5, T6). The same document renders in all
+three modes and is produced the same way by every kind, because it is just
+the `data` of an ordinary `handle` reply (§1.3).
+
+**One renderer.** droidtop already has one renderer-agnostic UI model that
+every mode draws: the settings catalog (`CatalogScreen` / `CatalogGroup` /
+`CatalogItem`, `runtime-common`). Gaming draws it with `CatalogNavigator`
+(pad and touch through `onPad`), Standard with the Preference surface, and
+Desktop with the same Settings app. A view is translated into that model by
+one host mechanism (`PluginViews`, `library-core`), so a plugin screen is a
+catalog screen: no second renderer per mode, and every improvement to the
+catalog renderers reaches plugin screens for free.
+
+**The document** (`docs/plugin-view.schema.json` is normative):
+
+```json
+{
+  "view": 1,
+  "title": "Filters",
+  "subtitle": "Narrow the search",
+  "sections": [
+    { "id": "main", "title": null, "items": [
+      { "type": "text", "id": "query", "title": "Search", "value": "" },
+      { "type": "choice", "id": "region", "title": "Region",
+        "options": [ { "value": "", "label": "Any" }, { "value": "eu", "label": "Europe" } ],
+        "value": "" },
+      { "type": "row", "id": "r1", "title": "Result title",
+        "columns": ["System", "1.2 GB"], "badges": ["Verified"],
+        "action": { "kind": "view", "op": "detail", "args": { "ref": "r1" } } },
+      { "type": "button", "id": "dl", "title": "Download",
+        "action": { "kind": "job", "op": "acquire", "title": "Downloading Result title" } }
+    ] }
+  ]
+}
+```
+
+**Node types** (closed set; an unknown `type` is skipped, so a newer plugin
+still renders on an older droidtop):
+
+| `type` | Fields | Rendered as |
+| --- | --- | --- |
+| `info` | `title`, `subtitle?`, `value?` | a read-only row |
+| `row` | `title`, `subtitle?`, `columns?[]`, `badges?[]`, `value?`, `action?` | a row; `columns` join the subtitle with " · ", `badges` fill the value column; with an `action` it is pressable (a `view` action makes it open a page) |
+| `button` | `title`, `subtitle?`, `value?`, `confirm?`, `action` | an action row; `confirm` asks the two-step confirm every destructive row uses |
+| `toggle` | `title`, `subtitle?`, `value: bool`, `action?` | a toggle |
+| `choice` | `title`, `subtitle?`, `options[{value,label}]`, `value`, `action?` | a pick-one (the version, region and format pickers of a download) |
+| `slider` | `title`, `subtitle?`, `min`, `max`, `value`, `action?` | an integer stepper |
+| `text` | `title`, `subtitle?`, `value`, `action?` | a text field (controller and touch text entry). **Never secret**: there is no password field; secrets wait for the vault (G1, #69) |
+| `progress` | `title`, `value` (0 to 100, or -1 for unknown), `subtitle?` | a read-only status row ("45%") |
+
+Text is plain (no markup, no links, no colours, no icons, no images yet).
+Limits: 12 sections, 200 items, 100 options per choice, 200 characters per
+title, 500 per subtitle, 16 KiB of `args` per action; anything over is
+cut, never refused, and the whole view is still subject to the 256 KiB
+reply cap.
+
+**Actions.** An `action` is `{kind, op, args?, title?}`. The host calls
+`op` on the **same extension point** that produced the view, through
+`handle`, with `args` plus the view's current form values:
+
+- `view`: the reply's `data` is another view, opened as a page on top
+  (Back returns).
+- `call`: a quick call (15 s); the reply's `data.message`, if any, is shown
+  on the row, then the current view is fetched again.
+- `job`: a long-running job (§8, J1) with live progress on the row and in
+  Jobs; when it ends the current view is fetched again.
+
+On an input node, `action` fires when the value is committed, with the new
+value already in `values`; an input without one only keeps its value for
+the next action. Every call carries:
+
+```json
+"args": { "...": "the action's own args",
+          "values": { "<input id>": "<value>" },
+          "context": { "...": "what the extension point adds (below)" } }
+```
+
+`values` are strings (`"true"`/`"false"` for a toggle, the decimal for a
+slider). `context` is filled by droidtop only and the plugin cannot change
+it: a source's `destination`, a settings page's `target`, a context
+action's `target`.
+
+**Jobs in contract 2.** `startJob` keeps its signature
+(`jobId, capability, args`); for a v2 job the capability is the contract 1
+capability the point replaced (`library.sources` → `acquire_content`,
+`ui.settings` → `settings_rows`, `ui.context_action` → `library_action`)
+and `args` is one entry, `call`, holding the whole v2 envelope as JSON
+text, so the plugin reads a job exactly like a `handle` call. A point with
+no contract 1 capability (`ui.quick_tile`) cannot run jobs yet. Progress
+and completion are the existing `jobProgress`/`jobComplete` shape; a
+completion's `values` may carry `message`.
+
+**The plugin is named on every page.** A rendered page's subtitle is the
+view's own `subtitle` or "From <plugin label>", and its title is the view's
+title or the plugin's label. A view cannot set droidtop's title bar, hint
+row, colours or buttons.
+
+**Errors.** A view call that fails (the plugin's own FAILED, a timeout, a
+crash under the usual crash policy) renders as one `info` row with the
+reason, plus a way out where the host knows one (a source's "Open <plugin>
+settings" when it provides `ui.settings`). droidtop never shows a blank
+page for a plugin.
+
+**Which extension points use views.**
+
+| Point | Op that returns a view | Notes |
+| --- | --- | --- |
+| `ui.settings@1` (C1) | `view {context:{target}}` | the plugin's own page under Accounts and sources → Plugins → <plugin> → Settings (`target` `plugin`). Replaces read-only `settings_rows` for contract 2 plugins (contract 1 rows still render). |
+| `library.sources@1` (A2) | `form`, `detail` | below |
+| `ui.context_action@1` (C4) | `run` may reply `{view}` | the view opens as a page over the screen the action ran from |
+| `ui.quick_tile@1` (C2) | `action` may reply `{view}` | the view opens over the Quick Menu |
+
+**`library.sources` with views (the Get games flow).** Every call on this
+point carries `context: {system: {id, name}, destination}`; `system.id` is
+droidtop's system id (the ES-DE short name, `snes`), `destination` the
+system's own games folder, resolved by droidtop (absent when a search has
+no destination, such as the PC library). Ops:
+
+- `form {context}` → a view whose input nodes are the search field and the
+  filters (region, format, a system list, anything the source has). Every
+  committed input runs `search` again with all `values`. Optional: a source
+  that answers UNSUPPORTED (or a contract 1 source) gets droidtop's default
+  form, one `text` node `query`.
+- `search {query, values, context}` → `{results: [result]}`, where a result
+  is `{id, title, subtitle?, columns?[], badges?[], platform?, ref?}`.
+  `ref` is any JSON object; droidtop hands it back unread in `detail` and
+  `acquire` and never parses it (12a checklist point 5). droidtop renders a
+  result as a `row` that opens `detail`. At most 200 results are shown.
+- `detail {ref, context}` → a view: the result's own sections (description
+  rows, its files), its pickers (`choice` nodes for version, region,
+  format, mirror) and its actions, at least one `job` action with op
+  `acquire`. Optional: droidtop's default detail shows the result's title
+  and a Download job.
+- `acquire {ref, values, context}` → a **job**. It writes only into
+  `context.destination`. When it succeeds droidtop rescans the library, so
+  the new game appears; results become games only through that scan (12a,
+  A10).
+
+A source that fails `search` with a setup problem answers FAILED with a
+plain sentence ("The game index is not downloaded yet"); droidtop shows it
+under the source's name and, when the source provides `ui.settings`, an
+"Open <plugin> settings" row right there.
+
+**Consent.** Approving a plugin grants every extension point it lists
+under Adds, including high-risk ones: providing is what the plugin *is*,
+and an approved plugin whose only point is refused without a prompt (two
+of three modes have no prompt, #128) is a plugin that silently never works
+(audit 2026-10-01). Revoking stays on the Permissions screen, and an update
+that adds a high-risk point still waits at `ask` ("Wants new access",
+§1.5 Update). Dangerous *permissions* are unchanged: they still wait for a
+tick or the first-use sheet.
+
+**All kinds.** A view is the `data` of a `handle` reply, so every kind
+produces it the same way: `native_bundle` from `DroidtopPlugin.handle`,
+`python` from a module-level `handle(call_json) -> reply_json`, and
+`flutter_embed` from the channel method `handle` (envelope in, reply out,
+both JSON text). A contract 2 plugin of any kind must implement `handle`;
+a contract 1 plugin keeps the legacy translation.
+
+**As built (2026-10-01, the renderer core).**
+
+- `PluginView` (`plugin-host`) reads a view into typed nodes with the
+  limits above, drops what it cannot draw, and reads a source's
+  contract 2 `results` (`SourceResultProtocol`); `PluginViewCall` writes
+  `values` and `context` after the plugin's own args so they cannot be
+  spoofed. Unit-tested in `PluginViewTest`.
+- `PluginViews` (`library-core`) is the one renderer: view to
+  `CatalogScreen`, actions through `PluginCrashPolicy.handle`, jobs
+  through `PluginJobsCenter`, input actions off the main thread, and no
+  plugin page in the settings search index.
+- `ui.settings`: a contract 2 plugin's Settings row on its plugin page
+  opens its view (`PluginSettingsRows.screenFor`); contract 1 rows are
+  unchanged.
+- `handle` for contract 2 `python` and `flutter_embed` plugins, and the
+  approval grant of every provided point.
+- **Not built yet** (queued): the Get games flow on views (`form`,
+  `search` in the contract 2 shape, `detail`, `acquire`, replacing
+  `AcquireContentSources.searchScreen` and `SourceOptionsDialog`), reply
+  views for `ui.context_action` and `ui.quick_tile`, and samples that use
+  views.
 
 ---
 

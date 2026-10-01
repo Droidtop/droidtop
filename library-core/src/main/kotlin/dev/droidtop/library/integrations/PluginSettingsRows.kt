@@ -6,6 +6,7 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginRecord
+import org.json.JSONObject
 
 /**
  * Renders a plugin's declared [PluginCapability.SETTINGS_ROWS] as real
@@ -37,11 +38,25 @@ import dev.droidtop.pluginhost.PluginRecord
  */
 object PluginSettingsRows {
     const val TARGET_GLOBAL = "global"
+    const val UI_SETTINGS = "ui.settings"
 
     fun systemTarget(systemId: String): String = "system:$systemId"
 
     fun screenFor(record: PluginRecord, target: String = TARGET_GLOBAL): CatalogScreen {
         val m = record.manifest
+        // A contract 2 plugin's settings page is its own view (docs/plugin-api.md 1.6):
+        // inputs, actions and jobs, drawn by droidtop. `target` keeps its C1 meaning,
+        // with the contract 1 "global" spelled "plugin".
+        if (m.contractVersion >= 2 && m.v2.provides.any { it.point == UI_SETTINGS }) {
+            return PluginViews.screen(
+                record = record,
+                point = UI_SETTINGS,
+                op = "view",
+                id = "plugin_settings_view_${m.id}_$target",
+                title = "${m.label} settings",
+                hostContext = JSONObject().put("target", if (target == TARGET_GLOBAL) "plugin" else target),
+            )
+        }
         return CatalogScreen(
             id = "plugin_settings_rows_${m.id}_$target",
             title = m.label,

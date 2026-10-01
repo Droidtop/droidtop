@@ -21,6 +21,8 @@ class PythonDroidtopPlugin(
     private val uniqueName: String,
     private val scriptPath: String,
     private val dataDir: String,
+    /** The manifest's contract: 2 means `plugin.py` answers `handle` itself. */
+    private val contractVersion: Int = 1,
 ) : DroidtopPlugin {
     override fun onLoad(context: PluginContext) {
         // Throws PythonCallException on any failure -- caught by
@@ -54,6 +56,17 @@ class PythonDroidtopPlugin(
         }
     }
 
+    /**
+     * The contract 2 envelope (docs/plugin-api.md 1.3, 1.6): a contract 2 `plugin.py`
+     * defines `handle(call_json) -> reply_json`, JSON text both ways like `invoke`. A
+     * contract 1 plugin keeps the translation onto its capabilities. An unhandled
+     * Python exception propagates as a crash, the same as from `invoke`.
+     */
+    override fun handle(call: PluginCall): PluginReply {
+        if (contractVersion < 2) return LegacyHandle.translate(this, call)
+        return PluginReply.parse(PythonBridge.nativeCallFunction(uniqueName, "handle", call.toJson().toString()))
+    }
+
     // startJob is not implemented for v1 of the python kind -- the
     // default in DroidtopPlugin (throws UnsupportedOperationException,
     // turned into a clean "doesn't support jobs" by PluginRuntimeService)
@@ -82,7 +95,10 @@ class PythonDroidtopPlugin(
                 return Result.failure(IllegalStateException("failed to initialize the Python interpreter"))
             }
             val dataDir = File(installDir, "data").apply { mkdirs() }
-            return Result.success(PythonDroidtopPlugin(pluginId, script.absolutePath, dataDir.absolutePath))
+            val contract = runCatching {
+                PluginManifest.fromJson(JSONObject(File(installDir, "manifest.json").readText()))?.contractVersion ?: 1
+            }.getOrDefault(1)
+            return Result.success(PythonDroidtopPlugin(pluginId, script.absolutePath, dataDir.absolutePath, contract))
         }
     }
 }

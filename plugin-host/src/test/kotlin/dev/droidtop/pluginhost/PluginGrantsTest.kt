@@ -67,14 +67,14 @@ class PluginGrantsTest {
     }
 
     @Test
-    fun `a high-risk point waits for a grant, a medium one does not`() {
+    fun `approval grants every point the plugin adds, high-risk ones too`() {
         val record = plugin(2, "acme.tool") { it.put("provides", arr(obj("point" to "library.sources"), obj("point" to "ui.status_tile"))) }
+        // Before approval (no file), a high-risk point of a contract 2 plugin is not granted.
+        assertEquals(GrantState.ASK, PluginGrants.provideState(record, grants.read("acme.tool"), "library.sources"))
         grants.initialiseOnApproval(record)
         val snap = grants.read("acme.tool")
-        assertEquals(GrantState.ASK, PluginGrants.provideState(record, snap, "library.sources"))
+        assertEquals(GrantState.GRANTED, PluginGrants.provideState(record, snap, "library.sources"))
         assertEquals(GrantState.GRANTED, PluginGrants.provideState(record, snap, "ui.status_tile"))
-        grants.initialiseOnApproval(record, ticked = setOf("provide:library.sources"))
-        assertEquals(GrantState.GRANTED, PluginGrants.provideState(record, grants.read("acme.tool"), "library.sources"))
     }
 
     @Test

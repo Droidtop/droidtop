@@ -159,10 +159,13 @@ class PluginGrants(private val dir: File) {
                 GrantState.ASK
             }
         }
+        // Approving a plugin grants every point it lists under Adds, high-risk ones too
+        // (docs/plugin-api.md 1.6 "Consent"): providing is what the plugin is, and a
+        // refused point has no prompt in two of three modes, so it silently never ran.
+        // An update's NEW high-risk point still waits at ask ([applyUpdate]).
         for (entry in record.manifest.v2.provides) {
-            val point = ExtensionPoints.find(entry.point) ?: continue
-            val key = PluginPermissions.PROVIDE_PREFIX + entry.point
-            states[key] = if (record.manifest.contractVersion < 2 || !point.risk.needsConsent || key in ticked) GrantState.GRANTED else GrantState.ASK
+            if (ExtensionPoints.find(entry.point) == null) continue
+            states[PluginPermissions.PROVIDE_PREFIX + entry.point] = GrantState.GRANTED
         }
         for (export in record.manifest.v2.exports) states[EXPORT_PREFIX + export.api] = GrantState.GRANTED
         writeLocked(record.manifest.id, Snapshot(states = states))

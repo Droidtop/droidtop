@@ -386,24 +386,51 @@ class FlutterDroidtopPlugin(
     }
 
     override fun invoke(capability: PluginCapability, args: PluginArgs): PluginResult {
-        val ch = channel ?: return PluginResult.failure("flutter engine not loaded")
         val argsJson = JSONObject().apply { args.keys().forEach { put(it, args.string(it)) } }
         val payload = JSONObject().put("capability", capability.id).put("args", argsJson).toString()
+        val (resultJson, errorMessage) = callDart("invoke", payload)
+        errorMessage?.let { return PluginResult.failure(it) }
+        val raw = resultJson ?: return PluginResult.failure("plugin returned no result")
+        return decode(raw)
+    }
 
-        // MethodChannel calls are async and must run on the engine's own
-        // platform thread; PluginRuntimeService.invoke already runs off
-        // droidtop's own main thread (a binder thread), so blocking here
-        // with a latch -- bounded by the SAME PluginRunner.CALL_TIMEOUT_MS
-        // the whole call is already wrapped in -- is safe and keeps this
-        // adapter's public shape identical to PythonDroidtopPlugin's
-        // synchronous invoke().
+    /**
+     * The contract 2 envelope (docs/plugin-api.md 1.3, 1.6): a contract 2 plugin's
+     * Dart code answers the channel method `handle` with the envelope in and the
+     * reply out, both JSON text. A contract 1 plugin keeps the translation onto its
+     * capabilities, so nothing changes for a bundle built before this existed.
+     */
+    override fun handle(call: PluginCall): PluginReply {
+        if (!speaksContract2) return LegacyHandle.translate(this, call)
+        val (replyJson, errorMessage) = callDart("handle", call.toJson().toString())
+        errorMessage?.let { return PluginReply.error(PluginErrorCode.FAILED, it) }
+        return PluginReply.parse(replyJson)
+    }
+
+    /** Whether this plugin's own manifest is contract 2, read once from its installed payload. */
+    private val speaksContract2: Boolean by lazy {
+        runCatching {
+            PluginManifest.fromJson(JSONObject(File(installDir, "manifest.json").readText()))?.contractVersion ?: 1
+        }.getOrDefault(1) >= 2
+    }
+
+    /**
+     * One request/response call into Dart: the JSON text it answered, or why it did not.
+     * MethodChannel calls are async and must run on the engine's own platform thread;
+     * every caller here already runs off droidtop's main thread (a binder thread), so
+     * blocking on a latch -- bounded by the same [PluginRunner.CALL_TIMEOUT_MS] the whole
+     * call is already wrapped in -- is safe and keeps this adapter synchronous like
+     * [PythonDroidtopPlugin].
+     */
+    private fun callDart(method: String, payload: String): Pair<String?, String?> {
+        val ch = channel ?: return null to "flutter engine not loaded"
         val latch = CountDownLatch(1)
         var resultJson: String? = null
         var errorMessage: String? = null
         val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
         mainHandler.post {
             ch.invokeMethod(
-                "invoke",
+                method,
                 payload,
                 object : MethodChannel.Result {
                     override fun success(result: Any?) {
@@ -417,18 +444,16 @@ class FlutterDroidtopPlugin(
                     }
 
                     override fun notImplemented() {
-                        errorMessage = "plugin's Dart code has no MethodChannel handler for 'invoke'"
+                        errorMessage = "plugin's Dart code has no MethodChannel handler for '$method'"
                         latch.countDown()
                     }
                 },
             )
         }
         if (!latch.await(PluginRunner.CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-            return PluginResult.failure("timed out waiting for the Dart side")
+            return null to "timed out waiting for the Dart side"
         }
-        errorMessage?.let { return PluginResult.failure(it) }
-        val raw = resultJson ?: return PluginResult.failure("plugin returned no result")
-        return decode(raw)
+        return resultJson to errorMessage
     }
 
     private fun decode(resultJson: String): PluginResult {

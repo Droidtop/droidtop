@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Droidtop/droidtop/docs/plugin-manifest.schema.json",
+  "title": "droidtop plugin manifest (contract 1 and 2)",
+  "description": "The signed manifest.json inside a .droidplugin bundle (docs/SPEC.md 12a, docs/plugin-api.md 1.2). PluginManifest.fromJson and PluginBundleInstaller are the enforcement; this schema is for authors and CI. Ids inside provides, permissions and subscribes that a build does not know are kept and listed as not supported, never refused, so they are plain strings here. Unknown top-level fields are ignored by droidtop.",
+  "type": "object",
+  "required": ["id", "origin", "kind", "contractVersion"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_-]+\\.[a-z0-9._-]+$",
+      "description": "<origin>.<name>, lowercase, namespaced under origin."
+    },
+    "origin": { "type": "string", "minLength": 1 },
+    "label": { "type": "string" },
+    "description": { "type": ["string", "null"] },
+    "version": { "type": "string" },
+    "kind": { "enum": ["native_bundle", "python", "flutter_embed"] },
+    "contractVersion": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "minDroidtop": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": { "enum": ["acquire_content", "metadata_source", "library_action", "status_tile", "settings_rows", "app_status"] },
+      "uniqueItems": true
+    },
+    "requestsRoot": { "type": "boolean" },
+    "abis": { "type": "array", "items": { "enum": ["arm64-v8a", "x86_64", "armeabi-v7a", "x86"] }, "uniqueItems": true },
+    "entryClass": { "type": ["string", "null"] },
+    "runtimeVersion": { "type": ["string", "null"] },
+    "payload": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "boundServiceTargets": { "type": "array", "items": { "type": "string" } },
+    "subscribedEvents": { "type": "array", "items": { "type": "string" } },
+    "provides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["point"],
+        "properties": {
+          "point": { "type": "string", "minLength": 1 },
+          "version": { "type": "integer", "minimum": 1 },
+          "id": { "type": ["string", "null"] },
+          "label": { "type": ["string", "null"] },
+          "surfaces": { "type": "array", "items": { "type": "string" } },
+          "target": { "type": "string" },
+          "targets": { "type": "array", "items": { "enum": ["game", "app", "file", "folder", "system", "container", "window"] } },
+          "systems": { "type": "array", "items": { "type": "string" } },
+          "packages": { "type": "array", "items": { "type": "string" } },
+          "job": { "type": "boolean" }
+        }
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "reason": { "type": ["string", "null"] },
+          "required": { "type": "boolean" },
+          "domains": { "type": "array", "items": { "type": "string" } },
+          "packages": { "type": "array", "items": { "type": "string" } },
+          "scope": { "type": "string" }
+        }
+      }
+    },
+    "subscribes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event"],
+        "properties": { "event": { "type": "string" }, "version": { "type": "integer", "minimum": 1 } }
+      }
+    },
+    "exports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["api"],
+        "properties": {
+          "api": { "type": "string" },
+          "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+          "attributes": { "type": "object" },
+          "ops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["op", "permission"],
+              "properties": { "op": { "type": "string" }, "permission": { "type": "string" }, "job": { "type": "boolean" } }
+            }
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id"],
+              "properties": { "id": { "type": "string" }, "risk": { "enum": ["low", "medium", "high", "critical"] }, "label": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "requires": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["api"],
+        "properties": {
+          "api": { "type": "string" },
+          "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+          "optional": { "type": "boolean" },
+          "minLevel": { "type": ["string", "null"] },
+          "reason": { "type": ["string", "null"] }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "contractVersion": { "const": 1 } } },
+      "then": { "required": ["capabilities"], "properties": { "capabilities": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "native_bundle" } } },
+      "then": { "required": ["entryClass"], "properties": { "entryClass": { "type": "string", "minLength": 1 } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "flutter_embed" } } },
+      "then": { "required": ["runtimeVersion"], "properties": { "runtimeVersion": { "type": "string", "minLength": 1 } } }
+    }
+  ]
+}

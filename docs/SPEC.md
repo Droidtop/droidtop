@@ -11426,6 +11426,45 @@ of what is built. The decisions, briefly:
     (Android 13 gives a non-privileged app no way to end another app's
     game). droidtop's running-game state still clears only when the game
     really ended.
+- **Plugin UI extensions: the view schema (decided 2026-10-01,
+  Droidtop/tracker#164; `docs/plugin-api.md` §1.6,
+  `docs/plugin-view.schema.json`).** The owner: "make sure the plugin API is
+  full featured ... also need plugins to expose their own UI extensions".
+  The audit behind it (plugin API audit, 2026-10-01, summarised on #164)
+  found that Get games could not work with a real source plugin: the source
+  needed a one-time setup step (downloading its own index) and the API had
+  nowhere to put one, while droidtop drew every source screen itself from
+  the source's own field names.
+  - A plugin contributes UI as a **view**: a JSON document of a closed set
+    of node types (`info`, `row`, `button`, `toggle`, `choice`, `slider`,
+    `text`, `progress`) in sections, returned as the `data` of an ordinary
+    `handle` reply. Nodes carry actions (`view` opens a page, `call` runs a
+    quick op, `job` runs a tracked job) that droidtop sends back to the same
+    extension point with the page's form values and a host-filled
+    `context`.
+  - droidtop renders a view by translating it into the settings catalog
+    model (`CatalogScreen`, `PluginViews` in `library-core`). That model is
+    already drawn in all three modes (Gaming's `CatalogNavigator` through
+    the one `onPad` pipeline, Standard's Preference surface, Desktop's
+    Settings app), so plugin pages are themed, D-pad and touch navigable,
+    and need no renderer of their own. A plugin never draws a native view,
+    never sets droidtop's chrome, and every page names it.
+  - Views are used by `ui.settings` (a plugin's own settings page, with
+    real inputs, actions and jobs), by `library.sources` (the source's own
+    search form and filters, result rows with its own columns and badges, a
+    detail page with its own sections, download-option pickers and the
+    acquire job), and as an optional reply of `ui.context_action` `run` and
+    `ui.quick_tile` `action`.
+  - Contract 2 jobs keep `startJob`'s signature: the capability is the
+    point's contract 1 capability and the args carry the whole envelope as
+    `call`.
+  - `handle` now reaches `python` and `flutter_embed` plugins whose
+    manifest is contract 2 (each kind's own `handle` function or channel
+    method); before, both only had the contract 1 translation.
+  - Approving a plugin grants every extension point it lists under Adds,
+    high-risk ones included; a later update's new high-risk point still
+    waits. Before, a contract 2 source was approved and then refused on
+    every call with no prompt.
 
 The catalogue has 89 entries across ten areas (library and content,
 launch and runtime, UI, system and device, desktop, other apps,
