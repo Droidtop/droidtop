@@ -12233,11 +12233,7 @@ folderScreen`, :app) and Gaming's gamelist Select-button options menu
 `CatalogNavigator` its own Settings section already uses, so the query
 field gets real controller/touch text entry for free). A JSON source
 keeps its original one-way shape (a text field or button that fires an
-`am start` and never hears back); a plugin source opens its own search
-screen -- a live query field and a focusable results list, each result a
-real `AsyncActionItem` that starts the download job and shows its
-progress inline, then rescans the library (`LibraryRescan`) on success so
-the file appears without a separate manual step. No installed source at
+`am start` and never hears back); a plugin source opens its own search screen, then a result detail; the per-system screen and the shared search's detail now come from the source's own views (contract 2) or droidtop's defaults (contract 1). No installed source at
 all shows a plain row saying so, rather than hiding the whole "Get games"
 entry.
 

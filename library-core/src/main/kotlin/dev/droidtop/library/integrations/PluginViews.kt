@@ -59,6 +59,7 @@ object PluginViews {
      * view droidtop draws when the plugin answers UNSUPPORTED (an optional op).
      * [onJobDone] runs after any job this page started finishes (a source rescans).
      * [extraWhenFailed] adds rows under a load failure, for a way out the host knows.
+     * [extraGroups] appends host data built from committed page values (source results).
      */
     fun screen(
         record: PluginRecord,
@@ -71,7 +72,8 @@ object PluginViews {
         fallback: (() -> PluginView)? = null,
         onJobDone: suspend (Context, PluginResult) -> Unit = { _, _ -> },
         extraWhenFailed: () -> List<CatalogItem> = { emptyList() },
-    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed).screen(id, title)
+        extraGroups: suspend (Context, Map<String, String>) -> List<CatalogGroup> = { _, _ -> emptyList() },
+    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups).screen(id, title)
 
     /** A page drawn from a view the plugin already returned (a context action's or quick tile's reply). It has no op to fetch again; its actions may replace it. */
     fun screenFor(
@@ -146,6 +148,7 @@ private class PluginPage(
     private val fallback: (() -> PluginView)?,
     private val onJobDone: suspend (Context, PluginResult) -> Unit,
     private val extraWhenFailed: () -> List<CatalogItem>,
+    private val extraGroups: suspend (Context, Map<String, String>) -> List<CatalogGroup> = { _, _ -> emptyList() },
 ) {
     @Volatile private var view: PluginView? = initial
     @Volatile private var error: String? = null
@@ -164,7 +167,7 @@ private class PluginPage(
         groups = { context ->
             withContext(Dispatchers.IO) {
                 load(context)
-                groups(id)
+                groups(id) + extraGroups(context, HashMap(values))
             }
         },
         // The settings search walks screens; it must never call a plugin to do so.
@@ -292,7 +295,7 @@ private class PluginPage(
             title = title,
             subtitle = subtitle,
             valueLabel = value?.let { shown -> { _: Context -> shown } },
-            inline = PluginPage(record, point, action.op, action.args(), hostContext, HashMap(values), null, null, onJobDone, extraWhenFailed)
+            inline = PluginPage(record, point, action.op, action.args(), hostContext, HashMap(values), null, null, onJobDone, extraWhenFailed, extraGroups)
                 .screen("${screenId}_${action.op}_${itemId.hashCode()}", action.title ?: title),
         )
         ViewAction.Kind.CALL, ViewAction.Kind.JOB -> AsyncActionItem(

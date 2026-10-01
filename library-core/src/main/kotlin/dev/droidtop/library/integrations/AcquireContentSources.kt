@@ -89,7 +89,7 @@ sealed interface AcquireContentSource {
  * shown in the options sheet the search surfaces (LibraryQueryUi's "Get
  * more" group, docs/SPEC.md 12a "Search fan-out") open on selection.
  * [index] round-trips back as `linkIndex` in the download job, the same
- * field [searchScreen] already defaults to 0.
+ * field [SourceScreens.searchScreen] now opens result details.
  */
 data class AcquireContentOption(val label: String, val index: Int)
 
@@ -111,6 +111,8 @@ data class AcquireContentResult(
     val artUrl: String?,
     val options: List<AcquireContentOption>,
     val raw: String,
+    val columns: List<String> = emptyList(),
+    val badges: List<String> = emptyList(),
 )
 
 /** What a finished (or failed) download job reported, translated out of plugin-host's own `PluginResult` so callers never need that type. */
@@ -169,7 +171,7 @@ object AcquireContentSources {
     /**
      * The one "Get games" screen for one system -- lists every source
      * [available], a JSON one as its existing text-field-or-button shape,
-     * a plugin one as a [NestedScreenItem] opening [searchScreen]. Both
+     * a plugin one as a [NestedScreenItem] opening [SourceScreens.searchScreen]. Both
      * :app's per-system settings screen and :shell-gamepad's gamelist
      * options menu ("Get games") push exactly this screen, through their
      * own renderer (`CatalogNavigator`/the Preference surface).
@@ -194,7 +196,7 @@ object AcquireContentSources {
                                         id = "acquire_src_${source.id}",
                                         title = source.label,
                                         subtitle = source.description ?: "Search ${source.label} for $systemName",
-                                        inline = searchScreen(source, systemId, systemName, systemFolder),
+                                        inline = SourceScreens.searchScreen(source, systemId, systemName, systemFolder),
                                     )
                                     is AcquireContentSource.Json -> jsonSourceItem(source, systemId, systemName, systemFolder)
                                 }
@@ -338,89 +340,6 @@ object AcquireContentSources {
             systemName = systemName,
             systemFolder = systemFolder,
             query = query,
-        )
-    }
-
-    /**
-     * A plugin's own "Get games" screen: a live query field and its
-     * results, each a real [AsyncActionItem] that starts the real
-     * download job and shows its progress inline (the async item's own
-     * `onStatus` stream). Kept alongside the generic search fan-out
-     * (SPEC 12a "Search fan-out") for a person who wants to search ONE
-     * named source directly rather than through the shared game search.
-     *
-     * `currentQuery`/`lastResults`/`lastError` are plain closure state,
-     * not persisted -- this screen is rebuilt fresh from [available] each
-     * time its parent screen is (re)entered, same lifetime as every other
-     * per-visit catalog state.
-     */
-    fun searchScreen(
-        source: AcquireContentSource.Plugin,
-        systemId: String,
-        systemName: String,
-        systemFolder: File,
-    ): CatalogScreen {
-        var currentQuery = ""
-        var lastResults: List<AcquireContentResult> = emptyList()
-        var lastError: String? = null
-        return CatalogScreen(
-            id = "acquire_search_${source.id}_$systemId",
-            title = source.label,
-            subtitle = "Search ${source.label} for $systemName; picking a result downloads it straight into this system's folder",
-            groups = { context ->
-                listOf(
-                    CatalogGroup(
-                        id = "acquire_query",
-                        title = null,
-                        items = listOf(
-                            TextInputItem(
-                                id = "acquire_query_${source.id}",
-                                title = "Search",
-                                subtitle = "Type what to search for and commit to run it",
-                                value = currentQuery,
-                                onChange = { ctx, query ->
-                                    currentQuery = query
-                                    lastError = null
-                                    if (query.isBlank()) {
-                                        lastResults = emptyList()
-                                    } else {
-                                        search(ctx, source, systemId, systemName, query.trim())
-                                            .onSuccess { lastResults = it }
-                                            .onFailure {
-                                                lastResults = emptyList()
-                                                lastError = it.message ?: "Search failed"
-                                            }
-                                    }
-                                },
-                            ),
-                        ),
-                    ),
-                    CatalogGroup(
-                        id = "acquire_results",
-                        title = when {
-                            lastError != null -> "Search failed"
-                            currentQuery.isBlank() -> null
-                            else -> "Results (${lastResults.size})"
-                        },
-                        items = when {
-                            lastError != null -> listOf(
-                                ActionItem(id = "acquire_error_${source.id}", title = lastError ?: "Search failed", run = {}),
-                            )
-                            currentQuery.isNotBlank() && lastResults.isEmpty() -> listOf(
-                                ActionItem(id = "acquire_no_results_${source.id}", title = "No results", run = {}),
-                            )
-                            else -> lastResults.map { result ->
-                                AsyncActionItem(
-                                    id = "acquire_result_${source.id}_${result.raw.hashCode()}",
-                                    title = result.title,
-                                    subtitle = listOfNotNull(result.platform, result.sizeLabel).joinToString(" · ").ifBlank { null },
-                                    run = { ctx, onStatus -> runDownloadAndAwait(ctx, source, systemFolder, result, onStatus, linkIndex = 0) },
-                                )
-                            }
-                        },
-                    ),
-                )
-            },
         )
     }
 

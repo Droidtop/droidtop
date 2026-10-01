@@ -2,7 +2,6 @@ package dev.droidtop.library.integrations
 
 import android.content.Context
 import android.content.ContextWrapper
-import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -34,19 +33,12 @@ class PluginSearchAggregatorTest {
         object : GameSourceProvider {
             override val id = "fake_$label"
             override val label = label
+            override fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: java.io.File?) = dev.droidtop.library.settings.CatalogScreen("fake_detail", result.title, groups = { emptyList() })
             override suspend fun search(context: Context, query: String, platform: String?): Result<List<AcquireContentResult>> {
                 delay(delayMs)
                 if (throws) error("$label failed")
                 return Result.success(results)
             }
-            override suspend fun acquire(
-                context: Context,
-                result: AcquireContentResult,
-                choice: Int,
-                destination: File,
-                onProgress: (percent: Int, statusLine: String) -> Unit,
-                onComplete: (AcquireDownloadOutcome) -> Unit,
-            ): AcquireContentJob? = null
         }
 
     @Test
@@ -151,18 +143,11 @@ class PluginSearchAggregatorTest {
     private fun fakeSourceCounting(calls: AtomicInteger): GameSourceProvider = object : GameSourceProvider {
         override val id = "counting"
         override val label = "Counting"
+        override fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: java.io.File?) = dev.droidtop.library.settings.CatalogScreen("count_detail", result.title, groups = { emptyList() })
         override suspend fun search(context: Context, query: String, platform: String?): Result<List<AcquireContentResult>> {
             calls.incrementAndGet()
             return Result.success(emptyList())
         }
-        override suspend fun acquire(
-            context: Context,
-            result: AcquireContentResult,
-            choice: Int,
-            destination: File,
-            onProgress: (percent: Int, statusLine: String) -> Unit,
-            onComplete: (AcquireDownloadOutcome) -> Unit,
-        ): AcquireContentJob? = null
     }
 
     /** No fake source above reads anything off the Context it is handed; a bare ContextWrapper is enough to satisfy the interface's non-null Context parameter without instantiating a real Android Context. */

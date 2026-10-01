@@ -1,6 +1,7 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
+import dev.droidtop.library.settings.CatalogScreen
 import java.io.File
 
 /**
@@ -65,26 +66,10 @@ interface GameSourceProvider {
         ids: Map<String, String> = emptyMap(),
     ): Result<List<AcquireContentResult>> = search(context, title, platform)
 
-    /** The labelled choices one result offers before acquiring it. Every provider built so far attaches its choices to the result itself ([AcquireContentResult.options]), so the default just returns that; a provider whose choices need a live round trip (a store's own region/edition picker) overrides this. */
-    suspend fun options(context: Context, result: AcquireContentResult): List<AcquireContentOption> = result.options
+    fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: File?): CatalogScreen
 
-    /**
-     * Starts acquiring [result] with the given [choice] (an index into
-     * [options]) into [destination]. Returns null when this provider has
-     * no running-job support for this result -- droidtop shows that as
-     * "can't start this download" rather than treating it as a crash.
-     * [onProgress]/[onComplete] fire on whatever thread the
-     * implementation's own callback arrives on, same as
-     * [AcquireContentSources.startDownload] today.
-     */
-    suspend fun acquire(
-        context: Context,
-        result: AcquireContentResult,
-        choice: Int,
-        destination: File,
-        onProgress: (percent: Int, statusLine: String) -> Unit,
-        onComplete: (AcquireDownloadOutcome) -> Unit,
-    ): AcquireContentJob?
+    fun settingsScreen(): CatalogScreen? = null
+
 }
 
 /**
@@ -108,30 +93,44 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
     override val label get() = source.label
 
     override suspend fun search(context: Context, query: String, platform: String?): Result<List<AcquireContentResult>> =
-        AcquireContentSources.search(
-            context = context,
-            source = source,
-            systemId = platform.orEmpty(),
-            systemName = platform.orEmpty(),
-            query = query,
-        )
+        searchWithValues(context, query, platform, emptyMap(), null, platform.orEmpty())
 
-    override suspend fun acquire(
-        context: Context,
-        result: AcquireContentResult,
-        choice: Int,
-        destination: File,
-        onProgress: (percent: Int, statusLine: String) -> Unit,
-        onComplete: (AcquireDownloadOutcome) -> Unit,
-    ): AcquireContentJob? = AcquireContentSources.startDownload(
-        context = context,
-        source = source,
-        systemFolder = destination,
-        result = result,
-        linkIndex = choice,
-        onProgress = onProgress,
-        onComplete = onComplete,
-    )
+    internal suspend fun searchWithValues(context: Context, query: String, platform: String?, values: Map<String, String>, destination: File?, systemName: String): Result<List<AcquireContentResult>> {
+        if (source.record.manifest.contractVersion < 2) return AcquireContentSources.search(context, source, platform.orEmpty(), systemName, query)
+        val systemId = platform.orEmpty()
+        val hostContext = org.json.JSONObject().put("system", org.json.JSONObject().put("id", systemId).put("name", systemName))
+        destination?.let { hostContext.put("destination", it.absolutePath) }
+        val args = org.json.JSONObject().put("query", query).put("values", org.json.JSONObject(values as Map<*, *>)).put("context", hostContext)
+        val reply = PluginViews.call(context, source.record, "library.sources", "search", args)
+        if (!reply.ok) return Result.failure(IllegalStateException(reply.message ?: "Search failed"))
+        return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).map { row ->
+            AcquireContentResult(row.id, row.title, row.subtitle, null, row.platform, null, emptyList(), row.refJson, row.columns, row.badges)
+        })
+    }
+
+    override fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: File?): CatalogScreen {
+        if (source.record.manifest.contractVersion < 2) return SourceScreens.legacyDetail(source, result, systemId, systemName, destination)
+        if (destination == null) return SourceScreens.noDestination(result)
+        val ref = org.json.JSONObject(result.raw)
+        val context = org.json.JSONObject().put("system", org.json.JSONObject().put("id", systemId.orEmpty()).put("name", systemName.orEmpty())).put("destination", destination.absolutePath)
+        val fallback = {
+            dev.droidtop.pluginhost.PluginView(null, null, listOf(dev.droidtop.pluginhost.ViewSection("main", null, listOf(
+                dev.droidtop.pluginhost.ViewNode.Info("title", result.title, null, null),
+                dev.droidtop.pluginhost.ViewNode.Button("download", "Download", null, null, null,
+                    dev.droidtop.pluginhost.ViewAction(dev.droidtop.pluginhost.ViewAction.Kind.JOB, "acquire", org.json.JSONObject().put("ref", ref).toString())),
+            ))))
+        }
+        return PluginViews.screen(source.record, "library.sources", "detail", "source_detail_${source.record.manifest.id}_${result.id}", result.title,
+            org.json.JSONObject().put("ref", ref), context, fallback,
+            onJobDone = { ctx, outcome -> if (outcome.ok) dev.droidtop.library.settings.LibraryRescan.run(ctx) {} },
+        )
+    }
+
+    override fun settingsScreen(): CatalogScreen? {
+        val m = source.record.manifest
+        return if (m.contractVersion >= 2 && m.v2.provides.any { it.point == "ui.settings" } || dev.droidtop.pluginhost.PluginCapability.SETTINGS_ROWS in m.capabilities) PluginSettingsRows.screenFor(source.record) else null
+    }
+
 }
 
 /** Every installed+approved+enabled source-plugin, wrapped as [GameSourceProvider] -- the whole plugin half of the Sources API's implementation list until a store adapter exists. */
