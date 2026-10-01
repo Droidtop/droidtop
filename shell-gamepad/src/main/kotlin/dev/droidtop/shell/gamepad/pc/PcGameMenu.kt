@@ -151,6 +151,11 @@ internal fun PcGameMenu(
     var importingLutris by remember(entry) { mutableStateOf(false) }
     var wineSettings by remember(entry) { mutableStateOf<WineGameSettings?>(null) }
     var protonDb by remember(entry) { mutableStateOf<ProtonDbState>(ProtonDbState.NotAsked) }
+    // Which page of the menu is showing and which row of it the cursor is
+    // on (docs/SPEC.md 7i): the short top page, or one of the two longer
+    // lists it opens. A sub-page's B goes back to the top, never out.
+    var page by remember(entry) { mutableStateOf(PcMenuPage.Root) }
+    var focusIndex by remember(entry) { mutableStateOf(0) }
 
     LaunchedEffect(entry, reloadToken) {
         loaded = false
@@ -517,8 +522,10 @@ internal fun PcGameMenu(
         },
     )
 
+    var pageAbout: List<PcMenuEntry> = emptyList()
     val isReady = runner?.option?.state == RunnerState.READY
     val setupAction = runner?.option?.action
+    val playState = if (loaded) playStateOf(runner, entry) else PcPlayStateLoading
 
     // Flattened once per recomposition into what this Dialog actually
     // draws and what Up/Down/A navigate: a section header (never
@@ -533,7 +540,7 @@ internal fun PcGameMenu(
     // Whether this game's "Get it on" rows were hidden (docs/SPEC.md 7m);
     // one small preferences read, on entry, like the other remembered facts.
     var storeLinksHidden by remember(entry) { mutableStateOf(dev.droidtop.library.StoreLinkPrefs.hidden(context, gameIds)) }
-    val entries = buildList {
+    val playEntries = buildList {
         // Play: what runs the game, and getting it running.
         add(PcMenuEntry.Header("Play"))
         // Runs with -- WHICH runner, and how to change it.
@@ -553,29 +560,19 @@ internal fun PcGameMenu(
             )
         }
         // Play, or the one action that makes Play possible -- the
-        // gamelist's own A now makes this exact decision on its own
-        // (docs/SPEC.md 7i, redecided 2026-09-26,
-        // PcRunnerOptions.resolveAndPlay), so this row is a second way to
-        // reach the very same thing from the menu, not a different one.
+        // gamelist's own A makes this exact decision on its own
+        // (docs/SPEC.md 7i, PcRunnerOptions.resolveAndPlay), and the
+        // library's hero and the game page draw the same [PcPlayState],
+        // so this row is a second way to reach the very same thing.
         if (entry.missing) {
             add(PcMenuEntry.Row(PcActionRow("The folder is not there", missingFolderLine(entry), null)))
         } else {
             add(
                 PcMenuEntry.Row(
                     PcActionRow(
-                        title = when {
-                            !loaded -> "…"
-                            isReady -> "Play"
-                            setupAction != null -> runner?.option?.reason ?: "Set up"
-                            else -> "Can't play yet"
-                        },
-                        detail = when {
-                            !loaded -> ""
-                            isReady -> runner?.option?.caveat ?: "Starts now on ${runner?.label}"
-                            setupAction != null -> "One step, then this becomes Play"
-                            else -> runner?.option?.reason ?: "No runner on this device offers this game"
-                        },
-                        onSelect = if (loaded && (isReady || setupAction != null)) {
+                        title = playState.verb,
+                        detail = playState.detail,
+                        onSelect = if (loaded && playState.pressable) {
                             {
                                 if (isReady) {
                                     onClose()
@@ -597,8 +594,9 @@ internal fun PcGameMenu(
             )
         }
         actions.play.forEach { add(PcMenuEntry.Row(it)) }
-        status?.let { add(PcMenuEntry.Info(it)) }
+    }
 
+    run {
         // About: this copy -- where it is owned and where to get it, its
         // update state, its record in the person's library, and how it
         // runs for other people.
@@ -682,29 +680,87 @@ internal fun PcGameMenu(
                 )
             }
         }
-        if (aboutEntries.isNotEmpty()) {
-            add(PcMenuEntry.Header("About"))
-            addAll(aboutEntries)
-        }
+        pageAbout = aboutEntries
+    }
 
-        // Fix and advanced: the repairs and the internals of how this copy
-        // runs -- drawn only when there is anything of the kind, because a
-        // header over no rows is a category claiming to exist.
-        if (actions.advanced.isNotEmpty()) {
-            add(PcMenuEntry.Header("Fix and advanced"))
-            actions.advanced.forEach { add(PcMenuEntry.Row(it)) }
+    // Fix and advanced: the repairs and the internals of how this copy
+    // runs -- offered only when there is anything of the kind, because a
+    // row opening an empty page is a category claiming to exist.
+    val advancedEntries = actions.advanced.map { PcMenuEntry.Row(it) }
+    val entries = buildList {
+        when (page) {
+            PcMenuPage.Root -> {
+                addAll(playEntries)
+                status?.let { add(PcMenuEntry.Info(it)) }
+                if (pageAbout.isNotEmpty()) {
+                    add(
+                        PcMenuEntry.Row(
+                            PcActionRow(
+                                "Game info and links",
+                                "Where it is owned, store links, compatibility, scraping and collections",
+                            ) {
+                                page = PcMenuPage.About
+                                focusIndex = 0
+                            },
+                        ),
+                    )
+                }
+                if (advancedEntries.isNotEmpty()) {
+                    add(
+                        PcMenuEntry.Row(
+                            PcActionRow("Fix and advanced", "Replacements, merging, the engine, other versions and the runner's settings") {
+                                page = PcMenuPage.Advanced
+                                focusIndex = 0
+                            },
+                        ),
+                    )
+                }
+                add(PcMenuEntry.Row(PcActionRow("Close", "", onClose)))
+            }
+            PcMenuPage.About -> {
+                add(PcMenuEntry.Header("Game info and links"))
+                status?.let { add(PcMenuEntry.Info(it)) }
+                addAll(pageAbout)
+                add(PcMenuEntry.Row(PcActionRow("Back", "") { page = PcMenuPage.Root; focusIndex = 0 }))
+            }
+            PcMenuPage.Advanced -> {
+                add(PcMenuEntry.Header("Fix and advanced"))
+                status?.let { add(PcMenuEntry.Info(it)) }
+                addAll(advancedEntries)
+                add(PcMenuEntry.Row(PcActionRow("Back", "") { page = PcMenuPage.Root; focusIndex = 0 }))
+            }
         }
-        add(PcMenuEntry.Row(PcActionRow("Close", "", onClose)))
     }
 
     val rowEntries = entries.filterIsInstance<PcMenuEntry.Row>()
-    var focusIndex by remember(entry) { mutableStateOf(0) }
-    Dialog(onDismissRequest = onClose) {
+    // The row list changes under the cursor (a page opens, a row goes
+    // away); it never points past the end it is drawn against.
+    LaunchedEffect(rowEntries.size, page) {
+        focusIndex = focusIndex.coerceIn(0, (rowEntries.size - 1).coerceAtLeast(0))
+    }
+    // B and the system Back step out of a sub-page before they close the
+    // menu; both reach the same function (the Dialog's own dismiss is Back).
+    val goBack = {
+        if (page != PcMenuPage.Root) {
+            page = PcMenuPage.Root
+            focusIndex = 0
+        } else {
+            onClose()
+        }
+    }
+    Dialog(onDismissRequest = goBack) {
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Game options",
             onKey = { event ->
-                if (event.type != KeyEventType.KeyUp) {
+                val closing = GamepadKeyMap.actionFor(event.key).let { it == GamepadAction.B || it == GamepadAction.BACK }
+                if (event.type == KeyEventType.KeyDown && closing) {
+                    // Answered on the down edge too: an unhandled B is
+                    // turned into the system Back by the platform, which
+                    // would step out of the menu a second time after the
+                    // up edge below had already stepped out of a page.
+                    true
+                } else if (event.type != KeyEventType.KeyUp) {
                     false
                 } else {
                     when (GamepadKeyMap.actionFor(event.key)) {
@@ -722,7 +778,11 @@ internal fun PcGameMenu(
                             rowEntries.getOrNull(focusIndex)?.row?.onSelect?.invoke()
                             true
                         }
-                        GamepadAction.B, GamepadAction.BACK, GamepadAction.SELECT -> {
+                        GamepadAction.B, GamepadAction.BACK -> {
+                            goBack()
+                            true
+                        }
+                        GamepadAction.SELECT -> {
                             onClose()
                             true
                         }
@@ -757,7 +817,7 @@ internal fun PcGameMenu(
                     }
                 }
             }
-            dev.droidtop.shell.gamepad.MenuHint("Up/Down moves, A activates, B closes")
+            dev.droidtop.shell.gamepad.MenuHint(if (page == PcMenuPage.Root) "Up/Down moves, A activates, B closes" else "Up/Down moves, A activates, B goes back")
         }
     }
 }
@@ -772,6 +832,9 @@ private fun FullScreenOverlay(onDismiss: () -> Unit, content: @Composable () -> 
         content()
     }
 }
+
+/** Which list of [PcGameMenu] is showing: the short top page, or one of the two it opens. */
+private enum class PcMenuPage { Root, About, Advanced }
 
 /** One entry in [PcGameMenu]'s flattened list: a section header, an info line, or a selectable row. */
 private sealed interface PcMenuEntry {
@@ -907,6 +970,11 @@ private fun rememberPcActions(
             // under "PC setup" (UI pass 2026-09-24, M7; renamed from
             // "Stores and folders" when store accounts moved to
             // "Accounts and sources").
+            PcActionRow(
+                if (favorite) "Remove from favourites" else "Add to favourites",
+                if (favorite) "It is in your Favourites collection" else "Puts it in your Favourites collection",
+                onToggleFavorite,
+            ),
         ),
         // About: this copy -- its update state and its record in the
         // person's library.
@@ -915,11 +983,6 @@ private fun rememberPcActions(
             PcActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong", onChooseMatch),
             if (media > 1) PcActionRow("View media", "$media images and videos scraped for this game", onViewMedia) else null,
             PcActionRow("Collections", "Which of your collections this game is in", onCollections),
-            PcActionRow(
-                if (favorite) "Remove from favourites" else "Add to favourites",
-                if (favorite) "It is in your Favourites collection" else "Puts it in your Favourites collection",
-                onToggleFavorite,
-            ),
         ),
         // Fix and advanced: the repairs (a found replacement, a same-game
         // merge, a corrected engine detection, another folder of the same
@@ -1108,18 +1171,6 @@ private fun runnerRows(
     )
     else -> null
 }
-
-/**
- * What the disabled button says under itself: where this game was. The
- * whole path, not its name -- the name is already the title above it,
- * and the path is the thing the person has to go and look at.
- */
-private fun missingFolderLine(entry: LibraryEntry): String =
-    if (entry.id.startsWith("/")) {
-        "${entry.id} is not there any more. Its history, favourite and collections are kept."
-    } else {
-        "Nothing droidtop scanned still has this game. Its history, favourite and collections are kept."
-    }
 
 /** What the detail knows of [PcGameMenu]'s entry from names alone, worked out off the main thread. */
 private data class DetailNames(
