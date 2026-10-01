@@ -455,6 +455,9 @@ fun GamepadShell(
         scope.launch {
             launchError = null
             launching = entry
+            // Hand the audio over before the other app opens its output:
+            // fade out and pause the themed preview video (tracker#160).
+            dev.droidtop.shell.gamepad.theme.ShellAudio.quiesce()
             runCatching { library.launch(entry) }
                 .onFailure {
                     android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)

@@ -5951,6 +5951,18 @@ variant axis, `fontSize`, from the one fixed above) may still fail to
 resolve — worth re-checking now that the axis-matching fix landed, since
 it could turn out to already be fixed as a side effect.
 
+**Launch audio hand-off (2026-09-30, tracker#160).** Droidtop's own audio
+(themed preview video, SoundPool navigation samples) must never be cut
+mid-buffer while a launched app opens its output; that is audible as a
+burst of static on every launch. The one mechanism is `ShellAudio`:
+before the launch intent is dispatched the themed videos are faded to
+zero over 120 ms and paused; the video's lifecycle observer mutes and
+pauses on ON_PAUSE (not ON_STOP) and resumes on ON_RESUME; the host
+activity's onPause silences and stops any sounding navigation sample.
+Preview video is `USAGE_MEDIA` with ExoPlayer audio-focus handling, so
+focus is requested on play and abandoned on pause/release in the order
+the launched app expects.
+
 Full real history/reasoning for each of the above (commit-by-commit,
 with citations to the exact real ES-DE source lines each decision was
 verified against) lives in `/root/coordination/HANDOFF.md`'s own theme-engine

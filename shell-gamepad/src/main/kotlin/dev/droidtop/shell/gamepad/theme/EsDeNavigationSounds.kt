@@ -142,6 +142,28 @@ object EsDeNavigationSounds {
     /** Plays one of [ES_DE_NAVIGATION_SOUND_NAMES]; silent no-op when the active theme doesn't provide it (see this object's doc comment -- no bundled fallback sounds, deliberately). */
     fun play(name: String) {
         val id = soundIdByName[name] ?: return
-        soundPool?.play(id, 1f, 1f, 1, 0, 1f)
+        val stream = soundPool?.play(id, 1f, 1f, 1, 0, 1f) ?: return
+        if (stream == 0) return
+        synchronized(liveStreams) {
+            liveStreams.addLast(stream)
+            while (liveStreams.size > MAX_STREAMS) liveStreams.removeFirst()
+        }
     }
+
+    /**
+     * Silence then stop every sample still sounding, so a launched app
+     * never opens its output while a sample is mid-buffer ([ShellAudio]).
+     * Stopping an already-finished stream id is a harmless no-op.
+     */
+    fun fadeStop() {
+        val pool = soundPool ?: return
+        val streams = synchronized(liveStreams) { liveStreams.toList().also { liveStreams.clear() } }
+        for (s in streams) {
+            pool.setVolume(s, 0f, 0f)
+            pool.stop(s)
+        }
+    }
+
+    private const val MAX_STREAMS = 4
+    private val liveStreams = ArrayDeque<Int>()
 }

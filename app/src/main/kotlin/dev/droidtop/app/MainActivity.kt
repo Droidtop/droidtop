@@ -506,6 +506,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // flight must not keep firing dispatchKeyEvent into a window
         // that is no longer the one the user is looking at.
         gamepadAxisNav.cancel()
+        // A navigation sample still sounding must not be cut mid-buffer
+        // by the launched app opening its output (tracker#160).
+        dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.fadeStop()
         super.onPause()
     }
 

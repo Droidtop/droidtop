@@ -1818,6 +1818,17 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     var playCount by remember(videoUri) { mutableStateOf(0) }
     val player = remember(videoUri) {
         ExoPlayer.Builder(context).build().apply {
+            // Preview audio is media, and it yields to the app that gets
+            // launched: handleAudioFocus ducks/pauses on the other app's
+            // focus request and abandons focus on pause and release, which
+            // is the focus order the launched app expects (tracker#160).
+            setAudioAttributes(
+                androidx.media3.common.AudioAttributes.Builder()
+                    .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                    .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                /* handleAudioFocus = */ true,
+            )
             setMediaItem(MediaItem.fromUri(videoUri))
             // Only ES-DE's "loop forever" case maps to the player's own
             // repeat; a finite count is counted in the listener below,
@@ -1828,6 +1839,10 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         }
     }
     LaunchedEffect(player, playAudio) { player.volume = if (playAudio) 1f else 0f }
+    DisposableEffect(player, playAudio) {
+        ShellAudio.register(player) { if (playAudio) 1f else 0f }
+        onDispose { ShellAudio.unregister(player) }
+    }
     DisposableEffect(player) {
         // The decoded frame's real dimensions are what real ES-DE's own
         // fit and pillarbox rules are computed from
@@ -1864,8 +1879,14 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         val lifecycle = lifecycleOwner?.lifecycle
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_STOP -> player.pause()
-                Lifecycle.Event.ON_START -> player.play()
+                // ON_PAUSE, not ON_STOP: the launched app opens its output
+                // while we are paused but before we are stopped, and the
+                // preview must already be silent by then (tracker#160).
+                Lifecycle.Event.ON_PAUSE -> { player.volume = 0f; player.pause() }
+                Lifecycle.Event.ON_RESUME -> {
+                    player.volume = if (playAudio) 1f else 0f
+                    player.play()
+                }
                 else -> Unit
             }
         }
