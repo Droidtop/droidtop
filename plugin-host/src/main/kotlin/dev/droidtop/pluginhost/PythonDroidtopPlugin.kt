@@ -91,10 +91,29 @@ class PythonDroidtopPlugin(
         return PluginReply.parse(PythonBridge.nativeCallFunction(uniqueName, "handle", call.toJson().toString()))
     }
 
-    // startJob is not implemented for v1 of the python kind -- the
-    // default in DroidtopPlugin (throws UnsupportedOperationException,
-    // turned into a clean "doesn't support jobs" by PluginRuntimeService)
-    // is exactly right until a real python-kind plugin needs it.
+    override fun startJob(jobId: String, capability: PluginCapability, args: PluginArgs, progress: PluginJobProgress) {
+        val payload = JSONObject().apply {
+            put("job_id", jobId)
+            put("call", JSONObject().apply { args.keys().forEach { put(it, args.string(it)) } })
+        }.toString()
+        val result = JSONObject(PythonBridge.nativeCallFunction(uniqueName, "start_job", payload))
+        val reports = result.optJSONArray("progress")
+        if (reports != null) {
+            for (index in 0 until reports.length()) {
+                val report = reports.optJSONObject(index) ?: continue
+                progress.report(report.optInt("percent", -1), report.optString("status", ""))
+            }
+        }
+        val ok = result.optBoolean("ok", false)
+        val values = result.optJSONObject("values") ?: JSONObject()
+        progress.complete(if (ok) {
+            PluginResult.success(buildMap { values.keys().forEach { key -> put(key, values.optString(key)) } })
+        } else PluginResult.failure(result.optString("error", "python plugin job failed")))
+    }
+
+    override fun cancelJob(jobId: String) {
+        PythonBridge.nativeCallFunction(uniqueName, "cancel_job", JSONObject().put("job_id", jobId).toString())
+    }
 
     companion object {
         /**
