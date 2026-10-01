@@ -3872,6 +3872,12 @@ launch it. Execution is a **runtime** choice, not a structural one:
   The test is that the same game with the same prefix launches in both
   modes.
 
+**A missing game working directory must not blank the Wine screen.** A
+Wine launch uses the game's directory when it still exists, otherwise
+the installed ImageFs root. If neither exists, the launch reports that
+the Windows environment needs setup. Startup errors stay visible on the
+game screen and tell the user to check Windows games in Settings.
+
 That means `PcGameRuntime`'s implementation must stop treating a live
 `PrimaryContainerSession` as the precondition for launching Windows
 software at all. `ContainerRuntime` as an interface is adequate to

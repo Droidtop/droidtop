@@ -227,7 +227,7 @@ class WineXSession(
             // from inside the prefix rather than only from Android.
             bindingPaths = prefix.drivesIterator().map { it[1] }.toTypedArray()
             this.envVars = envVars
-            setWorkingDir(workingDir.takeIf { it.isDirectory } ?: imageFs.rootDir)
+            setWorkingDir(WineWorkingDirectory.resolve(workingDir, imageFs.rootDir))
             guestExecutable = WineLaunchPlan.guestExecutable(xServer.screenInfo.toString(), target, prefix.execArgs, arguments)
             setTerminationCallback { code -> onTerminated(code ?: EXEC_FAILED) }
         }
@@ -271,6 +271,19 @@ class WineXSession(
 
         /** Container graphics-driver values that all resolve to the Vortek Vulkan renderer. */
         val VULKAN_DRIVERS = setOf("vortek", "adreno", "sd-8-elite")
+    }
+}
+
+/**
+ * A game or shortcut may have lost its working-directory setting. Wine
+ * still needs a directory in that case, so use the installed ImageFs
+ * root; fail with a readable error if neither location is usable.
+ */
+internal object WineWorkingDirectory {
+    fun resolve(workingDir: File?, imageFsRoot: File?): File {
+        return workingDir?.takeIf { it.isDirectory }
+            ?: imageFsRoot?.takeIf { it.isDirectory }
+            ?: throw IllegalStateException("the game folder and Windows system folder are missing; run Set up Windows games in Settings")
     }
 }
 

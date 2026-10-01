@@ -194,7 +194,7 @@ class WineGameActivity : Activity() {
             runCatching { session.start(::onGuestTerminated) }
                 .onFailure { failure ->
                     runOnUiThread {
-                        showFailure(failure.message ?: "the Wine environment failed to start")
+                        showFailure(failure.message ?: "the Wine environment failed to start", failure)
                     }
                 }
         }
@@ -226,16 +226,22 @@ class WineGameActivity : Activity() {
      * so it is shown here, and finishing immediately would take it away
      * before it could be read.
      */
-    private fun showFailure(message: String) {
+    private fun showFailure(message: String, cause: Throwable? = null) {
         if (failed) return
         failed = true
-        Timber.e("Wine launch failed: %s", message)
+        if (cause == null) {
+            Timber.e("Wine launch failed: %s", message)
+        } else {
+            Timber.e(cause, "Wine launch failed: %s", message)
+        }
         session?.stop()
         session = null
         setContentView(
             TextView(this).apply {
                 text = "This Windows game did not start." + "\n" + "\n" +
-                    message + "\n" + "\n" + "Press Back to return."
+                    message + "\n" + "\n" +
+                    "Check that Windows games is set up in Settings, then try again." + "\n" + "\n" +
+                    "Press Back to return."
                 gravity = Gravity.CENTER
                 setBackgroundColor(Color.BLACK)
                 setTextColor(Color.WHITE)
