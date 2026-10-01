@@ -2,6 +2,7 @@ package dev.droidtop.library.scraper
 
 import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * ES-DE-style scraper options (per direction: the scrape flow prompts
@@ -20,35 +21,32 @@ enum class ScrapeFilter(val label: String) {
 }
 
 object ScrapeOptionsPrefs {
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
+    private fun prefs(context: Context) = PrefsFile(context, LAUNCHER_PREFS_FILE_NAME)
     private const val KEY_FILTER = "droidtop_scrape_filter"
     private const val KEY_CONTENT_METADATA = "droidtop_scrape_content_metadata"
     private const val KEY_CONTENT_ARTWORK = "droidtop_scrape_content_artwork"
 
     fun filter(context: Context): ScrapeFilter {
-        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_FILTER, null) ?: return ScrapeFilter.MISSING_ANY
+        val raw = prefs(context).getString(KEY_FILTER, null) ?: return ScrapeFilter.MISSING_ANY
         return runCatching { ScrapeFilter.valueOf(raw) }.getOrDefault(ScrapeFilter.MISSING_ANY)
     }
 
     fun setFilter(context: Context, value: ScrapeFilter) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString(KEY_FILTER, value.name).apply()
+        prefs(context).putString(KEY_FILTER, value.name)
     }
 
     fun scrapeMetadata(context: Context): Boolean =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_CONTENT_METADATA, true)
+        prefs(context).getBoolean(KEY_CONTENT_METADATA, true)
 
     fun setScrapeMetadata(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_CONTENT_METADATA, value).apply()
+        prefs(context).putBoolean(KEY_CONTENT_METADATA, value)
     }
 
     private fun bool(context: Context, key: String, default: Boolean = true): Boolean =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(key, default)
+        prefs(context).getBoolean(key, default)
 
     private fun setBool(context: Context, key: String, value: Boolean) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(key, value).apply()
+        prefs(context).putBoolean(key, value)
     }
 
     // Per-media-type toggles, every default ON exactly like real ES-DE's
@@ -73,10 +71,9 @@ object ScrapeOptionsPrefs {
         setBool(context, "droidtop_miximage_rotate_horizontal_boxes", value)
 
     fun scrapeArtwork(context: Context): Boolean =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_CONTENT_ARTWORK, true)
+        prefs(context).getBoolean(KEY_CONTENT_ARTWORK, true)
 
     fun setScrapeArtwork(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_CONTENT_ARTWORK, value).apply()
+        prefs(context).putBoolean(KEY_CONTENT_ARTWORK, value)
     }
 }

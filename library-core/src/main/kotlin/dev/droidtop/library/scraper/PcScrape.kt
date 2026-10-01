@@ -9,6 +9,7 @@ import dev.droidtop.library.consoles.GameMetadataEntity
 import dev.droidtop.library.consoles.RomDatabase
 import dev.droidtop.library.esDeSystemName
 import dev.droidtop.library.toLibraryEntryKind
+import dev.droidtop.runtime.prefs.PrefsFile
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -52,11 +53,12 @@ enum class PcScraperSource(val key: String, val label: String) {
 }
 
 object PcScraperSourcePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
     private const val KEY_SOURCE = "droidtop_pc_scraper_source"
 
+    private fun prefs(context: Context) = PrefsFile(context, "com.android.launcher3.prefs")
+
     fun get(context: Context): PcScraperSource {
-        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_SOURCE, null)
+        val raw = prefs(context).getString(KEY_SOURCE, null)
         // Lutris is the default because it is the one that works with
         // nothing configured; a default that needs credentials would
         // make a fresh install's first scrape fail for a reason the user
@@ -65,7 +67,7 @@ object PcScraperSourcePrefs {
     }
 
     fun set(context: Context, source: PcScraperSource) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_SOURCE, source.key).apply()
+        prefs(context).putString(KEY_SOURCE, source.key)
     }
 }
 
