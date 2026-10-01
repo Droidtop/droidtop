@@ -34,7 +34,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import coil3.compose.AsyncImage
 import androidx.compose.runtime.remember
 import dev.droidtop.library.LibraryEntry
@@ -238,8 +237,6 @@ internal fun CompanionContent(entry: LibraryEntry?, topInset: androidx.compose.u
                         description,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 6,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                 }
                 if (entry.playtimeSeconds > 0) {

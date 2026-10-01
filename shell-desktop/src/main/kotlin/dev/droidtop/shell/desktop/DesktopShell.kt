@@ -311,7 +311,6 @@ private fun BoxScope.DesktopViewport(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             style = MaterialTheme.typography.bodySmall,
-                            maxLines = 2,
                             modifier = Modifier.padding(top = 16.dp),
                         )
                     }

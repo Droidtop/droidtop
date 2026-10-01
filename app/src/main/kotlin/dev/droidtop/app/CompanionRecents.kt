@@ -125,8 +125,6 @@ private fun RecentCard(entry: LibraryEntry) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(8.dp).align(androidx.compose.ui.Alignment.Center),
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
