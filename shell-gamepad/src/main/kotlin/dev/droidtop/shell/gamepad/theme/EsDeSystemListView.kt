@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.theme
 
+import dev.droidtop.shell.gamepad.input.PadCadence
+import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.animateFloatAsState
@@ -49,7 +51,6 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
@@ -98,8 +99,6 @@ import dev.droidtop.library.theme.layoutEsDeGrid
 import dev.droidtop.library.theme.layoutEsDeTextList
 import dev.droidtop.shell.gamepad.esDeSwipeSteps
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
-import dev.droidtop.shell.gamepad.input.handleGamepadKeyDown
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -665,32 +664,33 @@ private fun EsDeCarousel(
                 horizontal = if (verticalType) 0 else 1,
                 vertical = if (verticalType) 1 else 0,
             ) { step(it) }
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
-                    items.getOrNull(focusedIndex)?.onSelect?.invoke()
-                    return@onKeyEvent true
-                }
-                // DOWN edge only, repeats included -- see
-                // handleGamepadKeyDown's own doc comment
-                // (Droidtop/tracker#1: this exact carousel is the "main
-                // console screen" the owner found Left/Right each fired
-                // twice on, acting on KeyUp before this).
-                when (GamepadKeyMap.actionFor(event.key)) {
-                    GamepadAction.LEFT -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) { if (!verticalType) step(-1) }
-                    GamepadAction.RIGHT -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) { if (!verticalType) step(1) }
+            // ES-DE's own list cadence (IList's QUICK tiers), through the
+            // shell's one input pipeline (docs/SPEC.md 6e): each press
+            // steps once, a held direction runs, the release does nothing.
+            .onPad(cadence = PadCadence.THEMED_LIST) { press ->
+                when (press.action) {
+                    GamepadAction.A -> {
+                        items.getOrNull(focusedIndex)?.onSelect?.invoke()
+                        true
+                    }
+                    GamepadAction.LEFT, GamepadAction.RIGHT -> {
+                        if (!verticalType) step(if (press.action == GamepadAction.LEFT) -1 else 1)
+                        true
+                    }
                     // Up is owned only where this carousel can really use
                     // it (a vertical one). A horizontal carousel -- the
-                    // no-theme fallback the safe-mode banner draws over
-                    // -- has no Up of its own, and swallowing the press cut
-                    // the pad off from everything above it. Unhandled, it
-                    // reaches Compose's own focus search, which in safe
-                    // mode finds the banner's action (docs/SPEC.md 10c)
-                    // and otherwise finds nothing, because the top bar
-                    // cannot take focus (docs/SPEC.md 7k) -- the same
-                    // reasoning the gamelist widgets' Left/Right bubble
-                    // already uses (Droidtop/tracker#43).
-                    GamepadAction.UP -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, verticalType) { if (verticalType) step(-1) }
-                    GamepadAction.DOWN -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) { if (verticalType) step(1) }
+                    // no-theme fallback the safe-mode banner draws over --
+                    // has no Up of its own, and swallowing the press cut the
+                    // pad off from everything above it. Unhandled, it
+                    // reaches Compose's own focus search, which in safe mode
+                    // finds the banner's action (docs/SPEC.md 10c) and
+                    // otherwise finds nothing, because the top bar cannot
+                    // take focus (docs/SPEC.md 7k).
+                    GamepadAction.UP -> verticalType && step(-1)
+                    GamepadAction.DOWN -> {
+                        if (verticalType) step(1)
+                        true
+                    }
                     else -> false
                 }
             }
@@ -1286,30 +1286,18 @@ private fun EsDeTextList(
             .focusable()
             .clipToBounds()
             .esDeSwipeSteps(vertical = 1) { step(it) }
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
-                    items.getOrNull(cursor)?.onSelect?.invoke()
-                    return@onKeyEvent true
-                }
-                // Up/Down/Left/Right act on the DOWN edge only, repeats
-                // included -- see handleGamepadKeyDown's own doc comment
-                // (Droidtop/tracker#1: acting on KeyUp meant a held press
-                // stepped correctly on every repeat AND then stepped one
-                // more time on release).
-                when (GamepadKeyMap.actionFor(event.key)) {
-                    GamepadAction.UP -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) { step(-1) }
-                    GamepadAction.DOWN -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) { step(1) }
-                    // A gamelist bubbles Left/Right to the sibling-system
-                    // switch above it (GamesSection's own onKeyEvent,
-                    // GamepadShell.kt); the old unconditional `true` here
-                    // predates the top-bar focus fix and was really
-                    // defending against THAT bug (a stray horizontal
-                    // press escaping via focus search) -- the top bar can
-                    // no longer take focus at all (SectionTabBar), so
-                    // this no longer needs to swallow the press to stay
-                    // safe, and swallowing it was also silently eating
-                    // the real feature (tracker#43).
-                    GamepadAction.LEFT, GamepadAction.RIGHT -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, !gamelist) {}
+            .onPad(cadence = PadCadence.THEMED_LIST) { press ->
+                when (press.action) {
+                    GamepadAction.A -> {
+                        items.getOrNull(cursor)?.onSelect?.invoke()
+                        true
+                    }
+                    GamepadAction.UP -> step(-1)
+                    GamepadAction.DOWN -> step(1)
+                    // A gamelist leaves Left/Right to the sibling-system
+                    // switch above it (GamesSection, GamepadShell.kt,
+                    // tracker#43); a system list has no meaning for them.
+                    GamepadAction.LEFT, GamepadAction.RIGHT -> !gamelist
                     else -> false
                 }
             },
@@ -1612,38 +1600,31 @@ private fun EsDeGrid(
                         cursor = (cursor + delta).coerceIn(0, items.size - 1)
                     }
                 }
-                .onKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
-                        items.getOrNull(cursor)?.onSelect?.invoke()
-                        return@onKeyEvent true
-                    }
-                    // Up/Down/Left/Right act on the DOWN edge only,
-                    // repeats included (Droidtop/tracker#1's
-                    // handleGamepadKeyDown, own doc comment) -- the edge
-                    // (atEdge/owns) is worked out BEFORE the mutation so
-                    // it answers identically for the DOWN that moves and
-                    // the matching UP that must not move it again.
-                    fun step(delta: Int): Boolean = handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) {
+                .onPad(cadence = PadCadence.THEMED_LIST) { press ->
+                    fun step(delta: Int): Boolean {
                         if (items.isNotEmpty()) cursor = (cursor + delta).coerceIn(0, items.size - 1)
                         android.util.Log.d("droidtop.input", "EsDeGrid.step delta=$delta index=$cursor")
+                        return true
                     }
-                    // Left/Right at a real edge of the current row: not
-                    // consumed when this is a gamelist, so it bubbles to
-                    // the sibling-system switch (tracker#43); consumed
-                    // (a no-op) otherwise, same as every edge before this.
+                    // Left/Right at a real edge of the current row: left to
+                    // the sibling-system switch when this is a gamelist
+                    // (tracker#43); consumed (a no-op) otherwise.
                     fun stepColumn(delta: Int): Boolean {
-                        if (items.isEmpty()) return handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) {}
+                        if (items.isEmpty()) return true
                         val atEdge = if (delta < 0) {
                             cursor % layout.columns == 0
                         } else {
                             cursor % layout.columns == layout.columns - 1 || cursor == items.lastIndex
                         }
-                        return handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, !atEdge || !gamelist) {
-                            if (!atEdge) cursor = (cursor + delta).coerceIn(0, items.size - 1)
-                            android.util.Log.d("droidtop.input", "EsDeGrid.stepColumn delta=$delta atEdge=$atEdge index=$cursor")
-                        }
+                        if (!atEdge) cursor = (cursor + delta).coerceIn(0, items.size - 1)
+                        android.util.Log.d("droidtop.input", "EsDeGrid.stepColumn delta=$delta atEdge=$atEdge index=$cursor")
+                        return !atEdge || !gamelist
                     }
-                    when (GamepadKeyMap.actionFor(event.key)) {
+                    when (press.action) {
+                        GamepadAction.A -> {
+                            items.getOrNull(cursor)?.onSelect?.invoke()
+                            true
+                        }
                         GamepadAction.LEFT -> stepColumn(-1)
                         GamepadAction.RIGHT -> stepColumn(1)
                         GamepadAction.UP -> step(-layout.columns)

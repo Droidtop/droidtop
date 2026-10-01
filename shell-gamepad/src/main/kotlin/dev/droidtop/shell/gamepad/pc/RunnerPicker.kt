@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -20,10 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.GameEngine
 import dev.droidtop.library.GameLaunchStrategy
@@ -34,7 +32,6 @@ import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
 /**
  * Every runner for one game, in its state — docs/SPEC.md §7i's picker.
@@ -157,14 +154,15 @@ private fun PickerPage(
     onDismiss: () -> Unit,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
+    // The system back key; the pad's B is the onPad handler below.
+    androidx.activity.compose.BackHandler { onDismiss() }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MenuTokens.Ground)
             .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
-            .onKeyEvent { event ->
-                val action = GamepadKeyMap.actionFor(event.key)
-                if (event.type == KeyEventType.KeyUp && (action == GamepadAction.BACK || action == GamepadAction.B)) {
+            .onPad { press ->
+                if (press.action == GamepadAction.B) {
                     onDismiss()
                     true
                 } else {
@@ -199,10 +197,8 @@ private fun RunnerRow(
         modifier = Modifier
             .fillMaxWidth()
             // Ahead of the focus targets, not after them: see [GameCard].
-            .onKeyEvent { event ->
-                if (enabled && event.type == KeyEventType.KeyUp &&
-                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                ) {
+            .onPad { press ->
+                if (enabled && press.action == GamepadAction.A) {
                     onSelect()
                     true
                 } else {

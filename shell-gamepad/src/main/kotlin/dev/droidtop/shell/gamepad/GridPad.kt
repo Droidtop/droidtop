@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GamepadAction
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -42,24 +43,30 @@ internal fun gridPadTarget(at: Int, count: Int, cols: Int, direction: FocusDirec
     }
 }
 
+/** The grid direction a pad action moves in, or null when it is not a direction. */
+internal fun gridDirection(action: GamepadAction): FocusDirection? = when (action) {
+    GamepadAction.UP -> FocusDirection.Up
+    GamepadAction.DOWN -> FocusDirection.Down
+    GamepadAction.LEFT -> FocusDirection.Left
+    GamepadAction.RIGHT -> FocusDirection.Right
+    else -> null
+}
+
 /**
  * The D-pad over a grid of cards: one card per press, straight along the
  * row or the column, by index. The shell's three card grids (the Games
  * section's unthemed grid, the PC surface, the Launcher's Games grid) all
  * move through this one object.
  *
- * Compose's own focus search is not used for it, for two reasons the rig
- * showed. It also runs on the DOWN edge of a direction, while every screen
- * here moves on the UP edge, so a grid that left the DOWN edge unhandled
- * could move twice for one press; and it searches geometrically among the
- * cards that are composed, so Down from the second column landed on the
+ * Compose's own focus search is not used for it: it searches
+ * geometrically among the cards that are composed, so Down from the second column landed on the
  * first column of the next row when that row was only partly on screen
  * (dq-shell2-01). Here the target is the card one column or one row away,
  * scrolled in by one row when it is not on screen yet, then focused.
  *
  * A card attaches [requester] for its own index and reports focus through
- * [focused]; the screen's key handler takes both edges of a direction and
- * calls [move] on the UP edge. [move] answers false at the grid's edge, so
+ * [focused]; the screen's `onPad` handler calls [move] for each step of a
+ * direction (docs/SPEC.md 6e). [move] answers false at the grid's edge, so
  * the screen decides what the edge means (a system switch, the chip row).
  */
 internal class GridPad(val state: LazyGridState, private val scope: CoroutineScope) {

@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -27,16 +28,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.CollectionEntity
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import kotlinx.coroutines.launch
 
 /**
@@ -53,6 +50,8 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, onDismiss: () -> Unit) {
+    // The system back key; the pad's B is the onPad handler below.
+    androidx.activity.compose.BackHandler { onDismiss() }
     val scope = rememberCoroutineScope()
     var collections by remember { mutableStateOf<List<CollectionEntity>>(emptyList()) }
     var membership by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -72,8 +71,8 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
             .fillMaxSize()
             .background(MenuTokens.Ground)
             .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK) {
+            .onPad { press ->
+                if (press.action == GamepadAction.B) {
                     onDismiss()
                     true
                 } else {
@@ -155,8 +154,8 @@ private fun CollectionToggleRow(label: String, isMember: Boolean?, onClick: () -
         modifier = Modifier
             .fillMaxWidth()
             // Ahead of the focus targets, not after them: see [GameCard].
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
+            .onPad { press ->
+                if (press.action == GamepadAction.A) {
                     onClick()
                     true
                 } else {

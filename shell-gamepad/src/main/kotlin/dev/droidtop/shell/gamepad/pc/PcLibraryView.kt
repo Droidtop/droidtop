@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.gridDirection
+import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
@@ -34,10 +36,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,8 +46,6 @@ import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.GameCard
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
-import dev.droidtop.shell.gamepad.input.handleGamepadKeyDown
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -202,7 +199,7 @@ internal fun PcLibraryContent(
                             bottom = MenuTokens.HintBarRoom,
                         ),
                         // Same real GridPad contract as the Games section's
-                        // own unthemed grid: the UP key edge moves one card,
+                        // own unthemed grid: each step moves one card,
                         // Left/Right bubble to the sibling-system switcher
                         // at the grid's own edge (docs/SPEC.md 7j/7k -- never
                         // the other way). Up at the top row is NOT answered
@@ -211,21 +208,16 @@ internal fun PcLibraryContent(
                         // the Browse button just above the grid.
                         modifier = Modifier.fillMaxSize()
                             .focusProperties { if (pad.onTopRow) up = chipFocus }
-                            .onKeyEvent { event ->
-                                val direction = when (GamepadKeyMap.actionFor(event.key)) {
-                                    GamepadAction.UP -> FocusDirection.Up
-                                    GamepadAction.DOWN -> FocusDirection.Down
-                                    GamepadAction.LEFT -> FocusDirection.Left
-                                    GamepadAction.RIGHT -> FocusDirection.Right
-                                    else -> null
-                                } ?: return@onKeyEvent false
-                                // DOWN edge moves, repeats included
-                                // (Droidtop/tracker#1); canMove is pure
-                                // (GridPad's own doc comment) so the UP
-                                // edge answers the same true/false without
-                                // moving a second card.
-                                handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, pad.canMove(direction)) {
+                            .onPad { press ->
+                                val direction = gridDirection(press.action) ?: return@onPad false
+                                // One card per step (GridPad); at an edge
+                                // it answers false and Left/Right reach the
+                                // switch-system handler above.
+                                if (pad.canMove(direction)) {
                                     pad.move(direction)
+                                    true
+                                } else {
+                                    false
                                 }
                             },
                         horizontalArrangement = Arrangement.spacedBy(16.dp),

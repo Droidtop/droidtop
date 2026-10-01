@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.theme
 
+import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -32,10 +33,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -45,7 +44,6 @@ import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -172,10 +170,8 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
 
     Box(
         modifier = Modifier.fillMaxSize().background(MenuTokens.Ground)
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    (GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK || GamepadKeyMap.actionFor(event.key) == GamepadAction.B)
-                ) {
+            .onPad { press ->
+                if (press.action == GamepadAction.B) {
                     onDismiss()
                     true
                 } else {
@@ -215,10 +211,8 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                 entries.isEmpty() -> Column(
                     modifier = Modifier
                         .focusRequester(emptyFocus)
-                        .onKeyEvent { event ->
-                            if (fetchFailed && event.type == KeyEventType.KeyUp &&
-                                GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                            ) {
+                        .onPad { press ->
+                            if (fetchFailed && press.action == GamepadAction.A) {
                                 coroutineScope.launch { fetchIndex() }
                                 true
                             } else {
@@ -330,8 +324,8 @@ private fun ThemeBrowserRow(
         modifier = modifier
             .fillMaxWidth()
             // Ahead of the focus targets, not after them: see [GameCard].
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
+            .onPad { press ->
+                if (press.action == GamepadAction.A) {
                     onDownload()
                     true
                 } else {

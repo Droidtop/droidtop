@@ -41,9 +41,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.input.PadPress
@@ -172,10 +169,8 @@ internal fun ShellChip(
         maxLines = 1,
         modifier = modifier
             // Ahead of the focus targets, not after them: see [GameCard].
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                ) {
+            .onPad { press ->
+                if (press.action == GamepadAction.A) {
                     onClick()
                     true
                 } else {

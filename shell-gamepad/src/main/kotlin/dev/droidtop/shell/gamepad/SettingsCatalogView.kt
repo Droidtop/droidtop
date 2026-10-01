@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.menuStep
+import dev.droidtop.shell.gamepad.input.onPad
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -46,10 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -78,7 +77,6 @@ import dev.droidtop.library.settings.SubScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -412,11 +410,13 @@ fun CatalogNavigator(
     LaunchedEffect(screen, textItem == null, infoRow == null) {
         if (textItem == null && infoRow == null) requestFocusWhenAttached(listFocus, "Settings catalog")
     }
+    // A held direction follows the cursor without animating each step.
+    var heldStep by remember { mutableStateOf(false) }
     LaunchedEffect(rows, selected) {
         if (rows.isEmpty()) return@LaunchedEffect
         // Back at a depth left for a sub-screen: exactly where it was.
         scrollByDepth.remove(depth)?.let { (index, offset) -> listState.scrollToItem(index, offset) }
-        listState.keepInView(selected.coerceIn(0, rows.lastIndex))
+        listState.keepInView(selected.coerceIn(0, rows.lastIndex), animate = !heldStep)
     }
 
     // One value column for the whole screen, content-sized to the widest
@@ -442,67 +442,39 @@ fun CatalogNavigator(
                 .fillMaxWidth()
                 .focusRequester(listFocus)
                 .focusable()
-                .onKeyEvent { event ->
-                    // B and Escape leave a screen the same way the system
-                    // Back button does, on the UP edge like every other
-                    // screen in the shell, with the DOWN edge consumed.
-                    // Deliberately NOT Key.Back: that one is delivered
-                    // through the back DISPATCHER (the BackHandler above),
-                    // and handling it here as well would pop twice.
-                    // Without this a pad whose B reports as
-                    // KEYCODE_BUTTON_B had no way out of a settings screen
-                    // at all, and neither did a keyboard. Popping on DOWN
-                    // popped twice anyway: the UP went on to the shell's
-                    // pad owner (Modifier.ownPadButtons), which sent Back
-                    // again, so B from Settings > Android settings left
-                    // Settings for the Games carousel (UI pass 2026-09-24,
-                    // H3).
-                    if (event.key == Key.ButtonB || event.key == Key.Escape) {
-                        if (event.type == KeyEventType.KeyUp) pop()
-                        return@onKeyEvent true
-                    }
-                    // Y: the selected row's Info sheet, on the UP edge like
-                    // B, with the DOWN edge consumed so it goes nowhere else.
-                    if (GamepadKeyMap.actionFor(event.key) == GamepadAction.Y) {
-                        if (event.type == KeyEventType.KeyUp) rows.getOrNull(selected)?.let { infoRow = it.item }
-                        return@onKeyEvent true
-                    }
-                    if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    when (event.key) {
-                        Key.DirectionDown -> {
+                // The pad through the input pipeline (docs/SPEC.md 6e): each
+                // press acts once, on the press, and a held direction runs
+                // at the chrome cadence. B (and a keyboard's Escape) pops a
+                // level like the system back key's BackHandler above; its
+                // release belongs to this press, so it can no longer reach
+                // the shell's root and pop a second level (UI pass
+                // 2026-09-24, H3).
+                .onPad { press ->
+                    when (press.action) {
+                        GamepadAction.B -> pop()
+                        // Y: the selected row's Info sheet.
+                        GamepadAction.Y -> rows.getOrNull(selected)?.let { infoRow = it.item }
+                        GamepadAction.DOWN -> {
+                            heldStep = press.repeat
                             setSelected((selected + 1).coerceAtMost(rows.lastIndex))
-                            true
                         }
-                        Key.DirectionUp -> {
-                            // Owned only while the selection can really
-                            // move: at the first row an unhandled Up
-                            // reaches Compose's focus search, which in
-                            // safe mode finds the banner's action above
-                            // (docs/SPEC.md 10c) and otherwise finds
-                            // nothing -- the top bar cannot take focus
-                            // (docs/SPEC.md 7k) -- instead of being
-                            // swallowed as a no-op.
-                            if (selected > 0) {
-                                setSelected(selected - 1)
-                                true
-                            } else {
-                                false
-                            }
+                        // Owned only while the selection can really move:
+                        // a fresh Up at the first row reaches Compose's focus
+                        // search, which in safe mode finds the banner's
+                        // action above (docs/SPEC.md 10c) and otherwise
+                        // finds nothing -- the top bar cannot take focus
+                        // (docs/SPEC.md 7j). A held Up stops at the first row.
+                        GamepadAction.UP -> {
+                            if (selected == 0) return@onPad press.repeat
+                            heldStep = press.repeat
+                            setSelected(selected - 1)
                         }
-                        Key.DirectionLeft -> {
-                            rows.getOrNull(selected)?.let { adjust(it.item, -1) }
-                            true
-                        }
-                        Key.DirectionRight -> {
-                            rows.getOrNull(selected)?.let { adjust(it.item, +1) }
-                            true
-                        }
-                        Key.ButtonA, Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> {
-                            rows.getOrNull(selected)?.let { activate(it.item) }
-                            true
-                        }
-                        else -> false
+                        GamepadAction.LEFT -> rows.getOrNull(selected)?.let { adjust(it.item, -1) }
+                        GamepadAction.RIGHT -> rows.getOrNull(selected)?.let { adjust(it.item, +1) }
+                        GamepadAction.A -> rows.getOrNull(selected)?.let { activate(it.item) }
+                        else -> return@onPad false
                     }
+                    true
                 },
             contentPadding = MenuListContentPadding,
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
@@ -836,7 +808,8 @@ internal fun CatalogChoicePicker(
     val listState = rememberLazyListState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "Choice picker") }
-    LaunchedEffect(selected) { if (item.options.isNotEmpty()) listState.keepInView(selected) }
+    var heldStep by remember { mutableStateOf(false) }
+    LaunchedEffect(selected) { if (item.options.isNotEmpty()) listState.keepInView(selected, animate = !heldStep) }
     BackHandler { onDismiss() }
 
     Column(Modifier.fillMaxSize()) {
@@ -847,23 +820,17 @@ internal fun CatalogChoicePicker(
                 .fillMaxSize()
                 .focusRequester(focus)
                 .focusable()
-                .onKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    when (event.key) {
-                        Key.DirectionDown -> {
-                            selected = (selected + 1).coerceAtMost(item.options.lastIndex)
-                            true
+                .onPad { press ->
+                    when (press.action) {
+                        GamepadAction.UP, GamepadAction.DOWN -> {
+                            heldStep = press.repeat
+                            selected = menuStep(selected, item.options.size, if (press.action == GamepadAction.UP) -1 else 1)
                         }
-                        Key.DirectionUp -> {
-                            selected = (selected - 1).coerceAtLeast(0)
-                            true
-                        }
-                        Key.ButtonA, Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> {
-                            item.options.getOrNull(selected)?.let { onPick(it.value) }
-                            true
-                        }
-                        else -> false
+                        GamepadAction.A -> item.options.getOrNull(selected)?.let { onPick(it.value) }
+                        GamepadAction.B -> onDismiss()
+                        else -> return@onPad false
                     }
+                    true
                 },
             contentPadding = MenuListContentPadding,
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
@@ -995,11 +962,12 @@ private fun SettingsSearchOverlay(
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(fieldFocus)
-                    .onKeyEvent { event ->
-                        // Escape closes search from the field itself --
-                        // BackHandler alone does not see key events
-                        // consumed by a focused text field.
-                        if (event.key == Key.Escape && event.type == KeyEventType.KeyUp) {
+                    // B, or a keyboard's Escape, closes search from the
+                    // field itself: BackHandler alone does not see key
+                    // events a focused text field consumed, and the field
+                    // takes the keys it types before this sees them.
+                    .onPad { press ->
+                        if (press.action == GamepadAction.B) {
                             onClose()
                             true
                         } else {
@@ -1046,17 +1014,14 @@ private fun SettingsSearchOverlay(
                     modifier = Modifier
                         .fillMaxSize()
                         .focusable()
-                        .onKeyEvent { event ->
-                            if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                            when (event.key) {
-                                Key.DirectionDown -> { selected = (selected + 1).coerceAtMost(results.lastIndex); true }
-                                Key.DirectionUp -> { selected = (selected - 1).coerceAtLeast(0); true }
-                                Key.ButtonA, Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> {
-                                    results.getOrNull(selected)?.let(onPick)
-                                    true
-                                }
-                                else -> false
+                        .onPad { press ->
+                            when (press.action) {
+                                GamepadAction.UP, GamepadAction.DOWN ->
+                                    selected = menuStep(selected, results.size, if (press.action == GamepadAction.UP) -1 else 1)
+                                GamepadAction.A -> results.getOrNull(selected)?.let(onPick)
+                                else -> return@onPad false
                             }
+                            true
                         },
                     contentPadding = MenuListContentPadding,
                     verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),

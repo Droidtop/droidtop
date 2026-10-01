@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.onPad
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
@@ -29,14 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.ownPadButtons
@@ -128,27 +125,17 @@ private fun GamesGrid(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            // One handler for the screen, above the cards: Compose moves
-            // focus in a grid for nobody, so directions are moved here on
-            // the UP edge (the DOWN edge is taken so the framework cannot
-            // move a second time), and Select opens Game folders.
-            .onKeyEvent { event ->
-                val action = GamepadKeyMap.actionFor(event.key)
-                val direction = when (action) {
-                    GamepadAction.UP -> FocusDirection.Up
-                    GamepadAction.DOWN -> FocusDirection.Down
-                    GamepadAction.LEFT -> FocusDirection.Left
-                    GamepadAction.RIGHT -> FocusDirection.Right
-                    else -> null
-                }
-                if (event.type == KeyEventType.KeyDown) return@onKeyEvent direction != null
-                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+            // One handler for the screen, above the cards: each step of a
+            // direction moves one card (GridPad), and Select opens Game
+            // folders (docs/SPEC.md 6e).
+            .onPad { press ->
+                val direction = gridDirection(press.action)
                 when {
                     direction != null -> {
                         pad.move(direction)
                         true
                     }
-                    action == GamepadAction.SELECT && onOpenFolders != null -> {
+                    press.action == GamepadAction.SELECT && onOpenFolders != null -> {
                         onOpenFolders()
                         true
                     }

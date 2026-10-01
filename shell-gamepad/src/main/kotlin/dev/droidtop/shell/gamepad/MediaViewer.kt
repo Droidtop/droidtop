@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.onPad
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -22,16 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 
 /**
@@ -60,20 +57,25 @@ internal fun MediaViewer(title: String, media: List<Pair<String, String>>, onClo
             .background(MenuTokens.Ground)
             .focusRequester(focus)
             .focusable()
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                when (GamepadKeyMap.actionFor(event.key)) {
-                    GamepadAction.LEFT -> {
-                        index = (index - 1 + media.size) % media.size
-                        EsDeNavigationSounds.play("scroll")
+            .onPad { press ->
+                when (press.action) {
+                    // A pager wraps round on a fresh press, and a held
+                    // direction stops at the end instead of spinning
+                    // through every picture (ES-DE's LIST_PAUSE_AT_END,
+                    // IList.h:385).
+                    GamepadAction.LEFT, GamepadAction.RIGHT -> {
+                        val delta = if (press.action == GamepadAction.LEFT) -1 else 1
+                        val next = index + delta
+                        val moved = when {
+                            next in media.indices -> next
+                            press.repeat -> index
+                            else -> (next + media.size) % media.size
+                        }
+                        if (moved != index) EsDeNavigationSounds.play("scroll")
+                        index = moved
                         true
                     }
-                    GamepadAction.RIGHT -> {
-                        index = (index + 1) % media.size
-                        EsDeNavigationSounds.play("scroll")
-                        true
-                    }
-                    GamepadAction.B, GamepadAction.BACK -> {
+                    GamepadAction.B -> {
                         onClose()
                         true
                     }

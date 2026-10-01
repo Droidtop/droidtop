@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.PadCadence
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
@@ -59,7 +60,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
@@ -97,7 +97,6 @@ import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.input.HintBinding
-import dev.droidtop.shell.gamepad.input.handleGamepadKeyDown
 import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.ownPadButtons
@@ -1234,9 +1233,10 @@ private fun EntryDetailScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(LocalShellWindow.current.edgePadding)
-            .onKeyEvent { event ->
-                val action = GamepadKeyMap.actionFor(event.key)
-                if (event.type == KeyEventType.KeyUp && (action == GamepadAction.BACK || action == GamepadAction.B)) {
+            // B closes the detail; the system back key reaches the same
+            // close through the shell's BackHandler for it (SPEC 6e).
+            .onPad { press ->
+                if (press.action == GamepadAction.B) {
                     onClose()
                     true
                 } else {
@@ -2235,185 +2235,82 @@ private fun GamesSection(
         // group, so back leaves THAT first.
         nav.back()
     }
-    // Whether the press now in flight began while the group's options
-    // screen was up. That screen's list answers B on the DOWN edge and
-    // closes itself, so the UP edge of the very same press arrived here
-    // with the options already closed and was read as a second B: one
-    // press of the pad's B left "Stores and folders" AND the PC grid (rig,
-    // build 549). The edge that opened a press decides who it belongs to.
-    var pressBeganOverOptions by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown) pressBeganOverOptions = nav.optionsOpen
-                // The shoulders mean "switch system" at this level and
-                // "switch section" above it; inside a screen opened from
-                // the group they mean nothing, and letting them through
-                // tore that screen down and changed the tab under it
-                // (rig, build 549). Both edges, before anything below
-                // sees them.
-                val action = GamepadKeyMap.actionFor(event.key)
-                nav.optionsOpen && (action == GamepadAction.L || action == GamepadAction.R)
+            // The shoulders mean "switch system" at this level and "switch
+            // section" above it; inside a screen opened from the group they
+            // mean nothing, and letting them through tore that screen down
+            // and changed the tab under it (rig, build 549). Taken before
+            // anything below sees them.
+            .onPad(preview = true) { press ->
+                nav.optionsOpen && (press.action == GamepadAction.L || press.action == GamepadAction.R)
             }
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown && event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                // A screen opened FROM the group owns its own keys while
-                // it is up: the group's options screen is a level above
-                // this one, and its own list already handles B, its own
-                // BackHandler handles the system back key, and neither
-                // wants the shoulders switching the system underneath it.
-                if (nav.optionsOpen) return@onKeyEvent false
-                if (pressBeganOverOptions) {
-                    // The reset stays tied to the UP edge specifically
-                    // (not "the first edge seen"): Up/Down/Left/Right
-                    // below now also arrive on KeyDown, and resetting
-                    // this on THAT edge would un-arm the guard before the
-                    // matching KeyUp of the SAME press ever got here,
-                    // silently letting that release fall through to the
-                    // real handling below instead of being ignored.
-                    if (event.type == KeyEventType.KeyUp) pressBeganOverOptions = false
-                    return@onKeyEvent false
-                }
+            // B is not here: it is the back dispatcher's, through the shell's
+            // root, and this group's BackHandler above is the one that answers
+            // it -- one route for the pad's B and the system back key alike
+            // (SPEC 6e). The guard this handler kept against the release of a
+            // B that had closed the options screen above it is gone with it:
+            // a release belongs to the press that began it.
+            .onPad(cadence = PadCadence.THEMED_LIST) { press ->
+                // A screen opened FROM the group owns its own presses while
+                // it is up.
+                if (nav.optionsOpen) return@onPad false
                 val group = selectedGroup
                 // PC and engine games are a themed gamelist like any
-                // other now (docs/SPEC.md 7i, revised 2026-09-26); the
-                // carve-out this used to need for PcSurface's own
-                // headless focus tracking is gone.
+                // other now (docs/SPEC.md 7i, revised 2026-09-26).
                 val themed = hasThemedGamelist
-                val action = GamepadKeyMap.actionFor(event.key)
-                // Up/Down/Left/Right act on the DOWN edge only, repeats
-                // included (Droidtop/tracker#1, handleGamepadKeyDown's own
-                // doc comment); every other action here keeps its
-                // previous KeyUp-only contract by requiring `isUp` in its
-                // own condition below, so this same relaxed top guard
-                // (which used to block KeyDown outright) never changes
-                // their behaviour -- a KeyDown for one of them simply
-                // matches nothing and falls to `else -> false`, same as
-                // when the top guard blocked it directly.
-                val isUp = event.type == KeyEventType.KeyUp
-                when {
-                    (action == GamepadAction.BACK || action == GamepadAction.B) && group != null && isUp -> {
-                        // Same real BACKSOUND as the BackHandler route above.
-                        EsDeNavigationSounds.play("back")
-                        // One level at a time, the same answer the
-                        // dispatcher route above uses. KEYCODE_BACK reaches
-                        // the view tree as an ordinary key event BEFORE the
-                        // back dispatcher, which is why this branch -- an
-                        // ancestor of everything drawn inside the group --
-                        // is what actually ran when the user pressed BACK
-                        // inside "Stores and folders", and drilled all the
-                        // way out to the carousel (rig, build 548). The
-                        // guard at the top of this handler is what stops
-                        // it answering for a screen above it now.
-                        nav.back()
-                        true
-                    }
-                    // ES-DE's real, documented "General navigation" convention:
-                    // Left/Right inside a gamelist jumps directly to the
-                    // adjacent system's gamelist rather than requiring a
-                    // Back-then-reselect round trip through the system list.
-                    // The SHOULDERS used to quick-system-select here too;
-                    // real bug this fixes (owner, 2026-09-27): "Left and
-                    // right arrows in game menus should switch consoles
-                    // just like they do on the main screen. L1 and R1 are
-                    // for menu switching" -- the shoulders now mean the
-                    // same thing everywhere (switch section/tab, never
-                    // switch system), so this branch is gone and L/R
-                    // simply falls through to `else -> false` below,
-                    // bubbling to GamepadShell's own top-level handler.
-                    // Gamelist options (sort/scrape/import) right where
-                    // the user is -- the ES-DE GuiGamelistOptions
-                    // PATTERN in droidtop's own placement (short-press
-                    // Select, which had no gamelist meaning; the Quick
-                    // Menu stays on hold/R2).
-                    // Select opens options for WHERE YOU ARE: a system's
-                    // gamelist gets sort/scrape/import, the carousel gets
-                    // the library-wide actions.
-                    action == GamepadAction.SELECT && isUp -> {
+                val headless = group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget &&
+                    systemGamesForGroup.isNotEmpty()
+                when (press.action) {
+                    // Gamelist options (sort/scrape/import) right where the
+                    // user is -- the ES-DE GuiGamelistOptions PATTERN in
+                    // droidtop's own placement (Select; the Quick Menu is R2
+                    // or a held Select). A system's gamelist gets sort/
+                    // scrape/import, the carousel the library-wide actions.
+                    GamepadAction.SELECT -> {
                         gamelistOptionsOpen = true
                         true
                     }
-                    action == GamepadAction.LEFT && group != null && orderedGroups.size > 1 ->
-                        handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) {
-                            // Real ES-DE quicksysselect sound -- this jump
-                            // IS real ES-DE's quick system select
-                            // (ViewController.cpp:718/728, the only two
-                            // QUICKSYSSELECTSOUND call sites, both in its
-                            // Left/Right system jump).
-                            EsDeNavigationSounds.play("quicksysselect")
-                            val index = orderedGroups.indexOf(group)
-                            selectGroup(orderedGroups[(index - 1 + orderedGroups.size) % orderedGroups.size])
-                        }
-                    action == GamepadAction.RIGHT && group != null && orderedGroups.size > 1 ->
-                        handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) {
-                            EsDeNavigationSounds.play("quicksysselect")
-                            val index = orderedGroups.indexOf(group)
-                            selectGroup(orderedGroups[(index + 1) % orderedGroups.size])
-                        }
-                    // Real, headless per-game navigation -- only when the
-                    // active theme's gamelist view has no on-screen list
-                    // widget of its own to own D-pad focus (a widget owns
-                    // Up/Down/A itself via real Compose focus movement +
-                    // EsDeListItem.onSelect, exactly like the system-list
-                    // screen). Real ES-DE's own Left/Right-switches-
-                    // sibling-system convention above already owns
-                    // Left/Right regardless, so there's no conflict either
-                    // way.
-                    action == GamepadAction.UP && group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() ->
-                        handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) {
-                            // Real ES-DE scroll sound -- per-game movement
-                            // inside a gamelist plays SCROLLSOUND (GamelistBase.
-                            // cpp:133/174/182 and every primary component when
-                            // hosted in a gamelist, CarouselComponent.h:105-108).
-                            // Clamped, not wrapped (Droidtop/tracker#1): real
-                            // ES-DE builds a textlist with
-                            // ListLoopType::LIST_PAUSE_AT_END (see
-                            // EsDeTextList's own `step`, EsDeSystemListView.kt),
-                            // so a themeless/widgetless gamelist -- this
-                            // headless path -- must answer the same way. The
-                            // old `% size` wraparound jumped straight to the
-                            // last game on an Up press at the first row, which
-                            // read exactly like "Up escaped the list" even
-                            // though focus itself never left it.
-                            EsDeNavigationSounds.play("scroll")
-                            focusedGameIndex = (focusedGameIndex - 1).coerceAtLeast(0)
-                            android.util.Log.d("droidtop.input", "GamesSection.headless up index=$focusedGameIndex")
-                        }
-                    action == GamepadAction.DOWN && group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() ->
-                        handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) {
-                            EsDeNavigationSounds.play("scroll")
-                            focusedGameIndex = (focusedGameIndex + 1).coerceAtMost(systemGamesForGroup.size - 1)
-                            android.util.Log.d("droidtop.input", "GamesSection.headless down index=$focusedGameIndex")
-                        }
-                    action == GamepadAction.A && group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget && isUp -> {
-                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onLaunch(it) } != null
+                    // ES-DE's "General navigation": Left/Right inside a
+                    // gamelist jumps to the adjacent system's gamelist, with
+                    // ES-DE's quicksysselect sound (ViewController.cpp:718/
+                    // 728). The shoulders mean switch section everywhere
+                    // (owner, 2026-09-27), so they fall through to the root.
+                    GamepadAction.LEFT, GamepadAction.RIGHT -> {
+                        if (group == null || orderedGroups.size <= 1) return@onPad false
+                        EsDeNavigationSounds.play("quicksysselect")
+                        val index = orderedGroups.indexOf(group)
+                        val step = if (press.action == GamepadAction.LEFT) -1 else 1
+                        selectGroup(orderedGroups[(index + step + orderedGroups.size) % orderedGroups.size])
+                        true
                     }
-                    // Y/Info applies regardless of widget presence -- a
-                    // real, useful action either way, not specific to the
-                    // headless case. For a PC/engine game there is no
-                    // separate "Info" any more (the theme's own metadata
-                    // elements show it while browsing): Y opens the same
-                    // in-context "Game options" menu L2 does, so a player
-                    // who does not know the L2 convention still finds it.
-                    action == GamepadAction.Y && group != null && group !is GameGroup.Pc && themed && isUp -> {
+                    // Headless per-game navigation, only when the theme's
+                    // gamelist has no list widget of its own to own the
+                    // cursor. Clamped (tracker#1): ES-DE's textlist pauses
+                    // at its ends, and wrapping here read as "Up escaped the
+                    // list". ES-DE's scroll sound (GamelistBase.cpp:133).
+                    GamepadAction.UP, GamepadAction.DOWN -> {
+                        if (!headless) return@onPad false
+                        val next = (focusedGameIndex + if (press.action == GamepadAction.UP) -1 else 1)
+                            .coerceIn(0, systemGamesForGroup.size - 1)
+                        if (next != focusedGameIndex) EsDeNavigationSounds.play("scroll")
+                        focusedGameIndex = next
+                        true
+                    }
+                    GamepadAction.A -> headless && systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onLaunch(it) } != null
+                    // Y/Info, with or without a list widget. A PC/engine
+                    // game has no separate Info: its L2 menu is the place.
+                    GamepadAction.Y -> group != null && group !is GameGroup.Pc && themed &&
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onShowDetail(it) } != null
-                    }
-                    // X/favorite-toggle applies regardless of widget
-                    // presence, same reasoning as Y/Info above.
-                    action == GamepadAction.X && group != null && themed && isUp -> {
+                    // X/favourite, with or without a list widget.
+                    GamepadAction.X -> group != null && themed &&
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onToggleFavorite(it) } != null
-                    }
                     // L2: PC's own "Game options" menu (docs/SPEC.md 7i,
-                    // owner direction 2026-09-26) -- runner/Wine settings,
-                    // ProtonDB, the Lutris import, the F95 link, merge and
-                    // versions/segments, none of which the ES-DE element
-                    // schema has a slot for. Unclaimed everywhere else in
-                    // the shell (R2 is the Quick Menu's own hold-to-open),
-                    // so this is the one place it means anything.
-                    action == GamepadAction.L2 && group is GameGroup.Pc && systemGamesForGroup.isNotEmpty() && isUp -> {
+                    // owner direction 2026-09-26); the one place it means
+                    // anything.
+                    GamepadAction.L2 -> group is GameGroup.Pc && systemGamesForGroup.isNotEmpty() &&
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { pcMenuEntry = it } != null
-                    }
                     else -> false
                 }
             },
@@ -3067,26 +2964,16 @@ private fun GamesSection(
                         // `ShoulderGlyph`) remain the section route and
                         // never route through focus.
                         modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding)
-                            .onKeyEvent { event ->
-                                val direction = when (GamepadKeyMap.actionFor(event.key)) {
-                                    GamepadAction.UP -> FocusDirection.Up
-                                    GamepadAction.DOWN -> FocusDirection.Down
-                                    GamepadAction.LEFT -> FocusDirection.Left
-                                    GamepadAction.RIGHT -> FocusDirection.Right
-                                    else -> null
-                                } ?: return@onKeyEvent false
-                                // Both edges of a direction are this grid's
-                                // (GridPad); the DOWN edge moves, repeats
-                                // included (Droidtop/tracker#1,
-                                // handleGamepadKeyDown's own doc comment).
-                                // At an edge it answers false and Left/
-                                // Right reach the switch-system handler
-                                // above; canMove is pure (GridPad's own
-                                // doc comment) so the UP edge can answer
-                                // the identical true/false without moving
-                                // a second card.
-                                handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, pad.canMove(direction)) {
+                            .onPad { press ->
+                                val direction = gridDirection(press.action) ?: return@onPad false
+                                // One card per step (GridPad); at an edge
+                                // it answers false and Left/Right reach the
+                                // switch-system handler above.
+                                if (pad.canMove(direction)) {
                                     pad.move(direction)
+                                    true
+                                } else {
+                                    false
                                 }
                             },
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -3260,9 +3147,8 @@ private fun AppIconTile(
                 if (it.isFocused) onFocused()
             }
             // Ahead of the focus targets, not after them: see [GameCard].
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                when (GamepadKeyMap.actionFor(event.key)) {
+            .onPad { press ->
+                when (press.action) {
                     GamepadAction.A -> {
                         onLaunch()
                         true
@@ -3466,9 +3352,8 @@ internal fun GameCard(
             // a click, so A looked like it worked while X, Y and
             // every hint-bar tap -- a direct dispatchKeyEvent, which
             // gets no fallback -- did nothing (rig, build 548).
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                when (GamepadKeyMap.actionFor(event.key)) {
+            .onPad { press ->
+                when (press.action) {
                     GamepadAction.A -> {
                         onLaunch()
                         true

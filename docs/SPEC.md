@@ -9265,20 +9265,25 @@ pad.
 **The shell owns the pad; Android's generic fallbacks never act on it.**
 `Generic.kcm` gives every pad button a fallback key (A, Start and the thumb
 clicks become DPAD_CENTER, B becomes BACK, X DEL, Y SPACE, Select MENU),
-dispatched on both edges whenever the window leaves the button unhandled.
-Every screen here acts on the UP edge, so the unhandled DOWN of A on a card
-became a DPAD_CENTER pair that pressed the primary button of the detail the
-A had just opened (build 552). The outermost node of every window
-(`Modifier.ownPadButtons`: the shell's root, the Quick Menu's dialog)
-consumes only the one fallback the shell means — B is Back — and gives B
-its one meaning explicitly, the back dispatcher. Other gamepad buttons are
-not consumed at the root; they either reach the focused element (which
-handles A via `padSelectable`) or fall through to Android's default
-handling, exactly like a physical pad press. A `BackHandler` is therefore a
+dispatched whenever the window leaves the button's press unhandled. When
+screens acted on the release, the unhandled press of A on a card became a
+DPAD_CENTER that pressed the primary button of the detail the A had just
+opened (build 552); every screen now acts on the press through
+`Modifier.onPad` (§6e), which also ignores fallback keys, so a press a
+screen takes produces no fallback at all. The outermost node of every
+window (`Modifier.ownPadButtons`: the shell's root, the Launcher's games
+screen, onboarding) gives B its one meaning explicitly, the back
+dispatcher, and takes X, Y and Select whatever nothing below wanted, so
+their fallbacks never type a DEL or a space into a text field or open a
+menu. A is left to Android: a focused control that does not take the pad's
+A itself still answers its DPAD_CENTER. A `BackHandler` is therefore a
 complete answer to B for pad and touch alike -- a hint pill dispatches a
 real `BUTTON_B` into the window and it arrives at the root exactly as a
-pad's does -- and a screen with nothing focusable (an empty list) must have
-one. D-pad, keyboard and volume keys are not pad buttons and pass through.
+pad's does -- and the system back key, which no key handler takes, reaches
+the same `BackHandler`. A screen opened on top of another (an editor, a
+picker) registers its own `BackHandler`, so both routes leave that screen
+and not the one under it. D-pad, keyboard and volume keys are not pad
+buttons and pass through.
 
 **That block goes AHEAD of the element's focus targets in the modifier
 chain, never behind them.** Compose dispatches a key event to the
