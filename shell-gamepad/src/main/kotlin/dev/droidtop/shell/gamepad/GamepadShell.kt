@@ -2016,6 +2016,10 @@ private fun GamesSection(
     // detail screen: the PC surface's separate full-screen detail is
     // gone, along with its own back-stack level.
     var pcMenuEntry by remember { mutableStateOf<LibraryEntry?>(null) }
+    // The PC game whose own page is open (Y or a long-press on its card,
+    // docs/SPEC.md 7i): by id, so the page always draws the live entry
+    // (a favourite toggled on it shows at once), never a stale copy.
+    var pcPageId by remember { mutableStateOf<String?>(null) }
     // The PC group's own filter/sort/search state now lives inside
     // PcLibraryContent itself (dev.droidtop.shell.gamepad.query.
     // LibraryQuery, docs/SPEC.md 7i, redecided 2026-09-28) -- persisted
@@ -2246,11 +2250,27 @@ private fun GamesSection(
     // screen. Its own runner picker/Wine settings/media viewer/collection
     // editor sub-dialogs replace it exactly the way they used to replace
     // the old full-screen detail (PcGameMenu's own doc comment).
+    entries.firstOrNull { it.id == pcPageId }?.let { pageEntry ->
+        dev.droidtop.shell.gamepad.pc.PcGamePage(
+            entry = pageEntry,
+            plateColor = remember(GameGroup.Pc.themeFolder) {
+                dev.droidtop.library.theme.SystemThemeColors.forSystem(context, dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID)
+                    ?.let { Color(it) }
+            },
+            onPlay = { onLaunch(pageEntry) },
+            onToggleFavorite = { onToggleFavorite(pageEntry) },
+            onOpenOptions = { pcMenuEntry = pageEntry },
+            onClose = { pcPageId = null },
+        )
+    }
     pcMenuEntry?.let { menuEntry ->
         dev.droidtop.shell.gamepad.pc.PcGameMenu(
             entry = menuEntry,
             library = library,
-            onLaunch = { onLaunch(menuEntry) },
+            onLaunch = {
+                pcPageId = null
+                onLaunch(menuEntry)
+            },
             onClose = { pcMenuEntry = null },
             // Every PC/engine game the shell has, so this menu can offer
             // the other folders of the same game (docs/SPEC.md 7m).
@@ -3031,8 +3051,9 @@ private fun GamesSection(
                     val gameUnderCursor = systemGamesForGroup.isNotEmpty()
                     val pcHints = rememberHintList(
                         listOf(
-                            HintBinding(GamepadAction.A, "Launch") { gameUnderCursor },
-                            HintBinding(GamepadAction.L2, "Game options") { gameUnderCursor },
+                            HintBinding(GamepadAction.A, "Play") { gameUnderCursor },
+                            HintBinding(GamepadAction.Y, "Game page") { gameUnderCursor },
+                            HintBinding(GamepadAction.L2, "Options") { gameUnderCursor },
                             HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
                             HintBinding(GamepadAction.B, "Back"),
                         )
@@ -3084,7 +3105,7 @@ private fun GamesSection(
                                 },
                                 onLaunch = onLaunch,
                                 onToggleFavorite = onToggleFavorite,
-                                onOpenMenu = { pcMenuEntry = it },
+                                onOpenPage = { pcPageId = it.id },
                                 firstFocus = firstFocus,
                                 plateColor = plateColor,
                                 modifier = Modifier.fillMaxSize(),

@@ -54,71 +54,6 @@ import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/**
- * The chips row every library list leads with (docs/SPEC.md 7i): the
- * built-in section views and the person's own saved views, then the sort
- * and the way into the filter and search dialogs, then every active
- * selection as its own clearable chip. Tapping an active chip turns that
- * one filter off; nothing is buried behind a dialog that a chip could
- * have shown.
- *
- * One row, horizontally scrollable, for the same reason the PC surface's
- * old chip row was: a row that outgrows the width scrolls rather than
- * clipping, because a filter that runs off the edge is a filter the user
- * cannot turn off again.
- */
-@Composable
-internal fun LibraryQueryChips(
-    scope: LibraryQueryScope,
-    base: List<LibraryEntry>,
-    query: LibraryQuery,
-    onQueryChange: (LibraryQuery) -> Unit,
-    views: List<NamedLibraryView>,
-    onActivateView: (NamedLibraryView) -> Unit,
-    onOpenFilters: () -> Unit,
-    onOpenSearch: () -> Unit,
-    firstChipFocus: FocusRequester,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        views.forEachIndexed { index, view ->
-            ShellChip(
-                view.name,
-                // The chip row is entered at its start (the first view),
-                // never at whichever chip sits nearest the grid card the
-                // user came up from.
-                modifier = if (index == 0) Modifier.focusRequester(firstChipFocus) else Modifier,
-                on = view.query == query,
-                onClick = { onActivateView(view) },
-            )
-        }
-        ShellChip("Sort: ${query.sort.label}", onClick = {
-            val offered = scope.sorts
-            val next = offered[(offered.indexOf(query.sort) + 1) % offered.size]
-            onQueryChange(query.copy(sort = next))
-        })
-        ShellChip("Filters", onClick = onOpenFilters)
-        ShellChip("Search", onClick = onOpenSearch)
-        // The active search, clearable like every other active filter.
-        query.text.takeIf { it.isNotBlank() }?.let { text ->
-            ShellChip("Search: \"$text\"", on = true, onClick = { onQueryChange(query.copy(text = "")) })
-        }
-        scope.facets.forEach { facet ->
-            query.selected(facet).forEach { value ->
-                ShellChip(value, on = true, onClick = {
-                    onQueryChange(query.withToggled(facet, value, on = false))
-                })
-            }
-        }
-    }
-}
-
 /** One flattened row of the filter dialog: a section marker or a selectable row. */
 private sealed interface FilterEntry {
     data class Header(val text: String) : FilterEntry
@@ -148,6 +83,7 @@ internal fun LibraryFilterDialog(
     onQueryChange: (LibraryQuery) -> Unit,
     onSaveView: (String) -> Unit,
     onForgetView: (String) -> Unit,
+    onSearch: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var focusIndex by remember { mutableIntStateOf(0) }
@@ -162,6 +98,7 @@ internal fun LibraryFilterDialog(
                     onQueryChange(query.copy(sort = next))
                 },
             )
+            add(FilterEntry.Row("Search", value = query.text.takeIf { it.isNotBlank() }?.let { "\"$it\"" }, onClick = onSearch))
             scope.facets.forEach { facet ->
                 val values = facet.valuesIn(base, scope.context)
                 // A facet with no values in this list is not offered here:
@@ -179,7 +116,7 @@ internal fun LibraryFilterDialog(
                 }
             }
             if (savedViews.isNotEmpty()) {
-                add(FilterEntry.Header("Saved views"))
+                add(FilterEntry.Header("Views"))
                 savedViews.forEach { view ->
                     add(
                         FilterEntry.Row(
@@ -209,7 +146,7 @@ internal fun LibraryFilterDialog(
     if (naming) {
         TextEditDialog(
             title = "Save this view",
-            subtitle = "The filters, the search and the sort as they are now, as one chip on the row",
+            subtitle = "The filters, the search and the sort as they are now, as one view in this list",
             initial = query.text.takeIf { it.isNotBlank() } ?: "",
             onCommit = { name ->
                 naming = false

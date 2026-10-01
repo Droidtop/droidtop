@@ -1,8 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
@@ -39,15 +39,13 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.library.PcRunnerOptions
-import dev.droidtop.library.ResolvedRunner
-import dev.droidtop.library.scraper.FieldSources
+import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.GameCard
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.input.handleGamepadKeyDown
@@ -58,7 +56,6 @@ import dev.droidtop.shell.gamepad.query.INSTALLED_YES
 import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryFilterDialog
 import dev.droidtop.shell.gamepad.query.LibraryQuery
-import dev.droidtop.shell.gamepad.query.LibraryQueryChips
 import dev.droidtop.shell.gamepad.query.LibraryQueryScope
 import dev.droidtop.shell.gamepad.query.LibrarySearchDialog
 import dev.droidtop.shell.gamepad.query.LibrarySortKey
@@ -67,8 +64,6 @@ import dev.droidtop.shell.gamepad.query.NamedLibraryView
 import dev.droidtop.shell.gamepad.query.RECENT_YES
 import dev.droidtop.shell.gamepad.rememberGridPad
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * The PC group's own content, drawn over the active theme's FRAME ONLY
@@ -103,11 +98,11 @@ internal fun PcLibraryContent(
     onFocusEntry: (LibraryEntry) -> Unit,
     onLaunch: (LibraryEntry) -> Unit,
     onToggleFavorite: (LibraryEntry) -> Unit,
-    // Y and long-press (GameCard's own onShowDetail) open the same
-    // in-context "Game options" menu L2 does (docs/SPEC.md 7i): a player
-    // who has not learned the L2 convention still finds it, the same as
-    // every other GameCard-based grid's Y opens ITS detail screen.
-    onOpenMenu: (LibraryEntry) -> Unit,
+    // Y and long-press (GameCard's own onShowDetail) open the game's own
+    // page ([PcGamePage], docs/SPEC.md 7i), the same as every other
+    // GameCard-based grid's Y opens ITS detail screen. L2 (the short
+    // [PcGameMenu]) is bound at the shell, not here.
+    onOpenPage: (LibraryEntry) -> Unit,
     firstFocus: FocusRequester,
     plateColor: Color?,
     modifier: Modifier = Modifier,
@@ -167,22 +162,25 @@ internal fun PcLibraryContent(
     var searchOpen by remember { mutableStateOf(false) }
     val filtered = remember(entries, query, scope) { query.applyTo(entries, scope) }
     val chipFocus = remember { FocusRequester() }
+    val pad = rememberGridPad()
 
     Column(modifier = modifier.fillMaxSize()) {
-        LibraryQueryChips(
-            scope = scope,
-            base = entries,
-            query = query,
-            onQueryChange = { query = it },
-            views = builtInViews + savedViews,
-            onActivateView = { query = it.query },
-            onOpenFilters = { filterOpen = true },
-            onOpenSearch = { searchOpen = true },
-            firstChipFocus = chipFocus,
+        // ONE button in front of the grid (docs/SPEC.md 7i): the current
+        // shelf, sort and search in words, and A opens the one filter
+        // dialog. A single target needs no Left/Right of its own (those
+        // keep switching the system), the dialog is already a D-pad menu,
+        // and Up from it is cancelled so the tab bar is never reached.
+        Row(
             modifier = Modifier
                 .background(MenuTokens.Scrim, RoundedCornerShape(10.dp))
                 .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
-        )
+        ) {
+            ShellChip(
+                browseLabel(query, builtInViews + savedViews, filtered.size),
+                modifier = Modifier.focusRequester(chipFocus).focusProperties { up = FocusRequester.Cancel },
+                onClick = { filterOpen = true },
+            )
+        }
         Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
             Box(modifier = Modifier.weight(0.62f).fillMaxHeight()) {
                 if (filtered.isEmpty()) {
@@ -192,8 +190,9 @@ internal fun PcLibraryContent(
                         modifier = Modifier.align(Alignment.Center),
                     )
                 } else {
-                    val pad = rememberGridPad()
-                    LaunchedEffect(filtered) { requestFocusWhenAttached(firstFocus, "PC library grid") }
+                    // Focus lands on the grid when it first appears, never on
+                    // a filter change: the Browse button is a D-pad target.
+                    LaunchedEffect(Unit) { requestFocusWhenAttached(firstFocus, "PC library grid") }
                     LazyVerticalGrid(
                         state = pad.state,
                         columns = GridCells.Adaptive(minSize = 150.dp),
@@ -206,12 +205,12 @@ internal fun PcLibraryContent(
                         // own unthemed grid: the UP key edge moves one card,
                         // Left/Right bubble to the sibling-system switcher
                         // at the grid's own edge (docs/SPEC.md 7j/7k -- never
-                        // the other way), and Up at the top row is answered
-                        // true and left there rather than escaping onto the
-                        // chip row, which has no D-pad route of its own
-                        // (reached by touch only, same as every other
-                        // droidtop-drawn chip row in this shell).
+                        // the other way). Up at the top row is NOT answered
+                        // here: it falls through to Compose's own focus
+                        // search, which the focusProperties below point at
+                        // the Browse button just above the grid.
                         modifier = Modifier.fillMaxSize()
+                            .focusProperties { if (pad.onTopRow) up = chipFocus }
                             .onKeyEvent { event ->
                                 val direction = when (GamepadKeyMap.actionFor(event.key)) {
                                     GamepadAction.UP -> FocusDirection.Up
@@ -225,7 +224,7 @@ internal fun PcLibraryContent(
                                 // (GridPad's own doc comment) so the UP
                                 // edge answers the same true/false without
                                 // moving a second card.
-                                handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, pad.canMove(direction) || direction == FocusDirection.Up) {
+                                handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, pad.canMove(direction)) {
                                     pad.move(direction)
                                 }
                             },
@@ -239,7 +238,7 @@ internal fun PcLibraryContent(
                                     .focusRequester(pad.requester(index))
                                     .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier),
                                 onLaunch = { onLaunch(entry) },
-                                onShowDetail = { onOpenMenu(entry) },
+                                onShowDetail = { onOpenPage(entry) },
                                 onFocused = {
                                     pad.focused = index
                                     onFocusEntry(entry)
@@ -254,6 +253,7 @@ internal fun PcLibraryContent(
             FocusedGamePanel(
                 entry = focused,
                 plateColor = plateColor,
+                onLaunch = onLaunch,
                 modifier = Modifier.weight(0.38f).fillMaxHeight()
                     .padding(start = 12.dp, end = LocalShellWindow.current.edgePadding, top = 4.dp, bottom = MenuTokens.HintBarRoom),
             )
@@ -264,8 +264,12 @@ internal fun PcLibraryContent(
             scope = scope,
             base = entries,
             query = query,
-            savedViews = savedViews,
+            savedViews = builtInViews + savedViews,
             onQueryChange = { query = it },
+            onSearch = {
+                filterOpen = false
+                searchOpen = true
+            },
             onSaveView = { name ->
                 LibraryViewPrefs.saveView(context, scope.id, NamedLibraryView(name, query))
                 savedViews = LibraryViewPrefs.savedViews(context, scope.id)
@@ -297,23 +301,22 @@ internal fun PcLibraryContent(
 }
 
 /**
- * The focused game's own facts the theme's element schema has no slot
- * for and this pass's frame-only render therefore drops from the theme's
- * canvas entirely: hero art, the scraped logo, the "About this game"
- * facts and the line saying where each field came from (docs/SPEC.md 7h),
- * playtime, the resolved runner, the source/store, update state and
- * ProtonDB. Read-only -- every real action on this game (the runner
- * picker, Wine settings, the Lutris import, ProtonDB's own live ask, the
- * links as rows) stays on [PcGameMenu] (L2/Y), which this panel names as
- * where to find them rather than duplicating them.
+ * The focused game, Steam-style: its art, its name, the one big button A
+ * will press (Play, or the setup step that makes it Play,
+ * [PcPlayState]), and a few facts. Read-only and short enough to never
+ * overflow -- the full description, the about facts, where each came
+ * from and the game's own actions are on its page ([PcGamePage], Y) and
+ * in [PcGameMenu] (L2); nothing here is left for a finger to scroll.
+ * The button is a touch target too: a tap on it is A.
  */
 @Composable
-private fun FocusedGamePanel(entry: LibraryEntry?, plateColor: Color?, modifier: Modifier = Modifier) {
-    // Touch-scrollable because the restored About section can make the
-    // facts taller than the panel on a handheld screen; the panel is
-    // never in the D-pad's route (the grid owns it), so the scroll is a
-    // finger's, not a thumbstick's.
-    Column(modifier = modifier.verticalScroll(rememberScrollState())) {
+private fun FocusedGamePanel(
+    entry: LibraryEntry?,
+    plateColor: Color?,
+    onLaunch: (LibraryEntry) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
         if (entry == null) {
             Text("Select a game", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             return
@@ -327,7 +330,7 @@ private fun FocusedGamePanel(entry: LibraryEntry?, plateColor: Color?, modifier:
                 AsyncImage(model = art, contentDescription = null, modifier = Modifier.fillMaxSize())
             } else {
                 Text(
-                    dev.droidtop.library.GameNaming.displayName(entry.title),
+                    GameNaming.displayName(entry.title),
                     color = MenuTokens.OnSurface,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 3,
@@ -336,154 +339,72 @@ private fun FocusedGamePanel(entry: LibraryEntry?, plateColor: Color?, modifier:
                 )
             }
         }
-        val title = dev.droidtop.library.GameNaming.displayName(entry.title)
-        // The scraped logo names the game in its own lettering in place
-        // of the title text (docs/SPEC.md 7h), as the retired detail
-        // page did; the text answers for a game with no logo and for one
-        // whose logo failed to load. [logoUri] is the in-memory
-        // metadata-row field (a store install; a folder game's marquee
-        // lives in its layout, which this panel never reads), so this
-        // costs no IO.
-        var logoFailed by remember(entry.logoUri) { mutableStateOf(false) }
-        val logo = entry.logoUri
-        if (logo != null && !logoFailed) {
-            AsyncImage(
-                model = logo,
-                contentDescription = title,
-                contentScale = ContentScale.Fit,
-                alignment = Alignment.BottomStart,
-                onError = { logoFailed = true },
-                modifier = Modifier.padding(top = 12.dp).fillMaxWidth(0.8f).height(48.dp),
-            )
-        } else {
+        Text(
+            GameNaming.displayName(entry.title),
+            color = MenuTokens.OnSurface,
+            style = MaterialTheme.typography.titleLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+        val (play, runner) = rememberPcPlayState(entry)
+        val shape = RoundedCornerShape(12.dp)
+        Column(
+            modifier = Modifier.padding(top = 10.dp).fillMaxWidth()
+                .focusProperties { canFocus = false }
+                .clickable(enabled = play.pressable) { onLaunch(entry) }
+                .background(if (play.pressable) MenuTokens.Launch else MenuTokens.LaunchDisabled, shape)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
             Text(
-                title,
-                color = MenuTokens.OnSurface,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 2,
+                play.verb,
+                color = if (play.pressable) MenuTokens.OnSurface else MenuTokens.OnSurfaceDisabled,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 12.dp),
             )
-        }
-        // "About this game" (docs/SPEC.md 7h): the scraped flavour plus
-        // the one line saying where each field came from, all in-memory
-        // [LibraryEntry] data (aboutFacts/sourcesLine below). Restored
-        // here when 444271f2 deleted PcGameAbout.kt's full-screen detail:
-        // after the frame-only redecision this panel is the one surface
-        // that draws a PC game's own facts, so without it the field-source
-        // record protected a person's edits without ever being shown. The
-        // game's own hide-metadata flag hides the whole section, the same
-        // ES-DE semantic that hides a ROM's md_ fields on the theme's
-        // canvas.
-        if (!entry.hideMetadata) {
-            val facts = aboutFacts(entry)
-            val sources = sourcesLine(entry)
-            if (!entry.description.isNullOrBlank() || facts.isNotEmpty() || sources != null) {
+            if (play.detail.isNotBlank()) {
                 Text(
-                    "About this game",
-                    color = MenuTokens.SectionLabel,
+                    play.detail,
+                    color = if (play.pressable) MenuTokens.OnLaunchMuted else MenuTokens.OnSurfaceDisabled,
                     style = MaterialTheme.typography.labelSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (!entry.hideMetadata) {
+            entry.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                Text(
+                    desc,
+                    color = MenuTokens.OnSurfaceMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 10.dp),
                 )
-                entry.description?.takeIf { it.isNotBlank() }?.let { desc ->
-                    Text(
-                        desc,
-                        color = MenuTokens.OnSurfaceMuted,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 5,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-                facts.forEach { (label, value) -> PanelFact(label, value) }
-                sources?.let { line ->
-                    Text(
-                        line,
-                        color = MenuTokens.OnSurfaceDisabled,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
             }
         }
-        val context = LocalContext.current
-        val runner by produceState<ResolvedRunner?>(null, entry.id) {
-            value = null
-            value = withContext(Dispatchers.IO) {
-                val runners = PcRunnerOptions.forEntry(context, entry)
-                PcRunnerOptions.resolvedFor(context, entry, runners)
-            }
-        }
-        PanelFact("Runner", runner?.let { "${it.label} — ${it.reason}" } ?: "Working out what can run this…")
+        PanelFact("Runs with", runner?.let { "${it.label} - ${it.reason}" }.orEmpty())
         PanelFact("Source", entry.sourceLabel())
         if (entry.playtimeSeconds > 0) PanelFact("Played", "${entry.playtimeSeconds / 60} min")
         entry.availableUpdate?.let { PanelFact("Update", "$it available") }
-        // ProtonDB is asked for, never fetched automatically (docs/SPEC.md
-        // 7i: "compatibility is evidence, never a verdict and never a
-        // gate" -- looked up only when the person asks, on PcGameMenu).
-        if (entry.pcInfo?.source == "Steam") PanelFact("ProtonDB", "See Game options (L2)")
     }
 }
 
 @Composable
 private fun PanelFact(label: String, value: String) {
+    if (value.isBlank()) return
     Row(modifier = Modifier.padding(top = 6.dp)) {
         Text(label, color = MenuTokens.SectionLabel, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(end = 6.dp))
         Text(value, color = MenuTokens.Value, style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
-/**
- * The labelled "About this game" facts, in the order a store page lists
- * them; only the ones that exist. Restored from the PcGameAbout.kt
- * 444271f2 deleted, for [FocusedGamePanel] to draw (docs/SPEC.md 7h).
- */
-internal fun aboutFacts(entry: LibraryEntry): List<Pair<String, String>> = listOfNotNull(
-    entry.developer?.let { "Developer" to it },
-    entry.publisher?.let { "Publisher" to it },
-    entry.releaseDate?.let { formatReleaseDate(it) }?.let { "Released" to it },
-    entry.genre?.let { "Genre" to it },
-    entry.series?.let { "Series" to it },
-    // ES-DE's 0-1 rating, shown on the five-star scale ES-DE draws it on.
-    entry.rating?.let { "Rating" to String.format(java.util.Locale.US, "%.1f / 5", it * 5) },
-)
-
-/**
- * ES-DE's `YYYYMMDDT000000` as a date a person reads, in their locale;
- * null for anything that is not a full date (nothing here widens a year
- * into a day).
- */
-internal fun formatReleaseDate(raw: String): String? {
-    val parsed = runCatching {
-        java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).apply {
-            isLenient = false
-            timeZone = java.util.TimeZone.getTimeZone("UTC")
-        }.parse(raw.take(8))
-    }.getOrNull() ?: return null
-    return java.text.DateFormat.getDateInstance(java.text.DateFormat.LONG).apply {
-        timeZone = java.util.TimeZone.getTimeZone("UTC")
-    }.format(parsed)
-}
-
-/**
- * "Description from IGDB. Cover and hero art from SteamGridDB." -- each
- * source once, with the fields it gave, in the order the fields are
- * listed ([FieldSources.LABELS]); "you" for what the metadata editor
- * changed. Null when nothing recorded a source. The one line docs/
- * SPEC.md 7h promises, read straight out of
- * [LibraryEntry.fieldSources] with no state of its own: it is how a
- * person sees where each field came from, which is also how they can
- * see what a rescrape is not allowed to take from them.
- */
-internal fun sourcesLine(entry: LibraryEntry): String? {
-    if (entry.fieldSources.isEmpty()) return null
-    val order = FieldSources.LABELS.keys.toList()
-    val bySource = entry.fieldSources.entries
-        .sortedBy { order.indexOf(it.key).let { i -> if (i < 0) Int.MAX_VALUE else i } }
-        .groupBy({ it.value }, { FieldSources.LABELS[it.key] ?: it.key })
-    return bySource.entries.joinToString(" ") { (source, fields) ->
-        val list = fields.mapIndexed { i, field -> if (i == 0) field else field.lowercase() }
-        val joined = if (list.size == 1) list.single() else list.dropLast(1).joinToString(", ") + " and " + list.last()
-        if (source == FieldSources.EDITED) "$joined edited by you." else "$joined from $source."
-    }
-}
+/** The Browse button's words: the shelf, how many games it shows, the sort, and the search if there is one. */
+private fun browseLabel(query: LibraryQuery, views: List<NamedLibraryView>, shown: Int): String = buildList {
+    add(views.firstOrNull { it.query == query }?.name ?: "Custom view")
+    add(if (shown == 1) "1 game" else "$shown games")
+    add("Sort: ${query.sort.label}")
+    query.text.takeIf { it.isNotBlank() }?.let { add("\"$it\"") }
+}.joinToString(" · ")

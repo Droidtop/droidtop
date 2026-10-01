@@ -146,6 +146,8 @@ internal fun ShellChip(
     modifier: Modifier = Modifier,
     on: Boolean = false,
     primary: Boolean = false,
+    // The one big button of a page (the PC game page's Play).
+    large: Boolean = false,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -154,7 +156,7 @@ internal fun ShellChip(
     Text(
         if (on) "\u2713 $label" else label,
         color = if (filled) MenuTokens.OnSelected else MenuTokens.OnSurface,
-        style = MaterialTheme.typography.labelLarge,
+        style = if (large) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
         maxLines = 1,
         modifier = modifier
             // Ahead of the focus targets, not after them: see [GameCard].
@@ -180,7 +182,7 @@ internal fun ShellChip(
                     Modifier.selectionFrame(focused, shape)
                 },
             )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = if (large) 28.dp else 16.dp, vertical = if (large) 14.dp else 8.dp),
     )
 }
 

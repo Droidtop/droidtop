@@ -8526,7 +8526,10 @@ from this:
   substance.
   Since 2026-09-29 those rows are drawn under three section headers
   (Play, About, Fix and advanced; 13, "Gaming mode"), the same rows and actions,
-  filed by the question a player opening the menu is asking.
+  filed by the question a player opening the menu is asking. Since
+  2026-09-30 only the first of those is the menu's top page: About and
+  Fix and advanced are pages it opens (revision at the end of this
+  section's 2026-09-28 redecision, above).
 
 **PC is always visible (owner direction 2026-09-26: "PC should always be
 visible").** Unlike a console system, whose card only ever appears once
@@ -8589,14 +8592,16 @@ have for ArtBookNext is a terrible idea." Two changes from this:
   info stays "evidence, never a gate," so this panel never fetches it on its
   own). `PcGameMenu` (L2, and now Y/long-press through `GameCard`'s own
   binding) is unchanged: everything ES-DE has no slot for still lives there.
-- **Filter, sort and search are the one shared model, as clearable chips,
-  not the console Select-menu's "Sort"/"Show" rows.** `dev.droidtop.shell.
+- **Filter, sort and search are the one shared model (since 2026-09-30
+  behind one Browse button and the filter dialog, see the revision below;
+  first built as clearable chips), not the console Select-menu's
+  "Sort"/"Show" rows.** `dev.droidtop.shell.
   gamepad.query.LibraryQuery` (`LibraryQuery.kt`/`LibraryQueryUi.kt`) is a
   UI-free, Context-free search+filter+sort pass any list can use --
   `LibraryQueryScope` states which facets and sorts a list offers, `apply
-  To` filters then sorts, and `LibraryQueryChips`/`LibraryFilterDialog`/
-  `LibrarySearchDialog` are the one chip row, filter dialog and search
-  field. The PC library's own scope offers store, engine, install state,
+  To` filters then sorts, and `LibraryFilterDialog`/`LibrarySearchDialog`
+  are the one filter dialog and search field (the chip row,
+  `LibraryQueryChips`, was deleted 2026-09-30). The PC library's own scope offers store, engine, install state,
   favourites, played, recently played, genre, developer, year, update,
   missing art and hidden as facets (never runner/ready/ProtonDB -- those
   cost a folder walk or a network ask per entry, which this pass never
@@ -8614,6 +8619,72 @@ have for ArtBookNext is a terrible idea." Two changes from this:
 - **Console gamelists are untouched.** `LibraryQuery` is shared
   infrastructure, not wired into any console system's list in this pass --
   a real follow-up, not implemented here.
+
+**The PC library is a controller-first storefront view (owner, 2026-09-30,
+Droidtop/tracker#148): "the PC UI is still pretty broken. We probably need
+to redesign that tab specifically. There's an extra menu that I can't
+scroll through with button inputs, etc, and it's kinda terrible for a PC
+gaming UI."** The reference is Steam Big Picture and the Steam Deck
+library: a grid of art, a game page with one big Play or Install button,
+and a short menu of grouped actions. Reading the code found the "extra
+menu" and two more places where a pad had no way in: `PcGameMenu` was one
+flat list of up to two dozen rows (Runs with, Play, Install, F95, links,
+scrape, collections, favourite, ProtonDB, replacement, merge, engine,
+versions, the runner's settings), moved by a virtual cursor that acts on
+the key UP edge only (no repeat down a long list, and the unhandled down
+edge reaches Compose's own focus search); the filter chip row above the
+grid had no D-pad route at all (the grid answered Up at its top row, and a
+horizontal chip row cannot take Left/Right because those switch the
+system); and the focused-game panel scrolled by finger only. Not
+reproduced on a device from the session that made this change; the shape
+of the fix is that no part of the PC tab is a long list or a touch-only
+surface any more. What changed:
+
+- **A still plays, Y opens the game's own page, L2 the short menu.** A on a
+  card launches exactly as before (2026-09-26 decision above, unchanged:
+  `PcRunnerOptions.resolveAndPlay`). Y or a long-press opens `PcGamePage`
+  (`pc/PcGamePage.kt`), a full-bleed Dialog: art on the left; on the right
+  the name (or the scraped logo), ONE big primary button (Play, the one
+  setup step that makes it Play, or why it cannot, from `PcPlayState`),
+  Favourite and Options beside it, and under them the About facts and
+  where each came from, a column of focus targets the D-pad scrolls
+  through. The page has no key handling of its own: buttons and blocks
+  are real focus targets, so the pad's focus search moves between them, a
+  focused block scrolls itself into view, and B is the system Back.
+  `PcPlayState` (`pc/PcPlayState.kt`) is the ONE answer to "what does the
+  primary button say and can it be pressed", read by the library's hero
+  panel, the page and `PcGameMenu`'s first row.
+- **The focused-game panel is short and never scrolls.** Art, name, the
+  same big Play pill (a tap on it is A), the runner, source, play time
+  and update, and three lines of description; everything longer lives on
+  the page. The "About this game" facts and the field-source line moved
+  there with it (7h), unchanged.
+- **One Browse button replaces the chip row.** Sitting in front of the
+  grid, it states the current shelf, game count, sort and search; A opens
+  the filter dialog (`LibraryFilterDialog`), which now also carries the
+  built-in shelves (All games, Continue playing, Installed) beside the
+  person's saved views, and a Search row. Up from the top row of the grid
+  lands on it through the grid's `focusProperties` (not a key handler),
+  and Up from it is cancelled, so the tab bar is never reached (design
+  language: the D-pad never reaches the top bar). `LibraryQueryChips` is
+  deleted; "nothing is buried behind a dialog that a chip could have
+  shown" (2026-09-28) gave way to every control being reachable by pad,
+  because a horizontal chip row cannot take Left/Right.
+- **`PcGameMenu` is short.** The top page holds Play (or the setup step),
+  Runs with, Install/Manage install, Add to favourites, "Game info and
+  links" and "Fix and advanced" (the latter two only when they have
+  rows), and Close: at most nine rows. The two long lists, with the
+  rows they always had, are the pages those two rows open; B goes back to
+  the top page before it closes the menu. B is answered on both key edges
+  so the platform never turns it into a second Back.
+- **Input stays on the existing mechanisms.** Controller input is being
+  unified into one pipeline (Droidtop/tracker#152); this change adds no
+  new key handler beyond `PcGameMenu`'s existing virtual-cursor one
+  (adjusted for the pages) and uses standard focus (`focusProperties`,
+  focusable blocks, `ShellChip`) everywhere else, so there is little to
+  move. The swapped-confirm layout (`ControllerPrefs.swapConfirmCancel`)
+  is not honoured by the page's standard-focus A and B; that follows with
+  the pipeline.
 
 The original decision text below predates BOTH the 2026-09-26 and
 2026-09-28 revisions; where they disagree with it, the revisions above win.
@@ -12352,7 +12423,7 @@ deliberately, mode by mode, instead of letting the next surface reinvent it.
 ### Gaming mode
 
 **Today.** Real per §7f/§7i/§7j: themed carousel and gamelists, an
-expanded frame-only PC library view with `LibraryQuery` chips, `PcGameMenu`
+expanded frame-only PC library view with a `LibraryQuery` Browse button, a game page, `PcGameMenu`
 on L2/Y, Quick Menu with a Settings tile (`## One consistent way into
 Settings`, above), Start opening the Quick Menu.
 
@@ -12376,7 +12447,7 @@ Settings`, above), Start opening the Quick Menu.
   sit under three section headers — Play (Runs with, Play/Set up,
   Install/Manage install), About (Owned on, store links, the F95 thread
   and its update state, compatibility and ProtonDB, scrape/match/media/
-  collections/favourite), and Fix and advanced (the replacement fold,
+  collections; favourite moved to the top page 2026-09-30), and Fix and advanced (the replacement fold,
   same-game merge, the engine pin, versions/segments, and the runner's
   own settings rows) — drawn with the same `MenuSectionLabel`/`MenuRow`
   shell every other in-context menu uses, nothing new. ProtonDB landed
@@ -12390,7 +12461,10 @@ Settings`, above), Start opening the Quick Menu.
   was never confirmed on the rig: the 2026-09-28 walkthrough collapsed
   before reaching `PcGameMenu`, so the regrouping was cut from code alone
   and the rig item at this section's end is what says whether it reads
-  right.
+  right. Since 2026-09-30 About and Fix and advanced are sub-pages of a
+  short top page (7i, "The PC library is a controller-first storefront
+  view"), so no single screen of the menu is longer than about nine
+  rows.
 
 **v2 direction:**
 - Keep everything else: the frame-only themed render, the chip-row
