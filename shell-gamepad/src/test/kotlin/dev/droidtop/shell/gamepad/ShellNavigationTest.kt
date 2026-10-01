@@ -150,7 +150,7 @@ class ShellNavigationTest {
         nav.openOptions()
         nav.openSection(GamingSection.SETTINGS)
 
-        val saved = with(saverScope) { ShellBackStack.Saver.save(nav) }
+        val saved = with(ShellBackStack.Saver) { saverScope.save(nav) }
         val restored = ShellBackStack.Saver.restore(saved!!)
 
         assertEquals(GamingSection.SETTINGS, restored!!.section)
@@ -170,7 +170,7 @@ class ShellNavigationTest {
         nav.rememberFocus("snes-game")
         nav.openDetail("snes-game")
 
-        val saved = with(saverScope) { ShellBackStack.Saver.save(nav) }
+        val saved = with(ShellBackStack.Saver) { saverScope.save(nav) }
         val restored = ShellBackStack.Saver.restore(saved!!)
 
         assertEquals("system:snes", restored!!.groupKey)
@@ -185,7 +185,7 @@ class ShellNavigationTest {
 
     @Test
     fun `the saver saves and restores the top level of the shell`() {
-        val saved = with(saverScope) { ShellBackStack.Saver.save(stack()) }
+        val saved = with(ShellBackStack.Saver) { saverScope.save(stack()) }
         val restored = ShellBackStack.Saver.restore(saved!!)
 
         assertEquals(GamingSection.GAMES, restored!!.section)

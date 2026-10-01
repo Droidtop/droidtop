@@ -34,7 +34,7 @@ class SettingsCatalogRestoreTest {
         SettingsScreenRegistry.register(second)
         val stack = mutableStateListOf(root, first, second)
 
-        val saved = with(saverScope) { catalogStackSaver(root).save(stack) }
+        val saved = with(catalogStackSaver(root)) { saverScope.save(stack) }
         val restored = catalogStackSaver(root).restore(saved!!)
 
         assertEquals(listOf("restore-test-root", "restore-test-first", "restore-test-second"), restored!!.map { it.id })
@@ -47,7 +47,7 @@ class SettingsCatalogRestoreTest {
         SettingsScreenRegistry.register(registered)
         val stack = mutableStateListOf(root, registered, screen("restore-test-never-registered"))
 
-        val saved = with(saverScope) { catalogStackSaver(root).save(stack) }
+        val saved = with(catalogStackSaver(root)) { saverScope.save(stack) }
         val restored = catalogStackSaver(root).restore(saved!!)
 
         assertEquals(listOf("restore-test-root", "restore-test-registered"), restored!!.map { it.id })
@@ -56,7 +56,7 @@ class SettingsCatalogRestoreTest {
     @Test
     fun `a saved stack for another root is not restored`() {
         val root = screen("restore-test-root")
-        val saved = with(saverScope) { catalogStackSaver(root).save(mutableStateListOf(root, screen("pushed"))) }
+        val saved = with(catalogStackSaver(root)) { saverScope.save(mutableStateListOf(root, screen("pushed"))) }
 
         assertNull(catalogStackSaver(screen("restore-test-changed-root")).restore(saved!!))
     }
@@ -65,10 +65,10 @@ class SettingsCatalogRestoreTest {
     fun `each depth keeps the row it had selected`() {
         val byDepth = mutableStateMapOf(0 to 3, 1 to 7)
 
-        val saved = with(saverScope) { selectionByDepthSaver.save(byDepth) }
+        val saved = with(selectionByDepthSaver) { saverScope.save(byDepth) }
         val restored = selectionByDepthSaver.restore(saved!!)
 
-        assertEquals(3, restored[0])
-        assertEquals(7, restored[1])
+        assertEquals(3, restored!![0])
+        assertEquals(7, restored!![1])
     }
 }
