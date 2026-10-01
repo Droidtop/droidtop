@@ -16,6 +16,8 @@ const MethodChannel _channel = MethodChannel(
   'dev.droidtop.pluginhost/droidtop.sample-flutter-statustile',
 );
 
+String _rememberedName = '';
+
 void main() {
   // Only the services/widgets binding is needed to get a
   // BinaryMessenger -- there is no view to attach and no runApp() call,
@@ -34,36 +36,109 @@ void main() {
 }
 
 Future<String> _handleCall(MethodCall call) async {
-  if (call.method != 'invoke') {
-    return jsonEncode({'ok': false, 'error': 'unknown method ${call.method}'});
-  }
   try {
-    final payload = jsonDecode(call.arguments as String) as Map<String, dynamic>;
-    final capability = payload['capability'] as String?;
-    if (capability != 'status_tile') {
-      return jsonEncode({'ok': false, 'error': 'unsupported capability $capability'});
+    if (call.method == 'handle') {
+      return _handleContract2(call);
     }
-    final args = (payload['args'] as Map<String, dynamic>?) ?? const {};
-    // The one deliberate way to test crash containment on the rig
-    // (dq-flutterembed-01), same shape plugin.py's own "force-crash"
-    // query already gives the python leg -- never present in a real
-    // droidtop call site. A plain thrown Dart exception here would only
-    // produce a MethodChannel error reply (Flutter's own dispatcher
-    // catches it) -- it would NOT crash :pluginhost, so it would not
-    // actually exercise PluginCrashPolicy the way the python/native
-    // samples' forced crashes do. exit() kills this process outright,
-    // which does.
-    if (args['query'] == 'force-crash') {
-      exit(1);
+    if (call.method == 'invoke') {
+      return _handleInvoke(call);
     }
-    return jsonEncode({
-      'ok': true,
-      'values': {
-        'label': 'Flutter sample',
-        'value': 'Hello from Dart, running inside :pluginhost (flutter_embed)',
-      },
-    });
+    return jsonEncode({'ok': false, 'error': 'unknown method ${call.method}'});
   } catch (e) {
     return jsonEncode({'ok': false, 'error': e.toString()});
   }
+}
+
+String _handleContract2(MethodCall call) {
+  final envelope = jsonDecode(call.arguments as String) as Map<String, dynamic>;
+  final point = envelope['point'] as String?;
+  final op = envelope['op'] as String?;
+
+  if (point == 'ui.status_tile' && op == 'state') {
+    return jsonEncode({
+      'ok': true,
+      'data': {
+        'label': 'Sample tile (Flutter)',
+        'value': 'Hello from Dart',
+      },
+    });
+  }
+
+  if (point == 'ui.settings') {
+    if (op == 'view') {
+      return jsonEncode({
+        'ok': true,
+        'data': {
+          'view': 1,
+          'sections': [
+            {
+              'id': 'main',
+              'items': [
+                {
+                  'type': 'info',
+                  'id': 'about',
+                  'title': 'This is a sample plugin page',
+                  'subtitle': 'Drawn by droidtop from data the plugin returned',
+                },
+                {
+                  'type': 'text',
+                  'id': 'name',
+                  'title': 'Your name',
+                  'value': _rememberedName,
+                },
+                {
+                  'type': 'button',
+                  'id': 'greet',
+                  'title': 'Greet me',
+                  'action': {
+                    'kind': 'call',
+                    'op': 'greet',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      });
+    }
+    if (op == 'greet') {
+      final args = (envelope['args'] as Map<String, dynamic>?) ?? {};
+      final values = (args['values'] as Map<String, dynamic>?) ?? {};
+      final name = (values['name'] as String?) ?? 'there';
+      _rememberedName = name.isNotEmpty ? name : _rememberedName;
+      return jsonEncode({
+        'ok': true,
+        'data': {
+          'message': 'Hello, $name',
+        },
+      });
+    }
+  }
+
+  return jsonEncode({
+    'ok': false,
+    'error': {
+      'code': 'UNSUPPORTED',
+      'message': 'unsupported point $point op $op',
+    },
+  });
+}
+
+String _handleInvoke(MethodCall call) {
+  final payload = jsonDecode(call.arguments as String) as Map<String, dynamic>;
+  final capability = payload['capability'] as String?;
+  if (capability != 'status_tile') {
+    return jsonEncode({'ok': false, 'error': 'unsupported capability $capability'});
+  }
+  final args = (payload['args'] as Map<String, dynamic>?) ?? const {};
+  if (args['query'] == 'force-crash') {
+    exit(1);
+  }
+  return jsonEncode({
+    'ok': true,
+    'values': {
+      'label': 'Flutter sample',
+      'value': 'Hello from Dart, running inside :pluginhost (flutter_embed)',
+    },
+  });
 }

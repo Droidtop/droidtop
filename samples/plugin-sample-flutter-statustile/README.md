@@ -42,6 +42,21 @@ for droidtop's own "Add integration file" picker (Settings > Plugins).
 - Install, approve, "Call ... status tile" through the isolated
   `:pluginhost` process's real `FlutterEngine`, same end-to-end path the
   other two samples' README already documents for their own kind.
+## Contract 2 and views
+
+The manifest (`manifest.template.json`) is `contractVersion: 2` with
+`provides` for `ui.status_tile` (`state`) and `ui.settings` (`view`,
+`greet`). The Dart entrypoint (`lib/main.dart`) keeps the readiness
+handshake (`invokeMethod('ready')`) and responds to both the legacy
+`invoke` method and the contract-2 `handle` method (`call.arguments`
+is the envelope JSON). `handle` replies with the standard
+`{"ok":true,"data":{...}}` or
+`{"ok":false,"error":{"code":"UNSUPPORTED","message":"..."}}`
+shape. The settings view returns a document (`view: 1`, `sections`,
+`items`: `info`, `text`, `button`) and remembers the text field value
+in memory; `greet` reads `args.values.name` (defaulting to `'there'`)
+and returns a message reply.
+
 - `args.query == "force-crash"` calls Dart's `exit()` to kill
   `:pluginhost` outright -- the crash-containment test this sample needs
   that a caught Dart exception would NOT give (Flutter's own dispatcher
