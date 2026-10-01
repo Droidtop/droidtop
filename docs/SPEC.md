@@ -1892,7 +1892,10 @@ the `ContainerRuntime` interface that already exists (§3):
   so PCManFM aborted on its first icon (Droidtop/tracker#96). glycin probes bwrap once and, on
   that answer, decodes unsandboxed. glycin 2.1, the Alpine 3.24 package, has no
   `GLYCIN_DISABLE_SANDBOX` (2.2 added it), so the stand-in is the one mechanism that works on
-  both. proot is not a security boundary here; the droidspaces backend is unchanged.
+  both. proot is not a security boundary here; the droidspaces backend is unchanged. The plan
+  also installs an icon theme (`CompositorProvisioning.ICON_THEME_PACKAGE`, Adwaita): a stock
+  image ships none, and without one GTK draws only its built-in fallbacks, so every file,
+  folder and Places entry in PCManFM was a blank page (Droidtop/tracker#146).
 - **A real terminal into any container** — a computer the user can't
   open a shell on isn't a computer. **Decided and built 2026-09-02, the
   other way round from this section's original sketch**: droidtop does

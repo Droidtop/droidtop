@@ -67,6 +67,21 @@ object CompositorProvisioning {
      */
     const val FILE_MANAGER_PACKAGE = "pcmanfm"
 
+    /**
+     * The shared desktop's icon theme, installed with the file manager: a
+     * stock image ships none, and with none GTK renders only its built-in
+     * fallback icons, every file and folder in PCManFM a blank page (rig
+     * fix2-u2.png in device/verify-2026-09-29, Droidtop/tracker#146).
+     * Adwaita, because GTK looks in it whatever theme is selected (GTK 3's
+     * gtkicontheme.c: "Always look in the Adwaita, gnome and hicolor icon
+     * themes"), so the package alone is the fix, nothing selects it.
+     * Alpine's package depends on glycin-svg and so on librsvg, so the
+     * theme's SVG icons decode; Debian's libgtk-3-0 already depends on the
+     * theme, and it is named anyway so neither plan relies on that, like
+     * the font above. Same name in both distros.
+     */
+    const val ICON_THEME_PACKAGE = "adwaita-icon-theme"
+
     /** CUPS's own package name, the same in both distros droidtop provisions. */
     const val PRINTING_PACKAGE = "cups"
 
@@ -106,7 +121,7 @@ object CompositorProvisioning {
     }
 
     private fun basePlan(os: String, desktopEnvironment: String): PrimaryProvisioning? {
-        val terminal = "${ContainerTerminal.PACKAGE} $FILE_MANAGER_PACKAGE"
+        val terminal = "${ContainerTerminal.PACKAGE} $FILE_MANAGER_PACKAGE $ICON_THEME_PACKAGE"
         return when (os to desktopEnvironment) {
             "debian" to "sway" -> PrimaryProvisioning(
                 installCommand = "$DEBIAN_NO_SERVICE_STARTS && export DEBIAN_FRONTEND=noninteractive && " +

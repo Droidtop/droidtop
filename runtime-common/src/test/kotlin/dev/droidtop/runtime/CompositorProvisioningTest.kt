@@ -71,6 +71,14 @@ class CompositorProvisioningTest {
     }
 
     @Test
+    fun `every provisionable combination installs an icon theme for the file manager`() {
+        for ((os, de) in listOf("debian" to "sway", "alpine" to "sway", "alpine" to "labwc")) {
+            val words = CompositorProvisioning.plan(os, de)!!.installCommand.split(" ")
+            assertTrue("$os/$de must install an icon theme", words.contains(CompositorProvisioning.ICON_THEME_PACKAGE))
+        }
+    }
+
+    @Test
     fun `printing adds CUPS, points it at the shared socket, and starts it`() {
         val off = CompositorProvisioning.plan("debian", "sway")!!
         val on = CompositorProvisioning.plan("debian", "sway", printing = true)!!
