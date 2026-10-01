@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -251,6 +252,12 @@ internal fun MenuRow(
     // and tiles"); a caller only ever passes a limit for a surface that is
     // not a settings row.
     subtitleLines: Int = Int.MAX_VALUE,
+    // True for a row in a SCROLLING list that must scroll evenly (the
+    // Settings catalog): the row is exactly [uniformRowHeight] tall, a
+    // two-line title and a two-line summary fit, and what does not fit is
+    // ellipsized (the full text is in the screen's detail strip and the
+    // Info sheet). Never grows.
+    uniformHeight: Boolean = false,
     // An [adjustable] row is stepped with Left/Right on the pad. A touch
     // screen has no Left/Right, so on one the two arrows this row
     // already draws become the two targets that call this -- without it
@@ -303,7 +310,13 @@ internal fun MenuRow(
             // The one height rule: a row is at least RowMinHeight (and at
             // least one touch target where fingers are the input) and GROWS
             // with its text, never a fixed height.
-            .heightIn(min = maxOf(MenuTokens.RowMinHeight, if (window.touchFirst) window.minTouchTarget else 0.dp))
+            .then(
+                if (uniformHeight) {
+                    Modifier.height(uniformRowHeight())
+                } else {
+                    Modifier.heightIn(min = maxOf(MenuTokens.RowMinHeight, if (window.touchFirst) window.minTouchTarget else 0.dp))
+                },
+            )
             .clip(MenuTokens.RowShape)
             .selectionFrame(selected, MenuTokens.RowShape)
             // Touch works on every row, always -- the shell is
@@ -351,28 +364,40 @@ internal fun MenuRow(
                     it,
                     color = MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.bodySmall,
-                    maxLines = subtitleLines,
+                    maxLines = if (uniformHeight) 2 else subtitleLines,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
         if (value != null) {
             Spacer(Modifier.width(16.dp))
+            // One shared column across the screen's rows (content-sized to
+            // the widest value, so the arrows line up), else per-row.
+            val columnWidth = LocalValueColumnWidth.current
+            val valueLines = if (uniformHeight) MenuTokens.UniformValueMaxLines else MenuTokens.ValueMaxLines
             val valueColor = when {
                 placeholder -> MenuTokens.Placeholder
                 selected -> MenuTokens.OnSurface
                 else -> MenuTokens.Value
             }
             if (adjustable && onAdjust != null && window.touchFirst) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = if (columnWidth != null) Modifier.width(columnWidth + window.minTouchTarget * 2) else Modifier,
+                ) {
                     AdjustArrow("‹") { onAdjust(-1) }
                     Text(
                         value,
                         color = valueColor,
                         style = MaterialTheme.typography.bodyMedium,
-                        maxLines = MenuTokens.ValueMaxLines,
+                        textAlign = if (columnWidth != null) TextAlign.Center else TextAlign.Unspecified,
+                        maxLines = valueLines,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = MenuTokens.ValueColumnMaxWidth),
+                        modifier = if (columnWidth != null) {
+                            Modifier.weight(1f)
+                        } else {
+                            Modifier.widthIn(max = MenuTokens.ValueColumnMaxWidth)
+                        },
                     )
                     AdjustArrow("›") { onAdjust(+1) }
                 }
@@ -382,9 +407,13 @@ internal fun MenuRow(
                     color = valueColor,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.End,
-                    maxLines = MenuTokens.ValueMaxLines,
+                    maxLines = valueLines,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth, max = MenuTokens.ValueColumnMaxWidth),
+                    modifier = if (columnWidth != null) {
+                        Modifier.width(columnWidth)
+                    } else {
+                        Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth, max = MenuTokens.ValueColumnMaxWidth)
+                    },
                 )
             }
         }
@@ -468,3 +497,28 @@ internal fun MenuPanel(
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 internal fun Modifier.focusMarquee(active: Boolean): Modifier =
     if (active) basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 600) else this
+
+/**
+ * The width of the value column every row of one list shares, so values
+ * and their arrows align down the screen (content-sized to the widest
+ * value, not a share of the window). Null: each row sizes its own.
+ */
+internal val LocalValueColumnWidth = androidx.compose.runtime.compositionLocalOf<androidx.compose.ui.unit.Dp?> { null }
+
+/**
+ * The one height of a [uniformHeight] row: a two-line title plus a
+ * two-line summary plus the row's padding, derived from the CURRENT type
+ * scale (sp through the font scale the Text size setting drives), so it
+ * grows with the setting but never varies per row.
+ */
+@Composable
+internal fun uniformRowHeight(): androidx.compose.ui.unit.Dp {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val title = MaterialTheme.typography.bodyLarge
+    val summary = MaterialTheme.typography.bodySmall
+    return with(density) {
+        fun line(style: androidx.compose.ui.text.TextStyle) =
+            (if (style.lineHeight.isSpecified) style.lineHeight else style.fontSize * 1.4f).toDp()
+        maxOf(MenuTokens.RowMinHeight, line(title) * 2 + line(summary) * 2 + MenuTokens.RowVerticalPadding * 2)
+    }
+}

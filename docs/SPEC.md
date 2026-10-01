@@ -9756,32 +9756,47 @@ nothing else.
 
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 
-The owner could not read some settings items at all: rows were one line
-tall with one-line titles, values and supporting text cut with an
-ellipsis. One rule, in the shared components, not per screen:
+The owner could not read some settings items: rows were one line with
+one-line titles, values and summaries cut by an ellipsis. The first
+tester added: Settings are unusable in portrait, descriptions never use
+room that is there, columns sit at percentages of the width so arrows
+do not line up, the largest Text size cut everything off, and scrolling
+text is disliked. The owner's decision (2026-09-30), verbatim: "make sure
+settings entries are a consistent height, always. It makes scrolling more
+even." The rule, in the shared components (`MenuRow`, `SettingsCatalogView`):
 
-- **Rows are tall and grow with their content.** `MenuRow` (the row every
-  Settings catalog, Quick Menu and game menu uses) is at least
-  `MenuTokens.RowMinHeight` (72dp; on a touch-first window at least one
-  touch target) with `MenuTokens.RowVerticalPadding` (14dp) above and
-  below. The height is a minimum, never a fixed height: a row with more
-  text is taller.
-- **Titles wrap to two lines, then ellipsize. Supporting text wraps in
-  full, no line limit.** A value in the value column wraps to
-  `MenuTokens.ValueMaxLines` inside `ValueColumnMaxWidth`; the Info sheet
-  (Y / long press) still shows a row whole. A caller no longer limits a
-  row's supporting lines (`subtitleLines` defaults to unlimited).
-- **A label that must be one line (grid tile, carousel card, tab label)
-  scrolls while focused**: `Modifier.focusMarquee(focused)` with
-  `maxLines = 1` while focused, so nothing is unreadable forever. Unfocused
-  it wraps to the tile's own line budget and ellipsizes. Tiles use a
-  minimum height, not a fixed one.
-- **Text size**: every size is in `sp` and rows measure their text, so the
-  Text size setting (the activity's font scale) grows rows rather than
-  clipping them. A fixed `dp` height on anything holding text is a bug.
-- New text-bearing surfaces use these components; a per-screen
-  `maxLines = 1` / `singleLine` / fixed `height` on prose is removed, not
-  re-added. Text fields (`singleLine` input) are exempt.
+- **Every settings row is the same height, always.** `MenuRow(uniformHeight
+  = true)` (the Settings catalog) is exactly `uniformRowHeight()` tall:
+  two lines of the title style plus two lines of the summary style plus
+  `MenuTokens.RowVerticalPadding` (14dp) top and bottom, at least
+  `RowMinHeight` (72dp). It is computed from the current type scale in
+  sp, so the Text size setting (the activity's font scale) makes every
+  row taller together, and it never varies per row, in portrait or
+  landscape. A row never grows.
+- **A title wraps to two lines, a summary to two lines; the rest
+  ellipsizes** on the row. The full text of the selected row is in the
+  **detail strip** under the list (`CatalogDetailStrip`: the whole
+  summary, plus the title and value when long; fixed four-line height, so
+  the list never resizes), and in the Y Info sheet. This is the one
+  mechanism for "text that does not fit"; no scrolling text in rows (the
+  tester dislikes it).
+- **Content-sized, aligned columns.** Every row of a list shares one value
+  column (`LocalValueColumnWidth`), sized to the widest value any row can
+  show (all labels of a small choice, so cycling never moves it), bounded
+  by `ValueColumnMinWidth`/`ValueColumnMaxWidth`; arrows and values align
+  down the screen. The label takes the rest and its summary wraps
+  downward. No percentage-of-width positions.
+- **Non-settings menus** (Quick Menu, game menus) use `MenuRow` without
+  `uniformHeight`: at least `RowMinHeight`, growing with their text; the
+  title wraps to two lines, the summary in full.
+- **A label that must be one line (grid tile, carousel card, tab label)**
+  scrolls while focused (`Modifier.focusMarquee(focused)`, `maxLines = 1`
+  while focused); unfocused it wraps to the tile's budget and ellipsizes.
+  Tiles use a minimum height. This is the only place scrolling text is
+  allowed.
+- A fixed `dp` height on anything holding text, other than the uniform
+  row height derived above, is a bug. Text fields (`singleLine` input) are
+  exempt.
 
 **Header and footer are one frame; the header carries a quiet status readout (owner and first tester, 2026-09-29, Droidtop/tracker#157).** Gaming's own chrome (the section tabs on top, the hint bar below) is drawn by droidtop over every theme; a themed view's own canvas is not touched.
 

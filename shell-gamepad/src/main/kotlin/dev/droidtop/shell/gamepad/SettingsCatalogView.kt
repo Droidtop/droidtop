@@ -56,7 +56,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -418,14 +420,27 @@ fun CatalogNavigator(
         listState.keepInView(selected.coerceIn(0, rows.lastIndex))
     }
 
+    // One value column for the whole screen, content-sized to the widest
+    // value any row can show (docs/SPEC.md "Text in rows and tiles").
+    val valueMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val valueStyle = MaterialTheme.typography.bodyMedium
+    val valueDensity = androidx.compose.ui.platform.LocalDensity.current
+    val valueColumnWidth = remember(rows, valueStyle, valueDensity.fontScale) {
+        val widest = rows.flatMap { catalogValueCandidates(it.item, context) }
+            .maxOfOrNull { valueMeasurer.measure("‹ $it ›", valueStyle, maxLines = 1, softWrap = false).size.width } ?: 0
+        with(valueDensity) { widest.toDp() }.coerceIn(MenuTokens.ValueColumnMinWidth, MenuTokens.ValueColumnMaxWidth)
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         if (stack.size > 1 || screen.subtitle != null) {
             MenuHeader(screen.title, screen.subtitle)
         }
+        androidx.compose.runtime.CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
         LazyColumn(
             state = listState,
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .focusRequester(listFocus)
                 .focusable()
                 .onKeyEvent { event ->
@@ -533,6 +548,19 @@ fun CatalogNavigator(
                 }
             }
         }
+        }
+        // The selected row's full text, so a row never has to grow to be
+        // readable (owner, 2026-09-30).
+        val detail = rows.getOrNull(selected)?.item?.let { item ->
+            val v = catalogRowValue(item, context)
+            listOfNotNull(
+                item.title.takeIf { it.length > 28 },
+                v?.takeIf { it.length > 14 },
+                (statusById[item.id] ?: item.subtitle),
+            ).joinToString("
+")
+        }.orEmpty()
+        CatalogDetailStrip(detail)
     }
 }
 
@@ -685,17 +713,7 @@ private fun CatalogRowView(
     // separate is what stopped nested screens rendering a chevron in
     // the value column.
     val chevron = item is NestedScreenItem || item is SubScreenItem
-    val value = when (item) {
-        is ChoiceItem -> item.currentLabel()
-        is ToggleItem -> if (item.current) "On" else "Off"
-        is SliderItem -> item.current.toString()
-        is TextInputItem -> if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifEmpty { null }
-        is NestedScreenItem -> item.valueLabel?.invoke(context)
-        // The kinds with no state of their own carry it themselves
-        // (CatalogItem.value): Network's connection, VPN's on/off, a
-        // quick setting that is waiting on a permission.
-        else -> item.value
-    }
+    val value = catalogRowValue(item, context)
     val placeholder = value == null && item is TextInputItem
     MenuRow(
         title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
@@ -716,6 +734,58 @@ private fun CatalogRowView(
         // MenuRow's own `ownScrollKeeping` doc comment for why a second,
         // independent scroll animation here was the real jank.
         ownScrollKeeping = true,
+        uniformHeight = true,
+    )
+}
+
+/** What a settings row shows in its value column (null: none). */
+private fun catalogRowValue(item: CatalogItem, context: Context): String? = when (item) {
+    is ChoiceItem -> item.currentLabel()
+    is ToggleItem -> if (item.current) "On" else "Off"
+    is SliderItem -> item.current.toString()
+    is TextInputItem -> if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifEmpty { null }
+    is NestedScreenItem -> item.valueLabel?.invoke(context)
+    // The kinds with no state of their own carry it themselves
+    // (CatalogItem.value): Network's connection, VPN's on/off, a
+    // quick setting that is waiting on a permission.
+    else -> item.value
+}
+
+/**
+ * The strings a row's value column may show over its life, for sizing the
+ * screen's ONE shared value column: every label of a small choice (so
+ * cycling never moves the arrows), else the current value.
+ */
+private fun catalogValueCandidates(item: CatalogItem, context: Context): List<String> = when (item) {
+    is ChoiceItem -> if (item.options.size <= 6) item.options.map { it.label } else listOfNotNull(item.currentLabel())
+    is ToggleItem -> listOf("On", "Off")
+    is SliderItem -> listOf(item.min.toString(), item.max.toString())
+    else -> listOfNotNull(catalogRowValue(item, context))
+}
+
+/**
+ * The detail strip under a settings list: the selected row's whole text
+ * (title and value when the row had to cut them, and its full summary),
+ * in a fixed-height area so the list above never changes size. Four
+ * lines of the summary type scale; Y opens the Info sheet for more.
+ */
+@Composable
+private fun CatalogDetailStrip(text: String) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val style = MaterialTheme.typography.bodySmall
+    val lineHeight = with(density) {
+        (if (style.lineHeight.isSpecified) style.lineHeight else style.fontSize * 1.4f).toDp()
+    }
+    Text(
+        text,
+        color = MenuTokens.OnSurfaceMuted,
+        style = style,
+        maxLines = 4,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(lineHeight * 4 + 16.dp)
+            .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
     )
 }
 

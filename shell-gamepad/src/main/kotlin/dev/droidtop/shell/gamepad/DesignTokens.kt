@@ -343,6 +343,9 @@ object MenuTokens {
 
     /** A row's value wraps to this many lines inside [ValueColumnMaxWidth]. */
     const val ValueMaxLines = 3
+
+    /** In a uniform-height row a value takes at most this many lines. */
+    const val UniformValueMaxLines = 2
     val ValueColumnMaxWidth = 220.dp
 
     /**
