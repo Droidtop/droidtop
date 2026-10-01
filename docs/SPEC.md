@@ -4191,6 +4191,21 @@ checked against that keymap's own `xkb_keycodes` section (XKB keycode = evdev
 forwarded — swallowing them would strand the user inside a full-screen
 desktop.
 
+Shift can arrive with no press the compositor could latch: Android carries it
+in the meta state of the character key's own event, which is all an
+IME-synthesized keystroke has, and a hardware keyboard whose Shift press
+predates the surface's focus never delivered one either. Those keystrokes
+reached the container unshifted — `!` as `1`, capitals as lowercase
+(Droidtop/tracker#147) — so the router reads the meta state and, when it says
+Shift is part of the keystroke while the container does not already see a
+Shift, sends a Shift press before the key and a release once every key it was
+sent for is up. A Shift the container already sees — the user's forwarded
+press, or that same synthesis still serving a held key — is not doubled, and
+Shift's own events are exempt because they carry `META_SHIFT_ON` too. Caps
+lock is deliberately not read as shift: the Caps Lock key is forwarded like
+any other and toggles the container's own caps state, which a synthesized
+Shift on top of it would cancel.
+
 **Gamepad.** The right stick drives the pointer and the two stick clicks are
 left/right button; the D-pad, face buttons, shoulders and left stick are left
 alone. The shell around the surface — taskbar, start menu, settings — is
