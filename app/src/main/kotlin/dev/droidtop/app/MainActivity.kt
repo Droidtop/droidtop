@@ -737,7 +737,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     }
 
     override fun onDestroy() {
-        displayOrchestrator.onActivityDestroy()
+        // onCreate finishes early (first-run onboarding hand-off, crash-recovery
+        // route) before the orchestrator is built; there is nothing to tear down then.
+        if (::displayOrchestrator.isInitialized) displayOrchestrator.onActivityDestroy()
         // The companion's launch seam captures this instance's scope and
         // library; a destroyed Activity must not be reachable through it.
         // Identity-guarded: the relocation flow creates the NEW instance
