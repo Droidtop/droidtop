@@ -69,7 +69,7 @@ object F95ImportCatalog {
                         ActionItem(
                             id = "f95_matches_wait",
                             title = "The library is still being read",
-                            subtitle = "Its first scan is running; press A here to look again once the Games screen has shown it",
+                            subtitle = "Its first scan is running; select this again once games appear on the Games screen",
                             run = {},
                         ),
                     ),
@@ -101,7 +101,7 @@ object F95ImportCatalog {
                                         "${found.alreadyLinked} already linked; the other ${found.unmatched} watched games name no game in this library"
                                 },
                                 subtitle = if (found.alreadyLinked == 0) {
-                                    "A game whose name was written differently there stays for its own screen: " +
+                                    "A game whose name is written differently there can still be linked by hand: " +
                                         "paste the thread link on the game's detail, where you can see the game you are linking"
                                 } else {
                                     "Nothing to import from this watch list"
@@ -256,7 +256,7 @@ object F95ImportCatalog {
             matches = null
             accepted.clear()
             "Linked ${marked.size} games to their F95zone threads" +
-                (if (unasked == 0) "" else "; $unasked new threads could not be asked about the index right now (they are asked again later)")
+                (if (unasked == 0) "" else "; $unasked new threads could not be asked about right now (they are asked again later)")
         }
 
     /** How long the screen waits for a first library scan to publish before saying it is still running. */
