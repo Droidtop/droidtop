@@ -482,7 +482,12 @@ every pinned game names it. It runs in a task of its own (its own task
 affinity), so every tap runs it and it decides again; as part of the
 app's task, a tap brought back whatever droidtop screen was last in
 front, a Gaming shell whose mode had been switched off included
-(dq-onboard-01, dq-shell2-01). The games grid is reachable whatever modes are on: the
+(dq-onboard-01, dq-shell2-01). Its separate `taskAffinity` keeps it in
+its own task so it never brings back an older droidtop screen from the
+shared task. For tracker#158 (Android 14 Recents showing two droidtop
+cards), `LauncherGamesActivity` keeps that affinity and declares
+`excludeFromRecents="true"`, so the Games grid does not add a second
+droidtop card. The games grid is reachable whatever modes are on: the
 icon's app shortcut "Games" (a long press) and the home screen's
 long-press menu entry "droidtop games" open it (`ACTION_SHOW_GAMES`).
 Launcher3's pin sheet (`AddItemActivity`) also runs in a task of its own,

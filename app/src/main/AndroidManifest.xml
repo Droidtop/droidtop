@@ -237,6 +237,7 @@
             android:name="dev.droidtop.app.LauncherGamesActivity"
             android:exported="true"
             android:taskAffinity="dev.droidtop.app.games"
+            android:excludeFromRecents="true"
             android:label="@string/droidtop_app_name"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation">
             <intent-filter>
