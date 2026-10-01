@@ -203,7 +203,7 @@ class DocumentPickItem(
     override val subtitle: String? = null,
     val mimeType: String,
     val createName: String? = null,
-    val onPicked: (Context, Uri) -> String,
+    val onPicked: suspend (Context, Uri) -> String,
 ) : CatalogItem {
     fun pickerIntent(): Intent =
         Intent(if (createName != null) Intent.ACTION_CREATE_DOCUMENT else Intent.ACTION_OPEN_DOCUMENT).apply {
