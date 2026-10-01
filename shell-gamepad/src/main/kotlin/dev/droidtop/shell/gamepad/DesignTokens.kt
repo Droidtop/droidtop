@@ -395,7 +395,7 @@ object MenuTokens {
 
     /**
      * Estimates the header uses to decide whether the equal side slots
-     * (status readout left, R2 right) fit around the centred tabs: one
+     * (L2 on the left, status and R2 on the right) fit around the centred tabs: one
      * tab's drawn width, one L1/R1 badge, and the least a slot needs.
      */
     const val TabEstimateDp = 84

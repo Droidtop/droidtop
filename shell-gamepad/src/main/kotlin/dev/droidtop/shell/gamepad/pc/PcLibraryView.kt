@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.ResolvedRunner
 import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.GameCard
 import dev.droidtop.shell.gamepad.LocalShellWindow
