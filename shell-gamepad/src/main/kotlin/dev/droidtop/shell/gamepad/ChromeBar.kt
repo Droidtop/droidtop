@@ -2,18 +2,23 @@ package dev.droidtop.shell.gamepad
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -23,7 +28,10 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -36,11 +44,16 @@ import kotlin.math.roundToInt
  * them, the L2 context-menu and R2 Quick Menu indicators (docs/SPEC.md
  * 7k, "Header and footer are one frame").
  *
- * The L2 context menu stays at the left end and R2 Quick Menu at the right
- * end. The quiet status readout sits immediately before R2, inside the
- * right slot; equal weighted side slots keep the tabs centred. On compact
- * widths the status readout and menu labels shrink to glyphs, while tabs
- * scroll rather than clip.
+ * Where there is room the tabs sit in the exact middle of the bar, with
+ * the status readout in an equal slot on the left and the R2 indicator in
+ * an equal slot on the right, so the bar is balanced about the screen's
+ * centre. R2 stays at the top right, near the button it names (owner,
+ * 2026-09-29). Where there is not room (a phone, or the four tabs of the
+ * desktop-mode set) the tabs take the width and scroll, the readout
+ * shrinks to a clock and two glyphs, and the row keeps the selected tab
+ * whole in view: it scrolls by as little as it takes, so a label is
+ * never clipped mid-word (Droidtop/tracker#165). L2 stays at the left end,
+ * while the status readout sits before R2 at the right end.
  *
  * Nothing in it takes D-pad focus (the top bar is reached by touch, L1/R1
  * or Page Up/Page Down only; Droidtop/tracker#1).
@@ -61,20 +74,40 @@ internal fun SectionTabBar(
     val shoulders = sections.size > 1 && (!window.touchFirst || window.padPresent)
     // Whether the equal side slots are wide enough for the readout and the
     // R2 indicator once the tab group has what it needs. An estimate from
-    // the tab count, not a measurement: a wrong guess only picks the
-    // scrolling layout, which is always correct, never a clipped one.
+    // the tab count, not a measurement, and the tabs' half of it carries
+    // the live text scale: the labels grow with text, so Largest text must
+    // pick the scrolling layout instead of a centred row that clips the
+    // selected tab at the screen edge (Droidtop/tracker#165). A guess that
+    // errs the other way only picks the scrolling layout, which is always
+    // correct, never a clipped one.
     val slotDp = (window.widthDp - 2 * window.edgePadding.value -
-        sections.size * MenuTokens.TabEstimateDp - (sections.size - 1) * window.tabGap.value -
+        sections.size * MenuTokens.TabEstimateDp * LocalDensity.current.fontScale -
+        (sections.size - 1) * window.tabGap.value -
         (if (shoulders) 2 * MenuTokens.ShoulderEstimateDp else 0)) / 2f
     val centred = slotDp >= MenuTokens.StatusSlotMinDp
 
+    // Where each tab sits inside the scrolling row, in content pixels, as
+    // the row lays out: the selected tab is kept whole in view on top of
+    // that (docs/SPEC.md 7k).
+    val scrollState = rememberScrollState()
+    val tabBounds = remember { FloatArray(sections.size * 2) }
+    val tabRevision = remember { mutableIntStateOf(0) }
+    val rowX = remember { mutableIntStateOf(0) }
+    val rowW = remember { mutableIntStateOf(0) }
+
     val tabs: @Composable () -> Unit = {
-        sections.forEach { entrySection ->
+        sections.forEachIndexed { index, entrySection ->
             SectionTab(
                 label = entrySection.displayName(),
                 isCurrent = entrySection == current,
                 style = tabStyle,
                 onClick = { onSelect(entrySection) },
+                modifier = if (centred) Modifier else Modifier.onGloballyPositioned {
+                    val b = it.boundsInRoot()
+                    tabBounds[index * 2] = b.left - rowX.value + scrollState.value
+                    tabBounds[index * 2 + 1] = b.width
+                    tabRevision.value++
+                },
             )
         }
     }
@@ -114,11 +147,17 @@ internal fun SectionTabBar(
             // desktop-mode tab set is the tab a user cannot otherwise reach
             // without a pad. Same rule as the hint bar and the PC filter
             // chips: a row that can outgrow the width scrolls rather than
-            // clipping.
+            // clipping -- and the selected tab is the one the bar must
+            // never leave clipped: the row scrolls it whole into view, by
+            // as little as it takes (docs/SPEC.md 7k).
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .horizontalScroll(rememberScrollState()),
+                    .onGloballyPositioned {
+                        rowX.value = it.positionInRoot().x.toInt()
+                        rowW.value = it.size.width
+                    }
+                    .horizontalScroll(scrollState),
                 horizontalArrangement = Arrangement.spacedBy(window.tabGap),
                 verticalAlignment = Alignment.CenterVertically,
             ) { tabs() }
@@ -126,7 +165,26 @@ internal fun SectionTabBar(
             Box(Modifier.padding(start = 8.dp)) {
                 StatusCluster(showBatteryPercent = false, onClick = onQuickMenu)
             }
-            Box(Modifier.padding(start = 8.dp)) { quickMenu() }
+            Box(Modifier.padding(start = 12.dp)) { quickMenu() }
+            LaunchedEffect(current, tabRevision.value) {
+                val i = sections.indexOf(current)
+                if (i < 0) return@LaunchedEffect
+                val x = tabBounds[i * 2]
+                val w = tabBounds[i * 2 + 1]
+                val view = rowW.value.toFloat()
+                if (w <= 0f || view <= 0f) return@LaunchedEffect
+                val offset = scrollState.value
+                if (x >= offset && x + w <= offset + view) return@LaunchedEffect
+                // Held L1/R1 steps the selection faster than an animation
+                // can follow, so the row lands the tab at once, the same
+                // rule the lists' scroll-follow keeps (ScrollFollow.kt).
+                val delta = when {
+                    x < offset -> x - offset
+                    w >= view -> (x + w / 2f) - (offset + view / 2f)
+                    else -> x + w - (offset + view)
+                }
+                scrollState.scrollBy(delta)
+            }
         }
     }
 }
@@ -169,11 +227,12 @@ private fun SectionTab(
     isCurrent: Boolean,
     style: androidx.compose.ui.text.TextStyle,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val window = LocalShellWindow.current
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
+        modifier = modifier
             .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
             // Deliberately NOT a directional-search target (owner,
             // 2026-09-27: "the D-pad must NEVER be able to reach the top

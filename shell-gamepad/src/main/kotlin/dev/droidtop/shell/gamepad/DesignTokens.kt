@@ -397,6 +397,8 @@ object MenuTokens {
      * Estimates the header uses to decide whether the equal side slots
      * (L2 on the left, status and R2 on the right) fit around the centred tabs: one
      * tab's drawn width, one L1/R1 badge, and the least a slot needs.
+     * [TabEstimateDp] is a tab at normal text; the header scales it by
+     * the live text scale before the comparison (ChromeBar.kt).
      */
     const val TabEstimateDp = 84
     const val ShoulderEstimateDp = 38
