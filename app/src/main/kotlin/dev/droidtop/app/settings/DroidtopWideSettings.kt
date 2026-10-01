@@ -32,6 +32,7 @@ object DroidtopWideSettings {
 
     const val SCREEN_GLOBAL = "global_settings"
     const val SCREEN_DESKTOP = "desktop_settings"
+    const val SCREEN_STANDARD = "standard_settings"
 
     private const val KEY_TASKBAR_TOP = "pref_desktop_taskbar_top"
 
@@ -79,6 +80,11 @@ object DroidtopWideSettings {
                         defaultModeItem(context),
                         modeToggle(context, Mode.DESKTOP),
                         modeToggle(context, Mode.GAMING),
+                        dev.droidtop.library.settings.NestedScreenItem(
+                            id = "pref_standard_settings", title = "Standard mode settings",
+                            subtitle = "Launcher and screen settings", registryId = SCREEN_STANDARD,
+                            icon = dev.droidtop.library.settings.CatalogIcon.STANDARD,
+                        ),
                     ),
                 ),
                 CatalogGroup(
@@ -194,6 +200,7 @@ object DroidtopWideSettings {
                     id = "desktop",
                     title = null,
                     items = listOf(
+                        orientationChoice(context, Mode.DESKTOP),
                         ToggleItem(
                             id = KEY_TASKBAR_TOP,
                             title = "Taskbar at top",
@@ -228,6 +235,28 @@ object DroidtopWideSettings {
             )
         },
     )
+
+    fun standardScreen() = CatalogScreen(
+        id = SCREEN_STANDARD,
+        title = "Standard mode",
+        subtitle = "Settings for the launcher",
+        groups = { context -> listOf(CatalogGroup(
+            id = "standard", title = null,
+            items = listOf(orientationChoice(context, Mode.LAUNCHER)),
+        )) },
+    )
+
+    private fun orientationChoice(context: Context, mode: Mode): ChoiceItem {
+        val values = ScreenOrientationPrefs.options(mode)
+        val key = ScreenOrientationPrefs.KEY_PREFIX + mode.id
+        return ChoiceItem(
+            id = key,
+            title = "Screen orientation",
+            options = values.map { dev.droidtop.library.settings.ChoiceOption(it.first, it.second) },
+            current = ScreenOrientationPrefs.choice(context, mode),
+            onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(key, value).apply() },
+        )
+    }
 
     /**
      * Only modes that are on are offered; a stored default naming one that

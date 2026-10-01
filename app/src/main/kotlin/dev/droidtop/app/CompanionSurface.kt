@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -60,7 +61,8 @@ fun CompanionSurface(
      */
     controls: (@Composable () -> Unit)? = null,
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val portrait = maxHeight > maxWidth
         val density = LocalDensity.current
         // The status bar / notifications / "Continue playing" rail sit
         // above the focused-game info as their own measured block, so
@@ -88,7 +90,7 @@ fun CompanionSurface(
                     MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
                     RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
                 )
-                .padding(24.dp),
+                .padding(if (portrait) 16.dp else 24.dp),
         ) {
             // Status + controls bar, always the first row -- the companion
             // is the glanceable screen, and "is my Wi-Fi ok / how much

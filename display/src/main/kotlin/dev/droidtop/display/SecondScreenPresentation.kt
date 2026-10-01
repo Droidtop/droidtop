@@ -96,10 +96,12 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
             setContent {
-                if (content != null) {
-                    Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) { content() }
-                } else {
-                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+                DisplayOrientationContent {
+                    if (content != null) {
+                        Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) { content() }
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+                    }
                 }
             }
         }

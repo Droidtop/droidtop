@@ -46,6 +46,7 @@ what it learned last.
   device, both orientations, and on the oldest supported Android.
 
 ## Lessons log (append; one line each, dated, project)
+- 2026-10-01 droidtop: a companion's layout follows its own window bounds; an external display can keep its shape while the handheld rotates.
 - 2026-09-10 enginehost: hover focuses, focus moves the cursor, A acts on the one selection; hide our ring when the game's own highlight is the selection.
 - 2026-09-10 enginehost: per-engine action names from the engine's own input model; "Bypass" = raw input to the engine.
 - 2026-09-11 droidtop: a LazyColumn inside a vertical scroll crashes; bound lists explicitly.

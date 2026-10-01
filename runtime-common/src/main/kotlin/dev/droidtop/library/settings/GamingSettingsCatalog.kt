@@ -266,6 +266,17 @@ object GamingSettingsCatalog {
             id = GROUP_SCREENS,
             title = "System",
             items = buildList {
+                add(ChoiceItem(
+                    id = "pref_screen_orientation_gaming",
+                    title = "Screen orientation",
+                    options = listOf(
+                        ChoiceOption("follow", "Follow device"),
+                        ChoiceOption("landscape", "Landscape"),
+                        ChoiceOption("landscape_flipped", "Landscape (flipped)"),
+                    ),
+                    current = CatalogPrefs.prefs(context).getString("pref_screen_orientation_gaming", "follow"),
+                    onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString("pref_screen_orientation_gaming", value).apply() },
+                ))
                 add(displayShellTargetItem(context))
                 add(displayGameLaunchTargetItem(context))
                 add(secondScreenRoleItem(context, MODE_GAMING))

@@ -104,13 +104,15 @@ class SecondaryDisplayActivity : ComponentActivity() {
         val mode = SecondaryDisplayContent.currentMode(this)
         val content = SecondaryDisplayContent.contentFor(mode)
         setContent {
-            if (content != null) {
-                Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) { content() }
-            } else {
-                // A mode that registered nothing draws the ground and
-                // nothing else. Never a placeholder wordmark -- that was
-                // the bug this screen was reported for.
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+            DisplayOrientationContent {
+                if (content != null) {
+                    Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) { content() }
+                } else {
+                    // A mode that registered nothing draws the ground and
+                    // nothing else. Never a placeholder wordmark -- that was
+                    // the bug this screen was reported for.
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+                }
             }
         }
     }

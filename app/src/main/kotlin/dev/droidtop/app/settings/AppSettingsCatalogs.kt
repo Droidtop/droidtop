@@ -182,6 +182,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(F95ImportCatalog.screen())
         SettingsScreenRegistry.register(DroidtopWideSettings.globalScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.desktopScreen())
+        SettingsScreenRegistry.register(DroidtopWideSettings.standardScreen())
         SettingsScreenRegistry.register(ContainersCatalog.screen())
     }
 

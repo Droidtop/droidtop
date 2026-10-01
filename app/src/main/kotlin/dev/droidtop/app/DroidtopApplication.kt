@@ -61,6 +61,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // unconditionally, in every mode; it now starts only for the two
         // modes that use it. See ModeStartup.
         ModeStartup.install(this)
+        ScreenOrientationPrefs.install(this)
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)
         // What `host.info` tells a plugin about the mode droidtop is in (docs/plugin-api.md 3 J4).

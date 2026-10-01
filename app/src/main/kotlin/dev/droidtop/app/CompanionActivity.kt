@@ -79,14 +79,20 @@ class CompanionActivity : AppCompatActivity() {
                         widgetManager = widgetManager,
                         widgetHost = widgetHost,
                     ) {
-                        androidx.compose.foundation.layout.Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            TextButton(onClick = { pickWidget() }) { Text("Add widget") }
-                            if (widgetIds.isNotEmpty()) {
-                                TextButton(onClick = { removeLastWidget() }) {
-                                    Text("Remove widget", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        androidx.compose.foundation.layout.BoxWithConstraints {
+                            val portrait = maxHeight > maxWidth
+                            val buttons: @Composable () -> Unit = {
+                                TextButton(onClick = { pickWidget() }) { Text("Add widget") }
+                                if (widgetIds.isNotEmpty()) {
+                                    TextButton(onClick = { removeLastWidget() }) {
+                                        Text("Remove widget", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
+                            }
+                            if (portrait) {
+                                androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) { buttons() }
+                            } else {
+                                androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) { buttons() }
                             }
                         }
                     }

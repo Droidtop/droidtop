@@ -2715,6 +2715,24 @@ not settled designs):
 
 ## 4c. Multi-display: what iiSU does, and why droidtop fights the platform (2026-09-01)
 
+### Companion layout and per-mode orientation (Droidtop/tracker#213)
+
+Every companion surface chooses its layout from its own measured window bounds. Portrait
+surfaces stack their content vertically; this includes the widget and controls host, the
+live `SecondScreenPresentation`, the idle `SecondaryDisplayActivity`, and Desktop's
+second-screen input surface, where the keyboard sits above a trackpad that takes the
+remaining height. Layout follows the external display's size, never the handheld's
+orientation. Companion interaction stays touch-only: no focus and no gamepad handling.
+
+Each mode owns a `Screen orientation` choice in its own settings. Gaming offers Follow
+device (default), Landscape, and Landscape (flipped). Standard and Desktop offer Follow
+device (default), Portrait, Portrait (flipped), Landscape, and Landscape (flipped).
+One `Application.ActivityLifecycleCallbacks` applies the active mode's choice to each
+droidtop Activity at creation, and re-applies it when the choice or active mode changes.
+A fixed orientation maps to Android's matching `SCREEN_ORIENTATION_*` value. A
+`Presentation` cannot request display orientation, so its content rotates inside the
+display when the display aspect conflicts with the selected orientation.
+
 Read directly off the installed `com.iisulauncher` 0.1.6.1 APK
 (`/root/re/iisu` in the dev container). The code is obfuscated; the
 manifest and resources are not, and they were enough — class names,
