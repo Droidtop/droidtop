@@ -34,10 +34,9 @@ import java.util.zip.GZIPInputStream
  */
 object PythonRuntimeManager {
     private const val ASSET_PATH = "python-runtimes.json"
-    private const val MARKER_FILE = ".verified"
     private const val DOWNLOAD_POST = "python_runtime"
 
-    private data class RuntimeSpec(val version: String, val url: String, val sha256: String, val libpythonSoName: String, val stdlibDirName: String)
+    private data class RuntimeSpec(val artifact: ArtifactSpec, val libpythonSoName: String, val stdlibDirName: String)
 
     /** The ABI this device actually needs -- same 64-bit-first choice [PluginRuntimeService.nativeLibraryDirFor] already makes for native_bundle plugins, so both runners agree on which of a plugin's two shipped ABIs is "this device's". */
     // x86_64 wins whenever it is present -- see FlutterRuntimeManager.currentAbi's
@@ -56,9 +55,7 @@ object PythonRuntimeManager {
             val version = obj.getString("version")
             val artifact = obj.getJSONObject("artifacts").getJSONObject(currentAbi())
             RuntimeSpec(
-                version = version,
-                url = artifact.getString("url"),
-                sha256 = artifact.getString("sha256"),
+                artifact = ArtifactSpec(artifact.getString("url"), artifact.getString("sha256"), version),
                 libpythonSoName = obj.getString("libpythonSoName"),
                 stdlibDirName = obj.getString("stdlibDirName"),
             )
@@ -68,27 +65,26 @@ object PythonRuntimeManager {
     private fun rootDir(context: Context): File = File(context.filesDir, "python-runtime")
 
     private fun installDirFor(context: Context, spec: RuntimeSpec): File =
-        File(rootDir(context), "${spec.version}/${currentAbi()}")
+        File(rootDir(context), "${spec.artifact.version}/${currentAbi()}")
 
     /** Null when no pinned spec is readable at all (a packaging bug, never a normal state); otherwise the version this build would install/has installed. */
-    fun pinnedVersion(context: Context): String? = readSpec(context)?.version
+    fun pinnedVersion(context: Context): String? = readSpec(context)?.artifact?.version
 
     fun isInstalled(context: Context): Boolean {
         val spec = readSpec(context) ?: return false
-        return File(installDirFor(context, spec), MARKER_FILE).isFile
+        return RuntimeArtifactInstaller.isInstalled(installDirFor(context, spec))
     }
 
     fun installedVersion(context: Context): String? {
         val spec = readSpec(context) ?: return null
-        val marker = File(installDirFor(context, spec), MARKER_FILE)
-        if (!marker.isFile) return null
-        return spec.version
+        if (!RuntimeArtifactInstaller.isInstalled(installDirFor(context, spec))) return null
+        return spec.artifact.version
     }
 
     fun pythonHomeDir(context: Context): File? {
         val spec = readSpec(context) ?: return null
         val dir = installDirFor(context, spec)
-        return if (File(dir, MARKER_FILE).isFile) dir else null
+        return if (RuntimeArtifactInstaller.isInstalled(dir)) dir else null
     }
 
     fun libpythonSoPath(context: Context): File? {
@@ -111,13 +107,13 @@ object PythonRuntimeManager {
      */
     suspend fun ensureInstalled(context: Context, onStatus: (String) -> Unit): String? {
         val spec = readSpec(context) ?: return "no pinned Python runtime for this build (missing/broken $ASSET_PATH)"
-        if (File(installDirFor(context, spec), MARKER_FILE).isFile) {
+        if (RuntimeArtifactInstaller.isInstalled(installDirFor(context, spec))) {
             onStatus("Done")
             return null
         }
         val result = DownloadJobs.run(
-            context, "Python runtime", DOWNLOAD_POST, spec.url, "python-runtime.tar.gz",
-            sha256 = spec.sha256, onStatus = onStatus,
+            context, "Python runtime", DOWNLOAD_POST, spec.artifact.url, "python-runtime.tar.gz",
+            onStatus = onStatus,
         )
         return if (result.ok) null else "couldn't install the Python runtime: ${result.error}"
     }
@@ -131,15 +127,7 @@ object PythonRuntimeManager {
     private fun installFrom(context: Context, archive: File): String {
         val spec = readSpec(context) ?: throw IllegalStateException("no pinned Python runtime for this build")
         val installDir = installDirFor(context, spec)
-        try {
-            if (installDir.isDirectory) installDir.deleteRecursively()
-            installDir.mkdirs()
-            extractRuntime(archive, installDir)
-            File(installDir, MARKER_FILE).writeText("${spec.version} ${spec.sha256}")
-        } catch (e: Exception) {
-            installDir.deleteRecursively()
-            throw e
-        }
+        RuntimeArtifactInstaller.install(archive, installDir, spec.artifact, ::extractRuntime)
         return "Python runtime installed"
     }
 

@@ -51,11 +51,9 @@ import org.json.JSONObject
  */
 object FlutterRuntimeManager {
     private const val ASSET_PATH = "flutter-runtimes.json"
-    private const val MARKER_FILE = ".verified"
     private const val DOWNLOAD_POST = "flutter_runtime"
 
-    private data class ArtifactSpec(val url: String, val sha256: String, val jarEntry: String, val soEntryInJar: String)
-    private data class RuntimeSpec(val version: String, val libflutterSoName: String, val artifact: ArtifactSpec)
+    private data class RuntimeSpec(val version: String, val libflutterSoName: String, val artifact: ArtifactSpec, val jarEntry: String, val soEntryInJar: String)
 
     /**
      * Same ABI choice [PythonRuntimeManager.currentAbi] and
@@ -89,9 +87,10 @@ object FlutterRuntimeManager {
                 artifact = ArtifactSpec(
                     url = artifactJson.getString("url"),
                     sha256 = artifactJson.getString("sha256"),
-                    jarEntry = artifactJson.getString("jarEntry"),
-                    soEntryInJar = artifactJson.getString("soEntryInJar"),
+                    version = version,
                 ),
+                jarEntry = artifactJson.getString("jarEntry"),
+                soEntryInJar = artifactJson.getString("soEntryInJar"),
             )
         }.getOrNull()
     }
@@ -106,14 +105,14 @@ object FlutterRuntimeManager {
 
     fun isInstalled(context: Context): Boolean {
         val spec = readSpec(context) ?: return false
-        return File(installDirFor(context, spec), MARKER_FILE).isFile
+        return RuntimeArtifactInstaller.isInstalled(installDirFor(context, spec))
     }
 
     /** The extracted `libflutter.so`'s absolute path, or null when not installed -- what [FlutterDroidtopPlugin]'s custom `FlutterJNI.loadLibrary` override `System.load()`s instead of the stock APK-relative lookup. */
     fun libflutterSoPath(context: Context): File? {
         val spec = readSpec(context) ?: return null
         val dir = installDirFor(context, spec)
-        if (!File(dir, MARKER_FILE).isFile) return null
+        if (!RuntimeArtifactInstaller.isInstalled(dir)) return null
         return File(dir, spec.libflutterSoName)
     }
 
@@ -131,13 +130,13 @@ object FlutterRuntimeManager {
      */
     suspend fun ensureInstalled(context: Context, onStatus: (String) -> Unit): String? {
         val spec = readSpec(context) ?: return "no pinned Flutter runtime for this build (missing/broken $ASSET_PATH)"
-        if (File(installDirFor(context, spec), MARKER_FILE).isFile) {
+        if (RuntimeArtifactInstaller.isInstalled(installDirFor(context, spec))) {
             onStatus("Done")
             return null
         }
         val result = DownloadJobs.run(
             context, "Flutter runtime", DOWNLOAD_POST, spec.artifact.url, "flutter-runtime.zip",
-            sha256 = spec.artifact.sha256, onStatus = onStatus,
+            onStatus = onStatus,
         )
         return if (result.ok) null else "couldn't install the Flutter runtime: ${result.error}"
     }
@@ -151,15 +150,7 @@ object FlutterRuntimeManager {
     private fun installFrom(context: Context, archive: File): String {
         val spec = readSpec(context) ?: throw IllegalStateException("no pinned Flutter runtime for this build")
         val installDir = installDirFor(context, spec)
-        try {
-            if (installDir.isDirectory) installDir.deleteRecursively()
-            installDir.mkdirs()
-            extractLibflutter(archive, spec, installDir)
-            File(installDir, MARKER_FILE).writeText("${spec.version} ${spec.artifact.sha256}")
-        } catch (e: Exception) {
-            installDir.deleteRecursively()
-            throw e
-        }
+        RuntimeArtifactInstaller.install(archive, installDir, spec.artifact, { file, dir -> extractLibflutter(file, spec, dir) })
         return "Flutter runtime installed"
     }
 
@@ -172,16 +163,16 @@ object FlutterRuntimeManager {
      */
     private fun extractLibflutter(archive: File, spec: RuntimeSpec, installDir: File) {
         val jarBytes = ZipFile(archive).use { outer ->
-            val entry = outer.getEntry(spec.artifact.jarEntry)
-                ?: throw IllegalStateException("artifacts.zip has no ${spec.artifact.jarEntry}")
+            val entry = outer.getEntry(spec.jarEntry)
+                ?: throw IllegalStateException("artifacts.zip has no ${spec.jarEntry}")
             outer.getInputStream(entry).use { it.readBytes() }
         }
         val jarTmp = File(installDir, "flutter.jar.tmp")
         jarTmp.writeBytes(jarBytes)
         try {
             ZipFile(jarTmp).use { inner ->
-                val soEntry = inner.getEntry(spec.artifact.soEntryInJar)
-                    ?: throw IllegalStateException("${spec.artifact.jarEntry} has no ${spec.artifact.soEntryInJar}")
+                val soEntry = inner.getEntry(spec.soEntryInJar)
+                    ?: throw IllegalStateException("${spec.jarEntry} has no ${spec.soEntryInJar}")
                 inner.getInputStream(soEntry).use { input ->
                     File(installDir, spec.libflutterSoName).outputStream().use { output -> input.copyTo(output) }
                 }

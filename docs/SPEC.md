@@ -11396,6 +11396,15 @@ one runner per kind:
     droidtop's settings catalog already uses elsewhere) — never triggered
     implicitly by loading a plugin, so a 22 MB fetch never happens
     silently inside a capability call's 15-second watchdog.
+  - **Runtime artifact installation is one mechanism** (`RuntimeArtifactInstaller`,
+    `plugin-host`; Droidtop/tracker#190): Flutter and Python keep their own
+    manifest readers, directory names and archive extractors, while the
+    shared installer verifies the artifact digest, replaces a partial runtime
+    directory, and writes the `.verified` marker only after extraction
+    succeeds. Transfers remain `DownloadJobs` jobs as specified in §12a
+    "Downloads" (Droidtop/tracker#181), preserving DownloadManager resume,
+    restart reattachment and the single downloads list. A failed digest or
+    extraction leaves no verified marker.
   - **The embedding bridge** (`plugin-host/native`, `libdroidtoppy.so`,
     itself bundled in the base APK — only CPython is downloaded) `dlopen`s
     the downloaded `libpython3.14.so` and resolves only the small,
