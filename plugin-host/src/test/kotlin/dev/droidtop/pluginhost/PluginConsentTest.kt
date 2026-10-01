@@ -57,21 +57,31 @@ class PluginConsentTest {
         }
         val view = PluginConsent.of(m, listOf(record(provider), record(m)), badgeFor = { o -> if (o == "droidtop") "Official" else "Added by you" })
 
-        assertEquals(listOf("Gaming", "Desktop", "Wherever it fits"), view.adds.map { it.first })
+        // One tick box per point, under the first mode it shows in.
+        assertEquals(listOf("Gaming", "Wherever it fits"), view.adds.map { it.first })
         assertEquals("VPN", view.adds[0].second.single().title)
-        assertEquals("Get games from a source", view.adds[2].second.single().title)
+        val sources = view.adds[1].second.single()
+        assertEquals("Get games from a source", sources.title)
+        assertEquals("provide:library.sources", sources.id)
+        assertTrue("a high-risk point is marked and starts unticked", sources.highRisk && !sources.ticked)
+        assertTrue("what the point lets the plugin do is the detail", sources.detail!!.startsWith("Lets it"))
+        assertTrue(view.adds[0].second.single().let { it.ticked && !it.highRisk })
         assertEquals(
             listOf("See whether you are online", "Connect to: listed domains (api.acme.example)"),
             view.can.map { it.title },
         )
-        // Critical first, then dangerous; the high-risk point and its unnamed consent item is one line.
+        // Critical first, then dangerous; the high-risk point is a tick box under "Adds", not a second line here.
         assertEquals(PermissionTier.CRITICAL, view.asks.first().tier)
         assertEquals(
-            setOf("Run programs inside your containers, with access to everything in them", "Read the clipboard", "Add to droidtop: Get games from a source"),
+            setOf("Run programs inside your containers, with access to everything in them", "Read the clipboard"),
             view.asks.map { it.line.title }.toSet(),
         )
         val clip = view.asks.single { it.line.title == "Read the clipboard" }
         assertTrue(clip.needed)
+        assertTrue(clip.line.highRisk && !clip.line.ticked)
+        assertEquals("clipboard.read", clip.line.id)
+        assertTrue(view.can.all { it.ticked && it.id != null })
+        assertEquals(setOf("provide:ui.status_tile", "provide:library.sources", "net.state", "net.domains", "clipboard.read", "containers.exec"), view.items.map { it.id }.toSet())
         assertEquals("Reads the code you copy", clip.line.detail)
         assertEquals(listOf("extension point future.point", "permission made.up"), view.unsupported)
 
@@ -90,6 +100,8 @@ class PluginConsentTest {
         val view = PluginConsent.of(m, listOf(record(m)), badgeFor = { "Official" })
         assertTrue(view.olderPluginFullAccess)
         assertEquals(listOf("Status tiles and widgets"), view.adds.single().second.map { it.title })
+        // An older plugin's permissions are shown as full access, not as tick boxes.
+        assertTrue(view.asks.all { it.line.id == null } && view.can.all { it.id == null })
         assertTrue(view.asks.any { it.line.title.startsWith("Send information to listed apps / to any app") })
         assertTrue(view.asks.any { it.line.title == "Run with droidtop's full access (not contained)" })
         assertTrue(view.can.any { it.title.startsWith("Check whether listed apps are installed") })

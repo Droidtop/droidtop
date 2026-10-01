@@ -56,6 +56,7 @@ class PluginCrashPolicy(
         if (record.manifest.kind !in RUNNABLE_KINDS) {
             return PluginResult.failure("no runner for kind ${record.manifest.kind.id} yet")
         }
+        capabilityRefusal(record, capability)?.let { return PluginResult.failure(it) }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
         gateOnVerification(record)?.let { return it }
         missingRuntime(record)?.let { return PluginResult.failure(it.message) }
@@ -99,10 +100,8 @@ class PluginCrashPolicy(
         if (record.manifest.kind !in RUNNABLE_KINDS) {
             return PluginReply.error(PluginErrorCode.UNSUPPORTED, "no runner for kind ${record.manifest.kind.id} yet")
         }
-        if (!call.point.startsWith("api:") &&
-            PluginGrants.provideState(record, PluginGrants.forContext(context).read(record.manifest.id), call.point) != GrantState.GRANTED
-        ) {
-            return PluginReply.error(PluginErrorCode.PERMISSION_DENIED, "${record.manifest.label} has not been allowed to provide ${call.point}")
+        PluginGrants.pointRefusal(record, PluginGrants.forContext(context).read(record.manifest.id), call.point)?.let {
+            return PluginReply.error(PluginErrorCode.PERMISSION_DENIED, it)
         }
         gateOnVerification(record)?.let { return PluginReply.error(PluginErrorCode.FAILED, it.error ?: "plugin failed verification") }
         missingRuntime(record)?.let { return PluginReply.error(PluginErrorCode.FAILED, it.message) }
@@ -111,6 +110,12 @@ class PluginCrashPolicy(
         return PluginBrokers.during(record.manifest.id, userInitiated, timeoutMs) {
             runner.handle(record.manifest.id, call, timeoutMs, crashOnTimeout)
         }
+    }
+
+    /** The refusal for a contract 1 [capability] whose extension point the user did not allow ([PluginGrants.pointRefusal]); null when it may run. */
+    private fun capabilityRefusal(record: PluginRecord, capability: PluginCapability): String? {
+        val point = LegacyManifest.CAPABILITY_POINTS[capability] ?: return null
+        return PluginGrants.pointRefusal(record, PluginGrants.forContext(context).read(record.manifest.id), point)
     }
 
     /** Why [record] cannot be called right now although it is approved and enabled: a required API of another plugin has no provider (docs/plugin-api.md 2.3). Null when it can. */
@@ -123,6 +128,7 @@ class PluginCrashPolicy(
     override suspend fun startJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String): Boolean {
         if (!record.runnable() || waitingReason(record) != null) return false
         if (record.manifest.kind !in RUNNABLE_KINDS) return false
+        capabilityRefusal(record, capability)?.let { return false }
         gateOnVerification(record)?.let { return false }
         missingRuntime(record)?.let {
             Log.w("droidtop.plugin", "${record.manifest.id} job not started: ${it.message}")

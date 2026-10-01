@@ -263,11 +263,11 @@ each plugin:
 | Stage | What happens | Existing code |
 | --- | --- | --- |
 | **Install** | Picker or catalog download → `PluginBundleInstaller` checks: signature against the origin key, every payload hash, the manifest schema, the namespace, the ABIs, the contract version. **v2 adds:** every `provides`/`permissions`/`exports`/`requires` entry is checked against the host registries, and a `requires` on `priv.*` must be `optional` (§2.7). The record lands PENDING. No plugin code runs before approval, not even to describe itself. | `PluginBundleInstaller`, `PluginStore` |
-| **Approve** | The approval screen shows, in plain language: what the plugin adds and where (grouped by mode), what it can access (normal permissions as a short list; each dangerous permission and high-risk extension point as its own line), what it needs from other plugins, and its trust badge (Official / Added by you). Approve grants the normal permissions, **every extension point listed under Adds** (decided 2026-10-01, §1.6 "Consent"), and any dangerous permissions the user ticks. Unticked dangerous permissions stay at `ask` (§4.3). | the approval screen in `AppSettingsCatalogs.pluginsScreen` |
+| **Approve** | The approval screen shows, in plain language: what the plugin adds and where (grouped by mode), what it can access (normal permissions as a short list; each dangerous permission and high-risk extension point as its own line), what it needs from other plugins, and its trust badge (Official / Added by you). Every item is a tick box and **the plugin runs with the ticked subset** (decided 2026-10-01, §4.3 "Approval is a list"). Unticked dangerous permissions stay at `ask` (§4.3). | the approval screen in `AppSettingsCatalogs.pluginsScreen` |
 | **Enable** | An approved plugin is enabled by default. Disabling stops every call to it and hides its contributions everywhere, because `PluginStore.runnableFor` is the only iterator (checklist point 6). | `PluginStore.setEnabled` |
 | **Resolve** | On every install, approve, enable, disable, uninstall or crash, the `requires` graph is recomputed (§2.3). A plugin whose *required* API has no runnable provider is **Waiting**. It is not disabled, and it resumes by itself when a provider appears. | new: `PluginApiResolver` |
 | **Run** | Loading is lazy: a plugin is loaded on its first call, and after 60 s idle (proposed) it is unloaded unless it holds a job or a declared background service (§3 E7). A crash, an uncaught exception, a native crash, a timeout or process death disables that plugin with a reason, and the user re-enables it by hand (12a checklist point 6). **Kept as is:** crash containment is the one rule `PluginCrashPolicy` exists for. | `PluginCrashPolicy`, `NativePluginRunner` |
-| **Update** | Same key: approval carries over (12a "Trust over updates"). **v2 adds a permission diff.** An update that adds a dangerous permission, a high-risk extension point or a new `exports` entry keeps running with its *old* grants; the new items wait at `ask`, and the Plugins screen shows "Wants new access". An update never gains dangerous access silently. A different key, or a previously DENIED plugin, goes back to PENDING (unchanged). | `PluginStore`, `PluginRecord.approvedKeySha256` |
+| **Update** | Same key: approval carries over (12a "Trust over updates"). **v2 adds a permission diff.** An update that adds any permission, extension point or `exports` entry keeps running with its *old* grants; the new items wait at `ask`, and the plugin's page asks about those items only, on the same list as at approval ("Wants new access", §4.3). An update never gains dangerous access silently. A different key, or a previously DENIED plugin, goes back to PENDING (unchanged). | `PluginStore`, `PluginRecord.approvedKeySha256` |
 | **Uninstall** | `onUnload` runs, and the payload, data directory, vault entries, grants and scheduled work are deleted. The audit log for the plugin is kept for 7 days (labelled "removed plugin") so that "what did it do" can still be answered. Dependents are re-resolved (§2.5). | `PluginStore.uninstall` |
 
 ### 1.6 UI extensions: the view schema
@@ -467,14 +467,17 @@ any plugin content in Gaming, appear only on droidtop's own surfaces
 inside a themed system or gamelist view, until the frame-only render
 declares a region for host content.
 
-**Consent.** Approving a plugin grants every extension point it lists
-under Adds, including high-risk ones: providing is what the plugin *is*,
-and an approved plugin whose only point is refused without a prompt (two
-of three modes have no prompt, #128) is a plugin that silently never works
-(audit 2026-10-01). Revoking stays on the Permissions screen, and an update
-that adds a high-risk point still waits at `ask` ("Wants new access",
-§1.5 Update). Dangerous *permissions* are unchanged: they still wait for a
-tick or the first-use sheet.
+**Consent.** Approval is a list the user can cut down (§4.3 "Approval is
+a list"). Every extension point a plugin lists under Adds is a tick box,
+high-risk ones included, so a plugin whose only point the user unticked is
+shown as not allowed instead of silently never working. The high-risk
+points start unticked, as §4.2 and §4.1 already held them back; everything
+else starts ticked. A call to a point that is not granted is never made:
+`PluginGrants.pointRefusal` answers `PERMISSION_DENIED` before the plugin
+is loaded, and a plugin view for such a point is the standard error state
+saying it was not allowed, with a row that opens that plugin's
+Permissions screen. (This replaces the 2026-10-01 rule that approval
+granted every listed point.)
 
 **All kinds.** A view is the `data` of a `handle` reply, so every kind
 produces it the same way: `native_bundle` from `DroidtopPlugin.handle`,
@@ -1436,8 +1439,9 @@ Tiers:
 
 - **normal**: granted when the user approves the plugin. The approval
   screen lists these as a short list.
-- **dangerous**: never granted silently. The user ticks each one on the
-  approval screen, or answers a prompt on first use. A dangerous
+- **dangerous**: never granted silently. Each one is a tick box on the
+  approval screen that starts unticked, or the user answers a prompt on
+  first use. A dangerous
   permission can be revoked at any time.
 - **critical**: dangerous, plus a written warning. Some critical
   permissions are restricted to official origins (marked †).
@@ -1536,28 +1540,46 @@ plugin power there. These points are:
 - `containers.packages`;
 - every `exports` entry.
 
-Low and medium points are listed on the approval screen under "Adds",
-grouped by mode, and need no separate tick.
+Every point, high-risk or not, is listed on the approval screen under
+"Adds", grouped by mode, as its own tick box with one plain sentence on
+what it lets the plugin do; the high-risk ones are marked and start
+unticked, the others start ticked.
 
 ### 4.3 Grant states, and when the user is asked
 
 Each (plugin, permission) pair is in one of three states:
 
 - **granted**;
-- **denied**;
-- **ask**, which is the default for dangerous and critical permissions
-  the user did not tick at approval.
+- **denied**, which is what an unticked normal permission, extension
+  point or export becomes at approval;
+- **ask**, which is what a dangerous or critical permission the user did
+  not tick at approval becomes, and what an update's new items start as.
 
 When they are asked:
 
-- **At approval.** One screen:
-  - "Adds": provides grouped by Gaming / Android / Desktop;
-  - "Can": normal permissions;
+- **At approval ("Approval is a list").** One screen, and every line
+  below with a tick box can be unticked before approving, high-risk ones
+  included:
+  - "Adds": each extension point, grouped by Gaming / Android / Desktop,
+    with one plain sentence on what it lets the plugin do (high-risk ones
+    marked "high risk");
+  - "Can": normal permissions, each with its plain-language line;
   - "Asks for": each dangerous or critical item, with its tick box, the
     plugin's own `reason`, and "Needed" if `required`;
+  - "Offers to other plugins": each `exports` entry;
   - "Uses from other plugins": each `requires`, with its provider and
-    that provider's badge;
+    that provider's badge (information, not a tick box);
   - the trust badge.
+
+  Items start ticked except what this section already holds back: a
+  dangerous or critical permission and a high-risk extension point start
+  unticked. The plugin then runs with exactly the ticked subset: an
+  extension point that is not granted is never called, a denied host API
+  returns `PERMISSION_DENIED` ("turned off for this plugin") to the
+  plugin, and a plugin view for a denied point shows the standard error
+  state saying it was not allowed, with a route to its Permissions screen.
+  The same list serves the three modes through the settings catalog
+  (Gaming through the input pipeline, SPEC 6e; Standard; Desktop).
 - **On first use.** A call that needs a permission in `ask` state, made
   **during a user-initiated call**, shows a host sheet: "<Plugin> wants
   to <label>", with the reason and *Allow* / *Not now* / *Never*. The
@@ -1570,7 +1592,10 @@ When they are asked:
   lists every declared permission with its state and when it was last
   used (from the audit log). Changing a state takes effect on the next
   call. A revoked `background.service` stops the service.
-- **Updates.** New dangerous items in an update arrive in `ask` (§1.5).
+- **Updates.** Every item an update adds (any permission, extension point
+  or export) arrives in `ask` (§1.5), and the plugin's page asks about
+  those items only, as the same list with the same defaults ("Wants new
+  access"); what the user allowed before is untouched.
 - **After a denial.** A denied `required` permission leaves the plugin
   "Needs <label>" and it is not called. A denied optional permission
   makes only that call fail with `PERMISSION_DENIED`, and the plugin
@@ -1829,13 +1854,14 @@ arrays under the manifest's own keys (`V2Declarations`).
 - **Grants and the sheet.**
   - `PluginGrants` keeps `plugin-grants/<id>.json`: an explicit state per
     permission id, plus `provide:<point>` for a high-risk point and
-    `export:<api>` for an export. Approval writes it (normal granted, a
-    dangerous item granted only when ticked, otherwise `ask`); a contract 1
-    plugin holds what it could already do, and its root tick is the
-    `priv.shell.root` grant. A file that cannot be read is `ask` for
-    everything, never `granted`. The approval screen has no per-item tick
-    yet, so a dangerous permission is granted from the first-use sheet or
-    the Permissions screen.
+    `export:<api>` for an export. Approval writes it from the ticked
+    subset (a ticked item is granted; an unticked dangerous permission is
+    `ask`, any other unticked item `denied`); a contract 1 plugin keeps the
+    permissions it could already do, its points follow the ticks, and its
+    root tick is the `priv.shell.root` grant. A file that cannot be read is `ask` for
+    everything, never `granted`. The approval screen's tick boxes are
+    `ConsentView` lines with a grant key; the box state is kept until
+    Approve writes it through `PluginStore.setApproval`.
   - A call in `ask` state during a user-initiated host to plugin call
     shows the sheet (`PluginGrantPrompts`, drawn by Gaming's shell); a call
     from an event or a job fails with `PERMISSION_DENIED` and records that
@@ -1882,9 +1908,10 @@ arrays under the manifest's own keys (`V2Declarations`).
     the per-interface reply schemas are not written yet.
 - **Updates.** A same-key update keeps the grants it effectively had
   (written out first for a plugin that had no file), and
-  `PermissionDiff` puts each new dangerous permission, high-risk point
-  and export at `ask`, remembered as "fresh" until answered: that is
-  "Wants new access".
+  `PermissionDiff` puts each new permission, point and export at `ask`
+  (for a contract 1 plugin only the dangerous and high-risk ones),
+  remembered as "fresh" until answered: that is "Wants new access", and
+  `PluginGrants.answerNew` records the answer from the same list.
 - **Activity.** `PluginAudit` is the ring of §4.6 (2,000 entries, 30 days,
   kept 7 days after uninstall), written for dangerous and critical calls
   only; normal-permission calls are not counted yet. The Activity screen
@@ -1905,8 +1932,9 @@ arrays under the manifest's own keys (`V2Declarations`).
     needs. An interface with more than one running provider has a "Provided
     by" choice on the Plugins screen. There is no "Get <provider>" row yet:
     the catalog index carries no exports.
-  - The approval screen has no per-item tick, so a dangerous permission is
-    granted from the sheet or the Permissions screen, never at approval.
+  - The approval list ticks per item (see "At approval"); a dangerous
+    permission left unticked is asked on first use or granted on the
+    Permissions screen.
 - **Extension points wired** (#67, #73). All three are asked from the host's
   own code through `PluginCrashPolicy.handle`, so a plugin that only
   implements `invoke` answers them through `LegacyHandle`; the wire shapes

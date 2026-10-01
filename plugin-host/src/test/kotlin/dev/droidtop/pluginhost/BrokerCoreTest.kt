@@ -346,4 +346,19 @@ class BrokerCoreTest {
         assertEquals("ok", entry.result)
         assertNotNull(env.audits.single().first)
     }
+
+    @Test
+    fun `a host API the user turned off at approval returns denied to the plugin`() {
+        val env = FakeEnv(appsCaller())
+        env.installed += "com.example"
+        env.states["acme.caller"] = mutableMapOf("apps.check" to GrantState.GRANTED, "apps.launch" to GrantState.DENIED)
+        env.user = true
+        val core = BrokerCore("acme.caller", env)
+        assertTrue("the ticked one still works", reply(core.call(request("apps", "check", obj("packages" to org.json.JSONArray(listOf("com.example")))))).ok)
+        val denied = reply(core.call(request("apps", "launch", obj("package" to "com.example"))))
+        assertEquals(PluginErrorCode.PERMISSION_DENIED, denied.code)
+        assertTrue(denied.message!!.contains("turned off"))
+        assertTrue("a denied item is never asked about again", env.prompts.isEmpty())
+        assertTrue(env.launched.isEmpty())
+    }
 }

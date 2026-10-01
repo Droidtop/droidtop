@@ -65,9 +65,9 @@ object PluginStore {
 
     /**
      * The one action that moves a plugin from PENDING to APPROVED (or DENIED) -- the approval screen's confirm/decline buttons, and nothing else in the codebase may set this.
-     * Approving also writes the plugin's grants ([PluginGrants.initialiseOnApproval]): normal permissions granted, each dangerous one granted only when in [ticked] and otherwise left to be asked on first use.
+     * Approving also writes the plugin's grants ([PluginGrants.initialiseOnApproval]): exactly the items in [ticked] are granted, and null [ticked] is the list as first shown.
      */
-    fun setApproval(context: Context, pluginId: String, approved: Boolean, grantRoot: Boolean, ticked: Set<String> = emptySet()) {
+    fun setApproval(context: Context, pluginId: String, approved: Boolean, grantRoot: Boolean, ticked: Set<String>? = null) {
         val dir = root(context)
         val record = PluginBundleInstaller.readRecord(dir, pluginId) ?: return
         val updated = record.copy(
