@@ -59,6 +59,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -1096,23 +1097,26 @@ private fun OnboardingScaffold(
 
             // --- the action area, docked ----------------------------
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = Space.Lg),
-                horizontalArrangement = Arrangement.spacedBy(Space.Md, Alignment.End),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = Space.Lg)
+                    .layoutDirection(LayoutDirection.Rtl)
+                    .focusGroup(),
+                horizontalArrangement = Arrangement.spacedBy(Space.Md, Alignment.Start),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                secondary?.let { PadButton(it.label, it.onClick) }
                 primary?.let {
                     PadButton(
                         it.label,
                         it.onClick,
                         filled = true,
-                        // On a phone the primary fills the row; at TV
-                        // distance it stays a button on the right.
                         modifier = Modifier
                             .focusRequester(primaryFocus)
+                            .layoutDirection(LayoutDirection.Ltr)
                             .then(if (window.portrait) Modifier.weight(1f) else Modifier),
                     )
                 }
+                secondary?.let { PadButton(it.label, it.onClick, modifier = Modifier.layoutDirection(LayoutDirection.Ltr)) }
             }
         }
         // The shell's hint row: the legend of what the pad's buttons do

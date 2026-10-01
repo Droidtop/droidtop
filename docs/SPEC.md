@@ -4998,6 +4998,7 @@ Onboarding is one scaffold, not a set of unrelated screens. The scaffold owns:
   (§6e). Every control is `padSelectable`: ONE focus target that holds focus in touch mode too, a key
   handler for A, Enter and DPAD_CENTER, a tap, and button semantics. The window owns the pad
   (`ownPadButtons`), so B is Back, and a hint row (A Select, B Back) is the touch route to both.
+  DOWN from the content lands on the primary action in the bottom action row.
 - **Back**, always available, stepping back through the path actually taken. System Back and the
   pad's B are the same control. Leaving onboarding is a deliberate act with a confirmation, never
   one Back press; the answers are kept and the next open resumes.
