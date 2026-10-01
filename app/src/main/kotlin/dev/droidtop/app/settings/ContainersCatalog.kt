@@ -147,7 +147,7 @@ object ContainersCatalog {
                             ActionItem(
                                 id = "containers_none",
                                 title = "No containers yet",
-                                subtitle = "The desktop makes its own when it first starts; Create a container makes others",
+                                subtitle = "The desktop makes its own when it first starts; create others with the row above",
                                 run = {},
                             ),
                         )
@@ -351,17 +351,17 @@ object ContainersCatalog {
             return ActionItem(
                 id = "container_recreate",
                 title = "Recreate from the image",
-                subtitle = "This container has no recorded image reference to recreate from (made before this existed)",
+                subtitle = "This container has no recorded image reference to recreate from (it was made before droidtop recorded them)",
                 run = {},
             )
         }
         return AsyncActionItem(
             id = "container_recreate",
             title = "Recreate from the image",
-            subtitle = "Deletes it and pulls ${info.image} fresh, keeping the name and everything else about it",
+            subtitle = "Deletes it and downloads ${info.image} fresh, keeping the name and everything else about it",
             confirmTitle = "Recreate ${info.displayName} from ${info.image}? Everything installed by hand in it is lost",
             run = { _, onStatus ->
-                onStatus("Pulling ${info.image}...")
+                onStatus("Downloading ${info.image}...")
                 runtime.recreateFromImage(info.container)
                 "Recreated \"${info.displayName}\" from ${info.image}."
             },
@@ -410,7 +410,7 @@ object ContainersCatalog {
                     ToggleItem(
                         id = "container_socket_audio",
                         title = "Audio",
-                        subtitle = "Bridge the device's audio into this container",
+                        subtitle = "Share the device's audio with this container",
                         current = sockets.audioShared,
                         onToggle = { _, on ->
                             kotlinx.coroutines.runBlocking(Dispatchers.IO) {
@@ -462,7 +462,7 @@ object ContainersCatalog {
                 FolderPickItem(
                     id = "container_mount_add",
                     title = "Add a folder",
-                    subtitle = "Shares a host folder into this container, from its next start",
+                    subtitle = "Shares a folder from this device into this container, from its next start",
                     onPicked = { _, uri ->
                         val resolved = GamesRootPrefs.resolveStoragePath(uri)
                             ?: return@FolderPickItem "Couldn't resolve that folder to a real path on this device"
@@ -507,7 +507,7 @@ object ContainersCatalog {
             return ActionItem(
                 id = "container_terminal",
                 title = "Terminal",
-                subtitle = "A terminal opens as a window on the desktop, which is not running. This starts it; then choose Terminal again",
+                subtitle = "A terminal opens as a window on the desktop, which is not running. This starts the desktop; then choose Terminal again",
                 run = { ctx -> openDesktop(ctx) },
             )
         }
@@ -567,7 +567,7 @@ object ContainersCatalog {
         val cupsUp = desktopUp && File(runtime.hostSocketDir(), ContainerLayout.CUPS_SOCKET).exists()
         val status = when {
             on && cupsUp -> "CUPS is running, for every container."
-            on && desktopUp -> "CUPS is not running (yet). The desktop does not wait for it; if this stays, why is " +
+            on && desktopUp -> "CUPS is not running (yet). The desktop does not wait for it; if this stays, the reason is " +
                 "in droidtop's desktop log and in ${ContainerLayout.daemonLog(CompositorProvisioning.PRINTING_DAEMON)} " +
                 "in the desktop's container."
             on -> "CUPS is installed and started with the desktop."
