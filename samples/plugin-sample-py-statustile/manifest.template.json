@@ -5,8 +5,21 @@
   "description": "Harmless python-kind sample exercising the plugin API end to end (SPEC 12a); see build.sh in this folder.",
   "version": "1.0.0",
   "kind": "python",
-  "capabilities": ["status_tile"],
-  "contractVersion": 1,
+  "contractVersion": 2,
   "requestsRoot": false,
-  "abis": []
+  "abis": [],
+  "provides": [
+    {
+      "point": "ui.status_tile",
+      "version": 1,
+      "id": "state",
+      "label": "Sample tile (python)",
+      "surfaces": ["gaming.quick_menu"]
+    },
+    {
+      "point": "ui.settings",
+      "version": 1,
+      "target": "plugin"
+    }
+  ]
 }

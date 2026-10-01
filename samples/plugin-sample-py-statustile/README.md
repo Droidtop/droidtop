@@ -30,3 +30,16 @@ first (Settings -> App integrations -> Plugins -> "Download Python
 runtime", `PythonRuntimeManager`) -- this plugin's own approval/enable
 does not trigger that download; the runtime is a separate, explicit,
 progress-shown action by design (docs/SPEC.md 12a).
+
+## Contract 2 and views
+
+This sample runs on contract 2 (`manifest.template.json`). It provides
+`ui.status_tile` (`state`) and `ui.settings` (`view`/`greet`). The
+`handle()` function receives JSON envelopes and replies with
+`{"ok": true, "data": ...}` or `{"ok": false, "error": ...}`.
+The settings page is drawn by droidtop from the view document the plugin
+returns: a `main` section with an `info` row (`about`), a `toggle`
+(`show_count`), a `choice` (`greeting`), and a `button` (`greet`).
+`show_count` and `greeting` are stored in `data_dir/settings.json` when
+a call carries them in `args["values"]`. The status tile keeps the
+`force-crash` test (raise `RuntimeError`) for the rig.
