@@ -5029,25 +5029,27 @@ what happens.
 
 1. **What droidtop opens into** (`MODE`; this is also the welcome). Title "Welcome to droidtop".
    Body: "droidtop can be a games console or a desktop computer. Which should it open into? You can
-   switch to the other one at any time, and change this later in Settings." Rows: **Gaming** ("All
-   your games in one place, made for a controller or touch."; preselected) and **Desktop** ("A Linux
-   desktop that runs PC programs in windows. It downloads a Linux system the first time it starts.").
-   Under "Also", one tick row: **Set up Desktop too** (or "Gaming too", whichever is not chosen):
-   "Both will be ready. Switching between them takes one press." Forward: Next. The chosen mode is
+   change this later in Settings." Rows: **Gaming** ("All your games in one place, made for a
+   controller or touch."; preselected) and **Desktop** ("A Linux desktop that runs PC programs in
+   windows. It downloads a Linux system the first time it starts."), then one title-only tick row,
+   **Set up Desktop too** (or "Gaming too", whichever is not chosen). Forward: Next. The body is two
+   lines and the tick row has no supporting line so that all three rows are on screen on a 1080p
+   landscape handheld; with a section label and a third body line the tick row sat under the action
+   area (emulator-5560, 2026-10-01, d01-welcome.png). The chosen mode is
    what droidtop's icon opens and, with droidtop as the Home app, where Home goes; a mode not set up
    is switched off at the end and runs nothing (§2c, Rule 1; `appModesOnAfterOnboarding`). The
    modes are written only at the end, so leaving part-way changes nothing. A rerun starts from the
    modes that are on and the default mode as it is.
-2. **The Home button** (`HOME`). Body: "What should open when you press Home? If you choose droidtop,
-   Android asks you to confirm the change on its own screen." Rows, with the chosen mode's name where
-   "Gaming" stands here: **Keep my home screen as it is** ("Nothing changes. Open droidtop from its
-   icon, like any other app."; preselected, so a straight run through never changes the home screen);
-   **droidtop** ("droidtop becomes your Home app, and Home takes you straight to Gaming. Your other apps
-   are one press away."); **droidtop's home screen** ("A home screen with an app drawer, made by
-   droidtop. Gaming opens from its icon."); and one row per other installed launcher, by its own
-   application label and icon (never a class name; Android's FallbackHome is not a launcher): "Home
-   opens Pixel Launcher. droidtop stays underneath, so switching between Pixel Launcher and Gaming
-   keeps working." Forward: Next. What the rows mean: "droidtop" is Standard with the chosen mode as
+2. **The Home button** (`HOME`). Body: "What should open when you press Home?" (one line, so three
+   rows fit above the action area at 1080p landscape; the Android confirmation is said on the rows
+   that cause it). Rows, with the chosen mode's name where "Gaming" stands here: **Keep my home
+   screen as it is** ("Nothing changes. Open droidtop from its icon, like any other app."; preselected,
+   so a straight run through never changes the home screen); **droidtop** ("Home takes you straight to
+   Gaming. Android asks you to confirm the change."); **droidtop's home screen** ("An app drawer and
+   widgets, made by droidtop. Gaming opens from its icon."); and one row per other installed launcher,
+   by its own application label and icon (never a class name; Android's FallbackHome is not a
+   launcher): "Home opens Pixel Launcher, with droidtop underneath to switch to Gaming and back."
+   More rows than fit scroll, by D-pad or by swipe. Forward: Next. What the rows mean: "droidtop" is Standard with the chosen mode as
    the default mode (Home goes to the default mode, §2c); "droidtop's home screen" is Standard with
    the home screen as the default mode (the old "Opens into Android" answer, folded in here); a
    launcher row is Alternative with that launcher as the target. Next enables the matching HOME

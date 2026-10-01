@@ -1203,8 +1203,11 @@ private fun ModeStep(
     val other = if (opensInto == Mode.GAMING) Mode.DESKTOP else Mode.GAMING
     OnboardingScaffold(
         title = if (isReEntry) "What droidtop opens into" else "Welcome to droidtop",
+        // Two lines, so the "also" row below the two answers is on screen
+        // on a 1080p landscape handheld: a three-line body put it under the
+        // action area (emulator-5560, d01-welcome.png).
         body = "droidtop can be a games console or a desktop computer. Which should it open into? " +
-            "You can switch to the other one at any time, and change this later in Settings.",
+            "You can change this later in Settings.",
         progress = progress,
         onBack = onBack,
         primary = StepAction(if (isReEntry) "Done" else "Next", onClick = onContinue),
@@ -1223,10 +1226,10 @@ private fun ModeStep(
             selected = opensInto == Mode.DESKTOP,
             onClick = { onOpensInto(Mode.DESKTOP) },
         )
-        StepSectionLabel("Also")
+        // A title-only row: with a label above it and a line under it, it
+        // was the one answer a touch user could not see without scrolling.
         SelectableRow(
             title = "Set up ${other.label} too",
-            supporting = "Both will be ready. Switching between them takes one press.",
             selected = alsoOther,
             onClick = { onAlsoOther(!alsoOther) },
         )
@@ -1265,8 +1268,11 @@ private fun HomeStep(
     val mode = opensInto.label
     OnboardingScaffold(
         title = "The Home button",
-        body = "What should open when you press Home? If you choose droidtop, Android asks you to confirm " +
-            "the change on its own screen.",
+        // One line: the rows are the answer, and three of them fit above
+        // the action area on a 1080p landscape screen only with a one-line
+        // body (emulator-5560, t02-home.png). The Android confirmation is
+        // said on the rows that cause it.
+        body = "What should open when you press Home?",
         progress = progress,
         onBack = onBack,
         primary = StepAction(if (isReEntry) "Done" else "Next", onClick = onContinue),
@@ -1280,22 +1286,20 @@ private fun HomeStep(
         )
         SelectableRow(
             title = "droidtop",
-            supporting = "droidtop becomes your Home app, and Home takes you straight to $mode. " +
-                "Your other apps are one press away.",
+            supporting = "Home takes you straight to $mode. Android asks you to confirm the change.",
             selected = choice == HomeImplementation.STANDARD && !showsHomeScreen,
             onClick = { onSelect(HomeImplementation.STANDARD, false, null) },
         )
         SelectableRow(
             title = "droidtop's home screen",
-            supporting = "A home screen with an app drawer, made by droidtop. $mode opens from its icon.",
+            supporting = "An app drawer and widgets, made by droidtop. $mode opens from its icon.",
             selected = choice == HomeImplementation.STANDARD && showsHomeScreen,
             onClick = { onSelect(HomeImplementation.STANDARD, true, null) },
         )
         launchers?.forEach { launcher ->
             SelectableRow(
                 title = launcher.label,
-                supporting = "Home opens ${launcher.label}. droidtop stays underneath, so switching between " +
-                    "${launcher.label} and $mode keeps working.",
+                supporting = "Home opens ${launcher.label}, with droidtop underneath to switch to $mode and back.",
                 selected = choice == HomeImplementation.ALTERNATIVE && alternative == launcher.component,
                 icon = launcher.icon,
                 onClick = { onSelect(HomeImplementation.ALTERNATIVE, true, launcher.component) },
