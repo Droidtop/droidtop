@@ -38,7 +38,7 @@ object DroidtopWideSettings {
     fun globalScreen() = CatalogScreen(
         id = SCREEN_GLOBAL,
         title = "Global settings",
-        subtitle = "Home role, modes, and droidtop's settings as a whole",
+        subtitle = "The home screen, modes, and droidtop's settings as a whole",
         groups = { context ->
             listOf(
                 CatalogGroup(
@@ -137,7 +137,8 @@ object DroidtopWideSettings {
                         AsyncActionItem(
                             id = "pref_global_share_diagnostics",
                             title = "Share diagnostics",
-                            subtitle = "Zip the logs, settings without credentials, build and theme names, then choose where to send it; nothing is sent until you pick a target",
+                            subtitle = "Zip the logs, settings without credentials, build and theme names; " +
+                                "nothing is sent until you choose where to send it",
                             run = { ctx, onStatus ->
                                 onStatus("Packing diagnostics...")
                                 shareDiagnostics(ctx)
