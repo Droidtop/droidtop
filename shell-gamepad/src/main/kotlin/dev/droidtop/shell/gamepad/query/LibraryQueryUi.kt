@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.library.integrations.AcquireContentOption
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.GameSources
 import dev.droidtop.library.integrations.PluginSearchAggregator
@@ -58,7 +57,6 @@ import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -267,11 +265,10 @@ internal fun LibrarySearchDialog(
     // Plugins that are installed but cannot answer (waiting for approval, disabled), so "no source" is never said for them.
     var unavailable by remember { mutableStateOf<List<UnavailableSource>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
-    var pickedHit by remember { mutableStateOf<SourceHit?>(null) }
     var statusLine by remember { mutableStateOf<String?>(null) }
     // Bumped to search again after the person fixed something (installed a runtime, approved a plugin).
     var searchTick by remember { mutableIntStateOf(0) }
-    var pluginsScreen by remember { mutableStateOf<CatalogScreen?>(null) }
+    var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
     val sourceHits = remember(outcomes) { outcomes.hits() }
 
     // Debounced fan-out: a keystroke doesn't itself trigger a plugin round
@@ -380,7 +377,7 @@ internal fun LibrarySearchDialog(
                     },
                 )
                 if (!searching) {
-                    val openPlugins = { pluginsScreen = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID) }
+                    val openPlugins = { activeCatalog = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID) }
                     if (outcomes.isEmpty()) {
                         // No source answered because none can: say which of the two cases it is.
                         if (unavailable.isEmpty()) {
@@ -399,6 +396,9 @@ internal fun LibrarySearchDialog(
                         when {
                             outcome.failure != null -> {
                                 SourceNote("${outcome.source.label}: ${outcome.failure}")
+                                outcome.source.settingsScreen()?.let { settings ->
+                                    MenuRow(title = "Open ${outcome.source.label} settings", onClick = { activeCatalog = settings })
+                                }
                                 outcome.runtimeNeed?.let { need ->
                                     MenuRow(
                                         title = need.actionLabel,
@@ -426,14 +426,12 @@ internal fun LibrarySearchDialog(
                 sourceHits.forEach { hit ->
                     MenuRow(
                         title = hit.result.title,
-                        subtitle = listOfNotNull(hit.source.label, hit.result.platform, hit.result.sizeLabel).joinToString(" · "),
+                        subtitle = listOfNotNull(hit.source.label, hit.result.columns.joinToString(" · ").takeIf { it.isNotBlank() }, hit.result.platform, hit.result.sizeLabel).joinToString(" · "),
                         onClick = {
-                            if (hit.result.options.size <= 1) {
-                                coroutineScope.launch {
-                                    statusLine = startAcquire(context, hit, hit.result.options.firstOrNull()?.index ?: 0, systemFolder)
-                                }
+                            if (systemFolder == null) {
+                                statusLine = "No download destination configured for this list -- open ${hit.result.title} from its own system to download it"
                             } else {
-                                pickedHit = hit
+                                activeCatalog = hit.source.detailScreen(hit.result, systemId, null, systemFolder)
                             }
                         },
                     )
@@ -446,117 +444,17 @@ internal fun LibrarySearchDialog(
         }
     }
 
-    pluginsScreen?.let { screen ->
+    activeCatalog?.let { screen ->
         val close: () -> Unit = {
-            pluginsScreen = null
+            activeCatalog = null
             searchTick += 1
         }
         Dialog(onDismissRequest = close) { CatalogNavigator(root = screen, onExit = close) }
-    }
-
-    pickedHit?.let { hit ->
-        SourceOptionsDialog(
-            hit = hit,
-            onPick = { option ->
-                pickedHit = null
-                coroutineScope.launch {
-                    statusLine = startAcquire(context, hit, option.index, systemFolder)
-                }
-            },
-            onDismiss = { pickedHit = null },
-        )
     }
 }
 
 /** One muted line of the "Get more" group: a source's outcome when it has no rows to show. */
 @Composable
 private fun SourceNote(text: String) {
-    Text(
-        text,
-        color = MenuTokens.OnSurfaceMuted,
-        style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.padding(vertical = 4.dp),
-    )
-}
-
-/**
- * The options sheet a "Get more" result opens on selection when it
- * carries more than one choice (a mirror, a region, a format) -- droidtop
- * never assumes index 0 when a plugin actually offered a choice
- * (docs/SPEC.md 12a "Search fan-out": "Selecting a result shows the
- * plugin's own options in a droidtop sheet").
- */
-@Composable
-private fun SourceOptionsDialog(
-    hit: SourceHit,
-    onPick: (AcquireContentOption) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    // The options were rows only a finger could pick; the pad moves a
-    // cursor over them like every other menu.
-    var focusIndex by remember(hit) { mutableStateOf(0) }
-    val options = hit.result.options
-    Dialog(onDismissRequest = onDismiss) {
-        MenuPanel(
-            modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(480.dp)),
-            focusLabel = "Choose an option",
-            onPad = { press ->
-                when (press.action) {
-                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, options.size, press)
-                    GamepadAction.A -> options.getOrNull(focusIndex)?.let(onPick)
-                    GamepadAction.B -> onDismiss()
-                    else -> Unit
-                }
-                true
-            },
-        ) {
-            Text(hit.result.title, style = MaterialTheme.typography.titleLarge, color = MenuTokens.OnSurface)
-            Text("via ${hit.source.label}", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
-            options.forEachIndexed { index, option ->
-                MenuRow(
-                    title = option.label,
-                    selected = index == focusIndex,
-                    onClick = {
-                        focusIndex = index
-                        onPick(option)
-                    },
-                )
-            }
-            MenuHint("A picks; B cancels")
-        }
-    }
-}
-
-/**
- * Starts the real download job through [SourceHit.source]'s
- * [dev.droidtop.library.integrations.GameSourceProvider.acquire] --
- * progress and completion appear in droidtop's existing jobs surface
- * ([dev.droidtop.pluginhost.PluginJobsCenter]/the Jobs screen it already
- * feeds), so this dialog only needs an immediate one-line acknowledgement,
- * not its own progress bar. Returns null (no message shown) when
- * [systemFolder] is unresolved -- a cross-system search (the PC library
- * today) has nowhere to write a download to yet.
- */
-private suspend fun startAcquire(
-    context: android.content.Context,
-    hit: SourceHit,
-    choice: Int,
-    systemFolder: File?,
-): String {
-    if (systemFolder == null) {
-        return "No download destination configured for this list -- open ${hit.result.title} from its own system to download it"
-    }
-    val job = hit.source.acquire(
-        context = context,
-        result = hit.result,
-        choice = choice,
-        destination = systemFolder,
-        onProgress = { _, _ -> },
-        onComplete = { },
-    )
-    return if (job == null) {
-        "Couldn't start the download: ${hit.source.label} has no running job support"
-    } else {
-        "Downloading ${hit.result.title} -- see Jobs for progress"
-    }
+    Text(text, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp))
 }
