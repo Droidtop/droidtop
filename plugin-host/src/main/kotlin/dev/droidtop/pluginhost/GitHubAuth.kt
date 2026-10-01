@@ -65,4 +65,25 @@ object GitHubAuth {
         }
         error("too many redirects from $url")
     }
+
+    /**
+     * The address and headers a DownloadManager request for [url] must use. A request for a token
+     * host is resolved here, by hand, to its final address (a private release asset redirects to a
+     * pre-signed URL that must not get the token, and DownloadManager would re-send its headers to
+     * every hop); the headers are then decided for that final address alone. With no token the
+     * address is returned as it is. Makes a network round trip: call off the main thread.
+     */
+    fun downloadRequestFor(url: String, token: String?): Pair<String, Map<String, String>> {
+        if (authorizationFor(url, token) == null) return url to emptyMap()
+        val connection = open(url, token, 15_000, 30_000)
+        val finalUrl = connection.url.toString()
+        connection.disconnect()
+        val headers = buildMap {
+            authorizationFor(finalUrl, token)?.let { header ->
+                put("Authorization", header)
+                if (isApiAssetUrl(finalUrl)) put("Accept", "application/octet-stream")
+            }
+        }
+        return finalUrl to headers
+    }
 }

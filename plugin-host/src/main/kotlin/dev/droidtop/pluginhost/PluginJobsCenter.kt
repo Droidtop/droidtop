@@ -124,6 +124,8 @@ object PluginJobsCenter {
     private val nativeSpecs = ConcurrentHashMap<String, NativeSpec>()
     private val nativeJobs = ConcurrentHashMap<String, Job>()
     private val nativeCompletions = ConcurrentHashMap<String, (PluginResult) -> Unit>()
+    private val nativeCancelHooks = ConcurrentHashMap<String, (args: Map<String, String>, checkpoint: String?) -> Unit>()
+    private val nativeReattachKinds = ConcurrentHashMap.newKeySet<String>()
     private val nativeScope = CoroutineScope(SupervisorJob())
 
     /** Where a native job's coroutine runs; a test swaps it. */
@@ -145,6 +147,12 @@ object PluginJobsCenter {
     /** Adds interrupted resumable jobs, as paused, to the live list; a job already tracked is left as it is. */
     internal fun restore(restored: List<Entry>) {
         state.update { current -> (restored.filter { old -> current.none { it.jobId == old.jobId } } + current).distinctBy { it.jobId } }
+        // A job whose own system service kept going while the process was dead (a DownloadManager
+        // download) is not left paused for the person to resume: it re-attaches to its checkpoint.
+        restored.filter { it.nativeKind in nativeReattachKinds && it.paused && !it.done && nativeSpecs.containsKey(it.jobId) }.forEach { entry ->
+            update(entry.jobId) { it.copy(paused = false, statusLine = "Reconnecting…") }
+            launchNative(entry.jobId, entry.resumePayload)
+        }
     }
 
     private fun persist() {
@@ -251,9 +259,23 @@ object PluginJobsCenter {
         return jobId
     }
 
-    /** Registers how a job droidtop runs itself of [kind] is run (SPEC 12a "Jobs"); called once at process start, before [attach] restores anything. */
-    fun registerNative(kind: String, runner: NativeJobRunner) {
+    /**
+     * Registers how a job droidtop runs itself of [kind] is run (SPEC 12a "Jobs"); called once at
+     * process start, before [attach] restores anything. [onCancel] runs (off the main thread) when
+     * the person cancels a job of this kind, running or paused or restored, with its arguments and
+     * last checkpoint: the place to release whatever the job holds outside this process. With
+     * [reattachOnRestart] a restored job of this kind is run again from its checkpoint at once
+     * instead of waiting paused for Resume.
+     */
+    fun registerNative(
+        kind: String,
+        onCancel: ((args: Map<String, String>, checkpoint: String?) -> Unit)? = null,
+        reattachOnRestart: Boolean = false,
+        runner: NativeJobRunner,
+    ) {
         nativeRunners[kind] = runner
+        if (onCancel != null) nativeCancelHooks[kind] = onCancel else nativeCancelHooks.remove(kind)
+        if (reattachOnRestart) nativeReattachKinds.add(kind) else nativeReattachKinds.remove(kind)
     }
 
     /**
@@ -270,6 +292,8 @@ object PluginJobsCenter {
         title: String,
         args: Map<String, String> = emptyMap(),
         onComplete: (PluginResult) -> Unit = {},
+        owner: String = NATIVE_OWNER_LABEL,
+        pausable: Boolean = true,
     ): String? {
         context?.let(::attach)
         if (!nativeRunners.containsKey(kind)) return null
@@ -284,8 +308,8 @@ object PluginJobsCenter {
         state.update { current ->
             listOf(
                 Entry(
-                    jobId = jobId, pluginId = NATIVE_OWNER_ID, pluginLabel = NATIVE_OWNER_LABEL, capability = null, title = title,
-                    startedAtMs = System.currentTimeMillis(), kind = "native", pausable = true, resumable = true, nativeKind = kind,
+                    jobId = jobId, pluginId = NATIVE_OWNER_ID, pluginLabel = owner, capability = null, title = title,
+                    startedAtMs = System.currentTimeMillis(), kind = "native", pausable = pausable, resumable = true, nativeKind = kind,
                 ),
             ) + current
         }
@@ -383,7 +407,12 @@ object PluginJobsCenter {
         brokeredJobs[jobId]?.cancel()
         runners[jobId]?.cancelJob(entry.pluginId, jobId)
         nativeJobs.remove(jobId)?.cancel()
-        nativeSpecs.remove(jobId)
+        nativeSpecs.remove(jobId)?.let { spec ->
+            nativeCancelHooks[spec.kind]?.let { hook ->
+                val checkpoint = entry.resumePayload
+                resumeScope.launch { runCatching { hook(spec.args, checkpoint) } }
+            }
+        }
         nativeCompletions.remove(jobId)
         if (entry.resumable) {
             state.update { list -> list.filterNot { it.jobId == jobId } }
@@ -397,7 +426,7 @@ object PluginJobsCenter {
         val entry = find(jobId) ?: return false
         if (nativeSpecs.containsKey(jobId)) {
             // No checkpoint yet only means a resume starts from the beginning.
-            if (entry.done || entry.paused) return false
+            if (entry.done || entry.paused || !entry.pausable) return false
             update(jobId) { it.copy(paused = true, statusLine = "Paused") }
             nativeJobs[jobId]?.cancel()
             return true

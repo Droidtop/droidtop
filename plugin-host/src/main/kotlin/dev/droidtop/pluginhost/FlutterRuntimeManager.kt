@@ -3,10 +3,6 @@ package dev.droidtop.pluginhost
 import android.content.Context
 import android.os.Build
 import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.security.MessageDigest
 import java.util.zip.ZipFile
 import org.json.JSONObject
 
@@ -56,13 +52,7 @@ import org.json.JSONObject
 object FlutterRuntimeManager {
     private const val ASSET_PATH = "flutter-runtimes.json"
     private const val MARKER_FILE = ".verified"
-
-    sealed interface Progress {
-        data class Downloading(val bytesRead: Long, val totalBytes: Long) : Progress
-        object Verifying : Progress
-        object Extracting : Progress
-        object Done : Progress
-    }
+    private const val DOWNLOAD_POST = "flutter_runtime"
 
     private data class ArtifactSpec(val url: String, val sha256: String, val jarEntry: String, val soEntryInJar: String)
     private data class RuntimeSpec(val version: String, val libflutterSoName: String, val artifact: ArtifactSpec)
@@ -133,68 +123,44 @@ object FlutterRuntimeManager {
     }
 
     /**
-     * Downloads (if not already verified-installed), verifies and
-     * extracts the pinned runtime, reporting [onProgress] along the way
-     * -- meant to be driven from the same `AsyncActionItem` settings-row
-     * shape [PythonRuntimeManager.ensureInstalled] already uses. Must be
-     * called off the main thread; returns null on success, an error
-     * message otherwise, never throws.
+     * Downloads (if not already verified-installed) the pinned runtime as a job in "Downloads and
+     * installs" ([DownloadJobs]: DownloadManager transfers, the SHA-256 is checked, then
+     * [installFrom] extracts), narrating through [onStatus] -- driven from the
+     * `AsyncActionItem` settings-row shape, droidtop's "long action with live text". Returns null
+     * on success, an error message otherwise; throws nothing.
      */
-    suspend fun ensureInstalled(context: Context, onProgress: (Progress) -> Unit): String? {
+    suspend fun ensureInstalled(context: Context, onStatus: (String) -> Unit): String? {
         val spec = readSpec(context) ?: return "no pinned Flutter runtime for this build (missing/broken $ASSET_PATH)"
-        val installDir = installDirFor(context, spec)
-        if (File(installDir, MARKER_FILE).isFile) {
-            onProgress(Progress.Done)
+        if (File(installDirFor(context, spec), MARKER_FILE).isFile) {
+            onStatus("Done")
             return null
         }
+        val result = DownloadJobs.run(
+            context, "Flutter runtime", DOWNLOAD_POST, spec.artifact.url, "flutter-runtime.zip",
+            sha256 = spec.artifact.sha256, onStatus = onStatus,
+        )
+        return if (result.ok) null else "couldn't install the Flutter runtime: ${result.error}"
+    }
 
-        val tmpFile = File(context.cacheDir, "flutter-runtime-download.zip")
+    /** Names this runtime's post-processing step with the one download runner; called at process start. */
+    internal fun registerDownloadPost() {
+        DownloadJobs.registerPost(DOWNLOAD_POST) { context, file, _ -> installFrom(context, file) }
+    }
+
+    /** Extracts the verified download into the install directory and writes the marker; throws with the reason on failure. */
+    private fun installFrom(context: Context, archive: File): String {
+        val spec = readSpec(context) ?: throw IllegalStateException("no pinned Flutter runtime for this build")
+        val installDir = installDirFor(context, spec)
         try {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val connection = (URL(spec.artifact.url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 30_000
-                readTimeout = 30_000
-            }
-            connection.connect()
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                return "download failed: HTTP ${connection.responseCode}"
-            }
-            val total = connection.contentLengthLong
-            var readSoFar = 0L
-            connection.inputStream.use { input ->
-                FileOutputStream(tmpFile).use { output ->
-                    val buffer = ByteArray(64 * 1024)
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        output.write(buffer, 0, n)
-                        digest.update(buffer, 0, n)
-                        readSoFar += n
-                        onProgress(Progress.Downloading(readSoFar, total))
-                    }
-                }
-            }
-
-            onProgress(Progress.Verifying)
-            val actualSha = digest.digest().joinToString("") { "%02x".format(it) }
-            if (!actualSha.equals(spec.artifact.sha256, ignoreCase = true)) {
-                return "downloaded runtime failed SHA-256 verification (got $actualSha, expected ${spec.artifact.sha256}) -- refusing to install it"
-            }
-
-            onProgress(Progress.Extracting)
             if (installDir.isDirectory) installDir.deleteRecursively()
             installDir.mkdirs()
-            extractLibflutter(tmpFile, spec, installDir)
-
+            extractLibflutter(archive, spec, installDir)
             File(installDir, MARKER_FILE).writeText("${spec.version} ${spec.artifact.sha256}")
-            onProgress(Progress.Done)
-            return null
         } catch (e: Exception) {
             installDir.deleteRecursively()
-            return "couldn't install the Flutter runtime: ${e.message}"
-        } finally {
-            tmpFile.delete()
+            throw e
         }
+        return "Flutter runtime installed"
     }
 
     /**

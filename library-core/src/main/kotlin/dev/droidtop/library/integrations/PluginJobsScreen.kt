@@ -5,6 +5,7 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.PluginJobsCenter
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
@@ -99,7 +100,11 @@ object PluginJobsScreen {
         val cancelRow = ActionItem(
             id = "plugin_job_${entry.jobId}_cancel",
             title = "Cancel \"${entry.title}\"",
-            subtitle = if (entry.nativeKind != null) "Stops at the next game" else "Best-effort -- the plugin decides whether it actually stops",
+            subtitle = when (entry.nativeKind) {
+                null -> "Best-effort -- the plugin decides whether it actually stops"
+                DownloadJobs.KIND -> "Stops the download and deletes what was downloaded so far"
+                else -> "Stops at the next game"
+            },
             confirmTitle = "Cancel this job?",
             run = { PluginJobsCenter.cancel(entry.jobId) },
         )

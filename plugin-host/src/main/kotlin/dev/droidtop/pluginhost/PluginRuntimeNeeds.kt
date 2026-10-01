@@ -34,35 +34,10 @@ object PluginRuntimeNeeds {
         else -> null
     }
 
-    /** Downloads, verifies and installs [need]'s runtime, reporting progress as plain text. Returns null on success, otherwise the reason. Off the main thread; never throws. */
+    /** Downloads, verifies and installs [need]'s runtime as a job, reporting progress as plain text. Returns null on success, otherwise the reason. Off the main thread; never throws. */
     suspend fun install(context: Context, need: RuntimeNeed, onStatus: (String) -> Unit): String? = when (need.kind) {
-        PluginKind.FLUTTER_EMBED -> FlutterRuntimeManager.ensureInstalled(context) { progress ->
-            onStatus(
-                when (progress) {
-                    is FlutterRuntimeManager.Progress.Downloading -> downloadText(progress.bytesRead, progress.totalBytes)
-                    FlutterRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
-                    FlutterRuntimeManager.Progress.Extracting -> "Extracting..."
-                    FlutterRuntimeManager.Progress.Done -> "Done"
-                },
-            )
-        }
-        PluginKind.PYTHON -> PythonRuntimeManager.ensureInstalled(context) { progress ->
-            onStatus(
-                when (progress) {
-                    is PythonRuntimeManager.Progress.Downloading -> downloadText(progress.bytesRead, progress.totalBytes)
-                    PythonRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
-                    PythonRuntimeManager.Progress.Extracting -> "Extracting..."
-                    PythonRuntimeManager.Progress.Done -> "Done"
-                },
-            )
-        }
+        PluginKind.FLUTTER_EMBED -> FlutterRuntimeManager.ensureInstalled(context, onStatus)
+        PluginKind.PYTHON -> PythonRuntimeManager.ensureInstalled(context, onStatus)
         else -> "this kind of plugin needs no runtime"
-    }
-
-    private fun downloadText(bytesRead: Long, totalBytes: Long): String = if (totalBytes > 0) {
-        val pct = (bytesRead * 100 / totalBytes).toInt()
-        "Downloading... $pct% (${bytesRead / 1024 / 1024} MB / ${totalBytes / 1024 / 1024} MB)"
-    } else {
-        "Downloading... ${bytesRead / 1024 / 1024} MB"
     }
 }
