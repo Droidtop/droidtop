@@ -67,8 +67,8 @@ class CompanionActivity : AppCompatActivity() {
                     // the addon, THIS activity is what the remaining panel
                     // shows, and in Desktop mode that panel is the input
                     // surface (trackpad + keyboard) by default, not widgets.
-                    val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(this)
-                    if (SecondScreenInputPrefs.role(this, mode) == SecondScreenInputPrefs.Role.INPUT) {
+                    val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(this@CompanionActivity)
+                    if (SecondScreenInputPrefs.role(this@CompanionActivity, mode) == SecondScreenInputPrefs.Role.INPUT) {
                         SecondScreenInputSurface(mode)
                         return@DroidtopTheme
                     }
