@@ -296,6 +296,7 @@ class CatalogPreferenceNavigator(
             screen?.title?.let { fragment.activity?.title = it }
             backCallback.isEnabled = stack.isNotEmpty()
             ensureFocusRing()
+            applyRestoreFocus()
             if (focusKey != null) focusOn(focusKey)
         }
     }
