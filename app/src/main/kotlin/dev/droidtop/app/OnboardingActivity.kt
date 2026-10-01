@@ -170,6 +170,7 @@ class OnboardingActivity : AppCompatActivity() {
         onboardingRun.start(
             startStep,
             hasStorageAccess(this),
+            controllerAttached = ControllerPrefs.attachedControllers().isNotEmpty(),
             // A rerun starts from the modes as they are, so walking through
             // it again changes nothing that is not changed on the way.
             modesOnBefore = if (!firstRun) {
@@ -248,6 +249,10 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
     var storageGrantedAtEntry: Boolean = false
         private set
 
+    /** Whether a controller was attached when the run started; see [plannedSteps]. */
+    var controllerAttachedAtEntry: Boolean = true
+        private set
+
     /**
      * [modesOnBefore] is null on a first run, where nothing is ticked
      * until the person ticks it; on a rerun it is the modes already on,
@@ -259,9 +264,11 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
         modesOnBefore: Set<dev.droidtop.library.settings.Mode>? = null,
         saved: org.json.JSONObject? = null,
         persistent: Boolean = false,
+        controllerAttached: Boolean = true,
     ) {
         if (started) return
         started = true
+        this.controllerAttachedAtEntry = controllerAttached
         this.startStep = startStep
         this.persistent = persistent
         this.storageGrantedAtEntry = storageGranted
@@ -299,6 +306,7 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
         put("desktopCapable", desktopCapable.value)
         chosenMode.value?.let { put("mode", it.id) }
         put("storageAtEntry", storageGrantedAtEntry)
+        put("controllerAtEntry", controllerAttachedAtEntry)
     }.toString()
 
     private fun restore(saved: org.json.JSONObject) {
@@ -316,6 +324,7 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
         desktopCapable.value = saved.optBoolean("desktopCapable")
         chosenMode.value = dev.droidtop.library.settings.Mode.byId(saved.optString("mode").ifEmpty { null })
         storageGrantedAtEntry = saved.optBoolean("storageAtEntry", storageGrantedAtEntry)
+        controllerAttachedAtEntry = saved.optBoolean("controllerAtEntry", controllerAttachedAtEntry)
     }
 
     // Each answer is a MutableState the screen delegates to (`var step by
@@ -377,6 +386,10 @@ internal fun plannedSteps(
     configureDesktop: Boolean,
     configureGaming: Boolean,
     storageGranted: Boolean,
+    // Whether a controller was attached when the run started (asked once, for
+    // the same reason as [storageGranted]). With none there is nothing to
+    // test or map, and Settings, Input, Controller opens the same step later.
+    controllerAttached: Boolean = true,
 ): List<OnboardingStep> = buildList {
     add(OnboardingStep.WELCOME)
     add(OnboardingStep.HOME_CHOICE)
@@ -406,7 +419,7 @@ internal fun plannedSteps(
     // 7b). The pad is asked about whatever modes are being set up -- it is
     // how the shell itself is driven -- while the theme is Gaming's, so a
     // person who is not setting Gaming up is not asked to pick one.
-    add(OnboardingStep.CONTROLLER)
+    if (controllerAttached) add(OnboardingStep.CONTROLLER)
     if (configureGaming) add(OnboardingStep.APPEARANCE)
     // The keyboard is Desktop's: its reason is terminals and Windows
     // programs. Asked of a Gaming-only run, it was a question about
@@ -620,7 +633,7 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
     // reason plannedSteps gives: a plan that changes under the user's
     // feet cannot say where to go next -- and a plan rebuilt from a
     // fresh reading after every rotation is exactly that.
-    val plan = plannedSteps(homeChoice, configureDesktop, configureGaming, run.storageGrantedAtEntry)
+    val plan = plannedSteps(homeChoice, configureDesktop, configureGaming, run.storageGrantedAtEntry, run.controllerAttachedAtEntry)
 
     // Written down as it changes, so a new process resumes this run where
     // it was (OnboardingRun.persistent): becoming the Home app, a kill from
@@ -1018,6 +1031,9 @@ private fun OnboardingScaffold(
     // nothing on Welcome and D-pad Down went to the Back button
     // (dq-coordinator-24, finding 7).
     focusContentFirst: Boolean = false,
+    // A specific control that takes the pad's selection first, when the step
+    // has a clearer first action than Next (Game folders: "Add a folder").
+    initialFocus: FocusRequester? = null,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
     val window = currentShellWindow()
@@ -1032,7 +1048,11 @@ private fun OnboardingScaffold(
     LaunchedEffect(title) {
         repeat(FOCUS_ATTEMPTS) {
             runCatching {
-                if (primary != null && !focusContentFirst) primaryFocus.requestFocus() else contentFocus.requestFocus()
+                when {
+                    initialFocus != null -> initialFocus.requestFocus()
+                    primary != null && !focusContentFirst -> primaryFocus.requestFocus()
+                    else -> contentFocus.requestFocus()
+                }
             }
             delay(FOCUS_RETRY_MS)
             if (holdsFocus) return@LaunchedEffect
@@ -1224,7 +1244,7 @@ private fun WelcomeStep(progress: StepProgress?, onBack: (() -> Unit)?, onContin
 private fun DroidtopMark() {
     Text(
         "Android  ·  Gaming  ·  Desktop",
-        color = MenuTokens.Accent,
+        color = MenuTokens.OnSurfaceMuted,
         style = TypeRole.rowTitle,
         modifier = Modifier.padding(top = Space.Md),
     )
@@ -1333,6 +1353,9 @@ private fun AlternativeSetupStep(
             val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
             pm.queryIntentActivities(homeIntent, 0)
                 .filter { it.activityInfo.packageName != context.packageName }
+                // Android's own placeholder home (Settings' FallbackHome,
+                // priority -1000) answers the HOME query but is not a launcher.
+                .filter { it.priority > -1000 && !it.activityInfo.name.endsWith("FallbackHome") }
                 .map { info ->
                     Triple(
                         ComponentName(info.activityInfo.packageName, info.activityInfo.name),
@@ -1535,7 +1558,9 @@ private fun StoragePermissionStep(
         title = "Access to your game folders",
         // The rationale comes BEFORE the prompt, per Android's own
         // guidance and SPEC 7b: what droidtop reads and what it does not.
-        body = if (legacy) {
+        body = if (granted) {
+            null
+        } else if (legacy) {
             "droidtop will only read the folders you choose in the next step. Tap " +
                 "Allow access, and Android will ask you to confirm."
         } else {
@@ -1553,7 +1578,7 @@ private fun StoragePermissionStep(
         secondary = if (granted) null else StepAction("Continue without it", onClick = onContinue),
     ) {
         when {
-            granted -> StepNote("Storage access is on. droidtop can read the folders you name.", accent = true)
+            granted -> StepNote("Storage access is on. droidtop can read the folders you choose in the next step.", accent = true)
             permanentlyDenied -> StepNote(
                 "Android won't ask again. Until you allow it in Android's app settings, " +
                     "droidtop can't find games. Everything else still works.",
@@ -1593,6 +1618,7 @@ private fun GamesFoldersStep(
     // not moved (tester, 2026-09-29): focus is let go before the picker opens.
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     var pathFieldFocused by remember { mutableStateOf(false) }
+    val addFolderFocus = remember { FocusRequester() }
     // Looked for once per visit: a directory listing of /storage and
     // /mnt/windows, off the main thread.
     val found by produceState<List<String>>(initialValue = emptyList()) {
@@ -1609,6 +1635,7 @@ private fun GamesFoldersStep(
         progress = progress,
         onBack = onBack,
         primary = StepAction("Next", onClick = onContinue),
+        initialFocus = addFolderFocus,
     ) {
         if (roots.isEmpty()) {
             StepNote("No folders added yet. Add one, or continue with an empty library.")
@@ -1671,6 +1698,7 @@ private fun GamesFoldersStep(
                 onAddFolder()
             },
             filled = true,
+            modifier = Modifier.focusRequester(addFolderFocus),
         )
         // The picker can only offer what Android calls a storage volume,
         // and real libraries live outside that set: an emulator's host

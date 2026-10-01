@@ -4923,8 +4923,8 @@ buttons and a link. The component is the shell's existing menu row anatomy
   `/mnt/windows`, where emulators mount a host share), each with Add; the typed path's example
   names no folder, since a newcomer had to already know the share's path (dq-coordinator-24).
   The system picker's button ("Add a folder", filled) sits with the typed-path field, not in the
-  action area beside Next, so the two ways to add are one place; the path box gives up focus (and
-  the keyboard) before the picker opens, and the folder list is read again on every resume, so a
+  action area beside Next, so the two ways to add are one place; the pad's selection starts on it
+  rather than on Next, the path box gives up focus (and the keyboard) before the picker opens, and the folder list is read again on every resume, so a
   pick shows at once. An invalid-path error shows only after a path was tried. Adding a folder starts the library's walk of it at once (§2c). Each added folder is a row
   showing the path, what the scan found under it, and a way to remove it. The step reports the result of the scan; a folder that yields nothing is
   a fact the person learns here, not after onboarding.
@@ -4949,8 +4949,10 @@ buttons and a link. The component is the shell's existing menu row anatomy
     person who swapped their face buttons did not ask for it to start confirming. The value is
     loaded once at shell start and on every write, because `actionFor` is on every screen's key
     path and has no `Context`.
-  - The step is not conditional on Gaming: the pad is how the shell itself is driven. The
-    Settings row that owns it is Input > Controller, which re-enters this same step.
+  - The step is not conditional on Gaming: the pad is how the shell itself is driven. It is left
+    out of a run that started with no controller attached (rig review, 2026-09-30: there is
+    nothing to test or map, and the page asked a person using the D-pad to test it); the Settings
+    row that owns it is Input > Controller, which opens this same step.
 - **Appearance.** Built 2026-09-17. Themes as the one choice component with a real rendered
   preview, named by display name — the theme's own `<themeName>`, never a directory id, and never a theme's own
   untranslated capability label (a `capabilities.xml` declares one `<label>` per language, so

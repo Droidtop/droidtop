@@ -150,8 +150,17 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
     // codebase for the identical race (GamesSection's own firstFocus
     // handling): key a SEPARATE effect off the state that must have already
     // recomposed, not `Unit`.
+    // The attach can still be a frame away when the entries arrive, and an
+    // unattached requester throws and takes the process down (Droidtop/
+    // tracker#161: "Get more themes" in onboarding crashed droidtop, and
+    // Android then dropped the Always Home choice), so it is asked again
+    // until it holds and a miss is never fatal.
     LaunchedEffect(entries) {
-        if (entries.isNotEmpty()) firstFocus.requestFocus()
+        if (entries.isEmpty()) return@LaunchedEffect
+        repeat(10) {
+            if (runCatching { firstFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+            kotlinx.coroutines.delay(50)
+        }
     }
     // The dispatcher route out, which is the only route when the list is
     // empty: with no row focused there is nothing for a key event to
