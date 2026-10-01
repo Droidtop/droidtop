@@ -11,6 +11,9 @@ these three top-level functions are called directly:
 
   on_load(data_dir: str) -> None        (optional)
   invoke(payload_json: str) -> str      (required for status_tile)
+  on_event(payload_json: str) -> str    (optional, called when a subscribed
+                                       event fires; payload has "event" and
+                                       "args")
   on_unload() -> None                   (optional)
 
 invoke's payload is {"capability": "<id>", "args": {...}} as a JSON

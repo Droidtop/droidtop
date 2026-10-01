@@ -62,6 +62,30 @@ class PythonDroidtopPlugin(
      * contract 1 plugin keeps the translation onto its capabilities. An unhandled
      * Python exception propagates as a crash, the same as from `invoke`.
      */
+    override fun onEvent(event: PluginEvent, args: PluginArgs): PluginResult {
+        val payload = JSONObject().apply {
+            put("event", event.id)
+            put("args", JSONObject().apply { args.keys().forEach { put(it, args.string(it)) } })
+        }.toString()
+        val resultJson = try {
+            PythonBridge.nativeCallFunction(uniqueName, "on_event", payload)
+        } catch (e: PythonCallException) {
+            if (e.message?.contains("on_event", ignoreCase = true) == true) {
+                return PluginResult.success()
+            }
+            return PluginResult.failure(e.message ?: "python plugin event call failed")
+        }
+        return try {
+            val obj = JSONObject(resultJson)
+            val ok = obj.optBoolean("ok", false)
+            if (!ok) return PluginResult.failure(obj.optString("error", "python plugin event call failed"))
+            val values = obj.optJSONObject("values") ?: JSONObject()
+            PluginResult.success(buildMap { values.keys().forEach { k -> put(k, values.optString(k)) } })
+        } catch (e: Exception) {
+            PluginResult.failure("malformed result from python plugin event: ${e.message}")
+        }
+    }
+
     override fun handle(call: PluginCall): PluginReply {
         if (contractVersion < 2) return LegacyHandle.translate(this, call)
         return PluginReply.parse(PythonBridge.nativeCallFunction(uniqueName, "handle", call.toJson().toString()))

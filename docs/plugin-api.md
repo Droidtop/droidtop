@@ -214,10 +214,10 @@ The rules that make this "no kind-specific features":
 2. **Parity is tested, not claimed.** One conformance script (the fake
    host, §3 I2) drives the same calls against each kind's sample, and a
    kind that fails a case is a bug in that kind's adapter. The known gaps
-   (audit 2026-10-01): `startJob` for `python` (P1-8, #64), `host.call`
-   for `python` and `flutter_embed` (#127), and event delivery
-   (`onEvent`) for `python` and `flutter_embed`, which both still answer
-   every event with the default no-op. `handle` reaches all three kinds
+    (audit 2026-10-01): `startJob` for `python` (P1-8, #64), `host.call`
+    for `python` and `flutter_embed` (#127). Event delivery (`onEvent`)
+    for `python` and `flutter_embed` is delivered through both adapters
+    since this change. `handle` reaches all three kinds
    since 2026-10-01 (§1.6).
 3. **A new kind is a new adapter plus a pass of the same conformance
    script,** and nothing else. This is what `PluginKind`'s own doc

@@ -400,6 +400,18 @@ class FlutterDroidtopPlugin(
      * reply out, both JSON text. A contract 1 plugin keeps the translation onto its
      * capabilities, so nothing changes for a bundle built before this existed.
      */
+    override fun onEvent(event: PluginEvent, args: PluginArgs): PluginResult {
+        val argsJson = JSONObject().apply { args.keys().forEach { put(it, args.string(it)) } }
+        val payload = JSONObject().put("event", event.id).put("args", argsJson).toString()
+        val (resultJson, errorMessage) = callDart("onEvent", payload)
+        if (errorMessage != null && errorMessage.contains("plugin's Dart code has no MethodChannel handler for 'onEvent'")) {
+            return PluginResult.success()
+        }
+        errorMessage?.let { return PluginResult.failure(it) }
+        val raw = resultJson ?: return PluginResult.failure("plugin returned no result")
+        return decode(raw)
+    }
+
     override fun handle(call: PluginCall): PluginReply {
         if (!speaksContract2) return LegacyHandle.translate(this, call)
         val (replyJson, errorMessage) = callDart("handle", call.toJson().toString())

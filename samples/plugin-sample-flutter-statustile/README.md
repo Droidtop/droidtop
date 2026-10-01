@@ -47,3 +47,8 @@ for droidtop's own "Add integration file" picker (Settings > Plugins).
   that a caught Dart exception would NOT give (Flutter's own dispatcher
   turns an uncaught exception from a MethodChannel handler into an error
   *reply*, not a process crash; see `lib/main.dart`'s own comment).
+- Channel method `onEvent` (optional): receives payload
+  `{"event": "<event.id>", "args": {...}}`; reply with the same
+  `{"ok": true, ...}` / `{"ok": false, ...}` JSON shape. A plugin
+  that subscribes to an event but has no `onEvent` handler must return
+  nothing (the adapter treats the missing handler as success).
