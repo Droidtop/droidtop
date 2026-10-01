@@ -51,6 +51,35 @@ jobs:
       - name: Set up the Android build
         uses: ./.github/actions/android-setup
 
+      - name: Validate sample plugin manifests
+        run: |
+          python3 -m pip install --quiet jsonschema==4.23.0
+          python3 - <<'PY'
+          import json
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          import jsonschema
+
+          schema_path = Path("docs/plugin-manifest.schema.json")
+          schema = json.loads(schema_path.read_text())
+          manifests = subprocess.check_output(
+              ["git", "ls-files", "samples/*/manifest*.json"], text=True
+          ).splitlines()
+          validator = jsonschema.validators.validator_for(schema)(schema)
+          failures = 0
+          for filename in manifests:
+              try:
+                  validator.validate(json.loads(Path(filename).read_text()))
+              except (OSError, json.JSONDecodeError, jsonschema.ValidationError) as error:
+                  print(f"{filename}: {error}", file=sys.stderr)
+                  failures += 1
+          if failures:
+              sys.exit(1)
+          print(f"Validated {len(manifests)} sample plugin manifests")
+          PY
+
       # These run in their own workflow so that a failing check turns THIS
       # run red and never costs anyone the installable build: this
       # project's real workflow is installing the CI artifact on a rig, and

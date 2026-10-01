@@ -6,6 +6,7 @@
   "version": "1.0.0",
   "kind": "flutter_embed",
   "contractVersion": 2,
+  "runtimeVersion": "af7e796e161ae0bb1ff0758c71a7105418bd9ded",
   "requestsRoot": false,
   "provides": [
     {"point":"ui.status_tile","version":1,"id":"state","label":"Sample tile (Flutter)","surfaces":["gaming.quick_menu"]},
