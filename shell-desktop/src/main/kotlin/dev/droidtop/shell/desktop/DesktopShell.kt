@@ -367,7 +367,7 @@ private fun BoxScope.Taskbar(
         modifier = Modifier
             .align(if (DesktopPrefs.taskbarAtTop(context)) Alignment.TopStart else Alignment.BottomStart)
             .fillMaxWidth()
-            .height(48.dp)
+             .heightIn(min = 48.dp)
             .background(MaterialTheme.colorScheme.surface),
         verticalAlignment = Alignment.CenterVertically,
     ) {

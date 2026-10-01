@@ -106,7 +106,7 @@ private fun RecentCard(entry: LibraryEntry) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp)
+                 .heightIn(min = 150.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
