@@ -4493,7 +4493,11 @@ with three parts, and screens see only its output.
 **1. The front: one gate per window (`PadGate`, `shell-gamepad/input`).**
 Every window of the shell -- the activity and every Compose `Dialog`,
 which is a window of its own (`GatePadInThisDialog`) -- passes its key and
-joystick events through one gate before anything else sees them:
+joystick events through one gate before anything else sees them. A dialog
+is also its own window for immersive state (`HideSystemBarsInThisDialog`,
+same file): without it, Android's grey status bar paints over the top of
+every dialog-hosted menu (Quick Menu, L2 menu, game page, filter/search),
+leaving the shell's `StatusCluster` under a second OS clock (`tracker#169`).
 
 - **Bounce.** A fresh press of a key less than 25 ms after that key's own
   release is a worn or noisy switch: the press, its repeats and its

@@ -10,6 +10,9 @@ import android.view.ViewConfiguration
 import android.view.Window
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
@@ -447,6 +450,30 @@ fun GatePadInThisDialog() {
         val window = (view.parent as? DialogWindowProvider)?.window
         val detach = window?.let { PadGate.attach(it) } ?: {}
         onDispose { detach() }
+    }
+}
+
+/**
+ * Hides Android's system bars in the Compose `Dialog` window this is called
+ * from, with the same sticky-immersive behavior the activity uses (`docs/
+ * SPEC.md` 6e, Droidtop/tracker#169). A dialog is its own window: without
+ * this, the grey OS status bar (clock, icons) paints across the top of
+ * every dialog-hosted menu (Quick Menu, L2 menu, game page, filter/search),
+ * leaving the shell's own `StatusCluster` sitting under a second clock.
+ */
+@Composable
+fun HideSystemBarsInThisDialog() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = (view.parent as? DialogWindowProvider)?.window
+        if (window != null) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val controller = WindowInsetsControllerCompat(window, window.decorView)
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { }
     }
 }
 

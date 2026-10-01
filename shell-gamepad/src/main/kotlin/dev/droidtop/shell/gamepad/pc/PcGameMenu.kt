@@ -70,6 +70,7 @@ import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.MediaViewer
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -746,6 +747,7 @@ internal fun PcGameMenu(
         }
     }
     Dialog(onDismissRequest = goBack) {
+        HideSystemBarsInThisDialog()
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Game options",

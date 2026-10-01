@@ -2,6 +2,7 @@ package dev.droidtop.shell.gamepad.query
 
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.menuMove
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -299,6 +300,7 @@ internal fun LibrarySearchDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         GatePadInThisDialog()
+        HideSystemBarsInThisDialog()
         Column(
             modifier = Modifier
                 .width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp))

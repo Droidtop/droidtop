@@ -59,6 +59,7 @@ import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.ownPadButtons
@@ -140,6 +141,7 @@ internal fun PcGamePage(
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         GatePadInThisDialog()
+        HideSystemBarsInThisDialog()
         val art: @Composable () -> Unit = {
             PageArt(entry, modifier = Modifier.fillMaxWidth())
         }

@@ -41,6 +41,7 @@ import dev.droidtop.library.message
 import dev.droidtop.runtime.systemstatus.NotificationsStore
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.menuStep
@@ -122,6 +123,7 @@ internal fun QuickMenu(
         // pipeline as the shell's (docs/SPEC.md 6e), so the stick, the
         // repeat cadence and a held Select behave here as they do there.
         GatePadInThisDialog()
+        HideSystemBarsInThisDialog()
         // Game only while a game is actually running (see this
         // function's own doc comment) -- computed once per sheet
         // opening, same as runningEntry itself is (GamepadShell only
