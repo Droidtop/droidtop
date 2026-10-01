@@ -390,7 +390,7 @@ internal fun PcGameMenu(
     if (editingThread) {
         TextEditDialog(
             title = "F95zone thread",
-            subtitle = "Paste the game's thread link, or its number. droidtop asks F95Checker's public index " +
+            subtitle = "Paste the game's thread link, or its number. droidtop checks a public index " +
                 "for the thread's newest version; no F95zone account is needed. Clear it and save to unlink.",
             initial = links?.f95Thread?.let { F95Thread.url(it) }.orEmpty(),
             onCommit = { text ->
@@ -400,10 +400,10 @@ internal fun PcGameMenu(
                     status = "That is not an F95zone thread link: it should look like f95zone.to/threads/<name>.<number>/"
                 } else {
                     scope.launch {
-                        status = if (thread == null) "Unlinking..." else "Asking about thread $thread..."
+                        status = if (thread == null) "Unlinking..." else "Checking thread $thread..."
                         val failure = library.linkF95Thread(gameIds, thread)
                         status = when {
-                            failure != null -> "Linked thread $thread, but asking about it failed: $failure"
+                            failure != null -> "Linked thread $thread, but checking it failed: $failure"
                             thread == null -> "Unlinked. This game is no longer checked for updates."
                             else -> null
                         }
@@ -443,11 +443,11 @@ internal fun PcGameMenu(
                 links?.f95Thread?.let { thread ->
                     PcActionRow(
                         "Check for an update now",
-                        links?.check?.let { "Last asked " + android.text.format.DateUtils.getRelativeTimeSpanString(it.checkedAtEpochMs) }
-                            ?: "Not asked yet",
+                        links?.check?.let { "Last checked " + android.text.format.DateUtils.getRelativeTimeSpanString(it.checkedAtEpochMs) }
+                            ?: "Not checked yet",
                         {
                             scope.launch {
-                                status = "Asking about thread $thread..."
+                                status = "Checking thread $thread..."
                                 status = library.checkF95ThreadNow(thread)
                                 linksToken++
                             }
@@ -846,7 +846,7 @@ private fun f95Line(links: GameLinks?, available: String?, versions: List<String
     val check = links.check
     val newest = check?.version
     return when {
-        check == null -> "Thread $thread - not asked yet"
+        check == null -> "Thread $thread - not checked yet"
         check.gone -> "Thread $thread is gone: private, moved or deleted"
         available != null -> "${GameUpdates.line(available)} - thread $thread"
         newest == null -> "Thread $thread gives no version"
@@ -978,9 +978,9 @@ private fun rememberPcActions(
                     entry.missing -> PcActionRow(
                         "Find its replacement",
                         if (replacements == 0) {
-                            "Nothing detected looks like this game yet"
+                            "Nothing found looks like this game yet"
                         } else {
-                            "$replacements detected ${if (replacements == 1) "game looks" else "games look"} " +
+                            "$replacements found ${if (replacements == 1) "game looks" else "games look"} " +
                                 "like it; picking one moves this game's history, favourite and collections to it"
                         },
                         if (replacements == 0) null else onReplace,
@@ -1127,14 +1127,14 @@ private fun runnerRows(
     onClearWineSettings: () -> Unit,
 ): List<PcActionRow>? = when {
     runsOnEnginehost -> listOfNotNull(
-        PcActionRow("Saves", "Opens Enginehost's own save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
+        PcActionRow("Saves", "Opens Enginehost's save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
         PcActionRow(
             "Controls",
-            "Opens Enginehost's own per-engine controls for this game",
+            "Opens Enginehost's controls for this game",
             { onEnginehost(EngineHost.settingsIntent()) },
         ),
         if (isEngineGame) {
-            PcActionRow("Engine settings", "Opens Enginehost's own settings", { onEnginehost(EngineHost.settingsIntent()) })
+            PcActionRow("Engine settings", "Opens Enginehost's settings", { onEnginehost(EngineHost.settingsIntent()) })
         } else {
             null
         },
@@ -1256,4 +1256,3 @@ private suspend fun lookUpProtonDb(entry: LibraryEntry, name: String): ProtonDbS
 /** The name one folder derives for its game, before any grouping is worked out. */
 private fun ownNameOf(entry: LibraryEntry): String =
     if (entry.id.startsWith("/")) dev.droidtop.library.GameNaming.derive(entry.id).name.ifEmpty { entry.title } else entry.title
-
