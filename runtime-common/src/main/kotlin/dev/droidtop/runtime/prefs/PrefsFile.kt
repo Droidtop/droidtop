@@ -25,6 +25,22 @@ class PrefsFile private constructor(private val preferences: SharedPreferences) 
 
     fun keyedStrings(prefix: String) = KeyedStringStore(preferences, prefix)
 
+    fun getString(key: String, default: String? = null): String? = preferences.getString(key, default)
+    fun putString(key: String, value: String?) {
+        val editor = preferences.edit()
+        if (value == null) editor.remove(key) else editor.putString(key, value)
+        editor.apply()
+    }
+    fun putStrings(values: Map<String, String?>) {
+        val editor = preferences.edit()
+        values.forEach { (key, value) ->
+            if (value == null) editor.remove(key) else editor.putString(key, value)
+        }
+        editor.apply()
+    }
+    fun getBoolean(key: String, default: Boolean = false): Boolean = preferences.getBoolean(key, default)
+    fun putBoolean(key: String, value: Boolean) { preferences.edit().putBoolean(key, value).apply() }
+
     private fun <T> preference(
         key: String,
         default: T,

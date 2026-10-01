@@ -2,6 +2,7 @@ package dev.droidtop.library.scraper
 
 import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * The user's own SteamGridDB API key -- see [SteamGridDbScraperClient] for
@@ -14,10 +15,10 @@ object SteamGridDbPrefs {
     private const val KEY_API_KEY = "droidtop_steamgriddb_apikey"
 
     fun apiKey(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_API_KEY, "") ?: ""
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_API_KEY, "") ?: ""
 
     fun set(context: Context, apiKey: String) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_API_KEY, apiKey).apply()
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putString(KEY_API_KEY, apiKey)
     }
 
     fun isConfigured(context: Context): Boolean = apiKey(context).isNotBlank()

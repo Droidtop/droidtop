@@ -2,6 +2,7 @@ package dev.droidtop.library.scraper
 
 import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * ScreenScraper credentials. The USERNAME/PASSWORD pair is the user's
@@ -33,28 +34,24 @@ object ScreenScraperPrefs {
      * still wins, for anyone running their own registered pair.
      */
     fun devId(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_ID, "")
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_DEV_ID, "")
             ?.takeIf { it.isNotBlank() }
             ?: ScreenScraperDevCredentials.devId
 
     fun devPassword(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_PASSWORD, "")
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_DEV_PASSWORD, "")
             ?.takeIf { it.isNotBlank() }
             ?: ScreenScraperDevCredentials.devPassword
 
     fun userId(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_USER_ID, "") ?: ""
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_USER_ID, "") ?: ""
 
     fun userPassword(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_USER_PASSWORD, "") ?: ""
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_USER_PASSWORD, "") ?: ""
 
     fun set(context: Context, devId: String, devPassword: String, userId: String, userPassword: String) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_DEV_ID, devId)
-            .putString(KEY_DEV_PASSWORD, devPassword)
-            .putString(KEY_USER_ID, userId)
-            .putString(KEY_USER_PASSWORD, userPassword)
-            .apply()
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putStrings(
+            mapOf(KEY_DEV_ID to devId, KEY_DEV_PASSWORD to devPassword, KEY_USER_ID to userId, KEY_USER_PASSWORD to userPassword),
+        )
     }
 }

@@ -2,6 +2,7 @@ package dev.droidtop.library.scraper
 
 import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * User-supplied IGDB/Twitch developer credentials -- see
@@ -16,17 +17,15 @@ object ScraperPrefs {
     private const val KEY_CLIENT_SECRET = "droidtop_igdb_client_secret"
 
     fun clientId(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_CLIENT_ID, "") ?: ""
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_CLIENT_ID, "") ?: ""
 
     fun clientSecret(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_CLIENT_SECRET, "") ?: ""
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_CLIENT_SECRET, "") ?: ""
 
     fun set(context: Context, clientId: String, clientSecret: String) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_CLIENT_ID, clientId)
-            .putString(KEY_CLIENT_SECRET, clientSecret)
-            .apply()
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putStrings(
+            mapOf(KEY_CLIENT_ID to clientId, KEY_CLIENT_SECRET to clientSecret),
+        )
     }
 
     fun isConfigured(context: Context): Boolean = clientId(context).isNotBlank() && clientSecret(context).isNotBlank()
