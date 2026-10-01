@@ -557,8 +557,7 @@ fun CatalogNavigator(
                 item.title.takeIf { it.length > 28 },
                 v?.takeIf { it.length > 14 },
                 (statusById[item.id] ?: item.subtitle),
-            ).joinToString("
-")
+            ).joinToString("\n")
         }.orEmpty()
         CatalogDetailStrip(detail)
     }
