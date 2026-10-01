@@ -92,6 +92,7 @@ import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 internal fun PcLibraryContent(
     entries: List<LibraryEntry>,
     focused: LibraryEntry?,
+    focusedPlay: Pair<PcPlayState, ResolvedRunner?>?,
     onFocusEntry: (LibraryEntry) -> Unit,
     onLaunch: (LibraryEntry) -> Unit,
     onToggleFavorite: (LibraryEntry) -> Unit,
@@ -244,6 +245,7 @@ internal fun PcLibraryContent(
             }
             FocusedGamePanel(
                 entry = focused,
+                focusedPlay = focusedPlay,
                 plateColor = plateColor,
                 onLaunch = onLaunch,
                 modifier = Modifier.weight(0.38f).fillMaxHeight()
@@ -304,6 +306,7 @@ internal fun PcLibraryContent(
 @Composable
 private fun FocusedGamePanel(
     entry: LibraryEntry?,
+    focusedPlay: Pair<PcPlayState, ResolvedRunner?>?,
     plateColor: Color?,
     onLaunch: (LibraryEntry) -> Unit,
     modifier: Modifier = Modifier,
@@ -339,7 +342,7 @@ private fun FocusedGamePanel(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 10.dp),
         )
-        val (play, runner) = rememberPcPlayState(entry)
+        val (play, runner) = focusedPlay ?: (PcPlayStateLoading to null)
         val shape = RoundedCornerShape(12.dp)
         Column(
             modifier = Modifier.padding(top = 10.dp).fillMaxWidth()

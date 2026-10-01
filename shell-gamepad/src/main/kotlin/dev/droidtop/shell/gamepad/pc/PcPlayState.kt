@@ -8,6 +8,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.ResolvedRunner
 import dev.droidtop.library.RunnerState
+import dev.droidtop.library.RunnerAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -38,10 +39,20 @@ internal fun playStateOf(runner: ResolvedRunner?, entry: LibraryEntry): PcPlaySt
         option?.state == RunnerState.READY ->
             PcPlayState("Play", option.caveat ?: "Starts now on $label", pressable = true, ready = true)
         option?.action != null ->
-            PcPlayState(option.reason ?: "Set up", "One step, then this becomes Play", pressable = true, ready = false)
+            PcPlayState(primaryActionLabel(option.action), option.reason ?: "One step, then this becomes Play", pressable = true, ready = false)
         else ->
-            PcPlayState("Can't play yet", option?.reason ?: "No runner on this device offers this game", pressable = false, ready = false)
+            PcPlayState("Choose a runner", option?.reason ?: "No runner on this device offers this game", pressable = false, ready = false)
     }
+}
+
+/** The verb used by both the primary control and the shell's A hint. */
+internal fun primaryActionLabel(action: RunnerAction?): String = when (action) {
+    RunnerAction.INSTALL_ENGINEHOST,
+    RunnerAction.INSTALL_ENGINEHOST_PLUGIN,
+    RunnerAction.INSTALL_KIRIKIROID2 -> "Install"
+    RunnerAction.SET_UP_WINDOWS_GAMES -> "Set up"
+    RunnerAction.CHOOSE_ENGINE_VERSION,
+    null -> "Choose a runner"
 }
 
 /**

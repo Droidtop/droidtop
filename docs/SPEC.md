@@ -8884,9 +8884,14 @@ reproduced on a device from the session that made this change; the shape
 of the fix is that no part of the PC tab is a long list or a touch-only
 surface any more. What changed:
 
-- **A still plays, Y opens the game's own page, L2 the short menu.** A on a
-  card launches exactly as before (2026-09-26 decision above, unchanged:
-  `PcRunnerOptions.resolveAndPlay`). Y or a long-press opens `PcGamePage`
+- **A is the focused item's primary action (owner decision 2026-10-01,
+  Droidtop/tracker#148).** Its hint pill always names that action. Console
+  game lists keep launching on A, as ES-DE does. For a PC card, A plays
+  when its runner is ready and otherwise performs the next setup step
+  (Install or Set up); when no runner can act, the next step is to choose
+  a runner. The focused card, hero panel, game page, L2 menu and hint row
+  use the one `PcPlayState` answer for that label and state. Y or a
+  long-press opens `PcGamePage`
   (`pc/PcGamePage.kt`), a full-bleed Dialog: art on the left; on the right
   the name (or the scraped logo), ONE big primary button (Play, the one
   setup step that makes it Play, or why it cannot, from `PcPlayState`),

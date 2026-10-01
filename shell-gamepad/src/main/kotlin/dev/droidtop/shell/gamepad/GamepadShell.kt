@@ -2786,9 +2786,14 @@ private fun GamesSection(
                     // them acts on the game under the cursor, and an empty
                     // gamelist has none.
                     val gameUnderCursor = systemGamesForGroup.isNotEmpty()
+                    val focusedPcPlay = if (group is GameGroup.Pc) {
+                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let {
+                            dev.droidtop.shell.gamepad.pc.rememberPcPlayState(it)
+                        }
+                    } else null
                     val pcHints = rememberHintList(
                         listOf(
-                            HintBinding(GamepadAction.A, "Play") { gameUnderCursor },
+                            HintBinding(GamepadAction.A, focusedPcPlay?.first?.verb ?: "Launch") { gameUnderCursor },
                             HintBinding(GamepadAction.Y, "Game page") { gameUnderCursor },
                             HintBinding(GamepadAction.L2, "Options") { gameUnderCursor },
                             HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
@@ -2833,6 +2838,7 @@ private fun GamesSection(
                             PcLibraryContent(
                                 entries = systemGamesForGroup,
                                 focused = systemGamesForGroup.getOrNull(focusedGameIndex),
+                                focusedPlay = focusedPcPlay,
                                 onFocusEntry = { entry ->
                                     val index = systemGamesForGroup.indexOf(entry)
                                     if (index >= 0 && index != focusedGameIndex) {
