@@ -92,8 +92,8 @@ public final class SettingsMiscFragment: AbstractSettingsFragment() {
             PREF_DROIDTOP_HOME_SCREEN -> {
                 preference.summary = when (dev.droidtop.shell.standard.HomeRolePrefs.activeHomeImplementation(context)) {
                     dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.STANDARD -> "droidtop's own launcher"
-                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.ALTERNATIVE -> "Forwarding to another launcher"
-                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.NONE -> "Not set up yet"
+                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.ALTERNATIVE -> "A launcher you already have"
+                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.NONE -> "Neither, for now"
                 }
                 preference.setOnPreferenceClickListener {
                     // Re-entry into onboarding's own HOME_CHOICE step -- same
