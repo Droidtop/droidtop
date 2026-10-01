@@ -10604,8 +10604,8 @@ host-bridge            → native Wayland client + JNI: frame passthrough, input
                           and the host<->container clipboard bridge (§6d);
                           depends on runtime-common
 runtime-common         → shared types and interfaces (ContainerRuntime, ContainerLayout,
-                          DisplayOutput, RootfsImage, modes, settings catalogs, …);
-                          depends on nothing
+                          DisplayOutput, RootfsImage, modes, settings catalogs), loose
+                          version ordering and SHA-256 hex encoding; depends on nothing
 runtime-windows        → Wine/Box64, compiling the whole vendored gamenative tree
                           (vendor/gamenative, see below); no display code of its own;
                           depends on runtime-common and library-core (it supplies the

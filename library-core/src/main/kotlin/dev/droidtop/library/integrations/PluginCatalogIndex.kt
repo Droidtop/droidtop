@@ -1,6 +1,6 @@
 package dev.droidtop.library.integrations
 
-import dev.droidtop.pluginhost.BundleSignature
+import dev.droidtop.runtime.util.Sha256
 import org.json.JSONObject
 import java.time.Instant
 
@@ -98,7 +98,7 @@ object PluginCatalogIndexParser {
                 val declared = key.optString("keySha256")
                 if (!HEX_64.matches(declared)) return@runCatching null
                 val der = runCatching { java.util.Base64.getDecoder().decode(spki) }.getOrNull() ?: return@runCatching null
-                if (!BundleSignature.sha256(der).equals(declared, ignoreCase = true)) return@runCatching null
+                if (!Sha256.hex(der).equals(declared, ignoreCase = true)) return@runCatching null
                 declared
             }.getOrNull()
 

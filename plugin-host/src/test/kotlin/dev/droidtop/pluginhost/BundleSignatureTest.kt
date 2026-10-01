@@ -1,5 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.runtime.util.Sha256
+
 import java.security.KeyPairGenerator
 import java.security.Signature
 import java.security.spec.ECGenParameterSpec
@@ -56,7 +58,7 @@ class BundleSignatureTest {
     @Test
     fun `sha256 matches a known vector`() {
         // echo -n "" | sha256sum
-        assertTrue(BundleSignature.sha256(ByteArray(0)) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+        assertTrue(Sha256.hex(ByteArray(0)) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
     }
 
     @Test

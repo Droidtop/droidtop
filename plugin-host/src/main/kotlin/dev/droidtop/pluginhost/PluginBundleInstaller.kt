@@ -1,5 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.runtime.util.Sha256
+
 import java.io.File
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
@@ -106,7 +108,7 @@ object PluginBundleInstaller {
         for (file in manifest.payload) {
             val bytes = entries[file.path]
                 ?: return PluginInstallResult.Refused(PluginInstallError("manifest declares ${file.path} but the bundle doesn't contain it"))
-            val actual = BundleSignature.sha256(bytes)
+            val actual = Sha256.hex(bytes)
             if (!actual.equals(file.sha256, ignoreCase = true)) {
                 return PluginInstallResult.Refused(PluginInstallError("hash mismatch for ${file.path}"))
             }
@@ -134,7 +136,7 @@ object PluginBundleInstaller {
             target.setReadOnly()
         }
 
-        val digest = BundleSignature.sha256(manifestBytes)
+        val digest = Sha256.hex(manifestBytes)
         // The key this bundle verified against is the origin's pinned key
         // (the signature check above refused the install otherwise), so
         // its fingerprint is exactly what "signed by the same key" means
@@ -193,7 +195,7 @@ object PluginBundleInstaller {
         val sigFile = File(dir, "manifest.sig")
         if (!manifestFile.isFile || !sigFile.isFile) return PluginInstallError("plugin files are missing")
         val manifestBytes = manifestFile.readBytes()
-        if (BundleSignature.sha256(manifestBytes) != record.archiveDigest) {
+        if (Sha256.hex(manifestBytes) != record.archiveDigest) {
             return PluginInstallError("manifest.json changed on disk since approval")
         }
         if (!BundleSignature.verifyManifest(manifestBytes, sigFile.readText(), record.manifest.origin, userKeys)) {
@@ -201,7 +203,7 @@ object PluginBundleInstaller {
         }
         for (file in record.manifest.payload) {
             val target = File(dir, file.path)
-            if (!target.isFile || BundleSignature.sha256(target.readBytes()) != file.sha256) {
+            if (!target.isFile || Sha256.hex(target.readBytes()) != file.sha256) {
                 return PluginInstallError("${file.path} changed on disk since approval")
             }
         }

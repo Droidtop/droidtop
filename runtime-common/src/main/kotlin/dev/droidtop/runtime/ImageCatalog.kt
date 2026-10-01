@@ -1,6 +1,7 @@
 package dev.droidtop.runtime
 
 import android.content.Context
+import dev.droidtop.runtime.util.Versions
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -145,7 +146,7 @@ object ImageTags {
 
     fun current(tags: List<String>): String? {
         if (LATEST in tags) return LATEST
-        return tags.filter { VERSION.matches(it) }.maxWithOrNull { a, b -> compareVersions(a, b) }
+        return tags.filter { VERSION.matches(it) }.maxWithOrNull { a, b -> Versions.compareLoose(a, b) }
     }
 
     /**
@@ -155,19 +156,9 @@ object ImageTags {
      */
     fun ordered(tags: List<String>, limit: Int): List<String> {
         val current = current(tags)
-        val versions = tags.filter { it != current && VERSION.matches(it) }.sortedWith { a, b -> compareVersions(b, a) }
+        val versions = tags.filter { it != current && VERSION.matches(it) }.sortedWith { a, b -> Versions.compareLoose(b, a) }
         val others = tags.filter { it != current && !VERSION.matches(it) }.sortedDescending()
         return (listOfNotNull(current) + versions + others).distinct().take(limit)
-    }
-
-    private fun compareVersions(a: String, b: String): Int {
-        val left = a.split('.').map { it.toBigInteger() }
-        val right = b.split('.').map { it.toBigInteger() }
-        for (i in 0 until maxOf(left.size, right.size)) {
-            val order = (left.getOrNull(i) ?: java.math.BigInteger.ZERO).compareTo(right.getOrNull(i) ?: java.math.BigInteger.ZERO)
-            if (order != 0) return order
-        }
-        return left.size.compareTo(right.size)
     }
 }
 

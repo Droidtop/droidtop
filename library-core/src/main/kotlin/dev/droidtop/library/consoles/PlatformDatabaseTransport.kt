@@ -3,7 +3,7 @@ package dev.droidtop.library.consoles
 import android.content.Context
 import dev.droidtop.pluginhost.GitHubAuth
 import java.io.File
-import java.security.MessageDigest
+import dev.droidtop.runtime.util.Sha256
 
 /**
  * The download-and-replace half every platform database shares (docs/SPEC.md
@@ -57,13 +57,5 @@ internal object PlatformDatabaseTransport {
         }
     }
 
-    fun sha256(text: String): String = sha256(text.toByteArray())
-
-    fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { byte ->
-            val value = byte.toInt() and 0xff
-            HEX[value shr 4].toString() + HEX[value and 0x0f]
-        }
-
-    private const val HEX = "0123456789abcdef"
+    fun sha256(text: String): String = Sha256.hex(text.toByteArray())
 }

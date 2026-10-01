@@ -1,5 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.runtime.util.Sha256
+
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.KeyPairGenerator
@@ -31,7 +33,7 @@ class PluginBundleInstallerTest {
         includeExtraUndeclaredFile: Boolean = false,
         payloadBytes: ByteArray = classesJarBytes,
     ): File {
-        val classesSha = BundleSignature.sha256(payloadBytes)
+        val classesSha = Sha256.hex(payloadBytes)
         val manifestJson = JSONObject().apply {
             put("id", "$origin.sample-statustile")
             put("origin", origin)

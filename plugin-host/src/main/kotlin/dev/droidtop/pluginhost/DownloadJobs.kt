@@ -5,7 +5,7 @@ import android.content.Context
 import android.net.Uri
 import java.io.File
 import java.net.URI
-import java.security.MessageDigest
+import dev.droidtop.runtime.util.Sha256
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -357,18 +357,7 @@ object DownloadJobs {
     private fun downloadingLine(state: DownloadState.Running): String =
         if (state.totalBytes > 0) "Downloading… ${state.downloadedBytes / 1024 / 1024} MB of ${state.totalBytes / 1024 / 1024} MB" else "Downloading… ${state.downloadedBytes / 1024 / 1024} MB"
 
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
+    private fun sha256(file: File): String = Sha256.hex(file)
 }
 
 /** Additive contract-2 acquire result field, kept separate from the plugin's own job implementation. */

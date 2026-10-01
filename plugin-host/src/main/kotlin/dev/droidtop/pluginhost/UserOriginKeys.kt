@@ -1,5 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.runtime.util.Sha256
+
 import android.content.Context
 import java.io.File
 import java.security.PublicKey
@@ -177,7 +179,7 @@ object UserOriginKeys {
      */
     fun fingerprint(keyBase64: String): String? {
         val key: PublicKey = PluginOriginKeys.parseSpki(keyBase64) ?: return null
-        return BundleSignature.sha256(key.encoded)
+        return Sha256.hex(key.encoded)
             .take(16)
             .chunked(4)
             .joinToString(" ")

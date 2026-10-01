@@ -1,6 +1,6 @@
 package dev.droidtop.library.integrations
 
-import dev.droidtop.pluginhost.BundleSignature
+import dev.droidtop.runtime.util.Sha256
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -18,7 +18,7 @@ import org.junit.Test
  */
 class PluginCatalogIndexTest {
     private val keyDer = ByteArray(48) { it.toByte() }
-    private val keySha = BundleSignature.sha256(keyDer)
+    private val keySha = Sha256.hex(keyDer)
     private val keySpki = java.util.Base64.getEncoder().encodeToString(keyDer)
 
     private fun releaseJson(

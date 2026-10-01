@@ -12,7 +12,7 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
+import dev.droidtop.runtime.util.Sha256
 
 /**
  * droidtop's own update check and self-update (docs/SPEC.md "Releases and
@@ -441,18 +441,7 @@ object AppSelfUpdate {
     /** What each committed session installs, for the outcome sentence. */
     internal val pendingNames = java.util.concurrent.ConcurrentHashMap<Int, String>()
 
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02X".format(it) }
-    }
+    private fun sha256(file: File): String = Sha256.hex(file).uppercase()
 }
 
 /**

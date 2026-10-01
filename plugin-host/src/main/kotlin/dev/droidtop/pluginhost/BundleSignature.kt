@@ -1,7 +1,7 @@
 package dev.droidtop.pluginhost
 
 import java.security.KeyFactory
-import java.security.MessageDigest
+import dev.droidtop.runtime.util.Sha256
 import java.security.PublicKey
 import java.security.Signature
 import java.security.interfaces.ECPublicKey
@@ -67,7 +67,7 @@ object PluginOriginKeys {
      */
     fun keyFingerprintFor(origin: String): String? {
         val key = resolve(origin) ?: return null
-        return BundleSignature.sha256(key.encoded)
+        return Sha256.hex(key.encoded)
     }
 
     /** Test/tooling hook -- lets unit tests and the sample-bundle packager pin a throwaway key without touching [PINNED]. */
@@ -143,6 +143,4 @@ object BundleSignature {
         }.getOrDefault(false)
     }
 
-    fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }
