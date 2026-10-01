@@ -61,7 +61,7 @@ fun Modifier.ownPadButtons(onBack: () -> Unit): Modifier = onKeyEvent { event ->
  * BUTTON_A. With `ownPadButtons` no longer consuming A, a tapped hint pill
  * now reaches the focused element exactly like a pad press (rig,
  * dq-onboard-01: A had to be pressed twice on Welcome, the hint pills did
- * nothing, the tutorial's first A landed on "Skip" — fixed).
+ * nothing, the first A landed on "Skip" — fixed).
  *
  * So: the key handler first (a key event travels from the focused node up,
  * and [focusable] below is that node), then [onFocus] for the selection
@@ -75,10 +75,10 @@ fun Modifier.padSelectable(
     // The tap handler is keyed on nothing and reads the CURRENT onPress:
     // screens pass a fresh lambda on every recomposition, and keying the
     // pointer input on it restarted the gesture detector on each one, which
-    // cancelled a tap whose DOWN had already landed. Onboarding and the
-    // tutorial recompose right as a step appears (focus retries, state
-    // reads), so a first tap on a secondary button ("Continue without it",
-    // "Skip the tutorial") was dropped and the same tap a moment later
+    // cancelled a tap whose DOWN had already landed. Onboarding
+    // recomposes right as a step appears (focus retries, state
+    // reads), so a first tap on a secondary button ("Continue without it")
+    // was dropped and the same tap a moment later
     // worked (Droidtop/tracker#42).
     val currentPress by rememberUpdatedState(onPress)
     val currentFocus by rememberUpdatedState(onFocus)

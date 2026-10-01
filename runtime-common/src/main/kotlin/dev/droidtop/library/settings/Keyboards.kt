@@ -113,7 +113,8 @@ object Keyboards {
      * charge and is told why.
      */
     const val WHY: String =
-        "droidtop includes Hacker's Keyboard because desktop software needs Ctrl, Alt, Esc, " +
-            "Tab, arrows and function keys — a terminal or a Windows app can't be driven " +
-            "without them. You can switch back to any other keyboard at any time."
+        "droidtop includes Hacker's Keyboard because desktop programs need keys like Ctrl, " +
+            "Alt, Esc, Tab, the arrows and the function keys, and a terminal or a Windows " +
+            "program can't be used without them. You can switch back to any other " +
+            "keyboard at any time."
 }

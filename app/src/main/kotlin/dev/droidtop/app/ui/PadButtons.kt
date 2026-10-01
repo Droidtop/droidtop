@@ -24,7 +24,7 @@ import dev.droidtop.shell.gamepad.input.padSelectable
 
 /**
  * The button of droidtop's own full-screen flows outside the shells
- * (onboarding, the tutorial, the games screen): the pad's A presses it,
+ * (onboarding, the games screen): the pad's A presses it,
  * the shell's selection ring shows when it has the pad's focus, and it is
  * never smaller than a finger.
  *

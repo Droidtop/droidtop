@@ -4654,9 +4654,10 @@ clearly and in order, everything a person needs to be up and running the moment 
 home page of the default view they chose: games found, controls understood, the way to launch,
 switch modes and reach the Quick Menu known. Anything that leaves a newcomer thinking "I have to
 look in the settings" or "I don't know how to do this" is a defect to fix, not a documentation
-gap. droidtop has a first-run tutorial for what onboarding cannot ask about (controls, navigation,
-sections, launching, the Quick Menu, switching modes, where help is); its content comes from the
-rig's new-user passes, which try to break onboarding on purpose.
+gap. There is no first-run tutorial (removed, owner decision 2026-09-30, Droidtop/tracker#150):
+what a newcomer needs is carried by the screens themselves, the hint row on every screen names the
+live buttons and is also the touch route to them, and the rig's new-user passes, which try to
+break onboarding on purpose, are where a missing hint is found and fixed.
 
 **Themes are chosen during setup (directed 2026-09-24).** Onboarding includes the theme
 downloader (the same Browse themes screen Settings opens, one mechanism), so a person can pick and
@@ -4740,7 +4741,7 @@ Onboarding is one scaffold, not a set of unrelated screens. The scaffold owns:
   handler for A, Enter and DPAD_CENTER, a tap, and button semantics. Compose's `clickable` answers
   Enter and DPAD_CENTER but never BUTTON_A, and in touch mode its focus target refuses focus, so
   the initial selection never landed, the first pad press only brought the ring back, the
-  tutorial's first A hit "Skip", and a tapped hint pill dispatched its key into a window with
+  first A hit "Skip", and a tapped hint pill dispatched its key into a window with
   nothing focused; the window owns the pad (`ownPadButtons`), so B is Back; and
   a hint row (A Select, B Back) is the touch route to both. On the rig, A did nothing on Welcome, no
   focus showed anywhere, and D-pad Down went up to Back (dq-coordinator-24).
@@ -4915,27 +4916,18 @@ buttons and a link. The component is the shell's existing menu row anatomy
   whether it is now off; then what a newcomer will want a minute later and is asked where it is
   used (scraping, the Windows games download, notification access), named with where it is; then
   one action into the chosen mode. Finishing with droidtop's own launcher as Home puts droidtop's
-  icon on its home screen, and the first-run tutorial opens over the first frame of the chosen
-  mode. It does not end by returning to the system home. "Android" opens the home
+  icon on its home screen. It does not end by returning to the system home. "Android" opens the home
   screen droidtop holds, through the same `BackButtonMenu.openHome` the mode switcher uses;
   it is not a `MainActivity` shell.
 
-### The first-run tutorial
+### No first-run tutorial (decided 2026-09-30)
 
-Built 2026-09-25 (`TutorialActivity`). It covers what onboarding cannot ask about, in the order
-the rig's new-user pass asked for (dq-coordinator-24, "Tutorial should cover"): getting around (the
-controls, and that the hint row is also the touch route to them), finding and launching games, a
-game's page (Play, what runs it, the one Windows download), the Quick Menu, switching modes,
-Settings, and where help is. Rules:
-
-- It tells a setup only what it has: the Gaming pages only while Gaming is on, the ways into a mode
-  that this home screen and these modes actually have, and where the Home button goes
-  (`TutorialPages.build`, pure over the setup, unit-tested). Button names come from
-  `GamepadKeyMap.labelFor`, so a swapped pad reads right.
-- It opens once, over the first frame of the mode onboarding opens into, and again from Global
-  settings > "Show the tutorial". Every page but the last has "Skip the tutorial".
-- It is driven like every droidtop screen: A and the filled button go on, B goes back a page (out,
-  on the first), the hint row is tappable, the selection starts on the way on.
+The first-run tutorial (`TutorialActivity`, built 2026-09-25) and Global settings' "Show the
+tutorial" row are gone: nothing opens over the first frame of the chosen mode, and no setting
+reopens one. The owner's call, Droidtop/tracker#150. What it taught (the controls, that the hint
+row is also the touch route, switching modes, the Quick Menu, where help is) is not replaced by
+new UI here. Where a newcomer still cannot find one of those, that is a defect in the screen that
+owns it, found by the rig's new-user pass and fixed there.
 
 ### Copy
 
@@ -9465,9 +9457,9 @@ running on the console and asked for the visual pass on top of it. Decided and b
   ":settings:fragment" <class>` (the same exported entry point `APPLICATION_PREFERENCES` uses):
   the "Search settings" row and `Containers` (a `NestedScreenItem`) both draw their real icon; no
   leaf row does; `Modes`/`Data` (Global) and the untitled/`Containers` grouping (Desktop) draw as
-  section labels on both surfaces. Search for "tutorial" from Global settings' own row found
-  "Show the tutorial" and landed on it scrolled into view WITH the accent focus ring, not back on
-  the search row; D-pad down from there moved the ring to "Rerun onboarding", confirming the ring
+  section labels on both surfaces. Search from Global settings' own row found
+  "Rerun onboarding" and landed on it scrolled into view WITH the accent focus ring, not back on
+  the search row; D-pad down from there moved the ring to the next row, confirming the ring
   is a real focus target and not a one-off highlight. Search for "container" from Desktop found a
   depth-1 result ("Create a container", inside `Containers`) and pushed that real nested screen
   scrolled to and focused on that exact row; `KEYCODE_BACK` returned cleanly to Desktop mode's own
