@@ -2,6 +2,7 @@ package dev.droidtop.library.scraper
 
 import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.runtime.prefs.PrefsFile
 
 enum class ScraperSource { SCREENSCRAPER, THEGAMESDB, LIBRETRO }
 
@@ -25,7 +26,7 @@ object ScraperSourcePrefs {
     private const val KEY_SOURCE = "droidtop_rom_scraper_source"
 
     fun get(context: Context): ScraperSource {
-        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_SOURCE, null)
+        val raw = PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_SOURCE, null)
         return when (raw) {
             "thegamesdb" -> ScraperSource.THEGAMESDB
             "libretro" -> ScraperSource.LIBRETRO
@@ -39,6 +40,6 @@ object ScraperSourcePrefs {
             ScraperSource.LIBRETRO -> "libretro"
             ScraperSource.SCREENSCRAPER -> "screenscraper"
         }
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_SOURCE, raw).apply()
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putString(KEY_SOURCE, raw)
     }
 }
