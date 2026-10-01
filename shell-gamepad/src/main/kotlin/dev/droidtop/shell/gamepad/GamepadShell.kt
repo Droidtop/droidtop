@@ -376,6 +376,8 @@ fun GamepadShell(
     // below. Installed only while this composition is live.
     // Quick Menu (hold SELECT) -- see QuickMenu.kt for the paradigm.
     var quickMenuOpen by remember { mutableStateOf(false) }
+    var contextMenuRequest by remember { mutableIntStateOf(0) }
+    var focusedContextEntry by remember { mutableStateOf<LibraryEntry?>(null) }
     // A quick menu left open when this shell lost the foreground (the
     // Switch-mode dialog's own "Android"/"Desktop" rows, or Home) must not
     // still be showing when a fresh, real deep-link brings this same
@@ -775,6 +777,8 @@ fun GamepadShell(
                 current = section,
                 onSelect = selectSection,
                 onQuickMenu = { quickMenuOpen = true },
+                contextMenuEnabled = section == GamingSection.GAMES && detailEntry == null && !nav.optionsOpen && canGoBack && focusedContextEntry?.isPcOrEngineGame == true,
+                onContextMenu = { contextMenuRequest++ },
                 sections = sectionsFor(uiMode),
             )
         }
@@ -1011,7 +1015,11 @@ fun GamepadShell(
                                 nav = nav,
                                 onShowDetail = { nav.rememberFocus(it.id); nav.openDetail(it.id) },
                                 onDrillDownChanged = { canGoBack = it },
-                                onFocusedEntryChanged = onFocusedEntryChanged,
+                                onFocusedEntryChanged = { entry ->
+                                    focusedContextEntry = entry?.takeIf { it.isPcOrEngineGame }
+                                    onFocusedEntryChanged(entry)
+                                },
+                                contextMenuRequest = contextMenuRequest,
                                 // Scoped to the screen that says it: a
                                 // claim from a copy the Crossfade is
                                 // still drawing on its way out cannot
@@ -1837,6 +1845,7 @@ private fun GamesSection(
     onShowDetail: (LibraryEntry) -> Unit,
     onDrillDownChanged: (Boolean) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
+    contextMenuRequest: Int,
     onHelpRowClaim: (HelpRowClaim) -> Unit = {},
     onToggleFavorite: (LibraryEntry) -> Unit = {},
     onRequestRescan: () -> Unit = {},
@@ -2044,6 +2053,17 @@ private fun GamesSection(
     var focusedGameIndex by remember(selectedGroup) {
         mutableStateOf(systemGamesForGroup.indexOfFirst { it.id == nav.focusHere }.coerceAtLeast(0))
     }
+    var handledContextMenuRequest by remember { mutableIntStateOf(contextMenuRequest) }
+    LaunchedEffect(contextMenuRequest) {
+        if (contextMenuRequest != handledContextMenuRequest) {
+            handledContextMenuRequest = contextMenuRequest
+            if (selectedGroup == GameGroup.Pc) {
+                systemGamesForGroup.getOrNull(focusedGameIndex)
+                    ?.takeIf { it.isPcOrEngineGame }
+                    ?.let { pcMenuEntry = it }
+            }
+        }
+    }
     if (gamelistOptionsOpen) {
         val group = selectedGroup
         run {
@@ -2181,7 +2201,8 @@ private fun GamesSection(
         // (docs/SPEC.md 7i, revised 2026-09-26) -- no more carve-out for a
         // screen that drew its own grid and reported its own focus.
         if (hasThemedGamelist) {
-            onFocusedEntryChanged(systemGamesForGroup.getOrNull(focusedGameIndex))
+            val focused = systemGamesForGroup.getOrNull(focusedGameIndex)
+            onFocusedEntryChanged(focused)
             // What to come back to. Recorded as the user moves, not only
             // when they open something, so B out of a detail and B out of
             // the gamelist agree about where they were.

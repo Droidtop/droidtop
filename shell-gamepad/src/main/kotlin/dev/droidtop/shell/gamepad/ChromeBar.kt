@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.focusProperties
@@ -32,16 +33,14 @@ import kotlin.math.roundToInt
 
 /**
  * The Gaming shell's header: section tabs, the L1/R1 glyphs that step
- * them, the status readout and the R2 Quick Menu indicator (docs/SPEC.md
+ * them, the L2 context-menu and R2 Quick Menu indicators (docs/SPEC.md
  * 7k, "Header and footer are one frame").
  *
- * Where there is room the tabs sit in the exact middle of the bar, with
- * the status readout in an equal slot on the left and the R2 indicator in
- * an equal slot on the right, so the bar is balanced about the screen's
- * centre. R2 stays at the top right, near the button it names (owner,
- * 2026-09-29). Where there is not room (a phone, or the four tabs of the
- * desktop-mode set) the tabs take the width, scroll, and the readout
- * shrinks to a clock and two glyphs.
+ * The L2 context menu stays at the left end and R2 Quick Menu at the right
+ * end. The quiet status readout sits immediately before R2, inside the
+ * right slot; equal weighted side slots keep the tabs centred. On compact
+ * widths the status readout and menu labels shrink to glyphs, while tabs
+ * scroll rather than clip.
  *
  * Nothing in it takes D-pad focus (the top bar is reached by touch, L1/R1
  * or Page Up/Page Down only; Droidtop/tracker#1).
@@ -51,6 +50,8 @@ internal fun SectionTabBar(
     current: GamingSection,
     onSelect: (GamingSection) -> Unit,
     onQuickMenu: () -> Unit,
+    contextMenuEnabled: Boolean,
+    onContextMenu: () -> Unit,
     sections: List<GamingSection> = GamingSection.entries,
 ) {
     val window = LocalShellWindow.current
@@ -78,6 +79,7 @@ internal fun SectionTabBar(
         }
     }
     val quickMenu: @Composable () -> Unit = { QuickMenuIndicator(showLabel = !window.compact, onClick = onQuickMenu) }
+    val contextMenu: @Composable () -> Unit = { ContextMenuIndicator(contextMenuEnabled, !window.compact, onContextMenu) }
 
     Row(
         modifier = Modifier
@@ -89,7 +91,7 @@ internal fun SectionTabBar(
     ) {
         if (centred) {
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                StatusCluster(showBatteryPercent = true, onClick = onQuickMenu)
+                contextMenu()
             }
             if (shoulders) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = 6.dp))
             Row(
@@ -97,8 +99,14 @@ internal fun SectionTabBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) { tabs() }
             if (shoulders) ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = 6.dp))
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { quickMenu() }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    StatusCluster(showBatteryPercent = true, onClick = onQuickMenu)
+                    quickMenu()
+                }
+            }
         } else {
+            contextMenu()
             if (shoulders) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = 6.dp))
             // The tabs scroll and the Quick Menu control stays pinned beside
             // them. On a phone the names do not fit across 411dp, and a plain
@@ -115,11 +123,36 @@ internal fun SectionTabBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) { tabs() }
             if (shoulders) ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = 6.dp))
-            Box(Modifier.padding(start = 12.dp)) {
+            Box(Modifier.padding(start = 8.dp)) {
                 StatusCluster(showBatteryPercent = false, onClick = onQuickMenu)
             }
-            Box(Modifier.padding(start = 12.dp)) { quickMenu() }
+            Box(Modifier.padding(start = 8.dp)) { quickMenu() }
         }
+    }
+}
+
+@Composable
+private fun ContextMenuIndicator(enabled: Boolean, showLabel: Boolean, onClick: () -> Unit) {
+    val window = LocalShellWindow.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
+            .focusProperties { canFocus = false }
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .alpha(if (enabled) 1f else 0.42f),
+    ) {
+        Text(
+            "L2",
+            color = MenuTokens.OnSurface,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier
+                .border(1.dp, MenuTokens.HintPillOutline, RoundedCornerShape(50))
+                .padding(horizontal = 9.dp)
+                .opticallyCentred(MenuTokens.TabPillHeight, MaterialTheme.typography.labelLarge.fontSize),
+        )
+        if (showLabel) Text("Options", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -189,10 +222,11 @@ private fun QuickMenuIndicator(showLabel: Boolean, onClick: () -> Unit) {
         Text(
             "R2",
             color = MenuTokens.OnSurface,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelLarge,
             modifier = Modifier
-                .border(1.dp, MenuTokens.OnSurfaceMuted, RoundedCornerShape(6.dp))
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .border(1.dp, MenuTokens.HintPillOutline, RoundedCornerShape(50))
+                .padding(horizontal = 9.dp)
+                .opticallyCentred(MenuTokens.TabPillHeight, MaterialTheme.typography.labelLarge.fontSize),
         )
         if (showLabel) {
             Text("Quick Menu", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
