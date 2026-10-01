@@ -768,12 +768,6 @@ public class LatinIME extends InputMethodService implements
     }
 
     @Override
-    public void onFinishInput() {
-        SecondScreenKeyboard.onFinishInput();
-        super.onFinishInput();
-    }
-
-    @Override
     public void onStartInputView(EditorInfo attribute, boolean restarting) {
         sKeyboardSettings.editorPackageName = attribute.packageName;
         sKeyboardSettings.editorFieldName = attribute.fieldName;
@@ -962,6 +956,9 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onFinishInput() {
+        // The second-screen keyboard's editor connection ends with the
+        // session it was captured from (onStartInput above).
+        SecondScreenKeyboard.onFinishInput();
         super.onFinishInput();
 
         onAutoCompletionStateChanged(false);
