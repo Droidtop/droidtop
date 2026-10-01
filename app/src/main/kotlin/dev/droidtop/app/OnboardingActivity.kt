@@ -48,6 +48,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -67,6 +68,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import dev.droidtop.app.ui.PadButton
 import dev.droidtop.app.ui.SelectableRow
 import dev.droidtop.library.GamesRootReport
@@ -1096,27 +1098,33 @@ private fun OnboardingScaffold(
             }
 
             // --- the action area, docked ----------------------------
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = Space.Lg)
-                    .layoutDirection(LayoutDirection.Rtl)
-                    .focusGroup(),
-                horizontalArrangement = Arrangement.spacedBy(Space.Md, Alignment.Start),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                primary?.let {
-                    PadButton(
-                        it.label,
-                        it.onClick,
-                        filled = true,
-                        modifier = Modifier
-                            .focusRequester(primaryFocus)
-                            .layoutDirection(LayoutDirection.Ltr)
-                            .then(if (window.portrait) Modifier.weight(1f) else Modifier),
-                    )
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = Space.Lg)
+                        .focusGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(Space.Md, Alignment.Start),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    primary?.let {
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            PadButton(
+                                it.label,
+                                it.onClick,
+                                filled = true,
+                                modifier = Modifier
+                                    .focusRequester(primaryFocus)
+                                    .then(if (window.portrait) Modifier.weight(1f) else Modifier),
+                            )
+                        }
+                    }
+                    secondary?.let {
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            PadButton(it.label, it.onClick)
+                        }
+                    }
                 }
-                secondary?.let { PadButton(it.label, it.onClick, modifier = Modifier.layoutDirection(LayoutDirection.Ltr)) }
             }
         }
         // The shell's hint row: the legend of what the pad's buttons do
