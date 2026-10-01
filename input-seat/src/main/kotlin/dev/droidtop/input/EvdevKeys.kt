@@ -34,6 +34,11 @@ object EvdevKeys {
     const val BTN_SIDE = 0x113
     const val BTN_EXTRA = 0x114
 
+    // linux/input-event-codes.h KEY_LFSH/KEY_RTSH, named for the one other
+    // place that speaks them: DesktopInputRouter's Shift synthesis.
+    const val SHIFT_LEFT = 42
+    const val SHIFT_RIGHT = 54
+
     /**
      * The Android [KeyEvent] keycode -> evdev KEY_* table. Absent means
      * "droidtop does not forward this key", which is a real answer for
@@ -87,7 +92,7 @@ object EvdevKeys {
         put(KeyEvent.KEYCODE_SEMICOLON, 39)
         put(KeyEvent.KEYCODE_APOSTROPHE, 40)
         put(KeyEvent.KEYCODE_GRAVE, 41)
-        put(KeyEvent.KEYCODE_SHIFT_LEFT, 42)
+        put(KeyEvent.KEYCODE_SHIFT_LEFT, SHIFT_LEFT)
         put(KeyEvent.KEYCODE_BACKSLASH, 43)
 
         put(KeyEvent.KEYCODE_Z, 44)
@@ -100,7 +105,7 @@ object EvdevKeys {
         put(KeyEvent.KEYCODE_COMMA, 51)
         put(KeyEvent.KEYCODE_PERIOD, 52)
         put(KeyEvent.KEYCODE_SLASH, 53)
-        put(KeyEvent.KEYCODE_SHIFT_RIGHT, 54)
+        put(KeyEvent.KEYCODE_SHIFT_RIGHT, SHIFT_RIGHT)
         put(KeyEvent.KEYCODE_NUMPAD_MULTIPLY, 55)
         put(KeyEvent.KEYCODE_ALT_LEFT, 56)
         put(KeyEvent.KEYCODE_SPACE, 57)

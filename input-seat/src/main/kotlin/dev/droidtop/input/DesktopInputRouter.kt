@@ -59,6 +59,16 @@ class DesktopInputRouter {
     private val heldKeys = mutableSetOf<Int>()
     private val heldButtons = mutableSetOf<Int>()
 
+    /**
+     * Keys currently held down under the Shift [onKeyEvent] synthesized for
+     * them. Shift is released when the last of them is released, not with
+     * the first, so two overlapping shifted keystrokes share one press.
+     */
+    private val shiftDependents = mutableSetOf<Int>()
+
+    /** True while a Shift press this router sent is still down at the container. */
+    private var synthesizedShiftDown = false
+
     private var stickX = 0f
     private var stickY = 0f
     private var stickCallbackScheduled = false
@@ -96,6 +106,8 @@ class DesktopInputRouter {
         }
         heldButtons.clear()
         heldKeys.clear()
+        shiftDependents.clear()
+        synthesizedShiftDown = false
         touchButtonDown = false
         touchScrolling = false
         lastMouseButtonState = 0
@@ -350,13 +362,25 @@ class DesktopInputRouter {
             return true
         }
 
-        val evdev = EvdevKeys.evdevKeyCode(event.keyCode) ?: return false
-        when (event.action) {
+        return onKeyEvent(event.keyCode, event.action, event.repeatCount, event.metaState)
+    }
+
+    /**
+     * The key translation, split from [onKeyEvent] so a JVM unit test can
+     * drive it with plain ints: the android.jar a unit test runs against
+     * throws on every method call, so a [KeyEvent] cannot even be built
+     * there. Nothing but reading the four fields may happen in the shell.
+     */
+    internal fun onKeyEvent(androidKeyCode: Int, action: Int, repeatCount: Int, metaState: Int): Boolean {
+        val seat = seat ?: return false
+        val evdev = EvdevKeys.evdevKeyCode(androidKeyCode) ?: return false
+        when (action) {
             KeyEvent.ACTION_DOWN -> {
                 // Auto-repeat is the compositor's job: it owns the seat's
                 // repeat rate and delay. Forwarding Android's repeats as
                 // fresh presses would stack a second repeat on top of it.
-                if (event.repeatCount == 0) {
+                if (repeatCount == 0) {
+                    synthesizeShiftDown(seat, evdev, metaState)
                     heldKeys += evdev
                     seat.onKey(InputSource.LAPDOCK_PERIPHERAL, evdev, down = true)
                 }
@@ -365,11 +389,55 @@ class DesktopInputRouter {
             KeyEvent.ACTION_UP -> {
                 heldKeys -= evdev
                 seat.onKey(InputSource.LAPDOCK_PERIPHERAL, evdev, down = false)
+                releaseSynthesizedShift(seat, evdev)
             }
 
             else -> return false
         }
         return true
+    }
+
+    /**
+     * Shift can arrive with no press for the compositor to latch: Android
+     * carries it in the meta state of the character key itself, which is
+     * all an IME-synthesized keystroke has, and a hardware keyboard whose
+     * Shift press predates this surface's focus never delivered one either.
+     * Both reached the container unshifted — '!' as '1', capitals as
+     * lowercase (Droidtop/tracker#147) — so when the meta state says Shift
+     * is part of the keystroke and the container does not already see a
+     * Shift, one is sent around the key.
+     *
+     * Shift's own events are exempt (a Shift press carries META_SHIFT_ON
+     * too) and so is a Shift already down, whether the user's press was
+     * forwarded or this synthesis is still serving a held key. Caps lock
+     * is deliberately not read as shift: the Caps Lock key is forwarded
+     * like any other and toggles the container's own caps state, which a
+     * synthesized Shift on top of it would cancel.
+     */
+    private fun synthesizeShiftDown(seat: InputSeat, evdev: Int, metaState: Int) {
+        if (evdev == EvdevKeys.SHIFT_LEFT || evdev == EvdevKeys.SHIFT_RIGHT) return
+        val shiftBits =
+            KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_RIGHT_ON
+        if (metaState and shiftBits == 0) return
+        if (synthesizedShiftDown) {
+            // Chording under a Shift we are already holding down.
+            shiftDependents += evdev
+            return
+        }
+        if (EvdevKeys.SHIFT_LEFT in heldKeys || EvdevKeys.SHIFT_RIGHT in heldKeys) return
+        synthesizedShiftDown = true
+        shiftDependents += evdev
+        heldKeys += EvdevKeys.SHIFT_LEFT
+        seat.onKey(InputSource.LAPDOCK_PERIPHERAL, EvdevKeys.SHIFT_LEFT, down = true)
+    }
+
+    /** Takes the synthesized Shift away again once every key it was sent for is up. */
+    private fun releaseSynthesizedShift(seat: InputSeat, evdev: Int) {
+        if (!shiftDependents.remove(evdev)) return
+        if (shiftDependents.isNotEmpty() || !synthesizedShiftDown) return
+        synthesizedShiftDown = false
+        heldKeys -= EvdevKeys.SHIFT_LEFT
+        seat.onKey(InputSource.LAPDOCK_PERIPHERAL, EvdevKeys.SHIFT_LEFT, down = false)
     }
 
     private fun pressButton(seat: InputSeat, source: InputSource, button: Int) {
