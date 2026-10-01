@@ -264,7 +264,9 @@ class SecondScreenOrchestrator(
 
                 val second = outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
                 val showCompanion = DualScreenOrchestration.shouldShowSecondScreenCompanion(outputs.size)
-                if (!showCompanion) host.stopCompanion()
+                if (DualScreenOrchestration.shouldDismissCompanion(showCompanion, host.companionVisible())) {
+                    host.stopCompanion()
+                }
                 val mode = host.activityMode()
                 val gaming = mode == Mode.GAMING
                 val desktop = mode == Mode.DESKTOP

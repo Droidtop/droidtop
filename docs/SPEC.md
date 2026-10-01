@@ -6162,6 +6162,16 @@ variant axis, `fontSize`, from the one fixed above) may still fail to
 resolve — worth re-checking now that the axis-matching fix landed, since
 it could turn out to already be fixed as a side effect.
 
+**Single-display companion and bounced launches (2026-10-01, tracker#217, #216).**
+The orchestrator sends a dismiss to the companion only when one is visible
+(`DualScreenOrchestration.shouldDismissCompanion`); a dismiss is itself an
+Activity start on the built-in display, so sending it with no companion took
+focus from the shell, whose onStop/onStart re-ran the pass and sent it again.
+A launch counts as played only when the shell is not started again within
+`LaunchDisplay.BOUNCE_WINDOW_MS` of the launch beginning
+(`LaunchDisplay.bouncedBack`): a launch that leaves the shell in front put
+nothing on screen.
+
 **Launch audio hand-off (2026-09-30, redecided 2026-10-01, tracker#160).**
 When another app comes in front, droidtop has NO audio output stream of
 its own open: not playing, not paused, not idle. Pausing was not enough

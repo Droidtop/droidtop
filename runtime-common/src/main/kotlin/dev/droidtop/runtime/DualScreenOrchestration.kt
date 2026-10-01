@@ -65,6 +65,15 @@ object DualScreenOrchestration {
     fun shouldShowSecondScreenCompanion(displayCount: Int): Boolean = displayCount > 1
 
     /**
+     * A dismiss is itself an Activity start on the built-in display, which
+     * takes focus from the shell; the shell's onStop/onStart then re-runs the
+     * orchestration pass, which would dismiss again. So a dismiss is sent
+     * only when a companion actually exists to dismiss (tracker#217).
+     */
+    fun shouldDismissCompanion(showCompanion: Boolean, companionVisible: Boolean): Boolean =
+        !showCompanion && companionVisible
+
+    /**
      * Whether the shell is on the second screen RIGHT NOW. Derived from the
      * display the shell actually occupies, never from a decision flag:
      * parking (an app launched onto the second screen) makes the decision

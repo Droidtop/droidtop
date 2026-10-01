@@ -21,6 +21,14 @@ class DualScreenOrchestrationTest {
     }
 
     @Test
+    fun `a companion is dismissed only when one is visible and not wanted`() {
+        assertFalse(DualScreenOrchestration.shouldDismissCompanion(showCompanion = false, companionVisible = false))
+        assertTrue(DualScreenOrchestration.shouldDismissCompanion(showCompanion = false, companionVisible = true))
+        assertFalse(DualScreenOrchestration.shouldDismissCompanion(showCompanion = true, companionVisible = true))
+        assertFalse(DualScreenOrchestration.shouldDismissCompanion(showCompanion = true, companionVisible = false))
+    }
+
+    @Test
     fun `disconnecting the display occupied by shell moves shell to remaining built-in`() {
         assertEquals(0, DualScreenOrchestration.disconnectedShellDestination(9, setOf(0)))
     }
