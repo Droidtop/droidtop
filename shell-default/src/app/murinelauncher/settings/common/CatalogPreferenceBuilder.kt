@@ -134,11 +134,13 @@ class CatalogPreferenceNavigator(
             if (uri == null || item == null) return@registerForActivityResult
             val context = fragment.requireContext()
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            val error = item.onPicked(context, uri)
-            if (error != null) {
-                AlertDialog.Builder(context).setMessage(error).setPositiveButton(android.R.string.ok, null).show()
+            fragment.lifecycleScope.launch {
+                val error = item.onPicked(context, uri)
+                if (error != null) {
+                    AlertDialog.Builder(context).setMessage(error).setPositiveButton(android.R.string.ok, null).show()
+                }
+                rebuild()
             }
-            rebuild()
         }
 
     private var pendingDocumentPick: DocumentPickItem? = null
@@ -514,8 +516,10 @@ class CatalogPreferenceNavigator(
             isIconSpaceReserved = false
             isChecked = item.current
             setOnPreferenceChangeListener { _, newValue ->
-                item.onToggle(context, newValue as Boolean)
-                rebuild()
+                fragment.lifecycleScope.launch {
+                    item.onToggle(context, newValue as Boolean)
+                    rebuild()
+                }
                 true
             }
         }

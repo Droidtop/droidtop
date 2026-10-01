@@ -245,9 +245,11 @@ fun CatalogNavigator(
         pendingFolderPick = null
         if (uri == null || item == null) return@rememberLauncherForActivityResult
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        val error = item.onPicked(context, uri)
-        if (error != null) statusById[item.id] = error else statusById.remove(item.id)
-        refresh()
+        scope.launch {
+            val error = item.onPicked(context, uri)
+            if (error != null) statusById[item.id] = error else statusById.remove(item.id)
+            refresh()
+        }
     }
 
     fun pop() {
@@ -261,7 +263,12 @@ fun CatalogNavigator(
     }
 
     fun adjust(item: CatalogItem, direction: Int) {
-        if (adjustCatalogItem(context, item, direction)) refresh()
+        if (item is ToggleItem) {
+            scope.launch {
+                item.onToggle(context, !item.current)
+                refresh()
+            }
+        } else if (adjustCatalogItem(context, item, direction)) refresh()
     }
 
     fun activate(item: CatalogItem) {
@@ -650,10 +657,6 @@ internal fun adjustCatalogItem(context: Context, item: CatalogItem, direction: I
             item.onChange(context, next)
             true
         }
-    }
-    is ToggleItem -> {
-        item.onToggle(context, !item.current)
-        true
     }
     else -> false
 }

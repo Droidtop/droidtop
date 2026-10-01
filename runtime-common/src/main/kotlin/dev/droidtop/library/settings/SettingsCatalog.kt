@@ -102,7 +102,7 @@ class ToggleItem(
     override val title: String,
     override val subtitle: String? = null,
     val current: Boolean,
-    val onToggle: (Context, Boolean) -> Unit,
+    val onToggle: suspend (Context, Boolean) -> Unit,
 ) : CatalogItem
 
 /** An integer range setting (rendered as a seekbar or left/right stepper). */
@@ -187,7 +187,7 @@ class FolderPickItem(
     override val id: String,
     override val title: String,
     override val subtitle: String? = null,
-    val onPicked: (Context, Uri) -> String?,
+    val onPicked: suspend (Context, Uri) -> String?,
 ) : CatalogItem
 
 /**
