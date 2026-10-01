@@ -6,8 +6,8 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 /**
  * The user's own SteamGridDB API key -- see [SteamGridDbScraperClient] for
  * why it has to be theirs (a free key from their own steamgriddb.com
- * account) and never one droidtop ships. Same shared prefs file as every
- * other scraper credential, so the settings backup carries it too.
+ * account) and never one droidtop ships. Settings backup includes it
+ * only when the person opts in to the encoded credentials section.
  */
 object SteamGridDbPrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME

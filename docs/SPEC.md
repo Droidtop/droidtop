@@ -11015,6 +11015,14 @@ carries a credential: scraper and store secrets are redacted before a line
 is written (§7h's rule, applied to every sink), and a full library path is
 the most private thing a log holds.
 
+Settings backup follows the same privacy boundary by default. The Data
+group's **Back up credentials** toggle starts off; ordinary backups omit all
+credential keys, and restoring such a backup leaves the device's current
+credentials untouched. With explicit opt-in, credentials are stored under a
+separate Base64-encoded JSON field and restored only by decoding that field.
+This encoding only discourages casual/plaintext inspection; it is not
+encryption or a security boundary.
+
 **A crash is written down before anything else happens.** An uncaught
 exception in droidtop's process, in any mode, becomes a crash note in that
 folder (`crash-<epoch>.txt`: build, mode, shell screen, the exception and

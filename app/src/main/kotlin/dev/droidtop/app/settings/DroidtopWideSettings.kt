@@ -3,6 +3,7 @@ package dev.droidtop.app.settings
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Base64
 import dev.droidtop.app.AccessibilityPrefs
 import dev.droidtop.app.OnboardingActivity
 import dev.droidtop.app.ScreenOrientationPrefs
@@ -30,6 +31,25 @@ import org.json.JSONObject
  * drive (UI pass 2026-09-24, H4).
  */
 object DroidtopWideSettings {
+
+    private const val KEY_BACKUP_CREDENTIALS = "droidtop_backup_credentials_opt_in"
+    private const val BACKUP_CREDENTIALS_FIELD = "_credentials_b64"
+    private val CREDENTIAL_KEYS = setOf(
+        "droidtop_screenscraper_devid",
+        "droidtop_screenscraper_devpassword",
+        "droidtop_screenscraper_ssid",
+        "droidtop_screenscraper_sspassword",
+        "droidtop_steamgriddb_apikey",
+        "droidtop_thegamesdb_apikey",
+        "droidtop_igdb_client_id",
+        "droidtop_igdb_client_secret",
+    )
+
+    private fun isCredentialKey(key: String): Boolean {
+        val normalized = key.lowercase()
+        return key in CREDENTIAL_KEYS || listOf("password", "passwd", "secret", "apikey", "api_key", "token", "credential")
+            .any(normalized::contains)
+    }
 
     const val SCREEN_GLOBAL = "global_settings"
     const val SCREEN_DESKTOP = "desktop_settings"
@@ -150,6 +170,13 @@ object DroidtopWideSettings {
                                 onStatus("Packing diagnostics...")
                                 shareDiagnostics(ctx)
                             },
+                        ),
+                        ToggleItem(
+                            id = KEY_BACKUP_CREDENTIALS,
+                            title = "Back up credentials",
+                            subtitle = "Include passwords and API credentials in an encoded section of settings backups",
+                            current = CatalogPrefs.prefs(context).getBoolean(KEY_BACKUP_CREDENTIALS, false),
+                            onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_BACKUP_CREDENTIALS, on).apply() },
                         ),
                         DocumentPickItem(
                             id = "pref_global_backup",
@@ -358,12 +385,22 @@ object DroidtopWideSettings {
      */
     private fun writeBackup(context: Context, uri: Uri): String = runCatching {
         val json = JSONObject()
+        val includeCredentials = CatalogPrefs.prefs(context).getBoolean(KEY_BACKUP_CREDENTIALS, false)
+        val credentials = JSONObject()
         for ((key, value) in CatalogPrefs.prefs(context).all) {
+            if (key == KEY_BACKUP_CREDENTIALS) continue
+            if (isCredentialKey(key)) {
+                if (includeCredentials && key in CREDENTIAL_KEYS && value is String) credentials.put(key, value)
+                continue
+            }
             when (value) {
                 is Boolean, is Int, is Long, is Float, is String -> json.put(key, value)
                 is Set<*> -> json.put(key, JSONArray(value.toList()))
                 else -> {}
             }
+        }
+        if (includeCredentials) {
+            json.put(BACKUP_CREDENTIALS_FIELD, Base64.encodeToString(credentials.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP))
         }
         context.contentResolver.openOutputStream(uri)?.use { it.write(json.toString(2).toByteArray()) }
             ?: error("the file could not be opened")
@@ -392,6 +429,7 @@ object DroidtopWideSettings {
         val json = JSONObject(text)
         val editor = CatalogPrefs.prefs(context).edit()
         for (key in json.keys()) {
+            if (key == BACKUP_CREDENTIALS_FIELD || key == KEY_BACKUP_CREDENTIALS || isCredentialKey(key)) continue
             when (val value = json.get(key)) {
                 is Boolean -> editor.putBoolean(key, value)
                 is Int -> editor.putInt(key, value)
@@ -399,6 +437,12 @@ object DroidtopWideSettings {
                 is Double -> editor.putFloat(key, value.toFloat())
                 is String -> editor.putString(key, value)
                 is JSONArray -> editor.putStringSet(key, (0 until value.length()).map { value.getString(it) }.toSet())
+            }
+        }
+        json.optString(BACKUP_CREDENTIALS_FIELD).takeIf { it.isNotEmpty() }?.let { encoded ->
+            val credentials = JSONObject(String(Base64.decode(encoded, Base64.NO_WRAP), Charsets.UTF_8))
+            for (key in credentials.keys()) {
+                if (key in CREDENTIAL_KEYS) editor.putString(key, credentials.getString(key))
             }
         }
         editor.apply()

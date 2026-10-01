@@ -9,12 +9,11 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * pair is an APPLICATION credential (real ES-DE embeds its own and
  * never surfaces it) -- no settings field exposes it; it falls back to
  * the compiled-in pair in [ScreenScraperDevCredentials], and a stored
- * value (from settings restore -- the whole-prefs backup carries every
- * key here -- or from anyone running their own registered pair) wins
- * over it. Same shared prefs
- * file every other droidtop setting uses, which is exactly what makes
- * the existing backup/restore cover credentials for free (directed
- * 2026-08-31, replacing the retired debug-credentials file).
+ * value (from settings restore -- only an explicitly opted-in encoded
+ * credential section restores it -- or from anyone running their own
+ * registered pair) wins over it. Same shared prefs file every other
+ * droidtop setting uses (directed 2026-08-31, replacing the retired
+ * debug-credentials file).
  */
 object ScreenScraperPrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
