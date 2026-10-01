@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import dev.droidtop.app.AccessibilityPrefs
 import dev.droidtop.app.OnboardingActivity
+import dev.droidtop.app.ScreenOrientationPrefs
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
