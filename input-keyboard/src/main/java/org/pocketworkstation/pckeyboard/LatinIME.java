@@ -759,6 +759,21 @@ public class LatinIME extends InputMethodService implements
     }
     
     @Override
+    public void onStartInput(EditorInfo attribute, boolean restarting) {
+        super.onStartInput(attribute, restarting);
+        // InputMethodService starts an editor session independently of
+        // showing its soft-input window. The second-screen keyboard uses
+        // this connection even when Android declines to draw that window.
+        SecondScreenKeyboard.onStartInput(getCurrentInputConnection());
+    }
+
+    @Override
+    public void onFinishInput() {
+        SecondScreenKeyboard.onFinishInput();
+        super.onFinishInput();
+    }
+
+    @Override
     public void onStartInputView(EditorInfo attribute, boolean restarting) {
         sKeyboardSettings.editorPackageName = attribute.packageName;
         sKeyboardSettings.editorFieldName = attribute.fieldName;

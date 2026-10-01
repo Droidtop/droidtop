@@ -44,19 +44,17 @@ import android.view.inputmethod.InputConnection
  *   for a lapdock's physical keyboard.
  * - **Into an Android app** (Gaming and Standard modes): each key
  *   becomes an `InputConnection.sendKeyEvent`, which is precisely the call
- *   whose contract is "as though a hardware key was pressed". It needs
- *   droidtop's IME to be the selected input method (that is what supplies
- *   the `InputConnection`) and an editor to have focus (that is what the
- *   connection points at). Those two conditions are the platform's, not
- *   droidtop's, and the surface says which one is missing rather than
- *   dropping keystrokes.
+ *   whose contract is "as though a hardware key was pressed". The IME
+ *   records the connection in `onStartInput`; this input-session callback
+ *   is independent of Android showing its soft-input view. It needs
+ *   droidtop's IME selected and an editor focused, and the surface reports
+ *   when either condition is missing.
  *
  * Both routes share one translation ([HackersKeyCodes]) and one key table
  * (`EvdevKeys`, on the container side only). Nothing here reimplements the
- * IME, and nothing calls into [LatinIME]'s internals -- which is
- * deliberate: with the on-primary input view suppressed those internals
- * have no view to work against, and driving them from here would be
- * reaching into a service configured for a screen that is not showing.
+ * IME or drives its view internals. The service exposes only the active
+ * editor connection captured at input start, which remains usable when
+ * Android does not draw its soft-input window.
  *
  * ## What is given up, stated rather than hidden
  *
@@ -68,6 +66,20 @@ import android.view.inputmethod.InputConnection
  * this surface off.
  */
 object SecondScreenKeyboard {
+
+    @Volatile
+    private var activeInputConnection: InputConnection? = null
+
+    /** Called by LatinIME's input lifecycle, which is independent of its window lifecycle. */
+    @JvmStatic
+    fun onStartInput(connection: InputConnection?) {
+        activeInputConnection = connection
+    }
+
+    @JvmStatic
+    fun onFinishInput() {
+        activeInputConnection = null
+    }
 
     /**
      * How many second-screen keyboard surfaces are up.
@@ -121,9 +133,10 @@ object SecondScreenKeyboard {
      * Where the Android route types, or null when there is nowhere. Both
      * ways of being null are real preconditions: an IME that is installed
      * but not selected is never bound, and a bound IME with no focused
-     * editor has no `InputConnection`.
+     * editor has no `InputConnection`. Captured from `onStartInput`, not
+     * inferred from the IME window being visible.
      */
-    val androidTarget: InputConnection? get() = LatinIME.sInstance?.currentInputConnection
+    val androidTarget: InputConnection? get() = activeInputConnection
 
     /** Whether the Android route currently has anywhere to type. */
     fun androidTargetAvailable(): Boolean = androidTarget != null

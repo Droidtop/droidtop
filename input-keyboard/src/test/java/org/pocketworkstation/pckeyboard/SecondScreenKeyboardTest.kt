@@ -1,9 +1,12 @@
 package org.pocketworkstation.pckeyboard
 
 import android.view.KeyEvent
+import android.view.inputmethod.InputConnection
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.lang.reflect.Proxy
 
 /**
  * The second-screen keyboard's container route, as pure logic.
@@ -16,6 +19,26 @@ import org.junit.Test
  * user pressed.
  */
 class SecondScreenKeyboardTest {
+
+    @Test
+    fun `editor connection is available from input start even without an input view`() {
+        val connection = Proxy.newProxyInstance(
+            InputConnection::class.java.classLoader,
+            arrayOf(InputConnection::class.java),
+        ) { _, method, _ ->
+            when (method.returnType) {
+                java.lang.Boolean.TYPE -> false
+                java.lang.Integer.TYPE -> 0
+                else -> null
+            }
+        } as InputConnection
+
+        SecondScreenKeyboard.onStartInput(connection)
+        assertSame(connection, SecondScreenKeyboard.androidTarget)
+
+        SecondScreenKeyboard.onFinishInput()
+        assertNull(SecondScreenKeyboard.androidTarget)
+    }
 
     /**
      * Stands in for `KeyCharacterMap`. Only the handful of characters the

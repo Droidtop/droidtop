@@ -2978,19 +2978,19 @@ What is true on Android, and what this section corrects in the text above:
   unaffected by the flags, and a Presentation never competes for key focus
   again. This is what makes the Presentation-plus-SECONDARY_HOME split above
   actually hold: the live surface adds no second focus holder.
-- An IME for an editor on a non-default presentation display is shown on the
-  default display (display IME policy `FALLBACK_DISPLAY`; changing it needs a
-  signature permission), so droidtop's IME being selected and allowed to draw
-  is what gives such an app a soft keyboard at all. The second-screen input
-  surface sends key events and committed text to
-  `SecondScreenKeyboard.androidTarget`, the selected IME's current
-  `InputConnection`, so the focused app receives input while Android places
-  the IME window on the built-in display. The surface offers one explicit
-  “Use droidtop's keyboard for the second screen” action when droidtop is not
-  the running IME; it opens Android's keyboard picker and never selects an
-  IME itself. This uses the platform's permitted default-display fallback
-  rather than trying to move the IME window to a display droidtop cannot
-  control (Droidtop/tracker#156).
+- The selected IME may receive an input session for an editor on a
+  non-default display without Android drawing its IME window. Console
+  evidence for Droidtop/tracker#156: with Gboard selected and Chrome focused
+  on display 10, `dumpsys input_method` reported “shown on display 0” while no
+  IME window was drawn on either screen. The Android input-method lifecycle
+  calls `onStartInput` for a new editor session separately from
+  `onStartInputView`, which is only for showing the soft-input view. droidtop
+  therefore retains the connection in `LatinIME.onStartInput`; its own
+  second-screen surface sends keys and committed text through that connection
+  when `:input-keyboard` is selected. Android remains responsible for choosing
+  whether and where to draw the IME window. If droidtop's IME is not selected,
+  the surface offers “Use droidtop's keyboard for the second screen”, which
+  opens Android's picker and never selects an IME itself (Droidtop/tracker#156).
   `SecondScreenKeyboard.attached` suppresses the IME's own view while the
   second-screen keyboard surface is up. It counted ATTACHED surfaces, and a
   stopped Activity's views stay attached, so the idle `SECONDARY_HOME` cover
@@ -4278,14 +4278,14 @@ that produces.
   involved, no editor focus needed.
 - **Into an Android app** (Gaming and Standard): each key becomes an
   `InputConnection.sendKeyEvent`, whose contract is precisely "as though a
-  hardware key was pressed". This needs droidtop's IME to be the selected
-  input method (that is what supplies the connection) and an editor to
-  have focus (that is what it points at). Both are the platform's
-  conditions, not droidtop's, and the surface says which one is missing
-  rather than dropping keystrokes.
+  hardware key was pressed". `LatinIME.onStartInput` captures the editor
+  connection even when Android does not show the IME window; its own
+  `SecondScreenInput` surface draws the keyboard on the selected second
+  screen. This needs droidtop's IME selected and an editor to have focus.
 
-Nothing calls into `LatinIME`'s internals: with the on-primary input view
-suppressed those internals have no view to work against.
+The second-screen surface uses the current editor connection, not the IME's
+on-primary input view. Suppressing that view therefore does not prevent
+typing through the keyboard drawn on the second screen.
 
 What the hardware-key model gives up, stated rather than hidden: no
 autocorrect, no suggestion strip, no dead-key composition, and the key
