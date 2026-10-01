@@ -496,13 +496,16 @@ a contract 1 plugin keeps the legacy translation.
 - `ui.settings`: a contract 2 plugin's Settings row on its plugin page
   opens its view (`PluginSettingsRows.screenFor`); contract 1 rows are
   unchanged.
+- Reply views for `ui.context_action` (`run`) and `ui.quick_tile`
+  (`action`): both may reply `{view}`; droidtop opens it with
+  `PluginViews.screenFor`, carries the point's `target` or `tileId`
+  as `hostContext`, and the message stays on the status line.
 - `handle` for contract 2 `python` and `flutter_embed` plugins, and the
   approval grant of every provided point.
 - **Not built yet** (queued): the Get games flow on views (`form`,
   `search` in the contract 2 shape, `detail`, `acquire`, replacing
-  `AcquireContentSources.searchScreen` and `SourceOptionsDialog`), reply
-  views for `ui.context_action` and `ui.quick_tile`, and samples that use
-  views.
+  `AcquireContentSources.searchScreen` and `SourceOptionsDialog`), and
+  samples that use views.
 
 ---
 

@@ -23,7 +23,14 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import dev.droidtop.library.settings.CatalogScreen
 import org.json.JSONObject
+
+/** A plugin action or tile reply: either a message, or a screen to show, or both. */
+data class PluginOutcome(
+    val message: String?,
+    val screen: CatalogScreen?,
+)
 
 /** The plugins that are running and provide [point] at a version this build serves: manifests only, nothing is loaded or called. */
 internal fun providersOf(context: Context, point: String): List<Pair<PluginRecord, ProvidedPoint>> {
@@ -96,18 +103,38 @@ object PluginContextActions {
         }
     }
 
-    /** Runs [action] on [target] and returns what to tell the user. */
-    suspend fun run(context: Context, action: Action, target: ContextTarget): String {
+    /** Runs [action] on [target] and returns the outcome (message or reply screen). */
+    suspend fun run(context: Context, action: Action, target: ContextTarget): PluginOutcome {
         val args = argsFor(context, action, target)
         if (action.runsAsJob) {
             val flat = buildMap { args.keys().forEach { put(it, args.optString(it)) } }
             val jobId = PluginJobsCenter.start(context, action.record, PluginCapability.LIBRARY_ACTION, flat, title = action.label)
-            return if (jobId != null) "${action.label} started; it is under Jobs" else "${action.label} could not start"
+            return PluginOutcome(
+                message = if (jobId != null) "${action.label} started; it is under Jobs" else "${action.label} could not start",
+                screen = null,
+            )
         }
         val policy = PluginCrashPolicy(context.applicationContext)
         return try {
             val reply = policy.handle(action.record, newCall(POINT, "run", "game.detail", args, 15_000L))
-            if (reply.ok) reply.data.optString("message").takeIf { it.isNotBlank() } ?: "${action.label} done" else "${action.label} failed: ${reply.message}"
+            if (!reply.ok) {
+                return PluginOutcome(
+                    message = "${action.label} failed: ${reply.message}",
+                    screen = null,
+                )
+            }
+            val message = reply.data.optString("message").takeIf { it.isNotBlank() } ?: "${action.label} done"
+            val view = dev.droidtop.pluginhost.PluginViewCall.replyView(reply.data)
+            val screen = view?.let {
+                PluginViews.screenFor(
+                    record = action.record,
+                    point = POINT,
+                    view = it,
+                    id = "ctx_view_${action.record.manifest.id}_${action.id}",
+                    hostContext = JSONObject().put("target", args.get("target")),
+                )
+            }
+            PluginOutcome(message = message, screen = screen)
         } finally {
             policy.shutdown()
         }
@@ -214,13 +241,30 @@ object PluginTiles {
         }.associate { (key, deferred) -> key to deferred.await() }
     }
 
-    /** Presses a quick tile: `toggle` when it has an on state, otherwise `action`. Returns what to tell the user, or null when nothing needs saying. */
-    suspend fun press(context: Context, tile: Tile, state: TileState?): String? {
+    /** Presses a quick tile: `toggle` when it has an on state, otherwise `action`. Returns the outcome. */
+    suspend fun press(context: Context, tile: Tile, state: TileState?): PluginOutcome? {
         if (!tile.quick) return null
         val policy = PluginCrashPolicy(context.applicationContext)
         return try {
             val reply = policy.handle(tile.record, newCall(tile.entry.point, PluginTileProtocol.pressOp(state), QUICK_MENU_SURFACE, args(tile), 15_000L))
-            if (reply.ok) reply.data.optString("message").takeIf { it.isNotBlank() } else "${tile.fallbackLabel} failed: ${reply.message}"
+            if (!reply.ok) {
+                return PluginOutcome(
+                    message = "${tile.fallbackLabel} failed: ${reply.message}",
+                    screen = null,
+                )
+            }
+            val message = reply.data.optString("message").takeIf { it.isNotBlank() }
+            val view = dev.droidtop.pluginhost.PluginViewCall.replyView(reply.data)
+            val screen = view?.let {
+                PluginViews.screenFor(
+                    record = tile.record,
+                    point = tile.entry.point,
+                    view = it,
+                    id = "tile_view_${tile.record.manifest.id}_${(tile.entry.id ?: "")}",
+                    hostContext = JSONObject().put("tileId", args(tile).optString("tileId", "")),
+                )
+            }
+            PluginOutcome(message = message, screen = screen)
         } finally {
             policy.shutdown()
         }

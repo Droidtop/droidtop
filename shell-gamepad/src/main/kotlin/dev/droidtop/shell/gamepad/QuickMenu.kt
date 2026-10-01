@@ -471,6 +471,7 @@ private fun PluginTilesTab(
         mutableStateOf<Map<String, dev.droidtop.pluginhost.TileState?>>(tiles.associate { it.key to dev.droidtop.library.integrations.PluginTiles.cached(it) })
     }
     var message by remember { mutableStateOf<String?>(null) }
+    var tileScreen by remember { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
 
     suspend fun refresh() {
         states = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -495,9 +496,11 @@ private fun PluginTilesTab(
                         val tile = tiles.getOrNull(focusIndex)
                         if (tile != null && tile.quick) {
                             scope.launch {
-                                message = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                val outcome = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                     dev.droidtop.library.integrations.PluginTiles.press(context, tile, states[tile.key])
                                 }
+                                message = outcome?.message
+                                tileScreen = outcome?.screen
                                 refresh()
                             }
                         }
@@ -542,6 +545,12 @@ private fun PluginTilesTab(
             background = androidx.compose.ui.graphics.Color.Transparent,
             modifier = Modifier.padding(top = 8.dp),
         )
+    }
+    tileScreen?.let { screen ->
+        val close = { tileScreen = null }
+        androidx.compose.ui.window.Dialog(onDismissRequest = close) {
+            dev.droidtop.shell.gamepad.CatalogNavigator(root = screen, onExit = close)
+        }
     }
 }
 

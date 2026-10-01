@@ -1145,6 +1145,7 @@ private fun EntryDetailScreen(
     var scrapeStatus by remember(entry) { mutableStateOf<String?>(null) }
     var scrapeResult by remember(entry) { mutableStateOf<String?>(null) }
     var pluginActionStatus by remember(entry) { mutableStateOf<String?>(null) }
+    var pluginActionScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     // Everything scraped for this game, for the media viewer: listed on
     // IO once per entry, never while drawing (the same as PcGameMenu).
     val media by produceState(emptyList<Pair<String, String>>(), entry) {
@@ -1335,10 +1336,13 @@ private fun EntryDetailScreen(
                     action.label,
                     onClick = {
                         pluginActionStatus = "${action.label}…"
+                        pluginActionScreen = null
                         detailScope.launch {
-                            pluginActionStatus = withContext(Dispatchers.IO) {
+                            val outcome = withContext(Dispatchers.IO) {
                                 dev.droidtop.library.integrations.PluginContextActions.run(context, action, contextTarget)
                             }
+                            pluginActionStatus = outcome.message
+                            pluginActionScreen = outcome.screen
                         }
                     },
                 )
@@ -1434,6 +1438,12 @@ private fun EntryDetailScreen(
         // component that app no longer exports). Shown, not swallowed.
         integrationError?.let {
             Text(it, color = MenuTokens.Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+        }
+    }
+    pluginActionScreen?.let { screen ->
+        val close = { pluginActionScreen = null }
+        androidx.compose.ui.window.Dialog(onDismissRequest = close) {
+            dev.droidtop.shell.gamepad.CatalogNavigator(root = screen, onExit = close)
         }
     }
 }
