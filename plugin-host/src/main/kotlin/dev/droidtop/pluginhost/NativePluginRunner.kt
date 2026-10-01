@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import android.util.Log
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
@@ -42,6 +44,18 @@ class NativePluginRunner(
     // broadcast a wasted (though harmless, `runCatching`-guarded)
     // delivery attempt for as long as :pluginhost stays alive.
     private var callbackStub: IPluginRuntimeCallback.Stub? = null
+
+    // Why each plugin's last [load] returned false, for the caller to show and for logcat (see [loadFailure]).
+    private val loadFailures = ConcurrentHashMap<String, String>()
+
+    /** Why the last [load] of [pluginId] returned false, in words an end user can read; null when it has not failed. */
+    fun loadFailure(pluginId: String): String? = loadFailures[pluginId]
+
+    private fun failLoad(pluginId: String, reason: String): Boolean {
+        loadFailures[pluginId] = reason
+        Log.w("droidtop.plugin", "$pluginId did not load: $reason")
+        return false
+    }
 
     private suspend fun ensureConnected(): IPluginRuntime? {
         connection?.let { return it }
@@ -107,17 +121,34 @@ class NativePluginRunner(
         // to try. An empty string is the same "unused" placeholder
         // PluginRuntimeService already documents.
         val entryClass = record.manifest.entryClass ?: ""
-        val runtime = ensureConnected() ?: return false
+        val id = record.manifest.id
+        loadFailures.remove(id)
+        val runtime = ensureConnected() ?: return failLoad(id, "the plugin process could not be started")
         return try {
-            withTimeout(PluginRunner.CALL_TIMEOUT_MS) {
-                runtime.loadPlugin(record.manifest.id, installDir, entryClass, record.rootApproved, PluginBrokers.binderFor(context, record.manifest.id))
+            // loadPlugin is a blocking binder call: on the IO dispatcher so the budget below can
+            // actually fire, and so a caller on the main thread is never held for a cold engine start
+            // (rig, 2026-09-30: 15 s of skipped frames while a Flutter plugin started).
+            val loaded = withTimeout(PluginRunner.CALL_TIMEOUT_MS) {
+                withContext(Dispatchers.IO) {
+                    runtime.loadPlugin(id, installDir, entryClass, record.rootApproved, PluginBrokers.binderFor(context, id))
+                }
             }
+            if (!loaded) {
+                // The reason is the service's own (runtime missing, version mismatch, the plugin's
+                // own readiness failure); a crash it also reported already disabled the plugin.
+                failLoad(id, runCatching { runtime.lastLoadError(id) }.getOrNull().orEmpty().ifBlank { "plugin failed to load" })
+            }
+            loaded
         } catch (e: TimeoutCancellationException) {
-            onCrash(record.manifest.id, "", "load timed out")
-            false
+            // A slow first start (a runtime's cold start) is "not ready yet", not a crash: the plugin
+            // is not disabled, the load keeps going in the plugin process, and the next call joins it.
+            failLoad(id, "still starting up (the first start can take a while); try again in a moment")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
-            onCrash(record.manifest.id, "", e.message ?: "load failed across the binder")
-            false
+            val reason = e.message ?: "load failed across the binder"
+            onCrash(id, "", reason)
+            failLoad(id, reason)
         }
     }
 

@@ -6,8 +6,10 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.os.RemoteCallbackList
+import android.util.Log
 import dalvik.system.DexClassLoader
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import org.json.JSONObject
 
@@ -25,7 +27,21 @@ import org.json.JSONObject
  * [DroidtopPlugin] say so again so nobody mistakes what this is for.
  */
 class PluginRuntimeService : Service() {
-    private val loaded = mutableMapOf<String, DroidtopPlugin>()
+    // Binder threads (a pool) read and write these concurrently: a second load
+    // of the same plugin arrives while the first is still starting its engine.
+    private val loaded = ConcurrentHashMap<String, DroidtopPlugin>()
+
+    /** Why each plugin's last load returned false ([IPluginRuntime.lastLoadError]); also logged, so logcat has the reason too. */
+    private val loadErrors = ConcurrentHashMap<String, String>()
+
+    /** Serialises [IPluginRuntime.loadPlugin]: a caller that gave up waiting (its own timeout) and retries must join the load still in flight, not start a second engine beside it. */
+    private val loadLock = Any()
+
+    private fun failLoad(pluginId: String, reason: String): Boolean {
+        loadErrors[pluginId] = reason
+        Log.w("droidtop.plugin", "$pluginId did not load: $reason")
+        return false
+    }
 
     /**
      * Every caller currently connected, not just the most recent one --
@@ -78,7 +94,9 @@ class PluginRuntimeService : Service() {
             // engine moments earlier. A plugin already in [loaded] is
             // already loaded; returning true here without touching it is
             // what onLoad's own contract always said this should do.
+            return synchronized(loadLock) {
             loaded[pluginId]?.let { return true }
+            loadErrors.remove(pluginId)
             val dir = File(installDir)
             // The manifest on disk (written by PluginBundleInstaller,
             // re-verified before every activation by PluginCrashPolicy)
@@ -91,29 +109,38 @@ class PluginRuntimeService : Service() {
             val kind = runCatching {
                 PluginManifest.fromJson(JSONObject(manifestFile.readText()))?.kind
             }.getOrNull()
-            return when (kind) {
+            when (kind) {
                 PluginKind.PYTHON -> loadPythonPlugin(pluginId, dir, rootApproved, broker)
                 PluginKind.FLUTTER_EMBED -> loadFlutterPlugin(pluginId, dir, rootApproved, broker)
                 else -> loadNativeBundlePlugin(pluginId, dir, entryClass, rootApproved, broker)
             }
+            }
         }
+
+        override fun lastLoadError(pluginId: String): String = loadErrors[pluginId].orEmpty()
 
         private fun loadNativeBundlePlugin(pluginId: String, dir: File, entryClass: String, rootApproved: Boolean, broker: IPluginHostBroker): Boolean {
             return try {
                 val jar = File(dir, "classes.jar")
-                if (!jar.isFile) return false
+                if (!jar.isFile) return failLoad(pluginId, "its classes.jar is missing from the installed bundle")
                 val nativeDir = nativeLibraryDirFor(dir)
                 val optimizedDir = File(cacheDir, "dex-opt/$pluginId").apply { mkdirs() }
                 val loader = DexClassLoader(jar.absolutePath, optimizedDir.absolutePath, nativeDir, javaClass.classLoader)
                 val instance = loader.loadClass(entryClass).getDeclaredConstructor().newInstance()
-                val plugin = instance as? DroidtopPlugin ?: return false
+                val plugin = instance as? DroidtopPlugin ?: return failLoad(pluginId, "its entry class does not implement the plugin interface")
                 plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved, broker))
                 loaded[pluginId] = plugin
                 true
             } catch (t: Throwable) {
-                reportCrash(pluginId, "", "load failed: ${t.message ?: t::class.java.simpleName}")
-                false
+                loadCrashed(pluginId, t)
             }
+        }
+
+        /** A thrown load is a crash (the plugin is disabled with the reason) and also the reason the caller reads. */
+        private fun loadCrashed(pluginId: String, t: Throwable): Boolean {
+            val reason = "load failed: ${t.message ?: t::class.java.simpleName}"
+            reportCrash(pluginId, "", reason)
+            return failLoad(pluginId, reason)
         }
 
         /**
@@ -130,17 +157,17 @@ class PluginRuntimeService : Service() {
         private fun loadPythonPlugin(pluginId: String, dir: File, rootApproved: Boolean, broker: IPluginHostBroker): Boolean {
             val built = PythonDroidtopPlugin.forInstall(applicationContext, pluginId, dir)
             val plugin = built.getOrElse { e ->
-                if (e.message?.contains("runtime not installed", ignoreCase = true) == true) return false
-                reportCrash(pluginId, "", "load failed: ${e.message ?: e::class.java.simpleName}")
-                return false
+                if (e.message?.contains("runtime not installed", ignoreCase = true) == true) {
+                    return failLoad(pluginId, "the Python runtime is not installed")
+                }
+                return loadCrashed(pluginId, e)
             }
             return try {
                 plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved, broker))
                 loaded[pluginId] = plugin
                 true
             } catch (t: Throwable) {
-                reportCrash(pluginId, "", "load failed: ${t.message ?: t::class.java.simpleName}")
-                false
+                loadCrashed(pluginId, t)
             }
         }
 
@@ -171,30 +198,28 @@ class PluginRuntimeService : Service() {
             }.getOrNull()
             val pinnedVersion = FlutterRuntimeManager.pinnedVersion(applicationContext)
             if (pinnedVersion == null || FlutterRuntimeManager.libflutterSoPath(applicationContext) == null) {
-                return false
+                return failLoad(pluginId, "the Flutter runtime is not installed")
             }
             if (runtimeVersion != pinnedVersion) {
-                reportCrash(pluginId, "", "plugin's runtimeVersion ($runtimeVersion) does not match the installed Flutter runtime ($pinnedVersion)")
-                return false
+                val reason = "plugin's runtimeVersion ($runtimeVersion) does not match the installed Flutter runtime ($pinnedVersion)"
+                reportCrash(pluginId, "", reason)
+                return failLoad(pluginId, reason)
             }
             val built = FlutterDroidtopPlugin.forInstall(applicationContext, pluginId, dir)
-            val plugin = built.getOrElse { e ->
-                reportCrash(pluginId, "", "load failed: ${e.message ?: e::class.java.simpleName}")
-                return false
-            }
+            val plugin = built.getOrElse { e -> return loadCrashed(pluginId, e) }
             return try {
                 plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved, broker))
                 loaded[pluginId] = plugin
                 true
             } catch (t: Throwable) {
-                reportCrash(pluginId, "", "load failed: ${t.message ?: t::class.java.simpleName}")
-                false
+                loadCrashed(pluginId, t)
             }
         }
 
         override fun unloadPlugin(pluginId: String) {
             runCatching { loaded.remove(pluginId)?.onUnload() }
             loaded.remove(pluginId)
+            loadErrors.remove(pluginId)
         }
 
         override fun invoke(pluginId: String, capability: String, argsJson: String): String? {

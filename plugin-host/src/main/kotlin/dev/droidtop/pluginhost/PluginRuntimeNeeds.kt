@@ -1,0 +1,68 @@
+package dev.droidtop.pluginhost
+
+import android.content.Context
+
+/**
+ * A runtime a plugin cannot run without and the device does not have yet
+ * (docs/SPEC.md 12a, "A runtime the plugin needs"). [kind] is the plugin
+ * kind that needs it, [runtime] its name as a person reads it, [sizeLabel]
+ * the download size.
+ */
+data class RuntimeNeed(val kind: PluginKind, val runtime: String, val sizeLabel: String) {
+    /** The sentence every surface uses for this need, so a plugin page, a search result and a job all say the same thing. */
+    val message: String get() = "needs the $runtime runtime ($sizeLabel), which is not installed yet"
+
+    /** What the install action is called on every surface that offers it. */
+    val actionLabel: String get() = "Download the $runtime runtime ($sizeLabel)"
+}
+
+/**
+ * The one place that knows which plugin kinds need a downloaded runtime,
+ * whether it is there, and how to get it. The plugin's own page, the
+ * Accounts and sources counts, a failed search row and the call path
+ * ([PluginCrashPolicy]) all ask here, so none of them says "Running" for a
+ * plugin that cannot run, and the download is one mechanism with one set
+ * of words.
+ */
+object PluginRuntimeNeeds {
+    /** The runtime [manifest]'s kind needs that is not installed, or null when it needs none or has it. Reads a marker file: call off the main thread. */
+    fun missing(context: Context, manifest: PluginManifest): RuntimeNeed? = when (manifest.kind) {
+        PluginKind.FLUTTER_EMBED ->
+            if (FlutterRuntimeManager.isInstalled(context)) null else RuntimeNeed(PluginKind.FLUTTER_EMBED, "Flutter", "about 40 MB")
+        PluginKind.PYTHON ->
+            if (PythonRuntimeManager.isInstalled(context)) null else RuntimeNeed(PluginKind.PYTHON, "Python", "about 22 MB")
+        else -> null
+    }
+
+    /** Downloads, verifies and installs [need]'s runtime, reporting progress as plain text. Returns null on success, otherwise the reason. Off the main thread; never throws. */
+    suspend fun install(context: Context, need: RuntimeNeed, onStatus: (String) -> Unit): String? = when (need.kind) {
+        PluginKind.FLUTTER_EMBED -> FlutterRuntimeManager.ensureInstalled(context) { progress ->
+            onStatus(
+                when (progress) {
+                    is FlutterRuntimeManager.Progress.Downloading -> downloadText(progress.bytesRead, progress.totalBytes)
+                    FlutterRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
+                    FlutterRuntimeManager.Progress.Extracting -> "Extracting..."
+                    FlutterRuntimeManager.Progress.Done -> "Done"
+                },
+            )
+        }
+        PluginKind.PYTHON -> PythonRuntimeManager.ensureInstalled(context) { progress ->
+            onStatus(
+                when (progress) {
+                    is PythonRuntimeManager.Progress.Downloading -> downloadText(progress.bytesRead, progress.totalBytes)
+                    PythonRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
+                    PythonRuntimeManager.Progress.Extracting -> "Extracting..."
+                    PythonRuntimeManager.Progress.Done -> "Done"
+                },
+            )
+        }
+        else -> "this kind of plugin needs no runtime"
+    }
+
+    private fun downloadText(bytesRead: Long, totalBytes: Long): String = if (totalBytes > 0) {
+        val pct = (bytesRead * 100 / totalBytes).toInt()
+        "Downloading... $pct% (${bytesRead / 1024 / 1024} MB / ${totalBytes / 1024 / 1024} MB)"
+    } else {
+        "Downloading... ${bytesRead / 1024 / 1024} MB"
+    }
+}

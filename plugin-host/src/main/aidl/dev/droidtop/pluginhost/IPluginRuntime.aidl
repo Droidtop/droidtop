@@ -64,6 +64,15 @@ interface IPluginRuntime {
      */
     boolean loadPlugin(String pluginId, String installDir, String entryClass, boolean rootApproved, IPluginHostBroker broker);
 
+    /**
+     * Why the last {@link #loadPlugin} of this plugin returned false, in a
+     * sentence an end user can read ("the Flutter runtime is not installed",
+     * the plugin's own readiness failure, ...), or an empty string when
+     * there is nothing to say (it loaded, or was never asked to). Kept per
+     * plugin id in this process; the caller reads it right after a false.
+     */
+    String lastLoadError(String pluginId);
+
     void unloadPlugin(String pluginId);
 
     /**

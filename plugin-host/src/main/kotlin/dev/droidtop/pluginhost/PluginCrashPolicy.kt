@@ -1,6 +1,9 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * "A plugin failure is shown to the user and disables that plugin. The
@@ -34,6 +37,7 @@ class PluginCrashPolicy(
             // restarting the process on every call.
             return
         }
+        Log.w("droidtop.plugin", "$pluginId disabled: $reason")
         PluginStore.disableWithReason(context, pluginId, reason)
     }
 
@@ -53,8 +57,9 @@ class PluginCrashPolicy(
         }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
         gateOnVerification(record)?.let { return it }
+        missingRuntime(record)?.let { return PluginResult.failure(it.message) }
         if (!runner.load(record, dir.absolutePath)) {
-            return PluginResult.failure("plugin failed to load")
+            return PluginResult.failure(loadFailure(record))
         }
         // A returned PluginResult.failure (ok=false, no exception) is a
         // PLUGIN reporting its own ordinary failure -- "no network",
@@ -99,8 +104,9 @@ class PluginCrashPolicy(
             return PluginReply.error(PluginErrorCode.PERMISSION_DENIED, "${record.manifest.label} has not been allowed to provide ${call.point}")
         }
         gateOnVerification(record)?.let { return PluginReply.error(PluginErrorCode.FAILED, it.error ?: "plugin failed verification") }
+        missingRuntime(record)?.let { return PluginReply.error(PluginErrorCode.FAILED, it.message) }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
-        if (!runner.load(record, dir.absolutePath)) return PluginReply.error(PluginErrorCode.FAILED, "plugin failed to load")
+        if (!runner.load(record, dir.absolutePath)) return PluginReply.error(PluginErrorCode.FAILED, loadFailure(record))
         return PluginBrokers.during(record.manifest.id, userInitiated, timeoutMs) {
             runner.handle(record.manifest.id, call, timeoutMs, crashOnTimeout)
         }
@@ -117,6 +123,10 @@ class PluginCrashPolicy(
         if (!record.runnable() || waitingReason(record) != null) return false
         if (record.manifest.kind !in RUNNABLE_KINDS) return false
         gateOnVerification(record)?.let { return false }
+        missingRuntime(record)?.let {
+            Log.w("droidtop.plugin", "${record.manifest.id} job not started: ${it.message}")
+            return false
+        }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
         if (!runner.load(record, dir.absolutePath)) return false
         return runner.startJob(record.manifest.id, capability, args, jobId)
@@ -136,6 +146,7 @@ class PluginCrashPolicy(
         if (!record.runnable() || waitingReason(record) != null) return null
         if (record.manifest.kind !in RUNNABLE_KINDS) return null
         gateOnVerification(record)?.let { return null }
+        if (missingRuntime(record) != null) return null
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
         if (!runner.load(record, dir.absolutePath)) return null
         return runner.notifyEvent(record.manifest.id, event, args)
@@ -153,13 +164,22 @@ class PluginCrashPolicy(
      * all of them. Returns the failure result [invoke] should return,
      * or null when the plugin is fit to run.
      */
-    private fun gateOnVerification(record: PluginRecord): PluginResult? {
+    private suspend fun gateOnVerification(record: PluginRecord): PluginResult? = withContext(Dispatchers.IO) {
+        // Hashes every payload file: disk work, so never on the caller's (possibly main) thread.
         val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
         val problem = PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record, userKeys)
-        if (problem == null) return null
+        if (problem == null) return@withContext null
         PluginStore.disableWithReason(context, record.manifest.id, problem.reason)
-        return PluginResult.failure(problem.reason)
+        PluginResult.failure(problem.reason)
     }
+
+    /** The runtime [record] needs and the device lacks, or null. Answered before any load, so a plugin that cannot run is never started and never disabled for it. */
+    private suspend fun missingRuntime(record: PluginRecord): RuntimeNeed? =
+        withContext(Dispatchers.IO) { PluginRuntimeNeeds.missing(context, record.manifest) }
+
+    /** The reason [runner]'s last load of [record] failed (docs/SPEC.md 12a); never the bare "failed to load" when the host knows more. */
+    private fun loadFailure(record: PluginRecord): String =
+        runner.loadFailure(record.manifest.id) ?: "plugin failed to load"
 
     override fun cancelJob(pluginId: String, jobId: String) {
         runner.cancelJob(pluginId, jobId)
