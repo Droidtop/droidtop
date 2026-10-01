@@ -20,4 +20,8 @@ object EngineOverridePrefs {
     fun get(context: Context, folderPath: String): String? = prefs(context).get(folderPath)
 
     fun set(context: Context, folderPath: String, engineId: String?) = prefs(context).set(folderPath, engineId)
+
+    /** The overridden engine for [folderPath], resolved through the registry's id map; null when unset or unknown to this app. */
+    fun engineFor(context: Context, folderPath: String): GameEngine? =
+        get(context, folderPath)?.let { EngineRegistryParser.ENGINE_IDS[it] }
 }
