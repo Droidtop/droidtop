@@ -9628,6 +9628,35 @@ setting (section 7b), which is what lets it use the shell's own menu row anatomy
 tokens are absolute against the menu overlay surface and legible over a dark ground and
 nothing else.
 
+### Text in rows and tiles (directed 2026-09-30, tracker#154)
+
+The owner could not read some settings items at all: rows were one line
+tall with one-line titles, values and supporting text cut with an
+ellipsis. One rule, in the shared components, not per screen:
+
+- **Rows are tall and grow with their content.** `MenuRow` (the row every
+  Settings catalog, Quick Menu and game menu uses) is at least
+  `MenuTokens.RowMinHeight` (72dp; on a touch-first window at least one
+  touch target) with `MenuTokens.RowVerticalPadding` (14dp) above and
+  below. The height is a minimum, never a fixed height: a row with more
+  text is taller.
+- **Titles wrap to two lines, then ellipsize. Supporting text wraps in
+  full, no line limit.** A value in the value column wraps to
+  `MenuTokens.ValueMaxLines` inside `ValueColumnMaxWidth`; the Info sheet
+  (Y / long press) still shows a row whole. A caller no longer limits a
+  row's supporting lines (`subtitleLines` defaults to unlimited).
+- **A label that must be one line (grid tile, carousel card, tab label)
+  scrolls while focused**: `Modifier.focusMarquee(focused)` with
+  `maxLines = 1` while focused, so nothing is unreadable forever. Unfocused
+  it wraps to the tile's own line budget and ellipsizes. Tiles use a
+  minimum height, not a fixed one.
+- **Text size**: every size is in `sp` and rows measure their text, so the
+  Text size setting (the activity's font scale) grows rows rather than
+  clipping them. A fixed `dp` height on anything holding text is a bug.
+- New text-bearing surfaces use these components; a per-screen
+  `maxLines = 1` / `singleLine` / fixed `height` on prose is removed, not
+  re-added. Text fields (`singleLine` input) are exempt.
+
 ## 7m. One game, its versions and its segments (directed 2026-09-16)
 
 **Part and version folders are structure, not depth.** Both walks bound

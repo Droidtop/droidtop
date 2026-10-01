@@ -336,7 +336,14 @@ object MenuTokens {
      * three different heights down one settings screen (100 / 130 / 160
      * px) because the box was whatever its text happened to need.
      */
-    val RowMinHeight = 56.dp
+    val RowMinHeight = 72.dp
+
+    /** Generous vertical padding inside a row (owner, tracker#154). */
+    val RowVerticalPadding = 14.dp
+
+    /** A row's value wraps to this many lines inside [ValueColumnMaxWidth]. */
+    const val ValueMaxLines = 3
+    val ValueColumnMaxWidth = 220.dp
 
     /**
      * The value column's own width, so the values down a screen line up

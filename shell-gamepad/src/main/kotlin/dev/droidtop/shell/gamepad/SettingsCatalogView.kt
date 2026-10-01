@@ -721,7 +721,7 @@ private fun CatalogRowView(
 
 /**
  * A settings row in full: its name, what it is set to, and every word of
- * its explanation, which the row itself cuts to one line. Opened by Y on
+ * its explanation, for a value or title the row still has to cut. Opened by Y on
  * the row, or a long press; closed by B, A or Y.
  */
 @Composable

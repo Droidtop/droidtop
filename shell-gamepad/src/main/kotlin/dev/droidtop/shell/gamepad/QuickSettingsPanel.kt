@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -440,7 +441,7 @@ private fun QuickTileView(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(104.dp)
+            .heightIn(min = 104.dp)
             .clip(shape)
             .background(background)
             .border(MenuTokens.FocusRingWidth, if (focused) MenuTokens.Accent else Color.Transparent, shape)
@@ -465,8 +466,9 @@ private fun QuickTileView(
             color = if (confirmArmed) MenuTokens.Danger else MenuTokens.OnSurface,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            maxLines = 1,
+            maxLines = if (focused) 1 else 2,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.focusMarquee(focused),
         )
         val second = status ?: tile.value
         if (second != null) {
@@ -474,8 +476,9 @@ private fun QuickTileView(
                 second,
                 color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.labelMedium,
-                maxLines = 2,
+                maxLines = if (focused) 1 else 3,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.focusMarquee(focused),
             )
         }
     }

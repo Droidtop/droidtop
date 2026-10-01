@@ -134,7 +134,6 @@ internal fun SameGamePicker(
                     MenuRow(
                         title = choice.title,
                         subtitle = if (armed == index) confirmLine(choice) else choice.subtitle,
-                        subtitleLines = if (armed == index) 2 else 1,
                         selected = index == focusIndex,
                         onClick = { press(index) },
                     )

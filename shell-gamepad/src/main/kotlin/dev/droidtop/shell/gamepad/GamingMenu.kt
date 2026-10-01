@@ -201,8 +201,6 @@ internal fun MenuHeader(title: String, subtitle: String? = null, modifier: Modif
                 it,
                 color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -246,9 +244,10 @@ internal fun MenuRow(
     // Long-press is the touch route to Y on a row (the same convention
     // the shell's cards use for their detail).
     onLongClick: (() -> Unit)? = null,
-    // A row that is a status read-out rather than a setting (an action's
-    // multi-line result) may take more lines; a setting's row takes one.
-    subtitleLines: Int = 1,
+    // A supporting line wraps in full by default (docs/SPEC.md "Text in rows
+    // and tiles"); a caller only ever passes a limit for a surface that is
+    // not a settings row.
+    subtitleLines: Int = Int.MAX_VALUE,
     // An [adjustable] row is stepped with Left/Right on the pad. A touch
     // screen has no Left/Right, so on one the two arrows this row
     // already draws become the two targets that call this -- without it
@@ -298,10 +297,10 @@ internal fun MenuRow(
         modifier = modifier
             .fillMaxWidth()
             .then(if (ownScrollKeeping) Modifier else Modifier.bringIntoViewRequester(bringIntoViewRequester))
-            // The one height rule, plus a touch target where fingers are
-            // the input: a 56dp row is uniform everywhere, and on a
-            // touch-first window it is at least one touch target tall.
-            .heightIn(min = if (window.touchFirst) window.minTouchTarget else MenuTokens.RowMinHeight)
+            // The one height rule: a row is at least RowMinHeight (and at
+            // least one touch target where fingers are the input) and GROWS
+            // with its text, never a fixed height.
+            .heightIn(min = maxOf(MenuTokens.RowMinHeight, if (window.touchFirst) window.minTouchTarget else 0.dp))
             .clip(MenuTokens.RowShape)
             .selectionFrame(selected, MenuTokens.RowShape)
             // Touch works on every row, always -- the shell is
@@ -313,7 +312,7 @@ internal fun MenuRow(
                     else -> Modifier
                 },
             )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = MenuTokens.RowVerticalPadding),
     ) {
         if (accent != null) {
             Box(
@@ -339,12 +338,11 @@ internal fun MenuRow(
                 color = if (danger) MenuTokens.Danger else MenuTokens.OnSurface,
                 fontWeight = FontWeight.Medium,
                 style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            // One line, so every row with a subtitle is the same height
-            // (UI pass 2026-09-24, M14: rows of 84, 93 and more px down one
-            // screen). The whole sentence is on the row's Info sheet.
+            // Wraps in full: rows grow with their text, so nothing is cut
+            // (owner, tracker#154). The Info sheet still shows the row whole.
             subtitle?.let {
                 Text(
                     it,
@@ -369,8 +367,9 @@ internal fun MenuRow(
                         value,
                         color = valueColor,
                         style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
+                        maxLines = MenuTokens.ValueMaxLines,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = MenuTokens.ValueColumnMaxWidth),
                     )
                     AdjustArrow("›") { onAdjust(+1) }
                 }
@@ -380,9 +379,9 @@ internal fun MenuRow(
                     color = valueColor,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.End,
-                    maxLines = 1,
+                    maxLines = MenuTokens.ValueMaxLines,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth),
+                    modifier = Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth, max = MenuTokens.ValueColumnMaxWidth),
                 )
             }
         }
@@ -456,3 +455,13 @@ internal fun MenuPanel(
         content = content,
     )
 }
+
+/**
+ * The one scrolling-text rule for a label that must stay on one line (a
+ * grid tile, a carousel card, a tab label): while [active] (the focused
+ * item) the whole text scrolls, so nothing is unreadable forever
+ * (docs/SPEC.md "Text in rows and tiles"). Pair with maxLines = 1.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+internal fun Modifier.focusMarquee(active: Boolean): Modifier =
+    if (active) basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 600) else this
