@@ -3,6 +3,7 @@ package dev.droidtop.library.integrations
 import android.content.Context
 import dev.droidtop.library.consoles.PlatformDatabaseSource
 import dev.droidtop.library.consoles.PlatformDatabaseTransport
+import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.GitHubAuth
 import dev.droidtop.pluginhost.GitHubTokenStore
 import dev.droidtop.pluginhost.PluginBundleInstaller
@@ -12,9 +13,6 @@ import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginOriginKeys
 import dev.droidtop.pluginhost.PluginTrustState
 import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.security.MessageDigest
 import kotlin.math.sign
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -48,8 +46,9 @@ object PluginCatalog {
     private const val REFETCH_AFTER_MS = 60 * 60 * 1000L
     /** Bundles are payload-plus-manifest tar.xz; this cap is a sanity limit on the download, not a substitute for the installer's own per-entry caps. */
     private const val MAX_BUNDLE_BYTES = 512L * 1024 * 1024
-    private const val CONNECT_TIMEOUT_MS = 15_000
-    private const val READ_TIMEOUT_MS = 30_000
+    private const val DOWNLOAD_POST = "plugin_bundle"
+    private const val ARG_LABEL = "label"
+    private const val ARG_VERSION = "version"
 
     fun indexUrl(context: Context): String = PlatformDatabaseSource.urlFor(context, INDEX_RELATIVE_PATH)
 
@@ -194,32 +193,51 @@ object PluginCatalog {
         release: PluginCatalogRelease,
         onStatus: (String) -> Unit = {},
     ): String = withContext(Dispatchers.IO) {
-        val tmp = File.createTempFile("plugin-catalog-", ".droidplugin.tar.xz", context.cacheDir)
-        try {
-            when (val download = download(release.bundle, tmp, GitHubTokenStore.get(context)) { bytesRead, totalBytes ->
-                onStatus(
-                    if (totalBytes > 0) "Downloading... ${bytesRead * 100 / totalBytes}%" else "Downloading... ${bytesRead / 1024 / 1024} MB",
-                )
-            }) {
-                is Download.Failed -> return@withContext "Couldn't download ${plugin.label}: ${download.reason}"
-                is Download.Done -> {
-                    onStatus("Checking the bundle...")
-                    if (!download.sha256.equals(release.bundle.sha256, ignoreCase = true)) {
-                        return@withContext "The downloaded bundle doesn't match the catalog's own hash for it -- not installed"
+        // A token host is resolved to its signed address here (see GitHubAuth.downloadRequestFor);
+        // the transfer itself is one DownloadManager job in "Downloads and installs".
+        val (url, headers) = try {
+            GitHubAuth.downloadRequestFor(release.bundle.url, GitHubTokenStore.get(context))
+        } catch (failure: Exception) {
+            return@withContext "Couldn't download ${plugin.label}: the connection failed (${failure.message ?: "no network"})"
+        }
+        val result = DownloadJobs.run(
+            context = context,
+            title = "${plugin.label} ${release.version}",
+            post = DOWNLOAD_POST,
+            url = url,
+            name = "plugin-" + "${plugin.id}-${release.version}".replace(Regex("[^A-Za-z0-9._-]"), "_") + ".droidplugin.tar.xz",
+            sha256 = release.bundle.sha256,
+            maxBytes = MAX_BUNDLE_BYTES,
+            headers = headers,
+            extra = mapOf(ARG_LABEL to plugin.label, ARG_VERSION to release.version),
+            onStatus = onStatus,
+        )
+        when {
+            result.ok -> result.values["summary"].orEmpty()
+            // A catalog bundle gets no shortcut past its hash: a mismatch is never installed.
+            result.error == DownloadJobs.DIGEST_MISMATCH -> "The downloaded bundle doesn't match the catalog's own hash for it -- not installed"
+            else -> "Couldn't download ${plugin.label}: ${result.error}"
+        }
+    }
+
+    /**
+     * What happens to a downloaded, hash-checked bundle: [PluginBundleInstaller] in full (signature
+     * and hash checks), whose outcome line is the job's summary. Registered at process start so a
+     * download that finished while the process was gone is still installed.
+     */
+    fun registerDownloadPost() {
+        DownloadJobs.registerPost(DOWNLOAD_POST) { context, file, args ->
+            val label = args[ARG_LABEL] ?: "The plugin"
+            val version = args[ARG_VERSION].orEmpty()
+            when (val result = PluginBundleInstaller.install(file, PluginStore.root(context))) {
+                is PluginInstallResult.Installed ->
+                    if (result.record.trust == PluginTrustState.APPROVED) {
+                        "Updated $label to $version"
+                    } else {
+                        "$label $version installed -- approve it on the Plugins screen before it runs"
                     }
-                    when (val result = PluginBundleInstaller.install(tmp, PluginStore.root(context))) {
-                        is PluginInstallResult.Installed ->
-                            if (result.record.trust == PluginTrustState.APPROVED) {
-                                "Updated ${plugin.label} to ${release.version}"
-                            } else {
-                                "${plugin.label} ${release.version} installed -- approve it on the Plugins screen before it runs"
-                            }
-                        is PluginInstallResult.Refused -> "Not installed: ${result.error.reason}"
-                    }
-                }
+                is PluginInstallResult.Refused -> "Not installed: ${result.error.reason}"
             }
-        } finally {
-            tmp.delete()
         }
     }
 
@@ -270,57 +288,5 @@ object PluginCatalog {
         dir?.mkdirs()
         PlatformDatabaseTransport.write(cacheFile(context), text)
         return parsed
-    }
-
-    private sealed interface Download {
-        data class Done(val sha256: String) : Download
-        data class Failed(val reason: String) : Download
-    }
-
-    /** Streams [bundle] into [dest] (created fresh), enforcing the size cap and reporting progress; answers the file's own SHA-256. */
-    private fun download(bundle: PluginCatalogBundle, dest: File, token: String?, onProgress: (Long, Long) -> Unit): Download {
-        val connection: HttpURLConnection = try {
-            GitHubAuth.open(bundle.url, token, CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS)
-        } catch (failure: Exception) {
-            return Download.Failed("the connection failed (${failure.message ?: "no network"})")
-        }
-        return try {
-            when (val code = connection.responseCode) {
-                200 -> {
-                    val totalBytes = connection.contentLength.toLong()
-                    if (totalBytes > MAX_BUNDLE_BYTES) {
-                        return Download.Failed("the bundle is larger than the ${MAX_BUNDLE_BYTES / 1024 / 1024} MiB cap")
-                    }
-                    var written = 0L
-                    val digest = MessageDigest.getInstance("SHA-256")
-                    connection.inputStream.use { input ->
-                        FileOutputStream(dest).use { output ->
-                            val buffer = ByteArray(64 * 1024)
-                            while (true) {
-                                val read = input.read(buffer)
-                                if (read < 0) break
-                                written += read
-                                if (written > MAX_BUNDLE_BYTES) {
-                                    return Download.Failed("the bundle is larger than the ${MAX_BUNDLE_BYTES / 1024 / 1024} MiB cap")
-                                }
-                                digest.update(buffer, 0, read)
-                                output.write(buffer, 0, read)
-                                onProgress(written, totalBytes)
-                            }
-                        }
-                    }
-                    if (totalBytes > 0 && written != totalBytes) {
-                        return Download.Failed("the download was interrupted (${written} of $totalBytes bytes)")
-                    }
-                    Download.Done(digest.digest().joinToString("") { "%02x".format(it) })
-                }
-                404, 410 -> Download.Failed("the server says the bundle is not there (HTTP $code)")
-                else -> Download.Failed("the server answered HTTP $code")
-            }
-        } catch (failure: Exception) {
-            Download.Failed("the download was interrupted (${failure.message ?: "no network"})")
-        } finally {
-            connection.disconnect()
-        }
     }
 }

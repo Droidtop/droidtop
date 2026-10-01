@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
 import androidx.core.content.pm.PackageInfoCompat
+import dev.droidtop.pluginhost.DownloadJobs
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -360,7 +361,7 @@ object AppSelfUpdate {
             throw IllegalStateException(UNKNOWN_APPS_BLOCKED)
         }
         onStatus("Downloading ${info.versionName}...")
-        val apk = download(context, info)
+        val apk = download(context, info, onStatus)
         onStatus("Handing the update to the Android installer...")
         return commitSession(context, apk, info)
     }
@@ -388,30 +389,24 @@ object AppSelfUpdate {
     fun awaitOutcome(sessionId: Int, timeoutMs: Long): String? =
         runCatching { outcomes[sessionId]?.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) }.getOrNull()
 
-    private fun download(context: Context, info: Info): File {
-        val directory = File(context.cacheDir, "app-updates").apply { mkdirs() }
-        val apk = File(directory, "droidtop-${info.versionCode}.apk")
+    /**
+     * The APK as one DownloadManager job in "Downloads and installs" ([DownloadJobs], digest checked
+     * there against the one published next to it: bytes that do not match are discarded, whatever
+     * served them). The file stays where it landed for [commitSession]; a copy already there that
+     * matches is used as it is. Blocking, like the rest of the update path.
+     */
+    private fun download(context: Context, info: Info, onStatus: (String) -> Unit): File {
+        val name = "droidtop-${info.versionCode}.apk"
+        val apk = DownloadJobs.fileFor(context, name)
         if (apk.isFile && sha256(apk) == info.apkSha256) return apk
-        val connection = URL(info.apkUrl).openConnection() as HttpURLConnection
-        connection.connectTimeout = 20_000
-        connection.readTimeout = 300_000
-        connection.instanceFollowRedirects = true
-        connection.setRequestProperty("User-Agent", "droidtop")
-        try {
-            require(connection.responseCode in 200..299) { "APK download returned HTTP ${connection.responseCode}" }
-            val temporary = File(directory, apk.name + ".partial")
-            connection.inputStream.buffered().use { input ->
-                temporary.outputStream().buffered().use { output -> input.copyTo(output) }
-            }
-            // The digest published next to the APK is the gate: bytes that
-            // do not match it are discarded, whatever served them.
-            require(sha256(temporary) == info.apkSha256) { "Downloaded APK does not match the published digest" }
-            if (apk.exists()) apk.delete()
-            require(temporary.renameTo(apk)) { "Could not retain downloaded APK" }
-            return apk
-        } finally {
-            connection.disconnect()
+        val result = kotlinx.coroutines.runBlocking {
+            DownloadJobs.run(
+                context, "droidtop ${info.versionName}", DownloadJobs.POST_KEEP, info.apkUrl, name,
+                sha256 = info.apkSha256, onStatus = onStatus,
+            )
         }
+        require(result.ok) { "APK download failed: ${result.error}" }
+        return apk
     }
 
     private fun commitSession(context: Context, apk: File, info: Info): Int {

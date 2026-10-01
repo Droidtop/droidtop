@@ -32,7 +32,12 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // Native jobs register before attach restores any, so a paused scrape found on
         // disk can be resumed (docs/SPEC.md 12a "Jobs").
         dev.droidtop.library.scraper.LibraryScrapeJob.register(appContext)
+        // The one single-file download runner and the post step of the plugin catalog's bundles; a
+        // download that finished while the process was dead is re-attached and finished by these.
+        dev.droidtop.pluginhost.DownloadJobs.register(appContext)
+        dev.droidtop.library.integrations.PluginCatalog.registerDownloadPost()
         dev.droidtop.pluginhost.PluginJobsCenter.attach(appContext)
+        dev.droidtop.app.JobsSummaryNotification.start(appContext)
         AppSettingsCatalogs.ensureRegistered()
         dev.droidtop.library.settings.LibraryRescan.handler = { ctx, onStatus ->
             onStatus("Looking for new or changed games and apps\u2026")
