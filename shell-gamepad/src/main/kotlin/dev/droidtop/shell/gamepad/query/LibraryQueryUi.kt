@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.LibraryEntry
+import java.io.File
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.GameSources
 import dev.droidtop.library.integrations.PluginSearchAggregator
