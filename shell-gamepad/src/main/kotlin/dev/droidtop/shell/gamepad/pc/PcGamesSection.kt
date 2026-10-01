@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
@@ -443,7 +444,7 @@ internal fun PcGamesSection(
                             verticalArrangement = Arrangement.spacedBy(Space.Md),
                             modifier = Modifier.fillMaxSize(),
                         ) {
-                            androidx.compose.foundation.lazy.grid.itemsIndexed(grid, key = { _, entry -> entry.id }) { index, entry ->
+                            gridItemsIndexed(grid, key = { _, entry -> entry.id }) { index, entry ->
                                 PcCapsule(
                                     entry = entry,
                                     selected = !state.stripFocused && state.itemIndex == index,
@@ -619,7 +620,11 @@ private fun PcShelvesHome(
                     shelf.heading,
                     color = if (onThisShelf) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                     style = TypeRole.rowTitle,
-                    modifier = Modifier.padding(horizontal = window.edgePadding, bottom = Space.Sm),
+                    modifier = Modifier.padding(
+                        start = window.edgePadding,
+                        end = window.edgePadding,
+                        bottom = Space.Sm,
+                    ),
                 )
                 LazyRow(
                     state = rowState(shelf.id),
