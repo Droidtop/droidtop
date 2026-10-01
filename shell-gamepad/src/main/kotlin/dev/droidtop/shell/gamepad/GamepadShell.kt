@@ -3088,7 +3088,7 @@ private fun AppsSection(
     LaunchedEffect(entries) { if (sections.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Sections") }
 
     if (sections.isEmpty()) {
-        Text("No apps detected yet.", color = MenuTokens.OnSurface)
+        Text("No apps found yet.", color = MenuTokens.OnSurface)
         return
     }
     var firstAssigned = false
