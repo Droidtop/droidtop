@@ -17,6 +17,7 @@ import org.json.JSONObject
 object SourceScreens {
     fun searchScreen(source: AcquireContentSource.Plugin, systemId: String, systemName: String, systemFolder: File): CatalogScreen {
         val adapter = PluginGameSource(source)
+        if (source.record.manifest.contractVersion < 2) return legacySearchScreen(source, adapter, systemId, systemName, systemFolder)
         val form = PluginView(null, null, listOf(ViewSection("search", null, listOf(ViewNode.Text("query", "Search", null, "", null)))))
         var lastValues: Map<String, String>? = null
         var cachedGroups: List<CatalogGroup> = emptyList()
@@ -34,6 +35,20 @@ object SourceScreens {
             extraWhenFailed = { listOfNotNull(adapter.settingsScreen()?.let { NestedScreenItem("source_settings_${source.id}", "Open ${source.label} settings", inline = it) }) },
         )
         return screen
+    }
+
+    private fun legacySearchScreen(source: AcquireContentSource.Plugin, adapter: PluginGameSource, systemId: String, systemName: String, folder: File): CatalogScreen {
+        var query = ""
+        var groups: List<CatalogGroup> = emptyList()
+        return CatalogScreen("source_search_${source.id}_$systemId", source.label, "Search ${source.label} for $systemName", groups = {
+            listOf(CatalogGroup("source_form_${source.id}", null, listOf(TextInputItem(
+                "source_query_${source.id}", "Search", value = query,
+                onChange = { context, committed ->
+                    query = committed
+                    groups = resultGroups(context, adapter, systemId, systemName, folder, committed, mapOf("query" to committed))
+                },
+            )))) + groups
+        })
     }
 
     private suspend fun resultGroups(context: Context, adapter: PluginGameSource, systemId: String, systemName: String, folder: File, query: String, values: Map<String, String>): List<CatalogGroup> {
