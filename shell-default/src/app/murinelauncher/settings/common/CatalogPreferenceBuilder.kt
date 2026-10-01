@@ -497,7 +497,7 @@ class CatalogPreferenceNavigator(
                                 item.run(context) { status ->
                                     host.activity?.runOnUiThread { pref.summary = status }
                                 }
-                            }.getOrElse { "Failed: ${it.message}" }
+                            }.getOrElse { "Failed: ${it.message ?: "an unknown error"}" }
                         }
                         statusById[item.id] = outcome
                         // The action may have changed what the screen lists.
