@@ -3332,7 +3332,7 @@ private fun AppIconTile(
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = 6.dp).focusMarquee(focused),
         )
         Text(
             entry.kindLine(),
@@ -3340,6 +3340,7 @@ private fun AppIconTile(
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.focusMarquee(focused),
         )
     }
 }
@@ -3553,6 +3554,7 @@ internal fun GameCard(
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.focusMarquee(focused),
                     )
                 }
             }
@@ -3571,6 +3573,7 @@ internal fun GameCard(
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.focusMarquee(focused),
                 )
             }
         }

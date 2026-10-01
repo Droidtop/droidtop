@@ -385,7 +385,6 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                                 item.text,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MenuTokens.Value,
-                                maxLines = 2,
                             )
                         }
                     }
@@ -596,7 +595,6 @@ private fun GameTab(
             entry.title,
             style = MaterialTheme.typography.titleMedium,
             color = MenuTokens.OnSurface,
-            maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.padding(bottom = 12.dp),
         )
