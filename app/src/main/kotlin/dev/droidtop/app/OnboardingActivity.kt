@@ -522,6 +522,41 @@ internal fun appModesOnAfterOnboarding(
 }
 
 /**
+ * The answers [DefaultModeChoiceStep] offers (docs/SPEC.md 7b, "Default
+ * mode"): the modes whose setup actually produced something usable.
+ *
+ * The home screen joins the list only while a mode does: it is the way
+ * back to what the person just set up. With nothing set up at all it
+ * would be the ONLY answer, and finishing would open Android with both
+ * modes switched off -- the opposite of what the "Anything else to set
+ * up?" step says when nothing is ticked ("droidtop keeps Gaming mode on
+ * so it has somewhere to open"). That case confirms Gaming instead, which
+ * explains what to add (SPEC 7b).
+ */
+internal fun defaultModeChoices(
+    homeImplementation: HomeRolePrefs.HomeImplementation,
+    gamingUsable: Boolean,
+    desktopUsable: Boolean,
+): List<Pair<dev.droidtop.library.settings.Mode, String>> = buildList {
+    if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE && (gamingUsable || desktopUsable)) {
+        add(dev.droidtop.library.settings.Mode.LAUNCHER to "Your home screen, as you set it up a moment ago.")
+    }
+    if (gamingUsable) {
+        add(dev.droidtop.library.settings.Mode.GAMING to "The game library, in the theme you chose.")
+    }
+    if (desktopUsable) {
+        add(dev.droidtop.library.settings.Mode.DESKTOP to "The Linux desktop, with the image you chose.")
+    }
+    if (isEmpty()) {
+        add(
+            dev.droidtop.library.settings.Mode.GAMING to
+                "Nothing is set up yet, so droidtop opens the game library and " +
+                    "shows what to add. Everything else is in Settings.",
+        )
+    }
+}
+
+/**
  * [GamesRootPrefs.resolveStoragePath] can compute a perfectly correct real
  * path and it still won't matter -- Android 11+ blocks plain `java.io.File`
  * access outside the app's own sandbox unless the app holds "All files
@@ -2223,7 +2258,9 @@ private fun KeyboardStep(
  * — the OUTCOME, not the tick-box. Picking a Desktop that was skipped,
  * or whose root check failed, landed straight in that mode's failure
  * screen; the gate used to be the checkbox, which is exactly the dead end
- * the step existed to prevent.
+ * the step existed to prevent. With nothing set up at all the home screen
+ * was the only answer, so finishing opened Android with both modes off;
+ * [defaultModeChoices] confirms Gaming in that case instead.
  */
 @Composable
 private fun DefaultModeChoiceStep(
@@ -2236,37 +2273,23 @@ private fun DefaultModeChoiceStep(
     onSelect: (dev.droidtop.library.settings.Mode) -> Unit,
     onContinue: () -> Unit,
 ) {
-    val modes = buildList {
-        if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) {
-            add(dev.droidtop.library.settings.Mode.LAUNCHER to "Your home screen, as you set it up a moment ago.")
-        }
-        if (gamingUsable) {
-            add(dev.droidtop.library.settings.Mode.GAMING to "The game library, in the theme you chose.")
-        }
-        if (desktopUsable) {
-            add(dev.droidtop.library.settings.Mode.DESKTOP to "The Linux desktop, with the image you chose.")
-        }
-        if (isEmpty()) {
-            add(
-                dev.droidtop.library.settings.Mode.GAMING to
-                    "Nothing is set up yet, so droidtop opens the game library and " +
-                        "shows what to add. Everything else is in Settings.",
-            )
-        }
-    }
+    val modes = defaultModeChoices(homeImplementation, gamingUsable, desktopUsable)
     val single = modes.size == 1
+    // Nothing ticked anywhere: the confirmation is about Gaming running
+    // with no setup, so the body cannot say it is "the only thing set up".
+    val nothingConfigured = !gamingUsable && !desktopUsable
     val effective = selected ?: modes.first().first
 
     OnboardingScaffold(
         // When exactly one mode qualifies this is a confirmation, not a
         // question with one answer.
         title = if (single) "droidtop will open into ${modes.first().first.label}" else "Which should droidtop open into?",
-        body = if (single) {
-            "It is the only thing set up so far. Anything you set up later can " +
+        body = when {
+            single && nothingConfigured -> null
+            single -> "It is the only thing set up so far. Anything you set up later can " +
                 "become the default in Settings."
-        } else {
-            "This is where droidtop opens, and where the Home button takes you. Everything " +
-                "else you set up is one step away in the mode switcher."
+            else -> "This is where droidtop opens, and where the Home button takes you. " +
+                "Everything else you set up is one step away in the mode switcher."
         },
         progress = progress,
         onBack = onBack,

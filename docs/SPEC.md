@@ -5134,7 +5134,10 @@ buttons and a link. The component is the shell's existing menu row anatomy
   feedback, including when the platform screen it opens does not exist on this API level.
 - **Default mode.** Offers only modes whose setup actually produced something usable — the
   outcome, not the tick-box: Desktop qualifies when an image was chosen and the capability
-  check passed. When exactly one mode qualifies this is a confirmation, not a question with
+  check passed. The home screen joins the list while a mode qualifies — it is the way back
+  to what was just set up; held alone it would make "no mode set up" open Android with both
+  modes off, the opposite of what "Anything else to set up" says when nothing is ticked.
+  When exactly one mode qualifies this is a confirmation, not a question with
   one answer. When none does, it is a confirmation that droidtop opens into Gaming, which
   explains what to add.
 - **Default mode is also where Home goes** (§2c, "Home goes to the default mode"), and the step
