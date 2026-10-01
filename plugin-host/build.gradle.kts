@@ -44,6 +44,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":net-core"))
     implementation(project(":runtime-common"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)

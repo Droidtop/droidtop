@@ -221,6 +221,7 @@ configurations.all {
 }
 
 dependencies {
+    implementation(project(":net-core"))
 
     // Hilt runtime + compiler for this, the application module -- see the
     // plugins block comment. Versions from gamenative's own catalog so

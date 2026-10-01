@@ -1,4 +1,4 @@
-package dev.droidtop.pluginhost
+package dev.droidtop.net
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec

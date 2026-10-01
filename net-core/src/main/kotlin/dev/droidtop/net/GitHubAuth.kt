@@ -1,4 +1,4 @@
-package dev.droidtop.pluginhost
+package dev.droidtop.net
 
 import java.net.HttpURLConnection
 import java.net.URI

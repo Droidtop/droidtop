@@ -11730,6 +11730,10 @@ the secondary path for sources that publish no key.
   that host rejects a request carrying both the signature and a token. No token
   set means exactly the unauthenticated request of before; the token is never
   logged and never in a URL.
+  `:net-core` is the one HTTP and single-file download mechanism. It owns
+  bounded responses, streamed digest-checked downloads, GitHub token storage,
+  and per-hop authorization. The ES-DE theme repository itself remains a JGit
+  clone; installer files continue through Android DownloadManager jobs.
 - **The key file format plugin authors publish** — the whole contract,
   deliberately two fields:
   `{ "origin": "acme", "key": "<base64 of a P-256 public key as X.509 SubjectPublicKeyInfo — the same SPKI shape the official pinned key uses>" }`

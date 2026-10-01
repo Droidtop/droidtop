@@ -1,9 +1,10 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
-import dev.droidtop.pluginhost.GitHubAuth
+import dev.droidtop.net.GitHubAuth
+import dev.droidtop.net.Http
 import java.io.File
-import dev.droidtop.runtime.util.Sha256
+import java.security.MessageDigest
 
 /**
  * The download-and-replace half every platform database shares (docs/SPEC.md
@@ -18,27 +19,15 @@ import dev.droidtop.runtime.util.Sha256
  * replacement itself is a rename, so a killed process leaves either the old
  * file or the new one and never half of either.
  */
-internal object PlatformDatabaseTransport {
-    private const val CONNECT_TIMEOUT_MS = 15_000
-    private const val READ_TIMEOUT_MS = 30_000
+object PlatformDatabaseTransport {
 
     /** Fetches [url], throwing with a readable message on any non-200. */
     fun get(url: String, token: String? = null): String = getOrNull(url, token) ?: error("HTTP 404 from $url")
 
     /** Fetches [url], or null when the server says the file is not there. */
     fun getOrNull(url: String, token: String? = null): String? {
-        // [token] is the user's own GitHub token, given only by the plugin
-        // catalog; GitHubAuth attaches it to GitHub hosts and no others.
-        val connection = GitHubAuth.open(url, token, CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS)
-        return try {
-            when (val code = connection.responseCode) {
-                200 -> connection.inputStream.bufferedReader().use { it.readText() }
-                404, 410 -> null
-                else -> error("HTTP $code from $url")
-            }
-        } finally {
-            connection.disconnect()
-        }
+        return try { Http.get(url, maxBytes = 16L * 1024 * 1024, token = token).text() }
+        catch (e: Http.HttpException) { if (e.status == 404 || e.status == 410) null else throw e }
     }
 
     /** Atomically puts [text] at filesDir/[fileName]; call only after validating it. */
@@ -57,5 +46,5 @@ internal object PlatformDatabaseTransport {
         }
     }
 
-    fun sha256(text: String): String = Sha256.hex(text.toByteArray())
+    fun sha256(text: String): String = MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
 }

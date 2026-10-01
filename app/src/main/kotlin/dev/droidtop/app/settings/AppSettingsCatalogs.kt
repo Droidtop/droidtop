@@ -1353,7 +1353,7 @@ object AppSettingsCatalogs {
 
         val activeIntegrations = IntegrationStore.available(context).size
         val installedPlugins = PluginStore.installed(context)
-        val githubTokenLabel = if (dev.droidtop.pluginhost.GitHubTokenStore.isSet(context)) "Set" else "Not set"
+        val githubTokenLabel = if (dev.droidtop.net.GitHubTokenStore.isSet(context)) "Set" else "Not set"
         val pluginsValueLabel = when {
             installedPlugins.isEmpty() -> "none"
             installedPlugins.any { it.trust == PluginTrustState.PENDING } ->
@@ -1599,7 +1599,7 @@ object AppSettingsCatalogs {
         subtitle = "Sent only to api.github.com, github.com and raw.githubusercontent.com, only for plugin sources",
         groups = { context ->
             val (token, stored) = withContext(Dispatchers.IO) {
-                dev.droidtop.pluginhost.GitHubTokenStore.get(context) to dev.droidtop.pluginhost.GitHubTokenStore.isSet(context)
+                dev.droidtop.net.GitHubTokenStore.get(context) to dev.droidtop.net.GitHubTokenStore.isSet(context)
             }
             listOf(
                 CatalogGroup(
@@ -1611,7 +1611,7 @@ object AppSettingsCatalogs {
                                 id = "github_token_value",
                                 title = "Token",
                                 subtitle = when {
-                                    token != null -> "Stored encrypted on this device: ${dev.droidtop.pluginhost.GitHubTokenStore.masked(token)}"
+                                    token != null -> "Stored encrypted on this device: ${dev.droidtop.net.GitHubTokenStore.masked(token)}"
                                     stored -> "A token is stored but can no longer be read on this device; paste it again"
                                     else -> "A fine-grained token with read access to the plugin repositories, or a classic token with repo scope for private ones"
                                 },
@@ -1620,7 +1620,7 @@ object AppSettingsCatalogs {
                                 secret = true,
                                 onChange = { c, v ->
                                     if (v.isNotBlank()) {
-                                        withContext(Dispatchers.IO) { dev.droidtop.pluginhost.GitHubTokenStore.set(c, v) }
+                                        withContext(Dispatchers.IO) { dev.droidtop.net.GitHubTokenStore.set(c, v) }
                                     }
                                 },
                             ),
@@ -1633,7 +1633,7 @@ object AppSettingsCatalogs {
                                     subtitle = "Asks api.github.com who this token is and how many requests it allows",
                                     run = { _, onStatus ->
                                         onStatus("Asking GitHub...")
-                                        dev.droidtop.pluginhost.GitHubTokenStore.test(token)
+                                        dev.droidtop.net.GitHubTokenStore.test(token)
                                     },
                                 ),
                             )
@@ -1645,7 +1645,7 @@ object AppSettingsCatalogs {
                                     title = "Remove token",
                                     subtitle = "Plugin sources go back to unauthenticated requests",
                                     confirmTitle = "Remove the GitHub token from this device?",
-                                    run = { ctx -> dev.droidtop.pluginhost.GitHubTokenStore.clear(ctx) },
+                                    run = { ctx -> dev.droidtop.net.GitHubTokenStore.clear(ctx) },
                                 ),
                             )
                         }
@@ -2757,7 +2757,7 @@ object AppSettingsCatalogs {
     private fun fetchSourceKey(context: Context, url: String, onStatus: (String) -> Unit): String {
         if (url.isBlank()) return "Type the source's address first"
         onStatus("Fetching $url...")
-        return when (val fetched = PluginSourceKeys.fetchKey(url, dev.droidtop.pluginhost.GitHubTokenStore.get(context))) {
+        return when (val fetched = PluginSourceKeys.fetchKey(url, dev.droidtop.net.GitHubTokenStore.get(context))) {
             is PluginSourceKeys.FetchResult.Failed -> fetched.reason
             is PluginSourceKeys.FetchResult.Fetched -> {
                 val published = fetched.key

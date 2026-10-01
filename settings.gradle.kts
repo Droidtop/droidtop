@@ -67,6 +67,7 @@ rootProject.name = "droidtop"
 
 // Application shell — hosts the default touch UI and wires the other modules together.
 include(":app")
+include(":net-core")
 
 // Qubes-style host bridge: Android's ONLY privileged surface. Does not implement a
 // compositor itself — the real desktop compositor (vendor/sway, headless-output build)

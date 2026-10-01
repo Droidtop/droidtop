@@ -92,6 +92,7 @@ tasks.named("preBuild") { dependsOn(platformDatabaseSeed) }
 tasks.withType<Test>().configureEach { dependsOn(platformDatabaseSeed) }
 
 dependencies {
+    implementation(project(":net-core"))
     implementation(project(":runtime-common"))
     // §12a's plugin half needs the same JSON-integration store this
     // module already owns (Integration/IntegrationStore, §12) unified into

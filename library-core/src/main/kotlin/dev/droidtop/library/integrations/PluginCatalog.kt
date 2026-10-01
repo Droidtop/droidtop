@@ -4,8 +4,8 @@ import android.content.Context
 import dev.droidtop.library.consoles.PlatformDatabaseSource
 import dev.droidtop.library.consoles.PlatformDatabaseTransport
 import dev.droidtop.pluginhost.DownloadJobs
-import dev.droidtop.pluginhost.GitHubAuth
-import dev.droidtop.pluginhost.GitHubTokenStore
+import dev.droidtop.net.GitHubAuth
+import dev.droidtop.net.GitHubTokenStore
 import dev.droidtop.pluginhost.PluginBundleInstaller
 import dev.droidtop.pluginhost.PluginInstallResult
 import dev.droidtop.pluginhost.PluginRecord

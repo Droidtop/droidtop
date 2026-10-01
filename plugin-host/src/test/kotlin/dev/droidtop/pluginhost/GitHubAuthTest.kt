@@ -1,5 +1,8 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.net.GitHubAuth
+import dev.droidtop.net.GitHubTokenStore
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

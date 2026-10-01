@@ -1,5 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.net.GitHubAuth
+
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
