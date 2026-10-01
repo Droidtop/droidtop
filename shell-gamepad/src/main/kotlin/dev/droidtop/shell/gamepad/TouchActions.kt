@@ -89,8 +89,12 @@ fun TouchHintBar(
         modifier = modifier
             .fillMaxWidth()
             .background(background)
+            // A plate gets the frame's hairline on its top edge; over a
+            // theme's own canvas (transparent) there is no plate and none.
+            .then(if (background.alpha > 0f) Modifier.frameEdge(atTop = true) else Modifier)
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = window.edgePadding, vertical = MenuTokens.HintBarVerticalPadding),
+            .heightIn(min = window.frameBarHeight)
+            .padding(horizontal = window.edgePadding),
         horizontalArrangement = Arrangement.spacedBy(if (window.compact) 10.dp else 24.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -172,12 +176,29 @@ private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit)
  * the same way and none of them repeats the label text or the styling.
  */
 @Composable
-fun ShoulderGlyph(label: String, modifier: Modifier = Modifier) {
+fun ShoulderGlyph(label: String, modifier: Modifier = Modifier, badge: Boolean = false) {
+    if (!badge) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MenuTokens.OnSurfaceMuted,
+            modifier = modifier,
+        )
+        return
+    }
+    // The header's edition: as tall as the selected tab's pill and its
+    // label centred the same way, so the two read on one line (tester,
+    // 2026-09-29, Droidtop/tracker#157: "L1/R1 are smaller than the tab
+    // labels and look misaligned with the pill").
+    val style = MaterialTheme.typography.labelLarge
     Text(
         label,
-        style = MaterialTheme.typography.labelSmall,
+        style = style,
         color = MenuTokens.OnSurfaceMuted,
-        modifier = modifier,
+        modifier = modifier
+            .border(1.dp, MenuTokens.HintPillOutline, RoundedCornerShape(50))
+            .padding(horizontal = 9.dp)
+            .opticallyCentred(MenuTokens.TabPillHeight, style.fontSize),
     )
 }
 

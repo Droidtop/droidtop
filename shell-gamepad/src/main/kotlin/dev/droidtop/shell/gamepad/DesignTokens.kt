@@ -377,6 +377,38 @@ object MenuTokens {
     val HintBarVerticalPadding = 6.dp
 
     /**
+     * Header and footer are one frame (docs/SPEC.md 7k): both bars are at
+     * least this tall (the touch figure on a touch-first window, where the
+     * footer's 48dp tap targets have to fit), both use the screen-edge
+     * gutter, and both end in the same hairline on the side facing the
+     * content. [FrameBarHeightTouch] leaves a hint's 48dp tap target room.
+     */
+    val FrameBarHeight = 44.dp
+    val FrameBarHeightTouch = 52.dp
+    val FrameHairline = CardOutline
+
+    /** The selected tab's pill, and the L1/R1 badges beside the tabs, share this height. */
+    val TabPillHeight = 32.dp
+
+    /**
+     * Estimates the header uses to decide whether the equal side slots
+     * (status readout left, R2 right) fit around the centred tabs: one
+     * tab's drawn width, one L1/R1 badge, and the least a slot needs.
+     */
+    const val TabEstimateDp = 84
+    const val ShoulderEstimateDp = 38
+    const val StatusSlotMinDp = 150
+
+    /**
+     * A section heading ("Apps", "Games") sits close to what it names and
+     * leaves the room to the bar above: the gap under it is larger than
+     * the gap over it, and the list's own top gap is small.
+     */
+    val SectionHeadingTopGap = 4.dp
+    val SectionHeadingGap = 16.dp
+    val SectionListTopGap = 8.dp
+
+    /**
      * A hint chip's minimum drawn height, touch or not. Kept well under
      * [dev.droidtop.shell.gamepad.ShellWindow.minTouchTarget]: the tap
      * target is not the drawn chip (see [HintTouchTarget]) so shrinking

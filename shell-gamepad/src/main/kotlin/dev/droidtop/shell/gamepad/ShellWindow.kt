@@ -112,6 +112,9 @@ data class ShellWindow(
     val gridItemMinWidth: Dp
         get() = if (compact) 150.dp else 220.dp
 
+    /** The one height of the header and footer bars (docs/SPEC.md 7k). */
+    val frameBarHeight: Dp get() = if (touchFirst) MenuTokens.FrameBarHeightTouch else MenuTokens.FrameBarHeight
+
     /** A touch target is at least this tall -- Android's own 48dp minimum. */
     val minTouchTarget: Dp get() = 48.dp
 

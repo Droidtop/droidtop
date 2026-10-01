@@ -1564,117 +1564,7 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
 private val APP_KINDS = LibraryKinds.APPS
 private val GAME_KINDS = LibraryKinds.GAMES
 
-@Composable
-private fun SectionTabBar(
-    current: GamingSection,
-    onSelect: (GamingSection) -> Unit,
-    onQuickMenu: () -> Unit,
-    sections: List<GamingSection> = GamingSection.entries,
-) {
-    val window = LocalShellWindow.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = window.edgePadding, vertical = if (window.compact) 10.dp else 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // L1/R1 steps the tab that's currently selected; a tiny glyph
-        // flanking the row says so, replacing the "Previous/Next section"
-        // hint-bar pills (owner, 2026-09-25: "Can remove the next/previous
-        // section pills"). No glyph when there's nothing to switch to.
-        if (sections.size > 1) {
-            ShoulderGlyph("L1", modifier = Modifier.padding(end = 6.dp))
-        }
-        // The tabs scroll and the Quick Menu control stays pinned beside
-        // them. On a phone the four names do not fit across 411dp, and a
-        // plain Row silently pushes the last one off the edge -- which on
-        // the desktop-mode tab set is the tab a user cannot otherwise
-        // reach without a pad. Same rule as the hint bar and the PC
-        // filter chips: a row that can outgrow the width scrolls rather
-        // than clipping.
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(window.tabGap),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            sections.forEach { entrySection ->
-                val isCurrent = entrySection == current
-                Text(
-                    text = entrySection.displayName(),
-                    color = if (isCurrent) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier
-                        .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
-                        // Deliberately NOT a directional-search target
-                        // (owner, 2026-09-27: "the D-pad must NEVER be
-                        // able to reach the top bar"; still reproduced
-                        // live 2026-09-28, Droidtop/tracker#1, uiautomator
-                        // dump showing the "Games" label itself focused).
-                        // The comment this replaced claimed plain
-                        // `.clickable()` was enough because the label was
-                        // "deliberately NOT focusable" -- wrong:
-                        // `Modifier.clickable` always chains its own
-                        // internal `.focusable()` so hardware keyboards
-                        // can activate it, which is exactly the node
-                        // Compose's default 2D focus search picked up Up
-                        // from the first row of any list. `canFocus =
-                        // false` ahead of the clickable in the same chain
-                        // (same fix already used for the touch hint bar,
-                        // TouchActions.kt's own TouchHint) makes the node
-                        // itself unfocusable while leaving the tap
-                        // intact; L1/R1/Page Up/Page Down remain the only
-                        // D-pad route.
-                        .focusProperties { canFocus = false }
-                        .clickable(onClick = { onSelect(entrySection) })
-                        .then(
-                            if (isCurrent) {
-                                Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .background(MenuTokens.SurfaceSelected)
-                            } else {
-                                Modifier
-                            },
-                        )
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                )
-            }
-        }
-        if (sections.size > 1) {
-            ShoulderGlyph("R1", modifier = Modifier.padding(start = 6.dp))
-        }
-        Spacer(Modifier.width(window.tabGap))
-        // On-screen indicator for the Quick Menu button (per direction):
-        // the bordered pill names the physical button, the label names
-        // what it opens. Tapping it opens the menu too -- touch parity,
-        // the same rule as the section tabs beside it.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
-                // Same reasoning and same fix as the tab labels just
-                // above: `.clickable()` alone is a directional-search
-                // target, and this pill sits right beside them in the
-                // top bar the D-pad must never reach.
-                .focusProperties { canFocus = false }
-                .clickable(onClick = onQuickMenu),
-        ) {
-            Text(
-                "R2",
-                color = MenuTokens.OnSurface,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier
-                    .border(1.dp, MenuTokens.OnSurfaceMuted, RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-            Text("Quick Menu", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
-        }
-    }
-}
-
-private fun GamingSection.displayName(): String = when (this) {
+internal fun GamingSection.displayName(): String = when (this) {
     GamingSection.GAMES -> "Games"
     GamingSection.APPS -> "Apps"
     GamingSection.SETTINGS -> "Settings"
@@ -3300,7 +3190,7 @@ private fun AppsSection(
     }
     var firstAssigned = false
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(vertical = 16.dp),
+        modifier = Modifier.fillMaxSize().padding(top = MenuTokens.SectionListTopGap, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(32.dp),
         // The hint bar's own room (MenuTokens.HintBarRoom).
         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
@@ -3358,7 +3248,12 @@ private fun AppIconGrid(
             section.title,
             color = MenuTokens.OnSurface,
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
+            modifier = Modifier.padding(
+                start = LocalShellWindow.current.edgePadding,
+                end = LocalShellWindow.current.edgePadding,
+                top = MenuTokens.SectionHeadingTopGap,
+                bottom = MenuTokens.SectionHeadingGap,
+            ),
         )
         // Sized to fit every row with no internal scrolling of its own --
         // this grid lives inside AppsSection's outer LazyColumn (one item
@@ -3552,7 +3447,12 @@ private fun HomeSectionRow(
             section.title,
             color = MenuTokens.OnSurface,
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
+            modifier = Modifier.padding(
+                start = LocalShellWindow.current.edgePadding,
+                end = LocalShellWindow.current.edgePadding,
+                top = MenuTokens.SectionHeadingTopGap,
+                bottom = MenuTokens.SectionHeadingGap,
+            ),
         )
         LazyRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = LocalShellWindow.current.edgePadding),
