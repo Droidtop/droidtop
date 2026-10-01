@@ -158,7 +158,7 @@ class PluginGrantsTest {
         grants.answerNew(new, snap.fresh, ticked = setOf("vibrate", "export:acme.tool.status"))
         val answered = grants.read("acme.tool")
         assertFalse(answered.wantsNewAccess)
-        assertEquals("an old point is untouched", GrantState.GRANTED, PluginGrants.provideState(new, answered, "ui.status_tile"))
+        assertEquals("an old point is untouched", snap.states["provide:ui.status_tile"], answered.states["provide:ui.status_tile"])
         assertEquals(GrantState.GRANTED, PluginGrants.stateOf(new, answered, "vibrate"))
         assertEquals(GrantState.GRANTED, PluginGrants.exportState(answered, "acme.tool.status"))
         assertEquals("an unticked dangerous permission stays ask", GrantState.ASK, PluginGrants.stateOf(new, answered, "clipboard.read"))
