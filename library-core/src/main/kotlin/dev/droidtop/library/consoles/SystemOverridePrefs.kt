@@ -2,6 +2,7 @@ package dev.droidtop.library.consoles
 
 import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * Explicit folder-to-system assignment, overriding [resolveSystem]'s
@@ -16,8 +17,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * doesn't recognize at all, not just a known alias mismatch).
  */
 object SystemOverridePrefs {
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_PREFIX = "droidtop_system_override_"
+    private val prefs = { context: Context -> PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).keyedStrings("droidtop_system_override_") }
 
     /**
      * The value for a folder the person picked in order to choose its
@@ -27,24 +27,12 @@ object SystemOverridePrefs {
      */
     const val NOT_SET = "-"
 
-    fun get(context: Context, folderPath: String): String? =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PREFIX + folderPath, null)
+    fun get(context: Context, folderPath: String): String? = prefs(context).get(folderPath)
 
-    fun set(context: Context, folderPath: String, systemId: String?) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (systemId == null) {
-            prefs.edit().remove(KEY_PREFIX + folderPath).apply()
-        } else {
-            prefs.edit().putString(KEY_PREFIX + folderPath, systemId).apply()
-        }
-    }
+    fun set(context: Context, folderPath: String, systemId: String?) = prefs(context).set(folderPath, systemId)
 
     /** Every folder with an explicit value, by absolute path. */
-    fun assigned(context: Context): Map<String, String> =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).all
-            .filterKeys { it.startsWith(KEY_PREFIX) }
-            .mapNotNull { (key, value) -> (value as? String)?.let { key.removePrefix(KEY_PREFIX) to it } }
-            .toMap()
+    fun assigned(context: Context): Map<String, String> = prefs(context).entries()
 
     /**
      * [resolveSystem] by folder name, but an explicit override for

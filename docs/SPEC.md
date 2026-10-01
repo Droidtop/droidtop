@@ -11001,6 +11001,11 @@ mis-click cannot publish one.
 
 ## 10c. Diagnostics, crash recovery and privacy
 
+Preference access uses `runtime-common`'s `PrefsFile` typed delegates and
+`KeyedStringStore` for repeated prefixed string maps. These wrappers keep
+the existing file names and keys, and persist through `apply()`; they do
+not migrate or rename stored values.
+
 A handheld is used away from a computer, so the evidence for a defect has
 to be gathered on the device, by the person holding it, and handed over
 in one motion. Three mechanisms, one folder, and one privacy rule.

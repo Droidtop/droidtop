@@ -2,6 +2,7 @@ package dev.droidtop.library
 
 import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * Explicit folder-to-engine assignment, overriding rule-based detection
@@ -14,22 +15,9 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * versions.
  */
 object EngineOverridePrefs {
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_PREFIX = "droidtop_engine_override_"
+    private val prefs = { context: Context -> PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).keyedStrings("droidtop_engine_override_") }
 
-    fun get(context: Context, folderPath: String): String? =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PREFIX + folderPath, null)
+    fun get(context: Context, folderPath: String): String? = prefs(context).get(folderPath)
 
-    fun set(context: Context, folderPath: String, engineId: String?) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (engineId == null) {
-            prefs.edit().remove(KEY_PREFIX + folderPath).apply()
-        } else {
-            prefs.edit().putString(KEY_PREFIX + folderPath, engineId).apply()
-        }
-    }
-
-    /** The overridden engine for [folderPath], resolved through the registry's id map; null when unset or unknown to this app. */
-    fun engineFor(context: Context, folderPath: String): GameEngine? =
-        get(context, folderPath)?.let { EngineRegistryParser.ENGINE_IDS[it] }
+    fun set(context: Context, folderPath: String, engineId: String?) = prefs(context).set(folderPath, engineId)
 }

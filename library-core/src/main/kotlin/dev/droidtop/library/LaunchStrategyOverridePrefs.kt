@@ -2,6 +2,7 @@ package dev.droidtop.library
 
 import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * User's explicit choice of which [GameLaunchStrategy] runs a given
@@ -23,18 +24,11 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * PlayerPicker for ROMs.
  */
 object LaunchStrategyOverridePrefs {
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_PREFIX = "droidtop_launch_strategy_override_"
+    private val prefs = { context: Context -> PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).keyedStrings("droidtop_launch_strategy_override_") }
 
-    fun get(context: Context, entryId: String): String? =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PREFIX + entryId, null)
+    fun get(context: Context, entryId: String): String? = prefs(context).get(entryId)
 
     fun set(context: Context, entryId: String, strategy: GameLaunchStrategy?) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (strategy == null) {
-            prefs.edit().remove(KEY_PREFIX + entryId).apply()
-        } else {
-            prefs.edit().putString(KEY_PREFIX + entryId, strategy.name).apply()
-        }
+        prefs(context).set(entryId, strategy?.name)
     }
 }

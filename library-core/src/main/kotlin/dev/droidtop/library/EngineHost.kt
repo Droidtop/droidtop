@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import org.json.JSONObject
 import java.io.File
 import kotlinx.serialization.Serializable
+import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * `dev.enginehost` (`bi0shacker001/enginehost`) — a standalone, separately
@@ -340,16 +341,12 @@ data class EnginehostTarget(
  * exact folder path, `null` meaning "no override set."
  */
 object EngineVersionOverridePrefs {
-    private const val PREFS_NAME = "droidtop_engine_version_overrides"
+    private fun prefs(context: Context) = PrefsFile(context, "droidtop_engine_version_overrides").keyedStrings("")
 
-    private fun prefs(context: Context) = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-    fun get(context: Context, folderPath: String): String? = prefs(context).getString(folderPath, null)
+    fun get(context: Context, folderPath: String): String? = prefs(context).get(folderPath)
 
     fun set(context: Context, folderPath: String, engineVersion: String?) {
-        prefs(context).edit().apply {
-            if (engineVersion.isNullOrBlank()) remove(folderPath) else putString(folderPath, engineVersion)
-        }.apply()
+        prefs(context).set(folderPath, engineVersion?.takeIf { it.isNotBlank() })
     }
 }
 
