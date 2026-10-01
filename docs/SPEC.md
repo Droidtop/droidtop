@@ -9669,7 +9669,10 @@ running on the console and asked for the visual pass on top of it. Decided and b
   "Search settings" preference prepended to the settings home the same way the shell prepends
   its own search row; picking a result pushes the same one-level target the Gaming shell would.
   Wired into Global, Desktop and Gaming's Preference fragments (`SettingsGlobalFragment`/
-  `SettingsDesktopFragment`/`SettingsGamingFragment`, `enableSearch = true`).
+  `SettingsDesktopFragment`/`SettingsGamingFragment`, `enableSearch = true`). Once results
+  appear the text field stops capturing D-pad directions (Down/Up navigate results, A opens the
+  focused result): `selected` is kept at the overlay level and driven from `.onPad` (Droidtop/
+  tracker#135).
 
   **Fixed alongside it, in both renderers (rig, `p1-rig-settings-search-no-focus.md`): a picked
   result did not scroll to or focus the row it found.** The Gaming shell's `onPick` pushed the

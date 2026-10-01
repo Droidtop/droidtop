@@ -938,6 +938,10 @@ private fun SettingsSearchOverlay(
     // is pure and in-memory, and a null index (still building) filters to
     // nothing so the loading line below is what shows.
     val results = remember(index, query) { SettingsSearchIndex.search(index ?: emptyList(), query) }
+    var selected by remember { mutableStateOf(0) }
+    LaunchedEffect(results.size) {
+        selected = selected.coerceIn(0, (results.size - 1).coerceAtLeast(0))
+    }
     Column(modifier = Modifier.fillMaxSize()) {
         MenuHeader("Search settings", "Type a setting's name")
         Row(
@@ -969,6 +973,18 @@ private fun SettingsSearchOverlay(
                         if (press.action == GamepadAction.B) {
                             onClose()
                             true
+                        } else if (results.isNotEmpty()) {
+                            when (press.action) {
+                                GamepadAction.UP, GamepadAction.DOWN -> {
+                                    selected = menuStep(selected, results.size, if (press.action == GamepadAction.UP) -1 else 1)
+                                    true
+                                }
+                                GamepadAction.A -> {
+                                    results.getOrNull(selected)?.let(onPick)
+                                    true
+                                }
+                                else -> false
+                            }
                         } else {
                             false
                         }
@@ -1008,7 +1024,6 @@ private fun SettingsSearchOverlay(
                     modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 12.dp),
                 )
             else -> {
-                var selected by remember { mutableStateOf(0) }
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
