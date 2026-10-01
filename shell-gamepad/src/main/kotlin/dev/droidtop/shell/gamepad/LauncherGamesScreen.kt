@@ -42,7 +42,7 @@ import dev.droidtop.shell.gamepad.input.ownPadButtons
  * Settings' "Game folders" screen, by [SettingsScreenRegistry] id: :app
  * registers it at process start, and this module cannot depend on :app.
  */
-private const val GAME_FOLDERS_SCREEN_ID = "rom_folders"
+internal const val GAME_FOLDERS_SCREEN_ID = "rom_folders"
 
 /**
  * Launcher mode's Games grid (docs/SPEC.md 2c, "Games in the Launcher"),

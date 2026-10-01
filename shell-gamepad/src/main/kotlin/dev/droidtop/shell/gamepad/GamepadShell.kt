@@ -2397,8 +2397,37 @@ private fun GamesSection(
                 // downloaded community theme (ES-DWEE), and the same crash
                 // signature was already in the device's older crash logs.
                 if (entries.isEmpty()) {
-                    Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
-                        Text("No games yet. Add the folders your games are in under Settings, Library, Game folders.", color = MenuTokens.OnSurface, modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding))
+                    // An empty library offers the one thing that fills it,
+                    // never a sentence with nothing to press
+                    // (Droidtop/tracker#172): the same Game folders screen
+                    // Settings and the Launcher's games grid open, drawn in
+                    // place. CatalogNavigator owns its own B, so B leaves it.
+                    val foldersScreen = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(GAME_FOLDERS_SCREEN_ID) }
+                    var addingFolders by remember { mutableStateOf(false) }
+                    if (addingFolders && foldersScreen != null) {
+                        CatalogNavigator(root = foldersScreen, onExit = { addingFolders = false })
+                    } else {
+                        val emptyAction = remember { androidx.compose.ui.focus.FocusRequester() }
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding, vertical = Space.Xl),
+                            verticalArrangement = Arrangement.spacedBy(Space.Lg),
+                        ) {
+                            Text("No games yet.", color = MenuTokens.OnSurface, style = TypeRole.body)
+                            Text(
+                                "Add the folders your games are in. droidtop looks inside them for console and PC games.",
+                                color = MenuTokens.OnSurfaceMuted,
+                                style = TypeRole.supporting,
+                            )
+                            if (foldersScreen != null) {
+                                ShellChip(
+                                    "Add a folder",
+                                    primary = true,
+                                    modifier = Modifier.focusRequester(emptyAction),
+                                    onClick = { addingFolders = true },
+                                )
+                                LaunchedEffect(Unit) { requestFocusWhenAttached(emptyAction, "Games empty") }
+                            }
+                        }
                     }
                 } else {
                     // Box, not Column: EsDeThemedView needs to genuinely fill
