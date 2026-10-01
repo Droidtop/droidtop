@@ -546,6 +546,18 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
     var structureReport by run.structureReport
     var rootsVersion by run.rootsVersion
 
+    // The system folder picker is another activity: when it returns, the list
+    // is read again whatever order its result and the resume arrive in (the
+    // tester's list did not change after a pick).
+    val lifecycleOwner = context as? androidx.lifecycle.LifecycleOwner
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) rootsVersion++
+        }
+        lifecycleOwner?.lifecycle?.addObserver(observer)
+        onDispose { lifecycleOwner?.lifecycle?.removeObserver(observer) }
+    }
+
     val roots = remember(rootsVersion) { GamesRootPrefs.gamesRootPaths(context) }
     // What each root turned out to hold. Filled in off the main thread as
     // roots appear; a root with no report yet shows "Looking…" rather
@@ -1381,9 +1393,9 @@ private fun ConfigureMoreStep(
 ) {
     OnboardingScaffold(
         title = "Anything else to set up?",
-        body = "Anything you leave out is switched off until you turn it on in Settings, " +
-            "under Global settings. You can leave both out. If nothing else is set up " +
-            "either, droidtop keeps Gaming on so it has somewhere to open.",
+        body = "Choose any number of modes, including none. A mode you leave unchecked won't " +
+            "run anything unless you turn it on in Settings. If you don't set up any mode, " +
+            "droidtop keeps Gaming mode on so it has somewhere to open.",
         progress = progress,
         onBack = onBack,
         primary = StepAction("Next", onClick = onContinue),
@@ -1520,18 +1532,16 @@ private fun StoragePermissionStep(
     onContinue: () -> Unit,
 ) {
     OnboardingScaffold(
-        title = "Reading your game files",
+        title = "Access to your game folders",
         // The rationale comes BEFORE the prompt, per Android's own
         // guidance and SPEC 7b: what droidtop reads and what it does not.
         body = if (legacy) {
-            "droidtop reads only the game folders you name in the next step. It does " +
-                "not read your photos, messages or other apps' data. Android will ask " +
-                "you to allow this."
+            "droidtop will only read the folders you choose in the next step. Tap " +
+                "Allow access, and Android will ask you to confirm."
         } else {
-            "droidtop reads only the game folders you name in the next step. It does " +
-                "not read your photos, messages or other apps' data. Android has you " +
-                "allow this on its own Settings screen. Turn on \"Allow access to " +
-                "manage all files\" there, then come back."
+            "droidtop will only read the folders you choose in the next step. Android " +
+                "needs you to switch this on for it: tap Open Android's settings, turn on " +
+                "\"Allow access to manage all files\", then come back here."
         },
         progress = progress,
         onBack = onBack,
@@ -1578,6 +1588,11 @@ private fun GamesFoldersStep(
 ) {
     val window = currentShellWindow()
     val context = LocalContext.current
+    // The path box keeps focus (and the keyboard) while the system picker is
+    // up, and both were still there when it returned, over a list that had
+    // not moved (tester, 2026-09-29): focus is let go before the picker opens.
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    var pathFieldFocused by remember { mutableStateOf(false) }
     // Looked for once per visit: a directory listing of /storage and
     // /mnt/windows, off the main thread.
     val found by produceState<List<String>>(initialValue = emptyList()) {
@@ -1588,13 +1603,12 @@ private fun GamesFoldersStep(
     // folders" here, two names one navigation step apart.
     OnboardingScaffold(
         title = "Game folders",
-        body = "Add every folder your games are in: console games sorted by system, or " +
-            "Ren'Py, RPG Maker and Kirikiri games. You can add more or change these " +
-            "later in Settings.",
+        body = "Add each folder your games are in. droidtop looks inside it for console games " +
+            "and PC games such as Ren'Py, RPG Maker and Kirikiri. You can add more, or " +
+            "change these, later in Settings.",
         progress = progress,
         onBack = onBack,
         primary = StepAction("Next", onClick = onContinue),
-        secondary = StepAction("Add a folder", onClick = onAddFolder),
     ) {
         if (roots.isEmpty()) {
             StepNote("No folders added yet. Add one, or continue with an empty library.")
@@ -1649,12 +1663,20 @@ private fun GamesFoldersStep(
             }
         }
 
-        StepSectionLabel("A folder the picker can't show")
+        StepSectionLabel("Add a folder")
+        PadButton(
+            "Add a folder",
+            {
+                if (pathFieldFocused) focusManager.clearFocus()
+                onAddFolder()
+            },
+            filled = true,
+        )
         // The picker can only offer what Android calls a storage volume,
         // and real libraries live outside that set: an emulator's host
         // share (BlueStacks mounts one at /mnt/windows/BstSharedFolder), a
         // mount a rooted device adds itself, a USB drive under /mnt.
-        StepNote("For example an emulator's shared folder or a USB drive. Type the full path.")
+        StepNote("Or, if the picker can't reach it, type its full path. That can be an emulator's shared folder or a USB drive.")
         OutlinedTextField(
             value = pathEntry,
             onValueChange = onPathEntryChange,
@@ -1662,7 +1684,10 @@ private fun GamesFoldersStep(
             label = { Text("Folder path") },
             placeholder = { Text("A full path, starting with /") },
             isError = pathError != null,
-            modifier = Modifier.fillMaxWidth().widthIn(max = Measure.bodyMaxWidth),
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = Measure.bodyMaxWidth)
+                .onFocusChanged { pathFieldFocused = it.isFocused },
         )
         if (pathError != null) {
             Text(pathError, color = MenuTokens.Danger, style = TypeRole.supporting)
@@ -1744,8 +1769,8 @@ private fun ControllerStep(
             // run to skip ahead of and nowhere later to be sent to.
             isReEntry -> "Press a button to check droidtop sees your controller, then say " +
                 "which button confirms."
-            controllers.isEmpty() -> "No controller is connected right now. droidtop works by touch " +
-                "either way, and you can come back to this in Settings when you connect one."
+            controllers.isEmpty() -> "No controller connected right now. You can carry on with touch " +
+                "and set up a controller later in Settings, under Input."
             else -> "Press a button to check droidtop sees your controller, then say which " +
                 "button confirms. You can skip this and change it later in Settings."
         },
@@ -1762,12 +1787,12 @@ private fun ControllerStep(
     ) {
         StepSectionLabel("Connected controllers")
         if (controllers.isEmpty()) {
-            StepNote("No controller found.")
+            StepNote("No controller connected.")
         } else {
             controllers.forEach { controller -> SelectableRow(title = controller.name) }
         }
 
-        StepSectionLabel("Test your buttons")
+        StepSectionLabel("Test your controller")
         // A real key event, caught where it lands: the box takes focus and
         // reports the button by position. Nothing is remapped here -- this
         // only answers "is droidtop seeing your pad at all".
@@ -1963,10 +1988,18 @@ private fun AppearanceStep(
         value = withContext(Dispatchers.IO) { AppearanceCatalog.read(context) }
     }
     if (browsing) {
-        ThemeBrowserScreen(onDismiss = {
+        val closeBrowser = {
             browsing = false
             catalogVersion++
-        })
+        }
+        // The same Back as every other onboarding page, top left; the
+        // browser is shared with Settings and has none of its own.
+        Column(Modifier.fillMaxSize().background(MenuTokens.Ground).systemBarsPadding()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = currentShellWindow().edgePadding, vertical = Space.Lg)) {
+                PadButton("Back", closeBrowser)
+            }
+            Box(Modifier.weight(1f)) { ThemeBrowserScreen(onDismiss = closeBrowser) }
+        }
         return
     }
     // droidtop's recommended default (SPEC.md 7f) downloads itself the
@@ -1995,17 +2028,16 @@ private fun AppearanceStep(
     OnboardingScaffold(
         title = "Appearance",
         body = if (portraitScreen) {
-            "Gaming uses a theme for its look. This screen is taller than it is wide, so " +
-                "themes made for a tall screen are marked; the others are stretched to fit. " +
-                "Use Get more themes to download another."
+            "A theme sets the look of Gaming mode. This screen is taller than it is wide, so " +
+                "themes made for a tall screen are marked; the others are stretched to fit."
         } else {
-            "Gaming uses a theme for its look. Every theme droidtop has is shown below. " +
-                "Get more themes downloads another from the ES-DE community's list."
+            "A theme sets the look of Gaming mode. Choose one of the themes below, or " +
+                "download more from the ES-DE community's list."
         },
         progress = progress,
         onBack = onBack,
         primary = StepAction("Next", onClick = onContinue),
-        secondary = StepAction("Get more themes") { browsing = true },
+        secondary = StepAction("Download more themes") { browsing = true },
         focusContentFirst = true,
     ) {
         val themes = catalog?.themes
@@ -2019,13 +2051,9 @@ private fun AppearanceStep(
         val recommendedListed = themes?.any { it.name == OnboardingThemeDownload.RECOMMENDED_THEME_DIR } == true
         if (!recommendedListed) {
             when (downloadStatus) {
-                OnboardingThemeDownload.Status.DOWNLOADING -> StepNote(
-                    "Downloading Art Book Next, droidtop's recommended theme… " +
-                        "You don't need to wait here — press Next and it finishes in the background.",
-                )
                 OnboardingThemeDownload.Status.FAILED -> StepNote(
                     "Couldn't download Art Book Next. Check your connection. Staying on DEcaffe for " +
-                        "now; Get more themes offers it again later.",
+                        "now; Download more themes offers it again later.",
                 )
                 else -> {}
             }
@@ -2034,12 +2062,12 @@ private fun AppearanceStep(
             val hasVertical = theme.hasVertical
             SelectableRow(
                 title = theme.displayName,
-                supporting = when {
+                supporting = (when {
                     hasVertical && portraitScreen -> "Lays out a tall screen of its own. Recommended here."
                     hasVertical -> "Lays out both a wide and a tall screen."
                     portraitScreen -> "Wide layouts only. It will be stretched on this screen."
                     else -> "Wide layouts only."
-                },
+                }) + (if (theme.bundled) " Included with droidtop." else " Downloaded."),
                 selected = chosen == theme.name,
                 leading = {
                     ThemeSystemPreview(
@@ -2064,7 +2092,7 @@ private fun AppearanceStep(
 
 /** What the Appearance step lists, read once off the main thread. */
 private class AppearanceCatalog(val themes: List<Theme>, val defaultTheme: String?) {
-    class Theme(val name: String, val displayName: String, val hasVertical: Boolean)
+    class Theme(val name: String, val displayName: String, val hasVertical: Boolean, val bundled: Boolean)
 
     companion object {
         fun read(context: android.content.Context): AppearanceCatalog {
@@ -2075,6 +2103,7 @@ private class AppearanceCatalog(val themes: List<Theme>, val defaultTheme: Strin
                         name = theme.name,
                         displayName = ThemeAssets.displayName(context, theme),
                         hasVertical = ThemeAssets.hasVerticalVariant(context, theme),
+                        bundled = theme.bundledAssetFolder != null,
                     )
                 },
                 defaultTheme = ThemeAssets.defaultThemeFor(context, discovered)?.name,
@@ -2248,58 +2277,56 @@ private fun WhatNextStep(
             add(
                 when {
                     gamesStillCounting && counted > 0 ->
-                        "Gaming: still counting your folders, $counted " +
+                        "Gaming mode: still counting your folders, $counted " +
                             (if (counted == 1) "game" else "games") + " so far."
-                    gamesStillCounting -> "Gaming: set up, still counting your folders."
+                    gamesStillCounting -> "Gaming mode: set up, still counting your folders."
                     gamesFound > 0 ->
-                        "Gaming: $gamesFound " + (if (gamesFound == 1) "game" else "games") + " found in your folders."
-                    noFolders -> "Gaming: set up, with no game folders added yet."
-                    else -> "Gaming: set up, with no games found in your folders."
+                        "Gaming mode: $gamesFound " + (if (gamesFound == 1) "game" else "games") + " found in your folders."
+                    noFolders -> "Gaming mode: set up, with no game folders added yet."
+                    else -> "Gaming mode: set up, with no games found in your folders."
                 },
             )
         }
-        if (desktopConfigured) add("Desktop: Linux system chosen. It downloads the first time Desktop starts.")
-        add("droidtop opens into ${mode.label}.")
+        if (desktopConfigured) add("Desktop mode: Linux system chosen. It downloads the first time Desktop starts.")
+        add("droidtop opens into ${mode.label} mode.")
     }
+    // Each line names the Settings section it lives in. An unticked mode is
+    // switched off at the end of this step (appModesOnAfterOnboarding).
     val skipped = buildList {
         if (homeImplementation == HomeRolePrefs.HomeImplementation.NONE) {
-            add("Home screen: set it up in Settings, under Global settings.")
+            add("Home screen: Global settings")
         } else if (!homeHeld) {
-            add("Home screen: Home still opens another app. Change that in Settings, under Global settings.")
+            add("Home screen (Home still opens another app): Global settings")
         }
-        // Where each one lives, and whether it is on: an unticked mode is
-        // switched off at the end of this step (appModesOnAfterOnboarding).
         when {
             gamingConfigured -> Unit
             dev.droidtop.library.settings.Mode.GAMING in modesOn ->
-                add("Game folders: none yet. Add some in Settings, under Game folders.")
-            else -> add("Gaming: off. Turn it on in Settings, under Global settings.")
+                add("Game folders (none added yet): Game folders")
+            else -> add("Gaming mode (switched off): Global settings")
         }
         when {
             desktopConfigured -> Unit
             dev.droidtop.library.settings.Mode.DESKTOP in modesOn ->
-                add("Desktop: on, but no Linux system chosen yet. Choose one in Settings, under Desktop mode, Desktop setup.")
-            else -> add("Desktop: off. Turn it on in Settings, under Global settings.")
+                add("Desktop mode (no Linux system chosen yet): Desktop mode")
+            else -> add("Desktop mode (switched off): Global settings")
         }
-        if (gamingConfigured && !storageGranted) add("Storage access: not allowed yet. Allow it in Settings, under Game folders.")
-        // Skipped steps are skipped things too; the summary used to list
-        // neither (dq-coordinator-24, finding 10).
-        if (!controllerAnswered) add("Controller: skipped. Set it up in Settings, under Input, Controller.")
-        if (keyboardSkipped) add("Keyboard: skipped. Set it up in Settings, under Input, Keyboard.")
+        if (gamingConfigured && !storageGranted) add("Access to your files: Game folders")
+        if (!controllerAnswered) add("Controller: Input")
+        if (keyboardSkipped) add("Keyboard: Input")
     }
     // What a newcomer needs a minute from now and would otherwise have to
     // find (dq-coordinator-24, finding 8): each is asked where it is used,
     // as the permissions rule says (SPEC 7b), so here it is only named.
     val later = buildList {
         if (gamingConfigured) {
-            add("Pictures and descriptions for your games: Settings, Library, Scraper.")
-            add("Windows games need a one-time download. A Windows game's page offers it.")
-            add("Notifications in the Quick Menu: its Notifications tab asks for access.")
+            add("Pictures and descriptions for your games: Library, Scraper")
+            add("Windows games: open one, and its page offers the one-time download Windows games need")
+            add("Quick Menu notifications: open the Quick Menu's Notifications tab to allow access")
         }
     }
 
     OnboardingScaffold(
-        title = "You're set up",
+        title = "All done!",
         body = null,
         progress = progress,
         onBack = onBack,
@@ -2309,15 +2336,17 @@ private fun WhatNextStep(
         done.forEach { StepNote("• $it") }
         if (skipped.isNotEmpty()) {
             StepSectionLabel("Skipped")
+            StepNote("Find these later in Settings.")
             skipped.forEach { StepNote("• $it") }
         }
         if (later.isNotEmpty()) {
-            StepSectionLabel("Later, if you want them")
+            StepSectionLabel("Not set up")
+            StepNote("Set these up when you want them.")
             later.forEach { StepNote("• $it") }
         }
         Spacer(modifier = Modifier.padding(top = Space.Sm))
         StepNote(
-            "You can change any of this later in Settings.",
+            "All settings can be changed later.",
         )
     }
 }

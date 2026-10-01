@@ -4731,10 +4731,10 @@ break onboarding on purpose, are where a missing hint is found and fixed.
 **Themes are chosen during setup (directed 2026-09-24).** Onboarding includes the theme
 downloader (the same Browse themes screen Settings opens, one mechanism), so a person can pick and
 download another ES-DE theme before they first see the Gaming shell, not only the bundled default.
-Built 2026-09-25: the Appearance step's "Get more themes" draws `ThemeBrowserScreen` in place of the
+Built 2026-09-25: the Appearance step's "Download more themes" draws `ThemeBrowserScreen` in place of the
 step, and the theme list is read again when it returns. The downloader's git library is JGit 5.13,
 the last line built for Java 8: JGit 6 and 7 call Java 11+ methods (`InputStream.readNBytes(int)`)
-that Android has only from API 33, and both "Get more themes" and Settings > Browse themes crashed
+that Android has only from API 33, and both "Download more themes" and Settings > Browse themes crashed
 Android 9 with NoSuchMethodError (dq-onboard-01). A library method the running Android lacks is a
 failed download, never a crash (`ThemeDownloader` catches `LinkageError`). The browser has its own
 hint row.
@@ -4911,6 +4911,10 @@ buttons and a link. The component is the shell's existing menu row anatomy
     cannot grant it, say what to turn on, hand over, and re-check the real state on return
     rather than trusting a result code.
   - The skip label describes the consequence, not a motive the person may not hold.
+  - The wording (first human tester, 2026-09-29, Droidtop/tracker#150): the page points at the next
+    step ("droidtop will only read the folders you choose in the next step") and says what the
+    button does (open Android's settings, turn it on, come back). It never claims droidtop CANNOT
+    read other data, since all-files access is exactly the ability to; it says what droidtop reads.
 - **Game folders.** The single name for this concept, everywhere in droidtop. Two routes, both
   first-class: the system picker, and a typed path for what the picker cannot reach (an
   emulator's host share, a mount a rooted device adds, a USB drive), validated for real before
@@ -4918,7 +4922,10 @@ buttons and a link. The component is the shell's existing menu row anatomy
   (directories under `/storage` other than the emulated internal storage, and under
   `/mnt/windows`, where emulators mount a host share), each with Add; the typed path's example
   names no folder, since a newcomer had to already know the share's path (dq-coordinator-24).
-  Adding a folder starts the library's walk of it at once (§2c). Each added folder is a row
+  The system picker's button ("Add a folder", filled) sits with the typed-path field, not in the
+  action area beside Next, so the two ways to add are one place; the path box gives up focus (and
+  the keyboard) before the picker opens, and the folder list is read again on every resume, so a
+  pick shows at once. An invalid-path error shows only after a path was tried. Adding a folder starts the library's walk of it at once (§2c). Each added folder is a row
   showing the path, what the scan found under it, and a way to remove it. The step reports the result of the scan; a folder that yields nothing is
   a fact the person learns here, not after onboarding.
 - **No games yet.** When nothing is found, droidtop offers concrete repairs rather than an
@@ -4967,6 +4974,11 @@ buttons and a link. The component is the shell's existing menu row anatomy
   This step replaces the earlier `PORTRAIT_THEME` step, which appeared only when droidtop had
   already swapped the theme and offered exactly two answers, one of them hardcoded to DEcaffe.
   A person setting droidtop up chooses their theme; they are not handed a swap to ratify.
+
+  Each row says whether the theme is "Included with droidtop." or "Downloaded."; "Download more
+  themes" opens the browser with the same Back button every other page has. The recommended
+  theme's background download is not announced on this step (a notice nobody can act on); only a
+  failure is, once.
 - **Keyboard.** Asked only of a run setting up Desktop (decided 2026-09-25): its reason is
   terminals and Windows programs, and a Gaming-only run was asked about software it had just said
   it did not want. Optional. droidtop cannot set the system input method itself, so it states why
@@ -4990,6 +5002,12 @@ buttons and a link. The component is the shell's existing menu row anatomy
   it is not a `MainActivity` shell.
 
 ### No first-run tutorial (decided 2026-09-30)
+
+Also decided 2026-09-30 (owner): there is NO screenshots or getting-started page to replace it,
+because droidtop has no consistent look to photograph: every person's Gaming UI is drawn by
+whichever ES-DE theme they chose. Do not propose one again. For the same reason onboarding text
+never describes what the UI looks like; guidance names buttons, places in Settings and what
+happens, and stays true under any theme.
 
 The first-run tutorial (`TutorialActivity`, built 2026-09-25) and Global settings' "Show the
 tutorial" row are gone: nothing opens over the first frame of the chosen mode, and no setting
@@ -6559,7 +6577,7 @@ own Appearance step:
    rule applies here. A cancelled/failed/offline download leaves `ThemePrefs` unset, so
    `ThemeAssets.resolveActiveTheme`'s existing fallback (DEcaffe, or Slate on a portrait screen)
    applies exactly as it did before this section — no second fallback mechanism was added.
-5. "Browse themes" (Settings, and onboarding's own "Get more themes") offers Art Book Next exactly
+5. "Browse themes" (Settings, and onboarding's own "Download more themes") offers Art Book Next exactly
    as it offers every other theme in the index, whether or not onboarding's own download reached
    it — a person who skipped or lost the setup-time download is never blocked from getting it
    later the same way as any other theme.
