@@ -79,20 +79,20 @@
     <string name="pref_double_tap_action_title">Double tap</string>
     <string name="pref_swipe_down_action_title">Swipe down</string>
 
-    <string name="pref_accessibility_disclosure_desc">The launcher needs accessibility access to lock the screen and open Recents from gestures, and, on tablet-sized and external displays, to draw the taskbar.\n\nFor the taskbar it sees only the name of the app that comes to the front, never what is on screen, and it looks at key presses only to notice the Meta key or the Mode button, which move focus into the taskbar.\n\nNo data is collected, shared, or transmitted.</string>
+    <string name="pref_accessibility_disclosure_desc">droidtop needs accessibility access to lock the screen and open recent apps from gestures, and, on tablet-sized and external displays, to draw the taskbar.\n\nFor the taskbar it sees only the name of the app that comes to the front, never what is on screen, and it looks at key presses only to notice the Meta key or the Mode button, which move focus into the taskbar.\n\nNo data is collected, shared, or transmitted.</string>
     <string name="pref_taskbar_title">Taskbar on large screens</string>
-    <string name="pref_taskbar_desc">Pinned and open apps, the drawer and Recents along the bottom of tablet-sized and external displays. Needs accessibility access. The Meta key or the pad\'s Mode button moves the D-pad into it.</string>
+    <string name="pref_taskbar_desc">Pinned and open apps, the app drawer and Recents along the bottom of tablet-sized and external displays. Needs accessibility access. The Meta key or the pad\'s Mode button moves the D-pad into it.</string>
 
     <string name="gesture_action_none">Nothing</string>
     <string name="gesture_action_none_summary">This gesture does nothing</string>
     <string name="gesture_action_lock_screen">Lock screen</string>
     <string name="gesture_action_lock_screen_summary">Locks the screen</string>
     <string name="gesture_action_open_notifications">Open notifications</string>
-    <string name="gesture_action_open_notifications_summary">Expands the notification shade</string>
+    <string name="gesture_action_open_notifications_summary">Opens your notifications</string>
     <string name="gesture_action_open_drawer">Open app drawer</string>
     <string name="gesture_action_open_drawer_summary">Opens the full list of apps</string>
     <string name="gesture_action_open_recents">Open recent apps</string>
-    <string name="gesture_action_open_recents_summary">Opens the system task switcher</string>
+    <string name="gesture_action_open_recents_summary">Opens the list of recent apps</string>
 
     <!-- Murine search bar -->
     <string name="murine_search_hint">Search…</string>
