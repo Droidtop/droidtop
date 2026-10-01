@@ -266,12 +266,16 @@ internal fun QuickSettingsPanel(
         // the tab row itself, above (owner, 2026-09-25: "Can remove the
         // next/previous section pills").
         TouchHintBar(
-            hints = listOf(
-                GamepadAction.LEFT to "Lower",
-                GamepadAction.RIGHT to "Raise",
-                GamepadAction.A to "Act",
-                GamepadAction.B to "Close",
-            ),
+            // Left/Right adjust only a slider; on a tile they do nothing, so
+            // the bar names them only while a slider has the focus.
+            hints = buildList {
+                if (focusIndex < panel.sliders.size) {
+                    add(GamepadAction.LEFT to "Lower")
+                    add(GamepadAction.RIGHT to "Raise")
+                }
+                add(GamepadAction.A to "Act")
+                add(GamepadAction.B to "Close")
+            },
             background = Color.Transparent,
         )
     }
