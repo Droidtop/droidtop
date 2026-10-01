@@ -195,6 +195,7 @@ internal fun ShellChip(
                     Modifier.selectionFrame(focused, shape)
                 },
             )
+            .focusMarquee(focused)
             .padding(horizontal = if (large) 28.dp else 16.dp, vertical = if (large) 14.dp else 8.dp),
     )
 }

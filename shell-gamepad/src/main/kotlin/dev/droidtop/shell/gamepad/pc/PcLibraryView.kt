@@ -368,8 +368,6 @@ private fun FocusedGamePanel(
                     play.detail,
                     color = if (play.pressable) MenuTokens.OnLaunchMuted else MenuTokens.OnSurfaceDisabled,
                     style = MaterialTheme.typography.labelSmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -379,8 +377,6 @@ private fun FocusedGamePanel(
                     desc,
                     color = MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.bodySmall,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 10.dp),
                 )
             }
@@ -397,7 +393,7 @@ private fun PanelFact(label: String, value: String) {
     if (value.isBlank()) return
     Row(modifier = Modifier.padding(top = 6.dp)) {
         Text(label, color = MenuTokens.SectionLabel, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(end = 6.dp))
-        Text(value, color = MenuTokens.Value, style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(value, color = MenuTokens.Value, style = MaterialTheme.typography.labelSmall)
     }
 }
 
