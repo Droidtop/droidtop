@@ -100,9 +100,8 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
     /** The theme [load] last bound, so [reopen] can load it into a fresh pool after a hand-off. */
     private var boundTheme: EsDeTheme? = null
 
-    /** The launch sample's file and when it last started, for [awaitLaunchSound]. */
-    @Volatile private var launchPath: String? = null
-    @Volatile private var launchStartedAt = 0L
+    /** Each bound sound's file, so a hand-off can tell how long a sounding sample still has to play. */
+    @Volatile private var pathByName: Map<String, String> = emptyMap()
 
     init {
         AudioHandOff.register(this)
@@ -146,7 +145,7 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
         if (theme == null) return
         boundTheme = theme
         val declared = navigationSoundPaths(theme)
-        launchPath = declared["launch"]
+        pathByName = declared
         if (declared.isEmpty()) {
             soundIdByName = emptyMap()
             return
@@ -174,53 +173,49 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
         val id = soundIdByName[name] ?: return
         val stream = soundPool?.play(id, 1f, 1f, 1, 0, 1f) ?: return
         if (stream == 0) return
-        if (name == "launch") launchStartedAt = SystemClock.elapsedRealtime()
+        val sounding = Sounding(stream, pathByName[name], SystemClock.elapsedRealtime())
         synchronized(liveStreams) {
-            liveStreams.addLast(stream)
+            liveStreams.addLast(sounding)
             while (liveStreams.size > MAX_STREAMS) liveStreams.removeFirst()
         }
     }
 
     /**
-     * Waits until the launch sample that just started has played out, as
-     * real ES-DE does: it holds the launch behind its launch screen "for
-     * the navigation sound playing to be able to complete"
-     * (ViewController.cpp:1069-1071), 3 s at its normal setting
-     * (:1054-1056), which is also the cap here. A no-op when no launch
-     * sample is playing.
-     */
-    suspend fun awaitLaunchSound() {
-        val path = launchPath ?: return
-        val started = launchStartedAt
-        if (started == 0L || soundIdByName["launch"] == null) return
-        val lengthMs = withContext(Dispatchers.IO) { wavDurationMs(File(path)) } ?: return
-        val left = minOf(lengthMs, LAUNCH_WAIT_CAP_MS) - (SystemClock.elapsedRealtime() - started)
-        if (left > 0) delay(left)
-    }
-
-    /**
-     * Fades every sounding sample to silence, then releases the whole
+     * Lets every sample still sounding play out, then releases the whole
      * SoundPool: a stopped stream keeps its AudioTrack open for reuse, so
      * stopping is not enough to leave the output to the launched app.
+     *
+     * Playing out rather than cutting is ES-DE's own launch order: it
+     * plays the launch sound and holds the launch behind its launch screen
+     * "for the navigation sound playing to be able to complete"
+     * (ViewController.cpp:1069-1071), 3 s at its normal setting
+     * (:1054-1056), which is also the cap here. Without [fade] (the app is
+     * already coming in) the samples are stopped at once.
      */
     override suspend fun release(fade: Boolean): String? {
         val pool = soundPool ?: return null
         val streams = synchronized(liveStreams) { liveStreams.toList().also { liveStreams.clear() } }
+        var waited = 0L
         if (fade && streams.isNotEmpty()) {
-            for (step in 1..FADE_STEPS) {
-                val level = 1f - step.toFloat() / FADE_STEPS
-                streams.forEach { pool.setVolume(it, level, level) }
-                delay(FADE_MS / FADE_STEPS)
+            val now = SystemClock.elapsedRealtime()
+            val left = withContext(Dispatchers.IO) {
+                streams.maxOf { s ->
+                    val length = s.path?.let { wavDurationMs(File(it)) } ?: 0L
+                    minOf(length, PLAY_OUT_CAP_MS) - (now - s.startedAt)
+                }
+            }
+            if (left > 0) {
+                waited = left
+                delay(left)
             }
         }
-        streams.forEach { pool.stop(it) }
+        streams.forEach { pool.stop(it.streamId) }
         val samples = soundIdsByPath.size
         pool.release()
         soundPool = null
         soundIdsByPath.clear()
         soundIdByName = emptyMap()
-        launchStartedAt = 0L
-        return "SoundPool released ($samples samples, ${streams.size} recent streams stopped)"
+        return "SoundPool released ($samples samples; waited ${waited} ms for a sounding sample to finish)"
     }
 
     override suspend fun reopen() {
@@ -228,10 +223,10 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
     }
 
     private const val MAX_STREAMS = 4
-    private const val FADE_MS = 60L
-    private const val FADE_STEPS = 4
-    private const val LAUNCH_WAIT_CAP_MS = 3000L
-    private val liveStreams = ArrayDeque<Int>()
+    private const val PLAY_OUT_CAP_MS = 3000L
+
+    private class Sounding(val streamId: Int, val path: String?, val startedAt: Long)
+    private val liveStreams = ArrayDeque<Sounding>()
 }
 
 /**

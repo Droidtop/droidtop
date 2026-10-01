@@ -420,7 +420,16 @@ private fun GamepadShellBody(
         dev.droidtop.library.LaunchDisplay.chooser = { options, canRemember, onChosen ->
             displayChoice = DisplayChoiceRequest(options, canRemember, onChosen)
         }
-        onDispose { dev.droidtop.library.LaunchDisplay.chooser = null }
+        // The dispatch itself runs after the audio hand-off, so a failure
+        // there arrives here rather than through library.launch.
+        dev.droidtop.library.LaunchDisplay.onLaunchFailed = {
+            launching = null
+            launchError = "Couldn't launch: ${it.message}"
+        }
+        onDispose {
+            dev.droidtop.library.LaunchDisplay.chooser = null
+            dev.droidtop.library.LaunchDisplay.onLaunchFailed = null
+        }
     }
     displayChoice?.let { request ->
         LaunchDisplayChooserDialog(
@@ -492,15 +501,11 @@ private fun GamepadShellBody(
         scope.launch {
             launchError = null
             launching = entry
-            // Hand the audio over before the other app opens its output
-            // (tracker#160): let the launch sample play out behind the
-            // launch screen, as ES-DE does, then close every output
-            // stream droidtop has open.
-            EsDeNavigationSounds.awaitLaunchSound()
-            dev.droidtop.runtime.AudioHandOff.release("launch")
+            // The audio hand-off happens where the app is actually
+            // dispatched (LaunchDisplay.startOn), after the display
+            // chooser, not here (tracker#160).
             runCatching { library.launch(entry) }
                 .onFailure {
-                    dev.droidtop.runtime.AudioHandOff.reopen("launch failed")
                     android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)
                     launching = null
                     missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled

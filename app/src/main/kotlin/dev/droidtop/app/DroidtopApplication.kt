@@ -77,12 +77,20 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // whatever brings another app in front pauses a droidtop activity
         // first, and the next app is not resumed until onPause returns, so
         // every output stream of droidtop's own is closed by then. Coming
-        // back to any droidtop activity opens them again.
+        // back to any droidtop activity opens them again. The surfaces
+        // droidtop parks on the other screen (the companion, the cover a
+        // launch places on a display it vacates) come and go around a
+        // launch without the user leaving or returning, so they count
+        // for neither.
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityPaused(activity: Activity) =
-                AudioHandOff.releaseNow("${activity.javaClass.simpleName} paused")
-            override fun onActivityResumed(activity: Activity) =
-                AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
+            private fun Activity.isParkedSurface() =
+                this is CompanionActivity || this is dev.droidtop.display.SecondaryDisplayActivity
+            override fun onActivityPaused(activity: Activity) {
+                if (!activity.isParkedSurface()) AudioHandOff.releaseNow("${activity.javaClass.simpleName} paused")
+            }
+            override fun onActivityResumed(activity: Activity) {
+                if (!activity.isParkedSurface()) AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
+            }
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
             override fun onActivityStarted(activity: Activity) = Unit
             override fun onActivityStopped(activity: Activity) = Unit

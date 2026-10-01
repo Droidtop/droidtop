@@ -58,7 +58,7 @@ object AudioHandOff {
 
     private val holders = CopyOnWriteArrayList<Holder>()
     private val mutex = Mutex()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
 
     private val handedOffState = MutableStateFlow(false)
 

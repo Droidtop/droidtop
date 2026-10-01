@@ -3,7 +3,13 @@ package dev.droidtop.library
 import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.view.Display
+import dev.droidtop.runtime.AudioHandOff
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Launcher-wide launch-display targeting (docs/SPEC.md section 4,
@@ -153,7 +159,36 @@ object LaunchDisplay {
         runningGame = null
     }
 
+    /** Told when a launch fails after the audio hand-off, which runs asynchronously (the shell shows the error). */
+    @Volatile
+    var onLaunchFailed: ((Throwable) -> Unit)? = null
+
+    // Lazy: the JVM unit tests touch this object without a main looper.
+    private val dispatchScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+
+    /**
+     * The one point where an app is actually dispatched, after the display
+     * chooser if there is one, so it is also the one point where droidtop
+     * hands its audio over (docs/SPEC.md "Launch audio hand-off",
+     * Droidtop/tracker#160): any navigation sample still sounding plays
+     * out, then every output stream of droidtop's own is closed, and only
+     * then does the other app start. Opening the chooser hands nothing
+     * over.
+     */
     private fun startOn(context: Context, intent: Intent, displayId: Int?) {
+        dispatchScope.launch {
+            AudioHandOff.release("launch")
+            try {
+                dispatch(context, intent, displayId)
+            } catch (e: Exception) {
+                Log.e("droidtop.LaunchDisplay", "Launch failed", e)
+                AudioHandOff.reopen("launch failed")
+                onLaunchFailed?.invoke(e)
+            }
+        }
+    }
+
+    private fun dispatch(context: Context, intent: Intent, displayId: Int?) {
         coverVacatedDisplays?.invoke(displayId)
         // Always pin an explicit display, even for the "default display"
         // decision (displayId == null): leaving ActivityOptions off

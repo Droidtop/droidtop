@@ -6150,14 +6150,20 @@ draws its static image until the user is back), the navigation sounds
 (`EsDeNavigationSounds`: the SoundPool is released, and loaded again from
 the bound theme), and the Desktop audio bridge (`HostAudioServer`: every
 PulseAudio sink suspended over the native protocol, which closes the
-AAudio stream; container programs stay connected). It runs before a
-launch is dispatched (the Gaming shell, the companion screen) and from
-any droidtop activity's onPause (the next app is resumed only after
-that returns); it is undone when a droidtop activity resumes or regains
-top focus, or on Gaming navigation input. The Gaming launch first lets
-the theme's `launch` sample play out (capped at 3 s), as ES-DE holds the
-launch behind its launch screen for that (ViewController.cpp:1069-1071).
-Preview video is `USAGE_MEDIA` with ExoPlayer audio-focus handling.
+AAudio stream; container programs stay connected). It runs at the one
+point an app is actually dispatched, `LaunchDisplay.startOn`, which is
+after the "Launch on which screen?" chooser: opening the chooser (a
+dialog in the shell's own window) hands nothing over, and the owner
+heard the static exactly there when the old path paused the audio
+before the chooser. Any navigation sample still sounding plays out
+first (capped at 3 s), as ES-DE holds the launch behind its launch
+screen for that (ViewController.cpp:1069-1071). It also runs from any
+droidtop activity's onPause (the next app is resumed only after that
+returns), and it is undone when a droidtop activity resumes or regains
+top focus, or on Gaming navigation input. The surfaces droidtop parks
+on the other screen (the companion, the cover a launch places on a
+display it vacates) count for neither. Preview video is `USAGE_MEDIA`
+with ExoPlayer audio-focus handling.
 
 Full real history/reasoning for each of the above (commit-by-commit,
 with citations to the exact real ES-DE source lines each decision was
