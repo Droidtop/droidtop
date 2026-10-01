@@ -2,9 +2,15 @@ package dev.droidtop.shell.gamepad.theme
 
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.os.SystemClock
 import dev.droidtop.library.theme.EsDeTheme
 import dev.droidtop.library.theme.EsDeThemeValue
+import dev.droidtop.runtime.AudioHandOff
 import java.io.File
+import java.io.RandomAccessFile
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /**
  * Real ES-DE navigation-sound names, transcribed verbatim from
@@ -88,8 +94,21 @@ fun navigationSoundPaths(theme: EsDeTheme?): Map<String, String> {
  * wires its sounds correctly (the include + real paths) gets real
  * playback with no further work.
  */
-object EsDeNavigationSounds {
+object EsDeNavigationSounds : AudioHandOff.Holder {
     private var soundPool: SoundPool? = null
+
+    /** The theme [load] last bound, so [reopen] can load it into a fresh pool after a hand-off. */
+    private var boundTheme: EsDeTheme? = null
+
+    /** The launch sample's file and when it last started, for [awaitLaunchSound]. */
+    @Volatile private var launchPath: String? = null
+    @Volatile private var launchStartedAt = 0L
+
+    init {
+        AudioHandOff.register(this)
+    }
+
+    override val name = "navigation sounds"
 
     /** SoundPool sample id per already-loaded absolute file path -- loads are cached across theme reloads/per-system reparses (the same wav set recurs for every system's parse of one theme). */
     private val soundIdsByPath = mutableMapOf<String, Int>()
@@ -125,11 +144,15 @@ object EsDeNavigationSounds {
         // bindings. A real theme that genuinely declares no sounds falls
         // through to the empty-declared clear below.
         if (theme == null) return
+        boundTheme = theme
         val declared = navigationSoundPaths(theme)
+        launchPath = declared["launch"]
         if (declared.isEmpty()) {
             soundIdByName = emptyMap()
             return
         }
+        // No pool while another app has the audio: [reopen] loads this theme.
+        if (AudioHandOff.handedOff.value) return
         val pool = obtainPool()
         soundIdByName = buildMap {
             for ((name, path) in declared) {
@@ -141,9 +164,17 @@ object EsDeNavigationSounds {
 
     /** Plays one of [ES_DE_NAVIGATION_SOUND_NAMES]; silent no-op when the active theme doesn't provide it (see this object's doc comment -- no bundled fallback sounds, deliberately). */
     fun play(name: String) {
+        // A navigation sound only ever answers input to droidtop's own
+        // shell, so the user is back even if no activity was paused (a
+        // launch onto the other screen of a dual-screen device).
+        if (AudioHandOff.handedOff.value) {
+            AudioHandOff.reopen("navigation input")
+            return
+        }
         val id = soundIdByName[name] ?: return
         val stream = soundPool?.play(id, 1f, 1f, 1, 0, 1f) ?: return
         if (stream == 0) return
+        if (name == "launch") launchStartedAt = SystemClock.elapsedRealtime()
         synchronized(liveStreams) {
             liveStreams.addLast(stream)
             while (liveStreams.size > MAX_STREAMS) liveStreams.removeFirst()
@@ -151,19 +182,89 @@ object EsDeNavigationSounds {
     }
 
     /**
-     * Silence then stop every sample still sounding, so a launched app
-     * never opens its output while a sample is mid-buffer ([ShellAudio]).
-     * Stopping an already-finished stream id is a harmless no-op.
+     * Waits until the launch sample that just started has played out, as
+     * real ES-DE does: it holds the launch behind its launch screen "for
+     * the navigation sound playing to be able to complete"
+     * (ViewController.cpp:1069-1071), 3 s at its normal setting
+     * (:1054-1056), which is also the cap here. A no-op when no launch
+     * sample is playing.
      */
-    fun fadeStop() {
-        val pool = soundPool ?: return
+    suspend fun awaitLaunchSound() {
+        val path = launchPath ?: return
+        val started = launchStartedAt
+        if (started == 0L || soundIdByName["launch"] == null) return
+        val lengthMs = withContext(Dispatchers.IO) { wavDurationMs(File(path)) } ?: return
+        val left = minOf(lengthMs, LAUNCH_WAIT_CAP_MS) - (SystemClock.elapsedRealtime() - started)
+        if (left > 0) delay(left)
+    }
+
+    /**
+     * Fades every sounding sample to silence, then releases the whole
+     * SoundPool: a stopped stream keeps its AudioTrack open for reuse, so
+     * stopping is not enough to leave the output to the launched app.
+     */
+    override suspend fun release(fade: Boolean): String? {
+        val pool = soundPool ?: return null
         val streams = synchronized(liveStreams) { liveStreams.toList().also { liveStreams.clear() } }
-        for (s in streams) {
-            pool.setVolume(s, 0f, 0f)
-            pool.stop(s)
+        if (fade && streams.isNotEmpty()) {
+            for (step in 1..FADE_STEPS) {
+                val level = 1f - step.toFloat() / FADE_STEPS
+                streams.forEach { pool.setVolume(it, level, level) }
+                delay(FADE_MS / FADE_STEPS)
+            }
         }
+        streams.forEach { pool.stop(it) }
+        val samples = soundIdsByPath.size
+        pool.release()
+        soundPool = null
+        soundIdsByPath.clear()
+        soundIdByName = emptyMap()
+        launchStartedAt = 0L
+        return "SoundPool released ($samples samples, ${streams.size} recent streams stopped)"
+    }
+
+    override suspend fun reopen() {
+        load(boundTheme)
     }
 
     private const val MAX_STREAMS = 4
+    private const val FADE_MS = 60L
+    private const val FADE_STEPS = 4
+    private const val LAUNCH_WAIT_CAP_MS = 3000L
     private val liveStreams = ArrayDeque<Int>()
 }
+
+/**
+ * A PCM .wav file's playing time from its RIFF header (the `fmt ` chunk's
+ * byte rate and the `data` chunk's size), or null when it is not one.
+ * Reads only the chunk headers.
+ */
+internal fun wavDurationMs(file: File): Long? = runCatching {
+    RandomAccessFile(file, "r").use { raf ->
+        fun u32(): Long {
+            val b = ByteArray(4)
+            raf.readFully(b)
+            return (b[0].toLong() and 0xFF) or ((b[1].toLong() and 0xFF) shl 8) or
+                ((b[2].toLong() and 0xFF) shl 16) or ((b[3].toLong() and 0xFF) shl 24)
+        }
+        fun tag(): String = ByteArray(4).also { raf.readFully(it) }.toString(Charsets.US_ASCII)
+        if (tag() != "RIFF") return@use null
+        u32()
+        if (tag() != "WAVE") return@use null
+        var byteRate = 0L
+        while (raf.filePointer + 8 <= raf.length()) {
+            val id = tag()
+            val size = u32()
+            val body = raf.filePointer
+            when (id) {
+                "fmt " -> {
+                    raf.seek(body + 8)
+                    byteRate = u32()
+                }
+                "data" -> return@use if (byteRate > 0) size * 1000 / byteRate else null
+            }
+            raf.seek(body + size + (size and 1))
+        }
+        null
+    }
+}.getOrNull()

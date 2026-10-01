@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad.theme
 
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
@@ -30,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,9 +73,6 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.Row
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
@@ -1714,11 +1711,12 @@ private fun EsDeAutoOriginBox(
  *
  * Real `audio` (VideoComponent.cpp:254-255, default true): the theme
  * decides whether the preview has sound. Playback is additionally tied to
- * the host activity's real lifecycle -- paused on ON_STOP, resumed on
- * ON_START -- which is what makes honouring an audible default safe here;
- * the previous unconditional mute existed only because no such signal was
- * wired, and inventing one silent-by-default rule for every theme is not
- * what ES-DE does.
+ * droidtop's launch audio hand-off ([dev.droidtop.runtime.AudioHandOff]):
+ * whenever another app comes in front the player is faded out and
+ * released, and while the hand-off lasts this element draws its static
+ * image -- which is what makes honouring an audible default safe here;
+ * inventing one silent-by-default rule for every theme is not what ES-DE
+ * does.
  *
  * Falls back to [EsDeThemedFallbackImage]'s exact same static-poster path
  * (its own `default`/`defaultImage`/`path`/gameselector-artwork chain)
@@ -1733,7 +1731,9 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // Real `metadataElement` -- see esDeHiddenByMetadataFlag's own doc comment.
     if (esDeHiddenByMetadataFlag(element, selected)) return
     val videoUri = selected?.videoUri
-    if (videoUri == null) {
+    // No player at all while another app has the audio (tracker#160).
+    val audioHandedOff by dev.droidtop.runtime.AudioHandOff.handedOff.collectAsState()
+    if (videoUri == null || audioHandedOff) {
         EsDeThemedFallbackImage(element, viewWidth, viewHeight, gameSelection)
         return
     }
@@ -1818,10 +1818,9 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     var playCount by remember(videoUri) { mutableStateOf(0) }
     val player = remember(videoUri) {
         ExoPlayer.Builder(context).build().apply {
-            // Preview audio is media, and it yields to the app that gets
-            // launched: handleAudioFocus ducks/pauses on the other app's
-            // focus request and abandons focus on pause and release, which
-            // is the focus order the launched app expects (tracker#160).
+            // Preview audio is media: handleAudioFocus requests focus on
+            // play and abandons it on release, so a launched app finds
+            // focus already given back (tracker#160).
             setAudioAttributes(
                 androidx.media3.common.AudioAttributes.Builder()
                     .setUsage(androidx.media3.common.C.USAGE_MEDIA)
@@ -1867,31 +1866,8 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         player.addListener(listener)
         onDispose {
             player.removeListener(listener)
-            player.release()
+            ShellAudio.dispose(player)
         }
-    }
-    // Real ES-DE stops playback when the view goes away; droidtop's
-    // equivalent for "the whole app went away" is the host activity's
-    // lifecycle. Without this, honouring the real audible default would
-    // leak preview audio out of a backgrounded app.
-    val lifecycleOwner = context.findLifecycleOwner()
-    DisposableEffect(lifecycleOwner, player) {
-        val lifecycle = lifecycleOwner?.lifecycle
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                // ON_PAUSE, not ON_STOP: the launched app opens its output
-                // while we are paused but before we are stopped, and the
-                // preview must already be silent by then (tracker#160).
-                Lifecycle.Event.ON_PAUSE -> { player.volume = 0f; player.pause() }
-                Lifecycle.Event.ON_RESUME -> {
-                    player.volume = if (playAudio) 1f else 0f
-                    player.play()
-                }
-                else -> Unit
-            }
-        }
-        lifecycle?.addObserver(observer)
-        onDispose { lifecycle?.removeObserver(observer) }
     }
 
     // VideoFFmpegComponent.cpp:200-203: once the iterations are done the
@@ -3571,22 +3547,6 @@ private val STRFTIME_TO_JAVA = listOf(
     "%B" to "MMMM", "%b" to "MMM",
     "%%" to "%",
 )
-
-/**
- * The host activity behind a Compose [Context], as a [LifecycleOwner].
- * Used to tie a themed `video` element's playback to the app actually
- * being in the foreground -- see [EsDeThemedVideo]'s `audio` handling.
- * Null (so playback is simply never paused) if this composable is hosted
- * somewhere with no lifecycle at all, which is not a case droidtop has.
- */
-private fun Context.findLifecycleOwner(): LifecycleOwner? {
-    var current: Context? = this
-    while (current != null) {
-        if (current is LifecycleOwner) return current
-        current = (current as? ContextWrapper)?.baseContext
-    }
-    return null
-}
 
 /**
  * Real ES-DE MD_DATE storage format ("YYYYMMDDT000000",

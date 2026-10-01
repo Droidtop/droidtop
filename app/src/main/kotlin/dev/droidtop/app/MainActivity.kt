@@ -221,8 +221,11 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         companionLaunchSeam = { entry ->
             lifecycleScope.launch {
                 CompanionState.launchError.value = null
+                // Every output stream closed before the other app opens its own (tracker#160).
+                dev.droidtop.runtime.AudioHandOff.release("companion launch")
                 runCatching { library.launch(entry) }
                     .onFailure {
+                        dev.droidtop.runtime.AudioHandOff.reopen("launch failed")
                         android.util.Log.e("droidtop.MainActivity", "Companion launch of ${entry.title} failed", it)
                         // The shell's own wording for the same failure.
                         CompanionState.launchError.value = "Couldn't launch ${entry.title}: ${it.message}"
@@ -464,10 +467,15 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // flight must not keep firing dispatchKeyEvent into a window
         // that is no longer the one the user is looking at.
         padGate.cancel()
-        // A navigation sample still sounding must not be cut mid-buffer
-        // by the launched app opening its output (tracker#160).
-        dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.fadeStop()
         super.onPause()
+    }
+
+    // A launch onto the other screen of a dual-screen device pauses
+    // nothing; coming back to this window is still the user's return
+    // (AudioHandOff, tracker#160).
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        if (isTopResumedActivity) dev.droidtop.runtime.AudioHandOff.reopen("top window")
     }
 
     private fun leaveIfSwitchedOff(enabled: Set<Mode>) {

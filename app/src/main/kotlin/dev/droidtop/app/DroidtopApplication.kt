@@ -1,10 +1,13 @@
 package dev.droidtop.app
 
+import android.app.Activity
+import android.os.Bundle
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.svg.SvgDecoder
 import com.android.launcher3.LauncherApplication
+import dev.droidtop.runtime.AudioHandOff
 
 /**
  * Real fix for a real, confirmed-on-device bug: theme decorative art
@@ -70,6 +73,22 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).
         LibraryCore.followGamesRoots(this)
+        // Launch audio hand-off (SPEC "Launch audio hand-off", tracker#160):
+        // whatever brings another app in front pauses a droidtop activity
+        // first, and the next app is not resumed until onPause returns, so
+        // every output stream of droidtop's own is closed by then. Coming
+        // back to any droidtop activity opens them again.
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityPaused(activity: Activity) =
+                AudioHandOff.releaseNow("${activity.javaClass.simpleName} paused")
+            override fun onActivityResumed(activity: Activity) =
+                AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {

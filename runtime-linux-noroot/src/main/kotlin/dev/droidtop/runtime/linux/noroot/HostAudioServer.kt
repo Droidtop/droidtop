@@ -4,12 +4,15 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import dev.droidtop.runtime.AudioHandOff
 import io.airlift.compress.tar.TarInputStream
 import io.airlift.compress.zstd.ZstdInputStream
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Bridges host audio into proot containers, the missing half of
@@ -74,6 +77,36 @@ internal class HostAudioServer(private val context: Context) {
 
     val running: Boolean get() = process?.isAlive == true
 
+    /** The socket the running server listens on, for [handOff]. */
+    @Volatile private var socketPath: String? = null
+
+    /**
+     * The Desktop session's part of the launch audio hand-off
+     * ([AudioHandOff], Droidtop/tracker#160). The server runs with no
+     * idle suspend (the packaged modules have no module-suspend-on-idle),
+     * so its AAudio sink keeps a low-latency output stream open and
+     * writing silence for the whole session, including while another app
+     * is in front. Suspending every sink closes that stream
+     * ([PulseSinkSuspend]); resuming opens it again. Container programs
+     * stay connected and simply play into a suspended sink meanwhile.
+     */
+    private val handOff = object : AudioHandOff.Holder {
+        override val name = "Desktop audio bridge"
+
+        override suspend fun release(fade: Boolean): String? {
+            val path = socketPath ?: return null
+            if (!running) return null
+            withContext(Dispatchers.IO) { PulseSinkSuspend.setAllSuspended(path, suspend = true) }
+            return "PulseAudio sinks suspended, AAudio stream closed"
+        }
+
+        override suspend fun reopen() {
+            val path = socketPath ?: return
+            if (!running) return
+            withContext(Dispatchers.IO) { PulseSinkSuspend.setAllSuspended(path, suspend = false) }
+        }
+    }
+
     /**
      * Starts the server listening on the Unix socket at [socketPath],
      * stopping any previous instance first. Returns null on success, or
@@ -137,6 +170,8 @@ internal class HostAudioServer(private val context: Context) {
             return "could not start $BINARY_NAME: ${e.message}"
         }
         process = started
+        this.socketPath = socketPath
+        AudioHandOff.register(handOff)
         thread(name = "audio-bridge", isDaemon = true) {
             try {
                 started.inputStream.bufferedReader().forEachLine { Log.i(TAG, it) }
@@ -159,6 +194,8 @@ internal class HostAudioServer(private val context: Context) {
 
     /** Stops the server, if one is running. Never throws. */
     fun stop() {
+        AudioHandOff.unregister(handOff)
+        socketPath = null
         micPump.stop()
         val current = process ?: return
         process = null

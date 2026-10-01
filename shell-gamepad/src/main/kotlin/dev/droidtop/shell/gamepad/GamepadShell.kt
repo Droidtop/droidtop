@@ -467,11 +467,15 @@ fun GamepadShell(
         scope.launch {
             launchError = null
             launching = entry
-            // Hand the audio over before the other app opens its output:
-            // fade out and pause the themed preview video (tracker#160).
-            dev.droidtop.shell.gamepad.theme.ShellAudio.quiesce()
+            // Hand the audio over before the other app opens its output
+            // (tracker#160): let the launch sample play out behind the
+            // launch screen, as ES-DE does, then close every output
+            // stream droidtop has open.
+            EsDeNavigationSounds.awaitLaunchSound()
+            dev.droidtop.runtime.AudioHandOff.release("launch")
             runCatching { library.launch(entry) }
                 .onFailure {
+                    dev.droidtop.runtime.AudioHandOff.reopen("launch failed")
                     android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)
                     launching = null
                     missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled

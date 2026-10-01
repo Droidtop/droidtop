@@ -6133,17 +6133,30 @@ variant axis, `fontSize`, from the one fixed above) may still fail to
 resolve — worth re-checking now that the axis-matching fix landed, since
 it could turn out to already be fixed as a side effect.
 
-**Launch audio hand-off (2026-09-30, tracker#160).** Droidtop's own audio
-(themed preview video, SoundPool navigation samples) must never be cut
-mid-buffer while a launched app opens its output; that is audible as a
-burst of static on every launch. The one mechanism is `ShellAudio`:
-before the launch intent is dispatched the themed videos are faded to
-zero over 120 ms and paused; the video's lifecycle observer mutes and
-pauses on ON_PAUSE (not ON_STOP) and resumes on ON_RESUME; the host
-activity's onPause silences and stops any sounding navigation sample.
-Preview video is `USAGE_MEDIA` with ExoPlayer audio-focus handling, so
-focus is requested on play and abandoned on pause/release in the order
-the launched app expects.
+**Launch audio hand-off (2026-09-30, redecided 2026-10-01, tracker#160).**
+When another app comes in front, droidtop has NO audio output stream of
+its own open: not playing, not paused, not idle. Pausing was not enough
+(the owner still heard a burst of static on every launch): a paused
+ExoPlayer keeps its AudioTrack, SoundPool keeps an AudioTrack per stream
+after a sample ends, and the Desktop session's PulseAudio keeps a
+low-latency AAudio stream open writing silence; when the launched app
+opens its own output the HAL reconfigures under all of them. The one
+mechanism is `AudioHandOff` (runtime-common): every owner of an output
+stream registers a holder, and a hand-off closes them all and logs what
+it closed under the logcat tag `droidtop.audio`. Holders: the themed
+videos (`ShellAudio`: faded over 120 ms, then released; the video element
+draws its static image until the user is back), the navigation sounds
+(`EsDeNavigationSounds`: the SoundPool is released, and loaded again from
+the bound theme), and the Desktop audio bridge (`HostAudioServer`: every
+PulseAudio sink suspended over the native protocol, which closes the
+AAudio stream; container programs stay connected). It runs before a
+launch is dispatched (the Gaming shell, the companion screen) and from
+any droidtop activity's onPause (the next app is resumed only after
+that returns); it is undone when a droidtop activity resumes or regains
+top focus, or on Gaming navigation input. The Gaming launch first lets
+the theme's `launch` sample play out (capped at 3 s), as ES-DE holds the
+launch behind its launch screen for that (ViewController.cpp:1069-1071).
+Preview video is `USAGE_MEDIA` with ExoPlayer audio-focus handling.
 
 Full real history/reasoning for each of the above (commit-by-commit,
 with citations to the exact real ES-DE source lines each decision was
