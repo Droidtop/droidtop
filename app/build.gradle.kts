@@ -284,4 +284,9 @@ dependencies {
     // functions (UpdateNow/AppSelfUpdate.mayCheck), so :app carries plain
     // JVM tests now; CI runs :app:testDebugUnitTest with the rest.
     testImplementation(libs.junit)
+    // OnboardingRun writes and reads the saved first run as org.json, and
+    // the resume-and-migrate tests exercise that path; android.jar's
+    // org.json is a throwing stub in JVM tests, so the real library backs
+    // them (the same reasoning and version as shell-gamepad's test classpath).
+    testImplementation(libs.json.v20240303)
 }

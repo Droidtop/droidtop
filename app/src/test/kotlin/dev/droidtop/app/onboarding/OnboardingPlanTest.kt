@@ -1,97 +1,75 @@
 package dev.droidtop.app.onboarding
 
-import dev.droidtop.app.OnboardingPart
 import dev.droidtop.app.OnboardingStep
-import dev.droidtop.app.StepProgress
-import dev.droidtop.app.part
 import dev.droidtop.app.plannedSteps
+import dev.droidtop.library.settings.Mode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * The plan is the pipeline: every step the run presents comes out of it,
- * and "step N of M" is counted against it. Both defects below were live
- * on the Android 9 rig with fresh data (build 531).
+ * and "Step N of M" is counted against it (docs/SPEC.md 7b). Only the
+ * steps the answers need are in it.
  */
 class OnboardingPlanTest {
 
-    private fun plan(gaming: Boolean, storageGranted: Boolean, desktop: Boolean = false) = plannedSteps(
-        home = null,
-        configureDesktop = desktop,
-        configureGaming = gaming,
-        storageGranted = storageGranted,
-    )
-
     @Test
-    fun `a run that must ask for storage still has every gaming step after it`() {
-        val steps = plan(gaming = true, storageGranted = false)
-        assertTrue(steps.contains(OnboardingStep.STORAGE_PERMISSION))
-        val storage = steps.indexOf(OnboardingStep.STORAGE_PERMISSION)
-        val folders = steps.indexOf(OnboardingStep.GAMES_FOLDERS)
-        assertTrue("games folders must follow storage", storage in 0 until folders)
-        assertEquals(steps.last(), OnboardingStep.WHAT_NEXT)
-    }
-
-    @Test
-    fun `granting storage does not shorten the plan under the user`() {
-        // The rig defect: the plan was recomputed with the permission now
-        // held, STORAGE_PERMISSION left it, and the run had no next step.
-        // Whatever the plan says, the step the user is standing on has to
-        // be in it -- so a run that opened without the permission keeps
-        // its storage step for the whole run.
-        val asked = plan(gaming = true, storageGranted = false)
-        val granted = plan(gaming = true, storageGranted = true)
-        assertEquals(asked.size - 1, granted.size)
+    fun `a gaming-only run with no controller is five steps`() {
         assertEquals(
-            asked.filterNot { it == OnboardingStep.STORAGE_PERMISSION },
-            granted,
+            listOf(OnboardingStep.MODE, OnboardingStep.HOME, OnboardingStep.GAMES, OnboardingStep.APPEARANCE, OnboardingStep.DONE),
+            plannedSteps(Mode.GAMING, alsoOther = false, controllerAttached = false),
         )
     }
 
     @Test
-    fun `a run that already holds storage never asks`() {
-        assertTrue(OnboardingStep.STORAGE_PERMISSION !in plan(gaming = true, storageGranted = true))
-    }
-
-    @Test
-    fun `no gaming means no gaming steps`() {
-        val steps = plan(gaming = false, storageGranted = false)
-        assertTrue(OnboardingStep.STORAGE_PERMISSION !in steps)
-        assertTrue(OnboardingStep.GAMES_FOLDERS !in steps)
-        // The theme is Gaming's; the pad is how the shell itself is driven.
+    fun `desktop brings its own two steps and nothing of gaming`() {
+        val steps = plannedSteps(Mode.DESKTOP, alsoOther = false, controllerAttached = false)
+        assertTrue(OnboardingStep.GAMES !in steps)
         assertTrue(OnboardingStep.APPEARANCE !in steps)
-        assertTrue(OnboardingStep.CONTROLLER in steps)
+        assertTrue(OnboardingStep.DESKTOP_SETUP in steps)
+        // The keyboard's reason is terminals and Windows programs (rig,
+        // dq-coordinator-24, finding 10).
+        assertTrue(OnboardingStep.KEYBOARD in steps)
     }
 
     @Test
-    fun `input and appearance come after the games steps and before the keyboard`() {
-        val steps = plan(gaming = true, storageGranted = true, desktop = true)
-        val folders = steps.indexOf(OnboardingStep.GAMES_FOLDERS)
-        val controller = steps.indexOf(OnboardingStep.CONTROLLER)
-        val appearance = steps.indexOf(OnboardingStep.APPEARANCE)
-        val keyboard = steps.indexOf(OnboardingStep.KEYBOARD)
-        assertTrue(folders < controller)
-        assertTrue(controller < appearance)
-        assertTrue(appearance < keyboard)
+    fun `setting up both keeps each mode's steps together`() {
+        val steps = plannedSteps(Mode.GAMING, alsoOther = true)
+        assertEquals(steps.indexOf(OnboardingStep.GAMES) + 1, steps.indexOf(OnboardingStep.APPEARANCE))
+        assertEquals(steps.indexOf(OnboardingStep.DESKTOP_SETUP) + 1, steps.indexOf(OnboardingStep.KEYBOARD))
+        assertTrue(steps.indexOf(OnboardingStep.APPEARANCE) < steps.indexOf(OnboardingStep.DESKTOP_SETUP))
     }
 
     @Test
-    fun `the keyboard is asked only of a run setting up Desktop`() {
-        // Its reason is terminals and Windows programs (rig, dq-coordinator-24, finding 10).
-        assertTrue(OnboardingStep.KEYBOARD !in plan(gaming = true, storageGranted = true))
-        assertTrue(OnboardingStep.KEYBOARD in plan(gaming = false, storageGranted = true, desktop = true))
+    fun `the controller is asked only when one was attached, after the modes`() {
+        val with = plannedSteps(Mode.GAMING, alsoOther = true, controllerAttached = true)
+        assertEquals(OnboardingStep.CONTROLLER, with[with.size - 2])
+        assertTrue(OnboardingStep.CONTROLLER !in plannedSteps(Mode.GAMING, alsoOther = true, controllerAttached = false))
     }
 
     @Test
-    fun `progress counts the same parts whatever is answered`() {
-        // "Step 1 of 7", "2 of 8", "4 of 10" (rig, dq-coordinator-24, finding 9):
-        // every step belongs to one part, and the parts never change.
-        val short = plan(gaming = false, storageGranted = true)
-        val long = plan(gaming = true, storageGranted = false, desktop = true)
-        val parts = OnboardingPart.entries.size
-        (short + long).forEach { step -> assertEquals(parts, StepProgress(step.part).count) }
-        // The walk never goes back a part.
-        assertEquals(long.map { it.part }, long.map { it.part }.sortedBy { it.ordinal })
+    fun `every plan starts with the two questions and ends with the summary`() {
+        listOf(
+            plannedSteps(Mode.GAMING, alsoOther = false),
+            plannedSteps(Mode.DESKTOP, alsoOther = true, controllerAttached = false),
+        ).forEach { steps ->
+            assertEquals(listOf(OnboardingStep.MODE, OnboardingStep.HOME), steps.take(2))
+            assertEquals(OnboardingStep.DONE, steps.last())
+        }
+    }
+
+    @Test
+    fun `old step names land on the merged step that holds the question`() {
+        // A saved first run, or a Settings row built before the merge.
+        assertEquals(OnboardingStep.HOME, OnboardingStep.byName("HOME_CHOICE"))
+        assertEquals(OnboardingStep.HOME, OnboardingStep.byName("STANDARD_SETUP"))
+        assertEquals(OnboardingStep.GAMES, OnboardingStep.byName("STORAGE_PERMISSION"))
+        assertEquals(OnboardingStep.GAMES, OnboardingStep.byName("GAMES_FOLDERS"))
+        assertEquals(OnboardingStep.MODE, OnboardingStep.byName("DEFAULT_MODE_CHOICE"))
+        assertEquals(OnboardingStep.DONE, OnboardingStep.byName("WHAT_NEXT"))
+        assertEquals(OnboardingStep.CONTROLLER, OnboardingStep.byName("CONTROLLER"))
+        assertEquals(null, OnboardingStep.byName(null))
+        assertEquals(null, OnboardingStep.byName("NOT_A_STEP"))
     }
 }

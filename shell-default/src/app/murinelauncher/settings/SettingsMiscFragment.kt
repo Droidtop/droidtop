@@ -91,17 +91,17 @@ public final class SettingsMiscFragment: AbstractSettingsFragment() {
             }
             PREF_DROIDTOP_HOME_SCREEN -> {
                 preference.summary = when (dev.droidtop.shell.standard.HomeRolePrefs.activeHomeImplementation(context)) {
-                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.STANDARD -> "droidtop's own launcher"
-                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.ALTERNATIVE -> "A launcher you already have"
-                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.NONE -> "Neither, for now"
+                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.STANDARD -> "droidtop"
+                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.ALTERNATIVE -> "A launcher you already have, through droidtop"
+                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.NONE -> "Unchanged"
                 }
                 preference.setOnPreferenceClickListener {
-                    // Re-entry into onboarding's own HOME_CHOICE step -- same
+                    // Re-entry into onboarding's own Home step -- same
                     // explicit-component-name pattern as
                     // PREF_CONSOLE_SYSTEMS/PREF_GAME_FOLDERS.
                     val intent = Intent(Intent.ACTION_MAIN).apply {
                         component = ComponentName(context.packageName, "dev.droidtop.app.OnboardingActivity")
-                        putExtra("dev.droidtop.app.EXTRA_START_STEP", "HOME_CHOICE")
+                        putExtra("dev.droidtop.app.EXTRA_START_STEP", "HOME")
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     context.startActivity(intent)
