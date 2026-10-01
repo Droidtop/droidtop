@@ -32,6 +32,7 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
         val nav = CatalogPreferenceNavigator(
             fragment = this,
             rootGroups = { ctx -> SettingsScreenRegistry.get("global_settings")?.groups?.invoke(ctx).orEmpty() },
+            savedState = savedInstanceState,
             enableSearch = true,
             rootScreenId = "global_settings",
             rootTitle = getString(R.string.pref_global_settings_title),
@@ -39,5 +40,10 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
         navigator = nav
         nav.rebuild()
         activity?.title = getString(R.string.pref_global_settings_title)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        navigator?.saveState(outState)
     }
 }

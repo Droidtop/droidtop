@@ -42,6 +42,7 @@ public final class SettingsGamingFragment : AbstractSettingsFragment() {
         val nav = CatalogPreferenceNavigator(
             fragment = this,
             rootGroups = { ctx -> GamingSettingsCatalog.settingsGroups(ctx) },
+            savedState = savedInstanceState,
             skipGroupIds = setOf(GamingSettingsCatalog.GROUP_GLOBAL),
             enableSearch = true,
             rootScreenId = "gaming_settings",
@@ -50,5 +51,10 @@ public final class SettingsGamingFragment : AbstractSettingsFragment() {
         navigator = nav
         nav.rebuild()
         activity?.title = getString(R.string.pref_category_gaming_title)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        navigator?.saveState(outState)
     }
 }

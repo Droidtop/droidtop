@@ -3,6 +3,7 @@ package app.murinelauncher.settings.common
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -92,6 +93,7 @@ class CatalogPreferenceNavigator(
     private val enableSearch: Boolean = false,
     private val rootScreenId: String = "root",
     private val rootTitle: String = "",
+    savedState: Bundle? = null,
 ) {
     private val stack = ArrayDeque<CatalogScreen>()
     private var focusRingAttached = false
@@ -139,6 +141,22 @@ class CatalogPreferenceNavigator(
 
     init {
         fragment.requireActivity().onBackPressedDispatcher.addCallback(fragment, backCallback)
+        // Restore saved navigation state: the recreate that Text size / colour
+        // vision triggers must bring the user back to the same settings screen
+        // and row (Droidtop/tracker#139), not drop them at the root.
+        savedState?.getStringArray("catalog_nav_stack")?.let { ids ->
+            stack.clear()
+            for (id in ids) {
+                val screen = dev.droidtop.library.settings.SettingsScreenRegistry.get(id) ?: break
+                stack.addLast(screen)
+            }
+        }
+    }
+
+    /** Save the current settings navigation stack so a recreate restores it. */
+    fun saveState(outState: Bundle) {
+        val ids = stack.map { it.id }
+        outState.putStringArray("catalog_nav_stack", ids.toTypedArray())
     }
 
     fun rebuild(focusKey: String? = null) {

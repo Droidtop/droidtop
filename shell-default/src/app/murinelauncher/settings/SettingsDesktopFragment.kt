@@ -31,6 +31,7 @@ public final class SettingsDesktopFragment : AbstractSettingsFragment() {
         val nav = CatalogPreferenceNavigator(
             fragment = this,
             rootGroups = { ctx -> SettingsScreenRegistry.get("desktop_settings")?.groups?.invoke(ctx).orEmpty() },
+            savedState = savedInstanceState,
             enableSearch = true,
             rootScreenId = "desktop_settings",
             rootTitle = getString(R.string.pref_category_desktop_title),
@@ -38,5 +39,10 @@ public final class SettingsDesktopFragment : AbstractSettingsFragment() {
         navigator = nav
         nav.rebuild()
         activity?.title = getString(R.string.pref_category_desktop_title)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        navigator?.saveState(outState)
     }
 }
