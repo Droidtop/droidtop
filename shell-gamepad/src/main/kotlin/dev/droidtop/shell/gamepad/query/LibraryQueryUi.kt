@@ -447,9 +447,9 @@ internal fun LibrarySearchDialog(
     }
 
     pluginsScreen?.let { screen ->
-        val close = {
+        val close: () -> Unit = {
             pluginsScreen = null
-            searchTick++
+            searchTick += 1
         }
         Dialog(onDismissRequest = close) { CatalogNavigator(root = screen, onExit = close) }
     }
