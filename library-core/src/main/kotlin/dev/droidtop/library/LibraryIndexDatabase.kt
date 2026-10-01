@@ -2,6 +2,7 @@ package dev.droidtop.library
 
 import android.content.Context
 import androidx.room.Dao
+import androidx.room.ColumnInfo
 import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.Insert
@@ -11,6 +12,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * One game's place in the index (docs/SPEC.md 7g, step 3): only what a
@@ -42,6 +45,8 @@ data class GameIndexEntity(
     val rating: Float?,
     val releaseDate: String?,
     val artworkUri: String?,
+    /** When this game first became an index row; older rows migrate as 0. */
+    @ColumnInfo(defaultValue = "0") val firstSeenEpochMs: Long = 0L,
     /** Where [GameRecordStore] keeps this game's full record -- see [recordPathFor]. */
     val recordPath: String,
 )
@@ -116,14 +121,12 @@ interface LibraryIndexDao {
  * (a DERIVED index, safe to drop and rebuild) and changes shape on its
  * own schedule.
  *
- * `fallbackToDestructiveMigration`, deliberately: every column here is
- * derived from a [GameRecord] (see [GameIndexEntity]'s own doc comment),
- * so a version bump just drops and rebuilds from the records
- * ([RoomLibraryIndexStore.rebuildFromRecords]) rather than needing a real
- * migration path the way [PlayHistoryDatabase] (real play counts, not
- * derivable from anything else) does.
+ * Index columns are derived from [GameRecord], except first-seen time:
+ * that fact belongs to the index and must survive rescans. Schema changes
+ * that can preserve it use an explicit migration; destructive fallback
+ * remains available for other shape mismatches.
  */
-@Database(entities = [GameIndexEntity::class, PartIndexEntity::class], version = 1, exportSchema = false)
+@Database(entities = [GameIndexEntity::class, PartIndexEntity::class], version = 2, exportSchema = false)
 abstract class LibraryIndexDatabase : RoomDatabase() {
     abstract fun dao(): LibraryIndexDao
 
@@ -136,7 +139,13 @@ abstract class LibraryIndexDatabase : RoomDatabase() {
                     context.applicationContext,
                     LibraryIndexDatabase::class.java,
                     "library-index.db",
-                ).fallbackToDestructiveMigration().build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2).fallbackToDestructiveMigration().build().also { instance = it }
             }
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE games ADD COLUMN firstSeenEpochMs INTEGER NOT NULL DEFAULT 0")
+            }
+        }
     }
 }

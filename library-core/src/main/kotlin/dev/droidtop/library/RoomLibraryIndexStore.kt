@@ -71,6 +71,7 @@ class RoomLibraryIndexStore(
         lock.withLock {
             val previousByKey = lastWritten[providerKey]?.segments?.associateBy { it.key to it.root }.orEmpty()
             val keptKeys = slice.segments.mapTo(HashSet()) { it.key to it.root }
+            val firstSeenById = db.dao().gamesFor(providerKey).associate { it.id to it.firstSeenEpochMs }
         // A segment this save no longer carries at all is one
         // [Library.keepOnlyRoots] dropped, not one a walk emptied (a walk
         // never removes a segment, only marks its games missing) -- so
@@ -112,7 +113,14 @@ class RoomLibraryIndexStore(
                     folderMtime = segment.folderMtime ?: folderMtimeOf(segment.key),
                     walkedAt = System.currentTimeMillis(),
                 ),
-                segment.entries.map { it.toIndexRow(providerKey, segment.key, segment.root) },
+                segment.entries.map { entry ->
+                    entry.toIndexRow(
+                        providerKey,
+                        segment.key,
+                        segment.root,
+                        firstSeenEpochMsFor(entry.id, firstSeenById, System.currentTimeMillis()),
+                    )
+                },
             )
         }
         lastWritten[providerKey] = slice
@@ -145,7 +153,7 @@ class RoomLibraryIndexStore(
                     folderMtime = part?.let { folderMtimeOf(it) } ?: 0L,
                     walkedAt = System.currentTimeMillis(),
                 ),
-                recordsInPart.map { it.entry.toIndexRow(provider, part, root) },
+                recordsInPart.map { it.entry.toIndexRow(provider, part, root, 0L) },
             )
         }
         lastWritten.clear()
@@ -165,7 +173,15 @@ class RoomLibraryIndexStore(
         runCatching { File(key).takeIf { it.isDirectory }?.lastModified() }.getOrNull() ?: 0L
 }
 
-private fun LibraryEntry.toIndexRow(provider: String, part: String?, root: String?): GameIndexEntity = GameIndexEntity(
+internal fun firstSeenEpochMsFor(id: String, existing: Map<String, Long>, now: Long): Long =
+    if (id in existing) existing.getValue(id) else now
+
+internal fun LibraryEntry.toIndexRow(
+    provider: String,
+    part: String?,
+    root: String?,
+    firstSeenEpochMs: Long,
+): GameIndexEntity = GameIndexEntity(
     id = id,
     provider = provider,
     root = root,
@@ -186,5 +202,6 @@ private fun LibraryEntry.toIndexRow(provider: String, part: String?, root: Strin
     rating = rating,
     releaseDate = releaseDate,
     artworkUri = artworkUri,
+    firstSeenEpochMs = firstSeenEpochMs,
     recordPath = recordPathFor(id),
 )

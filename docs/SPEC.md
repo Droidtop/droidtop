@@ -8933,11 +8933,12 @@ false "you have nothing", while it runs.
 
 ### Known gaps, left open rather than shipped half-built
 
-- **"Recently added"** is a shelf the owner named and the tab does not
-  have: the library index keeps no first-seen time for a game. Adding
-  one (a `firstSeenEpochMs` fact on the index row, written when a walk
-  first finds a path, never by a rescrape) is library-core work for a
-  free worker; the shelf is one line in `pcShelves` once the fact exists.
+- **"Recently added"** remains a shelf the owner named and the tab does
+  not have. The library index now records `firstSeenEpochMs` on each game
+  row: a newly indexed game gets the current epoch time, rescans preserve
+  it, and preexisting rows migrate with 0. A rebuild from game records
+  also uses 0 because records do not establish when a game was first
+  indexed. The shelf is still future UI work.
 - **Achievements** need a source (#143) before the page can carry them.
 - **A rig check** of the tab by pad and touch on the emulator, and of the
   swapped face-button layout on the page, is listed in this change's

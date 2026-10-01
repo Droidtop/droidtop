@@ -74,6 +74,36 @@ class LibraryIndexTest {
     private fun game(path: String) = LibraryEntry(id = path, title = path.substringAfterLast('/'), kind = LibraryEntryKind.RENPY)
 
     @Test
+    fun `first seen is assigned once, preserved on rescans, and old rows stay zero`() {
+        assertEquals(123L, firstSeenEpochMsFor("new", emptyMap(), 123L))
+        assertEquals(40L, firstSeenEpochMsFor("known", mapOf("known" to 40L), 123L))
+        assertEquals(0L, firstSeenEpochMsFor("legacy", mapOf("legacy" to 0L), 123L))
+        assertEquals(0L, GameIndexEntity(
+            id = "legacy",
+            provider = "test",
+            root = null,
+            part = null,
+            kind = LibraryEntryKind.RENPY.name,
+            systemId = null,
+            title = "Legacy",
+            sortName = null,
+            collectionSortName = null,
+            missing = false,
+            hidden = false,
+            favorite = false,
+            completed = false,
+            kidGame = false,
+            broken = false,
+            genre = null,
+            players = null,
+            rating = null,
+            releaseDate = null,
+            artworkUri = null,
+            recordPath = "legacy.json",
+        ).firstSeenEpochMs)
+    }
+
+    @Test
     fun `a start with an index shows it and walks nothing`() = runBlocking {
         val provider = CountingProvider(LibraryEntryKind.RENPY, listOf(found))
         val store = FakeIndexStore(mapOf(provider.indexKey to sliceOf(ScanStep.Segment(ScanStep.WHOLE, entries = listOf(known)))))
