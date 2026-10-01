@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.input.padSelectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -61,6 +62,11 @@ internal fun SelectableRow(
 ) {
     val window = currentShellWindow()
     var focused by remember { mutableStateOf(false) }
+    // The ring is the pad's cursor, drawn only while a pad or keyboard is
+    // driving (docs/SPEC.md 6e): on a touch screen a ring on one answer
+    // beside the tick on another read as "the default" (first tester,
+    // Droidtop/tracker#159). The choice itself is the tick.
+    val ring = focused && PadModality.showsFocus
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -81,8 +87,8 @@ internal fun SelectableRow(
                 MenuTokens.RowShape,
             )
             .border(
-                width = if (focused) MenuTokens.FocusRingWidth else 1.dp,
-                color = if (focused) MenuTokens.Accent else Color.Transparent,
+                width = if (ring) MenuTokens.FocusRingWidth else 1.dp,
+                color = if (ring) MenuTokens.Accent else Color.Transparent,
                 shape = MenuTokens.RowShape,
             )
             .padding(horizontal = Space.Lg, vertical = Space.Md),

@@ -142,6 +142,32 @@ class OnboardingActivity : AppCompatActivity() {
      */
     private val onboardingRun: OnboardingRun by viewModels()
 
+    /**
+     * The front of the input pipeline for this window, as in the shell's
+     * own activity (docs/SPEC.md 6e): the stick and hat move through the
+     * steps like the D-pad, and the selection ring shows only while a pad or
+     * keyboard is driving -- a person setting up with a finger sees no ring
+     * (Droidtop/tracker#159).
+     */
+    private val padGate = dev.droidtop.shell.gamepad.input.PadGate(deliver = { event -> deliverKey(event) })
+
+    private fun deliverKey(event: android.view.KeyEvent): Boolean = super.dispatchKeyEvent(event)
+
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean = padGate.dispatchKey(event)
+
+    override fun dispatchGenericMotionEvent(event: android.view.MotionEvent): Boolean =
+        padGate.dispatchMotion(event) || super.dispatchGenericMotionEvent(event)
+
+    override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+        padGate.noteTouch(event)
+        return super.dispatchTouchEvent(event)
+    }
+
+    override fun onPause() {
+        padGate.cancel()
+        super.onPause()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)

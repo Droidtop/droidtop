@@ -16,8 +16,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * the plastic and what the person expects, so droidtop asks once instead
  * of guessing (docs/SPEC.md 7b).
  *
- * Same SharedPreferences file as every other droidtop preference, and the
- * same shape as [InputMapPrefs] beside it.
+ * Same SharedPreferences file as every other droidtop preference.
  */
 object ControllerPrefs {
     private const val KEY_SWAP = "droidtop_gamepad_swap_confirm_cancel"

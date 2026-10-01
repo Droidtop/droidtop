@@ -3,8 +3,6 @@ package dev.droidtop.app
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.activity.compose.setContent
@@ -38,6 +36,7 @@ import dev.droidtop.display.SecondScreenOrchestrator
 import dev.droidtop.shell.desktop.DesktopSessionMessage
 import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
+import dev.droidtop.shell.gamepad.input.PadGate
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.OnboardingGate
 import kotlinx.coroutines.flow.collectLatest
@@ -73,66 +72,25 @@ import kotlinx.coroutines.launch
  */
 class MainActivity : AppCompatActivity(), SecondScreenHost {
 
-    // Lazy: only ever touched from onResume/onPause/dispatchGenericMotionEvent/
-    // dispatchKeyEvent, all on the main thread, well after the window (and
-    // this Activity's own dispatchKeyEvent target) exists. See
-    // GamepadAxisNav's own doc comment -- Droidtop/tracker#1, a real
-    // gamepad's D-pad/stick reported through the joystick MotionEvent axes
-    // rather than real KeyEvents.
-    private val gamepadAxisNav by lazy { gamepadAxisNavFor(this, Handler(Looper.getMainLooper())) }
-
-    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        gamepadAxisNav.onGenericMotionEvent(event)
-        return super.dispatchGenericMotionEvent(event)
-    }
-
     /**
-     * Two jobs, both Droidtop/tracker#1/#43 (owner, on the console with a
-     * real gamepad): teach [gamepadAxisNav] about a (device, key) pair that
-     * ALSO sends real DPAD KeyEvents (so it stops translating just that
-     * exact key's own hat/stick motion -- a device sending both was
-     * doubling every press), and log every DPAD press, its source, and
-     * whether it was handled, so the owner's next on-console test can be
-     * read back from logcat without a debugger, since this session cannot
-     * reach the console itself to watch it live.
-     *
-     * `event.deviceId` is how "real" is told from "this app's own
-     * synthetic dispatch": a real hardware event always carries the
-     * originating `InputDevice`'s positive id; [GamepadAxisNav]'s own
-     * synthetic `KeyEvent`s (this class's own `gamepadAxisNavFor`, and
-     * `ForegroundShell.send` for the second screen) are built with no
-     * device id at all, which defaults to 0. Per-KEY, not per-device
-     * (Droidtop/tracker#1/#43, 2026-09-28): the Retroid Pocket 5's own pad
-     * sends DOWN/RIGHT as real KeyEvents but UP/LEFT only through the hat
-     * axis, so a device-wide dedupe here blinded [gamepadAxisNav] to the
-     * hat's own UP/LEFT the moment the first real DOWN arrived -- see
-     * [GamepadAxisNav]'s own "Per-KEY dedupe" doc comment.
+     * The front of the input pipeline for this window (docs/SPEC.md 6e,
+     * `PadGate`): bounce, the stick and hat as a D-pad, analog triggers,
+     * and a held Select, before any screen sees a press. Desktop mode hands
+     * the pad to the container (SPEC 6b), so the gate steps aside there and
+     * the stick's motion reaches the desktop surface untouched.
      */
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val dpadName = dpadKeyName(event.keyCode)
-        if (dpadName != null && event.deviceId > 0) gamepadAxisNav.noteRealDpadKeyEvent(event.deviceId, event.keyCode)
-        val handled = super.dispatchKeyEvent(event)
-        if (dpadName != null) {
-            val edge = when (event.action) {
-                KeyEvent.ACTION_DOWN -> "down"
-                KeyEvent.ACTION_UP -> "up"
-                else -> "action${event.action}"
-            }
-            val source = if (event.deviceId > 0) "key" else "axis"
-            android.util.Log.d(
-                "droidtop.input",
-                "$dpadName edge=$edge source=$source device=${event.deviceId} repeat=${event.repeatCount} handled=$handled",
-            )
-        }
-        return handled
-    }
+    private val padGate = PadGate(deliver = { event -> deliverKey(event) }, enabled = { mode != Mode.DESKTOP })
 
-    private fun dpadKeyName(keyCode: Int): String? = when (keyCode) {
-        KeyEvent.KEYCODE_DPAD_UP -> "UP"
-        KeyEvent.KEYCODE_DPAD_DOWN -> "DOWN"
-        KeyEvent.KEYCODE_DPAD_LEFT -> "LEFT"
-        KeyEvent.KEYCODE_DPAD_RIGHT -> "RIGHT"
-        else -> null
+    private fun deliverKey(event: KeyEvent): Boolean = super.dispatchKeyEvent(event)
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean =
+        padGate.dispatchMotion(event) || super.dispatchGenericMotionEvent(event)
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean = padGate.dispatchKey(event)
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        padGate.noteTouch(event)
+        return super.dispatchTouchEvent(event)
     }
 
     private lateinit var library: Library
@@ -505,7 +463,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // Same reasoning as ForegroundShell just above: a repeat in
         // flight must not keep firing dispatchKeyEvent into a window
         // that is no longer the one the user is looking at.
-        gamepadAxisNav.cancel()
+        padGate.cancel()
         // A navigation sample still sounding must not be cut mid-buffer
         // by the launched app opening its output (tracker#160).
         dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.fadeStop()

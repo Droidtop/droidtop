@@ -99,6 +99,7 @@ import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.handleGamepadKeyDown
 import dev.droidtop.shell.gamepad.input.HintRow
+import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.ownPadButtons
 import dev.droidtop.shell.gamepad.input.rememberHintList
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
@@ -386,9 +387,6 @@ fun GamepadShell(
     // Quick Menu still stacked on top, which read as "Gaming never
     // appears" even though mode had actually already resolved correctly.
     LaunchedEffect(deepLinkToken) { quickMenuOpen = false }
-    // Swallows the key-UP of the hold that opened the menu, so the
-    // shell's ordinary short-press Select action doesn't ALSO fire.
-    var swallowSelectUp by remember { mutableStateOf(false) }
     var displayChoice by remember {
         mutableStateOf<DisplayChoiceRequest?>(null)
     }
@@ -721,49 +719,43 @@ fun GamepadShell(
             // Outermost, so it sees only what nothing below wanted: the
             // shell owns the pad, and Android's generic fallbacks never
             // act on it (Modifier.ownPadButtons).
-            // Holding Select is the Quick Menu, decided HERE, on the way
-            // down, before any screen sees the press: a hold read on the
-            // way back up lost to whatever the screen underneath does with
-            // Select (the gamelist and library options took the press, and
-            // a held Select opened them instead: rig, dq-shell2-02). A hold
-            // is either the system's own key-repeat (a KeyDown with a
-            // repeat count) or, for a source that sends none, a KeyUp that
-            // came at least a long-press timeout after its KeyDown. Every
-            // edge of a hold is taken here, so the screen never sees a
-            // short press; a short press passes through untouched.
-            .onPreviewKeyEvent { event ->
-                if (GamepadKeyMap.actionFor(event.key) != GamepadAction.SELECT) return@onPreviewKeyEvent false
-                val native = event.nativeKeyEvent
-                when (event.type) {
-                    KeyEventType.KeyDown -> {
-                        if (native.repeatCount == 0) {
-                            // A fresh press: whatever an earlier hold left
-                            // behind is over (its KeyUp may have gone to the
-                            // Quick Menu's own window).
-                            swallowSelectUp = false
+            .ownPadButtons { backDispatcher?.onBackPressed() }
+            // What the whole shell means by a press, wherever it is: the
+            // Quick Menu and the sections. Closest to the content, so a
+            // screen that wants one of these presses for itself takes it
+            // first (docs/SPEC.md 6e).
+            .onPad { press ->
+                when (press.action) {
+                    // R2, the Quick Menu's own button (named by the R2 pill
+                    // in the top-right corner); a held Select arrives here
+                    // as R2 too, made by the pipeline's front (PadGate) for
+                    // pads whose triggers send no key. Start opens the same
+                    // menu (owner direction: "one obvious, consistent way
+                    // into Settings" -- the button most pads already read
+                    // as "menu"). The press opens; its release is this
+                    // owner's and goes nowhere, and a fresh press inside
+                    // the menu closes it there.
+                    GamepadAction.R2, GamepadAction.START -> {
+                        if (!quickMenuOpen) quickMenuOpen = true
+                        true
+                    }
+                    // L1/R1 cycle the sections -- the standard console-UI
+                    // pattern (Daijisho and most console launchers), which
+                    // works whatever has focus. Not over a game's detail.
+                    GamepadAction.L, GamepadAction.R -> {
+                        if (detailEntry != null) {
                             false
                         } else {
-                            if (!quickMenuOpen && !swallowSelectUp) quickMenuOpen = true
-                            swallowSelectUp = true
+                            val sections = sectionsFor(uiMode)
+                            val currentIndex = sections.indexOf(section)
+                            val step = if (press.action == GamepadAction.L) -1 else 1
+                            selectSection(sections[(currentIndex + step + sections.size) % sections.size])
                             true
                         }
-                    }
-                    KeyEventType.KeyUp -> when {
-                        swallowSelectUp -> {
-                            swallowSelectUp = false
-                            true
-                        }
-                        native.eventTime - native.downTime >=
-                            android.view.ViewConfiguration.getLongPressTimeout() -> {
-                            if (!quickMenuOpen) quickMenuOpen = true
-                            true
-                        }
-                        else -> false
                     }
                     else -> false
                 }
             }
-            .ownPadButtons { backDispatcher?.onBackPressed() }
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
                     lastInputMs.value = android.os.SystemClock.elapsedRealtime()
@@ -774,52 +766,7 @@ fun GamepadShell(
                         return@onKeyEvent true
                     }
                 }
-                // Quick Menu trigger: R2, the dedicated quick-device-
-                // management button (per direction), named on screen by
-                // the R2 pill in the top-right corner. KeyDown opens;
-                // the same press's KeyUp lands in the menu dialog, which
-                // swallows it, and a FRESH R2 press there toggles the
-                // menu closed.
-                if (GamepadKeyMap.actionFor(event.key) == GamepadAction.R2) {
-                    if (event.type == KeyEventType.KeyDown && !quickMenuOpen) {
-                        quickMenuOpen = true
-                    }
-                    return@onKeyEvent true
-                }
-                // Start/Menu opens the same menu (owner direction: "one
-                // obvious, consistent way into Settings" -- Start is the
-                // button most pads and most players already read as
-                // "menu", and it did nothing at all in the shell before
-                // this). Same KeyDown-opens contract as R2 above, and it
-                // is additive: R2 stays the one named on screen, this is
-                // muscle-memory support for a button that would otherwise
-                // sit dead in a gaming shell.
-                if (GamepadKeyMap.actionFor(event.key) == GamepadAction.START) {
-                    if (event.type == KeyEventType.KeyDown && !quickMenuOpen) {
-                        quickMenuOpen = true
-                    }
-                    return@onKeyEvent true
-                }
-                // HOLD Select stays as the fallback trigger for pads
-                // whose triggers are analog-only and never emit an R2
-                // KEY event at all -- a different failure domain, not a
-                // second mechanism for its own sake. repeatCount >= 2
-                // KeyDowns = the system's own key-repeat (~500ms), so
-                // short-press Select keeps its existing meaning.
-                if (event.type != KeyEventType.KeyUp || detailEntry != null) return@onKeyEvent false
-                val sections = sectionsFor(uiMode)
-                val currentIndex = sections.indexOf(section)
-                when (GamepadKeyMap.actionFor(event.key)) {
-                    GamepadAction.L -> {
-                        selectSection(sections[(currentIndex - 1 + sections.size) % sections.size])
-                        true
-                    }
-                    GamepadAction.R -> {
-                        selectSection(sections[(currentIndex + 1) % sections.size])
-                        true
-                    }
-                    else -> false
-                }
+                false
             },
     ) {
         // The screensaver owns the whole window: the tab bar and the hint

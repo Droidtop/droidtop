@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.PadModality
 
 /*
  * The Gaming shell's shared menu language, in one place. Its colours
@@ -114,21 +115,28 @@ internal val MenuListContentPadding: PaddingValues
  *
  * [rest] is the fill while not selected; [restOutline] is an optional
  * hairline kept while not selected (the cards keep [MenuTokens.CardOutline]).
+ *
+ * Drawn only while a pad or keyboard is driving ([PadModality], docs/
+ * SPEC.md 6e): on touch the selection is still there -- a tap moves it --
+ * but a ring on a row nobody is pressing reads as "the default".
  */
 fun Modifier.selectionFrame(
     selected: Boolean,
     shape: Shape,
     rest: Color = MenuTokens.Surface,
     restOutline: Color = Color.Transparent,
-): Modifier = this
-    .background(if (selected) MenuTokens.SurfaceSelected else rest, shape)
-    // Never a 0.dp border: Compose draws 0.dp (Dp.Hairline) as a 1px line,
-    // so "no ring" is a transparent colour, not a zero width.
-    .border(
-        width = if (selected) MenuTokens.FocusRingWidth else 1.dp,
-        color = if (selected) MenuTokens.Accent else restOutline,
-        shape = shape,
-    )
+): Modifier {
+    val shown = selected && PadModality.showsFocus
+    return this
+        .background(if (shown) MenuTokens.SurfaceSelected else rest, shape)
+        // Never a 0.dp border: Compose draws 0.dp (Dp.Hairline) as a 1px line,
+        // so "no ring" is a transparent colour, not a zero width.
+        .border(
+            width = if (shown) MenuTokens.FocusRingWidth else 1.dp,
+            color = if (shown) MenuTokens.Accent else restOutline,
+            shape = shape,
+        )
+}
 
 /**
  * The shell's one chip: a pill that is focusable for the pad and
@@ -177,9 +185,10 @@ internal fun ShellChip(
             .clickable(onClick = onClick)
             .then(
                 if (filled) {
+                    val ring = focused && PadModality.showsFocus
                     Modifier
-                        .background(if (focused) MenuTokens.Selected else MenuTokens.Accent, shape)
-                        .border(MenuTokens.FocusRingWidth, if (focused) MenuTokens.Accent else Color.Transparent, shape)
+                        .background(if (ring) MenuTokens.Selected else MenuTokens.Accent, shape)
+                        .border(MenuTokens.FocusRingWidth, if (ring) MenuTokens.Accent else Color.Transparent, shape)
                 } else {
                     Modifier.selectionFrame(focused, shape)
                 },

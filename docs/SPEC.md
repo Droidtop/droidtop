@@ -4385,6 +4385,126 @@ piece of state, each direction's echo is recognised as already-synced
 text and dropped. That is the whole loop-prevention mechanism and it
 lives in exactly one place, under unit test.
 
+## 6e. One input pipeline for the shell (decided 2026-09-30, Droidtop/tracker#152)
+
+The owner: "controls are a little finnicky, you can't scroll properly in
+the r2 menu ... I think we need to unify our control handler." An audit of
+the shell (coordination `design/input-audit-2026-09-30.md`) found 65
+separate places deciding what a press does, disagreeing on which edge of a
+press acts (33 handlers on the release, 7 on the press, 9 mixed), on how
+fast a held direction repeats (the device's own rate, the stick
+translator's, or not at all), on wrapping, on how the selection is kept in
+view, and on whether the face-button swap applies. A list that acts on the
+release cannot be held down at all: Android sends a held key's repeats as
+extra presses, so the R2 menu's tabs and every `MenuPanel` menu moved one
+row per press and never scrolled while held. The decision is one pipeline
+with three parts, and screens see only its output.
+
+**1. The front: one gate per window (`PadGate`, `shell-gamepad/input`).**
+Every window of the shell -- the activity and every Compose `Dialog`,
+which is a window of its own (`GatePadInThisDialog`) -- passes its key and
+joystick events through one gate before anything else sees them:
+
+- **Bounce.** A fresh press of a key less than 25 ms after that key's own
+  release is a worn or noisy switch: the press, its repeats and its
+  release are dropped.
+- **The stick and the hat are a D-pad.** Past half travel a direction is
+  pressed, back under 0.3 it is released (the band between is hysteresis,
+  inside it is the deadzone); the hat wins over the stick. A held stick is
+  a HELD key -- one DOWN, DOWNs with a rising repeat count at the
+  platform's own key-repeat timing, one UP -- exactly what a D-pad button
+  sends, so nothing downstream can tell them apart. The gate consumes the
+  joystick motion, so the platform's own joystick-to-D-pad conversion
+  (`ViewRootImpl`'s, with different thresholds and timing) never adds a
+  second set of presses. A device that also sends a real key for a
+  direction is not translated for that direction, per device and per key
+  (the Retroid Pocket 5 sends Down and Right as keys and Up and Left only
+  on the hat, tracker#1/#43).
+- **Analog triggers are buttons** on a pad that has no L2/R2 key: past
+  half travel they press `BUTTON_L2`/`BUTTON_R2` once, no repeat.
+- **A held Select is R2**, the Quick Menu's fallback for pads whose
+  triggers send nothing. Select is held back until it is released (one
+  Select press is delivered) or held for the long-press timeout (one R2
+  press is delivered, its release dropped); no screen ever sees half a
+  hold.
+- Desktop mode hands the pad to the container (§6b), so the activity's
+  gate steps aside there. Every D-pad edge is logged under
+  `droidtop.input` with what became of it, for console runs read back
+  from logcat.
+
+**2. One table: key to meaning (`GamepadKeyMap`).** `GamepadAction` is
+the vocabulary (ES-DE's own `es_input.xml` names, logical rather than
+physical): A accept, B back one level, X the focused thing's toggle, Y its
+detail, the four directions, L/R previous/next tab, R2 and Start the Quick
+Menu, Select options for where you are, L2 a PC game's own menu. Pad
+buttons and the keyboard are in the same table -- arrows, Enter = A,
+Escape = B, Space = X, Backspace = Y, the menu key = Select, F10 = R2, Page
+Up/Page Down and Shift+Tab/Tab = L1/R1 -- so no screen keeps a key list of
+its own. The face-button swap (§7b) applies to the pad's buttons and to
+DPAD_CENTER, which is what Android re-sends for an unhandled bottom face
+button; a keyboard's Enter always confirms and its Escape always cancels.
+The system back key is not a pad action: it belongs to the back
+dispatcher (`BackHandler`), so no key handler takes it and its long press
+still reaches the activity's mode switcher.
+
+**3. The edge rule and the cadence (`Modifier.onPad`).** A screen takes
+the pad with `onPad { press -> ... }` and gets a `PadPress`: an action,
+and whether it is a held direction coming round again. It never sees a
+key code or an edge.
+
+- **An action fires on the press.** Whoever takes a press owns it: its
+  repeats and its release come back to that owner and go nowhere else, and
+  a release whose press went somewhere else is nobody's. This one rule
+  replaces every guard the shell grew for the other half of a press
+  landing somewhere new (the R2 that opened the Quick Menu, a B that
+  closed a screen and then backed out of the one under it, a Select whose
+  release opened options).
+- **Buttons never repeat; a held direction steps at a cadence measured
+  from when it was pressed,** whatever rate the device repeats at, as real
+  ES-DE's `IList` scroll tiers (`es-core/src/components/IList.h:38-69`).
+  droidtop's own chrome (menus, settings, sheets, pickers, grids) uses
+  ES-DE's MEDIUM tiers: half a second before the first repeat, then every
+  180 ms, then every 80 ms after 1.6 s, so a long list runs smoothly and a
+  tap is never two steps. A themed ES-DE list uses ES-DE's own default,
+  QUICK (500 ms, then 114 ms, then every frame).
+- **Menus never wrap.** Real ES-DE's menus are `LIST_NEVER_LOOP`
+  (`ComponentList.cpp:17`): the cursor stops at both ends, held or not, so
+  a held direction can never spin round a menu (`menuStep`). A themed
+  gamelist keeps its own rule (§7f). A full-screen list leaves Up at its
+  first row unconsumed, so it reaches the safe-mode banner when there is
+  one and nothing otherwise; the top bar is never a focus target (§7j).
+- **The selection is always fully on screen,** by one mechanism per kind
+  of container: a lazy list or grid scrolls only as far as it takes to
+  show the selected row whole (`keepInView`), a scrolling column brings
+  the selected `MenuRow` into view, and a card grid moves through
+  `GridPad`. A held direction follows without animating each step, so the
+  scroll keeps up with the cursor instead of restarting an animation on
+  every repeat.
+
+**4. The selection is drawn only while a pad or keyboard drives
+(Droidtop/tracker#159).** Pointer and focus stay one selection: a tap
+moves it as surely as the D-pad does. But the ring and raised fill that
+mark it (`selectionFrame`, and the rows and buttons that draw their own)
+are drawn only while the last input was a pad or keyboard press
+(`PadModality`, set by the gate): a finger touching the screen hides them,
+and the next pad or keyboard press shows them again where the last tap
+left the selection. It starts as "a pad is attached", so a console opens
+with its selection visible and a phone without one does not. The first
+tester on a touch-only phone read a ring on one onboarding answer beside
+the tick on another as "the default", and the ring on an unpicked theme
+as the pick; a ring on something nobody is pressing is not information on
+a touch screen. A choice is never drawn with the ring: what is chosen
+carries the tick (or a chip's filled accent), what the pad is on carries
+the ring, and the two can sit on different rows without either reading as
+the other. A themed ES-DE view keeps its own selector, which is the
+theme's cursor in ES-DE too.
+
+Touch dispatches the same key events (`rememberGamepadTouch`), so a tapped
+hint is a press like any other. Raw passthrough to a guest is outside this
+pipeline by design: the Desktop seat (§6b), Wine's own input, the IME.
+Onboarding is its own activity with its own gate; the Standard launcher's
+View-based dialogs use Android's own focus handling.
+
 ## 7. Library / launcher-readiness
 
 `:library-core` models every runnable thing — native Android app, Wine
@@ -6879,15 +6999,9 @@ collection), interval, and a name overlay as their own rows. A on a
 slideshow or video launches the game shown; any other key wakes the
 shell. Android's own display timeout still powers the panel down, and
 the row says the screensaver shows only when its timer is the shorter.
-Holding Select for the Quick Menu is decided at the shell's root in the
-PREVIEW pass, on the way down, before any screen sees the press: a KeyDown
-with a repeat count, or a KeyUp a long-press timeout after its KeyDown for
-a source that sends no repeats. A hold takes every edge of the press, so
-the screen under it never sees a short press; a short press passes through
-untouched. Counting KeyDowns since the last KeyUp the root saw failed
-because a short press's KeyUp is taken by the menu it opens (dq-shell2-01),
-and reading the hold on the way back up lost to the screen that had already
-opened its options (dq-shell2-02). While the
+Holding Select for the Quick Menu belongs to the front of the input
+pipeline (§6e): a held Select becomes one R2 press before any screen sees
+it, and a tapped Select reaches the screen as one plain press. While the
 screensaver shows it has the whole window: the tab bar and the hint row
 stand down.
 The setting has one definition (`ScreensaverPrefs`) that the row writes
@@ -9435,7 +9549,7 @@ mechanism per job).
 
 **`Modifier.clickable()` is not "not focusable" (owner, on the console, 2026-09-28, Droidtop/tracker#1).** The rule two paragraphs up was real and the fix landed, but its mechanism was wrong: `SectionTabBar`'s tab labels (and the R2 Quick Menu pill beside them) kept only `.clickable(onClick = ...)` on the theory that a plain `clickable` with no explicit `.focusable()` could not be a focus target. It can -- `Modifier.clickable` always chains its own internal `.focusable()` so a hardware keyboard or gamepad can activate a clickable target, which is exactly the directional-search candidate this section already diagnosed once. Confirmed live: a uiautomator dump taken right after a cold launch showed the "Games" label itself `focused="true"`, before any Up press. The real fix is `Modifier.focusProperties { canFocus = false }` placed AHEAD of `.clickable()` in the same modifier chain -- it keeps the tap working while making that node genuinely unfocusable, the same pattern already proven for the touch hint bar (`TouchActions.kt`'s `TouchHint`, rig build 546). Applied to both the tab labels and the Quick Menu pill.
 
-**A gamepad's D-pad or stick can report through joystick axes, not KeyEvents (owner, on the console, 2026-09-28, Droidtop/tracker#1).** With the tab bar genuinely unfocusable, the owner's next report was "Up is now swallowed, not moved" on the real console with a real gamepad -- progress (nothing wrong gets selected) but still broken. droidtop's whole shell reads D-pad navigation exclusively through Compose's `Modifier.onKeyEvent` (`GamepadKeyMap`), which only ever sees real `KeyEvent`s; a controller whose D-pad is a hat switch (`AXIS_HAT_X`/`AXIS_HAT_Y`) or whose stick is used for navigation (`AXIS_X`/`AXIS_Y`) reports through `MotionEvent` instead, and the whole codebase had zero `onGenericMotionEvent`/`AXIS_HAT` handling anywhere -- a device reporting that way never reached any of this navigation code, key or no key, regardless of what else got fixed downstream. `GamepadAxisNav` (`app/src/main/kotlin/dev/droidtop/app/GamepadAxisNav.kt`) translates axis crossings into the same synthetic `KEYCODE_DPAD_*` down/up pair a physical button sends, dispatched through `Activity.dispatchKeyEvent` -- the identical route `ForegroundShell` already uses for the second screen's synthetic navigation keys, reaching the same Compose focus/key machinery a real D-pad reaches with no `INJECT_EVENTS` permission needed. Edge-triggered, plus a `Handler`-driven hold-repeat rather than one driven by incoming motion samples, since a stick held rock-steady at full deflection can stop producing new samples entirely. Wired into `MainActivity.dispatchGenericMotionEvent`, cancelled in `onPause` for the same reason `ForegroundShell` clears its own target there. UNVERIFIED beyond reading the platform APIs as of this entry -- neither rig (BlueStacks, the stock-Android emulator) can produce a real hat-switch or stick `MotionEvent`; only `input keyevent`, which always synthesizes a real `KeyEvent`. Needs a rig check on the actual console with the real gamepad.
+**A gamepad's D-pad or stick can report through joystick axes, not KeyEvents (owner, on the console, 2026-09-28, Droidtop/tracker#1).** A controller whose D-pad is a hat switch (`AXIS_HAT_X`/`AXIS_HAT_Y`), or whose stick is used to navigate, reports through `MotionEvent`s that no key handler ever sees; the Retroid Pocket 5 sends Down and Right as keys and Up and Left only on the hat. Turning that motion into D-pad keys is the front of the input pipeline's job (§6e, `PadGate`), per device and per key.
 
 **Left/Right's quicksysselect now reaches every real gamelist widget, not just droidtop's own grids (owner, on the console, 2026-09-28, Droidtop/tracker#43).** The rule above ("Left/Right switch the system... anywhere") was never actually true for a themed gamelist's own `textlist`/`grid` widgets: `EsDeTextList` unconditionally consumed Left/Right ("so a stray horizontal press can't escape the list and move Compose focus onto another surface") -- reasoning that predates the top-bar focus fix two entries up and was really defending against THAT bug; with the top bar genuinely unfocusable now, the swallow no longer protects anything and was quietly eating the real feature instead. `EsDeGrid` had the same gap in a different shape: Left/Right always stepped within the current row (`coerceIn`), with no edge case at all, unlike droidtop's own unthemed grids (`GridPad.kt`), which already stop and bubble at a real edge. Both widgets now take a `gamelist: Boolean` parameter (the flag already existed one level up, in `EsDeSystemListView`, for per-entry image resolution, but was never threaded down into the widgets that actually own the keys) and bubble Left/Right to `GamesSection`'s existing sibling-system handler at a genuine edge, ONLY when rendering a gamelist -- a system-level textlist/grid (browsing systems themselves, not a system's games) keeps its previous behaviour, since droidtop has no established meaning for Left/Right there and changing it without a theme to verify against would be an unrequested regression. UNVERIFIED on the console as of this entry, same reason as the axis entry above.
 

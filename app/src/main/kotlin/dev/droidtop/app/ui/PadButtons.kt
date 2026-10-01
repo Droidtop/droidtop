@@ -20,6 +20,7 @@ import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.currentShellWindow
 import dev.droidtop.shell.gamepad.Space
+import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.input.padSelectable
 
 /**
@@ -47,6 +48,8 @@ internal fun PadButton(
     color: Color = MenuTokens.Accent,
 ) {
     var focused by remember { mutableStateOf(false) }
+    // Drawn only while a pad or keyboard is driving (docs/SPEC.md 6e).
+    val ring = focused && PadModality.showsFocus
     val shape = RoundedCornerShape(50)
     Box(
         modifier = modifier
@@ -54,9 +57,9 @@ internal fun PadButton(
             .padSelectable(onFocus = { focused = it }, onPress = onClick)
             .background(if (filled) MenuTokens.Accent else Color.Transparent, shape)
             .border(
-                width = if (focused) MenuTokens.FocusRingWidth else 1.dp,
+                width = if (ring) MenuTokens.FocusRingWidth else 1.dp,
                 color = when {
-                    !focused -> Color.Transparent
+                    !ring -> Color.Transparent
                     filled -> MenuTokens.OnSurface
                     else -> MenuTokens.Accent
                 },
