@@ -4,6 +4,7 @@ import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
 import java.io.File
+import java.net.URI
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
@@ -149,6 +150,7 @@ object DownloadJobs {
 
     /** The post step that leaves the verified file where it landed; the caller takes it from [fileFor]. */
     const val POST_KEEP = "keep"
+    const val POST_PLACE_IN_FOLDER = "place_in_folder"
 
     const val DIGEST_MISMATCH = "the downloaded file does not match its published digest"
 
@@ -163,7 +165,7 @@ object DownloadJobs {
     private val posts = ConcurrentHashMap<String, DownloadPost>().apply { put(POST_KEEP, DownloadPost { _, _, _ -> "Downloaded" }) }
 
     /**
-     * Authorization-style headers are never written to the persisted job arguments (they would sit in
+     * Credential headers are never written to the persisted job arguments (they would sit in
      * plain text in the jobs store); they live here for the process, keyed by the file name. After a
      * restart a download Android no longer has is queued again without them and fails clearly.
      */
@@ -174,6 +176,16 @@ object DownloadJobs {
     /** Registers the runner with the one jobs registry. Called once at process start, before jobs are restored. */
     fun register(context: Context) {
         val appContext = context.applicationContext
+        registerPost(POST_PLACE_IN_FOLDER) { _, file, args ->
+            val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
+            withContext(Dispatchers.IO) {
+                require(destination.isDirectory || destination.mkdirs()) { "the game folder is not available" }
+                val target = File(destination, requireNotNull(args["targetName"]) { "the file name is missing" })
+                require(!target.exists()) { "a file with that name already exists" }
+                require(file.renameTo(target)) { "the download could not be placed in the game folder" }
+            }
+            "Added ${args["targetName"]}"
+        }
         FlutterRuntimeManager.registerDownloadPost()
         PythonRuntimeManager.registerDownloadPost()
         PluginJobsCenter.registerNative(
@@ -212,7 +224,10 @@ object DownloadJobs {
         extra: Map<String, String> = emptyMap(),
         onStatus: (String) -> Unit = {},
     ): PluginResult {
-        val (secret, plain) = headers.entries.partition { it.key.equals("Authorization", ignoreCase = true) }
+        val (secret, plain) = headers.entries.partition { entry ->
+            listOf("authorization", "proxy-authorization", "cookie", "credential", "token", "api-key", "secret")
+                .any { marker -> entry.key.contains(marker, ignoreCase = true) }
+        }
         if (secret.isNotEmpty()) secretHeaders[name] = secret.associate { it.key to it.value }
         val args = buildMap {
             putAll(extra)
@@ -353,5 +368,38 @@ object DownloadJobs {
             }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+}
+
+/** Additive contract-2 acquire result field, kept separate from the plugin's own job implementation. */
+data class AcquireDownloadDescriptor(
+    val url: String,
+    val headers: Map<String, String>,
+    val fileName: String,
+    val sha256: String?,
+    val size: Long?,
+) {
+    companion object {
+        fun parse(json: String?): AcquireDownloadDescriptor? = runCatching {
+            val value = JSONObject(requireNotNull(json))
+            val url = value.getString("url")
+            val parsedUrl = URI(url)
+            require(parsedUrl.scheme in setOf("http", "https") && !parsedUrl.host.isNullOrBlank())
+            val fileName = value.getString("fileName")
+            require(fileName.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))
+            val digest = value.optString("sha256").takeIf { it.isNotEmpty() }
+            require(digest == null || digest.matches(Regex("[A-Fa-f0-9]{64}")))
+            val size = if (value.has("size") && !value.isNull("size")) value.getLong("size") else null
+            require(size == null || size > 0)
+            val headersJson = value.optJSONObject("headers")
+            val headers = buildMap {
+                headersJson?.keys()?.forEach { key ->
+                    val headerValue = headersJson.getString(key)
+                    require(key.isNotBlank() && headerValue.isNotBlank())
+                    put(key, headerValue)
+                }
+            }
+            AcquireDownloadDescriptor(url, headers, fileName, digest, size)
+        }.getOrNull()
     }
 }

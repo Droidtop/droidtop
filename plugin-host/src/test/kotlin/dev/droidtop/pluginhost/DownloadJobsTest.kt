@@ -61,6 +61,26 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun acquireDownloadDescriptorParsesOptionalMetadataAndHeaders() {
+        val descriptor = AcquireDownloadDescriptor.parse(
+            """{"url":"https://example.invalid/game.zip","headers":{"Authorization":"Bearer secret","Accept":"application/zip"},"fileName":"game.zip","size":1234}""",
+        )!!
+        assertEquals("https://example.invalid/game.zip", descriptor.url)
+        assertEquals(mapOf("Authorization" to "Bearer secret", "Accept" to "application/zip"), descriptor.headers)
+        assertEquals("game.zip", descriptor.fileName)
+        assertEquals(1234L, descriptor.size)
+        assertNull(descriptor.sha256)
+    }
+
+    @Test
+    fun acquireDownloadDescriptorRejectsUnsafeOrInvalidFields() {
+        assertNull(AcquireDownloadDescriptor.parse("""{"url":"file:///etc/passwd","fileName":"game.zip"}"""))
+        assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"../game.zip"}"""))
+        assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"game.zip","size":0}"""))
+        assertNull(AcquireDownloadDescriptor.parse("not json"))
+    }
+
+    @Test
     fun statusAndReasonMapToTheJobState() {
         assertEquals(DownloadState.Waiting("Waiting to start"), DownloadState.of(snapshot(DownloadManager.STATUS_PENDING)))
         assertEquals(DownloadState.Running(25, 25, 100), DownloadState.of(snapshot(DownloadManager.STATUS_RUNNING, downloaded = 25, total = 100)))

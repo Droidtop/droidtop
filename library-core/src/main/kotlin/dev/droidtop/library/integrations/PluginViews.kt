@@ -22,6 +22,8 @@ import dev.droidtop.pluginhost.PluginResult
 import dev.droidtop.pluginhost.PluginRunner
 import dev.droidtop.pluginhost.PluginView
 import dev.droidtop.pluginhost.PluginViewCall
+import dev.droidtop.pluginhost.AcquireDownloadDescriptor
+import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.ViewAction
 import dev.droidtop.pluginhost.ViewNode
 import java.util.concurrent.ConcurrentHashMap
@@ -328,7 +330,32 @@ private class PluginPage(
                 PluginViewCall.replyMessage(reply.data) ?: "Done"
             }
             ViewAction.Kind.JOB -> {
-                val result = PluginViews.runJob(context, record, point, action.op, callArgs, action.title ?: label, onStatus)
+                var result = PluginViews.runJob(context, record, point, action.op, callArgs, action.title ?: label, onStatus)
+                if (result.ok && point == "library.sources" && action.op == "acquire") {
+                    val rawDescriptor = result.values["download"]
+                    if (rawDescriptor != null) {
+                        val descriptor = AcquireDownloadDescriptor.parse(rawDescriptor)
+                        val destination = hostContext.optString("destination").takeIf { it.isNotBlank() }
+                        result = if (descriptor == null) {
+                            PluginResult.failure("${record.manifest.label} returned an invalid download descriptor")
+                        } else if (destination == null) {
+                            PluginResult.failure("the game folder is not available")
+                        } else {
+                            DownloadJobs.run(
+                                context = context,
+                                title = action.title ?: label,
+                                post = DownloadJobs.POST_PLACE_IN_FOLDER,
+                                url = descriptor.url,
+                                name = "acquire_${System.currentTimeMillis()}_${descriptor.fileName}",
+                                sha256 = descriptor.sha256,
+                                maxBytes = descriptor.size ?: 0L,
+                                headers = descriptor.headers,
+                                extra = mapOf("destinationPath" to destination, "targetName" to descriptor.fileName),
+                                onStatus = onStatus,
+                            )
+                        }
+                    }
+                }
                 onJobDone(context, result)
                 val replaced = result.values["view"]?.let { text -> runCatching { PluginView.parse(JSONObject(text)) }.getOrNull() }
                 if (replaced != null) show(replaced) else stale = op != null

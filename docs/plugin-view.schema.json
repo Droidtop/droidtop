@@ -16,6 +16,18 @@
     }
   },
   "$defs": {
+    "acquireDownload": {
+      "type": "object",
+      "required": ["url", "fileName"],
+      "properties": {
+        "url": { "type": "string", "format": "uri", "pattern": "^https?://" },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Credential values are held in memory only by droidtop and are not persisted with the job." },
+        "fileName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "size": { "type": "integer", "minimum": 1, "description": "Maximum accepted bytes." }
+      },
+      "additionalProperties": false
+    },
     "section": {
       "type": "object",
       "required": ["items"],

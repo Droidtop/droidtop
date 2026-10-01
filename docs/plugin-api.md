@@ -427,7 +427,21 @@ no destination, such as the PC library). Ops:
 - `acquire {ref, values, context}` → a **job**. It writes only into
   `context.destination`. When it succeeds droidtop rescans the library, so
   the new game appears; results become games only through that scan (12a,
-  A10).
+  A10). Additive reply: a successful job may return `download` as a JSON
+  string containing `{url, headers?, fileName, sha256?, size?}` instead of
+  downloading the file itself. `url` is HTTP(S); `fileName` is a bare file
+  name; `sha256` is 64 hexadecimal characters and `size` is a positive
+  byte count used as a size cap. droidtop queues it through DownloadManager
+  into its own downloads area, then places it in `context.destination` and
+  rescans. Credential headers (Authorization, cookies, token and key
+  headers) remain in memory only. A plugin may omit `download` and continue
+  doing its own transfer as before.
+
+This reply extension is part of the additive 1.6 acquire contract; it does
+not change the view document's `view: 1` or the manifest's
+`contractVersion: 2`. The JSON shape is also recorded in
+`docs/plugin-view.schema.json` under `$defs.acquireDownload` for plugin
+authors and tooling.
 
 A source that fails `search` with a setup problem answers FAILED with a
 plain sentence ("The game index is not downloaded yet"); droidtop shows it
