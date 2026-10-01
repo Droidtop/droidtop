@@ -46,6 +46,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.datastore.preferences)
     // Bundle payloads are tar.xz (docs/SPEC.md 12a), same tooling choice
     // droidtop already made for OCI layers (runtime-common's
     // OciFlattener): commons-compress needs org.tukaani:xz on the

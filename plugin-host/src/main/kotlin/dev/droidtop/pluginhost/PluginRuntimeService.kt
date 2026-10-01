@@ -286,7 +286,11 @@ class PluginRuntimeService : Service() {
             }
             val progress = object : PluginJobProgress {
                 override fun report(percent: Int, statusLine: String) {
-                    broadcastJobProgress(pluginId, jobId, percent, statusLine)
+                    broadcastJobProgress(pluginId, jobId, percent, statusLine, null)
+                }
+
+                override fun checkpoint(percent: Int, statusLine: String, resumePayload: String?) {
+                    broadcastJobProgress(pluginId, jobId, percent, statusLine, resumePayload?.takeIf { it.length <= MAX_RESUME_PAYLOAD_CHARS })
                 }
 
                 override fun complete(result: PluginResult) {
@@ -352,11 +356,11 @@ class PluginRuntimeService : Service() {
      * dead or misbehaving callback (`runCatching` per item) never stops
      * the rest from being delivered.
      */
-    private fun broadcastJobProgress(pluginId: String, jobId: String, percent: Int, statusLine: String) = synchronized(broadcastLock) {
+    private fun broadcastJobProgress(pluginId: String, jobId: String, percent: Int, statusLine: String, resumePayload: String?) = synchronized(broadcastLock) {
         val n = callbacks.beginBroadcast()
         try {
             for (i in 0 until n) {
-                runCatching { callbacks.getBroadcastItem(i).onJobProgress(pluginId, jobId, percent, statusLine) }
+                runCatching { callbacks.getBroadcastItem(i).onJobProgress(pluginId, jobId, percent, statusLine, resumePayload) }
             }
         } finally {
             callbacks.finishBroadcast()
@@ -490,6 +494,7 @@ class PluginRuntimeService : Service() {
     private fun deviceHasRoot(): Boolean = deviceHasRootCached
 
     companion object {
+        private const val MAX_RESUME_PAYLOAD_CHARS = 4096
         fun bindIntent(context: Context): Intent = Intent(context, PluginRuntimeService::class.java)
 
         // The lightweight, no-client-library Shizuku check (PluginApi.kt's

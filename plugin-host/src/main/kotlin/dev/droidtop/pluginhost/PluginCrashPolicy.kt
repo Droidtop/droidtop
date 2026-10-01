@@ -20,9 +20,10 @@ import kotlinx.coroutines.withContext
  */
 class PluginCrashPolicy(
     private val context: Context,
-    private val onJobProgress: (pluginId: String, jobId: String, percent: Int, statusLine: String) -> Unit = { _, _, _, _ -> },
+    private val onJobProgress: (pluginId: String, jobId: String, percent: Int, statusLine: String, resumePayload: String?) -> Unit = { _, _, _, _, _ -> },
     private val onJobComplete: (pluginId: String, jobId: String, result: PluginResult) -> Unit = { _, _, _ -> },
 ) : PluginJobRunner {
+    override val supportsCheckpointResume: Boolean get() = true
     private val runner: NativePluginRunner = NativePluginRunner(context, ::onCrash, onJobProgress, onJobComplete)
 
     private fun onCrash(pluginId: String, capability: String, reason: String) {
@@ -131,6 +132,16 @@ class PluginCrashPolicy(
         if (!runner.load(record, dir.absolutePath)) return false
         return runner.startJob(record.manifest.id, capability, args, jobId)
     }
+
+    override fun pauseJob(pluginId: String, jobId: String, resumePayload: String): Boolean {
+        runner.cancelJob(pluginId, jobId)
+        return true
+    }
+
+    override suspend fun resumeJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String, resumePayload: String): Boolean =
+        startJob(record, capability, args + (RESUME_PAYLOAD_ARG to resumePayload), jobId)
+
+    companion object { const val RESUME_PAYLOAD_ARG = "droidtop.resume_payload" }
 
     /**
      * Fires [event] at [record] and returns its answer, or null when

@@ -90,6 +90,8 @@ interface DroidtopPlugin {
 /** What a plugin calls from inside [DroidtopPlugin.startJob] to report progress and, exactly once, completion. */
 interface PluginJobProgress {
     fun report(percent: Int, statusLine: String)
+    /** Reports an opaque, small checkpoint for a later restart. Null clears it. */
+    fun checkpoint(percent: Int, statusLine: String, resumePayload: String?) = report(percent, statusLine)
     fun complete(result: PluginResult)
 }
 

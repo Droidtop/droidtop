@@ -27,7 +27,7 @@ import org.json.JSONObject
 class NativePluginRunner(
     private val context: Context,
     private val onCrash: (pluginId: String, capability: String, reason: String) -> Unit,
-    private val onJobProgress: (pluginId: String, jobId: String, percent: Int, statusLine: String) -> Unit = { _, _, _, _ -> },
+    private val onJobProgress: (pluginId: String, jobId: String, percent: Int, statusLine: String, resumePayload: String?) -> Unit = { _, _, _, _, _ -> },
     private val onJobComplete: (pluginId: String, jobId: String, result: PluginResult) -> Unit = { _, _, _ -> },
 ) : PluginRunner {
     private var connection: IPluginRuntime? = null
@@ -81,8 +81,8 @@ class NativePluginRunner(
                         onCrash(pluginId, capability, reason)
                     }
 
-                    override fun onJobProgress(pluginId: String, jobId: String, percent: Int, statusLine: String) {
-                        this@NativePluginRunner.onJobProgress(pluginId, jobId, percent, statusLine)
+                    override fun onJobProgress(pluginId: String, jobId: String, percent: Int, statusLine: String, resumePayload: String?) {
+                        this@NativePluginRunner.onJobProgress(pluginId, jobId, percent, statusLine, resumePayload)
                     }
 
                     override fun onJobComplete(pluginId: String, jobId: String, resultJson: String) {

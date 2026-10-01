@@ -103,6 +103,17 @@ object PluginJobsScreen {
             confirmTitle = "Cancel this job?",
             run = { PluginJobsCenter.cancel(entry.jobId) },
         )
-        return listOf(progressRow, cancelRow)
+        val controls = buildList {
+            add(progressRow)
+            if (entry.pausable && entry.resumable && (entry.paused || entry.resumePayload != null)) {
+                add(ActionItem(
+                    id = "plugin_job_${entry.jobId}_${if (entry.paused) "resume" else "pause"}",
+                    title = if (entry.paused) "Resume \"${entry.title}\"" else "Pause \"${entry.title}\"",
+                    run = { if (entry.paused) PluginJobsCenter.resume(entry.jobId) else PluginJobsCenter.pause(entry.jobId) },
+                ))
+            }
+            add(cancelRow)
+        }
+        return controls
     }
 }

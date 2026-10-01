@@ -11,8 +11,15 @@ package dev.droidtop.pluginhost
  * `PluginJobsCenterTest.kt`.
  */
 interface PluginJobRunner {
+    val supportsCheckpointResume: Boolean get() = false
     /** Starts [capability]'s job for [record] under the given [jobId] (chosen by the caller -- see [IPluginRuntime.startJob]'s own doc comment for why). Returns false when refused outright. */
     suspend fun startJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String): Boolean
+
+    /** Stops at the runner's next cooperative boundary; false means unsupported. */
+    fun pauseJob(pluginId: String, jobId: String, resumePayload: String): Boolean = false
+
+    /** Restarts a paused job with its last checkpoint; false means unsupported. */
+    suspend fun resumeJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String, resumePayload: String): Boolean = false
 
     fun cancelJob(pluginId: String, jobId: String)
 

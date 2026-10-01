@@ -373,6 +373,15 @@ no contract 1 capability (`ui.quick_tile`) cannot run jobs yet. Progress
 and completion are the existing `jobProgress`/`jobComplete` shape; a
 completion's `values` may carry `message`.
 
+For a resumable native job, `PluginJobProgress.checkpoint(percent,
+statusLine, resumePayload)` reports an opaque checkpoint of at most 4096
+characters along with progress. The host retains the last checkpoint.
+Pause calls `cancelJob(jobId)`; the plugin must stop cooperatively after
+its current unit of work. Resume calls `startJob` again with the same job
+id and original arguments, plus `droidtop.resume_payload` containing that
+checkpoint. Jobs that have not reported a checkpoint cannot be paused from
+the host UI.
+
 **The plugin is named on every page.** A rendered page's subtitle is the
 view's own `subtitle` or "From <plugin label>", and its title is the view's
 title or the plugin's label. A view cannot set droidtop's title bar, hint

@@ -19,7 +19,7 @@ oneway interface IPluginRuntimeCallback {
     void onPluginCrashed(String pluginId, String capability, String reason);
 
     /** One progress tick for a job started with {@link IPluginRuntime#startJob}. percent is -1 for indeterminate. */
-    void onJobProgress(String pluginId, String jobId, int percent, String statusLine);
+    void onJobProgress(String pluginId, String jobId, int percent, String statusLine, String resumePayload);
 
     /** Fired exactly once per job, success or failure -- resultJson is the same shape {@link IPluginRuntime#invoke} returns. */
     void onJobComplete(String pluginId, String jobId, String resultJson);

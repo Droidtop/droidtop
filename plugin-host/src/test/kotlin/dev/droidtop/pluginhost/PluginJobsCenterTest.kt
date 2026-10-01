@@ -1,6 +1,8 @@
 package dev.droidtop.pluginhost
 
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -46,16 +48,22 @@ class PluginJobsCenterTest {
 
     /** A [PluginJobRunner] whose [startJob] hands the test full manual control over when (and with what jobId) progress/completion fire. */
     private class FakeJobRunner(
-        private val onJobProgress: (pluginId: String, jobId: String, percent: Int, statusLine: String) -> Unit,
+        private val onJobProgress: (pluginId: String, jobId: String, percent: Int, statusLine: String, resumePayload: String?) -> Unit,
         private val onJobComplete: (pluginId: String, jobId: String, result: PluginResult) -> Unit,
         private val onStart: (FakeJobRunner) -> Boolean = { true },
     ) : PluginJobRunner {
+        override val supportsCheckpointResume: Boolean get() = true
         lateinit var pluginId: String
             private set
         var cancelledJobId: String? = null
             private set
         var shutdownCalled = false
             private set
+        var pauseCalled = false
+            private set
+        var resumedPayload: String? = null
+            private set
+        val resumed = CountDownLatch(1)
 
         override suspend fun startJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String): Boolean {
             pluginId = record.manifest.id
@@ -66,11 +74,19 @@ class PluginJobsCenterTest {
             cancelledJobId = jobId
         }
 
+        override fun pauseJob(pluginId: String, jobId: String, resumePayload: String): Boolean { pauseCalled = true; return true }
+
+        override suspend fun resumeJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String, resumePayload: String): Boolean {
+            resumedPayload = resumePayload
+            resumed.countDown()
+            return true
+        }
+
         override fun shutdown() {
             shutdownCalled = true
         }
 
-        fun fireProgress(jobId: String, percent: Int, statusLine: String) = onJobProgress(pluginId, jobId, percent, statusLine)
+        fun fireProgress(jobId: String, percent: Int, statusLine: String, checkpoint: String? = null) = onJobProgress(pluginId, jobId, percent, statusLine, checkpoint)
         fun fireComplete(jobId: String, result: PluginResult) = onJobComplete(pluginId, jobId, result)
     }
 
@@ -198,5 +214,45 @@ class PluginJobsCenterTest {
         assertNull("job A's runner must not see a cancel meant for job B", fakes[0].cancelledJobId)
         assertEquals(jobB, fakes[1].cancelledJobId)
         assertFalse(fakes[0].shutdownCalled)
+    }
+
+    @Test
+    fun pausableJobKeepsCheckpointAcrossPauseAndResumeThenCompletes() = runBlocking {
+        lateinit var fake: FakeJobRunner
+        PluginJobsCenter.runnerFactory = { _, onProgress, onComplete -> FakeJobRunner(onProgress, onComplete).also { fake = it } }
+        val id = PluginJobsCenter.start(null, record("droidtop.checkpoint"), PluginCapability.APP_STATUS, mapOf("seed" to "x"), "Checkpoint job", pausable = true, resumable = true)!!
+        fake.fireProgress(id, 35, "Working", "part-35")
+        assertTrue(PluginJobsCenter.pause(id))
+        assertTrue(fake.pauseCalled)
+        assertTrue(PluginJobsCenter.find(id)!!.paused)
+        assertEquals("part-35", PluginJobsCenter.find(id)!!.resumePayload)
+        assertTrue(PluginJobsCenter.resume(id))
+        assertFalse(PluginJobsCenter.find(id)!!.paused)
+        assertTrue(fake.resumed.await(2, TimeUnit.SECONDS))
+        assertEquals("part-35", fake.resumedPayload)
+        fake.fireComplete(id, PluginResult.success())
+        assertTrue(PluginJobsCenter.find(id)!!.done)
+    }
+
+    @Test
+    fun resumableJobCanBeCancelled() = runBlocking {
+        lateinit var fake: FakeJobRunner
+        PluginJobsCenter.runnerFactory = { _, onProgress, onComplete -> FakeJobRunner(onProgress, onComplete).also { fake = it } }
+        val id = PluginJobsCenter.start(null, record("droidtop.cancel-resumable"), PluginCapability.APP_STATUS, emptyMap(), "Cancelable", pausable = true, resumable = true)!!
+        fake.fireProgress(id, 10, "Working", "checkpoint")
+        PluginJobsCenter.cancel(id)
+        assertEquals(id, fake.cancelledJobId)
+        assertNull(PluginJobsCenter.find(id))
+    }
+
+    @Test
+    fun persistenceRoundTripRestoresResumableEntryPausedWithCheckpoint() {
+        val original = PluginJobsCenter.Entry("persist-id", "droidtop.persist", "Persist", PluginCapability.APP_STATUS, "Persist job", 123L,
+            percent = 42, statusLine = "Working", pausable = true, resumable = true, resumePayload = "chunk-42")
+        val restored = PluginJobsCenter.decodeEntries(PluginJobsCenter.encodeEntries(listOf(original))).single()
+        assertEquals(original.jobId, restored.jobId)
+        assertEquals(original.percent, restored.percent)
+        assertEquals("chunk-42", restored.resumePayload)
+        assertTrue(restored.paused)
     }
 }
