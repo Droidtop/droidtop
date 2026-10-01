@@ -166,7 +166,7 @@ internal fun SectionTabBar(
                 StatusCluster(showBatteryPercent = false, onClick = onQuickMenu)
             }
             Box(Modifier.padding(start = 12.dp)) { quickMenu() }
-            LaunchedEffect(current, tabRevision.value) {
+            LaunchedEffect(current, tabRevision.value, rowX.value, rowW.value) {
                 val i = sections.indexOf(current)
                 if (i < 0) return@LaunchedEffect
                 val x = tabBounds[i * 2]
