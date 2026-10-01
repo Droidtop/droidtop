@@ -29,6 +29,9 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // First, because everything else asks it what to start. Also
         // where the one-time Handheld -> Gaming preference migration runs.
         Modes.load(appContext)
+        // Native jobs register before attach restores any, so a paused scrape found on
+        // disk can be resumed (docs/SPEC.md 12a "Jobs").
+        dev.droidtop.library.scraper.LibraryScrapeJob.register(appContext)
         dev.droidtop.pluginhost.PluginJobsCenter.attach(appContext)
         AppSettingsCatalogs.ensureRegistered()
         dev.droidtop.library.settings.LibraryRescan.handler = { ctx, onStatus ->

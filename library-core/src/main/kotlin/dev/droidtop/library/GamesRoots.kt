@@ -153,6 +153,8 @@ object GamesRoots {
                     if (walking == now) walking = null
                     if (signature(context) == now) markScanned(context)
                     ScanLog.write("games roots walked: ${current(context).joinToString { it.absolutePath }}")
+                    // The first finished walk is when "fetch box art?" is asked (docs/SPEC.md 7h).
+                    dev.droidtop.library.scraper.ScrapeOffer.walkFinished(context, library.backgroundScanState(kinds).value?.size ?: 0)
                 }
             } else {
                 null

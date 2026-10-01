@@ -7,6 +7,7 @@ import dev.droidtop.library.consoles.GameMetadataEntity
 import dev.droidtop.library.consoles.RomDatabase
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 // The scrape ENGINE, moved here from :app (directed: actions live on
@@ -26,6 +27,15 @@ suspend fun scrapeSystemArtwork(
     // whole-library pass stops there rather than asking the same source
     // about every other system only to be refused again.
     onRefusedEverything: () -> Unit = {},
+    // The library-scrape job's checkpoint (docs/SPEC.md 12a "Jobs"): the
+    // ROM the previous run finished last. The walk is sorted, so every
+    // ROM up to and including it is skipped before the scrape filter
+    // applies, whatever that filter later makes of the games already
+    // done. A ROM no longer in the folder means a start from the top.
+    resumeAfter: File? = null,
+    // Told after each ROM has been fully handled, never for one a pause
+    // or cancel interrupted.
+    onRomDone: (File) -> Unit = {},
     onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): String = withContext(Dispatchers.IO) {
     // A source that cannot be asked at all (a key that is not set) says
@@ -51,7 +61,9 @@ suspend fun scrapeSystemArtwork(
     if (!wantMetadata && !wantArtwork) {
         return@withContext "${system.displayName}: both content types are disabled in scrape options."
     }
-    val missing = romFiles.filter { romFile ->
+    val resumeIndex = resumeAfter?.let { after -> romFiles.indexOfFirst { it.absolutePath == after.absolutePath } } ?: -1
+    val candidates = if (resumeIndex >= 0) romFiles.drop(resumeIndex + 1) else romFiles
+    val missing = candidates.filter { romFile ->
         val noArt = EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension) == null
         val noMeta = romFile.absolutePath !in existingMetadataIds
         when (filter) {
@@ -68,7 +80,9 @@ suspend fun scrapeSystemArtwork(
         missing
     }
     if (targets.isEmpty()) {
-        return@withContext if (onlyRom != null) {
+        return@withContext if (resumeIndex >= 0 && candidates.isEmpty()) {
+            "${system.displayName}: nothing was left to scrape."
+        } else if (onlyRom != null) {
             "${system.displayName}: ${onlyRom.name} isn't in this folder's scan."
         } else {
             "${system.displayName}: nothing matches the \"${filter.label}\" scrape filter."
@@ -128,6 +142,8 @@ suspend fun scrapeSystemArtwork(
         // to learn nothing. Stop once the refusals are plainly not about
         // any individual game, and report what the server said.
         if (consecutiveRefusals >= REFUSAL_ABORT_THRESHOLD) return@forEachIndexed
+        // A pause or cancel lands here, between games, never inside one.
+        kotlin.coroutines.coroutineContext.ensureActive()
         onProgress(index, targets.size)
         attempted++
         try {
@@ -363,9 +379,11 @@ suspend fun scrapeSystemArtwork(
                 refused++
             }
         } catch (t: Exception) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
             failed++
             android.util.Log.e("droidtop.Scraper", "Failed to scrape ${romFile.name}", t)
         }
+        onRomDone(romFile)
     }
     } finally {
         pluginSession?.close()

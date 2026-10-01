@@ -3647,6 +3647,8 @@ one:
 
   **Pausable jobs (Droidtop/tracker#174):** a runner opts into checkpoint resume, and only jobs that declare resumability and have reported a checkpoint expose Pause. `PluginJobProgress.checkpoint` reports progress plus a bounded opaque payload; Pause asks the runner to cancel at its cooperative boundary and retains the last payload. Resume starts the same job again with that payload under `droidtop.resume_payload` in its arguments. DataStore persists resumable job identity, arguments and checkpoint off the main thread; restored work is paused and can be restarted if its plugin and capability are still available. Jobs without runner support or a checkpoint remain non-pausable.
 
+  **Native jobs (Droidtop/tracker#174):** work droidtop does itself (today the library scrape, §7h) is not a plugin and has no process to resume, but it is the same kind of long-running job, so it joins the same list rather than growing a second one. `PluginJobsCenter.registerNative(kind, runner)` registers a runner at process start (before `attach` restores anything); `startNative` tracks a job of that kind in the one `entries()` list as a pausable, resumable entry owned by "Library". The runner gets its arguments and the last checkpoint and reports `(percent, status, checkpoint)`; Pause cancels its coroutine and keeps the checkpoint, Resume runs it again from that checkpoint, a restart restores it paused with its arguments, and Cancel drops it. Starting a job of the same kind and arguments as one already running or paused returns that job. The jobs screen shows native and plugin jobs identically.
+
 ## 5. Windows compatibility — no real virtualization
 
 Confirmed via research, treat as settled: genuine hardware-accelerated x86
@@ -8666,6 +8668,44 @@ coroutine and returns, while `candidateFolders()` reads synchronously, so
 the first scan after an install read the EMPTY set. That is why build 537
 (upgraded, with a previous run's value in the preference) listed 171 games
 and a freshly installed 539 listed 151 with every folder game missing.
+
+### The library scrape is a job, and the first walk offers it (Droidtop/tracker#174)
+
+A scrape that takes an hour on the anonymous tier must not be a button that
+holds a screen. There is **one way to run a library scrape**:
+`LibraryScrapeJob.start`, which registers a native job with `PluginJobsCenter`
+(§12a "Jobs") and so shows in "Downloads and installs" with Pause, Resume and
+Cancel. The Games options menu ("Scrape all systems", "Scrape this system")
+and the per-system Settings row ("Scrape missing artwork & metadata") only
+start it, or find the same job already running or paused. The direct menu
+path and the Settings `AsyncActionItem` that ran `scrapeSystemArtwork` are
+gone; the one-game "Scrape" chip on a game's own page is a single request and
+stays direct.
+
+- **The checkpoint is the position in the scrape queue:** the system folder
+  being scraped and the last ROM of it that finished. The queue is the
+  library's system folders in their usual order, rebuilt after a restart; a
+  resume carries on in the checkpoint's folder after its ROM
+  (`scrapeSystemArtwork(resumeAfter)`, applied to the sorted walk before the
+  scrape filter, so the filter cannot shift the position) and then through the
+  rest of the queue. A folder that is gone from the queue starts from the top.
+  A pause or cancel lands between two games, never inside one.
+- **The rate limit is not the job's business.** Every request still goes
+  through `ScreenScraperClient`'s anonymous pacing and quota backoff, so a
+  paused, resumed or restarted job cannot ask faster than a fresh one.
+- **A restart restores the job paused** (DataStore, §12a); the person resumes
+  it from the jobs screen. The summary sentence a run ends with is what the
+  list shows for the finished job.
+
+**The one-time offer.** When the library's first walk of the games roots
+finishes with games on it, droidtop asks "Fetch box art and details for your
+games?" once (`ScrapeOffer`, the shell's `ScrapeOfferDialog` on the §6e input
+pipeline: A on "Fetch now", B or "No thanks" declines). The answer is stored
+at once and the question is never raised again; a question the process dies
+before the person answers is restored. Settings > Scraper > "After the first
+library scan" shows the answer and changes it: *Ask me* (the unanswered state,
+and the only one that asks), *Fetch automatically* (a later finished walk of
+changed games roots starts the scrape without a question) and *Don't fetch*.
 
 ## 7i. The PC surface — droidtop's own actions, on the theme's own layout (REDECIDED 2026-09-26)
 

@@ -33,7 +33,7 @@ object PluginJobsScreen {
     fun screen(): CatalogScreen = CatalogScreen(
         id = ID,
         title = "Downloads and installs",
-        subtitle = "Plugin downloads and long-running actions, wherever they were started from",
+        subtitle = "Plugin downloads, library scrapes and other long-running actions, wherever they were started from",
         groups = { _ ->
             val snapshot = PluginJobsCenter.entries().value
             listOf(
@@ -56,7 +56,7 @@ object PluginJobsScreen {
 
     private fun jobItems(entry: PluginJobsCenter.Entry): List<CatalogItem> {
         if (entry.done) {
-            val outcome = if (entry.result?.ok == true) "Done" else (entry.result?.error ?: "Failed")
+            val outcome = if (entry.result?.ok == true) entry.result?.values?.get("summary") ?: "Done" else (entry.result?.error ?: "Failed")
             return listOf(
                 ActionItem(
                     id = "plugin_job_${entry.jobId}",
@@ -92,20 +92,21 @@ object PluginJobsScreen {
                     }
                     collector.join()
                 }
-                finalEntry?.let { if (it.result?.ok == true) "Done" else (it.result?.error ?: "Failed") }
+                finalEntry?.let { if (it.result?.ok == true) it.result?.values?.get("summary") ?: "Done" else (it.result?.error ?: "Failed") }
                     ?: "This job is no longer tracked"
             },
         )
         val cancelRow = ActionItem(
             id = "plugin_job_${entry.jobId}_cancel",
             title = "Cancel \"${entry.title}\"",
-            subtitle = "Best-effort -- the plugin decides whether it actually stops",
+            subtitle = if (entry.nativeKind != null) "Stops at the next game" else "Best-effort -- the plugin decides whether it actually stops",
             confirmTitle = "Cancel this job?",
             run = { PluginJobsCenter.cancel(entry.jobId) },
         )
         val controls = buildList {
             add(progressRow)
-            if (entry.pausable && entry.resumable && (entry.paused || entry.resumePayload != null)) {
+            // A native job with no checkpoint yet pauses to a fresh start, so it may always be paused.
+            if (entry.pausable && entry.resumable && (entry.paused || entry.resumePayload != null || entry.nativeKind != null)) {
                 add(ActionItem(
                     id = "plugin_job_${entry.jobId}_${if (entry.paused) "resume" else "pause"}",
                     title = if (entry.paused) "Resume \"${entry.title}\"" else "Pause \"${entry.title}\"",

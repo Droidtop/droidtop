@@ -1,6 +1,11 @@
 package dev.droidtop.pluginhost
 
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
@@ -32,6 +37,7 @@ class PluginJobsCenterTest {
 
     @After
     fun resetFactory() {
+        PluginJobsCenter.nativeDispatcher = Dispatchers.IO
         // Every test replaces [PluginJobsCenter.runnerFactory]; put the
         // real production default back so no other test (in this class
         // or, since it's a JVM-static singleton, any other class run in
@@ -254,5 +260,94 @@ class PluginJobsCenterTest {
         assertEquals(original.percent, restored.percent)
         assertEquals("chunk-42", restored.resumePayload)
         assertTrue(restored.paused)
+    }
+
+    // A job droidtop runs itself (Droidtop/tracker#174): same list, same checkpoint, pause and resume.
+
+    @Test
+    fun nativeJobPausesAtItsCheckpointAndResumesFromIt() = runBlocking {
+        PluginJobsCenter.nativeDispatcher = Dispatchers.Default
+        val starts = CopyOnWriteArrayList<String?>()
+        val reachedThird = CompletableDeferred<Unit>()
+        PluginJobsCenter.registerNative("test_native_pause") { _, checkpoint, report ->
+            starts += checkpoint
+            val first = checkpoint?.toInt() ?: 0
+            for (item in first until 5) {
+                // The checkpoint is the next item to do, as a scrape's is the position in its queue.
+                report(item * 20, "item $item", (item + 1).toString())
+                if (item == 2 && checkpoint == null) {
+                    reachedThird.complete(Unit)
+                    awaitCancellation()
+                }
+            }
+            "all five"
+        }
+        val finished = CompletableDeferred<PluginResult>()
+        val id = PluginJobsCenter.startNative(null, "test_native_pause", "Native job", onComplete = { finished.complete(it) })!!
+        withTimeout(5_000) { reachedThird.await() }
+
+        assertTrue(PluginJobsCenter.pause(id))
+        val paused = PluginJobsCenter.find(id)!!
+        assertTrue(paused.paused)
+        assertEquals("3", paused.resumePayload)
+        assertEquals("test_native_pause", paused.nativeKind)
+
+        assertTrue(PluginJobsCenter.resume(id))
+        val result = withTimeout(5_000) { finished.await() }
+        assertTrue(result.ok)
+        assertEquals("all five", result.values["summary"])
+        assertEquals(listOf<String?>(null, "3"), starts.toList())
+        assertTrue(PluginJobsCenter.find(id)!!.done)
+    }
+
+    @Test
+    fun nativeJobRestoredAfterARestartResumesFromTheStoredCheckpoint() = runBlocking {
+        PluginJobsCenter.nativeDispatcher = Dispatchers.Default
+        val starts = CopyOnWriteArrayList<Pair<Map<String, String>, String?>>()
+        val reached = CompletableDeferred<Unit>()
+        PluginJobsCenter.registerNative("test_native_restart") { args, checkpoint, report ->
+            starts += args to checkpoint
+            if (checkpoint == null) {
+                report(50, "halfway", "queue-position-7")
+                reached.complete(Unit)
+                awaitCancellation()
+            }
+            "resumed at $checkpoint"
+        }
+        val id = PluginJobsCenter.startNative(null, "test_native_restart", "Restart job", mapOf("system" to "snes"))!!
+        withTimeout(5_000) { reached.await() }
+        assertTrue(PluginJobsCenter.pause(id))
+        val stored = PluginJobsCenter.encodeEntries(listOf(PluginJobsCenter.find(id)!!))
+
+        // The process dies: the job and its runner state are gone, the stored text is what is left.
+        PluginJobsCenter.cancel(id)
+        assertNull(PluginJobsCenter.find(id))
+        val restored = PluginJobsCenter.decodeEntries(stored).single()
+        assertTrue(restored.paused)
+        assertEquals("queue-position-7", restored.resumePayload)
+        assertEquals("test_native_restart", restored.nativeKind)
+
+        PluginJobsCenter.restore(listOf(restored))
+        assertTrue(PluginJobsCenter.resume(id))
+        withTimeout(5_000) {
+            while (PluginJobsCenter.find(id)?.done != true) kotlinx.coroutines.delay(10)
+        }
+        assertEquals(mapOf("system" to "snes") to "queue-position-7", starts.last())
+        assertEquals("resumed at queue-position-7", PluginJobsCenter.find(id)!!.result?.values?.get("summary"))
+    }
+
+    @Test
+    fun startingTheSameNativeJobTwiceIsOneJob() = runBlocking {
+        PluginJobsCenter.nativeDispatcher = Dispatchers.Default
+        val hold = CompletableDeferred<Unit>()
+        PluginJobsCenter.registerNative("test_native_once") { _, _, _ -> hold.await(); "ok" }
+        val first = PluginJobsCenter.startNative(null, "test_native_once", "Same job", mapOf("a" to "1"))!!
+        val second = PluginJobsCenter.startNative(null, "test_native_once", "Same job", mapOf("a" to "1"))!!
+        val other = PluginJobsCenter.startNative(null, "test_native_once", "Same job", mapOf("a" to "2"))!!
+        assertEquals(first, second)
+        assertTrue(first != other)
+        PluginJobsCenter.cancel(first)
+        PluginJobsCenter.cancel(other)
+        assertNull(PluginJobsCenter.startNative(null, "test_native_unregistered", "Nobody runs this"))
     }
 }

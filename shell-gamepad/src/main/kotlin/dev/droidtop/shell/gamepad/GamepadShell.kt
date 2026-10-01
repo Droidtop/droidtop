@@ -442,6 +442,19 @@ fun GamepadShell(
         )
     }
 
+    // The one-time "fetch box art?" question (docs/SPEC.md 7h). The walk that
+    // finished may have been in an earlier process, so the stored question is
+    // restored once, off the main thread.
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { dev.droidtop.library.scraper.ScrapeOffer.restore(context) }
+    }
+    if (dev.droidtop.library.scraper.ScrapeOffer.pending.collectAsState().value) {
+        ScrapeOfferDialog(
+            onFetch = { dev.droidtop.library.scraper.ScrapeOffer.respond(context, fetch = true) },
+            onNotNow = { dev.droidtop.library.scraper.ScrapeOffer.respond(context, fetch = false) },
+        )
+    }
+
     // The actual dispatch: unchanged for every entry, PC and engine games
     // included -- once something has decided this game IS ready, it
     // launches exactly the same way a console ROM does.

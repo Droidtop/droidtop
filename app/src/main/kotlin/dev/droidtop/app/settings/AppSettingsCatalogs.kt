@@ -5,7 +5,7 @@ import android.net.Uri
 import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.PluginStatusWidgetProvider
 import dev.droidtop.library.scraper.importGamelistXml
-import dev.droidtop.library.scraper.scrapeSystemArtwork
+import dev.droidtop.library.scraper.LibraryScrapeJob
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.canResolveFromFolder
 import dev.droidtop.library.consoles.ConsoleSystemEntity
@@ -516,14 +516,13 @@ object AppSettingsCatalogs {
                                                 ),
                                             )
                                             add(
-                                                AsyncActionItem(
+                                                ActionItem(
                                                     id = "folder_scrape_${folder.absolutePath}",
                                                     title = "Scrape missing artwork & metadata",
-                                                    subtitle = "Fills box art, descriptions, ratings and more for games that lack them",
-                                                    run = { ctx, onStatus ->
-                                                        scrapeSystemArtwork(ctx, folder, resolved) { done, total ->
-                                                            onStatus("Scraping ${resolved.displayName}: $done/$total")
-                                                        }
+                                                    subtitle = "Fills box art, descriptions, ratings and more for games that lack them. " +
+                                                        "Runs as a job under Downloads and installs: pause it there, and it carries on after a restart",
+                                                    run = { ctx ->
+                                                        LibraryScrapeJob.start(ctx, "Scrape ${resolved.displayName}", resolved.id, folder)
                                                     },
                                                 ),
                                             )
@@ -2967,6 +2966,17 @@ object AppSettingsCatalogs {
                                     ctx,
                                     dev.droidtop.library.scraper.ScrapeFilter.valueOf(value),
                                 )
+                            },
+                        ),
+                        ChoiceItem(
+                            id = "scrape_offer",
+                            title = "After the first library scan",
+                            subtitle = "What droidtop does about fetching box art and details when your games have been scanned",
+                            options = dev.droidtop.library.scraper.ScrapeOffer.Answer.entries.map { ChoiceOption(it.id, it.label) },
+                            current = dev.droidtop.library.scraper.ScrapeOffer.current(context).id,
+                            onSelect = { ctx, value ->
+                                dev.droidtop.library.scraper.ScrapeOffer.Answer.entries.firstOrNull { it.id == value }
+                                    ?.let { dev.droidtop.library.scraper.ScrapeOffer.set(ctx, it) }
                             },
                         ),
                         ToggleItem(

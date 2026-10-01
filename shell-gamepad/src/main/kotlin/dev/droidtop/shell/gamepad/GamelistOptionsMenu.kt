@@ -25,7 +25,6 @@ import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
-import dev.droidtop.library.scraper.scrapeSystemArtwork
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.SettingsScreenRegistry
@@ -280,6 +279,16 @@ internal fun GamelistOptionsMenu(
         }
     }
 
+    // The scrape is a job (docs/SPEC.md 12a "Jobs"): this only starts it, or finds it already
+    // running or paused. Its progress, Pause, Resume and Cancel live under Downloads and installs.
+    fun startScrapeJob(title: String, systemId: String?) {
+        val started = dev.droidtop.library.scraper.LibraryScrapeJob.start(context, title, systemId) { summary ->
+            status = summary
+            scope.launch { onScraped() }
+        }
+        status = if (started != null) "$title started. Follow it, pause it or cancel it under Downloads and installs." else "Scraping isn't available."
+    }
+
     fun activate(index: Int) {
         when (actions[index]) {
             "Rescan library" -> {
@@ -295,51 +304,7 @@ internal fun GamelistOptionsMenu(
                 }
             }
             "Scrape all systems" -> {
-                if (busy) return
-                busy = true
-                scope.launch {
-                    val summary = withContext(Dispatchers.IO) {
-                        // A source that cannot be asked (no key) refuses
-                        // here, once, with the fix -- never a count of
-                        // systems "scraped" by nothing (rig, build 814).
-                        dev.droidtop.library.scraper.ScraperReadiness.romSourceProblem(context)
-                            ?.let { return@withContext "Nothing was scraped\n$it" }
-                        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-                        val targets = dev.droidtop.library.consoles.SystemFolders.all(context, systemsById)
-                        if (targets.isEmpty()) {
-                            "No game folders to scrape."
-                        } else {
-                            // Each system's own sentence is the result: what
-                            // was found, missed, failed or refused there.
-                            val lines = mutableListOf<String>()
-                            var done = 0
-                            for ((folder, system) in targets) {
-                                done++
-                                status = "[$done/${targets.size}] ${system.displayName}"
-                                var refusedEverything = false
-                                val line = scrapeSystemArtwork(
-                                    context,
-                                    folder,
-                                    system,
-                                    onRefusedEverything = { refusedEverything = true },
-                                ) { fileDone, total ->
-                                    status = "[$done/${targets.size}] ${system.displayName}: $fileDone/$total"
-                                }
-                                // The source refused everything it was
-                                // asked: every further system would be
-                                // refused the same way, so stop and say so.
-                                if (refusedEverything) {
-                                    return@withContext "Stopped at system $done of ${targets.size}\n$line"
-                                }
-                                lines += line
-                            }
-                            "Scraped ${targets.size} systems\n" + lines.joinToString("\n")
-                        }
-                    }
-                    status = summary
-                    busy = false
-                    onScraped()
-                }
+                startScrapeJob(title = "Scrape all systems", systemId = null)
             }
             ORPHANS_FIND -> {
                 if (busy) return
@@ -413,34 +378,7 @@ internal fun GamelistOptionsMenu(
                 }
             }
             "Scrape this system" -> {
-                if (busy) return
-                busy = true
-                scope.launch {
-                    status = "Scraping $groupLabel…"
-                    val results = withContext(Dispatchers.IO) {
-                        // The first line is the row's title and is cut to one
-                        // line, so a refusal leads with a short one.
-                        dev.droidtop.library.scraper.ScraperReadiness.romSourceProblem(context)
-                            ?.let { return@withContext listOf("Nothing was scraped", it) }
-                        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-                        val system = systemsById[systemId] ?: return@withContext listOf("Unknown system $systemId")
-                        val folders = consoleFoldersFor(system.id)
-                        if (folders.isEmpty()) return@withContext listOf("No folder for ${system.displayName} in any games root.")
-                        folders.map { folder ->
-                            scrapeSystemArtwork(
-                                context,
-                                folder,
-                                system,
-                                onProgress = { done, total ->
-                                    status = "Scraping ${system.displayName}: $done/$total"
-                                },
-                            )
-                        }
-                    }
-                    status = results.joinToString("\n")
-                    busy = false
-                    onScraped()
-                }
+                startScrapeJob(title = "Scrape $groupLabel", systemId = systemId)
             }
             SCRAPE_PC_GAMES -> {
                 if (busy) return

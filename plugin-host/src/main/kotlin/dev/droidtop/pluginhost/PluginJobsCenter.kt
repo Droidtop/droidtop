@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -63,6 +65,8 @@ private val Context.pluginJobsStore by preferencesDataStore(name = "plugin_jobs"
  */
 object PluginJobsCenter {
     private const val FINISHED_RETENTION_MS = 15_000L
+    private const val NATIVE_OWNER_ID = "droidtop"
+    private const val NATIVE_OWNER_LABEL = "Library"
 
     data class Entry(
         val jobId: String,
@@ -83,6 +87,8 @@ object PluginJobsCenter {
         val resumable: Boolean = false,
         val resumePayload: String? = null,
         val paused: Boolean = false,
+        /** Set for a job droidtop runs itself ([registerNative]); the key of its [NativeJobRunner]. Null for a plugin job. */
+        val nativeKind: String? = null,
     )
 
     /**
@@ -113,6 +119,15 @@ object PluginJobsCenter {
     private val runners = ConcurrentHashMap<String, PluginJobRunner>()
     private data class ResumeSpec(val record: PluginRecord?, val capability: PluginCapability?, val args: Map<String, String>)
     private val resumeSpecs = ConcurrentHashMap<String, ResumeSpec>()
+    private data class NativeSpec(val kind: String, val args: Map<String, String>)
+    private val nativeRunners = ConcurrentHashMap<String, NativeJobRunner>()
+    private val nativeSpecs = ConcurrentHashMap<String, NativeSpec>()
+    private val nativeJobs = ConcurrentHashMap<String, Job>()
+    private val nativeCompletions = ConcurrentHashMap<String, (PluginResult) -> Unit>()
+    private val nativeScope = CoroutineScope(SupervisorJob())
+
+    /** Where a native job's coroutine runs; a test swaps it. */
+    internal var nativeDispatcher: CoroutineDispatcher = Dispatchers.IO
     private val resumeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var persistenceContext: Context? = null
@@ -123,9 +138,13 @@ object PluginJobsCenter {
         persistenceContext = context.applicationContext
         persistenceScope.launch {
             val prefs = context.applicationContext.pluginJobsStore.data.first()
-            val restored = decodeEntries(prefs[persistedKey].orEmpty())
-            state.update { current -> (restored.filter { old -> current.none { it.jobId == old.jobId } } + current).distinctBy { it.jobId } }
+            restore(decodeEntries(prefs[persistedKey].orEmpty()))
         }
+    }
+
+    /** Adds interrupted resumable jobs, as paused, to the live list; a job already tracked is left as it is. */
+    internal fun restore(restored: List<Entry>) {
+        state.update { current -> (restored.filter { old -> current.none { it.jobId == old.jobId } } + current).distinctBy { it.jobId } }
     }
 
     private fun persist() {
@@ -232,6 +251,89 @@ object PluginJobsCenter {
         return jobId
     }
 
+    /** Registers how a job droidtop runs itself of [kind] is run (SPEC 12a "Jobs"); called once at process start, before [attach] restores anything. */
+    fun registerNative(kind: String, runner: NativeJobRunner) {
+        nativeRunners[kind] = runner
+    }
+
+    /**
+     * Starts a native job of [kind] and tracks it like any other: pausable,
+     * resumable from its last checkpoint, persisted across a restart. A job of
+     * the same [kind] and [args] that is already running or paused is the same
+     * job: it is returned (and resumed if paused) instead of started twice.
+     * Null when no runner is registered for [kind]. [onComplete] is in-process
+     * only; a job restored after a restart does not call it.
+     */
+    fun startNative(
+        context: Context?,
+        kind: String,
+        title: String,
+        args: Map<String, String> = emptyMap(),
+        onComplete: (PluginResult) -> Unit = {},
+    ): String? {
+        context?.let(::attach)
+        if (!nativeRunners.containsKey(kind)) return null
+        nativeSpecs.entries.firstOrNull { (id, spec) -> spec.kind == kind && spec.args == args && find(id)?.done == false }?.let { (id, _) ->
+            nativeCompletions[id] = onComplete
+            if (find(id)?.paused == true) resume(id)
+            return id
+        }
+        val jobId = UUID.randomUUID().toString()
+        nativeSpecs[jobId] = NativeSpec(kind, args)
+        nativeCompletions[jobId] = onComplete
+        state.update { current ->
+            listOf(
+                Entry(
+                    jobId = jobId, pluginId = NATIVE_OWNER_ID, pluginLabel = NATIVE_OWNER_LABEL, capability = null, title = title,
+                    startedAtMs = System.currentTimeMillis(), kind = "native", pausable = true, resumable = true, nativeKind = kind,
+                ),
+            ) + current
+        }
+        persist()
+        launchNative(jobId, null)
+        return jobId
+    }
+
+    private fun launchNative(jobId: String, checkpoint: String?) {
+        val spec = nativeSpecs[jobId] ?: return
+        val runner = nativeRunners[spec.kind]
+        if (runner == null) {
+            update(jobId) { it.copy(paused = true, statusLine = "Unavailable in this version") }
+            return
+        }
+        val previous = nativeJobs[jobId]
+        nativeJobs[jobId] = nativeScope.launch(nativeDispatcher) {
+            // A paused run may still be reaching its next boundary; never two at once.
+            previous?.join()
+            try {
+                val summary = runner(spec.args, checkpoint) { percent, status, newCheckpoint ->
+                    // Progress that arrives after a pause belongs to the run being stopped.
+                    if (find(jobId)?.paused == false) {
+                        update(jobId) { it.copy(percent = percent, statusLine = status, resumePayload = newCheckpoint ?: it.resumePayload) }
+                    }
+                }
+                finishNative(jobId, PluginResult.success(mapOf("summary" to summary)))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                finishNative(jobId, PluginResult.failure(t.message ?: "job failed"))
+            }
+        }
+    }
+
+    private fun finishNative(jobId: String, result: PluginResult) {
+        update(jobId) {
+            it.copy(
+                done = true, result = result, percent = 100,
+                statusLine = if (result.ok) result.values["summary"] ?: "Done" else (result.error ?: "Failed"),
+            )
+        }
+        nativeCompletions.remove(jobId)?.invoke(result)
+        nativeSpecs.remove(jobId)
+        nativeJobs.remove(jobId)
+        prune()
+    }
+
     private val brokeredScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val brokeredJobs = ConcurrentHashMap<String, Job>()
     private val brokeredReplies = ConcurrentHashMap<String, PluginReply>()
@@ -280,6 +382,9 @@ object PluginJobsCenter {
         val entry = find(jobId) ?: return
         brokeredJobs[jobId]?.cancel()
         runners[jobId]?.cancelJob(entry.pluginId, jobId)
+        nativeJobs.remove(jobId)?.cancel()
+        nativeSpecs.remove(jobId)
+        nativeCompletions.remove(jobId)
         if (entry.resumable) {
             state.update { list -> list.filterNot { it.jobId == jobId } }
             resumeSpecs.remove(jobId)
@@ -290,6 +395,13 @@ object PluginJobsCenter {
     /** Pauses a declared pausable job and stores its caller-supplied opaque checkpoint. */
     fun pause(jobId: String, resumePayload: String? = find(jobId)?.resumePayload): Boolean {
         val entry = find(jobId) ?: return false
+        if (nativeSpecs.containsKey(jobId)) {
+            // No checkpoint yet only means a resume starts from the beginning.
+            if (entry.done || entry.paused) return false
+            update(jobId) { it.copy(paused = true, statusLine = "Paused") }
+            nativeJobs[jobId]?.cancel()
+            return true
+        }
         val checkpoint = resumePayload ?: return false
         if (!entry.pausable || !entry.resumable || entry.done || entry.paused) return false
         val runner = runners[jobId] ?: return false
@@ -303,6 +415,12 @@ object PluginJobsCenter {
     /** Marks a restored or paused job ready for its owner to resume. */
     fun resume(jobId: String): Boolean {
         val entry = find(jobId) ?: return false
+        if (nativeSpecs.containsKey(jobId)) {
+            if (!entry.paused || entry.done) return false
+            update(jobId) { it.copy(paused = false, statusLine = "Resuming…") }
+            launchNative(jobId, entry.resumePayload)
+            return true
+        }
         val spec = resumeSpecs[jobId] ?: return false
         val checkpoint = entry.resumePayload ?: return false
         if (!entry.paused || entry.done) return false
@@ -341,10 +459,12 @@ object PluginJobsCenter {
     internal fun encodeEntries(entries: List<Entry>): String = JSONArray().apply {
         entries.filter { it.resumable && !it.done }.forEach { e ->
             val spec = resumeSpecs[e.jobId]
+            val nativeSpec = nativeSpecs[e.jobId]
             put(JSONObject().put("id", e.jobId).put("plugin", e.pluginId).put("label", e.pluginLabel).put("title", e.title)
                 .put("started", e.startedAtMs).put("percent", e.percent).put("status", e.statusLine).put("kind", e.kind)
                 .put("pausable", e.pausable).put("resumable", e.resumable).put("payload", e.resumePayload).put("paused", true)
-                .put("capability", spec?.capability?.id ?: e.capability?.id).put("args", JSONObject().apply { spec?.args?.forEach { (k, v) -> put(k, v) } }))
+                .put("native", e.nativeKind).put("capability", spec?.capability?.id ?: e.capability?.id)
+                .put("args", JSONObject().apply { (spec?.args ?: nativeSpec?.args)?.forEach { (k, v) -> put(k, v) } }))
         }
     }.toString()
 
@@ -355,10 +475,12 @@ object PluginJobsCenter {
             title = o.getString("title"), startedAtMs = o.getLong("started"), percent = o.optInt("percent", -1),
             statusLine = "Paused", kind = o.optString("kind", "plugin"), pausable = o.optBoolean("pausable"),
             resumable = o.optBoolean("resumable"), resumePayload = o.optString("payload").takeIf { it.isNotEmpty() && it != "null" }, paused = true,
+            nativeKind = o.optString("native").takeIf { it.isNotEmpty() && it != "null" },
         ).also { entry ->
             val cap = PluginCapability.fromId(o.optString("capability"))
             val args = buildMap { o.optJSONObject("args")?.let { a -> a.keys().forEach { put(it, a.optString(it)) } } }
-            if (entry.pausable && entry.resumable && cap != null) resumeSpecs[entry.jobId] = ResumeSpec(null, cap, args)
+            if (entry.nativeKind != null) nativeSpecs[entry.jobId] = NativeSpec(entry.nativeKind, args)
+            else if (entry.pausable && entry.resumable && cap != null) resumeSpecs[entry.jobId] = ResumeSpec(null, cap, args)
         } } }
     } catch (_: Exception) { emptyList() }
 }
