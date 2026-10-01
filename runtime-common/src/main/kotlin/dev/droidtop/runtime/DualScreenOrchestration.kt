@@ -55,6 +55,62 @@ object DualScreenOrchestration {
 
     fun relocationHasFailed(attempts: Int): Boolean = attempts >= MAX_RELOCATION_ATTEMPTS
 
+    /** Where the shell has to be moved so it matches the Main screen choice. */
+    enum class ShellMove { NONE, TO_SECOND, TO_BUILT_IN }
+
+    /**
+     * Whether the shell is on the second screen RIGHT NOW. Derived from the
+     * display the shell actually occupies, never from a decision flag:
+     * parking (an app launched onto the second screen) makes the decision
+     * flag false while the shell has not moved, which flipped the launch
+     * chooser's "this screen" / "the other screen" labels.
+     */
+    fun shellIsOnSecond(shellDisplayId: Int, secondDisplayId: Int?): Boolean =
+        secondDisplayId != null && shellDisplayId == secondDisplayId
+
+    /**
+     * The one relocation decision for the shell, both ways. The Main screen
+     * choice owns where the shell lives: "Second screen when connected"
+     * moves it onto the second screen, "Built-in screen" moves it back, even
+     * while an app is parked on the second screen (the shell was never what
+     * the parking was about). Only the move TO the second screen respects
+     * parking and a relocation the platform refused.
+     */
+    fun shellMove(
+        shellDisplayId: Int,
+        secondDisplayId: Int?,
+        shellModeEligible: Boolean,
+        mainScreenWantsSecond: Boolean,
+        secondParked: Boolean,
+        relocationFailed: Boolean,
+    ): ShellMove {
+        if (secondDisplayId == null || !shellModeEligible) return ShellMove.NONE
+        val onSecond = shellIsOnSecond(shellDisplayId, secondDisplayId)
+        return when {
+            mainScreenWantsSecond && !onSecond && !secondParked && !relocationFailed -> ShellMove.TO_SECOND
+            !mainScreenWantsSecond && onSecond -> ShellMove.TO_BUILT_IN
+            else -> ShellMove.NONE
+        }
+    }
+
+    /**
+     * The display the live companion Presentation may be shown on, or null.
+     * Never the display the shell occupies (it would sit on top of the
+     * shell and eat its touches), never one an app is parked on, and not
+     * while the shell is about to move there.
+     */
+    fun companionPresentationDisplayId(
+        shellDisplayId: Int,
+        secondDisplayId: Int?,
+        secondParked: Boolean,
+        move: ShellMove,
+    ): Int? = when {
+        secondDisplayId == null || secondParked -> null
+        shellIsOnSecond(shellDisplayId, secondDisplayId) -> null
+        move == ShellMove.TO_SECOND -> null
+        else -> secondDisplayId
+    }
+
     /**
      * Chooser candidates in priority order: the addon/second screen FIRST,
      * so the default-highlighted row is the better surface (per direction:

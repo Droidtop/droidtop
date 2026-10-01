@@ -200,4 +200,72 @@ class DualScreenOrchestrationTest {
             ),
         )
     }
+
+    @Test
+    fun `Main screen Built-in moves a shell sitting on the second screen back`() {
+        // Tracker#163: the shell stayed on display 10 after the choice
+        // changed, and the companion then covered it.
+        assertEquals(
+            DualScreenOrchestration.ShellMove.TO_BUILT_IN,
+            DualScreenOrchestration.shellMove(
+                shellDisplayId = 10, secondDisplayId = 10, shellModeEligible = true,
+                mainScreenWantsSecond = false, secondParked = false, relocationFailed = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `Built-in still moves the shell back while an app is parked on the second screen`() {
+        assertEquals(
+            DualScreenOrchestration.ShellMove.TO_BUILT_IN,
+            DualScreenOrchestration.shellMove(
+                shellDisplayId = 10, secondDisplayId = 10, shellModeEligible = true,
+                mainScreenWantsSecond = false, secondParked = true, relocationFailed = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `Second-when-present moves a built-in shell to the second screen unless parked or refused`() {
+        fun move(parked: Boolean, failed: Boolean) = DualScreenOrchestration.shellMove(
+            shellDisplayId = 0, secondDisplayId = 10, shellModeEligible = true,
+            mainScreenWantsSecond = true, secondParked = parked, relocationFailed = failed,
+        )
+        assertEquals(DualScreenOrchestration.ShellMove.TO_SECOND, move(parked = false, failed = false))
+        assertEquals(DualScreenOrchestration.ShellMove.NONE, move(parked = true, failed = false))
+        assertEquals(DualScreenOrchestration.ShellMove.NONE, move(parked = false, failed = true))
+    }
+
+    @Test
+    fun `a shell already where the choice wants it, or without a second screen, does not move`() {
+        val none = DualScreenOrchestration.ShellMove.NONE
+        assertEquals(none, DualScreenOrchestration.shellMove(10, 10, true, true, false, false))
+        assertEquals(none, DualScreenOrchestration.shellMove(0, 10, true, false, false, false))
+        assertEquals(none, DualScreenOrchestration.shellMove(0, null, true, true, false, false))
+        assertEquals(none, DualScreenOrchestration.shellMove(10, 10, false, false, false, false))
+    }
+
+    @Test
+    fun `the companion Presentation is never placed on the display the shell occupies`() {
+        val builtIn = DualScreenOrchestration.ShellMove.NONE
+        assertEquals(null, DualScreenOrchestration.companionPresentationDisplayId(10, 10, false, builtIn))
+        assertEquals(
+            null,
+            DualScreenOrchestration.companionPresentationDisplayId(
+                0, 10, false, DualScreenOrchestration.ShellMove.TO_SECOND,
+            ),
+        )
+        assertEquals(null, DualScreenOrchestration.companionPresentationDisplayId(0, 10, true, builtIn))
+        assertEquals(10, DualScreenOrchestration.companionPresentationDisplayId(0, 10, false, builtIn))
+        assertEquals(null, DualScreenOrchestration.companionPresentationDisplayId(0, null, false, builtIn))
+    }
+
+    @Test
+    fun `chooser labels follow the shell's real display, parked or not`() {
+        // Tracker#162: shell on display 10 with display 10 parked read as
+        // "not on second" and swapped the labels.
+        assertTrue(DualScreenOrchestration.shellIsOnSecond(shellDisplayId = 10, secondDisplayId = 10))
+        assertFalse(DualScreenOrchestration.shellIsOnSecond(shellDisplayId = 0, secondDisplayId = 10))
+        assertFalse(DualScreenOrchestration.shellIsOnSecond(shellDisplayId = 0, secondDisplayId = null))
+    }
 }

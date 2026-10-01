@@ -3003,6 +3003,31 @@ What is true on Android, and what this section corrects in the text above:
 **Needs a rig check** (real dual-screen console; nothing here could be run
 from the build environment): see the commit message for the steps.
 
+### Second display: the Main screen choice moves the shell both ways (2026-10-01)
+
+Console findings, Droidtop/tracker#163 and #162 (build 1149): with Main screen
+changed to "Built-in screen" the shell stayed on the add-on and the companion
+Presentation then covered it; and after an app was launched onto the add-on the
+launch chooser swapped "This screen" and "The other screen" although the shell
+had not moved.
+
+**Decisions.**
+
+- The shell's position is read from the display it actually occupies
+  (`DualScreenOrchestration.shellIsOnSecond`), never from a decision flag that
+  parking changes. The launch chooser labels and "Same display as the shell"
+  follow that.
+- `DualScreenOrchestration.shellMove` is the one relocation decision, both
+  ways: Main screen "Second screen when connected" moves a built-in shell to the
+  second screen (not while an app is parked there, not after the platform
+  refused it); Main screen "Built-in screen" moves a shell on the second screen
+  back to the built-in display, also while an app is parked there. Both moves
+  share one cooldown.
+- The companion Presentation is only ever shown on a display the shell does not
+  occupy and is not about to occupy (`companionPresentationDisplayId`).
+
+Verification: rig steps are in the commit message.
+
 ### G6 status: store consolidated, relocation logic still in `:app` (2026-09-25)
 
 The "one persisted answer" decision above (`MainScreen`, 2026-09-24)
