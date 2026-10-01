@@ -13,14 +13,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -29,51 +32,64 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import dev.droidtop.library.GameNaming
+import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.ownership
+import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.scraper.FieldSources
+import dev.droidtop.shell.gamepad.CatalogDetailStrip
 import dev.droidtop.shell.gamepad.LocalShellWindow
+import dev.droidtop.shell.gamepad.LocalValueColumnWidth
+import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.ShellChip
-import dev.droidtop.shell.gamepad.requestFocusWhenAttached
-import dev.droidtop.shell.gamepad.selectionFrame
+import dev.droidtop.shell.gamepad.Space
+import dev.droidtop.shell.gamepad.TypeRole
+import dev.droidtop.shell.gamepad.groundBackground
+import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import dev.droidtop.shell.gamepad.input.menuStep
+import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.ownPadButtons
+import dev.droidtop.shell.gamepad.keepInView
+import dev.droidtop.shell.gamepad.requestFocusWhenAttached
+import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 
 /**
- * One PC game's own page -- what Steam Big Picture and the Steam Deck
- * library show for a game, drawn over the gamelist as a full-bleed
- * Dialog (docs/SPEC.md 7i, "The PC library is a controller-first
- * storefront view"): the game's art on the left; on the right its name,
- * ONE big primary button (Play, or the setup step that makes it Play,
- * [PcPlayState]), two secondary buttons (Favourite, Options), and under
- * them everything known about the game in a column the D-pad scrolls.
+ * One PC game's own page (docs/SPEC.md 7i, 2026-10-01): what the Steam
+ * Deck shows when you open a game. Its art large on one side; on the
+ * other, ONE big primary button that says what A does (Play, or the one
+ * setup step that makes it Play, or why it cannot -- [PcPlayState]),
+ * Favourite and Options beside it, and under them every fact droidtop has
+ * about this game as rows: play time, last played, size, the stores it is
+ * owned on, the runner, the engine, an update, the scraped facts, the
+ * community compatibility reports and the description. Nothing a person
+ * would look for is behind a menu (Droidtop/tracker#173).
  *
- * Opened by Y (or a long-press) on the library's grid; A on the grid
- * still plays at once (7i), so this page is for looking and for the
- * game's own actions, never a step in front of Play.
+ * The rows are Settings' rows: the same `MenuRow` at the same uniform
+ * height, one content-sized value column, and the selected row's full text
+ * in the detail strip under the list (docs/SPEC.md 7k, "Text in rows and
+ * tiles"), so a long description is read there instead of growing a row.
  *
- * Moving needs no key handling of its own: every button and every block of
- * the information column is a real focus target, so focus search moves
- * between them (Left/Right along the buttons, Up/Down between the buttons
- * and the blocks) and a block taking focus scrolls itself into view. The
- * presses go through the shell's one input pipeline (docs/SPEC.md 6e): the
- * page is its own window, so it gets the pipeline's front, A is the
- * confirm [ShellChip] answers, and B closes the page from the window's
- * outermost node ([ownPadButtons]), as the system back key does through
- * the Dialog. B used to be left to Android's fallback of BUTTON_B to BACK,
- * which a swapped face-button layout breaks: there the bottom button means
- * B, its fallback is DPAD_CENTER, and it pressed the focused button instead
- * of closing the page. Nothing on the page is reachable by touch only.
+ * The pad comes through the one pipeline (docs/SPEC.md 6e,
+ * Droidtop/tracker#178): this is a window of its own, so it gets the
+ * pipeline's front ([GatePadInThisDialog]); one `onPad` handler on its
+ * root moves ONE cursor over the button row and the fact rows, A presses
+ * what the cursor is on, X toggles favourite, L2 opens the game's menu, and
+ * B closes from the outermost node ([ownPadButtons]) -- so the face-button
+ * swap applies to every button here, and no control takes Compose focus of
+ * its own. A tap on a button or a row is the same press.
  *
  * No disk work while drawing: everything shown is already on the
  * [LibraryEntry]; the one lookup, the resolved runner, runs for this one
@@ -82,200 +98,374 @@ import dev.droidtop.shell.gamepad.input.ownPadButtons
 @Composable
 internal fun PcGamePage(
     entry: LibraryEntry,
-    plateColor: Color?,
+    // Every folder and store row of this same game (docs/SPEC.md 7m), for
+    // "Owned on" and the versions line; the entry itself when there is
+    // nothing to group with.
+    siblings: List<LibraryEntry>,
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit,
     onOpenOptions: () -> Unit,
     onClose: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val window = LocalShellWindow.current
     val (play, runner) = rememberPcPlayState(entry)
-    val playFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { requestFocusWhenAttached(playFocus, "PC game page") }
+    val rows = remember(entry, play, runner, siblings) { pageRows(context, entry, play, runner, siblings) }
+
+    // ONE cursor: row 0 is the button row, rows 1.. are the facts.
+    var row by remember(entry.id) { mutableIntStateOf(0) }
+    var button by remember(entry.id) { mutableIntStateOf(0) }
+    var heldStep by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "PC game page") }
+    LaunchedEffect(row, rows.size) {
+        if (row > 0 && rows.isNotEmpty()) listState.keepInView((row - 1).coerceIn(0, rows.lastIndex), animate = !heldStep)
+    }
+
+    val buttons = 3
+    fun pressButton(index: Int) {
+        when (index) {
+            0 -> if (play.pressable) {
+                onClose()
+                onPlay()
+            }
+            1 -> onToggleFavorite()
+            2 -> onOpenOptions()
+        }
+    }
 
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         GatePadInThisDialog()
-        val window = LocalShellWindow.current
-        Row(
+        val art: @Composable () -> Unit = {
+            PageArt(entry, modifier = Modifier.fillMaxWidth())
+        }
+        val header: @Composable () -> Unit = {
+            Text(
+                GameNaming.displayName(entry.title),
+                color = MenuTokens.OnSurface,
+                style = TypeRole.screenTitle,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                listOfNotNull(entry.sourceLabel(), entry.engineLabel()).joinToString(" · "),
+                color = MenuTokens.OnSurfaceMuted,
+                style = TypeRole.supporting,
+                modifier = Modifier.padding(top = Space.Xs),
+            )
+        }
+        val actions: @Composable () -> Unit = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Space.Md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ShellChip(
+                    play.verb,
+                    primary = true,
+                    large = true,
+                    enabled = play.pressable,
+                    selected = row == 0 && button == 0,
+                    onClick = {
+                        row = 0
+                        button = 0
+                        pressButton(0)
+                    },
+                )
+                ShellChip(
+                    "Favourite",
+                    on = entry.favorite,
+                    selected = row == 0 && button == 1,
+                    onClick = {
+                        row = 0
+                        button = 1
+                        pressButton(1)
+                    },
+                )
+                ShellChip(
+                    "Options",
+                    selected = row == 0 && button == 2,
+                    onClick = {
+                        row = 0
+                        button = 2
+                        pressButton(2)
+                    },
+                )
+            }
+            if (play.detail.isNotBlank()) {
+                Text(
+                    play.detail,
+                    color = if (play.pressable) MenuTokens.Value else MenuTokens.OnSurfaceDisabled,
+                    style = TypeRole.supporting,
+                    modifier = Modifier.padding(top = Space.Sm),
+                )
+            }
+        }
+        val facts: @Composable (Modifier) -> Unit = { modifier ->
+            // One value column for the page, content-sized to its widest
+            // value (docs/SPEC.md 7k), as the Settings catalog does.
+            val measurer = rememberTextMeasurer()
+            val valueStyle = MaterialTheme.typography.bodyMedium
+            val density = LocalDensity.current
+            val valueColumnWidth = remember(rows, valueStyle, density.fontScale) {
+                val widest = rows.mapNotNull { it.value }
+                    .maxOfOrNull { measurer.measure(it, valueStyle, maxLines = 1, softWrap = false).size.width } ?: 0
+                with(density) { widest.toDp() }.coerceIn(MenuTokens.ValueColumnMinWidth, MenuTokens.ValueColumnMaxWidth)
+            }
+            Column(modifier) {
+                CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = Space.Lg),
+                    ) {
+                        itemsIndexed(rows, key = { _, fact -> fact.title }) { index, fact ->
+                            MenuRow(
+                                title = fact.title,
+                                subtitle = fact.subtitle,
+                                value = fact.value,
+                                chevron = fact.onActivate != null,
+                                selected = row == index + 1,
+                                uniformHeight = true,
+                                ownScrollKeeping = true,
+                                onClick = {
+                                    row = index + 1
+                                    fact.onActivate?.invoke()
+                                },
+                            )
+                        }
+                    }
+                }
+                // The selected row in full, so no row has to grow to be
+                // read: the whole description, a long value, where the
+                // facts came from.
+                val selected = rows.getOrNull(row - 1)
+                CatalogDetailStrip(
+                    selected?.let { fact ->
+                        listOfNotNull(
+                            fact.value?.takeIf { it.length > 14 },
+                            fact.subtitle,
+                        ).joinToString("\n")
+                    }.orEmpty(),
+                )
+            }
+        }
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
+                // B from the outermost node; the cursor's own presses
+                // nearer the focus target, so they are answered first.
                 .ownPadButtons(onBack = onClose)
+                .onPad { press ->
+                    heldStep = press.repeat
+                    when (press.action) {
+                        GamepadAction.UP -> {
+                            // A held Up stops at the top; a fresh one too (a
+                            // page has nothing above its first row).
+                            val next = menuStep(row, rows.size + 1, -1)
+                            if (next != row) EsDeNavigationSounds.play("scroll")
+                            row = next
+                        }
+                        GamepadAction.DOWN -> {
+                            val next = menuStep(row, rows.size + 1, +1)
+                            if (next != row) EsDeNavigationSounds.play("scroll")
+                            row = next
+                        }
+                        GamepadAction.LEFT, GamepadAction.RIGHT -> {
+                            if (row != 0) return@onPad false
+                            val next = menuStep(button, buttons, if (press.action == GamepadAction.LEFT) -1 else 1)
+                            if (next != button) EsDeNavigationSounds.play("scroll")
+                            button = next
+                        }
+                        GamepadAction.A -> {
+                            if (row == 0) pressButton(button) else rows.getOrNull(row - 1)?.onActivate?.invoke()
+                        }
+                        GamepadAction.X -> onToggleFavorite()
+                        GamepadAction.L2 -> onOpenOptions()
+                        else -> return@onPad false
+                    }
+                    true
+                }
+                .focusRequester(focus)
+                .focusable()
                 .groundBackground()
-                .padding(start = window.edgePadding, end = window.edgePadding, top = 20.dp, bottom = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                .padding(start = window.edgePadding, end = window.edgePadding, top = Space.Lg, bottom = Space.Lg),
         ) {
-            Column(modifier = Modifier.weight(0.38f).fillMaxHeight()) {
-                val art = entry.heroUri ?: entry.artworkUri
-                Box(
-                    modifier = Modifier.fillMaxWidth().aspectRatio(if (entry.heroUri != null) 16f / 9f else 3f / 4f)
-                        .background(plateColor ?: MenuTokens.Card, RoundedCornerShape(12.dp)),
-                ) {
-                    if (art != null) {
-                        AsyncImage(
-                            model = art,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
-                        )
-                    } else {
-                        Text(
-                            GameNaming.displayName(entry.title),
-                            color = MenuTokens.OnSurface,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.align(Alignment.Center).padding(16.dp),
-                        )
+            if (window.portrait) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.fillMaxWidth().height((window.heightDp * 0.3f).dp)) { art() }
+                    Column(modifier = Modifier.padding(top = Space.Md)) {
+                        header()
+                        Column(modifier = Modifier.padding(top = Space.Md)) { actions() }
+                    }
+                    facts(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Lg))
+                }
+            } else {
+                Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Space.Xl)) {
+                    Column(modifier = Modifier.weight(0.38f).fillMaxHeight()) {
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) { art() }
+                        Column(modifier = Modifier.padding(top = Space.Md)) { header() }
+                    }
+                    Column(modifier = Modifier.weight(0.62f).fillMaxHeight()) {
+                        actions()
+                        facts(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Lg))
                     }
                 }
             }
-            Column(modifier = Modifier.weight(0.62f).fillMaxHeight()) {
-                PcPageHeader(
-                    entry = entry,
-                    play = play,
-                    playFocus = playFocus,
-                    onPlay = {
-                        if (play.pressable) {
-                            onClose()
-                            onPlay()
-                        }
-                    },
-                    onToggleFavorite = onToggleFavorite,
-                    onOpenOptions = onOpenOptions,
+        }
+    }
+}
+
+/**
+ * The game's art, as large as its column allows at its own shape: the hero
+ * (16:9) when one was scraped, else the capsule (2:3). With neither, the
+ * same plate every capsule without art draws, carrying the name -- never
+ * a stand-in cover.
+ */
+@Composable
+private fun PageArt(entry: LibraryEntry, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(12.dp)
+    val hero = entry.heroUri
+    val art = hero ?: entry.artworkUri
+    val ratio = if (hero != null) 16f / 9f else CAPSULE_ASPECT
+    Box(modifier = modifier, contentAlignment = Alignment.TopStart) {
+        Box(
+            modifier = Modifier
+                .aspectRatio(ratio)
+                .clip(shape)
+                .background(MenuTokens.Card, shape),
+        ) {
+            if (art != null) {
+                AsyncImage(
+                    model = art,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
                 )
-                Column(
-                    modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 16.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    PcPageAbout(entry, play, runner?.let { "${it.label} - ${it.reason}" })
-                }
+            } else {
+                Text(
+                    GameNaming.displayName(entry.title),
+                    color = MenuTokens.OnSurface,
+                    style = TypeRole.rowTitle,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.align(Alignment.Center).padding(Space.Lg),
+                )
             }
         }
     }
 }
 
-/** Title (or scraped logo), the identity line, the three buttons, and what the primary one will do. */
-@Composable
-private fun PcPageHeader(
+/** One fact on the page: a row title, what it says, and what A does on it when it does anything. */
+internal data class PageFact(
+    val title: String,
+    val value: String? = null,
+    val subtitle: String? = null,
+    val onActivate: (() -> Unit)? = null,
+)
+
+/**
+ * The page's rows, in the order a store page lists them: how you have
+ * played it, what you have of it, how it runs, what it is. Only facts that
+ * exist; a missing fact is not a row saying "unknown".
+ */
+private fun pageRows(
+    context: android.content.Context,
     entry: LibraryEntry,
     play: PcPlayState,
-    playFocus: FocusRequester,
-    onPlay: () -> Unit,
-    onToggleFavorite: () -> Unit,
-    onOpenOptions: () -> Unit,
-) {
-    val title = GameNaming.displayName(entry.title)
-    var logoFailed by remember(entry.logoUri) { mutableStateOf(false) }
-    val logo = entry.logoUri
-    if (logo != null && !logoFailed) {
-        AsyncImage(
-            model = logo,
-            contentDescription = title,
-            contentScale = ContentScale.Fit,
-            alignment = Alignment.BottomStart,
-            onError = { logoFailed = true },
-            modifier = Modifier.fillMaxWidth(0.7f).height(56.dp),
-        )
-    } else {
-        Text(
-            title,
-            color = MenuTokens.OnSurface,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+    runner: dev.droidtop.library.ResolvedRunner?,
+    siblings: List<LibraryEntry>,
+): List<PageFact> = buildList {
+    val now = System.currentTimeMillis()
+    add(PageFact("Play time", playtimeLine(entry.playtimeSeconds, entry.playCount)))
+    entry.lastPlayedEpochMs?.let { last ->
+        add(
+            PageFact(
+                "Last played",
+                android.text.format.DateUtils.getRelativeTimeSpanString(
+                    last, now, android.text.format.DateUtils.DAY_IN_MILLIS,
+                ).toString(),
+            ),
         )
     }
-    Text(
-        listOfNotNull(entry.sourceLabel(), entry.engineLabel()).joinToString(" - "),
-        color = MenuTokens.OnSurfaceMuted,
-        style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.padding(top = 4.dp),
+    entry.pcInfo?.let { pc ->
+        if (pc.sizeBytes > 0) {
+            add(
+                PageFact(
+                    "Size",
+                    android.text.format.Formatter.formatShortFileSize(context, pc.sizeBytes),
+                    subtitle = if (pc.installed) "On this device" else "To download",
+                ),
+            )
+        } else if (!pc.installed) {
+            add(PageFact("Install state", "Not installed"))
+        }
+    }
+    val owned = siblings.mapNotNull { it.ownership() }
+    val ownedLine = owned.ownershipLabel().removePrefix("Owned on ").takeIf { it.isNotBlank() }
+    add(
+        PageFact(
+            "Owned on",
+            ownedLine ?: if (entry.pcInfo?.source == null || entry.pcInfo?.source == "Folder") "Your folders" else entry.sourceLabel(),
+            subtitle = if (entry.id.startsWith("/")) entry.id else null,
+        ),
     )
-    Row(
-        modifier = Modifier.padding(top = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ShellChip(
-            play.verb,
-            modifier = Modifier.focusRequester(playFocus),
-            primary = true,
-            large = true,
-            onClick = onPlay,
-        )
-        ShellChip("Favourite", on = entry.favorite, onClick = onToggleFavorite)
-        ShellChip("Options", onClick = onOpenOptions)
+    // A version comes from a folder's own name (docs/SPEC.md 7m); a store
+    // row has none to derive.
+    val versions = siblings.filter { it.id.startsWith("/") }
+        .mapNotNull { GameNaming.derive(it.id).version.takeIf { v -> v.isNotBlank() } }
+        .distinct()
+    if (versions.isNotEmpty()) {
+        add(PageFact("Version", versions.first(), subtitle = if (versions.size > 1) "Also here: ${versions.drop(1).joinToString(", ")}" else null))
     }
-    if (play.detail.isNotBlank()) {
-        Text(
-            play.detail,
-            color = if (play.pressable) MenuTokens.Value else MenuTokens.OnSurfaceDisabled,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-    }
-}
-
-/**
- * "About this game" (docs/SPEC.md 7h): the scraped flavour, the labelled
- * facts, the line saying where each came from, then this copy's own
- * facts (runner, source, play time, update). All in-memory
- * [LibraryEntry] data.
- */
-@Composable
-private fun PcPageAbout(entry: LibraryEntry, play: PcPlayState, runnerLine: String?) {
+    entry.availableUpdate?.let { add(PageFact("Update", it, subtitle = GameUpdates.line(it))) }
+    add(
+        PageFact(
+            "Runs with",
+            runner?.label ?: if (play.pressable) "" else play.verb,
+            subtitle = runner?.reason ?: play.detail,
+        ),
+    )
+    entry.engineLabel()?.let { add(PageFact("Engine", it)) }
+    entry.pcInfo?.compatibility?.let { add(PageFact("Compatibility", subtitle = it.summary() + ". Other people's results on other hardware, not a verdict.")) }
     if (!entry.hideMetadata) {
-        entry.description?.takeIf { it.isNotBlank() }?.let { desc ->
-            InfoBlock { Text(desc, color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium) }
-        }
-        aboutFacts(entry).forEach { (label, value) -> PageFact(label, value) }
-        sourcesLine(entry)?.let { line ->
-            InfoBlock { Text(line, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelSmall) }
-        }
-    }
-    PageFact("Runs with", runnerLine ?: if (play.pressable) "" else play.detail)
-    PageFact("Source", entry.sourceLabel())
-    if (entry.playtimeSeconds > 0) PageFact("Played", "${entry.playtimeSeconds / 60} min")
-    entry.availableUpdate?.let { PageFact("Update", "$it available") }
-}
-
-@Composable
-private fun PageFact(label: String, value: String) {
-    if (value.isBlank()) return
-    InfoBlock {
-        Row {
-            Text(label, color = MenuTokens.SectionLabel, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(end = 8.dp))
-            Text(value, color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium)
-        }
+        aboutFacts(entry).forEach { (label, value) -> add(PageFact(label, value)) }
+        entry.players?.takeIf { it.isNotBlank() }?.let { add(PageFact("Players", it)) }
+        entry.description?.takeIf { it.isNotBlank() }?.let { add(PageFact("About", subtitle = it)) }
+        sourcesLine(entry)?.let { add(PageFact("Where these facts came from", subtitle = it)) }
     }
 }
 
 /**
- * One stop of the information column: a real focus target, so the pad
- * reaches it, the column scrolls it into view the moment it is focused
- * (a focusable asks its scrollable ancestor to), and it wears the shell's
- * selection frame while it holds focus.
+ * "2 h 15 min, played 7 times", "Never played". Pure, for the tests.
  */
-@Composable
-private fun InfoBlock(content: @Composable () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(10.dp)
-    Box(
-        modifier = Modifier.fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .selectionFrame(focused, shape)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) { content() }
+internal fun playtimeLine(seconds: Long, playCount: Int): String {
+    if (seconds <= 0 && playCount <= 0) return "Never played"
+    val hours = seconds / 3600
+    val minutes = (seconds % 3600) / 60
+    val time = when {
+        seconds <= 0 -> null
+        hours > 0 -> "$hours h $minutes min"
+        minutes > 0 -> "$minutes min"
+        else -> "Under a minute"
+    }
+    val times = when (playCount) {
+        0 -> null
+        1 -> "played once"
+        else -> "played $playCount times"
+    }
+    return listOfNotNull(time, times).joinToString(", ").replaceFirstChar { it.uppercase() }
 }
 
 /**
  * The labelled "About this game" facts, in the order a store page lists
- * them; only the ones that exist. Restored from the PcGameAbout.kt
- * 444271f2 deleted, for [PcGamePage] to draw (docs/SPEC.md 7h).
+ * them; only the ones that exist (docs/SPEC.md 7h).
  */
 internal fun aboutFacts(entry: LibraryEntry): List<Pair<String, String>> = listOfNotNull(
     entry.developer?.let { "Developer" to it },
@@ -308,11 +498,7 @@ internal fun formatReleaseDate(raw: String): String? {
  * "Description from IGDB. Cover and hero art from SteamGridDB." -- each
  * source once, with the fields it gave, in the order the fields are
  * listed ([FieldSources.LABELS]); "you" for what the metadata editor
- * changed. Null when nothing recorded a source. The one line docs/
- * SPEC.md 7h promises, read straight out of
- * [LibraryEntry.fieldSources] with no state of its own: it is how a
- * person sees where each field came from, which is also how they can
- * see what a rescrape is not allowed to take from them.
+ * changed. Null when nothing recorded a source (docs/SPEC.md 7h).
  */
 internal fun sourcesLine(entry: LibraryEntry): String? {
     if (entry.fieldSources.isEmpty()) return null

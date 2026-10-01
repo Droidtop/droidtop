@@ -343,16 +343,6 @@ fun EsDeThemedView(
     // the caller that has to translate the element layer by it. See
     // [EsDeSystemListView]'s parameter of the same name.
     onCamOffsetChanged: ((Float) -> Unit)? = null,
-    // Draw only the view's FRAME (docs/SPEC.md 7i's PC library redesign):
-    // the background, the colours and fonts, the header/logo, the help
-    // area and the proportions a theme owns, with every element that
-    // binds to the FOCUSED GAME dropped -- the primary list widget, the
-    // md_* metadata, the badges, the rating, the gameselector-fed art
-    // (see [esDeElementBindsGame]). The caller then draws its own content
-    // over the same canvas. The theme still lays the help row out: the
-    // slot is reported exactly as a full render reports it, so an
-    // overlay surface can put its own bar where the theme put that one.
-    frameOnly: Boolean = false,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -404,10 +394,6 @@ fun EsDeThemedView(
             // -- checked once here rather than duplicated in each
             // per-type renderer below.
             .filter { it.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false }
-            // The frame-only render (docs/SPEC.md 7i): a game-bound
-            // element is the theme's CONTENT, not its frame, and the PC
-            // library draws its own content over the frame instead.
-            .filter { element -> !frameOnly || !esDeElementBindsGame(element) }
             // SystemView.cpp:1695 and :1720 split the element layer on the
             // primary's own zIndex, and :196-208 draws the primary between
             // the two halves.
@@ -3615,35 +3601,12 @@ private fun sizeOf(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp): ko
 }
 
 /**
- * Whether a themed element binds to the FOCUSED GAME rather than to the
- * view itself -- the theme's content, as opposed to its frame (docs/
- * SPEC.md 7i's frame-only render). The primary list widget (carousel/
- * grid/textlist), the per-game metadata (an element with `metadata`,
- * `imageType` or a `gameselector` binding -- the real GamelistView::
- * setGameImage / metadata bindings), badges, rating and datetime are all
- * game-bound; a static-path image, a `systemdata` or literal `text`, the
- * help system, the clock and the status bar are the frame.
- */
-internal fun esDeElementBindsGame(element: EsDeThemeElement): Boolean = when (element.type) {
-    "carousel", "grid", "textlist", "rating", "badges", "datetime", "gameselector" -> true
-    "image", "video", "text" ->
-        element.strOrNull("metadata") != null ||
-            element.strOrNull("imageType") != null ||
-            element.strOrNull("gameselector") != null ||
-            element.uintOrNull("gameselectorEntry") != null ||
-            element.boolOrNull("metadataElement") == true
-    else -> false
-}
-
-/**
  * Where the one help row goes on this view: every declared
  * `<helpsystem>` merged in document order (a theme commonly declares
  * several, scope-gated), `posDimmed` winning while a menu is open, and
  * ES-DE's own component default (HelpComponent.cpp:23-27) when the theme
- * styles none. Extracted from [EsDeThemedView] so a surface drawing its
- * own bar over a frame-only render (the PC library, docs/SPEC.md 7i)
- * places it exactly where the full render would have -- the hint area is
- * part of the theme's frame, and the frame is what such a surface keeps.
+ * styles none. One answer for the renderer's own bar and for the shell's
+ * bar drawn over a themed view (GamepadShell's help-row slot report).
  */
 internal fun EsDeThemeView.helpRowSlot(vertical: Boolean, dimmed: Boolean = false): dev.droidtop.shell.gamepad.EsDeHelpRowSlot {
     val merged = EsDeThemeElement(
@@ -3660,30 +3623,6 @@ internal fun EsDeThemeView.helpRowSlot(vertical: Boolean, dimmed: Boolean = fals
         posY = pos?.y ?: default.posY,
         originY = origin?.y ?: default.originY,
     )
-}
-
-/** A themed element's declared rect, in the view's own dp coordinate space. */
-internal data class EsDeRect(val x: Dp, val y: Dp, val width: Dp, val height: Dp)
-
-/**
- * The rect this view's own primary list declared for itself -- the
- * proportions a theme chose for its content, for a surface that draws its
- * own content over the theme's frame (docs/SPEC.md 7i): the PC library's
- * grid takes the place the theme's list would have occupied, and the
- * focused-game panel takes what is left, so the view keeps the general
- * menu layout the theme laid out without drawing the theme's list.
- *
- * Null when the view declares no primary list, or none with a real
- * `size`/`maxSize`: a rect the theme never chose is not a proportion to
- * inherit, and the caller falls back to its own split.
- */
-internal fun EsDeThemeView.declaredListRect(viewWidth: Dp, viewHeight: Dp): EsDeRect? {
-    val primary = primaryListElement() ?: return null
-    val declared = primary.pairOrNull("size") ?: primary.pairOrNull("maxSize") ?: return null
-    val width = viewWidth * declared.x
-    val height = viewHeight * declared.y
-    val (x, y) = positionOf(primary, viewWidth, viewHeight, width, height)
-    return EsDeRect(x, y, width, height)
 }
 
 /**

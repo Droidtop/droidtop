@@ -4,6 +4,7 @@ import android.content.Context
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.shell.gamepad.pc.engineLabel
+import dev.droidtop.shell.gamepad.pc.isInstalled
 import dev.droidtop.shell.gamepad.pc.sourceLabel
 import org.json.JSONObject
 
@@ -62,7 +63,9 @@ enum class LibraryFacet(val key: String, val label: String) {
         STORE -> listOf(entry.sourceLabel())
         ENGINE -> entry.engineLabel()?.let { listOf(it) }.orEmpty()
         RUNNER -> context.runnerLabelOf(entry)?.let { listOf(it) }.orEmpty()
-        INSTALLED -> entry.pcInfo?.let { listOf(if (it.installed) INSTALLED_YES else INSTALLED_NO) }.orEmpty()
+        // The one answer the Installed shelf reads too (LibraryEntry.isInstalled): a
+        // store row says so, a folder the walk still finds is installed.
+        INSTALLED -> listOf(if (entry.isInstalled) INSTALLED_YES else INSTALLED_NO)
         READY -> context.runnerReadyOf(entry)?.let { ready -> listOf(if (ready) READY_YES else READY_NO) }.orEmpty()
         FAVOURITES -> if (entry.favorite) listOf(FAVOURITES_YES) else emptyList()
         PLAYED -> listOf(if (entry.playCount > 0 || entry.lastPlayedEpochMs != null) PLAYED_YES else PLAYED_NO)

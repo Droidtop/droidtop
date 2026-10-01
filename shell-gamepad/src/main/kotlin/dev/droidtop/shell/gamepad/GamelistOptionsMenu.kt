@@ -224,10 +224,10 @@ internal fun GamelistOptionsMenu(
             add(orphansLabel)
             add("Update platform databases")
         } else {
-            // The PC group's own filter/sort/search is the chip row over
-            // its grid now (dev.droidtop.shell.gamepad.query.LibraryQuery,
-            // docs/SPEC.md 7i, redecided 2026-09-28) -- these two rows
-            // would be a second, always-out-of-sync mechanism for it.
+            // The PC Games tab's filter, sort and search are its own view
+            // strip and filter dialog (dev.droidtop.shell.gamepad.query.
+            // LibraryQuery, docs/SPEC.md 7i) -- these rows would be a
+            // second, always-out-of-sync mechanism for it.
             if (systemId != PC_SYSTEM_ID) {
                 add("Sort: ${sort.label}")
                 add("Show: ${filter.label}")
@@ -237,7 +237,11 @@ internal fun GamelistOptionsMenu(
                 add("Jump to letter")
                 add("Random game")
             }
-            if (systemId != null) {
+            // A console system's own rows. The PC Games tab is not a console
+            // system (docs/SPEC.md 7i): its games have no system folder to
+            // import a gamelist.xml from or a Console systems page to open,
+            // and its scrape is the PC one below (Droidtop/tracker#175).
+            if (systemId != null && systemId != PC_SYSTEM_ID) {
                 add("Launch screen: " + (systemLaunchScreen?.label ?: "Ask"))
                 add(SYSTEM_SETTINGS)
                 add("Scrape this system")
@@ -252,10 +256,9 @@ internal fun GamelistOptionsMenu(
             // have no console systemId, so the action above never
             // covered them and there was no way to scrape them at all.
             if (games.any { it.isPcOrEngineGame }) add(SCRAPE_PC_GAMES)
-            // Only inside the PC group itself, whose games occupy this
-            // whole gamelist -- not "All games" or another collection
-            // that merely happens to contain a PC entry, which is not
-            // where a store login belongs.
+            // Only on the PC Games tab itself, whose games this whole list
+            // is -- not a collection that merely happens to contain a PC
+            // entry, which is not where a game folder belongs.
             if (systemId == PC_SYSTEM_ID) add(PC_SETUP)
         }
         add("Close")

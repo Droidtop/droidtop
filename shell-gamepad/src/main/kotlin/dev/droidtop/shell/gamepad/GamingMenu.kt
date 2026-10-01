@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -157,40 +158,73 @@ internal fun ShellChip(
     primary: Boolean = false,
     // The one big button of a page (the PC game page's Play).
     large: Boolean = false,
+    // A primary action that cannot be pressed right now is still drawn,
+    // faded, so the page says what it would do and why not (design
+    // language: "a disabled button that says why").
+    enabled: Boolean = true,
+    // Non-null from a screen that moves ONE cursor of its own through its
+    // one `onPad` handler (the PC Games tab and page, docs/SPEC.md 7i): the
+    // chip then takes no focus and no key of its own and draws the ring
+    // when the caller says it is the selected one. Null is the chip
+    // driving itself through Compose focus, as every other caller uses it.
+    selected: Boolean? = null,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(50)
     val filled = on || primary
+    val isSelected = selected ?: focused
+    val labelColor = when {
+        !enabled -> MenuTokens.OnSurfaceDisabled
+        filled -> MenuTokens.OnSelected
+        else -> MenuTokens.OnSurface
+    }
     Text(
         if (on) "\u2713 $label" else label,
-        color = if (filled) MenuTokens.OnSelected else MenuTokens.OnSurface,
+        color = labelColor,
         style = if (large) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
         maxLines = 1,
         modifier = modifier
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onPad { press ->
-                if (press.action == GamepadAction.A) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable(onClick = onClick)
             .then(
-                if (filled) {
-                    val ring = focused && PadModality.showsFocus
+                if (selected == null) {
                     Modifier
-                        .background(if (ring) MenuTokens.Selected else MenuTokens.Accent, shape)
-                        .border(MenuTokens.FocusRingWidth, if (ring) MenuTokens.Accent else Color.Transparent, shape)
+                        // Ahead of the focus targets, not after them: see [GameCard].
+                        .onPad { press ->
+                            if (press.action == GamepadAction.A) {
+                                onClick()
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        .onFocusChanged { focused = it.isFocused }
+                        .focusable()
+                        .clickable(onClick = onClick)
                 } else {
-                    Modifier.selectionFrame(focused, shape)
+                    // The caller's cursor is the selection; a tap is still
+                    // the press. `clickable` brings a focus target, made
+                    // unfocusable here exactly as the tab bar's are.
+                    Modifier
+                        .focusProperties { canFocus = false }
+                        .clickable(onClick = onClick)
                 },
             )
-            .focusMarquee(focused)
+            .then(
+                if (filled) {
+                    val ring = isSelected && PadModality.showsFocus
+                    val fill = when {
+                        !enabled -> MenuTokens.LaunchDisabled
+                        ring -> MenuTokens.Selected
+                        else -> MenuTokens.Accent
+                    }
+                    Modifier
+                        .background(fill, shape)
+                        .border(MenuTokens.FocusRingWidth, if (ring) MenuTokens.Accent else Color.Transparent, shape)
+                } else {
+                    Modifier.selectionFrame(isSelected, shape)
+                },
+            )
+            .focusMarquee(isSelected)
             .padding(horizontal = if (large) 28.dp else 16.dp, vertical = if (large) 14.dp else 8.dp),
     )
 }

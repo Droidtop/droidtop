@@ -43,7 +43,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [7f. Gaming mode: real, generic ES-DE theme engine](#7f-gaming-mode-real-generic-es-de-theme-engine)
 - [7g. One library across every source (audit + plan, directed 2026-09-01)](#7g-one-library-across-every-source-audit--plan-directed-2026-09-01)
 - [7h. Scraper honesty, and what counts as a game (directed 2026-09-02)](#7h-scraper-honesty-and-what-counts-as-a-game-directed-2026-09-02)
-- [7i. The PC surface — droidtop's own actions, on the theme's own layout (REDECIDED 2026-09-26)](#7i-the-pc-surface--droidtops-own-actions-on-the-themes-own-layout-redecided-2026-09-26)
+- [7i. PC Games — droidtop's own library tab, after Steam (decided 2026-10-01)](#7i-pc-games--droidtops-own-library-tab-after-steam-decided-2026-10-01)
 - [7j. Portrait and touch-first chrome (directed 2026-09-10)](#7j-portrait-and-touch-first-chrome-directed-2026-09-10)
 - [7k. The design system: one spacing scale, one type scale, one colour source](#7k-the-design-system-one-spacing-scale-one-type-scale-one-colour-source)
 - [7k2. Gaming theming: the active ES-DE theme as droidtop's own design tokens (owner direction 2026-10-01, Droidtop/tracker#185)](#7k2-gaming-theming-the-active-es-de-theme-as-droidtops-own-design-tokens-owner-direction-2026-10-01-droidtoptracker185)
@@ -447,8 +447,8 @@ package from the drawer. It now works like this:
   Opened from droidtop's own home screen, B reopens that home screen as the
   explicit "Android" one: a plain finish let Android recreate it with a
   fresh Home intent, which forwards to the default mode (dq-shell2-02).
-  PC and engine games are listed as Gaming's PC grid lists them, one card
-  per game under the game's name (`LibraryGrouping`, §7m).
+  PC and engine games are listed as Gaming's PC Games tab lists them, one
+  card per game under the game's name (`LibraryGrouping`, §7m).
 - A tap or A launches through `GameLaunchActivity.dispatch`, which is
   `Library.launch` (play history and launch-screen memory included).
 - Y or a long press pins the game to the home screen as an ordinary icon: a
@@ -1102,7 +1102,7 @@ is offered on devices that are not handhelds. It contributes:
 
 - the ES-DE theme engine and its themed surfaces (§7f),
 - the gamepad shell and its in-context menus, the Quick Menu (§7f),
-- the PC surface — every PC and engine game as one list (§7i),
+- the PC Games tab — every PC and engine game as droidtop's own library (§7i),
 - enginehost/emulator integration and the per-game runner choice (§7e2b),
 - scraping and metadata (the standing gap, §7),
 - the companion/input surface on a secondary screen (§4c, §4d).
@@ -8403,12 +8403,9 @@ the same care as the art.
   rating, series or links. The 2026-09-24 survey expected the per-game record to be HTML only;
   it is not. Its `gogslug` is not used (for Hollow Knight it names the soundtrack), its
   `provider_games` is.
-- **Where players see it.** A PC or engine game's detail is the focused-game panel beside the
-  library grid (PcLibraryView's FocusedGamePanel -- the 2026-09-28 redecision draws PC games
-  over the theme's frame only, so that panel is the one surface that draws a PC game's own
-  facts): the hero art (the cover when there is none) opens it, the scraped logo, when the
-  scrape filed one in the metadata row (a store install has no ES-DE layout), names the game
-  in its own lettering in place of the title text, and under that an "About this game"
+- **Where players see it.** A PC or engine game's page (`PcGamePage`, the PC Games tab's
+  Y, §7i): the hero art (the cover when there is none) opens it, the game's name and where it
+  came from sit under the art, and the facts are rows under the primary button -- an "About this game"
   section: the description (its first lines, a stop), the developer, publisher, date, genre,
   series and rating, each drawn only when scraped, and one line saying where each field came
   from, in the words the scrape recorded (`FieldSources.LABELS` over the entry's
@@ -8747,297 +8744,177 @@ library scan" shows the answer and changes it: *Ask me* (the unanswered state,
 and the only one that asks), *Fetch automatically* (a later finished walk of
 changed games roots starts the scrape without a question) and *Don't fetch*.
 
-## 7i. The PC surface — droidtop's own actions, on the theme's own layout (REDECIDED 2026-09-26)
+## 7i. PC Games — droidtop's own library tab, after Steam (decided 2026-10-01)
 
-**Superseded.** The 2026-09-10 decision below ("a PC in a box, not an
-ES-DE system") had the PC/engine list break from the theme entirely: its
-own fixed `PcSurface` grid (`PcGameCard`, a `LazyVerticalGrid`, its own
-header, its own chip row, its own help row), rendered the same regardless
-of which theme was active. Live use showed what that actually was: "we're
-essentially using the gamenative menu with our theme, but its layout and
-stuff need to be reactive to the theme" (the owner, 2026-09-26). A PC or
-engine game is a game in Gaming mode's one library, and the reason every
-console system's gamelist is themed is the same reason a PC game's should
-be: so the games a person is looking at read as the theme they picked,
-not as a screen the theme happens to be adjacent to.
+**The decision (owner, 2026-10-01, verbatim):** "The PC tab is still
+pretty terrible. I don't like the grid and weird backing and stuff. We
+need a different approach to it. I think having two games tabs instead
+of one might be better. The current games tab will be 'Retro Games' or
+something, and then the second will be 'PC games'. And the PC games tab
+will take after steam or some other mobile PC game interface, or a
+hybrid of them all. This also gets rid of the Windows game theming
+stuff." And: "It seems like we don't control the PC tab using the same
+controls system, we might want to fix that." (Droidtop/tracker#183; it
+supersedes the 2026-09-30 #148 design and folds #170, #173 and #178.)
 
-**The redecision.** PC and engine games are now a `GameGroup.Pc` gamelist
-like any console system's (§7f): the SAME `EsDeThemedView`/
-`EsDeSystemListView` machinery, the active theme's own gamelist view
-(its `<carousel>`/`<grid>`/`<textlist>`, whichever it declares, or none),
-its element positions, sizes, variants and aspect ratios, and its
-metadata elements (`md_image`, `md_video`, `md_description`,
-`md_developer`, `md_rating`, `md_lastplayed` and the rest) bound to the
-focused game exactly as a console ROM's are. `PcSurface`'s grid,
-`PcGameCard` and its own chip row and help row are deleted outright, not
-kept as a fallback: one mechanism draws every gamelist now.
+Gaming has two game tabs now, `GamingSection.GAMES` ("Retro Games") and
+`GamingSection.PC_GAMES` ("PC Games"), then Apps and Settings:
 
-What does NOT change: the runner model, availability states, overrides,
-the game's own actions, ProtonDB, the Lutris import, and same-game merge
-(all below, unchanged from 2026-09-10) — none of that is an ES-DE
-concept, so none of it moves into the theme.
+- **Retro Games** is the ES-DE-themed section exactly as §7f describes
+  it -- the theme's system view, the theme's gamelists, ES-DE's own
+  behaviour -- with every PC and engine game taken out of it. It has no
+  PC card, no `pc`/`windows` theme folder, no frame-only render and no
+  PC branch anywhere: `GameGroup.Pc`, `EsDeThemedView(frameOnly)`,
+  `esDeElementBindsGame`, `declaredListRect`, `PcLibraryView` and
+  `ThemeAssets.pcGroupThemeFolder` are deleted, not kept as fallbacks.
+- **PC Games** is droidtop-native and never drawn by an ES-DE theme. What
+  it takes from the active theme is what every other droidtop-drawn
+  surface takes (Droidtop/tracker#185): colours and fonts through the one
+  token layer (`MenuTokens`, `MaterialTheme`), never a theme's frames,
+  wordmarks or system art around PC content. The tab reads tokens only;
+  it names no colour or size of its own.
 
-**Revised again the same day: an expanded themed view, not a plain one
-(owner direction 2026-09-26).** The redecision above still had this
-section's own actions reachable only through A opening a fixed detail
-screen, which read as "the gamelist, then a second, different screen" —
-not the single coherent surface a theme's own PC card should open into.
-The owner's correction: "We don't want it to be the same as the others,
-it's an expanded view, because PC is so much bigger... [Extended] with PC
-regions that follow the theme's styling where the theme has no slot...
-We can also add an L2 menu for extra PC actions and stuff." Three changes
-from this:
+**One rule decides the tab a game is on** (`LibraryEntry.onPcGamesTab`,
+`pc/PcSurface.kt`): PC Games holds every game that is not a console
+system's ROM -- a detected engine game (which carries no systemId), a
+store or Wine title, and whatever a person put in a `pc` folder; Retro
+Games holds the rest. Both tabs filter the one folded library by that
+rule, so no game is on both or on neither, and `gameGroupKey` (the
+tested grouping answer) says `system:pc` for exactly those entries. The
+`pc` system id stays the tab's: its `downloaded_media` folder, its scrape
+and its `gamelist.xml` are unchanged.
 
-- **A launches, exactly like a console ROM's, when the runner is ready,
-  and runs the one setup action when it is not** — never opens a menu.
-  This is the same decision the old fixed detail screen's primary button
-  always made ("Play" when ready, *is the setup action* otherwise), made
-  once now in the ONE launch handler
-  (`PcRunnerOptions.resolveAndPlay`, called from `GamepadShell`'s
-  `onLaunch`) rather than inside a screen of its own, so the gamelist's A
-  and `PcGameMenu`'s own "Play"/"Set up" row can never disagree.
-  **One exception (2026-09-29, Droidtop/tracker#140):** the Windows
-  system-files setup is the one action that downloads several hundred
-  megabytes, so the press alone never starts it. Both implicit routes --
-  A on a not-yet-set-up Windows game, and the menu's own "Set up" row --
-  stop on an offer that names what would be fetched (Wine and the
-  Windows base system) and its size, and declines cleanly
-  (`PcRunnerOptions.windowsSetupConsent`, installed by the shell the
-  same way `LaunchDisplay.chooser` is; a process with no shell keeps the
-  gate open, because its callers — Settings' setup row, the Steam
-  sign-in's button — state the cost before the press). Once accepted,
-  the setup's own progress lines render as chrome, not as the red
-  launch-failure banner they used to share: a multi-minute download
-  painted as an error is what made the silent start read as a crash
-  (rig, build 1101: "Installing Windows system files... 0%" on a red
-  banner, no prompt — verify-2026-09-29/bst/w1.png).
-- **The PC gamelist is an EXPANDED themed view, not a plain one.** It is
-  still the active theme's own gamelist -- its element positions, sizes,
-  variants, aspect ratios, fonts and colours, exactly as any console
-  system's -- extended with two droidtop-drawn regions the ES-DE element
-  schema has no slot for at all, layered OVER the theme's canvas rather
-  than shrinking it (the same rule the shell's help row already follows,
-  §7j): a filter/organisation strip (source/store, engine, install state
-  -- `PcExpandedOverlay`, replacing `PcSurface`'s own retired chip row)
-  and a compact per-focused-game info strip (resolved runner, source,
-  play time), both in droidtop's own palette
-  (`MenuTokens`) so they read as droidtop's addition to the theme rather
-  than a second competing look.
-- **L2 opens `PcGameMenu`,** an ES-DE-style in-context menu (the same
-  `GuiGamelistOptions` PATTERN `GamelistOptionsMenu` already uses for the
-  whole gamelist's Select-button actions, scoped here to ONE game) for
-  everything ES-DE genuinely has no concept of: the resolved runner and
+### The layout, and why
+
+The reference the owner named is Steam, on a handheld: the Steam Deck's
+library and Steam Big Picture. What those do, and what the tab does with
+it:
+
+| Steam Deck / Big Picture | Others | PC Games |
+| --- | --- | --- |
+| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves** on Home: Continue playing, Update available, Favourites, Installed (only when something is not), one per store (Steam, GOG, ...), one per engine family (Visual Novels, RPG Maker, Windows, ...). `pcShelves`, `pc/PcShelves.kt`. |
+| Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip**: Home, All games, Installed, Continue playing, the person's saved views, Filters and sort. One press to a view, one press to the filter dialog. The strip is the one place filter, sort, search and saved views are reached (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
+| 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it, the name under it on one line (scrolling while selected, the one place scrolling text is allowed, §7k), a plate with the name and kind where there is no art, a small favourite star and an "Update" mark in the corners. No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is a share of the window's height (`capsuleWidth`, 104-176dp), so the console shows a shelf and the top of the next, and a phone held upright gets two columns. |
+| Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window): the hero (16:9) or capsule art as large as its column allows; the name and where it came from under the art; ONE big primary button that says what A does (`PcPlayState`: Play, Install, Set up, Choose a runner, Folder is missing -- drawn faded, with its reason under it, when it cannot be pressed); Favourite and Options beside it; and under them every fact droidtop has as rows -- Play time, Last played, Size, Owned on, Version, Update, Runs with, Engine, Compatibility, Developer, Publisher, Released, Genre, Series, Rating, Players, About, where the facts came from. Only facts that exist are rows. Achievements are not a row because droidtop has no achievement data (#143); when it does, this is where the row goes. |
+| The page's rows are the same rows as Steam's settings | | **Settings' rows.** The page's facts are `MenuRow(uniformHeight = true)` at `uniformRowHeight()`, with one content-sized value column (`LocalValueColumnWidth`) and the selected row's full text in the detail strip under the list (`CatalogDetailStrip`, §7k "Text in rows and tiles"); a long description is read there, never by growing a row. |
+| A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A is the primary action** (owner, 2026-10-01: "A is Primary Action. We can make it contextual using the pills."): on a capsule A does what the hint pill says -- Play when the runner is ready, else the one setup step (`PcRunnerOptions.resolveAndPlay`, the one launch handler); Y opens the page. The page exists for looking and for the game's own actions, never as a step in front of Play. |
+
+Why shelves and not the 2026-09-30 grid-plus-hero: the hero panel was a
+second surface repeating what the page says, drawn on a theme frame the
+owner read as "weird backing"; a shelf home puts the games a person
+touches first (what they were playing, what has an update) on the first
+screen with no panel at all, and the page is one press away for the
+facts. Why a strip and not the one Browse button: the 2026-09-30 design
+removed the chip row because a horizontal row could not take Left/Right
+inside a themed gamelist whose Left/Right switch systems; PC Games is not
+a gamelist and has no system to switch, so Left/Right are free, and the
+Deck's library tabs are the better shape.
+
+### The controls
+
+Everything goes through the one input pipeline (§6e; Droidtop/tracker#178
+closed by this). The tab is ONE focus target with ONE `onPad` handler
+moving ONE cursor; no capsule, chip or row takes Compose focus or a key
+of its own (`ShellChip(selected = ...)` draws the ring where the caller's
+cursor is and takes no focus, the same chip every other screen drives by
+focus). The face-button swap therefore applies to every press here, as
+the pipeline applies it.
+
+- **Up/Down** move between the strip, the shelves (each shelf remembers
+  where its cursor was, as the Deck's rows do) and the grid's rows; at the
+  top the cursor lands on the strip, and Up on the strip is consumed: the
+  D-pad never reaches the tab bar (§7j; owner, 2026-09-27).
+- **Left/Right** move along the strip, along a shelf, or along a grid row
+  (`gridPadTarget`, the one card-grid edge rule), never wrapping
+  (`menuStep`: ES-DE's menus do not loop). A held direction repeats at
+  the chrome cadence and the selection is kept fully in view by
+  `keepInView` on the strip, the shelf row, the shelf column and the grid
+  -- the four containers this tab has, one mechanism each.
+- **A** runs the focused capsule's primary action, or presses the focused
+  chip. **Y** opens the page. **X** toggles favourite. **L2** opens the
+  game's own menu (`PcGameMenu`, unchanged in substance: the runner and
   its picker, Wine/container settings, ProtonDB, the Lutris import, the
-  F95 link and update state, same-game merge, and versions/segments.
-  Checked against every other binding in `GamepadShell.kt`/`QuickMenu.kt`
-  before choosing it: L2 was unclaimed (L/R are the sibling-system jump,
-  R2 opens the Quick Menu on hold, L3/R3 are unused) -- the one gamepad
-  region with nothing else on it. Y still opens the same menu for a
-  PC/engine game (a player who has not learned the L2 convention still
-  finds it, the same row Y already opens for a console ROM's own "Info"
-  would have been if PC still needed one), and the menu is reached by
-  touch through the gamelist's own hint row exactly like every other
-  bound action (design language: "the hint row is the touch route to pad
-  buttons") -- no on-screen row is L2-only.
-  `PcGameMenu` replaced the old fixed-layout `PcGameDetail` screen
-  outright (renamed, not kept as a second implementation): its hero-art
-  header and scraped "About this game" text are gone from the menu
-  itself. The 2026-09-26 revision believed the theme's own gamelist
-  widget would keep showing a focused PC game's art and its
-  description/developer/rating/genre while browsing, the same as a
-  console ROM's; the 2026-09-28 frame-only redecision took PC games off
-  that widget entirely, so those facts live on the focused-game panel
-  instead (7h, "Where players see it" -- restored there, never dropped).
-  What remains here is a Dialog-hosted menu over rows this section's
-  action groups already produced (`rememberPcActions`), unchanged in
-  substance.
-  Since 2026-09-29 those rows are drawn under three section headers
-  (Play, About, Fix and advanced; 13, "Gaming mode"), the same rows and actions,
-  filed by the question a player opening the menu is asking. Since
-  2026-09-30 only the first of those is the menu's top page: About and
-  Fix and advanced are pages it opens (revision at the end of this
-  section's 2026-09-28 redecision, above).
+  F95 link and update, merge and versions, under Play / About / Fix and
+  advanced); the header's L2 pill (§7k) is live on this tab exactly while
+  a game is under the cursor. **Select** opens the list's options
+  (`GamelistOptionsMenu` with the `pc` system id: Jump to letter, Random
+  game, Get games, Scrape PC & engine games, PC setup, Close -- the
+  console-only rows Launch screen, System settings, Scrape this system and
+  Import gamelist.xml are not offered for it, Droidtop/tracker#175).
+  **B** goes back one level: from a view to Home, from PC setup to the
+  library; on Home it is the shell's top level and does nothing.
+- **Touch is the same cursor.** A tap on a capsule that is not selected
+  selects it (pointer and focus are one selection, and the hint row then
+  names what A would do); a tap on the selected capsule is A (design
+  language: "a second activation confirms"); a long-press is Y. A tap on
+  a chip presses it. On the page, a tap on a button or a row is the same
+  press as A on it. Nothing on the tab is reachable by touch only or by
+  pad only.
+- **The hint row is the tab's own** (`HelpRowClaim.SCREEN`, so the shell
+  draws no second bar): A names the focused game's primary action from
+  `PcPlayState` ("Select" on the strip), Y Game page, X Favourite, L2
+  Game options, Select Options, B Back when there is a level to leave.
+  Each is a `HintBinding` gated on its action really dispatching (§7j).
+  Over the PC setup screen the claim is `NONE` and the shell's bar draws,
+  because that screen has no row of its own.
 
-**PC is always visible (owner direction 2026-09-26: "PC should always be
-visible").** Unlike a console system, whose card only ever appears once
-it holds a game, `GameGroup.Pc` is forced into the carousel's group list
-regardless of how many PC/engine entries the library currently has. An
-empty PC group opens straight into first-run setup (`pc_stores`, the same
-settings-catalog screen the "Stores and folders" row and this section's
-own "First run" paragraph below already describe) instead of an empty
-gamelist -- this is also what fixes the gap the previous revision above
-left open: the group could not previously be OPENED at all with zero
-entries, so its own documented first-run screen had no way in.
+### Where the state lives
 
-**What still costs a themed screen its point of difference.** ES-DE's
-element schema has no element type for a runner, a prefix, install state
-or a store login, so the theme's own canvas alone was never going to
-carry a PC game's own concerns -- `PcGameMenu` and the two expanded-view
-strips exist for exactly that reason. The theme owns the list's layout;
-it was never going to own the runner picker.
+`PcGamesState` (view, query, cursor, open page or menu, setup level) is
+held by the shell and saved with it, for the same reason `ShellBackStack`
+exists: the tab is rebuilt whenever another tab is drawn, and a tab that
+owned its cursor lost it on every L1/R1. The grid's query persists per
+list through `LibraryViewPrefs` as before, so a filtered view stays
+filtered on the way back.
 
-**Known gap, left open rather than shipped half-built:** `GamelistSort`
-(name/rating/release date/last played) has no "size" option, unlike
-`PcSurface`'s own retired sort -- the expanded view's own filter strip
-covers source/engine/install state, which was the larger of the two
-gaps the previous revision above named, but a size sort still has no
-home. Real follow-up work, not implemented in this pass.
+### Performance
 
-The original decision text follows, still current except where a
-revision above says otherwise.
+Nothing reads a disk while drawing. The fold into one card per game
+(`LibraryGrouping`, §7m), the shelves (`pcShelves`, one sort per shelf)
+and the filtered, sorted grid (`LibraryQuery.applyTo`) are each computed
+on `Dispatchers.Default` as the library publishes or the query changes,
+and the previous answer stays on screen until the new one lands. A
+capsule reads in-memory `LibraryEntry` fields and asks Coil for its art.
+The one lookup that costs a folder walk, the focused game's resolved
+runner (`rememberPcPlayState`), runs for that one game off the main
+thread, as it always did. Shelves are capped at `SHELF_LIMIT` (24)
+capsules with the count in the heading ("Installed · 171"); the full set
+is the matching view. A library of thousands of games is a grid of
+thousands of lazily composed capsules, which is what `LazyVerticalGrid`
+is for; nothing here grows with the square of the library.
 
-**Redecided again 2026-09-28: droidtop's own content over the theme's FRAME
-only, not the theme's gamelist widget.** Live use of the 2026-09-26
-"expanded view" (above) showed the shape it actually produced: PC and
-engine games still rendered through the theme's own primary list widget
-(a real `<carousel>`/`<grid>`/`<textlist>`), which is right for a console
-system with a handful of boxart-shaped entries and wrong for PC, whose
-library is orders of magnitude larger and needs real per-game facts
-(runner, store, install/update state) legible AT A GLANCE, not just on
-L2. The owner's correction: "take the GENERAL menu layout from the
-selected theme, but fill the rest in -- a blanket list like we currently
-have for ArtBookNext is a terrible idea." Two changes from this:
+### Empty, and setup
 
-- **The PC group's list is now a frame-only themed render.** `EsDeThemedView`
-  gained a `frameOnly` mode (`esDeElementBindsGame`, `EsDeThemeRenderer.kt`):
-  every element that binds to the FOCUSED GAME -- the primary list widget,
-  `md_*` metadata, badges, rating, gameselector-fed art -- is dropped: only
-  the theme's background, colours, fonts, header/logo, help area and
-  proportions remain. `PcExpandedOverlay`'s two strips (layered OVER the
-  theme's own full render) are retired along with the full render itself
-  for this one group; `PcLibraryView.kt`'s `PcLibraryContent` draws the
-  content area instead: a cover-art grid (`GameCard`, reused unchanged from
-  every other card grid in this shell -- missing art now takes an optional
-  theme-coloured plate, `GameCard`'s new `plateColor` parameter, the same
-  per-system accent `SystemThemeColors.forSystem` already gives a drill-down
-  screen) and a focused-game panel (hero art or the same plate, the
-  scraped logo, the "About this game" facts with the line saying where
-  each field came from -- restored to this panel 2026-09-29, 7h "Where
-  players see it" -- the description, playtime, the resolved runner,
-  source/store, update state, and a note that ProtonDB is asked for on
-  `PcGameMenu` rather than fetched here -- compat
-  info stays "evidence, never a gate," so this panel never fetches it on its
-  own). `PcGameMenu` (L2, and now Y/long-press through `GameCard`'s own
-  binding) is unchanged: everything ES-DE has no slot for still lives there.
-- **Filter, sort and search are the one shared model (since 2026-09-30
-  behind one Browse button and the filter dialog, see the revision below;
-  first built as clearable chips), not the console Select-menu's
-  "Sort"/"Show" rows.** `dev.droidtop.shell.
-  gamepad.query.LibraryQuery` (`LibraryQuery.kt`/`LibraryQueryUi.kt`) is a
-  UI-free, Context-free search+filter+sort pass any list can use --
-  `LibraryQueryScope` states which facets and sorts a list offers, `apply
-  To` filters then sorts, and `LibraryFilterDialog`/`LibrarySearchDialog`
-  are the one filter dialog and search field (the chip row,
-  `LibraryQueryChips`, was deleted 2026-09-30). The PC library's own scope offers store, engine, install state,
-  favourites, played, recently played, genre, developer, year, update,
-  missing art and hidden as facets (never runner/ready/ProtonDB -- those
-  cost a folder walk or a network ask per entry, which this pass never
-  pays for a whole list at once) and name/last-played/playtime/year/
-  rating/SIZE as sorts -- closing the "no size sort" gap the 2026-09-26
-  pass left open, by the same mechanism rather than a patch to
-  `GamelistSort`. "Continue playing" and "Installed" (owner direction) are
-  this model's own built-in `NamedLibraryView`s, exactly like a person's
-  own saved view -- one mechanism for both, not a second "sections" concept.
-  `GamelistOptionsMenu`'s "Sort"/"Show" rows are hidden for the PC group
-  specifically (`systemId == PC_SYSTEM_ID`), since the chip row is now the
-  one place that filter and sort live for it; its `"PC setup"` row (renamed
-  from "Stores and folders" once store sign-in moved to Settings' "Accounts
-  and sources") is unchanged.
-- **Console gamelists are untouched.** `LibraryQuery` is shared
-  infrastructure, not wired into any console system's list in this pass --
-  a real follow-up, not implemented here.
+An empty PC library opens on **PC setup** (`pc_stores`, the one
+settings-catalog screen for game folders, the Windows system files and
+Downloads -- store sign-ins are under Accounts and sources, §7f), drawn
+in place, instead of empty shelves; the same screen is the options
+menu's "PC setup" row and B leaves it. Known empty, not merely unfolded:
+the fold runs off the main thread and the tab shows a spinner, never a
+false "you have nothing", while it runs.
 
-**The PC library is a controller-first storefront view (owner, 2026-09-30,
-Droidtop/tracker#148): "the PC UI is still pretty broken. We probably need
-to redesign that tab specifically. There's an extra menu that I can't
-scroll through with button inputs, etc, and it's kinda terrible for a PC
-gaming UI."** The reference is Steam Big Picture and the Steam Deck
-library: a grid of art, a game page with one big Play or Install button,
-and a short menu of grouped actions. Reading the code found the "extra
-menu" and two more places where a pad had no way in: `PcGameMenu` was one
-flat list of up to two dozen rows (Runs with, Play, Install, F95, links,
-scrape, collections, favourite, ProtonDB, replacement, merge, engine,
-versions, the runner's settings), moved by a virtual cursor that acts on
-the key UP edge only (no repeat down a long list, and the unhandled down
-edge reaches Compose's own focus search); the filter chip row above the
-grid had no D-pad route at all (the grid answered Up at its top row, and a
-horizontal chip row cannot take Left/Right because those switch the
-system); and the focused-game panel scrolled by finger only. Not
-reproduced on a device from the session that made this change; the shape
-of the fix is that no part of the PC tab is a long list or a touch-only
-surface any more. What changed:
+### Known gaps, left open rather than shipped half-built
 
-- **A is the focused item's primary action (owner decision 2026-10-01,
-  Droidtop/tracker#148).** Its hint pill always names that action. Console
-  game lists keep launching on A, as ES-DE does. For a PC card, A plays
-  when its runner is ready and otherwise performs the next setup step
-  (Install or Set up); when no runner can act, the next step is to choose
-  a runner. The focused card, hero panel, game page, L2 menu and hint row
-  use the one `PcPlayState` answer for that label and state. Y or a
-  long-press opens `PcGamePage`
-  (`pc/PcGamePage.kt`), a full-bleed Dialog: art on the left; on the right
-  the name (or the scraped logo), ONE big primary button (Play, the one
-  setup step that makes it Play, or why it cannot, from `PcPlayState`),
-  Favourite and Options beside it, and under them the About facts and
-  where each came from, a column of focus targets the D-pad scrolls
-  through. The page has no key handling of its own: buttons and blocks
-  are real focus targets, so the pad's focus search moves between them, a
-  focused block scrolls itself into view, and B is the system Back.
-  `PcPlayState` (`pc/PcPlayState.kt`) is the ONE answer to "what does the
-  primary button say and can it be pressed", read by the library's hero
-  panel, the page and `PcGameMenu`'s first row.
-- **The focused-game panel is short and never scrolls.** Art, name, the
-  same big Play pill (a tap on it is A), the runner, source, play time
-  and update, and three lines of description; everything longer lives on
-  the page. The "About this game" facts and the field-source line moved
-  there with it (7h), unchanged.
-- **One Browse button replaces the chip row.** Sitting in front of the
-  grid, it states the current shelf, game count, sort and search; A opens
-  the filter dialog (`LibraryFilterDialog`), which now also carries the
-  built-in shelves (All games, Continue playing, Installed) beside the
-  person's saved views, and a Search row. Up from the top row of the grid
-  lands on it through the grid's `focusProperties` (not a key handler),
-  and Up from it is cancelled, so the tab bar is never reached (design
-  language: the D-pad never reaches the top bar). `LibraryQueryChips` is
-  deleted; "nothing is buried behind a dialog that a chip could have
-  shown" (2026-09-28) gave way to every control being reachable by pad,
-  because a horizontal chip row cannot take Left/Right.
-- **`PcGameMenu` is short.** The top page holds Play (or the setup step),
-  Runs with, Install/Manage install, Add to favourites, "Game info and
-  links" and "Fix and advanced" (the latter two only when they have
-  rows), and Close: at most nine rows. The two long lists, with the
-  rows they always had, are the pages those two rows open; B goes back to
-  the top page before it closes the menu. B is answered on both key edges
-  so the platform never turns it into a second Back.
-- **Input stays on the existing mechanisms.** Controller input is being
-  unified into one pipeline (Droidtop/tracker#152); this change adds no
-  new key handler beyond `PcGameMenu`'s existing virtual-cursor one
-  (adjusted for the pages) and uses standard focus (`focusProperties`,
-  focusable blocks, `ShellChip`) everywhere else, so there is little to
-  move. The swapped-confirm layout (`ControllerPrefs.swapConfirmCancel`)
-  is not honoured by the page's standard-focus A and B; that follows with
-  the pipeline.
+- **"Recently added"** is a shelf the owner named and the tab does not
+  have: the library index keeps no first-seen time for a game. Adding
+  one (a `firstSeenEpochMs` fact on the index row, written when a walk
+  first finds a path, never by a rescrape) is library-core work for a
+  free worker; the shelf is one line in `pcShelves` once the fact exists.
+- **Achievements** need a source (#143) before the page can carry them.
+- **A rig check** of the tab by pad and touch on the emulator, and of the
+  swapped face-button layout on the page, is listed in this change's
+  commit message.
 
-The original decision text below predates BOTH the 2026-09-26 and
-2026-09-28 revisions; where they disagree with it, the revisions above win.
-
-The user's framing (2026-09-10): "we explicitly want THAT category to
-break from the ESDE theme, because of how much infrastructure we have to
-build. It needs to be a PC in a box, like droidtop, controlling
-detection, runners, and etc based on availability." Design pass and
-build plan: `/root/coordination/research/pc-in-a-box/README.md`.
+The runner model below is unchanged by the redesign.
 
 ### Scope
 
-The surface owns every game that is not a console ROM and not a native
-Android app: store games (Steam, GOG, Epic, Amazon), Windows and Linux
-games in a folder, and engine games (Ren'Py, RPG Maker, KiriKiri and the
-rest of the engines database). It owns their discovery, their detection
-results, the choice of what runs them, their install and prefix state,
-their per-game overrides, and their metadata actions.
-
-It does not own console ROMs, native Android apps, or anything in the
-theme's system view other than the `pc` card itself.
+The tab owns every game that is not a console ROM and not a native
+Android app: store games (Steam, GOG, Epic, Amazon, itch.io), Windows and
+Linux games in a folder, and engine games (Ren'Py, RPG Maker, KiriKiri
+and the rest of the engines database). It owns their discovery, their
+detection results, the choice of what runs them, their install and prefix
+state, their per-game overrides, and their metadata actions.
 
 **What "every game in a folder" means on disk.** A games root is walked
 down through folders that are not games until games are detected, bounded
@@ -9093,27 +8970,41 @@ it and never gates a launch enginehost would otherwise resolve.
 **Resolution order: availability first, the database's priority second.**
 The engines database's `strategies` list only ranks what is already
 available. The resolved runner and the reason it won are stated on the
-game, which is what turns that priority from an invisible constant into
-something the user can see. The runner's name carries the engine where
-the engine is what it means — "enginehost (Ren'Py) — the default for this
-engine" — because enginehost runs a Ren'Py game through one plugin and an
-RPG Maker game through another, and "enginehost" alone does not say
-which. One engine-naming table serves that row, the picker and
-"Install the … plugin".
+game's page ("Runs with"), which is what turns that priority from an
+invisible constant into something the user can see. The runner's name
+carries the engine where the engine is what it means — "enginehost
+(Ren'Py) — the default for this engine" — because enginehost runs a
+Ren'Py game through one plugin and an RPG Maker game through another, and
+"enginehost" alone does not say which. One engine-naming table serves
+that row, the picker and "Install the … plugin".
 
 **Overrides.** Per-game runner choice is an override over that stated
-default, editable where the game is and clearable back to the default.
-This is the Daijishō default-with-priority model §7g already commits to,
-now applied to PC entries as well as engine ones.
+default, editable where the game is (`PcGameMenu`) and clearable back to
+the default. This is the Daijishō default-with-priority model §7g already
+commits to, now applied to PC entries as well as engine ones.
 
 **Honesty about what cannot run yet.** A runner whose machinery exists but
 whose output the user cannot see is **Needs setup with the real reason**,
 not Ready. A Play button that is known in advance to produce nothing is
-worse than an honest row, and the surface may not ship one. The Wine row
+worse than an honest row, and the tab may not ship one. The Wine row
 was that case until the renderer seam landed (§5b) and is now Ready when
 the environment is provisioned; the rule and its one build-level switch
 stay, because the next backend behind the same seam (FEX/arm64ec) will
 need them again.
+
+**The primary action is one decision** (`PcPlayState`, `pc/PcPlayState.kt`):
+"Play" when the resolved runner is ready, the one setup step's own name
+when it is not (Install, Set up), "Choose a runner" when nothing on this
+device offers the game, "Folder is missing" for a game the walk no longer
+finds. The capsule's hint pill, the page's big button and `PcGameMenu`'s
+first row all read it, and A runs `PcRunnerOptions.resolveAndPlay`, so
+the four can never disagree. **One exception (2026-09-29,
+Droidtop/tracker#140):** the Windows system-files setup downloads several
+hundred megabytes, so the press alone never starts it: A on a
+not-yet-set-up Windows game and the menu's "Set up" row both stop on an
+offer that names what would be fetched and its size
+(`PcRunnerOptions.windowsSetupConsent`), and the setup's progress lines
+render as chrome, never as the launch-failure banner.
 
 **Root never gates a Gaming game.** Native Linux inside a container
 needs root today and is therefore "not on this device" on an unrooted
@@ -9141,74 +9032,15 @@ instead of offering a launch that cannot work. Root remains desktop-only.
   another app's private data. It is deleted, with its settings rows.
   Signing in to Steam/GOG/Epic/Amazon/itch.io in droidtop rebuilds the library.
 
-### Views
-
-**Entry point.** The theme's system card for the PC group, with the
-theme's own transition. **The card never wears DOS or IBM branding**
-(decided 2026-09-25): ES-DE's `pc` system is IBM PC and DOS and every theme
-draws it that way, so the group themes as `windows` (ES-DE's Microsoft
-Windows system) when the active theme's system view declares `windows` art
-that exists, and otherwise as a folder no theme ships
-(`ThemeAssets.NEUTRAL_PC_THEME_FOLDER`), so every per-system element falls
-through to the theme's own defaults and the carousel draws the plain name
-"PC". droidtop fabricates no art for it. The same folder is what the
-system view, its neighbour slots and the accent read, since they all ask
-through the group's one theme key; the companion screen and Desktop name
-the group in text only. The `pc` id itself stays the group's: its system
-id, its `downloaded_media` folder and its scrape. B returns to the carousel with focus
-on that card. Nothing else in the system view changes.
-
-**Library (REDECIDED 2026-09-26, revised again the same day -- see the
-top of this section for both).** The PC group's list is the active
-theme's own gamelist view, EXPANDED — the same `EsDeThemedView`/
-`EsDeSystemListView` call every console system's gamelist renders
-through, on `GameGroup.Pc`'s own folded, one-card-per-game list
-(`LibraryGrouping`, §7m), laid out, positioned and sized by the theme,
-showing the theme's own `md_image`/`md_video`/`md_description` and the
-rest for whichever game is focused, moving by the theme's own
-`<carousel>`/`<grid>`/`<textlist>` or, absent one, droidtop's headless
-per-game Up/Down (the same fallback a themeless console gamelist already
-used) — PLUS `PcExpandedOverlay`'s two droidtop-drawn regions layered
-over that same canvas without shrinking it: a source/engine/install-state
-filter strip (`PcSurface`'s own retired chips, filtering this gamelist
-instead of a grid of its own) and a compact resolved-runner/source/
-play-time strip for the focused game. The group is always in the
-carousel, even with zero games, opening straight into first-run setup
-when it is empty (see the top of this section).
-
-A game's actions: A launches when the resolved runner is ready and runs
-the one setup action when it is not, exactly like a console ROM's A (see
-the redecision above — this no longer opens a screen). B returns to the
-carousel, the shell's own back route in both its forms, matching every
-other themed gamelist. X toggles favourite in place. Y and L2 both open
-`PcGameMenu`, an in-context menu over everything ES-DE has no slot for:
-the resolved runner and its picker, Wine/container settings, ProtonDB,
-the Lutris import, the F95 link and update state, merge, and
-versions/segments — there is exactly one place to look for what can be
-done with a game beyond playing it. Select opens `GamelistOptionsMenu`
-for sort/scrape/"Stores and folders", the same as any system's gamelist.
-
-**Game detail.** In order: identity; a **Runs with** row carrying the
-resolved runner, its reason, and the picker; a primary button that is
-Play when the runner is Ready and *is the setup action* when it is not;
-install and storage actions for store games; prefix and graphics; saves;
-controls; engine settings; metadata, scrape, collections, favourite and
-hide; and compatibility. The download queue is not this game's and lives
-under Stores and folders. While the primary button is focused the hint
-row names what A does ("A Play", "A Set up"; "A Launch" on a console or
-app detail). Art narrower than 320px is not stretched across the hero:
-the plate is drawn without it. An app's detail draws its icon at icon
-size on the plate and offers App info and Uninstall (Android's own
-screens); B is the hint row's, never a Back button beside it.
-
 **Compatibility is evidence, never a verdict and never a gate.** It is
-other people's results on other hardware. It is shown factually, it may be
-filtered on by the user's own act, and it may never hide an entry, reorder
-the library, or block a download (directed 2026-09-01).
+other people's results on other hardware. The page's Compatibility row
+says so in as many words, it may be filtered on by the user's own act,
+and it may never hide an entry, reorder the library, or block a download
+(directed 2026-09-01).
 
 **ProtonDB, read-only, asked for rather than fetched (§7e3, built
 2026-09-25).** For a game with a Windows route or a known Steam app id,
-the detail offers a "ProtonDB" row; selecting it looks up
+`PcGameMenu` offers a "ProtonDB" row; selecting it looks up
 `protondb.com`'s own public summary endpoint and, once found, opens
 ProtonDB's own page for that app rather than droidtop rendering a
 verdict of its own. The lookup runs only on selection, never on open —
@@ -9221,59 +9053,13 @@ game of EXACTLY the same name (`ProtonDbClient.steamAppIdFor`) — a
 similar name is a suggestion, not an automatic identity, so it is never
 guessed.
 
-**First run.** An empty PC library offers concrete repairs — sign in to a
-store (Steam, GOG, Epic, Amazon, itch.io), add a games folder, set up Windows games, see what is downloading
-— never an empty grid. They are optional, skippable, and reachable again
-from the surface's options menu, which is the SAME list: implementation
-showed that "three first-run cards" and "the options menu" were the same
-four actions, so they are one settings-catalog screen (`pc_stores`,
-registered by `:app`) rendered in place by the catalog navigator the
-shell's settings already use, rather than two implementations of the same
-rows. Each row states the state it found — whether a store is signed in,
-how many game folders exist.
-
-### Relationship to the theme engine
-
-**Redecided 2026-09-26** (see the top of this section): the theme now
-owns the system view, the `pc`/`windows` card and its art, AND the
-gamelist — its element positions, sizes, variants, aspect ratios and
-metadata bindings for a PC or engine game, exactly as for a console ROM.
-It needs no theme patch to do this: a theme's `windows` art where it has
-some, its own defaults where it does not, the same fallback the entry
-point already used before this redecision.
-
-What the theme still does not, and structurally cannot, own: a runner, a
-prefix, install state or a store login. ES-DE's element schema has no
-element type for any of those, and its gamelist models "a game and its
-metadata" rather than "a game, four runners and an override" — so that
-half of this section (the game's own detail screen, its sections, the
-Lutris import, ProtonDB) is unchanged droidtop UI, reached from the
-themed gamelist via A on a game (opens detail, not launch) and via
-Select's `GamelistOptionsMenu` ("Stores and folders"), never a fixed
-screen drawn on top of the theme's canvas.
-
-Engine games fold into this one PC entry, with engine as a filter inside
-it, rather than appearing as invented per-engine systems in the carousel:
-the shell has ONE group for the PC category, and it owns the `pc` system
-id and theme folder outright. Everything that is not a console system's
-ROM belongs to it — a detected engine game (which carries no system id at
-all), a store or Wine title, a Linux-container game, and whatever a user
-put in a games-root folder named `pc`, which can no longer become a
-second card of its own that this surface would then render empty.
-
-Droidtop's own chrome that the theme genuinely does not reach — the
-game's detail screen, the Quick Menu, the settings catalog and the
-adopted gamenative dialogs — still takes its colour and type from one
-droidtop palette, not a separate look per screen.
-
 ### Relationship to the Quick Menu
 
-The surface is a shell screen, so the Gaming Quick Menu (§7f) opens over
-it unchanged. In-game is a separate surface and gets no new mechanism: an
+The tab is a shell screen, so the Gaming Quick Menu (§7f) opens over it
+unchanged. In-game is a separate surface and gets no new mechanism: an
 enginehost game's in-game menu is enginehost's own, a Wine game's is
 gamenative's own menu over its renderer, adopted rather than rewritten and
-taught the same contract. The PC surface never invents a third in-game
-overlay.
+taught the same contract. PC Games never invents a third in-game overlay.
 
 ### Relationship to enginehost
 
@@ -9301,17 +9087,17 @@ has one answer shared with the launch path — the game's own prefix when a
 store app id keyed one, droidtop's single provisioned container otherwise
 — so the prefix somebody configures is the prefix the game starts in.
 Playing is never one of these screens' jobs: a runner is resolved on the
-game's own screen, so their own play buttons return the user there rather
-than opening a second launch path that could disagree (a store-installed
-engine game is exactly that case — gamenative would run it under Wine,
-droidtop runs it on enginehost).
+game's own page and menu, so their own play buttons return the user there
+rather than opening a second launch path that could disagree (a
+store-installed engine game is exactly that case — gamenative would run
+it under Wine, droidtop runs it on enginehost).
 What droidtop adds on top is what gamenative has no concept of at all:
 engine games, enginehost routing, availability across four runners, the
-per-game override, and the carousel entry point.
+per-game override, and the library itself.
 
 ### One runner section, for the runner the game uses
 
-The detail's sections are the actions on this game, and a section for a
+`PcGameMenu`'s rows are the actions on this game, and a section for a
 runner it does not use is worse than nothing: it reads as a setting that
 applies. A game running on enginehost gets enginehost's saves, controls
 and engine settings; a game taking the Windows route gets its prefix, and
@@ -9437,8 +9223,8 @@ Consequences:
   exactly when it says THEME. A theme's row is a LEGEND -- it names
   buttons, it does not dispatch them -- so a touch-first window takes it
   over; a screen's own row is a real control surface with this screen's
-  own actions in it (the PC surface: A opens a game, it does not launch
-  it), so it is never doubled by the shell's bar in either shape.
+  own actions in it (the PC Games tab: A names the focused game's own
+  primary action), so it is never doubled by the shell's bar in either shape.
   Independent conditions for the one row are how droidtop drew two,
   twice: the theme's row sliced in half by the bar over it in landscape
   with Slate (rig, build 546), and the shell's bar stacked under the PC
@@ -11675,7 +11461,7 @@ of what is built. The decisions, briefly:
     host's standard empty state with the plugin's name and reason; and
     plugin content in Gaming appears only on droidtop's own surfaces
     (Quick Menu, game page, options menus, Settings), never inside a
-    themed view, until the frame-only render declares a region for it.
+    themed view; the PC Games tab is droidtop's own surface (7i).
   - A plugin with a full UI of its own may declare the optional extension
     point `ui.main` (docs/plugin-api.md 1.7, Droidtop/tracker#187) in
     addition to its views: `flutter_embed` only, with the Dart `entrypoint`
@@ -12837,8 +12623,8 @@ sequential) execution.
 **Search surfaces wired (2026-09-28).** The shared `LibraryQuery` search
 (`LibrarySearchDialog`, `shell-gamepad/query/LibraryQueryUi.kt` — the
 component the "one shared filter/sort/search component reusable by
-console lists" commit built, today consumed by the PC library view,
-`PcLibraryView.kt`, which IS "the PC view's search dialog": one and the
+console lists" commit built, today consumed by the PC Games tab,
+`PcGamesSection.kt`, which IS "the PC view's search dialog": one and the
 same component) now debounces the typed query (350ms) and fans it out via
 `PluginSearchAggregator.searchAll` to `GameSources.plugins(context)`,
 rendering a "Get more" group below the local match count using the
@@ -12862,8 +12648,8 @@ lands in the system's own folder. The typed text narrows the gamelist
 through `matchesSearchText`, the one text rule `LibraryQuery.matches` also
 uses (title, genre or developer); the row reads "Search: <text>" while a
 search is on, and clearing the text in the dialog clears it. The search
-lasts as long as the gamelist stays open. The PC group keeps its own chip
-row. **The launcher's drawer search is the same dialog too** (built
+lasts as long as the gamelist stays open. The PC Games tab keeps its own
+query (7i). **The launcher's drawer search is the same dialog too** (built
 2026-09-29, Droidtop/tracker#12): the drawer's search field opens
 `LauncherSearchActivity`, which draws `LibrarySearchDialog` with the installed
 apps and the library's games as local results, and gets the "Get more" group and
@@ -13004,9 +12790,9 @@ deliberately, mode by mode, instead of letting the next surface reinvent it.
 
 ### Gaming mode
 
-**Today.** Real per §7f/§7i/§7j: themed carousel and gamelists, an
-expanded frame-only PC library view with a `LibraryQuery` Browse button, a game page, `PcGameMenu`
-on L2/Y, Quick Menu with a Settings tile (`## One consistent way into
+**Today.** Real per §7f/§7i/§7j: a Retro Games tab with the themed carousel and gamelists, a
+PC Games tab after the Steam Deck's library (shelves, a view strip, a game page), `PcGameMenu`
+on L2, Quick Menu with a Settings tile (`## One consistent way into
 Settings`, above), Start opening the Quick Menu.
 
 **What still reads as accumulation:**
@@ -13049,8 +12835,8 @@ Settings`, above), Start opening the Quick Menu.
   rows.
 
 **v2 direction:**
-- Keep everything else: the frame-only themed render, the chip-row
-  filter/sort model, capture-style input, L2/Y binding.
+- Keep everything else: the themed Retro Games tab, the droidtop-native PC
+  Games tab with its one `LibraryQuery`, capture-style input, the L2 binding.
 
 ### Launcher mode
 

@@ -739,7 +739,7 @@ private fun catalogValueCandidates(item: CatalogItem, context: Context): List<St
  * lines of the summary type scale; Y opens the Info sheet for more.
  */
 @Composable
-private fun CatalogDetailStrip(text: String) {
+internal fun CatalogDetailStrip(text: String) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val style = MaterialTheme.typography.bodySmall
     val lineHeight = with(density) {

@@ -9,14 +9,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The "About this game" helpers the focused-game panel draws
- * (PcLibraryView.kt; docs/SPEC.md 7h), restored from the PcGameAbout.kt
- * 444271f2 deleted: the facts a scrape leaves, the ES-DE date format,
- * and the one line saying where each field came from. Pure functions
- * over in-memory [LibraryEntry] data, so the wording a player reads is
- * pinned here rather than only on hardware.
+ * The "About this game" helpers the PC game page draws (PcGamePage.kt;
+ * docs/SPEC.md 7h, 7i): the facts a scrape leaves, the ES-DE date
+ * format, and the one line saying where each field came from. Pure
+ * functions over in-memory [LibraryEntry] data, so the wording a player
+ * reads is pinned here rather than only on hardware.
  */
-class FocusedPanelAboutTest {
+class PcPageAboutTest {
     private fun entry(
         description: String? = null,
         developer: String? = null,
