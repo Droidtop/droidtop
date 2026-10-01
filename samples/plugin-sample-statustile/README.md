@@ -25,5 +25,16 @@ To produce an installable bundle: download the `sample-plugin` CI
 artifact's `build/manifest.json` + `build/classes.jar` (or run `build.sh`
 locally against a `:plugin-host:assembleDebug` classpath), then run
 `PLUGIN_SIGNING_KEY=/root/coordination/keys/droidtop-plugins/droidtop-origin-private.pem ./sign.sh`.
+## Contract 2 and views
+
+This plugin declares contract version 2 in its manifest (`provides` for
+`ui.status_tile` and `ui.settings`, no `capabilities`). It implements
+`DroidtopPlugin.handle` for the settings view (`op: view` on `ui.settings`)
+and for the status tile (`op: state` on `ui.status_tile`). It also runs a
+sample job (`startJob` for capability `settings_rows`, args `call` holding
+the v2 envelope) that reports progress in 10% steps over ~3 s and completes
+with a `message`. The settings view is a JSON document (info row, progress
+row, button) rendered by droidtop's own renderer (`PluginViews`).
+
 The rig item (`dq-plugins-01`, `/root/coordination/device/QUEUE.md`) uses
 the resulting `.tar.xz`.

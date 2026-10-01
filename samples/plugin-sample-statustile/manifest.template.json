@@ -5,8 +5,11 @@
   "description": "Harmless sample exercising the plugin API end to end (SPEC 12a); see build.sh in this folder.",
   "version": "1.0.0",
   "kind": "native_bundle",
-  "capabilities": ["status_tile"],
-  "contractVersion": 1,
+  "contractVersion": 2,
+  "provides": [
+    {"point":"ui.status_tile","version":1,"id":"state","label":"Sample tile","surfaces":["gaming.quick_menu"]},
+    {"point":"ui.settings","version":1,"target":"plugin"}
+  ],
   "requestsRoot": false,
   "abis": [],
   "entryClass": "dev.droidtop.samples.statustile.StatusTilePlugin"
