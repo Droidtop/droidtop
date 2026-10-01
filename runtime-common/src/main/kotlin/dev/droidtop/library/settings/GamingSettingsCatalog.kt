@@ -118,7 +118,7 @@ object GamingSettingsCatalog {
                 NestedScreenItem(
                     id = ID_GLOBAL_SETTINGS,
                     title = "Global settings",
-                    subtitle = "Home role, modes, and droidtop's settings as a whole",
+                    subtitle = "The home screen, modes, and droidtop's settings as a whole",
                     registryId = "global_settings",
                     icon = CatalogIcon.GLOBAL,
                 ),
