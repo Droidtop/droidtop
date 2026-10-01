@@ -119,6 +119,26 @@ object LaunchDisplay {
     @Volatile
     var coverVacatedDisplays: ((launchTargetDisplayId: Int?) -> Unit)? = null
 
+    /** When the shell last came to the foreground (its onStart); see [bouncedBack]. */
+    @Volatile
+    var shellStartedMs: Long = 0L
+
+    fun noteShellStarted(nowMs: Long) {
+        shellStartedMs = nowMs
+    }
+
+    /**
+     * A launch that left no app on screen: the shell was started again
+     * after the launch began, within the grace window the caller waited.
+     * Such a launch is not a play (tracker#216). A normal launch stops the
+     * shell and never starts it again until the user returns.
+     */
+    fun bouncedBack(launchStartedMs: Long, shellStartedMs: Long): Boolean =
+        shellStartedMs >= launchStartedMs
+
+    /** How long a dispatched launch is given to take the screen before it counts as played. */
+    const val BOUNCE_WINDOW_MS = 1500L
+
     fun start(context: Context, intent: Intent) {
         val ctx = launchContext
         val remembered = ctx?.let { LaunchScreenMemory.choiceFor(context, it.gameId, it.systemId) }

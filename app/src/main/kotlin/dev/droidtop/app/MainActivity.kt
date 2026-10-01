@@ -720,6 +720,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     override fun onStart() {
         super.onStart()
+        dev.droidtop.library.LaunchDisplay.noteShellStarted(System.currentTimeMillis())
         // Coming back to the foreground re-asserts the live companion,
         // through the same orchestration pass everything else uses, and
         // restarts the "an app on the addon exited on its own" health

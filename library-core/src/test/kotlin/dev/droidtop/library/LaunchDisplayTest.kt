@@ -36,6 +36,13 @@ class LaunchDisplayTest {
     }
 
     @Test
+    fun `a launch is bounced only when the shell started again after it began`() {
+        assertEquals(true, LaunchDisplay.bouncedBack(launchStartedMs = 1000L, shellStartedMs = 1005L))
+        assertEquals(false, LaunchDisplay.bouncedBack(launchStartedMs = 1000L, shellStartedMs = 900L))
+        assertEquals(false, LaunchDisplay.bouncedBack(launchStartedMs = 1000L, shellStartedMs = 0L))
+    }
+
+    @Test
     fun `clearRunning is safe to call when nothing is running`() {
         LaunchDisplay.clearRunning()
 

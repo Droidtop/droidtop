@@ -1613,10 +1613,18 @@ class Library(
             // LaunchDisplay.start captures it synchronously even when the
             // chooser dialog defers the actual dispatch.
             LaunchDisplay.launchContext = LaunchContext(entry.id, entry.systemId)
+            val launchStartedMs = System.currentTimeMillis()
             try {
                 providers.first { entry.kind in it.kinds }.launch(entry)
             } finally {
                 LaunchDisplay.launchContext = null
+            }
+            // A launch that ends with the shell back in front within the
+            // grace window put nothing on screen: not a play (tracker#216).
+            delay(LaunchDisplay.BOUNCE_WINDOW_MS)
+            if (LaunchDisplay.bouncedBack(launchStartedMs, LaunchDisplay.shellStartedMs)) {
+                Log.w("droidtop.Library", "Launch of ${entry.id} returned to the shell at once; not counted as played")
+                return@withContext
             }
             playHistory.recordPlay(entry.id, System.currentTimeMillis())
             changedFactIds += entry.id
