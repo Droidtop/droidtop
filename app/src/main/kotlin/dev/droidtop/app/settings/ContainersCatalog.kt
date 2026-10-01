@@ -299,7 +299,7 @@ object ContainersCatalog {
                 createName = "$fileName-container.tar",
                 onPicked = { ctx, uri ->
                     runCatching {
-                        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                        withContext(Dispatchers.IO) {
                             val out = ctx.contentResolver.openOutputStream(uri, "wt") ?: error("could not open that file")
                             out.use { runtime.exportData(container, it) }
                         }
@@ -319,7 +319,7 @@ object ContainersCatalog {
                 mimeType = "*/*",
                 onPicked = { ctx, uri ->
                     runCatching {
-                        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                        withContext(Dispatchers.IO) {
                             val input = ctx.contentResolver.openInputStream(uri) ?: error("could not open that file")
                             input.use { runtime.importData(container, it) }
                         }
@@ -396,7 +396,7 @@ object ContainersCatalog {
                     subtitle = "Share the desktop's display with this container's own programs",
                     current = sockets.waylandShared,
                     onToggle = { _, on ->
-                        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                        withContext(Dispatchers.IO) {
                             runCatching { runtime.setSockets(container, sockets.copy(waylandShared = on)) }
                         }
                     },
@@ -413,7 +413,7 @@ object ContainersCatalog {
                         subtitle = "Share the device's audio with this container",
                         current = sockets.audioShared,
                         onToggle = { _, on ->
-                            kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                            withContext(Dispatchers.IO) {
                                 runCatching { runtime.setSockets(container, sockets.copy(audioShared = on)) }
                             }
                         },
@@ -464,10 +464,10 @@ object ContainersCatalog {
                     title = "Add a folder",
                     subtitle = "Shares a folder from this device into this container, from its next start",
                     onPicked = { _, uri ->
-                        val resolved = GamesRootPrefs.resolveStoragePath(uri)
+                        val resolved = withContext(Dispatchers.IO) { GamesRootPrefs.resolveStoragePath(uri) }
                             ?: return@FolderPickItem "Couldn't resolve that folder to a real path on this device"
                         val name = uniqueMountName(resolved.name.ifBlank { "folder" }, mounts.map { it.name })
-                        val outcome = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                        val outcome = withContext(Dispatchers.IO) {
                             runCatching { runtime.setExtraMounts(container, mounts + ExtraMount(resolved.absolutePath, name)) }
                         }
                         outcome.exceptionOrNull()?.message
@@ -738,7 +738,7 @@ object ContainersCatalog {
                 current = path in shared,
                 onToggle = { _, on ->
                     val next = if (on) shared + path else shared - path
-                    kotlinx.coroutines.runBlocking(Dispatchers.IO) { runCatching { runtime.setSharedDevices(container, next.sorted()) } }
+                    withContext(Dispatchers.IO) { runCatching { runtime.setSharedDevices(container, next.sorted()) } }
                 },
             )
         }
