@@ -400,10 +400,10 @@ internal fun PcGameMenu(
                     status = "That is not an F95zone thread link: it should look like f95zone.to/threads/<name>.<number>/"
                 } else {
                     scope.launch {
-                        status = if (thread == null) "Unlinking..." else "Asking about thread $thread..."
+                        status = if (thread == null) "Unlinking..." else "Checking thread $thread..."
                         val failure = library.linkF95Thread(gameIds, thread)
                         status = when {
-                            failure != null -> "Linked thread $thread, but asking about it failed: $failure"
+                            failure != null -> "Linked thread $thread, but checking it failed: $failure"
                             thread == null -> "Unlinked. This game is no longer checked for updates."
                             else -> null
                         }
@@ -443,11 +443,11 @@ internal fun PcGameMenu(
                 links?.f95Thread?.let { thread ->
                     PcActionRow(
                         "Check for an update now",
-                        links?.check?.let { "Last asked " + android.text.format.DateUtils.getRelativeTimeSpanString(it.checkedAtEpochMs) }
-                            ?: "Not asked yet",
+                        links?.check?.let { "Last checked " + android.text.format.DateUtils.getRelativeTimeSpanString(it.checkedAtEpochMs) }
+                            ?: "Not checked yet",
                         {
                             scope.launch {
-                                status = "Asking about thread $thread..."
+                                status = "Checking thread $thread..."
                                 status = library.checkF95ThreadNow(thread)
                                 linksToken++
                             }
@@ -477,9 +477,9 @@ internal fun PcGameMenu(
                 PcActionRow(
                     "Engine",
                     when {
-                        engine == null -> "Not detected as an engine game; pick one if it is"
+                        engine == null -> "Not identified as an engine game; pick one if it is"
                         engineChoice.pinned -> "${engine.displayName()} - your choice"
-                        else -> "${engine.displayName()} - detected; pick another if that is wrong"
+                        else -> "${engine.displayName()} - identified; pick another if that is wrong"
                     },
                     { pickingEngine = true },
                 )
@@ -820,7 +820,7 @@ private sealed interface PcMenuEntry {
  * big it is -- or, for a game the walk no longer finds, the one fact
  * that matters, in the words the card uses (docs/SPEC.md 7g).
  */
-private fun LibraryEntry.identityLine(update: String?): String = if (missing) "broken - missing" else buildString {
+private fun LibraryEntry.identityLine(update: String?): String = if (missing) "Missing" else buildString {
     append(sourceLabel())
     engineLabel()?.let { append(" - ").append(it) }
     val size = pcInfo?.sizeBytes ?: 0L
@@ -846,7 +846,7 @@ private fun f95Line(links: GameLinks?, available: String?, versions: List<String
     val check = links.check
     val newest = check?.version
     return when {
-        check == null -> "Thread $thread - not asked yet"
+        check == null -> "Thread $thread - not checked yet"
         check.gone -> "Thread $thread is gone: private, moved or deleted"
         available != null -> "${GameUpdates.line(available)} - thread $thread"
         newest == null -> "Thread $thread gives no version"
@@ -978,9 +978,9 @@ private fun rememberPcActions(
                     entry.missing -> PcActionRow(
                         "Find its replacement",
                         if (replacements == 0) {
-                            "Nothing detected looks like this game yet"
+                            "No game in the library looks like this one yet"
                         } else {
-                            "$replacements detected ${if (replacements == 1) "game looks" else "games look"} " +
+                            "$replacements ${if (replacements == 1) "game looks" else "games look"} " +
                                 "like it; picking one moves this game's history, favourite and collections to it"
                         },
                         if (replacements == 0) null else onReplace,
@@ -1127,14 +1127,14 @@ private fun runnerRows(
     onClearWineSettings: () -> Unit,
 ): List<PcActionRow>? = when {
     runsOnEnginehost -> listOfNotNull(
-        PcActionRow("Saves", "Opens Enginehost's own save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
+        PcActionRow("Saves", "Opens Enginehost's save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
         PcActionRow(
             "Controls",
-            "Opens Enginehost's own per-engine controls for this game",
+            "Opens Enginehost's controls for this game",
             { onEnginehost(EngineHost.settingsIntent()) },
         ),
         if (isEngineGame) {
-            PcActionRow("Engine settings", "Opens Enginehost's own settings", { onEnginehost(EngineHost.settingsIntent()) })
+            PcActionRow("Engine settings", "Opens Enginehost's settings", { onEnginehost(EngineHost.settingsIntent()) })
         } else {
             null
         },
@@ -1244,11 +1244,11 @@ private sealed interface ProtonDbState {
 private suspend fun lookUpProtonDb(entry: LibraryEntry, name: String): ProtonDbState = withContext(Dispatchers.IO) {
     runCatching {
         val appId = ProtonDbClient.steamAppIdFor(entry, name)
-            ?: return@runCatching ProtonDbState.Unavailable("No Steam app id is known for $name, and ProtonDB lists only Steam games")
+            ?: return@runCatching ProtonDbState.Unavailable("No Steam ID is known for $name, and ProtonDB lists only Steam games")
         when (val lookup = ProtonDbClient.summary(appId)) {
             is ScrapeLookup.Found -> ProtonDbState.Found(lookup.value, appId)
             ScrapeLookup.NoMatch -> ProtonDbState.Unavailable("ProtonDB has no reports for this game yet")
-            is ScrapeLookup.Refused -> ProtonDbState.Unavailable("ProtonDB refused the request (HTTP ${lookup.httpStatus})")
+            is ScrapeLookup.Refused -> ProtonDbState.Unavailable("ProtonDB could not be reached (error ${lookup.httpStatus})")
         }
     }.getOrElse { ProtonDbState.Unavailable("ProtonDB could not be reached: ${it.message ?: it}") }
 }
