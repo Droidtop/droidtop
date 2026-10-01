@@ -9,6 +9,7 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
@@ -154,6 +155,9 @@ private class PluginPage(
 ) {
     @Volatile private var view: PluginView? = initial
     @Volatile private var error: String? = null
+
+    /** The call was refused because the user did not allow this point: shown as "not allowed", with the way to change it, never as a plugin failure. */
+    @Volatile private var denied: Boolean = false
     @Volatile private var stale: Boolean = initial == null
     @Volatile private var notice: String? = null
     @Volatile private var pending: Job? = null
@@ -182,6 +186,7 @@ private class PluginPage(
         if (!stale) return
         val reply = PluginViews.call(context, record, point, op, PluginViewCall.args(args, values, hostContext))
         stale = false
+        denied = !reply.ok && reply.code == PluginErrorCode.PERMISSION_DENIED
         if (reply.ok) {
             val parsed = PluginView.parse(reply.data)
             if (parsed == null) {
@@ -207,8 +212,16 @@ private class PluginPage(
         val head = buildList<CatalogItem> {
             notice?.let { add(ActionItem(id = "pv_${screenId}_notice", title = it, run = {})) }
             error?.let {
-                add(ActionItem(id = "pv_${screenId}_error", title = "${record.manifest.label} could not show this page", subtitle = it, run = {}))
-                addAll(extraWhenFailed())
+                if (denied) {
+                    // docs/plugin-api.md 4.3, "A denied point": the standard error state, and the route to the Permissions screen.
+                    add(ActionItem(id = "pv_${screenId}_error", title = "${record.manifest.label} is not allowed to show this", subtitle = "$it. Allow it under Permissions to see this page.", run = {}))
+                    SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, record.manifest.id)?.let { permissions ->
+                        add(NestedScreenItem(id = "pv_${screenId}_permissions", title = "Change what ${record.manifest.label} may do", subtitle = "Opens its Permissions", inline = permissions))
+                    }
+                } else {
+                    add(ActionItem(id = "pv_${screenId}_error", title = "${record.manifest.label} could not show this page", subtitle = it, run = {}))
+                    addAll(extraWhenFailed())
+                }
             }
             view?.subtitle?.let { add(ActionItem(id = "pv_${screenId}_about", title = it, run = {})) }
             // The empty-state contract (docs/plugin-api.md 1.6, #179): never a blank page.

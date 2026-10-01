@@ -23,10 +23,11 @@ enum class GrantState {
 }
 
 /**
- * What an update changed that needs the user's say-so (docs/plugin-api.md
- * 1.5, threat T2): dangerous permissions, high-risk extension points and
- * exports the new version declares and the old one did not. [permissions]
- * never holds a `provide:` id: those are [points], one mechanism each.
+ * What an update added, every item of it (docs/plugin-api.md 4.3, "Updates"):
+ * permissions, extension points and exports the new version declares and
+ * the old one did not. The user is asked about these and only these, on
+ * the same list as at approval. [permissions] never holds a `provide:` id:
+ * those are [points], one mechanism each.
  */
 data class PermissionDiff(
     val permissions: List<String>,
@@ -40,13 +41,15 @@ data class PermissionDiff(
             val oldPermissions = old.v2.permissions.map { it.id }.toSet()
             val oldPoints = old.v2.provides.map { it.point }.toSet()
             val oldExports = old.v2.exports.map { it.api }.toSet()
+            // A contract 1 plugin holds what it could always do: only its high-risk news is asked about.
+            val v2 = new.contractVersion >= 2
             return PermissionDiff(
                 permissions = new.v2.permissions
-                    .filter { it.id !in oldPermissions && !it.id.startsWith(PluginPermissions.PROVIDE_PREFIX) && PluginGrants.tierOf(it) != PermissionTier.NORMAL }
+                    .filter { it.id !in oldPermissions && !it.id.startsWith(PluginPermissions.PROVIDE_PREFIX) && (v2 || PluginGrants.tierOf(it) != PermissionTier.NORMAL) }
                     .map { it.id }
                     .distinct(),
                 points = new.v2.provides
-                    .filter { it.point !in oldPoints && ExtensionPoints.find(it.point)?.risk?.needsConsent == true }
+                    .filter { it.point !in oldPoints && ExtensionPoints.find(it.point)?.let { p -> v2 || p.risk.needsConsent } == true }
                     .map { it.point }
                     .distinct(),
                 exports = new.v2.exports.map { it.api }.filter { it !in oldExports }.distinct(),
@@ -141,34 +144,46 @@ class PluginGrants(private val dir: File) {
     }
 
     /**
-     * The state written when the user approves [record] (docs/plugin-api.md
-     * 4.3): normal permissions and points are granted, a dangerous or
-     * critical one is granted only when in [ticked] and stays `ask`
-     * otherwise, and a contract 1 plugin keeps what it always had (its root
-     * tick becomes the `priv.shell.root` grant).
+     * The state written when the user approves [record] with the items in
+     * [ticked] (docs/plugin-api.md 4.3): a ticked item is granted and an
+     * unticked one is not. An unticked dangerous or critical permission
+     * stays `ask` (the first-use sheet can still ask for it); every other
+     * unticked item, a normal permission, an extension point or an export,
+     * is `denied`. Null [ticked] is the list as first shown
+     * ([defaultTicked]). A contract 1 plugin keeps the permissions it always
+     * had (its root tick becomes the `priv.shell.root` grant); its points
+     * and the rest follow [ticked] like any other.
      */
-    fun initialiseOnApproval(record: PluginRecord, ticked: Set<String> = emptySet()) = synchronized(LOCK) {
+    fun initialiseOnApproval(record: PluginRecord, ticked: Set<String>? = null) = synchronized(LOCK) {
+        val on = ticked ?: defaultTicked(record)
         val states = linkedMapOf<String, GrantState>()
         for (declared in record.manifest.v2.permissions) {
             if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) continue
-            states[declared.id] = if (record.manifest.contractVersion < 2) {
-                defaultFor(record, declared)
-            } else if (tierOf(declared) == PermissionTier.NORMAL || declared.id in ticked) {
-                GrantState.GRANTED
-            } else {
-                GrantState.ASK
-            }
+            states[declared.id] = if (record.manifest.contractVersion < 2) defaultFor(record, declared) else answerFor(declared.id, tierOf(declared), on)
         }
-        // Approving a plugin grants every point it lists under Adds, high-risk ones too
-        // (docs/plugin-api.md 1.6 "Consent"): providing is what the plugin is, and a
-        // refused point has no prompt in two of three modes, so it silently never ran.
-        // An update's NEW high-risk point still waits at ask ([applyUpdate]).
         for (entry in record.manifest.v2.provides) {
             if (ExtensionPoints.find(entry.point) == null) continue
-            states[PluginPermissions.PROVIDE_PREFIX + entry.point] = GrantState.GRANTED
+            states[PluginPermissions.PROVIDE_PREFIX + entry.point] = answerFor(PluginPermissions.PROVIDE_PREFIX + entry.point, PermissionTier.NORMAL, on)
         }
-        for (export in record.manifest.v2.exports) states[EXPORT_PREFIX + export.api] = GrantState.GRANTED
+        for (export in record.manifest.v2.exports) states[EXPORT_PREFIX + export.api] = answerFor(EXPORT_PREFIX + export.api, PermissionTier.NORMAL, on)
         writeLocked(record.manifest.id, Snapshot(states = states))
+    }
+
+    /**
+     * The user's answer to an update's new items (docs/plugin-api.md 4.3,
+     * "Updates"): each of [ids] becomes granted when in [ticked] and
+     * otherwise denied (`ask` for a dangerous permission), and stops being
+     * "new". Nothing else in the grants changes.
+     */
+    fun answerNew(record: PluginRecord, ids: Set<String>, ticked: Set<String>) = synchronized(LOCK) {
+        val id = record.manifest.id
+        val snap = readLocked(id)
+        val states = snap.states.toMutableMap()
+        for (item in ids) {
+            val tier = record.manifest.v2.permissions.firstOrNull { it.id == item }?.let { tierOf(it) } ?: PermissionTier.NORMAL
+            states[item] = answerFor(item, tier, ticked)
+        }
+        writeLocked(id, snap.copy(states = states, wanted = snap.wanted - ids, fresh = snap.fresh - ids, corrupt = false))
     }
 
     /**
@@ -236,6 +251,32 @@ class PluginGrants(private val dir: File) {
 
         fun forContext(context: Context): PluginGrants = forPluginsRoot(PluginStore.root(context))
 
+        /** A ticked item is granted; an unticked dangerous or critical permission waits for the first-use sheet, anything else unticked is denied. */
+        private fun answerFor(item: String, tier: PermissionTier, ticked: Set<String>): GrantState = when {
+            item in ticked -> GrantState.GRANTED
+            tier != PermissionTier.NORMAL -> GrantState.ASK
+            else -> GrantState.DENIED
+        }
+
+        /**
+         * What the approval list starts as (docs/SPEC.md 12a, "Approval is a list"): every item ticked,
+         * except what SPEC already holds back, a dangerous or critical permission and a high-risk
+         * extension point, which start unticked. A contract 1 plugin holds what it could always do, so
+         * all of its points start ticked.
+         */
+        fun defaultTicked(record: PluginRecord): Set<String> = buildSet {
+            val v2 = record.manifest.contractVersion >= 2
+            for (declared in record.manifest.v2.permissions) {
+                if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) continue
+                if (v2 && tierOf(declared) == PermissionTier.NORMAL) add(declared.id)
+            }
+            for (entry in record.manifest.v2.provides) {
+                val point = ExtensionPoints.find(entry.point) ?: continue
+                if (!v2 || !point.risk.needsConsent) add(PluginPermissions.PROVIDE_PREFIX + entry.point)
+            }
+            for (export in record.manifest.v2.exports) add(EXPORT_PREFIX + export.api)
+        }
+
         /** The tier a declared permission is asked at. An id the registry does not know is a provider's own permission: asked like a dangerous one. */
         fun tierOf(declared: DeclaredPermission): PermissionTier {
             val scopeAny = declared.id == "apps.intents.out" &&
@@ -267,6 +308,16 @@ class PluginGrants(private val dir: File) {
             snapshot.states[PluginPermissions.PROVIDE_PREFIX + point]?.let { return it }
             val risky = ExtensionPoints.find(point)?.risk?.needsConsent == true
             return if (record.manifest.contractVersion < 2 || !risky) GrantState.GRANTED else GrantState.ASK
+        }
+
+        /**
+         * Why a call to [point] must not be made, or null when it may be (docs/plugin-api.md 4.3, "A denied point"). The one
+         * check every host call to a plugin goes through: a point the user did not allow, or has not answered yet, is never
+         * called at all. An `api:` call to a provider is checked by the broker, not here.
+         */
+        fun pointRefusal(record: PluginRecord, snapshot: Snapshot, point: String): String? {
+            if (point.startsWith("api:") || provideState(record, snapshot, point) == GrantState.GRANTED) return null
+            return "${record.manifest.label} has not been allowed to ${ExtensionPoints.find(point)?.label?.replaceFirstChar { it.lowercase() } ?: point}"
         }
 
         /** Whether the plugin's export of [api] is on: an update's new export waits for a grant. */

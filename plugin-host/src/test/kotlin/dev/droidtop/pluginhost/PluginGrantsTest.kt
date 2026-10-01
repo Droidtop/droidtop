@@ -30,9 +30,9 @@ class PluginGrantsTest {
     }
 
     @Test
-    fun `approval grants normal, asks for dangerous and grants what was ticked`() {
+    fun `approval grants what was ticked, asks for an unticked dangerous one and denies an unticked normal one`() {
         val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any"), obj("id" to "clipboard.read"), obj("id" to "containers.exec"))
-        grants.initialiseOnApproval(record, ticked = setOf("clipboard.read"))
+        grants.initialiseOnApproval(record, ticked = setOf("net.state", "clipboard.read"))
         val snap = grants.read("acme.tool")
         assertEquals(GrantState.GRANTED, PluginGrants.stateOf(record, snap, "net.state"))
         assertEquals(GrantState.ASK, PluginGrants.stateOf(record, snap, "net.any"))
@@ -67,14 +67,44 @@ class PluginGrantsTest {
     }
 
     @Test
-    fun `approval grants every point the plugin adds, high-risk ones too`() {
-        val record = plugin(2, "acme.tool") { it.put("provides", arr(obj("point" to "library.sources"), obj("point" to "ui.status_tile"))) }
-        // Before approval (no file), a high-risk point of a contract 2 plugin is not granted.
-        assertEquals(GrantState.ASK, PluginGrants.provideState(record, grants.read("acme.tool"), "library.sources"))
+    fun `the list starts ticked except dangerous permissions and high-risk points`() {
+        val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any")) {
+            it.put("provides", arr(obj("point" to "library.sources"), obj("point" to "ui.status_tile")))
+            it.put("exports", arr(obj("api" to "acme.tool.status", "version" to "1.0")))
+        }
+        assertEquals(setOf("net.state", "provide:ui.status_tile", "export:acme.tool.status"), PluginGrants.defaultTicked(record))
         grants.initialiseOnApproval(record)
         val snap = grants.read("acme.tool")
-        assertEquals(GrantState.GRANTED, PluginGrants.provideState(record, snap, "library.sources"))
         assertEquals(GrantState.GRANTED, PluginGrants.provideState(record, snap, "ui.status_tile"))
+        assertEquals(GrantState.DENIED, PluginGrants.provideState(record, snap, "library.sources"))
+        assertEquals(GrantState.ASK, PluginGrants.stateOf(record, snap, "net.any"))
+        assertEquals(GrantState.GRANTED, PluginGrants.exportState(snap, "acme.tool.status"))
+    }
+
+    @Test
+    fun `approval grants exactly the ticked subset, high-risk points included`() {
+        val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "vibrate")) {
+            it.put("provides", arr(obj("point" to "library.sources"), obj("point" to "ui.status_tile"), obj("point" to "ui.settings")))
+        }
+        // Before approval (no file), a high-risk point of a contract 2 plugin is not granted.
+        assertEquals(GrantState.ASK, PluginGrants.provideState(record, grants.read("acme.tool"), "library.sources"))
+        grants.initialiseOnApproval(record, ticked = setOf("provide:library.sources", "provide:ui.settings", "net.state"))
+        val snap = grants.read("acme.tool")
+        assertEquals(GrantState.GRANTED, PluginGrants.provideState(record, snap, "library.sources"))
+        assertEquals(GrantState.GRANTED, PluginGrants.provideState(record, snap, "ui.settings"))
+        assertEquals("an unticked point is denied, not asked", GrantState.DENIED, PluginGrants.provideState(record, snap, "ui.status_tile"))
+        assertEquals(GrantState.GRANTED, PluginGrants.stateOf(record, snap, "net.state"))
+        assertEquals(GrantState.DENIED, PluginGrants.stateOf(record, snap, "vibrate"))
+    }
+
+    @Test
+    fun `a contract 1 plugin's points can be unticked too`() {
+        val v1 = TestPlugins.record(TestPlugins.manifest(contract = 1))
+        assertEquals(setOf("provide:ui.status_tile"), PluginGrants.defaultTicked(v1))
+        grants.initialiseOnApproval(v1, ticked = emptySet())
+        val snap = grants.read("acme.tool")
+        assertEquals(GrantState.DENIED, PluginGrants.provideState(v1, snap, "ui.status_tile"))
+        assertEquals("what it could always do is unchanged", GrantState.GRANTED, PluginGrants.stateOf(v1, snap, "apps.launch"))
     }
 
     @Test
@@ -111,29 +141,36 @@ class PluginGrantsTest {
             it.put("exports", arr(obj("api" to "acme.tool.status", "version" to "1.0")))
         }
         val diff = grants.applyUpdate(old, new)
-        assertEquals(listOf("clipboard.read"), diff.permissions)
+        assertEquals("every new item is asked about, normal ones too", listOf("clipboard.read", "vibrate"), diff.permissions)
         assertEquals(listOf("library.sources"), diff.points)
         assertEquals(listOf("acme.tool.status"), diff.exports)
         val snap = grants.read("acme.tool")
         assertEquals("old dangerous grant kept", GrantState.GRANTED, PluginGrants.stateOf(new, snap, "net.any"))
         assertEquals(GrantState.ASK, PluginGrants.stateOf(new, snap, "clipboard.read"))
-        assertEquals("a new normal permission is just granted", GrantState.GRANTED, PluginGrants.stateOf(new, snap, "vibrate"))
+        assertEquals(GrantState.ASK, PluginGrants.stateOf(new, snap, "vibrate"))
         assertEquals(GrantState.ASK, PluginGrants.provideState(new, snap, "library.sources"))
         assertEquals(GrantState.ASK, PluginGrants.exportState(snap, "acme.tool.status"))
         assertTrue(snap.wantsNewAccess)
 
-        grants.set("acme.tool", "clipboard.read", GrantState.GRANTED)
-        grants.set("acme.tool", "provide:library.sources", GrantState.DENIED)
-        assertTrue("still waiting on the export", grants.read("acme.tool").wantsNewAccess)
-        grants.set("acme.tool", "export:acme.tool.status", GrantState.GRANTED)
-        assertFalse(grants.read("acme.tool").wantsNewAccess)
+        // Only the new items are asked, on the same list: the answer covers them and touches nothing else.
+        val view = PluginConsent.of(new.manifest, listOf(new), badgeFor = { "Official" }).only(snap.fresh)
+        assertEquals(snap.fresh, view.items.map { it.id }.toSet())
+        grants.answerNew(new, snap.fresh, ticked = setOf("vibrate", "export:acme.tool.status"))
+        val answered = grants.read("acme.tool")
+        assertFalse(answered.wantsNewAccess)
+        assertEquals("an old point is untouched", GrantState.GRANTED, PluginGrants.provideState(new, answered, "ui.status_tile"))
+        assertEquals(GrantState.GRANTED, PluginGrants.stateOf(new, answered, "vibrate"))
+        assertEquals(GrantState.GRANTED, PluginGrants.exportState(answered, "acme.tool.status"))
+        assertEquals("an unticked dangerous permission stays ask", GrantState.ASK, PluginGrants.stateOf(new, answered, "clipboard.read"))
+        assertEquals(GrantState.DENIED, PluginGrants.provideState(new, answered, "library.sources"))
+        assertEquals("old grant untouched", GrantState.GRANTED, PluginGrants.stateOf(new, answered, "net.any"))
     }
 
     @Test
-    fun `an update that adds nothing dangerous changes nothing`() {
+    fun `an update that adds nothing changes nothing`() {
         val old = plugin(2, "acme.tool", obj("id" to "net.any"))
         grants.initialiseOnApproval(old)
-        val new = plugin(2, "acme.tool", obj("id" to "net.any"), obj("id" to "vibrate"))
+        val new = plugin(2, "acme.tool", obj("id" to "net.any"))
         assertTrue(grants.applyUpdate(old, new).isEmpty)
         val snap = grants.read("acme.tool")
         assertEquals("still ask, not silently granted", GrantState.ASK, PluginGrants.stateOf(new, snap, "net.any"))
@@ -158,5 +195,24 @@ class PluginGrantsTest {
         assertEquals(setOf("net.any"), grants.read("acme.tool").wanted)
         grants.set("acme.tool", "net.any", GrantState.GRANTED)
         assertTrue(grants.read("acme.tool").wanted.isEmpty())
+    }
+
+    @Test
+    fun `a denied or unanswered point is refused before any call is made`() {
+        val record = plugin(2, "acme.tool") { it.put("provides", arr(obj("point" to "ui.settings"), obj("point" to "ui.status_tile"), obj("point" to "library.sources"))) }
+        grants.initialiseOnApproval(record, ticked = setOf("provide:ui.settings"))
+        val snap = grants.read("acme.tool")
+        assertNull("an allowed point is called", PluginGrants.pointRefusal(record, snap, "ui.settings"))
+        assertTrue(PluginGrants.pointRefusal(record, snap, "ui.status_tile")!!.contains("not been allowed"))
+        assertTrue(PluginGrants.pointRefusal(record, snap, "library.sources") != null)
+        assertNull("a call to another plugin's API is the broker's to check", PluginGrants.pointRefusal(record, snap, "api:priv.shell"))
+        // The user changes their mind on the Permissions screen: the next call follows.
+        grants.set("acme.tool", "provide:ui.settings", GrantState.DENIED)
+        grants.set("acme.tool", "provide:ui.status_tile", GrantState.GRANTED)
+        val later = grants.read("acme.tool")
+        assertTrue(PluginGrants.pointRefusal(record, later, "ui.settings") != null)
+        assertNull(PluginGrants.pointRefusal(record, later, "ui.status_tile"))
+        // A point the plugin only has because it was never answered (no entry) is not called either when it is high-risk.
+        assertTrue(PluginGrants.pointRefusal(record, PluginGrants.Snapshot(), "library.sources") != null)
     }
 }

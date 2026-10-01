@@ -1763,6 +1763,8 @@ object AppSettingsCatalogs {
         title = "Plugins",
         subtitle = "Real code, run in its own process and approved by you — for crash containment, not as a security sandbox",
         groups = { context -> pluginsGroups(context) },
+        // A plugin's own page opens the Permissions screen of one plugin through here (a denied plugin view's way to change it).
+        forDeepLink = { pluginId -> pluginPermissionsScreen(pluginId) },
     )
 
     private suspend fun pluginsGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
@@ -2007,45 +2009,13 @@ object AppSettingsCatalogs {
                     ActionItem(
                         id = "plugin_${m.id}_new_access",
                         title = "Wants new access",
-                        subtitle = "An update asks for more than you allowed. Nothing new is on until you say so under Permissions.",
+                        subtitle = "An update asks for more than you allowed. Nothing new is on until you choose below.",
                         run = {},
                     ),
                 )
             }
             when (record.trust) {
-                PluginTrustState.PENDING -> {
-                    add(
-                        ActionItem(
-                            id = "plugin_${m.id}_approve",
-                            title = "Approve",
-                            subtitle = if (m.requestsRoot) {
-                                "This plugin can also use root as an optional enhancement when your device has it -- its core function must still work without it. Approving here does NOT grant root; use \"Approve and allow root\" for that."
-                            } else {
-                                "Runs in its own process from now on"
-                            },
-                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
-                        ),
-                    )
-                    if (m.requestsRoot) {
-                        add(
-                            ActionItem(
-                                id = "plugin_${m.id}_approve_root",
-                                title = "Approve and allow root",
-                                subtitle = "Only takes effect if this device actually has root; root stays an enhancement, never a requirement",
-                                confirmTitle = "Let \"${m.label}\" use root on this device?",
-                                run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = true); PluginStatusWidgetProvider.requestUpdate(ctx) },
-                            ),
-                        )
-                    }
-                    add(
-                        ActionItem(
-                            id = "plugin_${m.id}_deny",
-                            title = "Deny",
-                            subtitle = "Stays installed but never runs. A future update (a new signed archive) can be approved again.",
-                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
-                        ),
-                    )
-                }
+                PluginTrustState.PENDING -> Unit
                 PluginTrustState.APPROVED -> {
                     add(
                         ToggleItem(
@@ -2070,9 +2040,78 @@ object AppSettingsCatalogs {
             }
         }
 
+        // Approval is a list (docs/plugin-api.md 4.3): every item is a tick box, the actions come after it, and the plugin runs with exactly what is ticked.
+        val approvalTicks = if (record.trust == PluginTrustState.PENDING) tickBuffer(m.id, PluginGrants.defaultTicked(record)) else null
+        val approveItems: List<CatalogItem> = if (approvalTicks == null) {
+            emptyList()
+        } else {
+            fun approve(ctx: Context, root: Boolean) {
+                PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = root, ticked = approvalTicks.toSet())
+                pendingTicks.remove(m.id)
+                PluginStatusWidgetProvider.requestUpdate(ctx)
+            }
+            buildList {
+                add(
+                    ActionItem(
+                        id = "plugin_${m.id}_approve",
+                        title = "Approve",
+                        subtitle = if (m.requestsRoot) {
+                            "Allows what is ticked above. This plugin can also use root as an optional enhancement when your device has it -- its core function must still work without it. Approving here does NOT grant root; use \"Approve and allow root\" for that."
+                        } else {
+                            "Allows what is ticked above and runs in its own process from now on. You can change any of it later under Permissions."
+                        },
+                        run = { ctx -> approve(ctx, false) },
+                    ),
+                )
+                if (m.requestsRoot) {
+                    add(
+                        ActionItem(
+                            id = "plugin_${m.id}_approve_root",
+                            title = "Approve and allow root",
+                            subtitle = "Only takes effect if this device actually has root; root stays an enhancement, never a requirement",
+                            confirmTitle = "Let \"${m.label}\" use root on this device?",
+                            run = { ctx -> approve(ctx, true) },
+                        ),
+                    )
+                }
+                add(
+                    ActionItem(
+                        id = "plugin_${m.id}_deny",
+                        title = "Deny",
+                        subtitle = "Stays installed but never runs. A future update (a new signed archive) can be approved again.",
+                        run = { ctx -> pendingTicks.remove(m.id); PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
+                    ),
+                )
+            }
+        }
+        // An update that added items asks about those only, on the same list (docs/plugin-api.md 4.3, "Updates").
+        val freshIds = if (record.trust == PluginTrustState.APPROVED) grantSnapshot.fresh.filterTo(HashSet()) { grantSnapshot.states[it] == GrantState.ASK } else emptySet<String>()
+        val newKey = "${m.id}#new"
+        val newTicks = if (freshIds.isEmpty()) null else tickBuffer(newKey, PluginGrants.defaultTicked(record).filterTo(HashSet()) { it in freshIds })
+        val newAccessGroups: List<CatalogGroup> = if (newTicks == null) {
+            emptyList()
+        } else {
+            pluginConsentGroups(context, record, userKeys, ticks = newTicks, only = freshIds) + CatalogGroup(
+                id = "plugin_${m.id}_new_access_group",
+                title = null,
+                items = listOf(
+                    ActionItem(
+                        id = "plugin_${m.id}_new_access_save",
+                        title = "Allow what is ticked",
+                        subtitle = "Only these new items change; what you allowed before stays as it was",
+                        run = { ctx ->
+                            PluginGrants.forContext(ctx).answerNew(record, freshIds, newTicks.toSet())
+                            pendingTicks.remove(newKey)
+                            PluginStatusWidgetProvider.requestUpdate(ctx)
+                        },
+                    ),
+                ),
+            )
+        }
+
         // "Asks for" is what approval is about; once approved, the Permissions screen below holds the real
         // state of each one, and a second list saying "Asks first" beside "7 allowed, 0 ask" contradicts it.
-        val consentGroups = pluginConsentGroups(context, record, userKeys)
+        val consentGroups = pluginConsentGroups(context, record, userKeys, ticks = approvalTicks)
             .filterNot { record.trust == PluginTrustState.APPROVED && it.id.endsWith("_consent_asks") }
 
         // Grants exist once the plugin is approved (docs/plugin-api.md 4.4): one screen per plugin, no second place.
@@ -2223,7 +2262,8 @@ object AppSettingsCatalogs {
         return listOfNotNull(
             CatalogGroup(id = "plugin_${m.id}_status_group", title = null, items = statusGroup),
             runtimeGroupItem.takeIf { runtimeNeed != null },
-        ) + consentGroups + listOfNotNull(
+        ) + newAccessGroups + consentGroups + listOfNotNull(
+            approveItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_approve_group", title = null, items = it) },
             permissionsGroup,
             CatalogGroup(id = "plugin_${m.id}_provides_group", title = "What it provides", items = providesGroup),
             runtimeGroupItem.takeIf { runtimeNeed == null },
@@ -2295,10 +2335,13 @@ object AppSettingsCatalogs {
         }
         for (entry in m.v2.provides) {
             val point = ExtensionPoints.find(entry.point) ?: continue
-            if (!point.risk.needsConsent) continue
             val id = PluginPermissions.PROVIDE_PREFIX + entry.point
-            val tier = if (point.risk == dev.droidtop.pluginhost.PointRisk.CRITICAL) PermissionTier.CRITICAL else PermissionTier.DANGEROUS
-            rows += PermissionRow(id, PluginPermissions.labelFor(id) ?: id, null, tier, PluginGrants.provideState(record, snap, entry.point))
+            val tier = when (point.risk) {
+                dev.droidtop.pluginhost.PointRisk.CRITICAL -> PermissionTier.CRITICAL
+                dev.droidtop.pluginhost.PointRisk.HIGH -> PermissionTier.DANGEROUS
+                else -> PermissionTier.NORMAL
+            }
+            rows += PermissionRow(id, point.label, point.lets.ifEmpty { null }, tier, PluginGrants.provideState(record, snap, entry.point))
         }
         for (export in m.v2.exports) {
             rows += PermissionRow(PluginGrants.EXPORT_PREFIX + export.api, "Offer ${export.api} to other plugins", null, PermissionTier.NORMAL, PluginGrants.exportState(snap, export.api))
@@ -2348,8 +2391,7 @@ object AppSettingsCatalogs {
                 onSelect = { ctx, value -> GrantState.fromId(value)?.let { PluginGrants.forContext(ctx).set(pluginId, row.id, it) } },
             )
         }
-        val fresh = rows.filter { it.id in snap.fresh && it.state == GrantState.ASK }
-        val rest = rows - fresh.toSet()
+        val rest = rows
         return listOfNotNull(
             if (record.manifest.contractVersion < 2) {
                 CatalogGroup(
@@ -2367,7 +2409,6 @@ object AppSettingsCatalogs {
             } else {
                 null
             },
-            if (fresh.isEmpty()) null else CatalogGroup("plugin_permissions_new", "Wants new access", fresh.map(::item)),
             rest.filter { it.tier == PermissionTier.CRITICAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_critical", "Critical", it.map(::item)) },
             rest.filter { it.tier == PermissionTier.DANGEROUS }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_dangerous", "Sensitive", it.map(::item)) },
             rest.filter { it.tier == PermissionTier.NORMAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_normal", "Can", it.map(::item)) },
@@ -2412,45 +2453,63 @@ object AppSettingsCatalogs {
             .ifEmpty { "No capabilities declared" }
 
     /**
-     * The approval view of one plugin (docs/plugin-api.md 4.3), read-only:
-     * what it adds and where, what it can do, what it asks for, what it
-     * uses from other plugins, and what this droidtop does not support.
-     * Built from the registries by [PluginConsent]; there is no grant
-     * storage yet, so nothing here is a switch. The existing root tick on
-     * the Approve rows is unchanged.
+     * The approval list of one plugin (docs/plugin-api.md 4.3): what it adds and where, what it can do, what it
+     * asks for, what it offers and what it uses from other plugins, and what this droidtop does not support.
+     * Built from the registries by [PluginConsent]. With [ticks] every item that has a grant key is a tick box
+     * the user can switch off before approving, high-risk ones marked; the box state lives in [ticks] until the
+     * Approve action writes it. Without [ticks] the list is read-only. [only] cuts the list down to what an
+     * update added.
      */
     private fun pluginConsentGroups(
         context: Context,
         record: dev.droidtop.pluginhost.PluginRecord,
         userKeys: Map<String, String>,
+        ticks: MutableSet<String>? = null,
+        only: Set<String>? = null,
     ): List<CatalogGroup> {
         val m = record.manifest
-        val view = PluginConsent.of(m, PluginStore.installed(context)) { pluginTrustBadge(it, userKeys) }
+        val scope = if (only == null) "" else "new_"
+        val full = PluginConsent.of(m, PluginStore.installed(context)) { pluginTrustBadge(it, userKeys) }
+        val view = if (only == null) full else full.only(only)
         fun info(key: String, title: String, subtitle: String? = null, value: String? = null) =
-            ActionItem(id = "plugin_${m.id}_$key", title = title, subtitle = subtitle, value = value, run = {})
+            ActionItem(id = "plugin_${m.id}_$scope$key", title = title, subtitle = subtitle, value = value, run = {})
+        fun line(key: String, l: dev.droidtop.pluginhost.ConsentLine, lead: String? = null, trail: String? = null, value: String? = null): CatalogItem {
+            val grantKey = l.id
+            if (ticks == null || grantKey == null) {
+                return info(key, l.title, listOfNotNull(lead, l.detail, trail).joinToString(" - ").ifEmpty { null }, value)
+            }
+            return ToggleItem(
+                id = "plugin_${m.id}_${scope}tick_$grantKey",
+                title = if (l.highRisk) "${l.title} (high risk)" else l.title,
+                subtitle = listOfNotNull(lead, l.detail, trail).joinToString(" - ").ifEmpty { null },
+                current = grantKey in ticks,
+                onToggle = { _, on -> if (on) ticks.add(grantKey) else ticks.remove(grantKey) },
+            )
+        }
         fun group(key: String, title: String, items: List<CatalogItem>) =
-            if (items.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_consent_$key", title = title, items = items)
+            if (items.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_consent_$scope$key", title = title, items = items)
         return listOfNotNull(
-            if (view.olderPluginFullAccess) {
+            if (view.olderPluginFullAccess && only == null) {
                 group("older", "Older plugin", listOf(info("older", "Full access (older plugin)", "Written before permissions existed: it can do everything it could before, and droidtop does not contain it")))
             } else {
                 null
             },
             group(
                 "adds", "Adds",
-                view.adds.flatMap { (mode, lines) -> lines.mapIndexed { i, l -> info("adds_${mode}_$i", l.title, l.detail, mode) } },
+                view.adds.flatMap { (mode, lines) -> lines.mapIndexed { i, l -> line("adds_${mode}_$i", l, lead = mode.takeIf { ticks != null }, value = mode.takeIf { ticks == null }) } },
             ),
-            group("can", "Can", view.can.mapIndexed { i, l -> info("can_$i", l.title, l.detail) }),
+            group("can", "Can", view.can.mapIndexed { i, l -> line("can_$i", l) }),
             group(
                 "asks", "Asks for",
                 view.asks.mapIndexed { i, a ->
-                    info(
-                        "asks_$i", a.line.title,
-                        listOfNotNull(a.line.detail, if (a.needed) "Needed" else null).joinToString(" - ").ifEmpty { null },
-                        if (a.tier == PermissionTier.CRITICAL) "Critical" else "Asks first",
+                    line(
+                        "asks_$i", a.line,
+                        trail = if (a.needed) "Needed" else null,
+                        value = if (a.tier == PermissionTier.CRITICAL) "Critical" else "Asks first",
                     )
                 },
             ),
+            group("offers", "Offers to other plugins", view.offers.mapIndexed { i, l -> line("offers_$i", l) }),
             group(
                 "uses", "Uses from other plugins",
                 view.uses.mapIndexed { i, u ->
@@ -2464,6 +2523,12 @@ object AppSettingsCatalogs {
             group("unsupported", "Not supported by this version of droidtop", view.unsupported.mapIndexed { i, t -> info("unsupported_$i", t) }),
         )
     }
+
+    /** The tick boxes of one approval list, kept between redraws until the user answers. Keyed by plugin, and by plugin plus "#new" for an update's list. */
+    private val pendingTicks = java.util.concurrent.ConcurrentHashMap<String, MutableSet<String>>()
+
+    private fun tickBuffer(key: String, start: Set<String>): MutableSet<String> =
+        pendingTicks.getOrPut(key) { java.util.Collections.synchronizedSet(start.toMutableSet()) }
 
     // ------------------------------------------------------------------
     // Keys you trust (docs/SPEC.md 12a): user-trusted plugin origin keys.

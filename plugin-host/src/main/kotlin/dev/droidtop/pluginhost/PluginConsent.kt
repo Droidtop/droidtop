@@ -2,8 +2,18 @@ package dev.droidtop.pluginhost
 
 import org.json.JSONObject
 
-/** One line on the approval screen: [title] is the plain-language wording, [detail] the plugin's own reason or a scope. */
-data class ConsentLine(val title: String, val detail: String? = null)
+/**
+ * One line on the approval screen: [title] is the plain-language wording, [detail] what it lets the plugin do or the
+ * plugin's own reason. A line with an [id] is a tick box (docs/plugin-api.md 4.3): the id is the grant key
+ * (`net.any`, `provide:library.sources`, `export:<api>`), [highRisk] marks it as such, and [ticked] is how it starts.
+ */
+data class ConsentLine(
+    val title: String,
+    val detail: String? = null,
+    val id: String? = null,
+    val highRisk: Boolean = false,
+    val ticked: Boolean = true,
+)
 
 /** How a permission or extension point is shown under "Asks for" (docs/plugin-api.md 4.3). */
 data class ConsentAsk(val tier: PermissionTier, val line: ConsentLine, val needed: Boolean)
@@ -22,13 +32,30 @@ data class ConsentView(
     val adds: List<Pair<String, List<ConsentLine>>>,
     val can: List<ConsentLine>,
     val asks: List<ConsentAsk>,
+    /** What the plugin offers other plugins ("Offer <api> to other plugins"), each a tick box. */
+    val offers: List<ConsentLine>,
     val uses: List<ConsentUse>,
     val unsupported: List<String>,
     /** A contract 1 plugin holds `host.full_trust`: shown as "Full access (older plugin)". */
     val olderPluginFullAccess: Boolean,
-)
+) {
+    /** Every tick box on the list, in the order shown. */
+    val items: List<ConsentLine> get() = (adds.flatMap { it.second } + can + asks.map { it.line } + offers).filter { it.id != null }
+
+    /** The list cut down to [ids]: what an update added, asked about on the same list as at approval. */
+    fun only(ids: Set<String>): ConsentView = copy(
+        adds = adds.map { (mode, lines) -> mode to lines.filter { it.id in ids } }.filter { it.second.isNotEmpty() },
+        can = can.filter { it.id in ids },
+        asks = asks.filter { it.line.id in ids },
+        offers = offers.filter { it.id in ids },
+        uses = emptyList(),
+        unsupported = emptyList(),
+    )
+}
 
 object PluginConsent {
+    private const val GRANT_EXPORT_PREFIX = PluginGrants.EXPORT_PREFIX
+
     private const val MODE_GAMING = "Gaming"
     private const val MODE_ANDROID = "Android"
     private const val MODE_DESKTOP = "Desktop"
@@ -49,41 +76,45 @@ object PluginConsent {
      */
     fun of(manifest: PluginManifest, installed: List<PluginRecord>, badgeFor: (String) -> String): ConsentView {
         val v2 = manifest.v2
+        val newContract = manifest.contractVersion >= 2
         val adds = linkedMapOf<String, MutableList<ConsentLine>>()
+        val seenPoints = mutableSetOf<String>()
         for (entry in v2.provides) {
             val point = ExtensionPoints.find(entry.point) ?: continue
             if (!ExtensionPoints.supports(entry.point, entry.version)) continue
-            val modes = entry.surfaces().mapNotNull { modeOf(it) }.distinct().ifEmpty { listOf(MODE_ANY) }
-            val line = ConsentLine(entry.label ?: point.label, if (entry.label != null) point.label else null)
-            for (mode in modes) adds.getOrPut(mode) { mutableListOf() }.add(line)
+            if (!seenPoints.add(entry.point)) continue
+            // One tick box per point, under the first mode it shows in.
+            val mode = entry.surfaces().mapNotNull { modeOf(it) }.distinct().minByOrNull { MODE_ORDER.indexOf(it) } ?: MODE_ANY
+            val line = ConsentLine(
+                title = entry.label ?: point.label,
+                detail = point.lets.ifEmpty { null },
+                id = PluginPermissions.PROVIDE_PREFIX + entry.point,
+                highRisk = point.risk.needsConsent,
+                ticked = !newContract || !point.risk.needsConsent,
+            )
+            adds.getOrPut(mode) { mutableListOf() }.add(line)
         }
 
         val can = mutableListOf<ConsentLine>()
         val asks = mutableListOf<ConsentAsk>()
-        val seenProvide = mutableSetOf<String>()
         for (declared in v2.permissions) {
+            // A `provide:` item is the tick box of its point under "Adds".
+            if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) continue
             val label = PluginPermissions.labelFor(declared.id) ?: continue
             val extra = runCatching { JSONObject(declared.extra) }.getOrDefault(JSONObject())
             val scope = scopeText(declared.id, extra)
             val tier = PluginPermissions.tierFor(declared.id, scopeIsAny = declared.id == "apps.intents.out" && extra.optString("scope") == "any") ?: continue
-            declared.id.let { PluginPermissions.providedPoint(it) }?.let { seenProvide += it }
-            val line = ConsentLine(label + (scope?.let { " ($it)" } ?: ""), declared.reason)
-            if (tier == PermissionTier.NORMAL) {
-                // A normal `provide:` item is already listed under "Adds".
-                if (!declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) can.add(line)
-            } else {
-                asks.add(ConsentAsk(tier, line, declared.required))
-            }
+            val risky = tier != PermissionTier.NORMAL
+            val line = ConsentLine(
+                title = label + (scope?.let { " ($it)" } ?: ""),
+                detail = declared.reason,
+                id = if (newContract) declared.id else null,
+                highRisk = risky,
+                ticked = !risky,
+            )
+            if (!risky) can.add(line) else asks.add(ConsentAsk(tier, line, declared.required))
         }
-        // A v2 plugin that provides a high-risk point without naming the consent item is still asked about it.
-        for (entry in v2.provides) {
-            val point = ExtensionPoints.find(entry.point) ?: continue
-            if (point.risk.needsConsent && entry.point !in seenProvide) {
-                seenProvide += entry.point
-                val tier = if (point.risk == PointRisk.CRITICAL) PermissionTier.CRITICAL else PermissionTier.DANGEROUS
-                asks.add(ConsentAsk(tier, ConsentLine("Add to droidtop: ${point.label}"), needed = false))
-            }
-        }
+        val offers = v2.exports.map { ConsentLine("Offer ${it.api} to other plugins", id = GRANT_EXPORT_PREFIX + it.api) }
 
         val uses = v2.requires.map { req ->
             val provider = installed.firstOrNull { rec ->
@@ -105,6 +136,7 @@ object PluginConsent {
             adds = MODE_ORDER.mapNotNull { mode -> adds[mode]?.let { mode to it.toList() } },
             can = can,
             asks = asks.sortedByDescending { it.tier.ordinal },
+            offers = offers,
             uses = uses,
             unsupported = manifest.unsupportedDeclarations(),
             olderPluginFullAccess = manifest.contractVersion < 2,

@@ -11590,10 +11590,19 @@ of what is built. The decisions, briefly:
     source's row in Gaming. `native_bundle` and `python` cannot declare it
     (no activity droidtop can name, no UI toolkit); the manifest check says
     so.
-  - Approving a plugin grants every extension point it lists under Adds,
-    high-risk ones included; a later update's new high-risk point still
-    waits. Before, a contract 2 source was approved and then refused on
-    every call with no prompt.
+  - **Approval is a list the user can cut down** (owner, 2026-10-01: filtered
+    approval, "like how Android permissions used to work"). Every extension
+    point under Adds and every permission, host API or export a plugin asks
+    for is a tick box with a plain-language line, high-risk ones marked.
+    Dangerous and critical permissions and high-risk points start unticked
+    (as before); everything else starts ticked. The plugin runs with the
+    ticked subset: a point that is not granted is never called, a denied
+    host API returns `PERMISSION_DENIED` to the plugin, and a plugin view for
+    a denied point is the standard error state saying it was not allowed,
+    with a row to its Permissions screen. The choices stay editable on the
+    plugin's Permissions screen, and an update asks only about the items it
+    added, on the same list. This replaces the rule that approval granted
+    every listed point (cc3367c5). Details: `docs/plugin-api.md` 4.3.
 
 The catalogue has 89 entries across ten areas (library and content,
 launch and runtime, UI, system and device, desktop, other apps,
