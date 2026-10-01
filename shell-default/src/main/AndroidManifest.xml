@@ -236,6 +236,7 @@
             android:name="com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher"
             android:theme="@style/AppTheme"
             android:launchMode="singleTop"
+            android:excludeFromRecents="true"
             android:exported="true"
             android:enabled="true" />
 
