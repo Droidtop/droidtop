@@ -12,6 +12,7 @@ import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginOriginKeys
 import dev.droidtop.pluginhost.PluginTrustState
+import dev.droidtop.runtime.util.Versions
 import java.io.File
 import kotlin.math.sign
 import kotlinx.coroutines.Dispatchers
@@ -153,7 +154,7 @@ object PluginCatalog {
 
     /** Version and date together: positive when [a] is newer, null when the two orders disagree. */
     private fun compareReleases(a: PluginCatalogRelease, b: PluginCatalogRelease): Int? {
-        val byVersion = dev.droidtop.library.GameVersion.compareVersions(a.version, b.version).sign
+        val byVersion = Versions.compareLoose(a.version, b.version).sign
         val byDate = if (a.publishedAt != null && b.publishedAt != null) {
             a.publishedAtMillis().compareTo(b.publishedAtMillis()).sign
         } else {
