@@ -424,6 +424,39 @@ plain sentence ("The game index is not downloaded yet"); droidtop shows it
 under the source's name and, when the source provides `ui.settings`, an
 "Open <plugin> settings" row right there.
 
+**Pad and hint row (#179).** A plugin never binds a button. On every
+plugin row, tile and menu entry, droidtop's input pipeline (SPEC 6e,
+`onPad`) gives A to the node's one action, B to Back and Y to droidtop's
+own Info sheet, exactly as on droidtop's own rows; X, Select and the
+shoulder buttons are never given to plugin content. A node that needs a
+second action shows it as a second row or `button`, never as another
+button on the same row. So the hint row (SPEC 7j: a hint promises only
+what dispatches) is built by the host from the node type alone, before
+and without loading the plugin, and an inert node (`info`, `progress`, a
+`row` with no action) shows no A hint. The same holds for static entries
+in `provides` (tiles, context actions): A runs them, nothing else. A
+`buttons` field in `provides` is reserved for a later version and is
+ignored today.
+
+**Empty and error states (#179).** One rule for every surface that shows
+plugin content (C1 settings pages, A2 sources, C2/C3 tiles, C4 context
+actions, C11 rows): when a plugin's op times out, fails or crashes, the
+host draws its standard empty state with the plugin's name and the
+one-line reason (the shape `SourceOutcome` already uses for search,
+2026-09-30), never a blank area and never a spinner that does not end.
+When an op succeeds with nothing to show (no results, an empty view),
+the host draws "<plugin>: nothing here" in the same place. A tile that
+misses its budget keeps its last value and says it is stale. Each
+surface's budget is §8's table.
+
+**Gaming rows over a themed view (#179).** ES-DE themes have no slot for
+host content, and the one precedent, an overlay over the frame-only
+render (SPEC 7i), overlapped the theme on the PC tab. So C11 rows, and
+any plugin content in Gaming, appear only on droidtop's own surfaces
+(the Quick Menu, a game's page, the options menus, Settings), never
+inside a themed system or gamelist view, until the frame-only render
+declares a region for host content.
+
 **Consent.** Approving a plugin grants every extension point it lists
 under Adds, including high-risk ones: providing is what the plugin *is*,
 and an approved plugin whose only point is refused without a prompt (two
@@ -1199,8 +1232,10 @@ Risk low.
 - **Ops:** `rows {section} → [{title, items[{title, art, action}]}]`,
   cached by the host and refreshed at most every 15 minutes or on user
   refresh.
-- **Surfaces:** G: home or section rows in the theme's own layout
-  (§7i); A: —; D: —.
+- **Surfaces:** G: droidtop's own surfaces only (Quick Menu, a game's
+  page, options menus), never inside a themed view, until the
+  frame-only render declares a region for host content (§1.6, #179);
+  A: —; D: —.
 - **Permission:** `provide:gaming.rows`, plus `net.domains` for the art,
   which the host fetches.
 - **Status:** not built.

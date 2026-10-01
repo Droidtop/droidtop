@@ -11479,6 +11479,15 @@ of what is built. The decisions, briefly:
   - `handle` now reaches `python` and `flutter_embed` plugins whose
     manifest is contract 2 (each kind's own `handle` function or channel
     method); before, both only had the contract 1 translation.
+  - Three contracts from the 2026-10-01 design review (#179): a plugin
+    never binds a button (A runs a node's one action, B is Back, Y is
+    droidtop's Info; X, Select and shoulders are never plugin buttons), so
+    the hint row is built from the node type without loading the plugin;
+    every surface draws a failed, timed-out or empty plugin op as the
+    host's standard empty state with the plugin's name and reason; and
+    plugin content in Gaming appears only on droidtop's own surfaces
+    (Quick Menu, game page, options menus, Settings), never inside a
+    themed view, until the frame-only render declares a region for it.
   - Approving a plugin grants every extension point it lists under Adds,
     high-risk ones included; a later update's new high-risk point still
     waits. Before, a contract 2 source was approved and then refused on

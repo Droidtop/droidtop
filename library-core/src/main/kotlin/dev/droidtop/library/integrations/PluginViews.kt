@@ -202,10 +202,14 @@ private class PluginPage(
         val head = buildList<CatalogItem> {
             notice?.let { add(ActionItem(id = "pv_${screenId}_notice", title = it, run = {})) }
             error?.let {
-                add(ActionItem(id = "pv_${screenId}_error", title = "This page could not be shown", subtitle = it, run = {}))
+                add(ActionItem(id = "pv_${screenId}_error", title = "${record.manifest.label} could not show this page", subtitle = it, run = {}))
                 addAll(extraWhenFailed())
             }
             view?.subtitle?.let { add(ActionItem(id = "pv_${screenId}_about", title = it, run = {})) }
+            // The empty-state contract (docs/plugin-api.md 1.6, #179): never a blank page.
+            if (error == null && view?.sections?.all { it.nodes.isEmpty() } != false) {
+                add(ActionItem(id = "pv_${screenId}_empty", title = "${record.manifest.label}: nothing here", run = {}))
+            }
         }
         val current = view
         val body = if (error != null || current == null) {
