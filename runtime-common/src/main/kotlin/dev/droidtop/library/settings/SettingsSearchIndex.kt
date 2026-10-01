@@ -17,9 +17,14 @@ data class SettingsSearchResult(
  * A flat, in-memory search over the settings tree reachable from one root
  * screen (docs/SPEC.md settings architecture, "search across settings").
  *
- * Built ONCE per search session ([build], a suspend IO-bound call -- the
- * same real cost as opening every top-level settings screen a single
- * time) and then filtered per keystroke with a plain substring match
+ * Built ONCE per search session ([build], a suspend IO-bound call --
+ * roughly the cost of opening every settings screen a single time,
+ * EXCEPT screens that declare [CatalogScreen.indexGroups]: their live
+ * [CatalogScreen.groups] is skipped for the cheap rows, because some of
+ * them cost library-sized work -- Console systems walks and game-counts
+ * every folder, which held the first search on "Indexing settings..."
+ * for 10-40 s on a real device (Droidtop/tracker#136)) and then filtered
+ * per keystroke with a plain substring match
  * ([search], pure and in-memory) -- never rebuilt while someone types,
  * satisfying "no file/database work ... in list rendering".
  *
@@ -42,7 +47,7 @@ object SettingsSearchIndex {
         val results = mutableListOf<SettingsSearchResult>()
 
         suspend fun indexScreen(screen: CatalogScreen, depth: Int) {
-            for (group in screen.groups(context)) {
+            for (group in screen.indexGroups?.invoke(context) ?: screen.groups(context)) {
                 // Live device state, not configuration (docs/SPEC.md 7f) --
                 // the Quick Menu draws these, Settings does not, and
                 // neither does its search.

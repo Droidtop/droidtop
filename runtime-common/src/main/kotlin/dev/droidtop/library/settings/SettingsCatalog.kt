@@ -238,6 +238,17 @@ class CatalogScreen(
      * resolves unchanged whatever the caller asked for.
      */
     val forDeepLink: ((String) -> CatalogScreen)? = null,
+    /**
+     * The rows the settings SEARCH INDEX reads instead of [groups]
+     * (SettingsSearchIndex.build). Set only when the live [groups] does
+     * work the index must not pay for: Console systems walks every games
+     * root and game-counts every store and engine folder, which made
+     * "Indexing settings..." sit there for 10-40 s on a real device
+     * (Droidtop/tracker#136). Rows the index can do without -- per-folder,
+     * per-platform, per-container instance rows -- belong to the screen,
+     * not to settings search. Null = the index reads [groups] itself.
+     */
+    val indexGroups: (suspend (Context) -> List<CatalogGroup>)? = null,
 )
 
 /**

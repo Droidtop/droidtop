@@ -9435,12 +9435,20 @@ running on the console and asked for the visual pass on top of it. Decided and b
   toolbar at all, and this surface already has a real, always-correct one.
 - **Search across settings, on the settings home, by pad and by touch.** `SettingsSearchIndex`
   (`:runtime-common`) builds a flat index ONCE per search session (`build`, suspend, IO-bound —
-  the same real cost as opening every top-level settings screen once) by walking the root's own
+  roughly the cost of opening every settings screen once) by walking the root's own
   groups (depth 0) and, for a `NestedScreenItem` found there, one level into whatever
   `CatalogScreen` it opens (depth 1) — never further, and never into a screen a catalog builds
   for one instance (a single ROM folder, one platform, one container), which is what keeps this
   flat against the size of anyone's library instead of growing with it (the performance rule:
-  no work that grows with the square of the library). `search` is then a pure, in-memory
+  no work that grows with the square of the library). A screen whose live `groups` costs
+  library-sized work opts out of that walk with `CatalogScreen.indexGroups`, which the index
+  reads instead: Console systems' `groups` walks every games root and game-counts every store
+  and engine folder, which held "Indexing settings..." up for 10-40 s on a real device before
+  the first result (Droidtop/tracker#136); its index rows are its management and
+  platform-database groups plus the folder picker, so the per-folder rows — live library data,
+  not settings to find by name — stay the screen's own business. Both surfaces get this for
+  free: the Gaming overlay and the Preference dialog both call the same `build`.
+  `search` is then a pure, in-memory
   substring filter, safe on every keystroke. In the Gaming shell, a synthetic "Search settings"
   row (`SEARCH_ROW_ID`) is prepended to the settings home's own row list — it rides the exact
   same focus order, Up/Down, A/touch and icon slot as every real row instead of a second

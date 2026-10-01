@@ -192,6 +192,13 @@ object AppSettingsCatalogs {
         title = "Console systems",
         subtitle = "Each folder's system comes from its name; open a folder to change it",
         groups = { context -> consoleSystemsGroups(context, systemId) },
+        // The search index must not pay for the folder walk in
+        // consoleSystemsGroups: on a real device it held "Indexing
+        // settings..." for 10-40 s before the first result
+        // (Droidtop/tracker#136). It reads the static groups plus the
+        // folder picker; the per-folder rows are live library data, not
+        // settings to find by name.
+        indexGroups = { context -> consoleSystemsGroups(context, systemId, forIndex = true) },
         // The per-system deep link the gamelist options menu's "System
         // settings" row opens (docs/SPEC.md "One consistent way into
         // Settings"): the SAME builder re-opened with the system id the
@@ -200,16 +207,26 @@ object AppSettingsCatalogs {
         forDeepLink = { deepLinkedSystemId -> consoleSystemsScreen(deepLinkedSystemId) },
     )
 
-    private suspend fun consoleSystemsGroups(context: Context, systemId: String? = null): List<CatalogGroup> = withContext(Dispatchers.IO) {
+    private suspend fun consoleSystemsGroups(
+        context: Context,
+        systemId: String? = null,
+        forIndex: Boolean = false,
+    ): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         // The library's own answer (SystemFolders), not a second walk:
         // the folders it scans as console systems, plus the ones the person
         // picked to choose a system for. A folder the library reads as PC
         // or engine games is not a console system folder and is not here.
-        val rawFolders = SystemFolders.all(context, systemsById).map { it.first }
-            .plus(SystemFolders.awaitingSystem(context))
-            .distinctBy { it.absolutePath }
-            .sortedBy { it.name.lowercase() }
+        // The search index passes forIndex and gets no folders at all: the
+        // walk and the per-folder game counts are library-sized work.
+        val rawFolders = if (forIndex) {
+            emptyList()
+        } else {
+            SystemFolders.all(context, systemsById).map { it.first }
+                .plus(SystemFolders.awaitingSystem(context))
+                .distinctBy { it.absolutePath }
+                .sortedBy { it.name.lowercase() }
+        }
         // Classify each folder: console system, PC/store, or engine.
         val classifiedFolders = mutableListOf<Pair<File, FolderKind>>()
         for (folder in rawFolders) {
@@ -310,6 +327,8 @@ object AppSettingsCatalogs {
                 title = if (deepLinkedRows != null) deepLinkedSystem?.displayName else "System folders",
                 items = (if (deepLinkedRows != null) {
                     deepLinkedRows
+                } else if (forIndex) {
+                    emptyList()
                 } else if (classifiedFolders.isEmpty()) {
                     listOf<CatalogItem>(
                         ActionItem(
