@@ -516,7 +516,7 @@ class CatalogPreferenceNavigator(
             isIconSpaceReserved = false
             isChecked = item.current
             setOnPreferenceChangeListener { _, newValue ->
-                fragment.lifecycleScope.launch {
+                this@CatalogPreferenceNavigator.fragment.lifecycleScope.launch {
                     item.onToggle(context, newValue as Boolean)
                     rebuild()
                 }
