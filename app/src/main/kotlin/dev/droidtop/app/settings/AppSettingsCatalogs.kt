@@ -347,7 +347,7 @@ object AppSettingsCatalogs {
                                 NestedScreenItem(
                                     id = "console_folder_${folder.absolutePath}",
                                     title = folder.name,
-                                    subtitle = "${kind.storeName} (PC games, detected per game: $gameText)",
+                                    subtitle = "${kind.storeName} (PC games: $gameText)",
                                     inline = folderScreen(folder, kind),
                                     valueLabel = { gameText },
                                 )
@@ -357,7 +357,7 @@ object AppSettingsCatalogs {
                                 NestedScreenItem(
                                     id = "console_folder_${folder.absolutePath}",
                                     title = folder.name,
-                                    subtitle = "Engine games (detected per game: $gameText)",
+                                    subtitle = "Engine games ($gameText)",
                                     inline = folderScreen(folder, kind),
                                     valueLabel = { gameText },
                                 )
@@ -443,8 +443,8 @@ object AppSettingsCatalogs {
                                         ActionItem(
                                             id = "folder_pc_store_info",
                                             title = "${kind.storeName} library",
-                                            subtitle = "PC games from ${kind.storeName} are detected per game ($gameText). " +
-                                                "They appear in the PC games list (Gaming shell > PC tab).",
+                                            subtitle = "PC games from ${kind.storeName} are found one by one ($gameText). " +
+                                                "They appear under PC on the Games screen.",
                                             run = {},
                                         ),
                                     ),
@@ -463,8 +463,8 @@ object AppSettingsCatalogs {
                                         ActionItem(
                                             id = "folder_engine_info",
                                             title = "Engine games folder",
-                                            subtitle = "Engine games (Ren'Py, RPG Maker, etc.) are detected per game ($gameText). " +
-                                                "They appear in the PC games list (Gaming shell > PC tab) and launch via Enginehost.",
+                                            subtitle = "Engine games (Ren'Py, RPG Maker, etc.) are found one by one ($gameText). " +
+                                                "They appear under PC on the Games screen and launch via Enginehost.",
                                             run = {},
                                         ),
                                     ),
@@ -531,8 +531,8 @@ object AppSettingsCatalogs {
                                                 AsyncActionItem(
                                                     id = "folder_gamelist_${folder.absolutePath}",
                                                     title = "Import gamelist.xml",
-                                                    subtitle = "Ingests an external scraper's output (Skraper, Skyscraper, ARRM, ES-DE) " +
-                                                        "for this folder: metadata into droidtop, media referenced where it sits",
+                                                    subtitle = "Imports an external scraper's output (Skraper, Skyscraper, ARRM, ES-DE) " +
+                                                        "for this folder: metadata into droidtop, media used from where it sits",
                                                     run = { ctx, _ -> importGamelistXml(ctx, folder) },
                                                 ),
                                             )
@@ -549,7 +549,7 @@ object AppSettingsCatalogs {
                                                 NestedScreenItem(
                                                     id = "folder_acquire_${resolved.id}",
                                                     title = "Get games",
-                                                    subtitle = "Search an installed acquire_content plugin or integration for ${resolved.displayName}",
+                                                    subtitle = "Search installed plugins and integrations for ${resolved.displayName} games",
                                                     inline = AcquireContentSources.systemScreen(resolved.id, resolved.displayName, folder),
                                                 ),
                                             )
@@ -779,7 +779,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "add_player_save",
                                 title = "Save player",
-                                subtitle = "Needs a name, a package, and arguments",
+                                subtitle = "Needs a package and arguments; without a name it uses the package name",
                                 run = { ctx ->
                                     if (pkg.isNotBlank() && args.isNotBlank()) {
                                         CustomPlayerPrefs.add(ctx, system.id, name.ifBlank { pkg }, args, pkg, kill)
@@ -868,7 +868,7 @@ object AppSettingsCatalogs {
     private fun enginehostScreen() = CatalogScreen(
         id = SCREEN_ENGINEHOST,
         title = "Enginehost",
-        subtitle = "The native VN/RPG engine runtime droidtop launches engine games through",
+        subtitle = "The separate app that runs engine games natively",
         groups = { context ->
             val installed = dev.droidtop.library.EngineHost.isInstalled(context)
             val bundles = if (installed) {
@@ -884,7 +884,7 @@ object AppSettingsCatalogs {
                                 ActionItem(
                                     id = "enginehost_missing",
                                     title = "Enginehost isn't installed",
-                                    subtitle = "Engine games fall back to Wine/Linux strategies until it is",
+                                    subtitle = "Engine games fall back to Wine or a Linux container until it is",
                                     run = {},
                                 ),
                             )
@@ -894,7 +894,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "enginehost_settings",
                                 title = "Enginehost settings",
-                                subtitle = "Opens Enginehost's own global configuration",
+                                subtitle = "Opens Enginehost's own settings",
                                 run = { ctx ->
                                     ctx.startActivity(dev.droidtop.library.EngineHost.settingsIntent())
                                 },
@@ -904,7 +904,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "enginehost_saves",
                                 title = "Save storage",
-                                subtitle = "Shared save root and migration, in Enginehost's own screen",
+                                subtitle = "One shared place for engine saves, and moving saves there, in Enginehost's own screen",
                                 run = { ctx ->
                                     ctx.startActivity(dev.droidtop.library.EngineHost.savesSettingsIntent())
                                 },
@@ -922,7 +922,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "enginehost_no_bundles",
                                 title = "No runtime bundles installed yet",
-                                subtitle = "Launching an engine game offers the matching bundle; auto-install is used when droidtop's detection is confident",
+                                subtitle = "Launching an engine game offers the matching bundle, and installs it without asking when droidtop is sure which one it needs",
                                 run = {},
                             ),
                         )
@@ -992,7 +992,7 @@ object AppSettingsCatalogs {
                             id = "updates_frequency",
                             title = "Check for updates",
                             subtitle = "Fetches one small file describing the latest build; nothing about this " +
-                                "device or your library is sent. Never stops automatic checks; Check now still works",
+                                "device or your library is sent. Picking Never stops the automatic checks; Check now still works",
                             options = dev.droidtop.app.update.AppSelfUpdate.Frequency.entries
                                 .map { ChoiceOption(it.name, it.label) },
                             current = update.frequency(context).name,
@@ -1169,7 +1169,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "windows_unavailable",
                                 title = "Windows support isn't loaded",
-                                subtitle = "This build has no PC runtime registered, so there is nothing to set up",
+                                subtitle = "This build cannot run Windows games, so there is nothing to set up",
                                 run = {},
                             ),
                         )
@@ -1509,7 +1509,7 @@ object AppSettingsCatalogs {
     private fun screenScraperAccountScreen() = CatalogScreen(
         id = "accounts_screenscraper_edit",
         title = "ScreenScraper account",
-        subtitle = "Account fields only -- the developer ID droidtop registers with ScreenScraper is compiled in, never a user-facing field",
+        subtitle = "Only your own account fields; droidtop's developer login is built into the app",
         groups = { context ->
             listOf(
                 CatalogGroup(
@@ -1718,7 +1718,7 @@ object AppSettingsCatalogs {
                                         append(" on ")
                                         append(integration.capability.surface)
                                         append(" - ")
-                                        append(if (installed) integration.packageName else "${integration.packageName} is NOT installed, so this is hidden elsewhere")
+                                        append(if (installed) integration.packageName else "${integration.packageName} is NOT installed, so it is hidden everywhere but here")
                                         IntegrationPlaceholders.usedIn(integration.argumentsTemplate)
                                             .takeIf { it.isNotEmpty() }
                                             ?.let { append("  |  uses ").append(it.joinToString(" ")) }
@@ -2080,7 +2080,7 @@ object AppSettingsCatalogs {
             null
         } else {
             val rows = permissionRows(record, grantSnapshot)
-            val summary = "${rows.count { it.state == GrantState.GRANTED }} allowed, ${rows.count { it.state == GrantState.ASK }} ask, ${rows.count { it.state == GrantState.DENIED }} blocked"
+            val summary = "${rows.count { it.state == GrantState.GRANTED }} allowed, ${rows.count { it.state == GrantState.ASK }} ask first, ${rows.count { it.state == GrantState.DENIED }} blocked"
             CatalogGroup(
                 id = "plugin_${m.id}_permissions_group",
                 title = "Permissions",
@@ -2109,7 +2109,7 @@ object AppSettingsCatalogs {
                     AsyncActionItem(
                         id = "plugin_${m.id}_call_status_tile",
                         title = "Call its status tile",
-                        subtitle = "Runs a real invoke() through the isolated plugin process and shows what it returns",
+                        subtitle = "Runs the status tile for real, in its own process, and shows what it returns",
                         run = { ctx, _ ->
                             val policy = PluginCrashPolicy(ctx.applicationContext)
                             try {
@@ -2251,14 +2251,14 @@ object AppSettingsCatalogs {
             PluginKind.PYTHON -> ActionItem(
                 id = "plugins_python_runtime_remove",
                 title = "Python runtime: installed",
-                subtitle = "CPython ${PythonRuntimeManager.installedVersion(context) ?: PythonRuntimeManager.pinnedVersion(context)} (${PythonRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other python-kind plugin) until it is downloaded again; you are asked to confirm first.",
+                subtitle = "CPython ${PythonRuntimeManager.installedVersion(context) ?: PythonRuntimeManager.pinnedVersion(context)} (${PythonRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other plugin that needs Python) until it is downloaded again; you are asked to confirm first.",
                 confirmTitle = "Remove the downloaded Python runtime?",
                 run = { ctx -> PythonRuntimeManager.remove(ctx) },
             )
             PluginKind.FLUTTER_EMBED -> ActionItem(
                 id = "plugins_flutter_runtime_remove",
                 title = "Flutter runtime: installed",
-                subtitle = "Flutter engine ${FlutterRuntimeManager.pinnedVersion(context)} (${FlutterRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other flutter_embed-kind plugin) until it is downloaded again; you are asked to confirm first.",
+                subtitle = "Flutter engine ${FlutterRuntimeManager.pinnedVersion(context)} (${FlutterRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other plugin that needs Flutter) until it is downloaded again; you are asked to confirm first.",
                 confirmTitle = "Remove the downloaded Flutter runtime?",
                 run = { ctx -> FlutterRuntimeManager.remove(ctx) },
             )
@@ -2323,7 +2323,7 @@ object AppSettingsCatalogs {
         val format = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
         fun item(row: PermissionRow): CatalogItem {
             val lastUsed = audit.lastUsed(pluginId, row.id)?.let { "Last used ${format.format(java.util.Date(it))}" }
-            val wanted = if (row.id in snap.wanted) "It tried to use this while you were not being asked" else null
+            val wanted = if (row.id in snap.wanted) "It tried to use this but could not ask you first" else null
             return dev.droidtop.library.settings.ChoiceItem(
                 id = "plugin_${pluginId}_perm_${row.id}",
                 title = row.label,
@@ -2574,7 +2574,7 @@ object AppSettingsCatalogs {
                             id = "plugin_keys_manual_origin",
                             title = "Origin id",
                             subtitle = "The origin's own id, e.g. acme -- it prefixes every plugin id it signs (<origin>.<name>). " +
-                                "It can never be \"${PluginOriginKeys.OFFICIAL_ORIGIN}\": that one is official",
+                                "It can never be \"${PluginOriginKeys.OFFICIAL_ORIGIN}\": that is the official origin",
                             value = pendingKeyManualOrigin,
                             onChange = { _, v -> pendingKeyManualOrigin = v.trim() },
                         ),
@@ -2979,7 +2979,7 @@ object AppSettingsCatalogs {
                         ToggleItem(
                             id = "scrape_content_artwork",
                             title = "Fetch box art",
-                            subtitle = "Cover images, including the keyless libretro fallback",
+                            subtitle = "Cover images, including from the libretro database, which needs no key",
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeArtwork(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setScrapeArtwork(ctx, value) },
                         ),

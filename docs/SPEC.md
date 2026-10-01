@@ -8014,8 +8014,9 @@ the system chosen on its page counts wherever the folder sits.
 
 **Fixed (H6): the Console systems page now classifies folders.** A folder
 that is a PC store root (Steam, GOG, etc.) or contains engine games shows
-"Steam (PC games, detected per game: N games)" or "Engine games (detected
-per game: N games)" with no system picker. Only folders that are truly
+"Steam (PC games: N games)" or "Engine games (N games)" with no system
+picker, and its own page says the games are found one by one and appear
+under PC on the Games screen. Only folders that are truly
 unrecognized ROM folders show "Not set" and offer the system picker.
 
 **A time limit belongs to the unit of work it can bound, which is one
