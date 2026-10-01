@@ -1048,10 +1048,34 @@ private fun versionsRows(
         }
     }
     for (version in game.versions) {
-        rows += row(group, version, currentId, onOpenOther, label = null)
+        // One game owned on several stores (docs/SPEC.md 7m): a row per
+        // store, because each store's copy has its own install and its own
+        // Play, and the person chooses which one to open.
+        val stores = version.copies.filter { group.entryFor(it)?.ownership() != null }
+        if (stores.size > 1) {
+            stores.forEach { rows += storeCopyRow(group, it, currentId, onOpenOther) }
+        } else {
+            rows += row(group, version, currentId, onOpenOther, label = null)
+        }
     }
     if (rows.size < 2) return null
     return rows
+}
+
+/** One store's copy of a game owned on several: named by the store, saying whether it is installed. */
+private fun storeCopyRow(
+    group: dev.droidtop.library.LibraryGameGroup,
+    copy: dev.droidtop.library.GameCopy,
+    currentId: String,
+    onOpenOther: (LibraryEntry) -> Unit,
+): PcActionRow {
+    val target = group.entryFor(copy)
+    val store = target?.ownership()?.label ?: copy.source ?: copy.path
+    val detail = buildString {
+        append(if (target?.id == currentId) "Open now" else "Open this one")
+        append(" - ").append(if (copy.installed) "installed" else "not installed")
+    }
+    return PcActionRow(store, detail, if (target == null || target.id == currentId) null else ({ onOpenOther(target) }))
 }
 
 private fun row(

@@ -10183,16 +10183,72 @@ pitch: no popups, no grid badges, and one "Hide these for this game" row
 dismisses them for that game (`StoreLinkPrefs`). A game a store owns gets
 none of it, and its scraped links stay as the plain Links rows.
 
-**Direction, not built**: one game across stores is one library game,
-identified by its store id, then a store cross-reference an identified
-scrape learned (IGDB's `external_games`), then the DLsite RJ code, the
-F95zone thread and the name the user confirmed. Titles never join that
-ladder: title, developer and year only SUGGEST a store row on the game's
-"The same game as..." picker, and only a person confirming folds it (with
-a split on the store row's own options). `LibraryGrouping` and
-`Library.mergeGames` stay the one mechanism for it; there is no second
-grouping. Two folds are not the person's to split: the shared store id of
-a folder that is a store's install, and a shared F95 thread.
+### One game across stores (decided 2026-09-30, Droidtop/tracker#133)
+
+The same game owned on Steam, GOG, Epic, Amazon and itch.io is ONE library
+game, a card with a copy per store, and no store's row is lost. Before this
+`LibraryGrouping` made every store row a group of one, so five stores meant
+five cards.
+
+`StoreIdentity.group` (`:library-core`) says which store rows are one game,
+in this order of evidence, inside the one grouping mechanism
+(`LibraryGrouping`; there is no second one):
+
+1. **The same install directory.** Two stores whose rows name one folder
+   are one game. It is the only cross-reference the stores' own rows carry:
+   a GOG, Epic, Amazon or itch.io row names no other store's id, and a
+   Steam row names none either. A cross-reference an identified scrape
+   learned (IGDB's `external_games`, `PcGameIds`) is a store id kept
+   beside a scraped game, not a field of the entry; it joins this list
+   when the entry carries it, and until then nothing here pretends to it.
+2. **The name the person gave** (`LibraryEntry.gameName`, "The same game
+   as..."): rows given one name are one game, whatever the stores call it.
+3. **The same title, spelled the same way** (`StoreIdentity.titleKey`):
+   an EXACT comparison of the titles once case, diacritics, trademark
+   symbols (the TM, registered and copyright signs), apostrophes and
+   punctuation are dropped, "&" is read as "and", a leading "The" is
+   dropped and trailing edition labels are removed ("Deluxe Edition",
+   "Game of the Year Edition", "GOTY", "Definitive/Complete/Ultimate/Gold/
+   Special/Enhanced/Digital Deluxe/Collector's Edition", "Director's Cut").
+   A label is removed only at the END of a title and never when it would
+   leave nothing ("Gold Edition" is a name).
+
+Similarity is NOT in the list. Every number and year in a title is kept,
+so `Doom`, `Doom 3`, `Doom (2016)` and `Doom II` are four games, as are
+`Fallout`/`Fallout 3`, `Half-Life`/`Half-Life 2` and `Civilization V`/`VI`.
+Roman numerals are deliberately not read as numbers: `Mega Man X` is not
+`Mega Man 10`. A pair that is alike but not equal is only ever offered on
+the game's "The same game as..." picker, where a person confirms it
+(`SimilarGames`, `Library.mergeGames`). Two folds are not the person's to
+split: the shared store id of a folder that is a store's install, and a
+shared F95 thread. The DLsite RJ code and the F95zone thread join folders,
+not stores, and stay as written in 7g.
+
+The merge is a hash lookup per row (two maps, then union-find), so it grows
+with the library and not with its square, and it reads only the entries in
+hand: no disk, no database, nothing on the main thread beyond the grouping
+the list already does.
+
+**What the card is.** One `LibraryGameGroup` whose one version has one
+`GameCopy` per store (`source`, `installed`), ordered Steam, GOG, Epic,
+Amazon, itch.io. Play starts the installed copy, else the first store's
+(`GameVersion.playable`); the card is titled by the plainest spelling (the
+shortest title) or the person's own name. Every store's own row stays an
+entry with its own id, so each keeps its install, verify, update and Play,
+its scrape and its play history. The game's detail lists a row per store
+under "Versions" ("Steam - installed", "GOG - not installed"); choosing one
+opens that store's own detail, which is where the install source is
+chosen (Install or Manage install for that store) and where Play starts
+that store's copy. "Owned on Steam and GOG" is built from the same rows.
+
+**Known limit.** A favourite, a collection membership and play history
+belong to an entry id, and the card draws one entry (the installed store's,
+else the first). Installing the game from another store moves the card to
+that entry, so those facts, kept on the other store's entry, are not shown
+on the card until the person opens that store's copy. They are not lost.
+Carrying them across a store switch is `Library.mergeGames`' job and is not
+done automatically.
+
 ### Switch content: an update and a DLC are parts of one game (2026-09-29)
 
 A Switch library is not folders but packages, and a package knows what it

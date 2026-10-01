@@ -58,10 +58,10 @@ data class LibraryGameGroup(
  *
  * An entry whose id is a path on this device is a folder the scan found,
  * so [GameNaming] can say what its name, version and segment are. An entry
- * with any other id is a store row (`steam:440`) whose name the store
- * already gave: it becomes a group of one under its own title, because
- * deriving a version out of a store's title would be guessing where a real
- * answer exists.
+ * with a store's id (`steam:440`) is a store row whose name the store
+ * already gave, so no version is derived from it; the rows of one game
+ * owned on several stores become ONE group with a copy per store
+ * ([StoreIdentity], docs/SPEC.md 7m). Any other id is a group of one.
  */
 object LibraryGrouping {
 
@@ -80,13 +80,23 @@ object LibraryGrouping {
         )
             .map { game -> LibraryGameGroup(game, game.allVersions.flatMap { it.copies }.mapNotNull { copy -> byPath[copy.path]?.let { copy.path to it } }.toMap()) }
             .filter { it.entriesByPath.isNotEmpty() }
-        val ungrouped = entries.filterNot { it.id.isFolderPath() }.map { entry ->
+        val (stores, ungroupedRows) = entries.filterNot { it.id.isFolderPath() }.partition { it.ownership() != null }
+        val storeGames = StoreIdentity.group(stores).map { merged ->
+            val copies = merged.entries.map { entry ->
+                GameCopy(path = entry.id, source = entry.pcInfo?.source, installed = entry.pcInfo?.installed != false)
+            }
+            LibraryGameGroup(
+                GroupedGame(merged.name, listOf(GameVersion(version = "", copies = copies))),
+                merged.entries.associateBy { it.id },
+            )
+        }
+        val ungrouped = ungroupedRows.map { entry ->
             LibraryGameGroup(
                 GroupedGame(entry.title, listOf(GameVersion(version = "", copies = listOf(GameCopy(path = entry.id))))),
                 mapOf(entry.id to entry),
             )
         }
-        return (grouped + ungrouped).sortedBy { it.game.name.lowercase() }
+        return (grouped + storeGames + ungrouped).sortedBy { it.game.name.lowercase() }
     }
 
     /**
