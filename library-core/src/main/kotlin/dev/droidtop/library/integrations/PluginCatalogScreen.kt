@@ -64,8 +64,12 @@ object PluginCatalogScreen {
                 add(
                     ActionItem(
                         id = "plugins_catalog_empty",
-                        title = "Nothing to show yet",
-                        subtitle = "The catalog index hasn't been published yet, or the refresh above just failed. A plugin file can still be installed from the Plugins screen.",
+                        title = if (load.published) "Nothing to show yet" else "No catalog is published yet",
+                        subtitle = if (load.published) {
+                            "The refresh above just failed. A plugin file can still be installed from the Plugins screen."
+                        } else {
+                            "There is nothing to browse yet. Install a plugin file from the Plugins screen instead."
+                        },
                         run = {},
                     ),
                 )

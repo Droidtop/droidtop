@@ -20,18 +20,19 @@ import kotlinx.coroutines.launch
  * started, so this screen shows all of them, not just ones started from
  * itself.
  *
- * Registered once (see `SCREEN_JOBS` in `:app`'s `AppSettingsCatalogs`)
- * and reached from Settings > App integrations, next to Plugins -- same
+ * Registered once (in `:app`'s `AppSettingsCatalogs`) and reached from
+ * the one "Downloads and installs" entry of Settings -- same
  * shared-catalog registry every other cross-module management screen
  * uses, so both the Gaming and Standard settings renderers get it for
- * free.
+ * free. There is no second entry for it: it used to also appear as
+ * "Jobs" under Accounts and sources (docs/SPEC.md 12a "Jobs").
  */
 object PluginJobsScreen {
     const val ID = "plugin_jobs"
 
     fun screen(): CatalogScreen = CatalogScreen(
         id = ID,
-        title = "Jobs",
+        title = "Downloads and installs",
         subtitle = "Plugin downloads and long-running actions, wherever they were started from",
         groups = { _ ->
             val snapshot = PluginJobsCenter.entries().value

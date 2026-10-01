@@ -54,7 +54,9 @@ import dev.droidtop.pluginhost.ExtensionPoints
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginOriginKeys
 import dev.droidtop.pluginhost.PluginSourceKeys
+import dev.droidtop.pluginhost.PluginRuntimeNeeds
 import dev.droidtop.pluginhost.PythonRuntimeManager
+import dev.droidtop.pluginhost.RuntimeNeed
 import dev.droidtop.pluginhost.FlutterRuntimeManager
 import dev.droidtop.pluginhost.UserOriginKey
 import dev.droidtop.pluginhost.UserOriginKeys
@@ -146,10 +148,9 @@ object AppSettingsCatalogs {
     const val SCREEN_ROM_FOLDERS = "rom_folders"
     const val SCREEN_SCRAPER = "rom_scraper"
     const val SCREEN_PLATFORMS = "manage_platforms"
-    const val SCREEN_INTEGRATIONS = "integrations"
-    const val SCREEN_PLUGINS = "plugins"
+    const val SCREEN_INTEGRATIONS = AcquireContentSources.INTEGRATIONS_SCREEN_ID
+    const val SCREEN_PLUGINS = AcquireContentSources.PLUGINS_SCREEN_ID
     const val SCREEN_PLUGIN_KEYS = "plugin_keys"
-    const val SCREEN_JOBS = "plugin_jobs"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
     const val SCREEN_PC_STORES = "pc_stores"
     const val SCREEN_ACCOUNTS_AND_SOURCES = "accounts_and_sources"
@@ -1356,7 +1357,17 @@ object AppSettingsCatalogs {
             installedPlugins.isEmpty() -> "none"
             installedPlugins.any { it.trust == PluginTrustState.PENDING } ->
                 "${installedPlugins.count { it.trust == PluginTrustState.PENDING }} awaiting approval"
-            else -> "${installedPlugins.count { it.runnable() }} active"
+            else -> {
+                // A plugin whose runtime is missing is approved but cannot run: it is "needs setup", never "active".
+                val runnable = installedPlugins.filter { it.runnable() }
+                val needSetup = runnable.count { PluginRuntimeNeeds.missing(context, it.manifest) != null }
+                val active = runnable.size - needSetup
+                when {
+                    needSetup == 0 -> "$active active"
+                    active == 0 -> "$needSetup need setup"
+                    else -> "$active active, $needSetup need setup"
+                }
+            }
         }
 
         listOf(
@@ -1489,12 +1500,6 @@ object AppSettingsCatalogs {
                         subtitle = "Your own token: lifts GitHub's request limit for plugin updates and reaches plugin sources in private repositories",
                         inline = githubTokenScreen(),
                         valueLabel = { githubTokenLabel },
-                    ),
-                    NestedScreenItem(
-                        id = "accounts_jobs_screen",
-                        title = "Jobs",
-                        subtitle = "Plugin downloads and long-running actions, with progress and cancel",
-                        registryId = SCREEN_JOBS,
                     ),
                 ),
             ),
@@ -1788,7 +1793,15 @@ object AppSettingsCatalogs {
                         )
                     }
                     installed.forEach { record ->
-                        add(pluginCard(record, userKeys, resolution.waiting[record.manifest.id], grantStore.read(record.manifest.id).wantsNewAccess))
+                        add(
+                            pluginCard(
+                                record,
+                                userKeys,
+                                resolution.waiting[record.manifest.id],
+                                grantStore.read(record.manifest.id).wantsNewAccess,
+                                PluginRuntimeNeeds.missing(context, record.manifest),
+                            ),
+                        )
                     }
                 },
             ),
@@ -1882,6 +1895,7 @@ object AppSettingsCatalogs {
         userKeys: Map<String, String>,
         waiting: List<dev.droidtop.pluginhost.RequiredApi>?,
         wantsNewAccess: Boolean,
+        runtimeNeed: RuntimeNeed?,
     ): NestedScreenItem {
         val m = record.manifest
         val state = when {
@@ -1889,6 +1903,8 @@ object AppSettingsCatalogs {
             record.trust == PluginTrustState.DENIED -> "Denied"
             record.disabledReason != null -> "Crashed"
             record.trust == PluginTrustState.APPROVED && !record.enabled -> "Disabled"
+            // Approved but its runtime is not on the device: it cannot run, so it is never "Running".
+            runtimeNeed != null -> "Needs setup"
             // Waiting is not disabled: the plugin resumes by itself when a provider returns (docs/plugin-api.md 2.3).
             waiting != null -> "Waiting"
             record.trust == PluginTrustState.APPROVED && wantsNewAccess -> "Wants new access"
@@ -1959,11 +1975,14 @@ object AppSettingsCatalogs {
         val m = record.manifest
         val resolution = PluginApiResolver.current(context)
         val grantSnapshot = PluginGrants.forContext(context).read(m.id)
+        val runtimeNeed = PluginRuntimeNeeds.missing(context, m)
         val statusGroup = buildList<CatalogItem> {
             val statusLine = when {
                 record.trust == PluginTrustState.PENDING -> "Awaiting approval"
                 record.trust == PluginTrustState.DENIED -> "Denied"
                 record.disabledReason != null -> "Disabled: ${record.disabledReason}"
+                record.trust == PluginTrustState.APPROVED && record.enabled && runtimeNeed != null ->
+                    "Needs the ${runtimeNeed.runtime} runtime (${runtimeNeed.sizeLabel}) to run"
                 record.trust == PluginTrustState.APPROVED && record.enabled -> "Running"
                 else -> "Disabled"
             }
@@ -2051,7 +2070,10 @@ object AppSettingsCatalogs {
             }
         }
 
+        // "Asks for" is what approval is about; once approved, the Permissions screen below holds the real
+        // state of each one, and a second list saying "Asks first" beside "7 allowed, 0 ask" contradicts it.
         val consentGroups = pluginConsentGroups(context, record, userKeys)
+            .filterNot { record.trust == PluginTrustState.APPROVED && it.id.endsWith("_consent_asks") }
 
         // Grants exist once the plugin is approved (docs/plugin-api.md 4.4): one screen per plugin, no second place.
         val permissionsGroup: CatalogGroup? = if (record.trust != PluginTrustState.APPROVED) {
@@ -2152,11 +2174,7 @@ object AppSettingsCatalogs {
         // automatically as part of approval is agent pluginapi's
         // permission-model work landing separately; today it is still an
         // explicit action, same as before.
-        val runtimeGroup: List<CatalogItem> = when (m.kind) {
-            PluginKind.PYTHON -> listOf(pythonRuntimeItem(context, forPluginLabel = m.label))
-            PluginKind.FLUTTER_EMBED -> listOf(flutterRuntimeItem(context, forPluginLabel = m.label))
-            else -> emptyList()
-        }
+        val runtimeGroup: List<CatalogItem> = listOfNotNull(runtimeItem(context, m.kind, m.label, runtimeNeed))
 
         val updateGroup = buildList<CatalogItem> {
             val index = PluginCatalog.lastGoodIndex(context)
@@ -2188,12 +2206,16 @@ object AppSettingsCatalogs {
             ActionItem(id = "plugin_${m.id}_digest", title = "Archive digest", subtitle = record.archiveDigest, run = {}),
         )
 
+        // A runtime the plugin cannot run without goes straight under the status line that says so, where
+        // the person is looking; an installed one (only its removal) stays further down.
+        val runtimeGroupItem = if (runtimeGroup.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_runtime_group", title = "Runtime", items = runtimeGroup)
         return listOfNotNull(
             CatalogGroup(id = "plugin_${m.id}_status_group", title = null, items = statusGroup),
+            runtimeGroupItem.takeIf { runtimeNeed != null },
         ) + consentGroups + listOfNotNull(
             permissionsGroup,
             CatalogGroup(id = "plugin_${m.id}_provides_group", title = "What it provides", items = providesGroup),
-            if (runtimeGroup.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_runtime_group", title = "Runtime", items = runtimeGroup),
+            runtimeGroupItem.takeIf { runtimeNeed == null },
             CatalogGroup(id = "plugin_${m.id}_update_group", title = "Version", items = updateGroup),
             CatalogGroup(
                 id = "plugin_${m.id}_uninstall_group",
@@ -2211,73 +2233,37 @@ object AppSettingsCatalogs {
         )
     }
 
-    private fun pythonRuntimeItem(context: Context, forPluginLabel: String): CatalogItem {
-        val installed = PythonRuntimeManager.isInstalled(context)
-        val version = PythonRuntimeManager.installedVersion(context) ?: PythonRuntimeManager.pinnedVersion(context)
-        return if (installed) {
-            ActionItem(
+    /**
+     * The runtime row of a plugin's own page: when the plugin cannot run without a runtime the device
+     * lacks, the one labelled action that downloads it; when it is installed, its removal (the surface
+     * asks for an explicit yes first). Null for a kind that needs no runtime.
+     */
+    private fun runtimeItem(context: Context, kind: PluginKind, forPluginLabel: String, need: RuntimeNeed?): CatalogItem? {
+        if (need != null) {
+            return AsyncActionItem(
+                id = "plugins_${need.runtime.lowercase()}_runtime_download",
+                title = need.actionLabel,
+                subtitle = "Press A to start. $forPluginLabel cannot run until it is installed. Downloaded once and checked against a SHA-256 before it is used.",
+                run = { ctx, onStatus -> PluginRuntimeNeeds.install(ctx, need, onStatus) ?: "${need.runtime} runtime installed" },
+            )
+        }
+        return when (kind) {
+            PluginKind.PYTHON -> ActionItem(
                 id = "plugins_python_runtime_remove",
-                title = "Python runtime",
-                subtitle = "Installed: CPython $version (${PythonRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other python-kind plugin) until it's downloaded again.",
+                title = "Python runtime: installed",
+                subtitle = "CPython ${PythonRuntimeManager.installedVersion(context) ?: PythonRuntimeManager.pinnedVersion(context)} (${PythonRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other python-kind plugin) until it is downloaded again; you are asked to confirm first.",
                 confirmTitle = "Remove the downloaded Python runtime?",
                 run = { ctx -> PythonRuntimeManager.remove(ctx) },
             )
-        } else {
-            AsyncActionItem(
-                id = "plugins_python_runtime_download",
-                title = "Python runtime",
-                subtitle = "Not installed -- $forPluginLabel needs it to run. CPython $version (${PythonRuntimeManager.currentAbi()}), ~22 MB from python.org, SHA-256 verified.",
-                run = { ctx, onStatus ->
-                    val error = PythonRuntimeManager.ensureInstalled(ctx) { progress -> onStatus(runtimeProgressText(progress)) }
-                    error ?: "Python runtime installed"
-                },
-            )
-        }
-    }
-
-    private fun flutterRuntimeItem(context: Context, forPluginLabel: String): CatalogItem {
-        val installed = FlutterRuntimeManager.isInstalled(context)
-        val version = FlutterRuntimeManager.pinnedVersion(context)
-        return if (installed) {
-            ActionItem(
+            PluginKind.FLUTTER_EMBED -> ActionItem(
                 id = "plugins_flutter_runtime_remove",
-                title = "Flutter runtime",
-                subtitle = "Installed: Flutter engine $version (${FlutterRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other flutter_embed-kind plugin) until it's downloaded again.",
+                title = "Flutter runtime: installed",
+                subtitle = "Flutter engine ${FlutterRuntimeManager.pinnedVersion(context)} (${FlutterRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other flutter_embed-kind plugin) until it is downloaded again; you are asked to confirm first.",
                 confirmTitle = "Remove the downloaded Flutter runtime?",
                 run = { ctx -> FlutterRuntimeManager.remove(ctx) },
             )
-        } else {
-            AsyncActionItem(
-                id = "plugins_flutter_runtime_download",
-                title = "Flutter runtime",
-                subtitle = "Not installed -- $forPluginLabel needs it to run. Flutter engine $version (${FlutterRuntimeManager.currentAbi()}), ~40 MB from Flutter's own release CDN, SHA-256 verified.",
-                run = { ctx, onStatus ->
-                    val error = FlutterRuntimeManager.ensureInstalled(ctx) { progress -> onStatus(runtimeProgressText(progress)) }
-                    error ?: "Flutter runtime installed"
-                },
-            )
+            else -> null
         }
-    }
-
-    private fun runtimeProgressText(progress: PythonRuntimeManager.Progress): String = when (progress) {
-        is PythonRuntimeManager.Progress.Downloading -> downloadProgressText(progress.bytesRead, progress.totalBytes)
-        PythonRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
-        PythonRuntimeManager.Progress.Extracting -> "Extracting..."
-        PythonRuntimeManager.Progress.Done -> "Done"
-    }
-
-    private fun runtimeProgressText(progress: FlutterRuntimeManager.Progress): String = when (progress) {
-        is FlutterRuntimeManager.Progress.Downloading -> downloadProgressText(progress.bytesRead, progress.totalBytes)
-        FlutterRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
-        FlutterRuntimeManager.Progress.Extracting -> "Extracting..."
-        FlutterRuntimeManager.Progress.Done -> "Done"
-    }
-
-    private fun downloadProgressText(bytesRead: Long, totalBytes: Long): String = if (totalBytes > 0) {
-        val pct = (bytesRead * 100 / totalBytes).toInt()
-        "Downloading... $pct% (${bytesRead / 1024 / 1024} MB / ${totalBytes / 1024 / 1024} MB)"
-    } else {
-        "Downloading... ${bytesRead / 1024 / 1024} MB"
     }
 
     /** One line of the Permissions screen: a permission, a high-risk point it may provide, or an export, with its current state. */
@@ -2372,7 +2358,7 @@ object AppSettingsCatalogs {
             },
             if (fresh.isEmpty()) null else CatalogGroup("plugin_permissions_new", "Wants new access", fresh.map(::item)),
             rest.filter { it.tier == PermissionTier.CRITICAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_critical", "Critical", it.map(::item)) },
-            rest.filter { it.tier == PermissionTier.DANGEROUS }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_dangerous", "Asks first", it.map(::item)) },
+            rest.filter { it.tier == PermissionTier.DANGEROUS }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_dangerous", "Sensitive", it.map(::item)) },
             rest.filter { it.tier == PermissionTier.NORMAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_normal", "Can", it.map(::item)) },
             if (rows.isEmpty()) {
                 CatalogGroup(

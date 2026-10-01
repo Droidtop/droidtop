@@ -69,19 +69,29 @@ object PluginCatalog {
         if (!stale) return@withContext Load(cached, null)
         try {
             Load(fetchAndCache(context), null)
+        } catch (failure: NotPublished) {
+            Load(cached, null, published = cached != null)
         } catch (failure: Exception) {
             Load(
                 cached,
                 if (cached != null) {
-                    "The refresh just failed (${failure.message ?: "unknown error"}); this is the copy fetched earlier."
+                    "The refresh just failed (${describe(failure)}); this is the copy fetched earlier."
                 } else {
-                    "Couldn't load the catalog: ${failure.message ?: "unknown error"}."
+                    "Couldn't load the catalog: ${describe(failure)}."
                 },
             )
         }
     }
 
-    data class Load(val index: PluginCatalogIndex?, val note: String?)
+    /** [published] is false when the host answered that the index file does not exist: no catalog yet, which is a state to say plainly, not an error to print. */
+    data class Load(val index: PluginCatalogIndex?, val note: String?, val published: Boolean = true)
+
+    /** The index file is not there (HTTP 404/410): nothing has been published to browse yet. */
+    private class NotPublished : Exception("No plugin catalog is published yet")
+
+    /** One sentence for a failed fetch, never a raw status line for the unpublished case. */
+    private fun describe(failure: Exception): String =
+        if (failure is NotPublished) "No plugin catalog is published yet" else failure.message ?: "unknown error"
 
     /**
      * The manual "Refresh catalog" row: always fetches (no cache-freshness
@@ -94,9 +104,11 @@ object PluginCatalog {
             "Catalog up to date: ${parsed.origins.sumOf { it.plugins.size }} plugin(s) listed."
         } catch (failure: Exception) {
             if (lastGoodIndex(context) != null) {
-                "Couldn't refresh (${failure.message ?: "unknown error"}); the copy fetched earlier is still on file."
+                "Couldn't refresh (${describe(failure)}); the copy fetched earlier is still on file."
+            } else if (failure is NotPublished) {
+                "No plugin catalog is published yet. A plugin file can still be installed from the Plugins screen."
             } else {
-                "Couldn't load the catalog: ${failure.message ?: "unknown error"}."
+                "Couldn't load the catalog: ${describe(failure)}."
             }
         }
     }
@@ -224,9 +236,11 @@ object PluginCatalog {
         } catch (failure: Exception) {
             val cached = lastGoodIndex(context)
             return@withContext if (cached != null) {
-                "Couldn't refresh the catalog (${failure.message ?: "unknown error"}); nothing was compared or updated."
+                "Couldn't refresh the catalog (${describe(failure)}); nothing was compared or updated."
+            } else if (failure is NotPublished) {
+                "No plugin catalog is published yet, so there is nothing to update from."
             } else {
-                "Couldn't load the catalog: ${failure.message ?: "unknown error"}."
+                "Couldn't load the catalog: ${describe(failure)}."
             }
         }
         val updates = updatesFor(PluginStore.installed(context), index)
@@ -249,7 +263,7 @@ object PluginCatalog {
 
     /** Fetches the index fresh and replaces the cached copy only after it parsed (the platform databases' own validate-before-replace contract). */
     private fun fetchAndCache(context: Context): PluginCatalogIndex {
-        val text = PlatformDatabaseTransport.get(indexUrl(context), GitHubTokenStore.get(context))
+        val text = PlatformDatabaseTransport.getOrNull(indexUrl(context), GitHubTokenStore.get(context)) ?: throw NotPublished()
         val parsed = PluginCatalogIndexParser.parse(text)
             ?: error("the catalog index at ${indexUrl(context)} no longer has a format this build of droidtop reads")
         val dir = cacheFile(context).parentFile

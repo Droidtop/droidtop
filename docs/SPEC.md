@@ -3604,7 +3604,7 @@ one:
 
 - **Now playing** (Spotify/Discord ambient presence, §7e) -- that section is scoped, not
   built; there is no now-playing store this screen could read.
-- **Running jobs and downloads** -- no second mechanism; the visible download/install queue uses `PluginJobsCenter` / the Jobs screen (`plugin_jobs`) directly (`GamingSettingsCatalog` exposes it as "Downloads and installs", `Droidtop/tracker#85`). No `ScanProgress`/download-queue store is invented -- the existing registry (`entries(): StateFlow<List<Entry>>`) is the one surface every caller reads, controller-first (`CatalogNavigator`'s own `LazyColumn` focus and touch dispatch), with end-user wording ("Downloading…" / "Done" / "Failed", progress % and status line, cancel best-effort). No main-thread file/database work: all reads go through the flow, writes stay in the plugin runtime.
+- **Running jobs and downloads** -- no second mechanism; the visible download/install queue uses `PluginJobsCenter` / the Jobs screen (`plugin_jobs`) directly (`GamingSettingsCatalog` exposes it as "Downloads and installs", `Droidtop/tracker#85`; it is the only entry, the screen carries that title). No `ScanProgress`/download-queue store is invented -- the existing registry (`entries(): StateFlow<List<Entry>>`) is the one surface every caller reads, controller-first (`CatalogNavigator`'s own `LazyColumn` focus and touch dispatch), with end-user wording ("Downloading…" / "Done" / "Failed", progress % and status line, cancel best-effort). No main-thread file/database work: all reads go through the flow, writes stay in the plugin runtime.
 
 ## 5. Windows compatibility — no real virtualization
 
@@ -11649,7 +11649,8 @@ what the index says is display data, never a trust decision.
   `droidtop-plugins/index.json` (its own generator and workflow,
   mirroring `generator/plugins_index.py`, in that repository — until it
   exists the app's catalog is empty and the file-picker path is the only
-  install source, which is a working state, not a broken one); the
+  install source, which is a working state, not a broken one: the catalog
+  screen says "No catalog is published yet", never a raw HTTP status); the
   deferred droidtop root key that would certify new origins without an
   app change; and offering testing/unstable streams.
 
@@ -12618,6 +12619,79 @@ digest/plugin trust details, `## Debug-credentials pathway`-style rows).
 DESIGN-LANGUAGE's own lesson log already names this shape of problem
 repeatedly ("one concept, one name", "state belongs in the value column")
 but has no lesson yet about disclosure depth.
+
+**Source outcomes, plugin readiness and finding a download source
+(2026-09-30, `Droidtop/tracker#151`).** A rig run found that every way a
+download could fail looked like "nothing found", and that a plugin
+without its runtime said "Running". Decisions:
+
+- **A search shows each source's outcome, never only a count.**
+  `PluginSearchAggregator.searchAll` returns one `SourceOutcome` per
+  source (its results, or the failure sentence, plus the `RuntimeNeed`
+  when the reason is a missing runtime), not a flattened list that drops
+  failures. "Get more" in `LibrarySearchDialog` shows, under its header:
+  "No download source is installed" with a row that opens Plugins; for an
+  installed plugin that cannot answer, why ("is waiting for your
+  approval", "is disabled: ..."); per source "<label>: <reason>" for a
+  failure or a timeout, "<label>: no match" for an empty answer; then the
+  results. A source that did not answer inside its budget is reported
+  as such, not as an empty list. `fanOut` (the lookup composition, which has
+  no failure channel) stays as a wrapper over the same
+  `fanOutOutcomes`. The work runs on the IO dispatcher (reading the plugin
+  store and calling a plugin were running on the main thread, which is
+  what froze the UI for 15 s).
+- **A load failure carries its reason.** `IPluginRuntime.lastLoadError`
+  returns why the last `loadPlugin` returned false (runtime missing,
+  `runtimeVersion` mismatch, a missing `classes.jar`, a thrown load);
+  `PluginRuntimeService` logs each with `Log.w("droidtop.plugin", ...)` and
+  `NativePluginRunner.loadFailure` hands it to `PluginCrashPolicy`, which
+  returns it instead of the fixed "plugin failed to load" for `invoke`,
+  `handle` and the job path. `PluginCrashPolicy.onCrash` logs the reason it
+  disables a plugin with. The plugin page shows `disabledReason` as before.
+- **A slow first start is not a crash.** The load budget
+  (`PluginRunner.CALL_TIMEOUT_MS`) runs the blocking binder call on the IO
+  dispatcher so it can fire at all, and when it fires the plugin is NOT
+  disabled: the call fails with "still starting up; try again", the load
+  keeps going in the plugin process, and `PluginRuntimeService.loadPlugin`
+  is serialised so the retry joins it instead of building a second engine.
+  Only a thrown load, a dead process, or a call that times out after a
+  successful load is a crash. `PluginCrashPolicy`'s re-verification (it
+  hashes every payload file) also runs on IO, so no plugin call blocks its
+  caller's thread.
+- **A runtime the plugin needs is shown where the person is.**
+  `PluginRuntimeNeeds` (`plugin-host`) is the one place that knows which
+  kinds need a runtime (`flutter_embed`: Flutter, `python`: Python),
+  whether it is installed, and how to install it with progress text. A
+  plugin that is approved and enabled but lacks it is "Needs setup" in the
+  list, "Needs the <runtime> runtime (<size>) to run" on its own page with
+  the labelled download action directly under that line, and counted as
+  "need setup" (not "active") under Accounts and sources. A call is
+  refused before any load with "needs the <runtime> runtime (<size>),
+  which is not installed yet" (so the plugin is never started and never
+  disabled for it), and a failed search row offers the same download and
+  re-runs the search when it finishes. Removing an installed runtime keeps
+  its explicit confirmation, now stated in the row.
+- **No catalog yet is a state, not an error.** `PluginCatalog` treats an
+  index that answers 404/410 as "not published" (`Load.published` false)
+  and the catalog screen says "No catalog is published yet" and points at
+  Install plugin file; any other failure still shows its reason. The
+  droidtop-platforms generator for the index is still not built (above).
+- **"Get games" is offered wherever games are listed.** From All games
+  and the PC list it opens `AcquireContentSources.chooseSystemScreen`
+  (which system to download for, then that system's own screen); from one
+  console system it opens that system's screen as before. With no source
+  the screen says so in plain words and leads to Plugins and App
+  integrations (it used to name the capability id).
+- **One entry for downloads and jobs.** "Downloads and installs" in
+  Settings is the single entry for the jobs screen (it carries that title
+  now); the second "Jobs" row under Accounts and sources is gone.
+- **Permissions never contradict their own summary.** Once a plugin is
+  approved its page no longer repeats the approval-time "Asks for" list (its
+  "Asks first" tags read as the current state next to "7 allowed, 0 ask");
+  the Permissions screen is the one place that shows each permission's real
+  state, and its tier group for the middle tier is titled "Sensitive"
+  instead of "Asks first" because an allowed permission is not one that
+  asks.
 
 **v2 direction:** an `advanced: Boolean` flag on the existing catalog row
 model (additive to `AppSettingsCatalogs.kt`, not a new screen type), with
