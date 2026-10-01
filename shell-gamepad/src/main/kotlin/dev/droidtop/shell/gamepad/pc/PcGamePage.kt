@@ -45,6 +45,8 @@ import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.selectionFrame
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import dev.droidtop.shell.gamepad.input.ownPadButtons
 
 /**
  * One PC game's own page -- what Steam Big Picture and the Steam Deck
@@ -59,13 +61,18 @@ import dev.droidtop.shell.gamepad.selectionFrame
  * still plays at once (7i), so this page is for looking and for the
  * game's own actions, never a step in front of Play.
  *
- * No key handling of its own (docs/SPEC.md 13, one input pipeline): every
- * button and every block of the information column is a real focus
- * target, so the pad's own focus search moves between them (Left/Right
- * along the buttons, Up/Down between the buttons and the blocks), a block
- * taking focus scrolls itself into view, A is the confirm the shell's
- * [ShellChip] already answers, and B is the system Back that closes the
- * Dialog. Nothing on the page is reachable by touch only.
+ * Moving needs no key handling of its own: every button and every block of
+ * the information column is a real focus target, so focus search moves
+ * between them (Left/Right along the buttons, Up/Down between the buttons
+ * and the blocks) and a block taking focus scrolls itself into view. The
+ * presses go through the shell's one input pipeline (docs/SPEC.md 6e): the
+ * page is its own window, so it gets the pipeline's front, A is the
+ * confirm [ShellChip] answers, and B closes the page from the window's
+ * outermost node ([ownPadButtons]), as the system back key does through
+ * the Dialog. B used to be left to Android's fallback of BUTTON_B to BACK,
+ * which a swapped face-button layout breaks: there the bottom button means
+ * B, its fallback is DPAD_CENTER, and it pressed the focused button instead
+ * of closing the page. Nothing on the page is reachable by touch only.
  *
  * No disk work while drawing: everything shown is already on the
  * [LibraryEntry]; the one lookup, the resolved runner, runs for this one
@@ -88,10 +95,12 @@ internal fun PcGamePage(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        GatePadInThisDialog()
         val window = LocalShellWindow.current
         Row(
             modifier = Modifier
                 .fillMaxSize()
+                .ownPadButtons(onBack = onClose)
                 .background(MenuTokens.Ground)
                 .padding(start = window.edgePadding, end = window.edgePadding, top = 20.dp, bottom = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
