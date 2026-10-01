@@ -17,9 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LibraryEntry
@@ -32,7 +30,6 @@ import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -531,48 +528,34 @@ internal fun GamelistOptionsMenu(
         return
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    // B, Select and the system back key all step out of the letter list
+    // first, and only then close the menu.
+    val goBack = {
+        if (pickingLetter) {
+            pickingLetter = false
+            focusIndex = 0
+        } else {
+            onDismiss()
+        }
+    }
+    Dialog(onDismissRequest = goBack) {
         MenuPanel(
             // A fixed 520dp panel is wider than a phone, and the part
             // that falls off the edge is the part with the buttons on it.
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(520.dp)),
             focusLabel = "Gamelist options",
-            onKey = { event ->
-                if (event.type != KeyEventType.KeyUp) {
-                    false
-                } else {
-                    val itemCount = if (pickingLetter) letters.size else actions.size
-                    when (GamepadKeyMap.actionFor(event.key)) {
-                        GamepadAction.UP -> {
-                            orphansArmed = false
-                            if (itemCount > 0) focusIndex = (focusIndex - 1 + itemCount) % itemCount
-                            EsDeNavigationSounds.play("scroll")
-                            true
-                        }
-                        GamepadAction.DOWN -> {
-                            orphansArmed = false
-                            if (itemCount > 0) focusIndex = (focusIndex + 1) % itemCount
-                            EsDeNavigationSounds.play("scroll")
-                            true
-                        }
-                        GamepadAction.A -> {
-                            if (pickingLetter) jumpToLetter(focusIndex) else activate(focusIndex)
-                            true
-                        }
-                        GamepadAction.B, GamepadAction.BACK, GamepadAction.SELECT -> {
-                            // Back out of the letter list to the actions
-                            // first; only then close the menu.
-                            if (pickingLetter) {
-                                pickingLetter = false
-                                focusIndex = 0
-                            } else {
-                                onDismiss()
-                            }
-                            true
-                        }
-                        else -> false
+            onPad = { press ->
+                val itemCount = if (pickingLetter) letters.size else actions.size
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> {
+                        orphansArmed = false
+                        focusIndex = menuMove(focusIndex, itemCount, press)
                     }
+                    GamepadAction.A -> if (pickingLetter) jumpToLetter(focusIndex) else activate(focusIndex)
+                    GamepadAction.B, GamepadAction.SELECT -> goBack()
+                    else -> Unit
                 }
+                true
             },
         ) {
             Text(

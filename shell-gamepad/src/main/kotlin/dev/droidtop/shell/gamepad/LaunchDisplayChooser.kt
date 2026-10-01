@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GamepadAction
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -22,11 +23,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -63,41 +59,23 @@ internal fun LaunchDisplayChooserDialog(
             }
     }
     var selected by remember { mutableStateOf(0) }
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "Launch display chooser") }
 
     val window = LocalShellWindow.current
     Dialog(onDismissRequest = onCancel) {
-        Column(
-            Modifier
-                .width(window.panelWidth(400.dp))
-                .clip(RoundedCornerShape(14.dp))
-                .background(MenuTokens.OverlaySurface)
-                .focusRequester(focus)
-                .focusable()
-                .onKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    when (event.key) {
-                        Key.DirectionDown -> {
-                            selected = (selected + 1).coerceAtMost(rows.lastIndex)
-                            true
-                        }
-                        Key.DirectionUp -> {
-                            selected = (selected - 1).coerceAtLeast(0)
-                            true
-                        }
-                        Key.ButtonA, Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> {
-                            rows.getOrNull(selected)?.let { onPick(it.option, it.remember) }
-                            true
-                        }
-                        Key.ButtonB, Key.Back, Key.Escape -> {
-                            onCancel()
-                            true
-                        }
-                        else -> false
-                    }
+        // The shell's one modal panel: focus, the pipeline's front for this
+        // dialog and the pad's presses are handled there (docs/SPEC.md 6e).
+        MenuPanel(
+            modifier = Modifier.width(window.panelWidth(400.dp)),
+            focusLabel = "Launch display chooser",
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> selected = menuMove(selected, rows.size, press)
+                    GamepadAction.A -> rows.getOrNull(selected)?.let { onPick(it.option, it.remember) }
+                    GamepadAction.B -> onCancel()
+                    else -> Unit
                 }
-                .padding(20.dp),
+                true
+            },
         ) {
             Text("Launch on which screen?", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
             Text(

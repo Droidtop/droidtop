@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.menuMove
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,10 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -72,7 +70,6 @@ import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.MediaViewer
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -752,43 +749,19 @@ internal fun PcGameMenu(
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Game options",
-            onKey = { event ->
-                val closing = GamepadKeyMap.actionFor(event.key).let { it == GamepadAction.B || it == GamepadAction.BACK }
-                if (event.type == KeyEventType.KeyDown && closing) {
-                    // Answered on the down edge too: an unhandled B is
-                    // turned into the system Back by the platform, which
-                    // would step out of the menu a second time after the
-                    // up edge below had already stepped out of a page.
-                    true
-                } else if (event.type != KeyEventType.KeyUp) {
-                    false
-                } else {
-                    when (GamepadKeyMap.actionFor(event.key)) {
-                        GamepadAction.UP -> {
-                            if (rowEntries.isNotEmpty()) focusIndex = (focusIndex - 1 + rowEntries.size) % rowEntries.size
-                            dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.play("scroll")
-                            true
-                        }
-                        GamepadAction.DOWN -> {
-                            if (rowEntries.isNotEmpty()) focusIndex = (focusIndex + 1) % rowEntries.size
-                            dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.play("scroll")
-                            true
-                        }
-                        GamepadAction.A -> {
-                            rowEntries.getOrNull(focusIndex)?.row?.onSelect?.invoke()
-                            true
-                        }
-                        GamepadAction.B, GamepadAction.BACK -> {
-                            goBack()
-                            true
-                        }
-                        GamepadAction.SELECT -> {
-                            onClose()
-                            true
-                        }
-                        else -> false
-                    }
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, rowEntries.size, press)
+                    GamepadAction.A -> rowEntries.getOrNull(focusIndex)?.row?.onSelect?.invoke()
+                    // B steps out of a page before it closes the menu, like
+                    // the system back key (the dialog's own dismiss); the
+                    // release of the same press can no longer step out a
+                    // second time, it belongs to this press (SPEC 6e).
+                    GamepadAction.B -> goBack()
+                    GamepadAction.SELECT -> onClose()
+                    else -> Unit
                 }
+                true
             },
         ) {
             Text(

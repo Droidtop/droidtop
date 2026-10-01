@@ -1,5 +1,8 @@
 package dev.droidtop.shell.gamepad.query
 
+import dev.droidtop.shell.gamepad.input.onPad
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import dev.droidtop.shell.gamepad.menuMove
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,9 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
@@ -56,7 +57,6 @@ import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -171,32 +171,14 @@ internal fun LibraryFilterDialog(
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Filters and sort",
-            onKey = { event ->
-                if (event.type != KeyEventType.KeyUp) {
-                    false
-                } else {
-                    when (GamepadKeyMap.actionFor(event.key)) {
-                        GamepadAction.UP -> {
-                            if (rows.isNotEmpty()) focusIndex = (focusIndex - 1 + rows.size) % rows.size
-                            EsDeNavigationSounds.play("scroll")
-                            true
-                        }
-                        GamepadAction.DOWN -> {
-                            if (rows.isNotEmpty()) focusIndex = (focusIndex + 1) % rows.size
-                            EsDeNavigationSounds.play("scroll")
-                            true
-                        }
-                        GamepadAction.A -> {
-                            rows.getOrNull(focusIndex)?.onClick?.invoke()
-                            true
-                        }
-                        GamepadAction.B, GamepadAction.BACK, GamepadAction.SELECT -> {
-                            onDismiss()
-                            true
-                        }
-                        else -> false
-                    }
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, rows.size, press)
+                    GamepadAction.A -> rows.getOrNull(focusIndex)?.onClick?.invoke()
+                    GamepadAction.B, GamepadAction.SELECT -> onDismiss()
+                    else -> Unit
                 }
+                true
             },
         ) {
             Text(
@@ -318,16 +300,16 @@ internal fun LibrarySearchDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        GatePadInThisDialog()
         Column(
             modifier = Modifier
                 .width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp))
-                .onPreviewKeyEvent { event ->
-                    // The pad's own B is not the system back key, so the
-                    // Dialog's dismiss-on-back does not see it; the field
-                    // does not type it either, so it arrives here.
-                    if (event.type == KeyEventType.KeyUp &&
-                        GamepadKeyMap.actionFor(event.key) == GamepadAction.B
-                    ) {
+                // The pad's own B (and a keyboard's Escape) is not the
+                // system back key, so the Dialog's dismiss-on-back does not
+                // see it; the field does not type it either. Ahead of the
+                // field, which leaves the keys it types to it (SPEC 6e).
+                .onPad(preview = true) { press ->
+                    if (press.action == GamepadAction.B) {
                         onDismiss()
                         true
                     } else {
@@ -510,25 +492,35 @@ private fun SourceOptionsDialog(
     onPick: (AcquireContentOption) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    // The options were rows only a finger could pick; the pad moves a
+    // cursor over them like every other menu.
+    var focusIndex by remember(hit) { mutableStateOf(0) }
+    val options = hit.result.options
     Dialog(onDismissRequest = onDismiss) {
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(480.dp)),
             focusLabel = "Choose an option",
-            onKey = { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    (GamepadKeyMap.actionFor(event.key) == GamepadAction.B || GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK)
-                ) {
-                    onDismiss()
-                    true
-                } else {
-                    false
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, options.size, press)
+                    GamepadAction.A -> options.getOrNull(focusIndex)?.let(onPick)
+                    GamepadAction.B -> onDismiss()
+                    else -> Unit
                 }
+                true
             },
         ) {
             Text(hit.result.title, style = MaterialTheme.typography.titleLarge, color = MenuTokens.OnSurface)
             Text("via ${hit.source.label}", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
-            hit.result.options.forEach { option ->
-                MenuRow(title = option.label, onClick = { onPick(option) })
+            options.forEachIndexed { index, option ->
+                MenuRow(
+                    title = option.label,
+                    selected = index == focusIndex,
+                    onClick = {
+                        focusIndex = index
+                        onPick(option)
+                    },
+                )
             }
             MenuHint("A picks; B cancels")
         }

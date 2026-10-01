@@ -13,9 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -23,7 +20,6 @@ import dev.droidtop.pluginhost.GrantAnswer
 import dev.droidtop.pluginhost.PermissionTier
 import dev.droidtop.pluginhost.PluginGrantPrompts
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
 /**
  * Where the first-use sheet is drawn (docs/plugin-api.md 4.3). Placed once
@@ -64,26 +60,14 @@ private fun PluginGrantSheet(pending: PluginGrantPrompts.Pending) {
         MenuPanel(
             modifier = Modifier.width(window.panelWidth(460.dp)),
             focusLabel = "Plugin permission sheet",
-            onKey = { event ->
-                val action = GamepadKeyMap.actionFor(event.key)
-                when {
-                    action == GamepadAction.B || action == GamepadAction.BACK -> {
-                        if (event.type == KeyEventType.KeyUp) answer(GrantAnswer.NOT_NOW)
-                        true
-                    }
-                    action == GamepadAction.UP || action == GamepadAction.DOWN -> {
-                        if (event.type == KeyEventType.KeyUp) {
-                            val step = if (action == GamepadAction.DOWN) 1 else -1
-                            selected = (selected + step).coerceIn(0, choices.lastIndex)
-                        }
-                        true
-                    }
-                    action == GamepadAction.A -> {
-                        if (event.type == KeyEventType.KeyUp) answer(choices[selected].second)
-                        true
-                    }
-                    else -> false
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> selected = menuMove(selected, choices.size, press)
+                    GamepadAction.A -> answer(choices[selected].second)
+                    GamepadAction.B -> answer(GrantAnswer.NOT_NOW)
+                    else -> Unit
                 }
+                true
             },
         ) {
             Text(

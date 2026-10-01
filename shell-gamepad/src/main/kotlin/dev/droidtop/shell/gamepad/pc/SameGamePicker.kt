@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.input.menuStep
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -12,9 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -24,7 +22,6 @@ import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.launch
 
@@ -95,30 +92,17 @@ internal fun SameGamePicker(
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(620.dp)),
             focusLabel = focusLabel,
-            onKey = { event ->
-                if (event.type != KeyEventType.KeyUp) {
-                    false
-                } else {
-                    when (GamepadKeyMap.actionFor(event.key)) {
-                        GamepadAction.UP -> {
-                            if (choices.isNotEmpty()) move((focusIndex - 1 + choices.size) % choices.size)
-                            true
-                        }
-                        GamepadAction.DOWN -> {
-                            if (choices.isNotEmpty()) move((focusIndex + 1) % choices.size)
-                            true
-                        }
-                        GamepadAction.A -> {
-                            if (choices.isNotEmpty()) press(focusIndex)
-                            true
-                        }
-                        GamepadAction.B, GamepadAction.BACK -> {
-                            onDismiss()
-                            true
-                        }
-                        else -> false
+            onPad = { pad ->
+                when (pad.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> {
+                        val next = menuStep(focusIndex, choices.size, if (pad.action == GamepadAction.UP) -1 else 1)
+                        if (next != focusIndex) move(next)
                     }
+                    GamepadAction.A -> if (choices.isNotEmpty()) press(focusIndex)
+                    GamepadAction.B -> onDismiss()
+                    else -> Unit
                 }
+                true
             },
         ) {
             Text(

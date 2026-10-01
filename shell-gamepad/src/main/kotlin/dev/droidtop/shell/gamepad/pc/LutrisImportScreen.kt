@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.menuMove
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -13,9 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,7 +41,6 @@ import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuSectionLabel
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -191,40 +189,19 @@ internal fun LutrisImportScreen(
     }
 
     BackHandler { back() }
-    Dialog(onDismissRequest = onDismiss) {
+    // The system back key steps back a stage, as B does.
+    Dialog(onDismissRequest = { back() }) {
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(680.dp)),
             focusLabel = "Import a Lutris install script",
-            onKey = { event ->
-                if (event.type != KeyEventType.KeyUp) {
-                    false
-                } else {
-                    when (GamepadKeyMap.actionFor(event.key)) {
-                        GamepadAction.UP -> {
-                            if (rows.isNotEmpty()) {
-                                focusIndex = (focusIndex - 1 + rows.size) % rows.size
-                                EsDeNavigationSounds.play("scroll")
-                            }
-                            true
-                        }
-                        GamepadAction.DOWN -> {
-                            if (rows.isNotEmpty()) {
-                                focusIndex = (focusIndex + 1) % rows.size
-                                EsDeNavigationSounds.play("scroll")
-                            }
-                            true
-                        }
-                        GamepadAction.A -> {
-                            rows.getOrNull(focusIndex)?.takeIf { it.enabled }?.onSelect?.invoke()
-                            true
-                        }
-                        GamepadAction.B, GamepadAction.BACK -> {
-                            back()
-                            true
-                        }
-                        else -> false
-                    }
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, rows.size, press)
+                    GamepadAction.A -> rows.getOrNull(focusIndex)?.takeIf { it.enabled }?.onSelect?.invoke()
+                    GamepadAction.B -> back()
+                    else -> Unit
                 }
+                true
             },
         ) {
             Text(

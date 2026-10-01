@@ -798,12 +798,10 @@ private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(520.dp)),
             focusLabel = "Settings info",
-            onKey = { event ->
-                val action = GamepadKeyMap.actionFor(event.key)
-                val closes = action == GamepadAction.B || action == GamepadAction.BACK ||
-                    action == GamepadAction.A || action == GamepadAction.Y || event.key == Key.Escape
-                if (closes && event.type == KeyEventType.KeyUp) onDismiss()
-                closes
+            onPad = { press ->
+                val closes = press.action == GamepadAction.B || press.action == GamepadAction.A || press.action == GamepadAction.Y
+                if (closes) onDismiss()
+                true
             },
         ) {
             Text(item.title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)

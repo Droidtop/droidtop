@@ -14,9 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,7 +30,6 @@ import dev.droidtop.library.scraper.TheGamesDbClient
 import dev.droidtop.library.scraper.TheGamesDbPrefs
 import dev.droidtop.library.scraper.TheGamesDbSystemIds
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -125,33 +122,15 @@ internal fun ManualMatchPicker(
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(620.dp)),
             focusLabel = "Manual match",
-            onKey = { event ->
+            onPad = { press ->
                 val list = candidates.orEmpty()
-                if (event.type != KeyEventType.KeyUp || list.isEmpty()) {
-                    false
-                } else {
-                    when (GamepadKeyMap.actionFor(event.key)) {
-                        GamepadAction.UP -> {
-                            focusIndex = (focusIndex - 1 + list.size) % list.size
-                            EsDeNavigationSounds.play("scroll")
-                            true
-                        }
-                        GamepadAction.DOWN -> {
-                            focusIndex = (focusIndex + 1) % list.size
-                            EsDeNavigationSounds.play("scroll")
-                            true
-                        }
-                        GamepadAction.A -> {
-                            list.getOrNull(focusIndex)?.let { apply(it) }
-                            true
-                        }
-                        GamepadAction.B, GamepadAction.BACK -> {
-                            onDismiss()
-                            true
-                        }
-                        else -> false
-                    }
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, list.size, press)
+                    GamepadAction.A -> list.getOrNull(focusIndex)?.let { apply(it) }
+                    GamepadAction.B -> onDismiss()
+                    else -> Unit
                 }
+                true
             },
         ) {
             Text(

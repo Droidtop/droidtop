@@ -41,12 +41,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,7 +55,11 @@ import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.PadModality
+import dev.droidtop.shell.gamepad.input.PadPress
+import dev.droidtop.shell.gamepad.input.menuStep
+import dev.droidtop.shell.gamepad.input.onPad
 
 /*
  * The Gaming shell's shared menu language, in one place. Its colours
@@ -464,20 +466,29 @@ internal fun MenuHint(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * A modal menu panel with focus handled ONCE, here.
+ * A modal menu panel with focus and the pad handled ONCE, here.
  *
  * A Compose Dialog silently drops key events unless something inside it
  * actually holds focus -- a real bug that shipped in this shell before
  * this existed (the gamelist options overlay ignored every D-pad press
  * on a real device). Surfaces built on this cannot reintroduce it.
+ *
+ * The panel takes the pad through the input pipeline (docs/SPEC.md 6e):
+ * the dialog it sits in gets the pipeline's front ([GatePadInThisDialog]),
+ * and [onPad] gets each press once, on the press, with a held direction
+ * coming round at the chrome cadence -- so every menu built on this can be
+ * held down to run through it, which none could while they acted on the
+ * key's release. In the PREVIEW pass, so a row a tap gave focus to cannot
+ * take the press first. The system back key is the dialog's own dismiss.
  */
 @Composable
 internal fun MenuPanel(
     modifier: Modifier = Modifier,
     focusLabel: String = "Menu",
-    onKey: (KeyEvent) -> Boolean,
+    onPad: (PadPress) -> Boolean,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    GatePadInThisDialog()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, focusLabel) }
     Column(
@@ -486,7 +497,7 @@ internal fun MenuPanel(
             .background(MenuTokens.OverlaySurface)
             .focusRequester(focus)
             .focusable()
-            .onPreviewKeyEvent(onKey)
+            .onPad(preview = true, handler = onPad)
             // A panel whose content can outgrow the screen must scroll:
             // the jump-to-letter list reaches 27 rows on a library that
             // spans the alphabet, which is taller than the display.
@@ -495,6 +506,16 @@ internal fun MenuPanel(
         verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         content = content,
     )
+}
+
+/**
+ * Up or Down on a menu's cursor: ES-DE's menus stop at both ends
+ * ([menuStep]), and a move that happens plays ES-DE's own scroll sound.
+ */
+internal fun menuMove(index: Int, count: Int, press: PadPress): Int {
+    val next = menuStep(index, count, if (press.action == GamepadAction.UP) -1 else 1)
+    if (next != index) dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.play("scroll")
+    return next
 }
 
 /**
