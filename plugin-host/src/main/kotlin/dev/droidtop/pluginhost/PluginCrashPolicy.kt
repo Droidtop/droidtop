@@ -141,8 +141,6 @@ class PluginCrashPolicy(
     override suspend fun resumeJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String, resumePayload: String): Boolean =
         startJob(record, capability, args + (RESUME_PAYLOAD_ARG to resumePayload), jobId)
 
-    companion object { const val RESUME_PAYLOAD_ARG = "droidtop.resume_payload" }
-
     /**
      * Fires [event] at [record] and returns its answer, or null when
      * [record] never subscribed ([PluginManifest.subscribedEvents]) --
@@ -214,5 +212,8 @@ class PluginCrashPolicy(
         // ever reaching the runner that would have worked. One list instead
         // of two separate != chains so a future kind only needs one edit.
         private val RUNNABLE_KINDS = setOf(PluginKind.NATIVE_BUNDLE, PluginKind.PYTHON, PluginKind.FLUTTER_EMBED)
+
+        // Carries a paused job's checkpoint into resumeJob's startJob call.
+        const val RESUME_PAYLOAD_ARG = "droidtop.resume_payload"
     }
 }
