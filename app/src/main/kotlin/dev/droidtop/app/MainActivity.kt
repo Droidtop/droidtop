@@ -666,6 +666,17 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         )
     }
 
+    override fun stopCompanion() {
+        startActivity(
+            Intent(this, CompanionActivity::class.java)
+                .setAction(CompanionActivity.ACTION_DISMISS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            android.app.ActivityOptions.makeBasic()
+                .setLaunchDisplayId(android.view.Display.DEFAULT_DISPLAY)
+                .toBundle(),
+        )
+    }
+
     override fun companionVisible(): Boolean = CompanionActivity.visible
 
     override fun setDualScreenBroken(broken: Boolean) {

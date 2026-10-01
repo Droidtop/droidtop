@@ -59,6 +59,9 @@ interface SecondScreenHost {
     /** Starts :app's CompanionActivity on the built-in display. Throws on refusal. */
     fun startCompanionOnBuiltIn()
 
+    /** Finishes the companion when no second display remains. */
+    fun stopCompanion()
+
     /** Whether a companion instance is currently started/visible (CompanionActivity.visible). */
     fun companionVisible(): Boolean
 
@@ -251,13 +254,17 @@ class SecondScreenOrchestrator(
                 }
 
                 val currentDisplay = host.currentDisplayId()
-                if (currentDisplay != Display.DEFAULT_DISPLAY && currentDisplay !in displayIds) {
+                val disconnectedShellDestination = DualScreenOrchestration
+                    .disconnectedShellDestination(currentDisplay, displayIds)
+                if (disconnectedShellDestination != null) {
                     host.clearParkedDisplayId()
-                    host.relaunchOnDisplay(Display.DEFAULT_DISPLAY)
+                    host.relaunchOnDisplay(disconnectedShellDestination)
                     return@collectLatest
                 }
 
                 val second = outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
+                val showCompanion = DualScreenOrchestration.shouldShowSecondScreenCompanion(outputs.size)
+                if (!showCompanion) host.stopCompanion()
                 val mode = host.activityMode()
                 val gaming = mode == Mode.GAMING
                 val desktop = mode == Mode.DESKTOP
@@ -296,12 +303,12 @@ class SecondScreenOrchestrator(
                 }
                 host.publishLaunchTargeting(second?.androidDisplayId, targetDisplayId, askOptions)
 
-                val presentationDisplayId = DualScreenOrchestration.companionPresentationDisplayId(
+                val presentationDisplayId = if (showCompanion) DualScreenOrchestration.companionPresentationDisplayId(
                     shellDisplayId = currentDisplay,
                     secondDisplayId = second?.androidDisplayId,
                     secondParked = !secondAvailable,
                     move = move,
-                )
+                ) else null
                 if (presentationDisplayId != null) {
                     if (secondScreenPresentation?.display?.displayId != presentationDisplayId) {
                         secondScreenPresentation?.dismiss()

@@ -14,6 +14,25 @@ import org.junit.Test
 class DualScreenOrchestrationTest {
 
     @Test
+    fun `second screen preference has no effect with one display and no companion is shown`() {
+        assertEquals(DualScreenOrchestration.ShellMove.NONE,
+            DualScreenOrchestration.shellMove(0, null, true, true, false, false))
+        assertFalse(DualScreenOrchestration.shouldShowSecondScreenCompanion(1))
+    }
+
+    @Test
+    fun `disconnecting the display occupied by shell moves shell to remaining built-in`() {
+        assertEquals(0, DualScreenOrchestration.disconnectedShellDestination(9, setOf(0)))
+    }
+
+    @Test
+    fun `reconnecting second display restores selected arrangement`() {
+        assertEquals(DualScreenOrchestration.ShellMove.TO_SECOND,
+            DualScreenOrchestration.shellMove(0, 9, true, true, false, false))
+        assertTrue(DualScreenOrchestration.shouldShowSecondScreenCompanion(2))
+    }
+
+    @Test
     fun `a launch to the built-in screen covers the addon with the idle surface`() {
         // The reported bug: game goes to the default display, the addon's
         // stack is left empty, and Android mirrors the default display

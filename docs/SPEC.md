@@ -3039,6 +3039,12 @@ had not moved.
   share one cooldown.
 - The companion Presentation is only ever shown on a display the shell does not
   occupy and is not about to occupy (`companionPresentationDisplayId`).
+- Main screen selection applies only with multiple displays. With one display,
+  the shell stays on the available display and neither the live companion nor
+  an idle second-screen surface is shown. Display-added and display-removed
+  events rerun the same pure orchestration decisions; if the shell's display
+  disappears, it is relaunched on the remaining display immediately, and a
+  later reconnect restores the selected arrangement.
 
 Verification: rig steps are in the commit message.
 

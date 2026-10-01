@@ -49,6 +49,10 @@ class CompanionActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent.action == ACTION_DISMISS) {
+            finish()
+            return
+        }
         widgetManager = AppWidgetManager.getInstance(this)
         widgetHost = CompanionWidgets.host(this)
         widgetIds = CompanionWidgetPrefs.widgetIds(this)
@@ -146,6 +150,7 @@ class CompanionActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.action == ACTION_DISMISS) finish()
     }
 
     override fun onStart() {
@@ -161,6 +166,7 @@ class CompanionActivity : AppCompatActivity() {
     }
 
     companion object {
+        const val ACTION_DISMISS = "dev.droidtop.app.action.DISMISS_COMPANION"
         private const val REQUEST_PICK_WIDGET = 71
         private const val REQUEST_CONFIGURE_WIDGET = 72
 

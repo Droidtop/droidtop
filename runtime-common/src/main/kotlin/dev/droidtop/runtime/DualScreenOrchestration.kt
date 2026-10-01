@@ -58,6 +58,12 @@ object DualScreenOrchestration {
     /** Where the shell has to be moved so it matches the Main screen choice. */
     enum class ShellMove { NONE, TO_SECOND, TO_BUILT_IN }
 
+    /** A detached display leaves one authoritative shell destination. */
+    fun disconnectedShellDestination(shellDisplayId: Int, availableDisplayIds: Set<Int>): Int? =
+        if (shellDisplayId !in availableDisplayIds) availableDisplayIds.firstOrNull() else null
+
+    fun shouldShowSecondScreenCompanion(displayCount: Int): Boolean = displayCount > 1
+
     /**
      * Whether the shell is on the second screen RIGHT NOW. Derived from the
      * display the shell actually occupies, never from a decision flag:
