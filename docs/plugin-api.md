@@ -203,7 +203,7 @@ The reply uses the same `{ok, data|error}` shape.
 | --- | --- | --- | --- |
 | `native_bundle` | `DroidtopPlugin.handle(call: PluginCall): PluginReply` (v2); v1 `invoke(capability, args)` still served via the legacy translation | `PluginHost.call(api, version, op, args)` handed to `onLoad(host)` | `startJob(jobId, call, progress)` / `cancelJob` (as today) |
 | `python` | module-level `handle(call_json) -> reply_json` (JSON text both ways, like `invoke`; called for a contract 2 manifest, built 2026-10-01); v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args, version=1)`: a module the bootstrap injects before `plugin.py` is imported | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: **not built** (P1-8) |
-| `flutter_embed` | the plugin's `MethodChannel("dev.droidtop.pluginhost/<plugin id>")`, method `handle`, envelope and reply as JSON strings (called for a contract 2 manifest, built 2026-10-01) | the same channel's `host.call`, envelope as a JSON string | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
+| `flutter_embed` | the plugin's `MethodChannel("dev.droidtop.pluginhost/<plugin id>")`, method `handle`, envelope and reply as JSON strings (called for a contract 2 manifest, built 2026-10-01) | the same channel's `hostCall`, with `{api, version, op, args}` as JSON text and the broker reply as JSON text | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
 
 The rules that make this "no kind-specific features":
 
@@ -214,10 +214,11 @@ The rules that make this "no kind-specific features":
 2. **Parity is tested, not claimed.** One conformance script (the fake
    host, §3 I2) drives the same calls against each kind's sample, and a
    kind that fails a case is a bug in that kind's adapter. The known gaps
-    (audit 2026-10-01): `startJob` for `python` (P1-8, #64), `host.call`
-    for `python` and `flutter_embed` (#127). Event delivery (`onEvent`)
-    for `python` and `flutter_embed` is delivered through both adapters
-    since this change. `handle` reaches all three kinds
+   (audit 2026-10-01): `startJob` for `python` (P1-8, #64), and event delivery
+   (`onEvent`) for `python` and `flutter_embed`, which both still answer
+   every event with the default no-op. `host.call` for python and `hostCall`
+   for Flutter are now exposed through their adapters. `handle` reaches all
+   three kinds since 2026-10-01 (§1.6).
    since 2026-10-01 (§1.6).
 3. **A new kind is a new adapter plus a pass of the same conformance
    script,** and nothing else. This is what `PluginKind`'s own doc
@@ -1821,9 +1822,9 @@ arrays under the manifest's own keys (`V2Declarations`).
     (`moe.shizuku.privileged.api.permission.API_V23` instead of
     `moe.shizuku.manager.permission.API_V23`), so it always answered false.
   - `PluginContext.call(api, version, op, argsJson)` is `host.call` for a
-    `native_bundle` plugin. **The `python` and `flutter_embed` adapters do
-    not expose `host.call` yet**, so the parity of §1.3 has this known gap
-    next to `startJob` for python.
+    `native_bundle` plugin. Python exposes it as `host.call`; Flutter
+    exposes it as `hostCall` on its existing channel and runs the broker
+    call on the adapter's single background executor.
   - Quota: 50 calls burst, 10 per second sustained, per plugin (`TokenBucket`).
 - **Grants and the sheet.**
   - `PluginGrants` keeps `plugin-grants/<id>.json`: an explicit state per

@@ -12,6 +12,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 
@@ -73,6 +74,9 @@ class FlutterDroidtopPlugin(
 ) : DroidtopPlugin {
     private var engine: FlutterEngine? = null
     private var channel: MethodChannel? = null
+    @Volatile private var pluginContext: PluginContext? = null
+    private val hostCallExecutor = Executors.newSingleThreadExecutor()
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     // Job callbacks the host is waiting on, keyed by the SAME jobId
     // PluginRuntimeService.startJob generated and handed to startJob()
@@ -104,6 +108,7 @@ class FlutterDroidtopPlugin(
     private var readyLatch: CountDownLatch? = null
 
     override fun onLoad(context: PluginContext) {
+        pluginContext = context
         val libapp = File(installDir, "lib/${FlutterRuntimeManager.currentAbi()}/libapp.so")
         if (!libapp.isFile) {
             throw IllegalStateException("no lib/${FlutterRuntimeManager.currentAbi()}/libapp.so in this plugin's payload")
@@ -343,19 +348,22 @@ class FlutterDroidtopPlugin(
             android.os.Handler(android.os.Looper.getMainLooper()).post { toDestroy.destroy() }
         }
         activeJobs.clear()
+        pluginContext = null
+        hostCallExecutor.shutdownNow()
     }
 
     /**
      * Handles calls Dart makes INTO the host over the same channel
      * [invoke] and [startJob] use to call OUT to Dart -- Flutter's
      * [MethodChannel] is bidirectional on one [BinaryMessenger], the
-     * same object underlies both directions. Only "jobProgress" and
-     * "jobComplete" are expected here; anything else (including a
-     * mistaken "invoke", which only ever flows host-to-plugin) is
-     * [MethodChannel.Result.notImplemented].
+     * same object underlies both directions. The plugin can make broker
+     * calls with "hostCall" and report jobs with "jobProgress"/
+     * "jobComplete"; other calls (including a mistaken "invoke", which
+     * only ever flows host-to-plugin) are [MethodChannel.Result.notImplemented].
      */
     private fun handleIncomingCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "hostCall" -> handleHostCall(call.arguments, result)
             "ready" -> {
                 // The readiness handshake's other half -- see [readyLatch]'s
                 // own doc comment. Counting down more than once (a plugin
@@ -384,6 +392,36 @@ class FlutterDroidtopPlugin(
             else -> result.notImplemented()
         }
     }
+
+    /** Broker calls can block, so they run off the main Looper that delivers MethodChannel calls. */
+    private fun handleHostCall(arguments: Any?, result: MethodChannel.Result) {
+        val request = try {
+            FlutterHostCallRequest.parse(arguments)
+        } catch (e: Exception) {
+            result.success(errorReply("INVALID_ARGS", e.message ?: "malformed hostCall argument"))
+            return
+        }
+
+        val context = pluginContext
+        if (context == null) {
+            result.success(errorReply("FAILED", "plugin is not loaded"))
+            return
+        }
+        try {
+            hostCallExecutor.execute {
+                val reply = runCatching { context.call(request.api, request.version, request.op, request.argsJson) }
+                    .getOrElse { errorReply("FAILED", it.message ?: "broker call failed") }
+                mainHandler.post { result.success(reply) }
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            result.success(errorReply("FAILED", "plugin is unloading"))
+        }
+    }
+
+    private fun errorReply(code: String, message: String): String = JSONObject()
+        .put("ok", false)
+        .put("error", JSONObject().put("code", code).put("message", message))
+        .toString()
 
     override fun invoke(capability: PluginCapability, args: PluginArgs): PluginResult {
         val argsJson = JSONObject().apply { args.keys().forEach { put(it, args.string(it)) } }
@@ -568,6 +606,25 @@ class FlutterDroidtopPlugin(
                 return Result.failure(IllegalStateException("Flutter runtime not installed -- download it in Settings > Plugins first"))
             }
             return Result.success(FlutterDroidtopPlugin(pluginId, context, installDir))
+        }
+    }
+}
+
+/** Parsed, broker-ready fields for the JSON text accepted by Flutter's `hostCall` method. */
+internal data class FlutterHostCallRequest(val api: String, val version: Int, val op: String, val argsJson: String) {
+    companion object {
+        fun parse(arguments: Any?): FlutterHostCallRequest {
+            require(arguments is String) { "hostCall argument must be a JSON string" }
+            val json = JSONObject(arguments)
+            val api = (json.opt("api") as? String)?.takeIf { it.isNotBlank() }
+                ?: throw IllegalArgumentException("api must be a non-empty string")
+            val version = json.opt("version")
+            require(version is Int && version > 0) { "version must be a positive integer" }
+            val op = (json.opt("op") as? String)?.takeIf { it.isNotBlank() }
+                ?: throw IllegalArgumentException("op must be a non-empty string")
+            val args = json.optJSONObject("args")
+                ?: throw IllegalArgumentException("args must be a JSON object")
+            return FlutterHostCallRequest(api, version, op, args.toString())
         }
     }
 }

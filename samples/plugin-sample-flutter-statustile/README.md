@@ -52,3 +52,22 @@ for droidtop's own "Add integration file" picker (Settings > Plugins).
   `{"ok": true, ...}` / `{"ok": false, ...}` JSON shape. A plugin
   that subscribes to an event but has no `onEvent` handler must return
   nothing (the adapter treats the missing handler as success).
+
+## Calling droidtop
+
+Plugins call a host API on the same channel with method `hostCall`. Its
+argument is JSON text containing `api`, `version`, `op` and an `args`
+object; the method result is the broker's reply as JSON text. For example,
+inside a Dart handler:
+
+```dart
+final replyJson = await _channel.invokeMethod<String>(
+  'hostCall',
+  jsonEncode({'api': 'host.info', 'version': 1, 'op': 'info', 'args': {}}),
+);
+final reply = jsonDecode(replyJson!) as Map<String, dynamic>;
+```
+
+The broker call runs off the main Looper, and its reply returns through
+the original method result. A malformed request returns the broker reply
+shape with error code `INVALID_ARGS`.

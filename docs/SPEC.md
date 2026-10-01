@@ -11405,6 +11405,12 @@ of what is built. The decisions, briefly:
   `flutter_embed` carry the same JSON envelope (`handle` in,
   `host.call` out). No kind has a feature the others lack, and a shared
   conformance script checks this.
+  The `flutter_embed` adapter receives `hostCall` with `{api, version,
+  op, args}` as JSON text on the plugin's existing channel. It calls the
+  loaded `PluginContext` on one adapter-owned background executor and
+  returns the broker's JSON reply on the main Looper; malformed requests
+  receive an `INVALID_ARGS` broker-shaped reply. `onUnload` shuts the
+  executor down.
 - **Plugin-provided APIs.** A plugin can `export` an API and others can
   `require` it. droidtop brokers every such call, and the caller needs
   its own grant for the provider's permission, so A never reaches root
