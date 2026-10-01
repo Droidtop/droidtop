@@ -1988,7 +1988,7 @@ private fun AppearanceStep(
         value = withContext(Dispatchers.IO) { AppearanceCatalog.read(context) }
     }
     if (browsing) {
-        val closeBrowser = {
+        val closeBrowser: () -> Unit = {
             browsing = false
             catalogVersion++
         }
