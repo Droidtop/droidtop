@@ -51,10 +51,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,7 +67,7 @@ import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.runtime.systemstatus.NetworkKind
 import dev.droidtop.runtime.systemstatus.SystemStatus
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.onPad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -180,17 +176,30 @@ internal fun QuickSettingsPanel(
         }
     }
 
-    fun moveTo(direction: QuickMove) {
+    // A held direction follows the cursor without animating each step.
+    var heldStep by remember { mutableStateOf(false) }
+
+    fun moveTo(direction: QuickMove, repeat: Boolean) {
         confirmArmedId = null
+        heldStep = repeat
         focusIndex = QuickTiles.move(focusIndex, panel.sliders.size, panel.tiles.size, columns, direction)
     }
 
     val focus = remember { FocusRequester() }
     val gridState = rememberLazyGridState()
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "Quick settings") }
+    // The selected tile is kept wholly on screen by as little scrolling as
+    // it takes (docs/SPEC.md 6e). animateScrollToItem pinned the tile's row
+    // to the TOP of the grid on every move, so the grid jumped on each
+    // press and restarted the animation at the pad's repeat rate -- the R2
+    // menu "can't scroll properly" (tracker#152). Back on the sliders, the
+    // grid returns to its first row.
     LaunchedEffect(focusIndex, panel.tiles.size) {
         val tileIndex = focusIndex - panel.sliders.size
-        if (tileIndex in panel.tiles.indices) gridState.animateScrollToItem(tileIndex)
+        when {
+            tileIndex in panel.tiles.indices -> gridState.keepInView(tileIndex, animate = !heldStep)
+            panel.tiles.isNotEmpty() -> gridState.keepInView(0, animate = !heldStep)
+        }
     }
 
     Column(
@@ -198,33 +207,31 @@ internal fun QuickSettingsPanel(
             .fillMaxSize()
             .focusRequester(focus)
             .focusable()
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                val action = GamepadKeyMap.actionFor(event.key)
+            // Every press is this tab's: the sheet above has already taken
+            // the tabs and the close (docs/SPEC.md 6e). A slider's Left/Right
+            // is the adjustment, not a move (QuickTiles.move says so too),
+            // and holding it keeps adjusting at the cadence a held direction
+            // steps at.
+            .onPad { press ->
                 val slider = panel.sliders.getOrNull(focusIndex)
-                when (action) {
-                    GamepadAction.UP -> { moveTo(QuickMove.UP); true }
-                    GamepadAction.DOWN -> { moveTo(QuickMove.DOWN); true }
+                when (press.action) {
+                    GamepadAction.UP -> moveTo(QuickMove.UP, press.repeat)
+                    GamepadAction.DOWN -> moveTo(QuickMove.DOWN, press.repeat)
                     GamepadAction.LEFT, GamepadAction.RIGHT -> {
-                        val step = if (action == GamepadAction.LEFT) -1 else +1
+                        val step = if (press.action == GamepadAction.LEFT) -1 else +1
                         if (slider != null) {
-                            // A slider's Left/Right is the adjustment,
-                            // not a move (QuickTiles.move says so too).
                             if (adjustCatalogItem(context, slider, step * QuickTiles.sliderStep(slider))) refresh()
                         } else {
-                            moveTo(if (step < 0) QuickMove.LEFT else QuickMove.RIGHT)
+                            moveTo(if (step < 0) QuickMove.LEFT else QuickMove.RIGHT, press.repeat)
                         }
-                        true
                     }
-                    GamepadAction.A -> {
-                        if (slider == null) {
-                            panel.tiles.getOrNull(focusIndex - panel.sliders.size)?.let { activate(it.item) }
-                        }
-                        true
+                    GamepadAction.A -> if (slider == null) {
+                        panel.tiles.getOrNull(focusIndex - panel.sliders.size)?.let { activate(it.item) }
                     }
-                    GamepadAction.B, GamepadAction.BACK -> { onDismiss(); true }
-                    else -> false
+                    GamepadAction.B -> onDismiss()
+                    else -> Unit
                 }
+                true
             },
     ) {
         QuickStatusHeader()

@@ -106,11 +106,15 @@ internal class PadEdges(private val cadence: PadCadence) {
     /**
      * One raw key event. The system back key is never taken: it belongs to
      * the back dispatcher, and taking its DOWN would also cost the long
-     * press the activity opens the mode switcher with.
+     * press the activity opens the mode switcher with. Nor is a FALLBACK
+     * key: that is Android re-sending a pad button nobody took as some
+     * other key (`Generic.kcm`: Y becomes SPACE, X becomes DEL, A becomes
+     * DPAD_CENTER), and acting on it would make an unused Y mean X.
      */
     fun dispatch(event: android.view.KeyEvent, preview: Boolean, handle: (PadPress) -> Boolean): Boolean {
         val keyCode = event.keyCode
         if (keyCode == android.view.KeyEvent.KEYCODE_BACK) return false
+        if ((event.flags and android.view.KeyEvent.FLAG_FALLBACK) != 0) return false
         if (preview && GamepadKeyMap.isTextKey(keyCode)) return false
         val action = GamepadKeyMap.actionFor(keyCode, event.isShiftPressed) ?: return false
         return when (event.action) {

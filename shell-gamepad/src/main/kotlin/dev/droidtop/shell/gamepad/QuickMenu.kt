@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -33,20 +34,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.message
 import dev.droidtop.runtime.systemstatus.NotificationsStore
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
-import dev.droidtop.shell.gamepad.input.ownPadButtons
+import dev.droidtop.shell.gamepad.input.menuStep
+import dev.droidtop.shell.gamepad.input.onPad
 import kotlinx.coroutines.launch
 
 /**
@@ -120,6 +118,10 @@ internal fun QuickMenu(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        // The sheet is a window of its own: the same front of the input
+        // pipeline as the shell's (docs/SPEC.md 6e), so the stick, the
+        // repeat cadence and a held Select behave here as they do there.
+        GatePadInThisDialog()
         // Game only while a game is actually running (see this
         // function's own doc comment) -- computed once per sheet
         // opening, same as runningEntry itself is (GamepadShell only
@@ -159,38 +161,24 @@ internal fun QuickMenu(
                         },
                     )
                     .align(if (window.portrait) Alignment.BottomCenter else Alignment.CenterEnd)
-                    // Preview, not plain onKeyEvent: the System tab's
-                    // CatalogNavigator holds focus and handles its own
-                    // keys, and tab switching must win over it -- a
-                    // parent's PREVIEW pass runs before the child sees
-                    // the event at all.
-                    .onPreviewKeyEvent { event ->
-                        val action = GamepadKeyMap.actionFor(event.key)
-                        // R2 toggles: a FRESH KeyDown closes. The
-                        // opening press's own key-up lands in this
-                        // window once it takes focus, so R2 KeyUp is
-                        // swallowed, never acted on -- the same
-                        // flash-open-shut hazard the SELECT note below
-                        // describes.
-                        if (action == GamepadAction.R2 || action == GamepadAction.START) {
-                            if (event.type == KeyEventType.KeyDown) onDismiss()
-                            return@onPreviewKeyEvent true
-                        }
-                        if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
-                        when (action) {
-                            GamepadAction.L -> {
-                                val i = visibleTabs.indexOf(tab)
-                                tab = visibleTabs[(i - 1 + visibleTabs.size) % visibleTabs.size]; true
+                    // Preview: tab switching and closing win over the tab
+                    // inside, which holds focus and takes its own presses.
+                    // R2 (or Start) closes: the press that OPENED the sheet
+                    // belonged to the shell underneath, so its release never
+                    // acts here (docs/SPEC.md 6e) and only a fresh press
+                    // closes. A held Select arrives as R2 too, so holding it
+                    // again closes the sheet it opened.
+                    .onPad(preview = true) { press ->
+                        when (press.action) {
+                            GamepadAction.R2, GamepadAction.START -> {
+                                onDismiss(); true
                             }
-                            GamepadAction.R -> {
+                            GamepadAction.L, GamepadAction.R -> {
                                 val i = visibleTabs.indexOf(tab)
-                                tab = visibleTabs[(i + 1) % visibleTabs.size]; true
+                                val step = if (press.action == GamepadAction.L) -1 else 1
+                                tab = visibleTabs[(i + step + visibleTabs.size) % visibleTabs.size]
+                                true
                             }
-                            // SELECT deliberately does NOT close: the
-                            // opening hold's own key-up can land in this
-                            // window once it takes focus, and closing on
-                            // it would make the menu flash open-shut. B
-                            // closes.
                             else -> false
                         }
                     },
@@ -281,9 +269,12 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
     // any of it.
     val press = rememberGamepadTouch()
 
+    // A held direction follows the cursor without animating each step.
+    var heldStep by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     LaunchedEffect(focusIndex, items.size) {
-        if (items.isNotEmpty()) listState.keepInView(focusIndex.coerceIn(0, items.size - 1))
+        if (items.isNotEmpty()) listState.keepInView(focusIndex.coerceIn(0, items.size - 1), animate = !heldStep)
     }
 
     Column(
@@ -291,41 +282,34 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
             .fillMaxSize()
             .focusRequester(focusRequester)
             .focusable()
-            // A dialog is its own window with its own fallbacks: the same
-            // ownership as the shell's root (Modifier.ownPadButtons).
-            .ownPadButtons(onBack = onDismiss)
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
-                val action = GamepadKeyMap.actionFor(event.key)
+            // Every press is this tab's: the sheet above has already
+            // taken the tabs and the close.
+            .onPad { press ->
                 val current = items.getOrNull(focusIndex)
-                when {
-                    action == GamepadAction.BACK || action == GamepadAction.B -> {
-                        onDismiss(); true
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> {
+                        heldStep = press.repeat
+                        focusIndex = menuStep(focusIndex, items.size, if (press.action == GamepadAction.UP) -1 else 1)
                     }
-                    action == GamepadAction.UP && items.isNotEmpty() -> {
-                        focusIndex = (focusIndex - 1 + items.size) % items.size; true
+                    GamepadAction.B -> onDismiss()
+                    GamepadAction.A -> when {
+                        !granted -> {
+                            context.startActivity(NotificationsStore.grantIntent())
+                            onDismiss()
+                        }
+                        current != null -> {
+                            // Captured locally: contentIntent is a property
+                            // from another module, so no smart cast.
+                            val pending = current.contentIntent
+                            if (pending != null) runCatching { pending.send() }
+                            onDismiss()
+                        }
                     }
-                    action == GamepadAction.DOWN && items.isNotEmpty() -> {
-                        focusIndex = (focusIndex + 1) % items.size; true
-                    }
-                    action == GamepadAction.A && !granted -> {
-                        context.startActivity(NotificationsStore.grantIntent()); onDismiss(); true
-                    }
-                    action == GamepadAction.A && current != null -> {
-                        // Captured locally: contentIntent is a property
-                        // from another module, so no smart cast.
-                        val pending = current.contentIntent
-                        if (pending != null) runCatching { pending.send() }
-                        onDismiss(); true
-                    }
-                    action == GamepadAction.X && current?.clearable == true -> {
-                        NotificationsStore.controller?.dismiss(current.key); true
-                    }
-                    action == GamepadAction.Y && items.any { it.clearable } -> {
-                        NotificationsStore.controller?.clearAll(); true
-                    }
-                    else -> false
+                    GamepadAction.X -> if (current?.clearable == true) NotificationsStore.controller?.dismiss(current.key)
+                    GamepadAction.Y -> if (items.any { it.clearable }) NotificationsStore.controller?.clearAll()
+                    else -> Unit
                 }
+                true
             },
     ) {
         val showList = granted && items.isNotEmpty()
@@ -503,21 +487,11 @@ private fun PluginTilesTab(
             .fillMaxSize()
             .focusRequester(focusRequester)
             .focusable()
-            .ownPadButtons(onBack = onDismiss)
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
-                when (GamepadKeyMap.actionFor(event.key)) {
-                    GamepadAction.BACK, GamepadAction.B -> {
-                        onDismiss(); true
-                    }
-                    GamepadAction.UP -> {
-                        if (tiles.isNotEmpty()) focusIndex = (focusIndex - 1 + tiles.size) % tiles.size
-                        true
-                    }
-                    GamepadAction.DOWN -> {
-                        if (tiles.isNotEmpty()) focusIndex = (focusIndex + 1) % tiles.size
-                        true
-                    }
+            .onPad { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN ->
+                        focusIndex = menuStep(focusIndex, tiles.size, if (press.action == GamepadAction.UP) -1 else 1)
+                    GamepadAction.B -> onDismiss()
                     GamepadAction.A -> {
                         val tile = tiles.getOrNull(focusIndex)
                         if (tile != null && tile.quick) {
@@ -528,14 +502,19 @@ private fun PluginTilesTab(
                                 refresh()
                             }
                         }
-                        true
                     }
-                    else -> false
+                    else -> Unit
                 }
+                true
             },
     ) {
+        // Scrolls, so a selected row past the sheet's bottom is brought into
+        // view by MenuRow itself: a plain Column left those rows unreachable
+        // on screen (tracker#152).
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(androidx.compose.foundation.rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             tiles.forEachIndexed { index, tile ->
@@ -602,26 +581,15 @@ private fun GameTab(
             .fillMaxSize()
             .focusRequester(focusRequester)
             .focusable()
-            // A dialog is its own window with its own fallbacks: the same
-            // ownership as the shell's root (Modifier.ownPadButtons).
-            .ownPadButtons(onBack = onDismiss)
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
-                when (GamepadKeyMap.actionFor(event.key)) {
-                    GamepadAction.BACK, GamepadAction.B -> {
-                        onDismiss(); true
-                    }
-                    GamepadAction.UP -> {
-                        focusIndex = (focusIndex - 1 + tiles.size) % tiles.size; true
-                    }
-                    GamepadAction.DOWN -> {
-                        focusIndex = (focusIndex + 1) % tiles.size; true
-                    }
-                    GamepadAction.A -> {
-                        tiles.getOrNull(focusIndex)?.action?.invoke(); true
-                    }
-                    else -> false
+            .onPad { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN ->
+                        focusIndex = menuStep(focusIndex, tiles.size, if (press.action == GamepadAction.UP) -1 else 1)
+                    GamepadAction.B -> onDismiss()
+                    GamepadAction.A -> tiles.getOrNull(focusIndex)?.action?.invoke()
+                    else -> Unit
                 }
+                true
             },
     ) {
         Text(
