@@ -2374,7 +2374,13 @@ the `ContainerRuntime` interface that already exists (§3):
   dependency). Notifications need the
   notification-access grant (NotificationListenerService in `:app`
   feeding `runtime-common`'s NotificationsStore); until granted the tab
-  offers the grant, never a silently empty list. Honest limitation:
+  offers the grant, never a silently empty list. When notification access
+  is not granted the Quick Menu opens on System (or Game when a game is
+  running) rather than on an empty Notifications sheet; the Notifications
+  tab then shows the grant as one `MenuRow` at the top using the same
+  shape as the brightness and DND grant rows (`QuickMenu.kt:326`), so
+  there is one empty-state rule for grants (Droidtop/tracker#180, decided
+  2026-10-01 from the product review). Honest limitation:
   the menu overlays the SHELL only — games are separate activities, and
   a Deck-style in-game overlay is future work tied to this section's
   overlay plans, not claimed here.

@@ -133,10 +133,19 @@ internal fun QuickMenu(
                 dev.droidtop.library.integrations.PluginTiles.tilesFor(context)
             }
         }
+        val granted = remember { NotificationsStore.isGranted(context) }
         val visibleTabs = remember(runningEntry != null, pluginTiles.isNotEmpty()) {
             QuickTab.entries.filter { (it != QuickTab.GAME || runningEntry != null) && (it != QuickTab.PLUGINS || pluginTiles.isNotEmpty()) }
         }
-        var tab by remember { mutableStateOf(if (runningEntry != null) QuickTab.GAME else QuickTab.NOTIFICATIONS) }
+        var tab by remember {
+            mutableStateOf(
+                when {
+                    runningEntry != null -> QuickTab.GAME
+                    !granted -> QuickTab.SYSTEM
+                    else -> QuickTab.NOTIFICATIONS
+                }
+            )
+        }
 
         val window = currentShellWindow()
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -314,11 +323,15 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
     ) {
         val showList = granted && items.isNotEmpty()
         when {
-            !granted -> Text(
-                "droidtop needs notification access to show these.\n\nPress A to open the grant screen. It is a one-time system permission.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MenuTokens.OnSurface,
-                modifier = Modifier.padding(vertical = 12.dp),
+            !granted -> MenuRow(
+                title = "Notification access",
+                subtitle = "One-time grant on the system screen this opens; afterwards notifications appear here",
+                value = "Needs permission",
+                selected = focusIndex == 0,
+                onClick = {
+                    context.startActivity(NotificationsStore.grantIntent())
+                    onDismiss()
+                },
             )
             items.isEmpty() -> Text(
                 "No notifications.",
