@@ -3,11 +3,11 @@ package dev.droidtop.display
 import android.content.Context
 import android.os.Bundle
 import android.view.Display
-import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
@@ -73,10 +73,7 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
         // the shell on the other screen. This surface is touch-only (no text
         // fields, the keyboard surface is a pure touch View), so it asks for
         // no focus and no input method; touch is unaffected by the flag.
-        window?.addFlags(
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM,
-        )
+        window?.addFlags(SecondScreenWindowFlags.touchOnly(includeAltFocusableIm = true))
         savedStateOwner.controller.performRestore(null)
         lifecycleOwner.registry.currentState = Lifecycle.State.CREATED
 
@@ -100,7 +97,7 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
             setContent {
                 if (content != null) {
-                    content()
+                    Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) { content() }
                 } else {
                     Box(modifier = Modifier.fillMaxSize().background(Color.Black))
                 }

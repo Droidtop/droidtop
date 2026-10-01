@@ -2983,6 +2983,14 @@ What is true on Android, and what this section corrects in the text above:
   unaffected by the flags, and a Presentation never competes for key focus
   again. This is what makes the Presentation-plus-SECONDARY_HOME split above
   actually hold: the live surface adds no second focus holder.
+- All companion surfaces are touch-only: `CompanionActivity` and the
+  `SECONDARY_HOME` idle activity also use `FLAG_NOT_FOCUSABLE`, and every
+  companion Compose root denies focus to its descendants. Companion content
+  does not install `PadGate`, `Modifier.onPad`, or an initial focus request;
+  D-pad and gamepad events stay with the shell on the other display. Tapping
+  still dispatches normal touch actions. Text entry on a companion uses the
+  existing second-screen keyboard surface and its input connection; it does
+  not make the companion window focusable.
 - The selected IME may receive an input session for an editor on a
   non-default display without Android drawing its IME window. Console
   evidence for Droidtop/tracker#156: with Gboard selected and Chrome focused

@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 
 /**
@@ -49,6 +50,7 @@ class SecondaryDisplayActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(SecondScreenWindowFlags.touchOnly())
         render()
     }
 
@@ -103,7 +105,7 @@ class SecondaryDisplayActivity : ComponentActivity() {
         val content = SecondaryDisplayContent.contentFor(mode)
         setContent {
             if (content != null) {
-                content()
+                Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) { content() }
             } else {
                 // A mode that registered nothing draws the ground and
                 // nothing else. Never a placeholder wordmark -- that was

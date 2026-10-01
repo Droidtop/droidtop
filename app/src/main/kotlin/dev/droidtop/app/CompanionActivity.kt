@@ -21,8 +21,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -53,36 +54,39 @@ class CompanionActivity : AppCompatActivity() {
             finish()
             return
         }
+        window.addFlags(dev.droidtop.display.SecondScreenWindowFlags.touchOnly())
         widgetManager = AppWidgetManager.getInstance(this)
         widgetHost = CompanionWidgets.host(this)
         widgetIds = CompanionWidgetPrefs.widgetIds(this)
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-                // The same mode+role selection every other second-screen
-                // host applies (SecondScreenPresentation, :display's
-                // SecondaryDisplayActivity): with the shell relocated to
-                // the addon, THIS activity is what the remaining panel
-                // shows, and in Desktop mode that panel is the input
-                // surface (trackpad + keyboard) by default, not widgets.
-                val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(this)
-                if (SecondScreenInputPrefs.role(this, mode) == SecondScreenInputPrefs.Role.INPUT) {
-                    SecondScreenInputSurface(mode)
-                    return@DroidtopTheme
-                }
-                val entry = settledFocusedEntry()
-                CompanionSurface(
-                    entry = entry,
-                    widgetIds = widgetIds,
-                    widgetManager = widgetManager,
-                    widgetHost = widgetHost,
-                ) {
-                    androidx.compose.foundation.layout.Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) {
+                    // The same mode+role selection every other second-screen
+                    // host applies (SecondScreenPresentation, :display's
+                    // SecondaryDisplayActivity): with the shell relocated to
+                    // the addon, THIS activity is what the remaining panel
+                    // shows, and in Desktop mode that panel is the input
+                    // surface (trackpad + keyboard) by default, not widgets.
+                    val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(this)
+                    if (SecondScreenInputPrefs.role(this, mode) == SecondScreenInputPrefs.Role.INPUT) {
+                        SecondScreenInputSurface(mode)
+                        return@DroidtopTheme
+                    }
+                    val entry = settledFocusedEntry()
+                    CompanionSurface(
+                        entry = entry,
+                        widgetIds = widgetIds,
+                        widgetManager = widgetManager,
+                        widgetHost = widgetHost,
                     ) {
-                        TextButton(onClick = { pickWidget() }) { Text("Add widget") }
-                        if (widgetIds.isNotEmpty()) {
-                            TextButton(onClick = { removeLastWidget() }) {
-                                Text("Remove widget", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        androidx.compose.foundation.layout.Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(onClick = { pickWidget() }) { Text("Add widget") }
+                            if (widgetIds.isNotEmpty()) {
+                                TextButton(onClick = { removeLastWidget() }) {
+                                    Text("Remove widget", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                         }
                     }
