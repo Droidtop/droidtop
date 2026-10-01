@@ -314,7 +314,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 params.width = ViewGroup.LayoutParams.WRAP_CONTENT
                 params.gravity = Gravity.BOTTOM or Gravity.END
                 root.setBackgroundColor(BAR_COLOR)
-                root.addView(textButton("Taskbar") {
+                root.addView(textButton("Show taskbar") {
                     this@StandardTaskbar.collapsed = false
                     renderAll()
                 })
