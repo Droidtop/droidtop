@@ -202,5 +202,27 @@ def handle(call_json):
     )
 
 
+_cancelled_jobs = set()
+
+
+def start_job(payload_json):
+    """Sample long-running operation; progress records reach the host callbacks."""
+    job = json.loads(payload_json)
+    job_id = job["job_id"]
+    _cancelled_jobs.discard(job_id)
+    if job_id in _cancelled_jobs:
+        return json.dumps({"ok": False, "error": "cancelled", "progress": []})
+    return json.dumps({
+        "ok": True,
+        "values": {"message": "Python sample job complete"},
+        "progress": [{"percent": 100, "status": "Complete"}],
+    })
+
+
+def cancel_job(payload_json):
+    _cancelled_jobs.add(json.loads(payload_json)["job_id"])
+    return "{}"
+
+
 def on_unload():
     pass
