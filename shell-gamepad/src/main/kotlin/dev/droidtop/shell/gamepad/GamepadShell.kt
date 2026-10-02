@@ -3305,14 +3305,14 @@ private fun AppsSection(
                     }
                     firstAssigned = true
                 }
+                // Games are not apps, but this is where a person on the Apps tab looks for more of anything.
+                item(key = "get_games") {
+                    GetGamesChip(
+                        dev.droidtop.library.integrations.GetGamesContext.APPS,
+                        modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding),
+                    )
             }
-        }
-        // Games are not apps, but this is where a person on the Apps tab looks for more of anything.
-        item(key = "get_games") {
-            GetGamesChip(
-                dev.droidtop.library.integrations.GetGamesContext.APPS,
-                modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding),
-            )
+                }
         }
     }
 
