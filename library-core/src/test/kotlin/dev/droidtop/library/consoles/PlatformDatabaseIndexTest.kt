@@ -30,7 +30,7 @@ class PlatformDatabaseIndexTest {
         assumeTrue("vendor/droidtop-platforms is not checked out", File(repo, "index.json").isFile)
         val index = index()
         val composedCollections = index.collections.values.filter { it.legacy != null }
-        assertEquals("every consumed collection is present", 4, composedCollections.size)
+        assertEquals("every consumed collection is present", 5, composedCollections.size)
         for (collection in composedCollections) {
             val entries = index.files.filter { it.collection == collection.name }
             val composed = PlatformDatabaseIndex.compose(
