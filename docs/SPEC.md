@@ -3257,6 +3257,26 @@ start over an app the user had opened on its screen (tracker#274). Where the sys
 shell (an app that was already running, brought forward by Android itself), touching the app's
 screen moves it; that is the supported route and nothing droidtop does fights it.
 
+**A touch-only activity never leaves a key without a window (console, build 1386).** Android sends a
+key to the focused window of the top-focused display; when that display's focused *application* has
+no focusable window, the dispatcher waits 5 s and reports the app as not responding, and keeps doing
+so for every later key. Two droidtop activities made that state: (1) moving the shell to the other
+screen (`relaunchOnDisplay`) creates a new `MainActivity` in a new task there, because a singleTask
+lookup does not reach a task on another display, and the old instance stayed behind, stopped, under
+the companion in display 0's task, still that display's focused application (ANR naming
+`MainActivity t2618`, re-raised every ~30 s until a force-stop); (2) the companion and the idle cover
+are `FLAG_NOT_FOCUSABLE` activities, so whenever one of them became the top activity (an app on its
+screen exits, the companion is started) the pad pointed at a display with no window to take it (ANR
+naming `CompanionActivity`, 15:55:44, from the owner's own pad). Decisions: a new shell instance
+finishes any older live one (one shell, ever); and `TouchOnlySurfaceFocus` (`:display`) makes the
+companion and the idle cover focusable only while they are the top resumed activity (when the pad
+already points at their display, so it takes nothing from the shell), hands the pad back by moving
+the shell's task to the front when the shell is resumed on the other screen (`REORDER_TASKS`, a
+normal permission), delivers any key that still arrives to the shell's window, and swallows pad,
+D-pad and Back keys when there is no shell to give them to. The moment the surface stops being the
+top activity it is touch-only again (#186 holds). The orchestrator's separate "re-front the shell
+after starting the companion" call is gone: the companion does it.
+
 ### Second display: a Presentation takes no focus, the IME follows visibility (2026-09-30)
 
 Owner, 2026-09-30: "most things on the second display aren't touchable"
@@ -3284,8 +3304,9 @@ What is true on Android, and what this section corrects in the text above:
   again. This is what makes the Presentation-plus-SECONDARY_HOME split above
   actually hold: the live surface adds no second focus holder.
 - All companion surfaces are touch-only: `CompanionActivity` and the
-  `SECONDARY_HOME` idle activity also use `FLAG_NOT_FOCUSABLE`, and every
-  companion Compose root denies focus to its descendants. Companion content
+  `SECONDARY_HOME` idle activity also use `FLAG_NOT_FOCUSABLE` (except while
+  one is the top activity, see "A touch-only activity never leaves a key
+  without a window" above), and every companion Compose root denies focus to its descendants. Companion content
   does not install `PadGate`, `Modifier.onPad`, or an initial focus request;
   D-pad and gamepad events stay with the shell on the other display. Tapping
   still dispatches normal touch actions. Text entry on a companion uses the

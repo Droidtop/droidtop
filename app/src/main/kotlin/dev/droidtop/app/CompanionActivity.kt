@@ -165,6 +165,17 @@ class CompanionActivity : AppCompatActivity() {
         dev.droidtop.display.CompanionCover.resumed(displayIdCompat())
     }
 
+    // Touch-only, except while Android has made it the top activity: then keys reach this
+    // display and it must have a window for them, or the system reports droidtop as not
+    // responding (TouchOnlySurfaceFocus; console, build 1386).
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        dev.droidtop.display.TouchOnlySurfaceFocus.onTopResumedChanged(this, isTopResumedActivity, displayIdCompat())
+    }
+
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
+        dev.droidtop.display.TouchOnlySurfaceFocus.consumesKey(event) || super.dispatchKeyEvent(event)
+
     override fun onPause() {
         // Paused with something in front of it (an app launched onto this screen,
         // the widget picker): the orchestration leaves that app alone (tracker#265).

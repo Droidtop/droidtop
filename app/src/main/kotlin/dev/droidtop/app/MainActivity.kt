@@ -213,6 +213,21 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             return
         }
 
+        // One shell. Moving the shell to the other screen (relaunchOnDisplay) creates a NEW
+        // instance in a new task there, because a singleTask lookup does not reach a task on
+        // another display; the old instance used to stay behind, stopped, under the companion
+        // in display 0's task. Android kept it as that display's focused application, so a key
+        // sent there waited for a window it would never add and raised "droidtop isn't
+        // responding" every few seconds until a force-stop (console, build 1386: "ANR in
+        // ActivityRecord{1d32bc7 ... MainActivity} t2618 ... Application does not have a
+        // focused window", the instance the relocation at 16:40:23 left in task 2618).
+        // The new instance retires the old one.
+        live?.get()?.takeIf { it !== this && !it.isFinishing && !it.isDestroyed }?.let { old ->
+            android.util.Log.i("droidtop.SecondScreen", "Shell moved to display ${currentDisplayId()}: finishing the instance left on display ${old.currentDisplayId()}")
+            old.finish()
+        }
+        live = java.lang.ref.WeakReference(this)
+
         // One library per process, built by the shared core rather than
         // here: launch resolution must work with Gaming and Desktop both
         // off, and this Activity does not run then (LibraryCore).
@@ -678,12 +693,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         )
     }
 
-    override fun bringSelfForward() {
-        startActivity(
-            Intent(intent).setClass(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }
-
     // Companion explicitly on the BUILT-IN display: startActivity without
     // options launches on the CALLER's display, which after relocation is
     // the addon -- confirmed live: the companion landed behind the shell
@@ -782,5 +791,10 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             return true
         }
         return super.onKeyLongPress(keyCode, event)
+    }
+
+    private companion object {
+        /** The shell instance created last; an older one still alive is the one a relocation left behind. */
+        var live: java.lang.ref.WeakReference<MainActivity>? = null
     }
 }

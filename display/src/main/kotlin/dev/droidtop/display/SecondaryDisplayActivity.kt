@@ -90,6 +90,16 @@ class SecondaryDisplayActivity : ComponentActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
+    // Touch-only, except while Android has made it the top activity: then keys reach this display
+    // and it must have a window for them (TouchOnlySurfaceFocus).
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        TouchOnlySurfaceFocus.onTopResumedChanged(this, isTopResumedActivity, displayIdCompat())
+    }
+
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
+        TouchOnlySurfaceFocus.consumesKey(event) || super.dispatchKeyEvent(event)
+
     override fun onResume() {
         super.onResume()
         // The mode can change while this sits on the other screen (the

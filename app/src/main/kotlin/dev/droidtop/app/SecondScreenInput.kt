@@ -88,6 +88,35 @@ object ForegroundShell {
 
     fun current(): Activity? = ref?.get()
 
+    /**
+     * Wires the touch-only second-screen activities to the shell (docs/SPEC.md 4c): when one of
+     * them becomes the top activity, the shell's task is brought to the front if the shell is
+     * resumed on another screen, and any key that still reaches the surface is delivered here.
+     * Moving a task needs REORDER_TASKS (a normal permission); the caller is the top activity, so
+     * the background-start rules allow it.
+     */
+    fun installPadReturn() {
+        dev.droidtop.display.TouchOnlySurfaceFocus.returnPadToShell = returnPad@{ fromDisplayId ->
+            val shell = current()?.takeIf { !it.isFinishing && !it.isDestroyed } ?: return@returnPad false
+            if (displayIdOf(shell) == fromDisplayId) return@returnPad false
+            val activityManager = shell.getSystemService(android.app.ActivityManager::class.java)
+                ?: return@returnPad false
+            activityManager.moveTaskToFront(shell.taskId, 0)
+            true
+        }
+        dev.droidtop.display.TouchOnlySurfaceFocus.forwardKeyToShell = { event ->
+            current()?.takeIf { !it.isFinishing && !it.isDestroyed }?.dispatchKeyEvent(event) ?: false
+        }
+    }
+
+    private fun displayIdOf(activity: Activity): Int? =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            activity.display?.displayId
+        } else {
+            @Suppress("DEPRECATION")
+            activity.windowManager.defaultDisplay?.displayId
+        }
+
     fun send(navKey: NavKey) {
         val activity = current() ?: return
         val keyCode = when (navKey) {

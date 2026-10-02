@@ -54,9 +54,6 @@ interface SecondScreenHost {
     /** Relaunches this same singleTask Activity, explicitly pinned to [displayId]. */
     fun relaunchOnDisplay(displayId: Int)
 
-    /** Re-fronts this Activity on whatever display it is already on (no explicit display options). */
-    fun bringSelfForward()
-
     /** Starts :app's CompanionActivity on the built-in display. Throws on refusal. */
     fun startCompanionOnBuiltIn()
 
@@ -398,8 +395,9 @@ class SecondScreenOrchestrator(
                         now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS
                     ) {
                         lastRelocationAttemptMs = now
+                        // Starting the companion makes it the top activity; it hands the
+                        // pad straight back to the shell itself (TouchOnlySurfaceFocus).
                         host.startCompanionOnBuiltIn()
-                        host.bringSelfForward()
                     }
                 }
 

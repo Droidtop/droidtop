@@ -65,6 +65,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // .gamenative file written into the user's folder (SPEC 7g, tracker#269).
         dev.droidtop.runtime.windows.DroidtopGameIdStore.install(this)
         ScreenOrientationPrefs.install(this)
+        // A second-screen surface that becomes the top activity hands the pad back to the
+        // shell instead of leaving keys without a window (SPEC 4c, console build 1386 ANR).
+        ForegroundShell.installPadReturn()
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)
         // What `host.info` tells a plugin about the mode droidtop is in (docs/plugin-api.md 3 J4).

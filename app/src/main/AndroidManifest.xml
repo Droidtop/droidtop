@@ -29,6 +29,11 @@
          droidtop eligible (its own installer of record). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <!-- A second-screen surface that becomes the top activity brings the
+         shell's own task back to the front, so the pad stays with the
+         shell (ForegroundShell.installPadReturn, docs/SPEC.md 4c). A normal
+         permission: nothing to grant. -->
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
 
     <!-- Real wifi/cellular connectivity check for Gaming's own
          systemstatus theme element (EsDeThemeRenderer.kt). -->
