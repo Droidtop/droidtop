@@ -2630,7 +2630,7 @@ a close path of its own. Every call works off the main thread.
   (audio hand-off, display cover, ledger). For an open app that resumes its task; whether Android also
   moves the task to the other display is Android's decision, so the UI says "asked", not "moved". There
   is no shell-side `move-task` fallback.
-- **The Quick Menu's Running apps section and the companion Tasks tab share one vertical list** (`SharedRunningAppsList`): one row per running app (icon, name, screen, Close, and Switch to when another screen exists), with Clear all at the top. Rows use the source's most-recent-first order and one row height. The companion is touch-only and takes no controller focus; the Quick Menu keeps pad navigation, with A switching, X closing and Y asking for the other screen. Both surfaces use the same task actions and touch buttons.
+- **The Quick Menu's Running apps section and the companion Tasks tab share one vertical list** (`SharedRunningAppsList`): one row per running app (icon, name, screen, Close, and Move when another screen exists; a tap on the row switches to the app), with Clear all at the top. Rows use the source's most-recent-first order and one row height. The companion is touch-only and takes no controller focus; the Quick Menu keeps pad navigation, with A switching, X closing and Y asking for the other screen. Both surfaces use the same task actions and touch buttons.
 - **Clear all apps: one action, four surfaces** (tracker#252). `TaskManager.clearAllTargets` reads the
   list fresh and applies `TaskPolicy.clearAllTargets`; `TaskManager.clearAll` closes each target by the
   one close path and returns a `ClearAllSummary` whose sentence says how many were closed, how many

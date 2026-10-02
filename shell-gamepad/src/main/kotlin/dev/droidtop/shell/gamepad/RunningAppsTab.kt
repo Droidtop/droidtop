@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -67,6 +69,8 @@ internal fun AppsTab(onDismiss: () -> Unit) {
     var clearAllArmed by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
+    // The other screen, when there is one: a display manager call, read once rather than per recomposition.
+    val displays = remember { TaskManager.displayIds(context) }
     val press = rememberGamepadTouch()
     // Row 0 is Clear all apps, then one row per app.
     val index = focusIndex.coerceIn(0, apps.size)
@@ -147,7 +151,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
             }
             SharedRunningAppsList(
                 apps = apps,
-                displays = TaskManager.displayIds(context),
+                displays = displays,
                 selectedIndex = index,
                 clearLabel = if (index == 0 && message != null) message else "Clear all",
                 rowMessage = { i -> if (i + 1 == index) message else null },
@@ -189,8 +193,12 @@ fun SharedRunningAppsList(
         SharedTaskAction(clearLabel, selectedIndex == 0, onClear)
         apps.forEachIndexed { i, app ->
             val selected = selectedIndex == i + 1
+            // The pad's cursor is virtual (the Quick Menu's index), so the scrolling column is asked to show
+            // the selected row, as MenuRow does for the rows this list replaced.
+            val bringIntoView = remember { BringIntoViewRequester() }
+            LaunchedEffect(selected) { if (selected) bringIntoView.bringIntoView() }
             Row(
-                modifier = Modifier.fillMaxWidth().clip(MenuTokens.RowShape)
+                modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoView).clip(MenuTokens.RowShape)
                     .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
                     .clickable { onSwitch(i, app) }.heightIn(min = MenuTokens.RowMinHeight),
                 verticalAlignment = Alignment.CenterVertically,
@@ -200,7 +208,8 @@ fun SharedRunningAppsList(
                     Text(app.label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                     Text(rowMessage(i) ?: TaskPolicy.displayLabel(app.displayId), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                 }
-                if (displays.any { it != app.displayId }) SharedTaskAction("Switch to", false) { onMove(i, app) }
+                // A tap on the row switches to the app; this asks for it on the other screen.
+                if (displays.any { it != app.displayId }) SharedTaskAction("Move", false) { onMove(i, app) }
                 SharedTaskAction("Close", false) { onClose(i, app) }
             }
         }
