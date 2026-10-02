@@ -2572,9 +2572,34 @@ a close path of its own. Every call works off the main thread.
   (audio hand-off, display cover, ledger). For an open app that resumes its task; whether Android also
   moves the task to the other display is Android's decision, so the UI says "asked", not "moved". There
   is no shell-side `move-task` fallback.
-- **The Quick Menu's Apps tab.** One row per running app (icon, name, which screen). A switches to it
-  on the screen it is on, X closes it, Y asks for it on the other screen when there is one, B closes
-  the menu. The same rows are touch targets, and the hint row's pills are the touch route to X and Y.
+- **The Quick Menu's Apps tab.** First row Clear all apps (below), then one row per running app (icon,
+  name, which screen). A switches to it on the screen it is on, X closes it, Y asks for it on the other
+  screen when there is one, B closes the menu. The same rows are touch targets, and the hint row's pills are the touch route to X and Y.
+- **Clear all apps: one action, four surfaces** (tracker#252). `TaskManager.clearAllTargets` reads the
+  list fresh and applies `TaskPolicy.clearAllTargets`; `TaskManager.clearAll` closes each target by the
+  one close path and returns a `ClearAllSummary` whose sentence says how many were closed, how many
+  were only asked, and how many failed (and, for the last two, `ENABLE_HINT`). Every surface calls those
+  two functions and adds only its own presentation:
+  - **Never closed by Clear all:** droidtop (its shell and the companion are its own tasks), Enginehost
+    (it may be hosting a running game; closing it by name from the list is still allowed), the system UI,
+    any installed home app, and packages in `ProtectedApps` (the user's own set, a string set in
+    droidtop's preferences); marking a package protected has no screen yet.
+  - **A confirm only when it matters:** more than `CONFIRM_CLEAR_ALL_ABOVE` (3) targets, the count in the
+    question. The Quick Menu's Apps tab and the System tab use the shell's arm-then-press-again step
+    (System arms when the last read is not known either); the companion asks inline with Close them and
+    Cancel; Standard shows a dialog.
+  - **Quick Menu:** the first row of the Apps tab, and a "Close all apps" tile on the System tab beside
+    "Close <app>". **Companion:** a "Clear all apps" pill above the running-apps row; touch only, no
+    controller focus (tracker#186), and the switch tap launches on the app's own screen so the
+    companion never moves what the user opened (tracker#243). **Standard:** "Close all apps" in the mode
+    switcher's menu (the dialog the home screen's long-press, long Back and the taskbar already open)
+    and as a gesture-slot action, both through `ClearAllApps`, a translucent activity that shows the
+    confirm after the list is read and ends with a toast.
+  - **What it can and cannot do is stated in the result,** not before: with the Shizuku plugin it closes
+    for real and says "Closed N apps."; without it, it asks Android to end each app's background
+    processes, says it cannot confirm that, and names the plugin. A list from `LAUNCHED_ONLY` can
+    include an app the user already closed, so Clear all may ask Android about it too; that is
+    harmless.
 
 ## 4a. Networking & VPN (directed 2026-08-30)
 

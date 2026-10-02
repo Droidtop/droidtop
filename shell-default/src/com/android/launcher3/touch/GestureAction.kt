@@ -40,6 +40,9 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
      * global action (docs/SPEC.md, Standard mode "Recents").
      */
     OPEN_RECENTS(R.string.gesture_action_open_recents, R.string.gesture_action_open_recents_summary),
+
+    /** The task manager's Clear all apps (docs/SPEC.md "The task manager"): it asks first when more than a few would close. */
+    CLEAR_ALL_APPS(R.string.gesture_action_clear_all_apps, R.string.gesture_action_clear_all_apps_summary),
     ;
 
     fun getDisplayName(context: Context): String = context.getString(displayNameRes)
@@ -62,6 +65,10 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
         }
         OPEN_RECENTS -> {
             performGlobal(launcher, AccessibilityService.GLOBAL_ACTION_RECENTS)
+            true
+        }
+        CLEAR_ALL_APPS -> {
+            dev.droidtop.shell.standard.ClearAllApps.open(launcher)
             true
         }
     }

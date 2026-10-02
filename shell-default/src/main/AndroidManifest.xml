@@ -210,6 +210,18 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!--
+          Standard's Clear all apps (ClearAllApps): reads what is running, asks first when
+          more than a few apps would close, and ends with a toast. Its own task and translucent,
+          like the mode switcher, so it shows over whatever was on screen.
+        -->
+        <activity
+            android:name="dev.droidtop.shell.standard.ClearAllAppsActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity android:name="com.android.launcher3.widgetpicker.WidgetPickerActivity"
             android:theme="@style/WidgetPickerActivityTheme"
             android:excludeFromRecents="true"

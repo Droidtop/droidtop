@@ -73,6 +73,34 @@ object TaskManager {
             outcome
         }
 
+    /**
+     * Every app Clear all would close right now: the list as the system gives it, minus [protectedNow].
+     * Reads fresh, so the count a confirm shows is the count that will be closed.
+     */
+    suspend fun clearAllTargets(context: Context): List<RunningApp> =
+        withContext(Dispatchers.IO) {
+            TaskPolicy.clearAllTargets(refreshNow(context).apps, protectedNow(context))
+        }
+
+    /** Closes [targets] (from [clearAllTargets]) one after another, re-reads the list, and says what came of it. */
+    suspend fun clearAll(context: Context, targets: List<RunningApp>): ClearAllSummary =
+        withContext(Dispatchers.IO) {
+            val summary = closer(context).closeAll(targets.map { it.packageName })
+            refreshNow(context)
+            summary
+        }
+
+    /**
+     * How many apps Clear all would close by the last list read, null before any read. For a surface that
+     * must decide whether to ask first without waiting for a fresh read: it asks when this is null.
+     */
+    fun knownClearAllCount(context: Context): Int? =
+        snapshot.value?.let { TaskPolicy.clearAllTargets(it.apps, protectedNow(context)).size }
+
+    /** The packages Clear all leaves alone: see [TaskPolicy.protectedPackages]. */
+    fun protectedNow(context: Context): Set<String> =
+        TaskPolicy.protectedPackages(context.packageName, homePackages(context), ProtectedApps.get(context))
+
     /** What the user can do right now, so a surface can say what is missing. Asks the plugin registry, so not for the main thread. */
     fun privileges(): TaskPrivileges = ops.available()
 

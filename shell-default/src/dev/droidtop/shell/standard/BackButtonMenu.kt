@@ -155,6 +155,7 @@ object BackButtonMenu {
         }
         addRow(SETTINGS_ITEM) { openGlobalSettings(activity) }
         addRow(REINIT_DISPLAYS_ITEM) { reinitializeDisplays(activity) }
+        addRow(CLEAR_ALL_APPS_ITEM) { ClearAllApps.open(activity) }
 
         root.addView(
             View(activity).apply {
@@ -217,6 +218,13 @@ object BackButtonMenu {
      * shortcut plumbing, just making the existing recovery findable.
      */
     private const val REINIT_DISPLAYS_ITEM = "Reinitialize displays"
+
+    /**
+     * Standard's route to the task manager's Clear all apps (docs/SPEC.md "The task manager",
+     * tracker#252): this is the one menu every mode and the home screen's long-press already open,
+     * so the way out of a stuck app is findable without a gesture nobody is told about.
+     */
+    private const val CLEAR_ALL_APPS_ITEM = "Close all apps"
 
     /**
      * Re-sends the existing HARD display reinit

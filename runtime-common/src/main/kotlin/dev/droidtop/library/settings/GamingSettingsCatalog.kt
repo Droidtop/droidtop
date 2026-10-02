@@ -60,6 +60,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_SWITCH_MODE = "pref_gaming_system_switch_mode"
     const val ID_SYSTEM_OPEN_SETTINGS = "pref_gaming_system_open_settings"
     const val ID_SYSTEM_CLOSE_APP = "action_system_close_app"
+    const val ID_SYSTEM_CLEAR_ALL = "action_system_clear_all_apps"
     const val ID_SYSTEM_DND = "pref_gaming_system_dnd"
     const val ID_SYSTEM_DND_GRANT = "pref_gaming_system_dnd_grant"
     const val ID_SYSTEM_ADAPTIVE = "pref_gaming_system_adaptive"
@@ -453,6 +454,22 @@ object GamingSettingsCatalog {
                         ),
                     )
                 }
+                // Every app but droidtop, Enginehost and what the user protected (docs/SPEC.md "The task
+                // manager", tracker#252). The arm-then-confirm step applies when more than a few would
+                // close, or when the last list read is not known yet, since the count is not known either.
+                val known = dev.droidtop.runtime.tasks.TaskManager.knownClearAllCount(context)
+                add(
+                    AsyncActionItem(
+                        id = ID_SYSTEM_CLEAR_ALL,
+                        title = "Close all apps",
+                        subtitle = "Ends every other app, except Enginehost and the ones you protected",
+                        confirmTitle = if (known == null || dev.droidtop.runtime.tasks.TaskPolicy.needsClearAllConfirm(known)) "Close all apps?" else null,
+                        run = { ctx, _ ->
+                            val targets = dev.droidtop.runtime.tasks.TaskManager.clearAllTargets(ctx)
+                            dev.droidtop.runtime.tasks.TaskManager.clearAll(ctx, targets).message
+                        },
+                    ),
+                )
                 add(
                     ActionItem(
                         id = ID_SYSTEM_NETWORK,

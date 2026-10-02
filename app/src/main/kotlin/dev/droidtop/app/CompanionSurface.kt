@@ -103,6 +103,8 @@ fun CompanionSurface(
             // Continue-playing rail: tap a recent game to launch it,
             // through the one real launch path -- see CompanionRecents.
             CompanionRecents()
+            // What is running, with close and Clear all apps, touch only: the shared task manager.
+            CompanionTasks()
         }
         // Starts exactly where the measured block above ends (that
         // block already carries its own 24dp top padding) -- not a
