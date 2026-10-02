@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.query
 
+import dev.droidtop.shell.gamepad.getGamesScreen
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
@@ -41,14 +42,18 @@ import dev.droidtop.library.LibraryEntry
 import java.io.File
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.GameSources
+import dev.droidtop.library.integrations.GetGamesContext
+import dev.droidtop.library.integrations.GetGamesEntry
+import dev.droidtop.library.integrations.GetMoreState
+import dev.droidtop.library.integrations.PluginGameSource
 import dev.droidtop.library.integrations.PluginSearchAggregator
 import dev.droidtop.library.integrations.SourceHit
 import dev.droidtop.library.integrations.SourceOutcome
 import dev.droidtop.library.integrations.UnavailableSource
 import dev.droidtop.library.integrations.hits
 import dev.droidtop.library.settings.CatalogScreen
-import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
+import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.MenuHint
 import dev.droidtop.shell.gamepad.MenuPanel
@@ -271,6 +276,8 @@ internal fun LibrarySearchDialog(
     // Bumped to search again after the person fixed something (installed a runtime, approved a plugin).
     var searchTick by remember { mutableIntStateOf(0) }
     var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
+    // What a failed source's plugin reported in its own words, shown on request under its plain sentence (Droidtop/tracker#167).
+    var technicalDetails by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     val sourceHits = remember(outcomes) { outcomes.hits() }
 
     // Debounced fan-out: a keystroke doesn't itself trigger a plugin round
@@ -380,25 +387,31 @@ internal fun LibrarySearchDialog(
                     },
                 )
                 if (!searching) {
-                    val openPlugins = { activeCatalog = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID) }
-                    if (outcomes.isEmpty()) {
-                        // No source answered because none can: say which of the two cases it is.
-                        if (unavailable.isEmpty()) {
-                            SourceNote("No download source is installed.")
-                            MenuRow(
-                                title = "Install a download source",
-                                subtitle = "Opens Settings > Accounts and sources > Plugins",
-                                onClick = openPlugins,
-                            )
-                        } else {
-                            unavailable.forEach { SourceNote("${it.label} ${it.reason}") }
-                            MenuRow(title = "Open Plugins", subtitle = "Approve or turn on a download source", onClick = openPlugins)
-                        }
+                    // No source answered because none can: say which of the two cases it is. Every state ends at the
+                    // one Get games entry below, which leads to Plugins when there is nothing to browse.
+                    val state = GetMoreState.of(outcomes, unavailable)
+                    when (state) {
+                        GetMoreState.NO_SOURCE -> SourceNote("No download source is installed.")
+                        GetMoreState.NOT_READY -> unavailable.forEach { SourceNote("${it.label} ${it.reason}") }
+                        else -> Unit
                     }
                     outcomes.forEach { outcome ->
                         when {
                             outcome.failure != null -> {
                                 SourceNote("${outcome.source.label}: ${outcome.failure}")
+                                val pluginId = (outcome.source as? PluginGameSource)?.source?.record?.manifest?.id
+                                if (pluginId != null) {
+                                    technicalDetails[pluginId]?.let { SourceNote(it) } ?: MenuRow(
+                                        title = "Technical details",
+                                        subtitle = "What the plugin reported, for its developer",
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                val detail = withContext(Dispatchers.IO) { PluginStore.disabledDetail(context, pluginId) }
+                                                technicalDetails = technicalDetails + (pluginId to (detail ?: "The plugin reported nothing more."))
+                                            }
+                                        },
+                                    )
+                                }
                                 outcome.source.settingsScreen()?.let { settings ->
                                     MenuRow(title = "Open ${outcome.source.label} settings", onClick = { activeCatalog = settings })
                                 }
@@ -438,6 +451,11 @@ internal fun LibrarySearchDialog(
                             )
                         }
                     }
+                    MenuRow(
+                        title = GetGamesEntry.LABEL,
+                        subtitle = GetGamesEntry.searchSubtitle(state),
+                        onClick = { activeCatalog = getGamesScreen(GetGamesContext.SEARCH, systemId) },
+                    )
                 }
                 sourceHits.forEach { hit ->
                     MenuRow(

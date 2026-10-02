@@ -170,6 +170,8 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(scraperScreen())
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
+        // The one "Get games" screen every menu opens (docs/SPEC.md 12a "Get games everywhere").
+        SettingsScreenRegistry.register(AcquireContentSources.chooseSystemScreen())
         SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(pluginKeysScreen())
         SettingsScreenRegistry.register(PluginJobsScreen.screen())
@@ -2008,6 +2010,31 @@ object AppSettingsCatalogs {
             // are the action; keep the trust/status row for plugins that already have a decision.
             if (record.trust != PluginTrustState.PENDING) {
                 add(ActionItem(id = "plugin_${m.id}_status", title = statusLine, subtitle = trustLine, run = {}))
+            }
+            // The headline above is a plain sentence; what the plugin actually reported is one press away,
+            // for its developer or a bug report (docs/SPEC.md 12a, Droidtop/tracker#167).
+            val detail = record.disabledDetail
+            if (record.disabledReason != null && detail != null) {
+                add(
+                    NestedScreenItem(
+                        id = "plugin_${m.id}_detail",
+                        title = "Technical details",
+                        subtitle = "What the plugin reported, for its developer",
+                        inline = CatalogScreen(
+                            id = "plugin_${m.id}_detail_screen",
+                            title = "Technical details",
+                            groups = { _ ->
+                                listOf(
+                                    CatalogGroup(
+                                        id = "plugin_${m.id}_detail_group",
+                                        title = null,
+                                        items = listOf(ActionItem(id = "plugin_${m.id}_detail_text", title = "${m.label} reported", subtitle = detail, run = {})),
+                                    ),
+                                )
+                            },
+                        ),
+                    ),
+                )
             }
             resolution.waiting[m.id]?.let { missing ->
                 add(

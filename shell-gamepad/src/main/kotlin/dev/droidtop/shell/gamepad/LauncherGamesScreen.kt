@@ -171,6 +171,7 @@ private fun GamesGrid(
                             )
                             LaunchedEffect(Unit) { requestFocusWhenAttached(emptyAction, "Launcher games empty") }
                         }
+                        GetGamesChip(dev.droidtop.library.integrations.GetGamesContext.EMPTY_STATE)
                     }
                 }
                 else -> {

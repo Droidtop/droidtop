@@ -140,6 +140,9 @@ object AcquireContentSources {
     /** The registered settings screen id of Accounts and sources > Plugins: where "no source" and "needs approval" lead. */
     const val PLUGINS_SCREEN_ID = "plugins"
 
+    /** The registered id of the one "Get games" screen every menu opens (see [chooseSystemScreen]); deep-link it with a console system id. */
+    const val GET_GAMES_SCREEN_ID = "get_games"
+
     /** The registered settings screen id of Accounts and sources > App integrations. */
     const val INTEGRATIONS_SCREEN_ID = "integrations"
 
@@ -246,14 +249,20 @@ object AcquireContentSources {
     }
 
     /**
-     * "Get games" from a list that is not one console system (All games, the PC list): asks which
-     * system to download for, then opens that system's own [systemScreen]. With no source it says so
-     * and leads to Plugins instead of an empty list of systems.
+     * The registered "Get games" screen (docs/SPEC.md 12a "Get games everywhere"): the ONE screen every
+     * menu, page, empty state and the search dialog opens, through
+     * `SettingsScreenRegistry.get(GET_GAMES_SCREEN_ID, systemId)`. With no system id it asks which
+     * system to download for, then opens that system's own [systemScreen]; deep-linked at a console
+     * system id it opens that system's [systemScreen] directly. With no source it says so and leads to
+     * Plugins instead of an empty list of systems.
      */
     fun chooseSystemScreen(): CatalogScreen = CatalogScreen(
-        id = "acquire_choose_system",
+        id = GET_GAMES_SCREEN_ID,
         title = "Get games",
         subtitle = "Pick the system to download for",
+        forDeepLink = { systemId -> deepLinkedSystemScreen(systemId) },
+        // Settings search must not walk the systems' folders to index a screen that is entered from a menu.
+        indexGroups = { emptyList() },
         groups = { context ->
             withContext(Dispatchers.IO) {
                 if (available(context).isEmpty()) {
@@ -268,14 +277,7 @@ object AcquireContentSources {
                             id = "acquire_choose_systems",
                             title = null,
                             items = if (targets.isEmpty()) {
-                                listOf(
-                                    ActionItem(
-                                        id = "acquire_choose_none",
-                                        title = "No system folders yet",
-                                        subtitle = "Downloads go into a system's own folder. Add a games folder under Settings > Game folders first.",
-                                        run = {},
-                                    ),
-                                )
+                                listOf(noFolderItem("acquire_choose_none", "No system folders yet"))
                             } else {
                                 targets.map { (folder, system) ->
                                     NestedScreenItem(
@@ -290,6 +292,32 @@ object AcquireContentSources {
                 }
             }
         },
+    )
+
+    /** [systemScreen] for a system known only by id: its name and folder are read when the screen opens, off the main thread. */
+    private fun deepLinkedSystemScreen(systemId: String): CatalogScreen = CatalogScreen(
+        id = "acquire_system_$systemId",
+        title = "Get games",
+        indexGroups = { emptyList() },
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+                val name = systemsById[systemId]?.displayName ?: systemId
+                val folder = SystemFolders.all(context, systemsById).firstOrNull { (_, system) -> system.id == systemId }?.first
+                if (folder == null) {
+                    listOf(CatalogGroup(id = "acquire_no_folder", title = null, items = listOf(noFolderItem("acquire_no_folder_$systemId", "No folder for $name in any games root"))))
+                } else {
+                    systemScreen(systemId, name, folder).groups(context)
+                }
+            }
+        },
+    )
+
+    private fun noFolderItem(id: String, title: String) = ActionItem(
+        id = id,
+        title = title,
+        subtitle = "Downloads go into a system's own folder. Add a games folder under Settings > Game folders first.",
+        run = {},
     )
 
     private fun jsonSourceItem(

@@ -2,9 +2,7 @@ package dev.droidtop.shell.gamepad
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -22,13 +20,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
-import dev.droidtop.library.integrations.AcquireContentSources
+import dev.droidtop.library.integrations.GetGamesContext
+import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -216,12 +214,18 @@ internal fun GamelistOptionsMenu(
     val orphansLabel = if (orphansArmed) ORPHANS_DELETE else ORPHANS_FIND
 
     val libraryScope = groupKey.isEmpty()
+    val getGamesContext = when {
+        libraryScope -> GetGamesContext.LIBRARY
+        systemId == PC_SYSTEM_ID -> GetGamesContext.PC
+        systemId != null -> GetGamesContext.SYSTEM
+        else -> GetGamesContext.COLLECTION
+    }
     val searchRowLabel = if (searchText.isBlank()) "Search" else "Search: ${searchText.trim()}"
     var searchOpen by remember { mutableStateOf(false) }
     val actions = buildList {
         if (libraryScope) {
             // The library-wide actions that used to live in Settings.
-            add("Get games")
+            add(GetGamesEntry.LABEL)
             add("Rescan library")
             add("Scrape all systems")
             add(orphansLabel)
@@ -252,7 +256,7 @@ internal fun GamelistOptionsMenu(
             }
             // Wherever games are listed, not only one console system: All games and the PC list ask
             // which system to download for (rig, 2026-09-30: the entry was unreachable from the Games tab).
-            add("Get games")
+            add(GetGamesEntry.LABEL)
             // Offered wherever PC or engine games are actually on
             // screen, which is the same "act on what you are looking
             // at" placement every other action here uses. Those groups
@@ -414,23 +418,10 @@ internal fun GamelistOptionsMenu(
                     onScraped()
                 }
             }
-            "Get games" -> {
-                if (busy) return
-                val id = systemId
-                if (id == null || id == PC_SYSTEM_ID) {
-                    acquireScreen = AcquireContentSources.chooseSystemScreen()
-                    return
-                }
-                busy = true
-                scope.launch {
-                    val folder = withContext(Dispatchers.IO) { consoleFoldersFor(id).firstOrNull() }
-                    busy = false
-                    if (folder == null) {
-                        status = "No folder for $groupLabel in any games root."
-                    } else {
-                        acquireScreen = AcquireContentSources.systemScreen(id, groupLabel, folder)
-                    }
-                }
+            GetGamesEntry.LABEL -> {
+                // One screen for every list: with a console system it opens that system's sources, otherwise it asks which system.
+                val screen = getGamesScreen(getGamesContext, systemId)
+                if (screen != null) acquireScreen = screen else status = "Get games isn't available."
             }
             PC_SETUP -> {
                 onDismiss()
@@ -457,30 +448,16 @@ internal fun GamelistOptionsMenu(
 
     val openAcquireScreen = acquireScreen
     if (openAcquireScreen != null) {
-        val window = LocalShellWindow.current
-        Dialog(
-            onDismissRequest = { acquireScreen = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            // Keep the catalog sheet inside Gaming's content area, clear
-            // of the persistent top and bottom bars.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = window.frameBarHeight, bottom = window.frameBarHeight),
-            ) {
-                CatalogNavigator(
-                    root = openAcquireScreen,
-                    onExit = {
-                        acquireScreen = null
-                        // A download may have just landed a real file in
-                        // this system's folder -- rescan so it shows up,
-                        // same as every other library-changing action here.
-                        onScraped()
-                    },
-                )
-            }
-        }
+        CatalogSheet(
+            root = openAcquireScreen,
+            onExit = {
+                acquireScreen = null
+                // A download may have just landed a real file in
+                // this system's folder -- rescan so it shows up,
+                // same as every other library-changing action here.
+                onScraped()
+            },
+        )
         return
     }
 

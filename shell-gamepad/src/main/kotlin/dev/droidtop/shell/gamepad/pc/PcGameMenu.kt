@@ -147,6 +147,7 @@ internal fun PcGameMenu(
     var pickingEngine by remember(entry) { mutableStateOf(false) }
     var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
     var importingLutris by remember(entry) { mutableStateOf(false) }
+    var gettingGames by remember(entry) { mutableStateOf(false) }
     var wineSettings by remember(entry) { mutableStateOf<WineGameSettings?>(null) }
     var protonDb by remember(entry) { mutableStateOf<ProtonDbState>(ProtonDbState.NotAsked) }
     // Which page of the menu is showing and which row of it the cursor is
@@ -294,6 +295,14 @@ internal fun PcGameMenu(
                 onDismiss = { pickingEngine = false },
             )
         }
+        return
+    }
+    if (gettingGames) {
+        // The one Get games screen (docs/SPEC.md 12a "Get games everywhere"), asking which system.
+        dev.droidtop.shell.gamepad.GetGamesSheet(
+            dev.droidtop.library.integrations.GetGamesContext.PC,
+            onDismiss = { gettingGames = false },
+        )
         return
     }
     if (importingLutris) {
@@ -713,6 +722,7 @@ internal fun PcGameMenu(
                         ),
                     )
                 }
+                add(PcMenuEntry.Row(PcActionRow(dev.droidtop.library.integrations.GetGamesEntry.LABEL, "More games from your download sources") { gettingGames = true }))
                 add(PcMenuEntry.Row(PcActionRow("Close", "", onClose)))
             }
             PcMenuPage.About -> {

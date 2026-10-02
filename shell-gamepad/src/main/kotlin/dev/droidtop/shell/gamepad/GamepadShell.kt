@@ -1475,6 +1475,11 @@ private fun EntryDetailScreen(
             if (isRomEntry) {
                 ShellChip("Choose match", onClick = { pickingMatch = true })
             }
+            // More games for this game's own system (an app's page asks which system).
+            GetGamesChip(
+                dev.droidtop.library.integrations.GetGamesContext.GAME_PAGE,
+                systemId = entry.systemId.takeIf { isRomEntry },
+            )
             if (media.size > 1) {
                 ShellChip("View media (${media.size})", onClick = { viewingMedia = true })
             }
@@ -2423,6 +2428,7 @@ private fun GamesSection(
                                 )
                                 LaunchedEffect(Unit) { requestFocusWhenAttached(emptyAction, "Games empty") }
                             }
+                            GetGamesChip(dev.droidtop.library.integrations.GetGamesContext.EMPTY_STATE, onChanged = onRequestRescan)
                         }
                     }
                 } else {
@@ -3006,6 +3012,13 @@ private fun AppsSection(
                 )
             }
             firstAssigned = true
+        }
+        // Games are not apps, but this is where a person on the Apps tab looks for more of anything.
+        item(key = "get_games") {
+            GetGamesChip(
+                dev.droidtop.library.integrations.GetGamesContext.APPS,
+                modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding),
+            )
         }
     }
 }

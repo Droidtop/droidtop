@@ -13170,12 +13170,40 @@ without its runtime said "Running". Decisions:
   and the catalog screen says "No catalog is published yet" and points at
   Install plugin file; any other failure still shows its reason. The
   droidtop-platforms generator for the index is still not built (above).
-- **"Get games" is offered wherever games are listed.** From All games
-  and the PC list it opens `AcquireContentSources.chooseSystemScreen`
-  (which system to download for, then that system's own screen); from one
-  console system it opens that system's screen as before. With no source
-  the screen says so in plain words and leads to Plugins and App
-  integrations (it used to name the capability id).
+- **"Get games" is offered everywhere, and it runs in search (owner,
+  2026-10-01: "Get Games should be offered from EVERY menu, and it should
+  also run in the global search bar").** One registered screen
+  (`AcquireContentSources.GET_GAMES_SCREEN_ID`, built by
+  `chooseSystemScreen`, registered in `AppSettingsCatalogs`) is what every
+  entry opens, through `SettingsScreenRegistry.get(id, systemId)`: with no
+  system id it asks which system to download for, then opens that system's
+  own source screen; deep-linked at a console system id it opens that
+  system's screen directly; with no source it says so in plain words and
+  leads to Plugins and App integrations. `GetGamesEntry` (`library-core`,
+  pure) holds the label and the one rule for which contexts know their
+  system (`systemFor`: a system's menu, a game's page, an empty state
+  and a scoped search do; All games, a collection, PC Games, Apps ask; the PC list is never a destination). `getGamesScreen`,
+  `GetGamesSheet`, `GetGamesChip` and `CatalogSheet` (`GetGames.kt`,
+  :shell-gamepad) are the one way a surface hosts it, bounded by the
+  persistent shell bars. Offered from: the Select menu of All games, every
+  system, every collection and PC Games; the Apps section; a console
+  game's or app's page and a PC game's menu; the empty-library states
+  (Games, the launcher's Games grid, PC shelves); and the search dialog.
+  It is a contextual action, not a system setting (owner, 2026-10-01), so
+  it is deliberately not in the Quick Menu or any System group. A new surface (the left menu) adds a row that
+  calls `getGamesScreen`; it never builds its own screen.
+  **In search**, the shared search dialog (PC library, console lists, the
+  launcher search) already queries every runnable source off the main
+  thread while the local results show; its "Get more" group now shows one
+  outcome line per source, then a Get games entry whose subtitle follows
+  `GetMoreState` (no source, not ready, failed, no match, found). The
+  group's own "Install a download source" and "Open Plugins" rows are
+  gone: the Get games entry is the one route to Plugins.
+- **Failure text is plain, the detail is one press away (#167).** A
+  plugin's disabled reason is the plain sentence
+  (`PluginLoadErrorMessage`); the raw reason is kept in the log and in
+  `PluginRecord.disabledDetail`, shown under "Technical details" on the
+  plugin page and on a failed source row in search.
 - **One entry for downloads and jobs.** "Downloads and installs" in
   Settings is the single entry for the jobs screen (it carries that title
   now); the second "Jobs" row under Accounts and sources is gone.
