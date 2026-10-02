@@ -292,8 +292,12 @@ class SecondScreenOrchestrator(
                     shellStarted = host.shellStarted(),
                     coverCoveredDisplayId = SecondaryDisplayActivity.coveredDisplayId,
                 )
+                // Only the idle cover's state is stale once the shell is in front on the second
+                // screen. The companion cover belongs to the OTHER screen and must survive this
+                // pass: clearing it here let the companion replace an app the user started on its
+                // screen while the shell was in front (tracker#274).
                 if (DualScreenOrchestration.shellIsOnSecond(currentDisplay, second?.androidDisplayId) && host.shellStarted()) {
-                    giveScreensBack()
+                    SecondaryDisplayActivity.clearCovered()
                 }
                 val parked = host.parkedDisplayId() ?: userApp
                 // The companion's own screen (the built-in one while the shell is

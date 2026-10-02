@@ -3213,7 +3213,9 @@ focused display back. The cover and the companion stay `FLAG_NOT_FOCUSABLE` (#18
 `PadGate` also drops keys it makes up (a held stick's repeats, a Select hold) and releases what is
 held whenever the shell is not the top resumed activity, because those are delivered straight into
 the window and would otherwise keep driving the shell, Start's left menu (#258) included, while an
-emulator on the other screen has the pad. Where the system still keeps the focused display on the
+emulator on the other screen has the pad. The pass that runs while the shell is in front on the add-on
+clears only the idle cover's state, never the companion's: clearing `CompanionCover` there let the companion
+start over an app the user had opened on its screen (tracker#274). Where the system still keeps the focused display on the
 shell (an app that was already running, brought forward by Android itself), touching the app's
 screen moves it; that is the supported route and nothing droidtop does fights it.
 
