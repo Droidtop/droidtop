@@ -687,12 +687,7 @@ private fun pageRows(
     add(PageFact("Play time", playtimeLine(entry.playtimeSeconds, entry.playCount)))
     entry.lastPlayedEpochMs?.let { last ->
         add(
-            PageFact(
-                "Last played",
-                android.text.format.DateUtils.getRelativeTimeSpanString(
-                    last, now, android.text.format.DateUtils.DAY_IN_MILLIS,
-                ).toString(),
-            ),
+            PageFact("Last played", lastPlayedPhrase(now, last).replaceFirstChar { c -> c.uppercase() }),
         )
     }
     entry.pcInfo?.let { pc ->
@@ -795,18 +790,12 @@ private fun folderSizeBytes(path: String): Long {
 }
 
 /**
- * "2 h 15 min, played 7 times", "Never played". Pure, for the tests.
+ * "2 h 15 min, played 7 times", "Never played": the one play-time sentence of
+ * the facts strip and the Details tab. Pure, for the tests.
  */
 internal fun playtimeLine(seconds: Long, playCount: Int): String {
     if (seconds <= 0 && playCount <= 0) return "Never played"
-    val hours = seconds / 3600
-    val minutes = (seconds % 3600) / 60
-    val time = when {
-        seconds <= 0 -> null
-        hours > 0 -> "$hours h $minutes min"
-        minutes > 0 -> "$minutes min"
-        else -> "Under a minute"
-    }
+    val time = playtimeShort(seconds).takeIf { seconds > 0 }
     val times = when (playCount) {
         0 -> null
         1 -> "played once"
@@ -957,7 +946,7 @@ internal fun factsStrip(
     formatSize: (Long) -> String,
 ): List<Pair<String, String>> = listOfNotNull(
     "Last played" to (entry.lastPlayedEpochMs?.let { lastPlayedPhrase(now, it).replaceFirstChar { c -> c.uppercase() } } ?: "Never"),
-    "Play time" to playtimeShort(entry.playtimeSeconds),
+    "Play time" to playtimeLine(entry.playtimeSeconds, entry.playCount),
     versionFact(installedVersion, entry.availableUpdate)?.let { "Version" to it },
     (folderSizeBytes ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { "Size" to formatSize(it) },
     runsWith?.takeIf { it.isNotBlank() }?.let { "Runs with" to it },

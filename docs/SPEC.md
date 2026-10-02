@@ -9219,7 +9219,9 @@ structure, top to bottom, drawn only from theme tokens:
   Play time, Version (the installed version against the latest known:
   "0.9.5, v0.9.6 is available", the one wording of `GameUpdates.line`), Size
   and Runs with, only those that exist. It scrolls sideways rather than
-  clipping at a large text size. Under it the one line saying why the
+  clipping at a large text size. Last played and Play time are said by the
+  same two functions (`lastPlayedPhrase`, `playtimeLine`) in the strip and in
+  the Details tab, so the two never disagree. Under it the one line saying why the
   primary action is what it is. In portrait the strip sits under the
   buttons. While the cursor is in the rows the band keeps only the buttons.
   Store games have no installed or latest version until #222 gives them

@@ -205,7 +205,7 @@ class PcPageAboutTest {
         )
 
         val bare = factsStrip(entry(), now, folderSizeBytes = null, installedVersion = null, runsWith = null, formatSize = { "$it B" })
-        assertEquals(listOf("Last played" to "Never", "Play time" to "Not played yet"), bare)
+        assertEquals(listOf("Last played" to "Never", "Play time" to "Never played"), bare)
     }
 
     @Test
