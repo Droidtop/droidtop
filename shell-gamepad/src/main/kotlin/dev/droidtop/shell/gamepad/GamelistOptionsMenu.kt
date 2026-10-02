@@ -2,7 +2,9 @@ package dev.droidtop.shell.gamepad
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -20,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.importGamelistXml
@@ -454,17 +457,29 @@ internal fun GamelistOptionsMenu(
 
     val openAcquireScreen = acquireScreen
     if (openAcquireScreen != null) {
-        Dialog(onDismissRequest = { acquireScreen = null }) {
-            CatalogNavigator(
-                root = openAcquireScreen,
-                onExit = {
-                    acquireScreen = null
-                    // A download may have just landed a real file in
-                    // this system's folder -- rescan so it shows up,
-                    // same as every other library-changing action here.
-                    onScraped()
-                },
-            )
+        val window = LocalShellWindow.current
+        Dialog(
+            onDismissRequest = { acquireScreen = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            // Keep the catalog sheet inside Gaming's content area, clear
+            // of the persistent top and bottom bars.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = window.frameBarHeight, bottom = window.frameBarHeight),
+            ) {
+                CatalogNavigator(
+                    root = openAcquireScreen,
+                    onExit = {
+                        acquireScreen = null
+                        // A download may have just landed a real file in
+                        // this system's folder -- rescan so it shows up,
+                        // same as every other library-changing action here.
+                        onScraped()
+                    },
+                )
+            }
         }
         return
     }

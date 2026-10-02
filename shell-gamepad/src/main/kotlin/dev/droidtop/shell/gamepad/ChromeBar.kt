@@ -116,7 +116,12 @@ internal fun SectionTabBar(
             )
         }
     }
-    val quickMenu: @Composable () -> Unit = { QuickMenuIndicator(showLabel = !window.compact, onClick = onQuickMenu) }
+    val quickMenu: @Composable () -> Unit = {
+        QuickMenuIndicator(
+            showLabel = !window.compact && density.fontScale <= 1f,
+            onClick = onQuickMenu,
+        )
+    }
     val contextMenu: @Composable () -> Unit = { ContextMenuIndicator(contextMenuEnabled, !window.compact, onContextMenu) }
 
     Row(
@@ -293,7 +298,13 @@ private fun QuickMenuIndicator(showLabel: Boolean, onClick: () -> Unit) {
                 .opticallyCentred(MenuTokens.TabPillHeight, MaterialTheme.typography.labelLarge.fontSize),
         )
         if (showLabel) {
-            Text("Quick Menu", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+            Text(
+                "Quick Menu",
+                color = MenuTokens.OnSurfaceMuted,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                softWrap = false,
+            )
         }
     }
 }

@@ -527,14 +527,15 @@ fun CatalogNavigator(
             }
         }
         }
-        // The selected row's full text, so a row never has to grow to be
-        // readable (owner, 2026-09-30).
+        // The selected row's full title and value when the uniform row had
+        // to cut them. Its summary is already visible on the row; repeating
+        // every selected summary here wastes the sheet's content area.
         val detail = rows.getOrNull(selected)?.item?.let { item ->
             val v = catalogRowValue(item, context)
             listOfNotNull(
                 item.title.takeIf { it.length > 28 },
                 v?.takeIf { it.length > 14 },
-                (statusById[item.id] ?: item.subtitle),
+                statusById[item.id],
             ).joinToString("\n")
         }.orEmpty()
         CatalogDetailStrip(detail)

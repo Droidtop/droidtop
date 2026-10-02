@@ -9182,6 +9182,10 @@ the handful of places where the shape genuinely differs:
   scale before choosing a centred layout; when the status slots would
   crowd the tabs, it gives that space to a scrollable tab row and keeps
   the selected tab completely visible;
+- the Quick Menu label stays on one line and gives way to its R2 glyph
+  when enlarged text would crowd the bar; the Get games sheet is bounded
+  by the persistent shell bars, and its selected-row detail area does not
+  repeat a summary already shown on that row;
 - a modal panel's fixed width is capped by the window, because the half
   that falls off a phone's edge is the half with the buttons on it;
 - the **Quick Menu** is a right-edge sheet in landscape and a **bottom
