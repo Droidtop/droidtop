@@ -5,6 +5,7 @@ import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.menuMove
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -31,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
@@ -63,34 +66,46 @@ import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** One flattened row of the filter dialog: a section marker or a selectable row. */
+/** One flattened row of a sheet: a section marker or a selectable row. */
 private sealed interface FilterEntry {
     data class Header(val text: String) : FilterEntry
     data class Row(
         val title: String,
         val value: String? = null,
+        val subtitle: String? = null,
+        val chevron: Boolean = false,
         val danger: Boolean = false,
         val onLongClick: (() -> Unit)? = null,
         val onClick: (() -> Unit)? = null,
     ) : FilterEntry
 }
 
+/** A row a list adds to a sheet: a facet's own extra (Usage access under Recently used) or a foot action. */
+internal data class SheetAction(val title: String, val subtitle: String? = null, val onClick: () -> Unit)
+
+/** What the sheet counts off the main thread: the facets with their values, and how many entries show. */
+private class SheetCounts(val offers: List<FacetOffer>, val shown: Int, val total: Int)
+
 /**
- * The whole filter, sort and saved-view surface of one library list: every
- * facet the scope offers with every value the list actually holds, the
- * sort, the person's saved views (activate with A, forget with a
- * long-press), and saving the current view under a name. Entirely
- * controller-driven like every menu in this shell: Up/Down moves, A
- * activates, B closes -- and every row is a touch target too.
+ * X on a library or app list: the Filter sheet (docs/SPEC.md 7j). Two
+ * levels, both controller-first: the facets this list offers with what each
+ * is set to, and, one A deeper, a facet's values with how many entries
+ * each would show (several values of one facet add up; facets narrow each
+ * other). B goes back a level, then closes; X clears every filter. The
+ * person's saved views and "Save this view" sit on the first level. Every
+ * row is a touch target too. Counting happens off the main thread.
  */
 @Composable
-internal fun LibraryFilterDialog(
+internal fun LibraryFilterSheet(
     scope: LibraryQueryScope,
     base: List<LibraryEntry>,
     query: LibraryQuery,
@@ -98,57 +113,94 @@ internal fun LibraryFilterDialog(
     onQueryChange: (LibraryQuery) -> Unit,
     onSaveView: (String) -> Unit,
     onForgetView: (String) -> Unit,
-    onSearch: () -> Unit,
+    onSearch: (() -> Unit)?,
     onDismiss: () -> Unit,
+    facetActions: Map<LibraryFacet, List<SheetAction>> = emptyMap(),
+    footerActions: List<SheetAction> = emptyList(),
 ) {
     var focusIndex by remember { mutableIntStateOf(0) }
+    var openFacet by remember { mutableStateOf<LibraryFacet?>(null) }
+    var parentFocus by remember { mutableIntStateOf(0) }
     var naming by remember { mutableStateOf(false) }
 
-    val entries = remember(query, base, scope, savedViews) {
-        buildList {
-            add(
-                FilterEntry.Row("Sort by", value = query.sort.label) {
-                    val offered = scope.sorts
-                    val next = offered[(offered.indexOf(query.sort) + 1) % offered.size]
-                    onQueryChange(query.copy(sort = next))
-                },
-            )
-            add(FilterEntry.Row("Search", value = query.text.takeIf { it.isNotBlank() }?.let { "\"$it\"" }, onClick = onSearch))
-            scope.facets.forEach { facet ->
-                val values = facet.valuesIn(base, scope.context)
-                // A facet with no values in this list is not offered here:
-                // "runner" before the background pass has answered and
-                // "ProtonDB tier" before anything was asked have nothing to
-                // filter yet, and a list of nothing is noise, not a filter.
-                if (values.isEmpty()) return@forEach
-                add(FilterEntry.Header(facet.label))
-                values.forEach { value ->
-                    add(
-                        FilterEntry.Row(value, value = if (value in query.selected(facet)) "✓" else null) {
-                            onQueryChange(query.withToggled(facet, value, value !in query.selected(facet)))
-                        },
-                    )
-                }
-            }
-            if (savedViews.isNotEmpty()) {
-                add(FilterEntry.Header("Views"))
-                savedViews.forEach { view ->
+    val counts by produceState<SheetCounts?>(null, base, scope, query) {
+        value = withContext(Dispatchers.Default) {
+            SheetCounts(query.facetOffers(base, scope), query.applyTo(base, scope).size, query.totalIn(base, scope))
+        }
+    }
+
+    val entries = remember(query, counts, scope, savedViews, openFacet, facetActions, footerActions) {
+        buildList<FilterEntry> {
+            val facet = openFacet
+            val offers = counts?.offers.orEmpty()
+            if (facet == null) {
+                if (onSearch != null) {
                     add(
                         FilterEntry.Row(
-                            view.name,
-                            value = if (view.query == query) "✓" else null,
-                            onLongClick = { onForgetView(view.name) },
-                        ) {
-                            onQueryChange(view.query)
-                        },
+                            "Search",
+                            value = query.text.trim().takeIf { it.isNotEmpty() }?.let { "\"$it\"" },
+                            chevron = true,
+                            onClick = onSearch,
+                        ),
                     )
                 }
+                offers.forEach { offer ->
+                    val selected = query.selected(offer.facet)
+                    add(
+                        FilterEntry.Row(
+                            offer.facet.label,
+                            value = when (selected.size) {
+                                0 -> null
+                                1 -> selected.first()
+                                else -> "${selected.size} selected"
+                            },
+                            chevron = true,
+                            onClick = {
+                                parentFocus = focusIndex
+                                openFacet = offer.facet
+                                focusIndex = 0
+                            },
+                        ),
+                    )
+                }
+                if (savedViews.isNotEmpty()) {
+                    add(FilterEntry.Header("Views"))
+                    savedViews.forEach { view ->
+                        add(
+                            FilterEntry.Row(
+                                view.name,
+                                value = if (view.query == query) "✓" else null,
+                                onLongClick = { onForgetView(view.name) },
+                                onClick = { onQueryChange(view.query) },
+                            ),
+                        )
+                    }
+                }
+                if (!query.isEmpty) add(FilterEntry.Row("Clear filters", danger = true, onClick = { onQueryChange(query.cleared) }))
+                add(FilterEntry.Row("Save this view", onClick = { naming = true }))
+                footerActions.forEach { add(FilterEntry.Row(it.title, subtitle = it.subtitle, onClick = it.onClick)) }
+            } else {
+                offers.firstOrNull { it.facet == facet }?.values?.forEach { entry ->
+                    val on = entry.value in query.selected(facet)
+                    add(
+                        FilterEntry.Row(
+                            entry.value,
+                            value = (if (on) "✓ " else "") + entry.count,
+                            onClick = { onQueryChange(query.withToggled(facet, entry.value, !on)) },
+                        ),
+                    )
+                }
+                facetActions[facet].orEmpty().forEach { add(FilterEntry.Row(it.title, subtitle = it.subtitle, onClick = it.onClick)) }
+                add(
+                    FilterEntry.Row(
+                        "Back",
+                        onClick = {
+                            openFacet = null
+                            focusIndex = parentFocus
+                        },
+                    ),
+                )
             }
-            if (!query.isEmpty) {
-                add(FilterEntry.Row("Clear every filter", danger = true) { onQueryChange(query.clearFacets.copy(text = "")) })
-            }
-            add(FilterEntry.Row("Save this view") { naming = true })
-            add(FilterEntry.Row("Close", onClick = onDismiss))
         }
     }
     val rows = entries.filterIsInstance<FilterEntry.Row>()
@@ -175,46 +227,225 @@ internal fun LibraryFilterDialog(
     Dialog(onDismissRequest = onDismiss) {
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
-            focusLabel = "Filters and sort",
+            focusLabel = "Filter",
             onPad = { press ->
                 when (press.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, rows.size, press)
                     GamepadAction.A -> rows.getOrNull(focusIndex)?.onClick?.invoke()
-                    GamepadAction.B, GamepadAction.SELECT -> onDismiss()
+                    GamepadAction.B -> if (openFacet != null) {
+                        openFacet = null
+                        focusIndex = parentFocus
+                    } else {
+                        onDismiss()
+                    }
+                    GamepadAction.X -> if (!query.isEmpty) onQueryChange(query.cleared)
+                    GamepadAction.SELECT -> onDismiss()
                     else -> Unit
                 }
                 true
             },
         ) {
             Text(
-                "Filters and sort",
+                openFacet?.label ?: "Filter",
+                style = MaterialTheme.typography.titleLarge,
+                color = MenuTokens.OnSurface,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            )
+            counts?.let {
+                Text(
+                    queryCountLine(it.shown, it.total, !query.isEmpty, scope),
+                    color = MenuTokens.OnSurfaceMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            entries.forEach { entry ->
+                when (entry) {
+                    is FilterEntry.Header -> MenuSectionLabel(entry.text)
+                    is FilterEntry.Row -> MenuRow(
+                        title = entry.title,
+                        value = entry.value,
+                        subtitle = entry.subtitle,
+                        chevron = entry.chevron,
+                        danger = entry.danger,
+                        selected = rows.indexOf(entry) == focusIndex,
+                        onLongClick = entry.onLongClick,
+                        onClick = entry.onClick ?: {},
+                    )
+                }
+            }
+            HintRow(
+                bindings = listOf(
+                    HintBinding(GamepadAction.A, "Select"),
+                    HintBinding(GamepadAction.X, "Clear") { !query.isEmpty },
+                    HintBinding(GamepadAction.B, if (openFacet != null) "Back" else "Close"),
+                ),
+                background = Color.Transparent,
+            )
+        }
+    }
+}
+
+/**
+ * Y on a library or app list: the Sort By sheet (docs/SPEC.md 7j). One row
+ * per sort the list offers, the active one marked with its direction; A on
+ * the sort that is already active flips its direction, on another starts it
+ * in its natural order. A or B closes.
+ */
+@Composable
+internal fun LibrarySortSheet(
+    scope: LibraryQueryScope,
+    query: LibraryQuery,
+    onQueryChange: (LibraryQuery) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var focusIndex by remember { mutableIntStateOf(scope.sorts.indexOf(query.sort).coerceAtLeast(0)) }
+    Dialog(onDismissRequest = onDismiss) {
+        MenuPanel(
+            modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
+            focusLabel = "Sort by",
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, scope.sorts.size, press)
+                    GamepadAction.A -> {
+                        scope.sorts.getOrNull(focusIndex)?.let { onQueryChange(query.withSort(it)) }
+                        onDismiss()
+                    }
+                    GamepadAction.B, GamepadAction.Y, GamepadAction.SELECT -> onDismiss()
+                    else -> Unit
+                }
+                true
+            },
+        ) {
+            Text(
+                "Sort by",
                 style = MaterialTheme.typography.titleLarge,
                 color = MenuTokens.OnSurface,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             )
             Text(
-                "${query.applyTo(base, scope).size} of ${base.size} games shown",
+                "Pick the sort that is on again to flip its direction",
                 color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodySmall,
             )
-            entries.forEach { entry ->
-                when (entry) {
-                    is FilterEntry.Header -> MenuSectionLabel(entry.text)
-                    is FilterEntry.Row -> {
-                        val index = rows.indexOf(entry)
-                        MenuRow(
-                            title = entry.title,
-                            value = entry.value,
-                            danger = entry.danger,
-                            selected = index == focusIndex,
-                            onLongClick = entry.onLongClick,
-                            onClick = entry.onClick ?: {},
-                        )
-                    }
+            scope.sorts.forEachIndexed { index, key ->
+                val active = key == query.sort
+                MenuRow(
+                    title = scope.sortLabel(key),
+                    value = if (active) "✓ ${key.orderLabel(query.reversed)}" else key.naturalOrder,
+                    selected = index == focusIndex,
+                    onClick = {
+                        onQueryChange(query.withSort(key))
+                        onDismiss()
+                    },
+                )
+            }
+            HintRow(
+                bindings = listOf(
+                    HintBinding(GamepadAction.A, "Sort"),
+                    HintBinding(GamepadAction.B, "Close"),
+                ),
+                background = Color.Transparent,
+            )
+        }
+    }
+}
+
+/**
+ * The state line and the active-filter chips under a list's title: "12 of
+ * 80 apps · Sort: Name, A to Z" always, and while anything filters one chip
+ * per filter plus a leading Clear chip. Chips are a touch shortcut (a tap
+ * takes that filter off) and are never a D-pad stop: the pad reaches the
+ * same things through X (Filter) and Y (Sort By). [message] is a short
+ * transient notice appended to the line.
+ */
+@Composable
+internal fun QueryChipRow(
+    scope: LibraryQueryScope,
+    query: LibraryQuery,
+    shown: Int,
+    total: Int,
+    onChange: (LibraryQuery) -> Unit,
+    modifier: Modifier = Modifier,
+    message: String? = null,
+) {
+    val chips = query.activeChips(scope)
+    Column(modifier = modifier) {
+        Text(
+            querySummaryLine(shown, total, query, scope) + (message?.let { " · $it" } ?: ""),
+            color = MenuTokens.OnSurfaceMuted,
+            style = dev.droidtop.shell.gamepad.TypeRole.supporting,
+        )
+        if (chips.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(dev.droidtop.shell.gamepad.Space.Sm),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(top = dev.droidtop.shell.gamepad.Space.Xs),
+            ) {
+                ShellChip("Clear", selected = false, onClick = { onChange(query.cleared) })
+                chips.forEach { chip ->
+                    ShellChip(chip.label, on = true, selected = false, onClick = { onChange(query.without(chip)) })
                 }
             }
-            MenuHint("Up/Down moves, A chooses, B closes")
         }
+    }
+}
+
+/**
+ * A list's saved views (docs/SPEC.md 7j): the named filter-and-sort
+ * combinations the filter sheet lists, kept per scope id. Reads and writes
+ * go through [LibraryViewPrefs] off the main thread and republish [views].
+ */
+internal class SavedViews(
+    private val context: Context,
+    private val scopeId: String,
+    private val coroutines: CoroutineScope,
+) {
+    var views by mutableStateOf<List<NamedLibraryView>>(emptyList())
+        private set
+
+    suspend fun load() {
+        views = withContext(Dispatchers.IO) { LibraryViewPrefs.savedViews(context, scopeId) }
+    }
+
+    fun save(name: String, query: LibraryQuery) {
+        coroutines.launch {
+            withContext(Dispatchers.IO) { LibraryViewPrefs.saveView(context, scopeId, NamedLibraryView(name, query)) }
+            load()
+        }
+    }
+
+    fun forget(name: String) {
+        coroutines.launch {
+            withContext(Dispatchers.IO) { LibraryViewPrefs.removeView(context, scopeId, name) }
+            load()
+        }
+    }
+}
+
+@Composable
+internal fun rememberSavedViews(scopeId: String): SavedViews {
+    val context = LocalContext.current
+    val coroutines = rememberCoroutineScope()
+    val saved = remember(scopeId) { SavedViews(context, scopeId, coroutines) }
+    LaunchedEffect(saved) { saved.load() }
+    return saved
+}
+
+/**
+ * Remembers one view's query across visits: loaded from the list's prefs
+ * once, then written back on every change, off the main thread.
+ * [onLoaded] gets what was saved; [loaded] says it has.
+ */
+@Composable
+internal fun PersistQuery(scopeId: String, query: LibraryQuery, loaded: Boolean, onLoaded: (LibraryQuery) -> Unit) {
+    val context = LocalContext.current
+    LaunchedEffect(scopeId) {
+        if (!loaded) onLoaded(withContext(Dispatchers.IO) { LibraryViewPrefs.activeQuery(context, scopeId) })
+    }
+    LaunchedEffect(query, loaded) {
+        if (loaded) withContext(Dispatchers.IO) { LibraryViewPrefs.setActiveQuery(context, scopeId, query) }
     }
 }
 

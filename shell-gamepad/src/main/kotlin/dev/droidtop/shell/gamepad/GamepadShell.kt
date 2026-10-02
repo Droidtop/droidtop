@@ -72,8 +72,24 @@ import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.toQuitResult
 import dev.droidtop.library.Library
+import dev.droidtop.runtime.tasks.TaskManager
+import dev.droidtop.library.AppCategoryRules
+import dev.droidtop.library.AppGameMarks
+import dev.droidtop.library.AppUsageAccess
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.PcStoreNames
+import dev.droidtop.shell.gamepad.query.APPS_SCOPE_ID
+import dev.droidtop.shell.gamepad.query.LibraryFacet
+import dev.droidtop.shell.gamepad.query.LibraryFilterSheet
+import dev.droidtop.shell.gamepad.query.LibraryQuery
+import dev.droidtop.shell.gamepad.query.LibraryViewPrefs
+import dev.droidtop.shell.gamepad.query.retroQueryScope
+import dev.droidtop.shell.gamepad.query.LibrarySortSheet
+import dev.droidtop.shell.gamepad.query.PersistQuery
+import dev.droidtop.shell.gamepad.query.QueryChipRow
+import dev.droidtop.shell.gamepad.query.SheetAction
+import dev.droidtop.shell.gamepad.query.appsQueryScope
+import dev.droidtop.shell.gamepad.query.rememberSavedViews
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.CapsuleStatusBadge
@@ -98,7 +114,10 @@ import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.input.HintBinding
-import dev.droidtop.shell.gamepad.input.HintRow
+import dev.droidtop.shell.gamepad.input.FocusedHintRow
+import dev.droidtop.shell.gamepad.input.FocusedHints
+import dev.droidtop.shell.gamepad.input.LocalFocusedHints
+import dev.droidtop.shell.gamepad.input.declaresHints
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.ownPadButtons
 import dev.droidtop.shell.gamepad.input.rememberHintList
@@ -306,6 +325,9 @@ private fun GamepadShellBody(
     // a deliberate user choice, exactly the distinction this draws.
     val selectSection: (GamingSection) -> Unit = { target -> nav.openSection(target) }
     var canGoBack by remember { mutableStateOf(false) }
+    // What the focused element says the one footer should promise (see
+    // [FocusedHints]); the footer falls back to the screen's own list.
+    val focusedHints = remember { FocusedHints() }
     // What the screen on top has of its OWN to put in the help row (see
     // [HelpRowClaim]), and WHICH screen said so. A screen key rather than
     // a bare flag, because the screens cross over during the Crossfade
@@ -807,6 +829,7 @@ private fun GamepadShellBody(
         LocalShellWindow provides shellWindow,
         LocalHelpRowOwner provides helpRowOwner,
         LocalShoulderStrips provides shoulderStrips,
+        LocalFocusedHints provides focusedHints,
         LocalHelpRowSlotReport provides { slot -> helpRowSlotReport = currentScreenKey to slot },
     ) {
     Column(
@@ -1657,13 +1680,13 @@ private fun ButtonHintFooter(
     // the condition under which that action really dispatches here, and
     // the row keeps only the ones that hold -- never a hand-built list
     // that can drift from what the key handlers above actually bind.
-    HintRow(
+    FocusedHintRow(
         background = background,
-        bindings = listOf(
+        // Start is the left menu on every screen the shell draws, whatever
+        // has the focus; the chip is also its touch route.
+        trailing = listOf(HintBinding(GamepadAction.START, "Menu")),
+        fallback = listOf(
             HintBinding(GamepadAction.A, aLabel),
-            // Start is the left menu on every screen the shell draws; the
-            // chip is also its touch route.
-            HintBinding(GamepadAction.START, "Menu"),
             HintBinding(GamepadAction.Y, "Info") { showInfo },
             // B is the hint row's own touch route to back.
             HintBinding(GamepadAction.B, "Back") { canGoBack },
@@ -2153,7 +2176,22 @@ private fun GamesSection(
     // Alphabetical -- real ES-DE's own default gamelist sort order, and a
     // real, stable Up/Down order for the headless (no list widget) case
     // below, unlike allGames' own natural Library order.
-    val systemGamesBeforeSearch = remember(selectedGroup, entries, collectionGroupMembers, sortVersion) {
+    // The group's own filter and sort: the same query model, sheets and
+    // remembered state every library list uses (docs/SPEC.md 7j). The
+    // stored view is read once per group (an in-memory preference read) and
+    // written back off the main thread.
+    val retroScope = remember(selectedGroup?.label) { retroQueryScope(selectedGroup?.label.orEmpty()) }
+    var retroQuery by remember(retroScope.id) { mutableStateOf(LibraryViewPrefs.activeQuery(context, retroScope.id)) }
+    LaunchedEffect(retroQuery, retroScope.id) {
+        withContext(Dispatchers.IO) { LibraryViewPrefs.setActiveQuery(context, retroScope.id, retroQuery) }
+    }
+    val retroSaved = rememberSavedViews(retroScope.id)
+    val retroBase = remember(entries, selectedGroup) {
+        selectedGroup?.let { group -> entries.filter { it.gameGroup() == group } }.orEmpty()
+    }
+    var retroSortOpen by remember { mutableStateOf(false) }
+    var retroFilterOpen by remember { mutableStateOf(false) }
+    val systemGamesBeforeSearch = remember(selectedGroup, entries, collectionGroupMembers, sortVersion, retroQuery, retroScope, retroBase) {
         val group = selectedGroup
         when (group) {
             null -> emptyList()
@@ -2167,15 +2205,9 @@ private fun GamesSection(
             } else {
                 collectionGroupMembers[group].orEmpty().sortedBy { it.title.lowercase() }
             }
-            // The stored per-group sort (GamelistSortPrefs), NAME by
-            // default which is real ES-DE's own gamelist default, and
-            // the stored per-group filter (ALL by default).
-            else -> {
-                val filter = GamelistFilterPrefs.get(context, group.label)
-                entries.filter { it.gameGroup() == group }
-                    .filter { filter.matches(it) }
-                    .sortedWith(GamelistSortPrefs.comparator(GamelistSortPrefs.get(context, group.label)))
-            }
+            // The stored per-group sort and filter: NAME by default, which
+            // is real ES-DE's own gamelist default, and no filter.
+            else -> retroQuery.applyTo(retroBase, retroScope)
         }
     }
     // The console gamelist's search (Select menu -> Search, the shared
@@ -2204,7 +2236,6 @@ private fun GamesSection(
                 groupKey = group?.label.orEmpty(),
                 groupLabel = group?.label ?: "Library",
                 systemId = (group as? GameGroup.System)?.systemId,
-                onSortChanged = { sortVersion += 1 },
                 // A finished scrape/import refreshes the REAL library
                 // scan -- cached rows now live-resolve media, so the
                 // refresh is what makes new art visible immediately.
@@ -2223,8 +2254,38 @@ private fun GamesSection(
                 onJumpTo = { index ->
                     focusedGameIndex = index.coerceIn(0, (systemGamesForGroup.lastIndex).coerceAtLeast(0))
                 },
+                // A collection is a cross-cutting list with its own order.
+                onOpenSort = if (group == null || group is GameGroup.Collection) null else ({ retroSortOpen = true }),
+                onOpenFilter = if (group == null || group is GameGroup.Collection) null else ({ retroFilterOpen = true }),
             )
         }
+    }
+    if (retroSortOpen) {
+        LibrarySortSheet(
+            scope = retroScope,
+            query = retroQuery,
+            onQueryChange = {
+                retroQuery = it
+                focusedGameIndex = 0
+            },
+            onDismiss = { retroSortOpen = false },
+        )
+    }
+    if (retroFilterOpen) {
+        LibraryFilterSheet(
+            scope = retroScope,
+            base = retroBase,
+            query = retroQuery,
+            savedViews = retroSaved.views,
+            onQueryChange = {
+                retroQuery = it
+                focusedGameIndex = 0
+            },
+            onSaveView = { retroSaved.save(it, retroQuery) },
+            onForgetView = { retroSaved.forget(it) },
+            onSearch = null,
+            onDismiss = { retroFilterOpen = false },
+        )
     }
 
     // Real, unified themed-gamelist condition -- ONE real render path
@@ -3032,7 +3093,31 @@ private fun GamesSection(
 
 
 
-/** Flat, kind-sectioned browser — no drill-down, unlike Games: apps aren't organized into "systems." */
+/**
+ * What an app tile promises while it has the focus: A opens, X and Y open
+ * the Filter and Sort By sheets (the list around the tile answers them),
+ * Select the app's own options. The one footer draws these
+ * ([declaresHints]).
+ */
+private val APP_TILE_HINTS = listOf(
+    HintBinding(GamepadAction.A, "Open"),
+    HintBinding(GamepadAction.X, "Filter"),
+    HintBinding(GamepadAction.Y, "Sort By"),
+    HintBinding(GamepadAction.SELECT, "Options"),
+)
+
+/**
+ * The Apps tab (docs/SPEC.md 7j, "Filters, sort and the hint bar"): every
+ * launchable thing that is not a game library, as one list over the same
+ * query model the game libraries use. All apps, A to Z until the person
+ * says otherwise; X opens the Filter sheet (Category, Running, Recently
+ * used, Recently installed, Favourites, Hidden, Source, each with counts),
+ * Y Sort By, Select the focused app's options, and a long press marks an
+ * app as a game. The view's filters and sort are remembered, the chips
+ * under the title say what is on, and nothing here reads a disk while
+ * drawing: the category rules, the usage log and the filtered list are
+ * worked out off the main thread.
+ */
 @Composable
 private fun AppsSection(
     entries: List<LibraryEntry>,
@@ -3042,52 +3127,185 @@ private fun AppsSection(
     onToggleFavorite: (LibraryEntry) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val sections = buildAppSections(entries)
-    val firstFocus = remember { FocusRequester() }
-    // Same "don't request focus on an unattached FocusRequester" fix as
-    // GamesSection -- firstFocus is only attached to a card once sections
-    // is confirmed non-empty (see the early return right below).
-    LaunchedEffect(entries) { if (sections.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Sections") }
+    val coroutineScope = rememberCoroutineScope()
 
-    if (sections.isEmpty()) {
-        Text("No apps found yet.", color = MenuTokens.OnSurface)
+    // Which apps are running, from the task manager's one list (read here
+    // once, and again whenever the Filter sheet opens, so its Running count
+    // is current); nothing polls while this tab is not showing.
+    val running by TaskManager.snapshot.collectAsState()
+    val runningPackages = remember(running) { running?.apps?.mapTo(HashSet()) { it.packageName }.orEmpty() }
+
+    var query by remember { mutableStateOf(LibraryQuery()) }
+    var queryLoaded by remember { mutableStateOf(false) }
+    PersistQuery(APPS_SCOPE_ID, query, queryLoaded) {
+        query = it
+        queryLoaded = true
+    }
+    val savedViews = rememberSavedViews(APPS_SCOPE_ID)
+
+    // What the rules and the usage log say, loaded off the main thread and
+    // reloaded when the person changes a mark or comes back from granting
+    // Usage access.
+    var marksTick by remember { mutableIntStateOf(0) }
+    var usageTick by remember { mutableIntStateOf(0) }
+    val rules by produceState(AppCategoryRules(), marksTick) {
+        value = withContext(Dispatchers.IO) { AppCategoryRules.load(context) }
+    }
+    val usage by produceState(emptyMap<String, Long>(), usageTick) {
+        value = withContext(Dispatchers.IO) { AppUsageAccess.lastUsed(context) }
+    }
+    val usageGranted by produceState(false, usageTick) {
+        value = withContext(Dispatchers.IO) { AppUsageAccess.granted(context) }
+    }
+    val scope = remember(rules, usage, runningPackages) { appsQueryScope(rules, usage, runningPackages) }
+
+    val shown by produceState<List<LibraryEntry>?>(null, entries, query, scope) {
+        value = withContext(Dispatchers.Default) { query.applyTo(entries, scope) }
+    }
+    val total = remember(entries, query, scope) { query.totalIn(entries, scope) }
+
+    var filterOpen by remember { mutableStateOf(false) }
+    var sortOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(filterOpen) { TaskManager.refresh(context) }
+    var optionsFor by remember { mutableStateOf<LibraryEntry?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(notice) {
+        if (notice != null) {
+            delay(3_000)
+            notice = null
+        }
+    }
+
+    // "Mark as game" from a long press and from the app's options: the
+    // one answer is stored, then the category rules reload.
+    val markGame: (LibraryEntry) -> Unit = { entry ->
+        if (entry.appFacts != null) {
+            val nowGame = !rules.isGame(entry.id, entry.appFacts)
+            coroutineScope.launch {
+                withContext(Dispatchers.IO) { AppGameMarks.set(context, entry.id, nowGame) }
+                marksTick++
+                notice = if (nowGame) "${entry.title} marked as a game" else "${entry.title} is not a game"
+            }
+        }
+    }
+
+    val list = shown
+    if (list == null || !queryLoaded) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = MenuTokens.OnSurface)
+        }
         return
     }
-    var firstAssigned = false
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(top = MenuTokens.SectionListTopGap, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(32.dp),
-        // The hint bar's own room (MenuTokens.HintBarRoom).
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
+
+    val sections = remember(list) { buildAppSections(list) }
+    val firstFocus = remember { FocusRequester() }
+    val emptyFocus = remember { FocusRequester() }
+    // The first tile takes the focus when the list first arrives, and the
+    // empty state when a filter leaves nothing, so X and Y always have a
+    // focused element to answer them.
+    LaunchedEffect(list.isEmpty()) {
+        if (list.isEmpty()) requestFocusWhenAttached(emptyFocus, "Apps") else requestFocusWhenAttached(firstFocus, "Sections")
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .onPad { press ->
+                when (press.action) {
+                    GamepadAction.X -> {
+                        filterOpen = true
+                        true
+                    }
+                    GamepadAction.Y -> {
+                        sortOpen = true
+                        true
+                    }
+                    else -> false
+                }
+            },
     ) {
-        items(sections, key = { it.title }) { homeSection ->
-            // Native Android apps get their own dense, icon-first grid
-            // (columns configurable via SettingsGamingFragment's
-            // "Apps grid columns" -- see GamingPrefs.appsGridColumns),
-            // separate from the artwork-carousel HomeSectionRow every other
-            // kind still uses: apps have square launcher icons, not
-            // portrait artwork, so the same 220x260 GameCard layout wastes
-            // most of a real handheld's screen on empty card background.
-            if (homeSection.entries.firstOrNull()?.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
-                AppIconGrid(
-                    homeSection,
-                    columns = GamingPrefs.appsGridColumns(context),
-                    firstTileFocus = if (!firstAssigned) firstFocus else null,
-                    onLaunch = onLaunch,
-                    onShowDetail = onShowDetail,
-                    onFocusedEntryChanged = onFocusedEntryChanged,
-                )
-            } else {
-                HomeSectionRow(
-                    homeSection,
-                    firstCardFocus = if (!firstAssigned) firstFocus else null,
-                    onLaunch = onLaunch,
-                    onShowDetail = onShowDetail,
-                    onFocusedEntryChanged = onFocusedEntryChanged,
-                    onToggleFavorite = onToggleFavorite,
+        QueryChipRow(
+            scope = scope,
+            query = query,
+            shown = list.size,
+            total = total,
+            onChange = { query = it },
+            message = notice,
+            modifier = Modifier.padding(
+                start = LocalShellWindow.current.edgePadding,
+                end = LocalShellWindow.current.edgePadding,
+                top = MenuTokens.SectionListTopGap,
+            ),
+        )
+        if (list.isEmpty()) {
+            val emptyHints = remember {
+                listOf(
+                    HintBinding(GamepadAction.A, "Clear filters") { !query.isEmpty },
+                    HintBinding(GamepadAction.X, "Filter"),
+                    HintBinding(GamepadAction.Y, "Sort By"),
                 )
             }
-            firstAssigned = true
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .focusRequester(emptyFocus)
+                    .declaresHints(emptyHints)
+                    .onPad { press ->
+                        if (press.action == GamepadAction.A && !query.isEmpty) {
+                            query = query.cleared
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    .focusable(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    if (entries.isEmpty()) "No apps found yet." else "No apps match these filters",
+                    color = MenuTokens.OnSurfaceMuted,
+                )
+            }
+        } else {
+            var firstAssigned = false
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(32.dp),
+                // The hint bar's own room (MenuTokens.HintBarRoom).
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
+            ) {
+                items(sections, key = { it.title }) { homeSection ->
+                    // Native Android apps get their own dense, icon-first grid
+                    // (columns configurable via SettingsGamingFragment's
+                    // "Apps grid columns" -- see GamingPrefs.appsGridColumns),
+                    // separate from the artwork-carousel HomeSectionRow every other
+                    // kind still uses: apps have square launcher icons, not
+                    // portrait artwork, so the same 220x260 GameCard layout wastes
+                    // most of a real handheld's screen on empty card background.
+                    if (homeSection.entries.firstOrNull()?.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
+                        AppIconGrid(
+                            homeSection,
+                            columns = GamingPrefs.appsGridColumns(context),
+                            firstTileFocus = if (!firstAssigned) firstFocus else null,
+                            onLaunch = onLaunch,
+                            onOptions = { optionsFor = it },
+                            onMarkGame = markGame,
+                            onFocusedEntryChanged = onFocusedEntryChanged,
+                        )
+                    } else {
+                        HomeSectionRow(
+                            homeSection,
+                            firstCardFocus = if (!firstAssigned) firstFocus else null,
+                            onLaunch = onLaunch,
+                            onShowDetail = onShowDetail,
+                            onFocusedEntryChanged = onFocusedEntryChanged,
+                            onToggleFavorite = onToggleFavorite,
+                        )
+                    }
+                    firstAssigned = true
+                }
+            }
         }
         // Games are not apps, but this is where a person on the Apps tab looks for more of anything.
         item(key = "get_games") {
@@ -3096,6 +3314,53 @@ private fun AppsSection(
                 modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding),
             )
         }
+    }
+
+    if (filterOpen) {
+        val usageAction = SheetAction(
+            title = "Include apps opened outside droidtop",
+            subtitle = "Optional. Lets droidtop read when you last used each app, through Android's Usage access. Nothing leaves this device.",
+            onClick = { runCatching { context.startActivity(AppUsageAccess.settingsIntent()) } },
+        )
+        LibraryFilterSheet(
+            scope = scope,
+            base = entries,
+            query = query,
+            savedViews = savedViews.views,
+            onQueryChange = { query = it },
+            onSaveView = { savedViews.save(it, query) },
+            onForgetView = { savedViews.forget(it) },
+            onSearch = null,
+            onDismiss = {
+                filterOpen = false
+                // Back from the system's Usage access screen lands here.
+                usageTick++
+            },
+            facetActions = if (usageGranted) emptyMap() else mapOf(LibraryFacet.RECENTLY_USED to listOf(usageAction)),
+            footerActions = if (usageGranted) emptyList() else listOf(usageAction),
+        )
+    }
+    if (sortOpen) {
+        LibrarySortSheet(scope = scope, query = query, onQueryChange = { query = it }, onDismiss = { sortOpen = false })
+    }
+    optionsFor?.let { entry ->
+        AppOptionsMenu(
+            entry = entry,
+            isGame = rules.isGame(entry.id, entry.appFacts),
+            onDetails = {
+                optionsFor = null
+                onShowDetail(entry)
+            },
+            onToggleFavorite = {
+                optionsFor = null
+                onToggleFavorite(entry)
+            },
+            onMarkGame = {
+                optionsFor = null
+                markGame(entry)
+            },
+            onDismiss = { optionsFor = null },
+        )
     }
 }
 
@@ -3112,7 +3377,8 @@ private fun AppIconGrid(
     columns: Int,
     firstTileFocus: FocusRequester?,
     onLaunch: (LibraryEntry) -> Unit,
-    onShowDetail: (LibraryEntry) -> Unit,
+    onOptions: (LibraryEntry) -> Unit,
+    onMarkGame: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
 ) {
     Column {
@@ -3154,7 +3420,8 @@ private fun AppIconGrid(
                     entry = entry,
                     modifier = if (index == 0 && firstTileFocus != null) Modifier.focusRequester(firstTileFocus) else Modifier,
                     onLaunch = { onLaunch(entry) },
-                    onShowDetail = { onShowDetail(entry) },
+                    onOptions = { onOptions(entry) },
+                    onMarkGame = { onMarkGame(entry) },
                     onFocused = { onFocusedEntryChanged(entry) },
                 )
             }
@@ -3170,7 +3437,8 @@ private fun AppIconTile(
     entry: LibraryEntry,
     modifier: Modifier = Modifier,
     onLaunch: () -> Unit,
-    onShowDetail: () -> Unit = {},
+    onOptions: () -> Unit = {},
+    onMarkGame: () -> Unit = {},
     onFocused: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -3188,24 +3456,23 @@ private fun AppIconTile(
                         onLaunch()
                         true
                     }
-                    // The row over this grid promises "Y  Info", and the
-                    // long-press beside it already opens the app's own
-                    // detail -- only the button route to that same screen
-                    // was missing, so the row named an action nothing
-                    // dispatched (rig, build 548; docs/SPEC.md 7j: a hint
-                    // row promises only what dispatches). One screen, one
-                    // action, both routes.
-                    GamepadAction.Y -> {
-                        onShowDetail()
+                    // Select is Options, the focused thing's own menu
+                    // (docs/SPEC.md 7j): its details, favourite and
+                    // Mark as game. X and Y are the list's (Filter and
+                    // Sort By) and bubble to the section around the grid.
+                    GamepadAction.SELECT -> {
+                        onOptions()
                         true
                     }
                     else -> false
                 }
             }
+            .declaresHints(APP_TILE_HINTS)
             .focusable()
             // Same real touch-input fix as GameCard -- see its own
-            // comment -- and the same long-press-is-Y convention.
-            .combinedClickable(onClick = onLaunch, onLongClick = onShowDetail)
+            // comment. A long press marks the app as a game (or not),
+            // the touch route to the same answer the options menu gives.
+            .combinedClickable(onClick = onLaunch, onLongClick = onMarkGame)
             // The shell's ONE selection idiom, the same one [GameCard]
             // and the menus draw: the accent ring over a brightened
             // surface. This tile kept a third one -- a thin white
@@ -3284,20 +3551,15 @@ internal data class HomeSection(val title: String, val entries: List<LibraryEntr
 
 /**
  * One section per display name actually present among [entries], in
- * [LibraryEntryKind] declaration order. Entries within each section are
- * sorted alphabetically by title -- without this, [NativeAppProvider]'s
- * scan order (raw [android.content.pm.LauncherApps.getActivityList] order,
- * effectively install/registration order) leaked straight through to the
- * Apps tab and looked completely random; every other kind had the same
- * latent gap (only [GameGroup.System]'s system-list ordering, a separate
- * code path, was ever sorted), so this sorts generally rather than just
- * patching Apps.
+ * [LibraryEntryKind] declaration order. Entries keep the order they come
+ * in: the Apps view's query sorts them (A to Z until the person says
+ * otherwise), and a section only groups.
  */
 internal fun buildAppSections(entries: List<LibraryEntry>): List<HomeSection> {
     val byDisplayName = entries.groupBy { it.kind.displayName() }
     val order = LibraryEntryKind.entries.map { it.displayName() }.distinct()
     return order.mapNotNull { name ->
-        byDisplayName[name]?.let { HomeSection(name, it.sortedBy { entry -> entry.title.lowercase() }) }
+        byDisplayName[name]?.let { HomeSection(name, it) }
     }
 }
 

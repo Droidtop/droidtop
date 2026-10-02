@@ -156,12 +156,6 @@ class PcShelvesTest {
     }
 
     @Test
-    fun `the grid's summary names the count, the sort and the search`() {
-        assertEquals("171 games · Sort: Name", gridSummary(LibraryQuery(), 171))
-        assertEquals("1 game · Sort: Last played · \"zelda\"", gridSummary(LibraryQuery(text = "zelda", sort = LibrarySortKey.RECENT), 1))
-    }
-
-    @Test
     fun `play time reads as a person says it`() {
         assertEquals("Never played", playtimeLine(0, 0))
         assertEquals("Under a minute, played once", playtimeLine(30, 1))

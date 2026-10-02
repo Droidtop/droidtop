@@ -77,7 +77,7 @@ fun rememberGamepadTouch(): (GamepadAction) -> Unit {
  * has no other route to.
  */
 @Composable
-fun TouchHintBar(
+internal fun TouchHintBar(
     hints: List<Pair<GamepadAction, String>>,
     modifier: Modifier = Modifier,
     background: Color = MenuTokens.HintBar,

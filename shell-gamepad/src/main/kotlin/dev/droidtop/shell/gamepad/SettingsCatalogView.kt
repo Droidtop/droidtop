@@ -77,6 +77,8 @@ import dev.droidtop.library.settings.SubScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -817,8 +819,8 @@ private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -
                 Text(it, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
             }
             status?.let { Text(it, color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
-            TouchHintBar(
-                hints = listOf(GamepadAction.B to "Close"),
+            HintRow(
+                bindings = listOf(HintBinding(GamepadAction.B, "Close")),
                 background = Color.Transparent,
                 modifier = Modifier.padding(top = 8.dp),
             )

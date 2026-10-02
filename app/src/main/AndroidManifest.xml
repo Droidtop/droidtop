@@ -95,6 +95,11 @@
     -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- Optional Usage access: lets the Apps view read when an app opened outside droidtop was last used,
+         for its Recently used filter. The person grants it in system settings, with a plain explanation
+         first; without it the filter reads only droidtop's own launch log, and nothing needs it. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+
     <application
         android:name=".DroidtopApplication"
         android:label="@string/droidtop_app_name"

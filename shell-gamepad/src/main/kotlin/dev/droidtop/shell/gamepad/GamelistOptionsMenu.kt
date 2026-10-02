@@ -36,96 +36,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
-/**
- * Per-gamelist sort order, persisted per group (the pattern is real
- * ES-DE's GuiGamelistOptions "SORT GAMES BY"; the placement and controls
- * are droidtop's own -- per direction, ES-DE's general UI is the copy
- * target, never its literal control scheme).
- */
-enum class GamelistSort(val label: String) {
-    NAME("Name"),
-    RATING("Rating"),
-    RELEASE_DATE("Release date"),
-    LAST_PLAYED("Last played"),
-}
-
-/**
- * Which games a gamelist shows (the GuiGamelistFilter idea, kept to the
- * states droidtop actually stores per game). Persisted per group like
- * the sort order, so a filtered list stays filtered on the way back.
- *
- * The last three read [LibraryEntry.switchFacts] (docs/SPEC.md 7m,
- * "Switch content"), so on a non-Switch gamelist they simply match
- * nothing -- the same honest nothing a "Favorites" filter says on a
- * list with no favourites.
- */
-enum class GamelistFilter(val label: String) {
-    ALL("All games"),
-    FAVORITES("Favorites"),
-    COMPLETED("Completed"),
-    UNPLAYED("Never played"),
-    HAS_DLC("Has DLC"),
-    MISSING_UPDATE("Missing update"),
-    LOOSE_DLC("DLC without base game"),
-    ;
-
-    fun matches(entry: LibraryEntry): Boolean = when (this) {
-        ALL -> true
-        FAVORITES -> entry.favorite
-        COMPLETED -> entry.completed
-        UNPLAYED -> entry.lastPlayedEpochMs == null
-        HAS_DLC -> entry.switchFacts?.let { it.dlcCount > 0 } == true
-        // A Switch game classification could say nothing about is not
-        // "missing" anything -- only a row known to be a base game
-        // without an update beside it is.
-        MISSING_UPDATE -> entry.switchFacts?.let { !it.loose && !it.hasUpdate } == true
-        LOOSE_DLC -> entry.switchFacts?.loose == true
-    }
-}
-
-object GamelistFilterPrefs {
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_PREFIX = "droidtop_gamelist_filter_"
-
-    fun get(context: Context, groupKey: String): GamelistFilter {
-        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_PREFIX + groupKey, null) ?: return GamelistFilter.ALL
-        return runCatching { GamelistFilter.valueOf(raw) }.getOrDefault(GamelistFilter.ALL)
-    }
-
-    fun cycle(context: Context, groupKey: String): GamelistFilter {
-        val next = GamelistFilter.entries[(get(context, groupKey).ordinal + 1) % GamelistFilter.entries.size]
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString(KEY_PREFIX + groupKey, next.name).apply()
-        return next
-    }
-}
-
-object GamelistSortPrefs {
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_PREFIX = "droidtop_gamelist_sort_"
-
-    fun get(context: Context, groupKey: String): GamelistSort {
-        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_PREFIX + groupKey, null) ?: return GamelistSort.NAME
-        return runCatching { GamelistSort.valueOf(raw) }.getOrDefault(GamelistSort.NAME)
-    }
-
-    fun cycle(context: Context, groupKey: String): GamelistSort {
-        val next = GamelistSort.entries[(get(context, groupKey).ordinal + 1) % GamelistSort.entries.size]
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString(KEY_PREFIX + groupKey, next.name).apply()
-        return next
-    }
-
-    fun comparator(sort: GamelistSort): Comparator<LibraryEntry> = when (sort) {
-        GamelistSort.NAME -> compareBy { it.title.lowercase() }
-        GamelistSort.RATING -> compareByDescending<LibraryEntry> { it.rating ?: -1f }.thenBy { it.title.lowercase() }
-        GamelistSort.RELEASE_DATE -> compareBy<LibraryEntry> { it.releaseDate ?: "99999999" }.thenBy { it.title.lowercase() }
-        GamelistSort.LAST_PLAYED -> compareByDescending<LibraryEntry> { it.lastPlayedEpochMs ?: 0L }.thenBy { it.title.lowercase() }
-    }
-}
-
 /** The one label for the PC/engine scrape action, shared by the list that offers it and the handler that runs it. */
 private const val SCRAPE_PC_GAMES = "Scrape PC & engine games"
 // Renamed from "Stores and folders" (uisources agent, 2026-09-28): the
@@ -133,6 +43,8 @@ private const val SCRAPE_PC_GAMES = "Scrape PC & engine games"
 // and Downloads -- store accounts moved to the "Accounts and sources"
 // settings area.
 private const val PC_SETUP = "PC setup"
+private const val SORT_BY = "Sort by"
+private const val FILTER = "Filter"
 private const val SYSTEM_SETTINGS = "System settings"
 private const val ORPHANS_FIND = "Find orphaned media"
 private const val ORPHANS_DELETE = "Delete orphaned media: press A again"
@@ -153,7 +65,6 @@ internal fun GamelistOptionsMenu(
     groupKey: String,
     groupLabel: String,
     systemId: String?,
-    onSortChanged: () -> Unit,
     onScraped: () -> Unit,
     onDismiss: () -> Unit,
     // The gamelist as it is currently shown, so jump and random address
@@ -172,11 +83,14 @@ internal fun GamelistOptionsMenu(
     searchText: String = "",
     totalGames: Int = games.size,
     onSearchTextChange: ((String) -> Unit)? = null,
+    // "Sort by" and "Filter" open the shared sheets (the one query model,
+    // docs/SPEC.md 7j) over this gamelist; null where the list has none.
+    onOpenSort: (() -> Unit)? = null,
+    onOpenFilter: (() -> Unit)? = null,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var focusIndex by remember { mutableIntStateOf(0) }
-    var sort by remember { mutableStateOf(GamelistSortPrefs.get(context, groupKey)) }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     // Non-null while a real settings catalog screen is hosted over this
@@ -190,7 +104,6 @@ internal fun GamelistOptionsMenu(
     // second slot would be a second mechanism for "show a settings
     // screen over this menu".
     var acquireScreen by remember { mutableStateOf<CatalogScreen?>(null) }
-    var filter by remember { mutableStateOf(GamelistFilterPrefs.get(context, groupKey)) }
     // Per-system launch-screen default (docs/SPEC.md section 4c: "Select
     // which display to open ROMs from this tab" / "Tune individual
     // platforms"). A per-game choice still wins over this; cycling back
@@ -231,14 +144,11 @@ internal fun GamelistOptionsMenu(
             add(orphansLabel)
             add("Update platform databases")
         } else {
-            // The PC Games tab's filter, sort and search are its own view
-            // strip and filter dialog (dev.droidtop.shell.gamepad.query.
-            // LibraryQuery, docs/SPEC.md 7i) -- these rows would be a
-            // second, always-out-of-sync mechanism for it.
-            if (systemId != PC_SYSTEM_ID) {
-                add("Sort: ${sort.label}")
-                add("Show: ${filter.label}")
-            }
+            // Sort and filter are the one shared query model's sheets
+            // (dev.droidtop.shell.gamepad.query, docs/SPEC.md 7j); the PC
+            // Games tab opens them from X and Y and passes no rows here.
+            if (onOpenSort != null) add(SORT_BY)
+            if (onOpenFilter != null) add(FILTER)
             if (onSearchTextChange != null && systemId != PC_SYSTEM_ID) add(searchRowLabel)
             if (games.isNotEmpty()) {
                 add("Jump to letter")
@@ -359,13 +269,13 @@ internal fun GamelistOptionsMenu(
                     busy = false
                 }
             }
-            "Sort: ${sort.label}" -> {
-                sort = GamelistSortPrefs.cycle(context, groupKey)
-                onSortChanged()
+            SORT_BY -> {
+                onDismiss()
+                onOpenSort?.invoke()
             }
-            "Show: ${filter.label}" -> {
-                filter = GamelistFilterPrefs.cycle(context, groupKey)
-                onSortChanged()
+            FILTER -> {
+                onDismiss()
+                onOpenFilter?.invoke()
             }
             "Launch screen: " + (systemLaunchScreen?.label ?: "Ask which display") -> {
                 val next = when (systemLaunchScreen) {

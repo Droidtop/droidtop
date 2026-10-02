@@ -1,6 +1,8 @@
 package dev.droidtop.shell.gamepad.input
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 /**
@@ -49,5 +51,25 @@ class HintBindingsTest {
     @Test
     fun `nothing bound means nothing promised`() {
         assertEquals(emptyList<Pair<GamepadAction, String>>(), activeHintPairs(emptyList()))
+    }
+
+    @Test
+    fun `only the focus owner's declaration shows and a late release by the old owner is ignored`() {
+        val host = FocusedHints()
+        val first = Any()
+        val second = Any()
+        val one = listOf(HintBinding(GamepadAction.A, "One"))
+        val two = listOf(HintBinding(GamepadAction.A, "Two"))
+
+        host.declare(first, one)
+        assertSame(one, host.bindings)
+
+        // The next element takes the focus before the old one reports losing it.
+        host.declare(second, two)
+        host.release(first)
+        assertSame(two, host.bindings)
+
+        host.release(second)
+        assertNull(host.bindings)
     }
 }

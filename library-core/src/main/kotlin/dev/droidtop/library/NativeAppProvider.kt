@@ -2,6 +2,7 @@ package dev.droidtop.library
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
 import android.graphics.Bitmap
 import android.os.Process
@@ -10,6 +11,7 @@ import com.android.launcher3.LauncherAppState
 import com.android.launcher3.icons.cache.CacheLookupFlag
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.util.Executors
+import app.murinelauncher.settings.hiddenapps.HiddenAppsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
@@ -42,6 +44,7 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
 
     override suspend fun scan(): List<LibraryEntry> = scanLock.withLock { scanLocked() }
 
+    @Suppress("DEPRECATION")
     private suspend fun scanLocked(): List<LibraryEntry> {
         val launcherApps = context.getSystemService(LauncherApps::class.java)
         val appState = LauncherAppState.getInstance(context)
@@ -54,19 +57,40 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
         // time read once. Two launcher activities of one package are one
         // entry (the id is the package), so the second is never resolved.
         val iconDir = File(context.cacheDir, "app_icons")
-        val (activities, updateTimes, cachedNames) = withContext(Dispatchers.IO) {
+        val pass = withContext(Dispatchers.IO) {
             iconDir.mkdirs()
             // droidtop's own drawer icon (the Launcher's Games screen) is a
             // way into this library, not an app in it.
             val activities = launcherApps.getActivityList(null, Process.myUserHandle())
                 .filter { it.componentName.packageName != context.packageName }
                 .distinctBy { it.componentName.packageName }
-            val updateTimes = activities.associate { activity ->
+            // One package-manager read per app, shared by the icon state
+            // (its update time) and the Apps facets (first install time,
+            // installer, Android's own game and system flags).
+            val pm = context.packageManager
+            val updateTimes = HashMap<String, Long>()
+            val facts = HashMap<String, InstalledAppFacts>()
+            val hiddenComponents = HiddenAppsRepository.getHiddenComponents(context)
+            val hidden = HashSet<String>()
+            activities.forEach { activity ->
                 val pkg = activity.componentName.packageName
-                pkg to runCatching { context.packageManager.getPackageInfo(pkg, 0).lastUpdateTime }.getOrDefault(0L)
+                val info = runCatching { pm.getPackageInfo(pkg, 0) }.getOrNull()
+                updateTimes[pkg] = info?.lastUpdateTime ?: 0L
+                val app = activity.applicationInfo
+                facts[pkg] = InstalledAppFacts(
+                    firstInstalledEpochMs = info?.firstInstallTime ?: 0L,
+                    flaggedGame = (app.flags and ApplicationInfo.FLAG_IS_GAME) != 0 ||
+                        app.category == ApplicationInfo.CATEGORY_GAME,
+                    system = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                    installer = runCatching { pm.getInstallerPackageName(pkg) }.getOrNull(),
+                )
+                if (activity.componentName.flattenToString() in hiddenComponents) hidden += pkg
             }
-            Triple(activities, updateTimes, iconDir.list()?.toHashSet() ?: hashSetOf())
+            PackagePass(activities, updateTimes, facts, hidden, iconDir.list()?.toHashSet() ?: hashSetOf())
         }
+        val activities = pass.activities
+        val updateTimes = pass.updateTimes
+        val cachedNames = pass.cachedNames
 
         // IconCache asserts it's only ever touched from Launcher3's own
         // worker thread -- a real, confirmed crash caught via logcat
@@ -143,6 +167,10 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
                     // an installed app the platform is the source, and
                     // the shell reads one field either way.
                     genre = app.category,
+                    appFacts = pass.facts[app.packageName],
+                    // The drawer's own "hide this app" answer, one rule for
+                    // every list: hidden apps are out unless asked for.
+                    hidden = app.packageName in pass.hidden,
                 )
             }
             // Only a finished scan prunes: a cancelled one throws before
@@ -152,6 +180,15 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
             entries
         }
     }
+
+    /** What the one package-manager pass of a scan read, before any icon work. */
+    private class PackagePass(
+        val activities: List<android.content.pm.LauncherActivityInfo>,
+        val updateTimes: Map<String, Long>,
+        val facts: Map<String, InstalledAppFacts>,
+        val hidden: Set<String>,
+        val cachedNames: Set<String>,
+    )
 
     /**
      * One app as the scan read it, before it becomes a [LibraryEntry].

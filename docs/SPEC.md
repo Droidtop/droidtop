@@ -7343,8 +7343,9 @@ own prefs, a filtered list says so in its header (`gamelistinfo`'s filter
 count) and in the hint row, and "Reset filters" is a row of the same
 screen. **Hidden entries are left out of every list unless the hidden
 filter is on** — the carousel's counts, the unthemed grid, the PC surface
-and the Launcher's Games grid alike; today the flag is written by the
-metadata editor and read by nothing.
+and the Launcher's Games grid alike. The one query model (§7j, "Filters,
+sort and the hint bar") applies the rule to every list that offers the
+Hidden facet: the PC library, the Retro gamelists and the Apps view.
 
 **Sorts.** Name, rating, release date, developer, publisher, genre,
 players, last played, times played and, inside a collection, system;
@@ -9178,7 +9179,7 @@ it:
 | 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule. No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is a share of the window's height (`capsuleWidth`, 104-176dp), so the console shows a shelf and the top of the next, and a phone held upright gets two columns. |
 | Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons, a quiet facts strip, a tab strip (Overview, Versions and updates, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are not a row because droidtop has no achievement data (#143); when it does, this is where the row goes. |
 | The page's rows are the same rows as Steam's settings | | **Settings' rows.** The page's facts are `MenuRow(uniformHeight = true)` at `uniformRowHeight()`, with one content-sized value column (`LocalValueColumnWidth`) and the selected row's full text in the detail strip under the list (`CatalogDetailStrip`, §7k "Text in rows and tiles"); a long description is read there, never by growing a row. |
-| A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A is the primary action** (owner, 2026-10-01: "A is Primary Action. We can make it contextual using the pills."): on a capsule A does what the hint pill says -- Play when the runner is ready, else the one setup step (`PcRunnerOptions.resolveAndPlay`, the one launch handler); Y opens the page. The page exists for looking and for the game's own actions, never as a step in front of Play. |
+| A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A is the primary action** (owner, 2026-10-01: "A is Primary Action. We can make it contextual using the pills."): on a capsule A does what the hint pill says -- Play when the runner is ready, else the one setup step (`PcRunnerOptions.resolveAndPlay`, the one launch handler); the page is the first row of the game's menu (Select) and a long press. The page exists for looking and for the game's own actions, never as a step in front of Play. |
 
 Why shelves and not the 2026-09-30 grid-plus-hero: the hero panel was a
 second surface repeating what the page says, drawn on a theme frame the
@@ -9311,33 +9312,37 @@ the pipeline applies it.
   `keepInView` on the strip, the shelf row, the shelf column and the grid
   -- the four containers this tab has, one mechanism each.
 - **A** runs the focused capsule's primary action, or presses the focused
-  chip. **Y** opens the page. **X** toggles favourite. **L2** opens the
-  game's own menu (`PcGameMenu`, unchanged in substance: the runner and
-  its picker, Wine/container settings, ProtonDB, the Lutris import, the
-  F95 link and update, merge and versions, under Play / About / Fix and
-  advanced); the header's L2 pill (§7k) is live on this tab exactly while
-  a game is under the cursor. **Select** opens the list's options
-  (`GamelistOptionsMenu` with the `pc` system id: Jump to letter, Random
-  game, Get games, Scrape PC & engine games, PC setup, Close -- the
-  console-only rows Launch screen, System settings, Scrape this system and
-  Import gamelist.xml are not offered for it, Droidtop/tracker#175).
+  chip. **X** opens the Filter sheet and **Y** the Sort By sheet (§7j,
+  "Filters, sort and the hint bar"). **Select** is Options: the focused
+  game's own menu (`PcGameMenu`, unchanged in substance: the game page, the
+  favourite, the runner and its picker, Wine/container settings, ProtonDB,
+  the Lutris import, the F95 link and update, merge and versions, under
+  Play / About / Fix and advanced); **L2** is its alias and the header's L2
+  pill (§7k) is live on this tab exactly while a game is under the cursor.
+  With no game under the cursor (the strip, an empty list) Select opens the
+  list's options (`GamelistOptionsMenu` with the `pc` system id: Jump to
+  letter, Random game, Get games, Scrape PC & engine games, PC setup,
+  Close -- the console-only rows Launch screen, System settings, Scrape this
+  system and Import gamelist.xml are not offered for it,
+  Droidtop/tracker#175), which is also the Filter sheet's last row, "List
+  options", so it stays reachable from an empty library.
   **B** goes back one level: from a view to Home, from PC setup to the
   library; on Home it is the shell's top level and does nothing.
 - **Touch is the same cursor.** A tap on a capsule that is not selected
   selects it (pointer and focus are one selection, and the hint row then
   names what A would do); a tap on the selected capsule is A (design
-  language: "a second activation confirms"); a long-press is Y. A tap on
+  language: "a second activation confirms"); a long-press opens the game's
+  page. A tap on
   a chip presses it. On the page, a tap on a button or a row is the same
   press as A on it. Nothing on the tab is reachable by touch only or by
   pad only.
-- **The hint row is the tab's own** (`HelpRowClaim.SCREEN`, so the shell
-  draws no second bar): A names the focused game's primary action from
-  `PcPlayState` ("Select" on the strip), Y Game page, X Favourite, L2
-  Game options, Select Options, B Back when there is a level to leave,
-  Start Menu, L1/R1 Previous/Next view.
-  Each is a `HintBinding` gated on its action really dispatching (§7j).
-  Over the PC setup screen the claim is `NONE` and the shell's bar draws,
-  because that screen has no row of its own.
+- **The hint row is the shell's one footer, fed by the focused element**
+  (§7j, "Filters, sort and the hint bar"; the tab claims no row of its
+  own): A names the focused game's primary action from `PcPlayState`
+  ("Select" on the strip), X Filter, Y Sort By, Select Options, B Back when
+  there is a level to leave, L1/R1 Previous/Next view, and the footer adds
+  Start Menu. Each is a `HintBinding` gated on its action really
+  dispatching (§7j).
 
 ### Capsules and the primary action (decided 2026-10-02, Droidtop/tracker#255, #222, #223)
 
@@ -10090,6 +10095,101 @@ mechanism per job).
 **Left/Right's quicksysselect now reaches every real gamelist widget, not just droidtop's own grids (owner, on the console, 2026-09-28, Droidtop/tracker#43).** The rule above ("Left/Right switch the system... anywhere") was never actually true for a themed gamelist's own `textlist`/`grid` widgets: `EsDeTextList` unconditionally consumed Left/Right ("so a stray horizontal press can't escape the list and move Compose focus onto another surface") -- reasoning that predates the top-bar focus fix two entries up and was really defending against THAT bug; with the top bar genuinely unfocusable now, the swallow no longer protects anything and was quietly eating the real feature instead. `EsDeGrid` had the same gap in a different shape: Left/Right always stepped within the current row (`coerceIn`), with no edge case at all, unlike droidtop's own unthemed grids (`GridPad.kt`), which already stop and bubble at a real edge. Both widgets now take a `gamelist: Boolean` parameter (the flag already existed one level up, in `EsDeSystemListView`, for per-entry image resolution, but was never threaded down into the widgets that actually own the keys) and bubble Left/Right to `GamesSection`'s existing sibling-system handler at a genuine edge, ONLY when rendering a gamelist -- a system-level textlist/grid (browsing systems themselves, not a system's games) keeps its previous behaviour, since droidtop has no established meaning for Left/Right there and changing it without a theme to verify against would be an unrequested regression. UNVERIFIED on the console as of this entry, same reason as the axis entry above.
 
 **A LazyColumn's own scroll-follow and `MenuRow`'s `BringIntoViewRequester` must never both run for the same list (owner, on the console, 2026-09-28, Droidtop/tracker#2).** The "virtual-cursor menu" rule above fixed `MenuPanel`'s `verticalScroll` menus, but `MenuRow` is shared by the Settings catalog's own `LazyColumn`s too (`CatalogNavigator`, `CatalogChoicePicker`), which separately run `LazyListState.keepInView` (edge-aware, non-animated-jump; see its own doc comment) on every selection change. With no way to tell "I already have a scroll-keeper" from "I need one," every Settings row armed its own `BringIntoViewRequester` regardless, so a single Up/Down press fired two independent scroll animations against the same `LazyListState` at once -- two competing animations is what `dumpsys gfxinfo` showed as the jank behind "settings scrolling isn't smooth." `MenuRow` takes a new `ownScrollKeeping: Boolean` parameter (default `false`, the original always-on behaviour): `true` from the two Settings call sites that already keep their own scroll position, which skips `MenuRow`'s internal `BringIntoViewRequester` entirely there; left `false` everywhere else the row is used (Quick Menu, `PcGameMenu`, `GamelistOptionsMenu` and the rest of the `verticalScroll`-based menus, plus the Settings search-results `LazyColumn`, which has no `keepInView` of its own) so those keep the behaviour the original fix was for. Owner-confirmed fixed on the console ("fixed beautifully").
+
+### Filters, sort and the hint bar (owner, 2026-10-01, Droidtop/tracker#257, #260)
+
+One vocabulary on every library and app list: **X Filter, Y Sort By,
+Select Options** (the focused thing's own menu), **Start** the left menu,
+**A** the primary action, **B** back one level. Principles are taken from
+what other handheld frontends and Big Picture do, not their code, art or
+words; the sheets and chips are droidtop's own, from `MenuTokens` and
+`TypeRole`.
+
+**One query model per (surface, view).** `LibraryQuery` is the state of a
+view: the search text, the facet selections, the sort and its direction.
+`LibraryQueryScope` is what a list offers: its facets, its sorts (and what
+it calls them), its noun ("games", "apps") and the lookups its facets read.
+The PC library (`pc`), the Apps view (`apps`) and every Retro gamelist
+(`retro:<group>`) are scopes of the same model; the view's query is
+remembered per scope id (`LibraryViewPrefs`, written off the main thread),
+so each view keeps its own filters and sort. Pure and unit-tested
+(`LibraryQueryTest`).
+- Values within a facet OR, facets AND, the search text ANDs with both.
+- **Sort direction.** Each sort has a natural direction (`naturalOrder`:
+  "A to Z", "Latest first", ...). Picking the sort that is on flips it
+  ("Z to A"); picking another starts it in its natural order. Entries the
+  sort has no fact for (never played, no release date) are last in both
+  directions.
+- **Hidden is one rule.** An entry marked hidden is out of every list that
+  offers the Hidden facet unless that facet is selected; counts and the
+  "12 of 80" line leave hidden entries out too.
+- **Counts.** Every facet is offered with the values the list actually
+  holds and how many entries carry each (counted over the whole list, one
+  pass per facet, off the main thread). A facet no entry has a value for is
+  not offered, nor is one whose single value every entry carries; a
+  selected value nothing has right now stays listed at zero so it can be
+  taken off.
+
+**X opens the Filter sheet, Y the Sort By sheet**, both controller-first
+dialogs (`LibraryFilterSheet`, `LibrarySortSheet`): Up/Down moves, A
+chooses, B goes back a level and then closes, every row is a touch target.
+The Filter sheet has two levels: the facets with what each is set to, and
+one A deeper a facet's values with counts (a check marks the selected
+ones). Its first level also lists the saved views, "Clear filters" while
+anything is on (X does the same), "Save this view" and any list-specific
+rows (the Apps view's Usage access row, the PC library's "List options").
+The Sort By sheet marks the active sort with its direction.
+**Under the list's title** one state line says "12 of 80 apps · Sort:
+Name, A to Z" and, while anything filters, one chip per active filter with
+a leading Clear chip (`QueryChipRow`). Chips are a touch shortcut (a tap
+takes that filter off) and are never a D-pad stop: the pad reaches the same
+things through X and Y.
+
+**Apps** are one list over the model: **All apps, A to Z** until the
+person says otherwise. Facets, in order: **Category** (Games, Emulators,
+System, Other), **Running** (the task manager's list), **Recently used**
+(last 7 days), **Recently installed** (last 7 days), **Favourites**,
+**Hidden** (the drawer's own hidden apps) and **Source** (Play Store,
+Sideloaded, another store, System). Sorts: A to Z, Recently used, Most
+used, Recently installed.
+- **Category is a default plus an override.** Games is seeded from
+  Android's own game flag (the manifest's game flag or the game category)
+  and a short list of game stores and launchers; Emulators is every
+  emulator in droidtop's player database; System is a preinstalled app.
+  **Mark as game** (and "Not a game") is the person's answer and beats every
+  default; it is a **long press on an app** and a row in the app's Options
+  menu (Select), both writing the same answer (`AppGameMarks`).
+- **Recently used reads two logs.** droidtop's own launch log (it needs
+  nothing), and, where the person has granted the optional **Usage access**
+  special permission, what Android says, which also covers apps opened
+  outside droidtop. The permission is asked for with a plain explanation (a
+  row in the Filter sheet, under Recently used and at the foot), never
+  required, and without it the filter simply reads the launch log. The
+  facts an app list reads (first install time, installer, Android's game
+  and system flags) come from the one package pass the scan already makes
+  (`InstalledAppFacts`), never per row.
+- Select on an app opens its Options (details, favourite, Mark as game);
+  the details screen is no longer a Y press.
+
+**Retro gamelists** keep ES-DE's own bindings on the themed canvas; their
+Select menu's "Sort by" and "Filter" rows open the same sheets over the
+group's own query (favourites, completed, played, genre, developer, release
+year, Switch content, hidden; sorts name, rating, release date, last
+played). The earlier cycling "Sort:" and "Show:" rows and their separate
+stored preferences are gone: one mechanism.
+
+**The hint bar follows the focused element.** The shell draws ONE footer
+(`FocusedHintRow`). A focused element declares its hints with
+`Modifier.declaresHints` (a remembered list of `HintBinding`s gated on the
+action really dispatching) and releases them when the focus leaves; only
+the focus owner's declaration shows, so two elements trading focus in
+either order end with the right row. With nothing declared the footer falls
+back to the screen's own list, and it always adds Start Menu. The PC
+Games tab and the Apps tiles declare their hints this way and claim no row
+of their own. Every hint row, in the shell and in the screens that run
+outside it, draws through `HintRow`; `TouchHintBar` is only the drawing
+primitive under it. A hint's tap dispatches the real key press, so the
+sheets' and tiles' hints are their touch routes.
 
 ## 7k. The design system: one spacing scale, one type scale, one colour source
 

@@ -29,6 +29,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 
 /**
@@ -104,13 +106,13 @@ internal fun MediaViewer(title: String, media: List<Pair<String, String>>, onClo
             Text("$label  (${index + 1}/${media.size})", color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium)
             // The same three actions the key handler above implements,
             // as the only route to them on a screen with no pad: each
-            // hint dispatches the real press (see TouchHintBar), so
+            // hint dispatches the real press (see HintRow), so
             // there is still one definition of what each one does.
-            TouchHintBar(
-                hints = listOf(
-                    GamepadAction.LEFT to "Previous",
-                    GamepadAction.RIGHT to "Next",
-                    GamepadAction.B to "Close",
+            HintRow(
+                bindings = listOf(
+                    HintBinding(GamepadAction.LEFT, "Previous"),
+                    HintBinding(GamepadAction.RIGHT, "Next"),
+                    HintBinding(GamepadAction.B, "Close"),
                 ),
                 background = Color.Transparent,
             )

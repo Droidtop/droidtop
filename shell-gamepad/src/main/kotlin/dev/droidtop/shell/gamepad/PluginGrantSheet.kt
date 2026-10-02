@@ -20,6 +20,8 @@ import dev.droidtop.pluginhost.GrantAnswer
 import dev.droidtop.pluginhost.PermissionTier
 import dev.droidtop.pluginhost.PluginGrantPrompts
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 
 /**
  * Where the first-use sheet is drawn (docs/plugin-api.md 4.3). Placed once
@@ -97,8 +99,8 @@ private fun PluginGrantSheet(pending: PluginGrantPrompts.Pending) {
                     },
                 )
             }
-            TouchHintBar(
-                hints = listOf(GamepadAction.A to "Choose", GamepadAction.B to "Not now"),
+            HintRow(
+                bindings = listOf(HintBinding(GamepadAction.A, "Choose"), HintBinding(GamepadAction.B, "Not now")),
                 background = Color.Transparent,
                 modifier = Modifier.padding(top = 4.dp),
             )

@@ -45,6 +45,8 @@ import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -301,10 +303,10 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
         // list already leaves it its room (MenuTokens.HintBarRoom). It had
         // none on its own, opened from Settings or onboarding (rig,
         // dq-onboard-01).
-        dev.droidtop.shell.gamepad.TouchHintBar(
-            hints = listOf(
-                GamepadAction.A to "Download or update",
-                GamepadAction.B to "Back",
+        HintRow(
+            bindings = listOf(
+                HintBinding(GamepadAction.A, "Download or update"),
+                HintBinding(GamepadAction.B, "Back"),
             ),
             modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
         )

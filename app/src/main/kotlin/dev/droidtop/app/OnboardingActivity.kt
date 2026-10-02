@@ -23,8 +23,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import dev.droidtop.shell.gamepad.TouchHintBar
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.ownPadButtons
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import androidx.compose.foundation.focusable
@@ -1136,10 +1137,10 @@ private fun OnboardingScaffold(
         }
         // The shell's hint row: the legend of what the pad's buttons do
         // here, and on a touch screen the buttons themselves.
-        TouchHintBar(
-            hints = listOf(
-                GamepadAction.A to "Select",
-                GamepadAction.B to "Back",
+        HintRow(
+            bindings = listOf(
+                HintBinding(GamepadAction.A, "Select"),
+                HintBinding(GamepadAction.B, "Back"),
             ),
         )
     }

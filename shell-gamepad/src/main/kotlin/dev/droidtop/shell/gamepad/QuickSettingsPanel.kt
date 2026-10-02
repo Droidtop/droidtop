@@ -67,6 +67,8 @@ import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.runtime.systemstatus.NetworkKind
 import dev.droidtop.runtime.systemstatus.SystemStatus
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.onPad
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -274,17 +276,15 @@ internal fun QuickSettingsPanel(
         // tabs but is no longer named here -- see the ShoulderGlyph beside
         // the tab row itself, above (owner, 2026-09-25: "Can remove the
         // next/previous section pills").
-        TouchHintBar(
+        HintRow(
             // Left/Right adjust only a slider; on a tile they do nothing, so
             // the bar names them only while a slider has the focus.
-            hints = buildList {
-                if (focusIndex < panel.sliders.size) {
-                    add(GamepadAction.LEFT to "Lower")
-                    add(GamepadAction.RIGHT to "Raise")
-                }
-                add(GamepadAction.A to "Act")
-                add(GamepadAction.B to "Close")
-            },
+            bindings = listOf(
+                HintBinding(GamepadAction.LEFT, "Lower") { focusIndex < panel.sliders.size },
+                HintBinding(GamepadAction.RIGHT, "Raise") { focusIndex < panel.sliders.size },
+                HintBinding(GamepadAction.A, "Act"),
+                HintBinding(GamepadAction.B, "Close"),
+            ),
             background = Color.Transparent,
         )
     }

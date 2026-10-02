@@ -51,7 +51,7 @@ class GamepadShellTest {
     }
 
     @Test
-    fun `entries within a section are sorted alphabetically by title, not scan order`() {
+    fun `entries within a section keep the order the query gave them`() {
         val entries = listOf(
             entry("zebra", LibraryEntryKind.NATIVE_ANDROID_APP).copy(title = "Zebra"),
             entry("apple", LibraryEntryKind.NATIVE_ANDROID_APP).copy(title = "apple"),
@@ -60,7 +60,7 @@ class GamepadShellTest {
 
         val sections = buildAppSections(entries)
 
-        assertEquals(listOf("apple", "Mango", "Zebra"), sections.single().entries.map { it.title })
+        assertEquals(listOf("Zebra", "apple", "Mango"), sections.single().entries.map { it.title })
     }
 
 }

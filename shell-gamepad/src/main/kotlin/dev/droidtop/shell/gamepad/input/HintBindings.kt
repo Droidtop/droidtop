@@ -1,9 +1,17 @@
 package dev.droidtop.shell.gamepad.input
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.TouchHintBar
@@ -67,4 +75,80 @@ fun HintRow(
         modifier = modifier,
         background = background,
     )
+}
+
+/**
+ * What the focused element says the footer should promise (docs/SPEC.md
+ * 7j, "Filters, sort and the hint bar"). The shell owns one of these and
+ * its ONE footer draws it: an element that has the focus declares its hints
+ * with [declaresHints], and releases them when the focus leaves, so the bar
+ * always names what a press does where the cursor is, and no screen draws a
+ * row of its own. Only the focus owner's declaration shows; a release by an
+ * element that no longer owns it is ignored, so two elements trading focus
+ * in either order end with the right row.
+ */
+class FocusedHints {
+    private var owner: Any? = null
+
+    /** The declared bindings, or null while no element that declares any has the focus. */
+    var bindings by mutableStateOf<List<HintBinding>?>(null)
+        private set
+
+    internal fun declare(owner: Any, bindings: List<HintBinding>) {
+        if (this.owner === owner && this.bindings === bindings) return
+        this.owner = owner
+        this.bindings = bindings
+    }
+
+    internal fun release(owner: Any) {
+        if (this.owner === owner) {
+            this.owner = null
+            bindings = null
+        }
+    }
+}
+
+/** The shell's [FocusedHints]; null outside the shell, where [declaresHints] does nothing. */
+val LocalFocusedHints = compositionLocalOf<FocusedHints?> { null }
+
+/**
+ * Declares [bindings] as the footer's hints while this element, or anything
+ * inside it, has the focus. Pass a remembered list (rebuilt only when what it
+ * says changes): a new list instance on every recomposition would republish
+ * it on every recomposition.
+ */
+fun Modifier.declaresHints(bindings: List<HintBinding>): Modifier = composed {
+    val host = LocalFocusedHints.current
+    val token = remember { Any() }
+    var focused by remember { mutableStateOf(false) }
+    if (host != null) {
+        SideEffect { if (focused) host.declare(token, bindings) }
+        DisposableEffect(host) { onDispose { host.release(token) } }
+    }
+    Modifier.onFocusChanged {
+        focused = it.hasFocus
+        if (host != null) {
+            if (it.hasFocus) host.declare(token, bindings) else host.release(token)
+        }
+    }
+}
+
+/**
+ * The shell's footer: the focused element's declared hints, or [fallback]
+ * (what the screen means by a press when nothing declares), then the
+ * [trailing] ones that hold everywhere. The ONE hint row of a screen the
+ * shell draws; the declared list is read here, inside
+ * this composable, so a change in it recomposes only the row.
+ */
+@Composable
+fun FocusedHintRow(
+    fallback: List<HintBinding>,
+    modifier: Modifier = Modifier,
+    background: Color = MenuTokens.HintBar,
+    // What the shell means on every screen (Start is the left menu), so a
+    // declaration names only what is the focused element's own.
+    trailing: List<HintBinding> = emptyList(),
+) {
+    val declared = LocalFocusedHints.current?.bindings
+    HintRow(bindings = (declared ?: fallback) + trailing, modifier = modifier, background = background)
 }

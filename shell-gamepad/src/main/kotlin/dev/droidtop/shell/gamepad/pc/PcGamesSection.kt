@@ -62,19 +62,22 @@ import dev.droidtop.shell.gamepad.gridPadTarget
 import dev.droidtop.shell.gamepad.showsShoulderGlyphs
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
-import dev.droidtop.shell.gamepad.input.HintRow
+import dev.droidtop.shell.gamepad.input.declaresHints
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.keepCentred
 import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.query.LibraryFacet
-import dev.droidtop.shell.gamepad.query.LibraryFilterDialog
+import dev.droidtop.shell.gamepad.query.LibraryFilterSheet
+import dev.droidtop.shell.gamepad.query.LibrarySortSheet
+import dev.droidtop.shell.gamepad.query.PersistQuery
+import dev.droidtop.shell.gamepad.query.QueryChipRow
+import dev.droidtop.shell.gamepad.query.SheetAction
+import dev.droidtop.shell.gamepad.query.rememberSavedViews
 import dev.droidtop.shell.gamepad.query.LibraryQuery
 import dev.droidtop.shell.gamepad.query.LibraryQueryScope
 import dev.droidtop.shell.gamepad.query.LibrarySearchDialog
 import dev.droidtop.shell.gamepad.query.LibrarySortKey
-import dev.droidtop.shell.gamepad.query.LibraryViewPrefs
-import dev.droidtop.shell.gamepad.query.NamedLibraryView
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.Dispatchers
@@ -111,6 +114,7 @@ internal class PcGamesState {
     var setupOpen by mutableStateOf(false)
     var optionsOpen by mutableStateOf(false)
     var filterOpen by mutableStateOf(false)
+    var sortOpen by mutableStateOf(false)
     var searchOpen by mutableStateOf(false)
 
     /**
@@ -235,26 +239,20 @@ internal fun PcGamesSection(
                 LibraryFacet.YEAR, LibraryFacet.UPDATE, LibraryFacet.MISSING_ART, LibraryFacet.HIDDEN,
             ),
             sorts = listOf(
-                LibrarySortKey.NAME, LibrarySortKey.RECENT, LibrarySortKey.PLAYTIME,
+                LibrarySortKey.NAME, LibrarySortKey.RECENT, LibrarySortKey.ADDED, LibrarySortKey.PLAYTIME,
                 LibrarySortKey.YEAR, LibrarySortKey.RATING, LibrarySortKey.SIZE,
             ),
         )
     }
-    LaunchedEffect(Unit) {
-        if (!state.queryLoaded) {
-            state.query = withContext(Dispatchers.IO) { LibraryViewPrefs.activeQuery(context, scope.id) }
-            state.queryLoaded = true
-        }
+    PersistQuery(scope.id, state.query, state.queryLoaded) {
+        state.query = it
+        state.queryLoaded = true
     }
-    LaunchedEffect(state.query, state.queryLoaded) {
-        if (state.queryLoaded) withContext(Dispatchers.IO) { LibraryViewPrefs.setActiveQuery(context, scope.id, state.query) }
-    }
-    var savedViews by remember { mutableStateOf<List<NamedLibraryView>>(emptyList()) }
-    LaunchedEffect(Unit) { savedViews = withContext(Dispatchers.IO) { LibraryViewPrefs.savedViews(context, scope.id) } }
     // The strip's counts (All, Installed, Updates, Favourites), worked out with
     // the shelves; Updates and Favourites show only when they hold something.
     var counts by remember { mutableStateOf(emptyMap<String, Int>()) }
-    val views = pcStripViews(counts, savedViews)
+    val savedViews = rememberSavedViews(scope.id)
+    val views = pcStripViews(counts, savedViews.views)
 
     var shelves by remember { mutableStateOf(emptyList<PcShelf>()) }
     LaunchedEffect(games) {
@@ -327,11 +325,11 @@ internal fun PcGamesSection(
     val knownEmpty = games?.isEmpty() == true
     val showingSetup = (state.setupOpen || knownEmpty) && storesScreen != null
     val canGoBack = state.setupOpen || !state.home
-    LaunchedEffect(showingSetup, canGoBack) {
-        // The setup screen is a plain settings screen with no row of its
-        // own, so the shell's bar draws there; everywhere else this tab's
-        // own row is the control surface.
-        onHelpRowClaim(if (showingSetup) HelpRowClaim.NONE else HelpRowClaim.SCREEN)
+    LaunchedEffect(canGoBack) {
+        // The shell's one footer draws this tab's hints too: the focused
+        // element declares them ([declaresHints] below), so the tab claims
+        // no row of its own.
+        onHelpRowClaim(HelpRowClaim.NONE)
         onCanGoBackChanged(canGoBack)
     }
     BackHandler(enabled = canGoBack && !showingSetup) {
@@ -374,6 +372,24 @@ internal fun PcGamesSection(
             EsDeNavigationSounds.play("scroll")
             activateChip(next)
         }
+    }
+
+    // What this tab's focus promises, X and Y being the list's Filter and
+    // Sort By (docs/SPEC.md 7j), Select the focused game's menu: only what
+    // dispatches, re-read as the cursor moves.
+    val verb = focusedPlay?.first?.verb
+    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.home) {
+        listOf(
+            HintBinding(GamepadAction.A, if (state.stripFocused) "Select" else verb ?: "Play") { state.stripFocused || focusedEntry != null },
+            HintBinding(GamepadAction.X, "Filter"),
+            HintBinding(GamepadAction.Y, "Sort By"),
+            HintBinding(GamepadAction.SELECT, "Options"),
+            HintBinding(GamepadAction.B, "Back") { !state.home },
+            // L1/R1 step this strip's views (OwnShoulders), so the row names
+            // what they do HERE; Start is the shell's, drawn by the footer.
+            HintBinding(GamepadAction.L, "Previous view"),
+            HintBinding(GamepadAction.R, "Next view"),
+        )
     }
 
     val focus = remember { FocusRequester() }
@@ -423,6 +439,7 @@ internal fun PcGamesSection(
                 .weight(1f)
                 .fillMaxWidth()
                 .focusRequester(focus)
+                .declaresHints(hints)
                 .focusable()
                 .onPad { press ->
                     heldStep = press.repeat
@@ -469,10 +486,13 @@ internal fun PcGamesSection(
                         GamepadAction.A -> {
                             if (state.stripFocused) activateChip(state.stripIndex) else focusedEntry?.let(launch)
                         }
-                        GamepadAction.Y -> focusedEntry?.let { state.pageId = it.id }
-                        GamepadAction.X -> focusedEntry?.let(onToggleFavorite) ?: return@onPad false
-                        GamepadAction.L2 -> focusedEntry?.let { state.menuId = it.id } ?: return@onPad false
-                        GamepadAction.SELECT -> state.optionsOpen = true
+                        GamepadAction.X -> state.filterOpen = true
+                        GamepadAction.Y -> state.sortOpen = true
+                        // Options is the focused game's menu (L2 stays its
+                        // alias); with no game under the cursor it is the
+                        // list's own options.
+                        GamepadAction.SELECT, GamepadAction.L2 ->
+                            focusedEntry?.let { state.menuId = it.id } ?: run { state.optionsOpen = true }
                         else -> return@onPad false
                     }
                     true
@@ -536,10 +556,15 @@ internal fun PcGamesSection(
                     partsOf = ::partsOf,
                 )
                 else -> {
-                    Text(
-                        gridSummary(state.query, grid.size),
-                        color = MenuTokens.OnSurfaceMuted,
-                        style = TypeRole.supporting,
+                    QueryChipRow(
+                        scope = scope,
+                        query = state.query,
+                        shown = grid.size,
+                        total = state.query.totalIn(games.orEmpty(), scope),
+                        onChange = {
+                            state.query = it
+                            state.itemIndex = 0
+                        },
                         modifier = Modifier.padding(horizontal = window.edgePadding, vertical = Space.Xs),
                     )
                     if (grid.isEmpty()) {
@@ -587,32 +612,13 @@ internal fun PcGamesSection(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = window.edgePadding, vertical = Space.Xs),
             )
         }
-        // This tab's own hint row: the one legend AND the touch route to
-        // these buttons (docs/SPEC.md 7j), promising only what dispatches.
-        val verb = focusedPlay?.first?.verb
-        val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.home) {
-            listOf(
-                HintBinding(GamepadAction.A, if (state.stripFocused) "Select" else verb ?: "Play") { state.stripFocused || focusedEntry != null },
-                HintBinding(GamepadAction.Y, "Game page") { focusedEntry != null },
-                HintBinding(GamepadAction.X, "Favourite") { focusedEntry != null },
-                HintBinding(GamepadAction.L2, "Game options") { focusedEntry != null },
-                HintBinding(GamepadAction.SELECT, "Options"),
-                HintBinding(GamepadAction.B, "Back") { !state.home },
-                // Start is the shell's left menu; L1/R1 step this strip's
-                // views (OwnShoulders), so the row names what they do HERE.
-                HintBinding(GamepadAction.START, "Menu"),
-                HintBinding(GamepadAction.L, "Previous view"),
-                HintBinding(GamepadAction.R, "Next view"),
-            )
-        }
-        HintRow(bindings = hints)
     }
     }
 
     // The windows this tab opens over itself. Each is its own window and
     // takes the pad through the pipeline's front (docs/SPEC.md 6e).
     if (state.filterOpen) {
-        LibraryFilterDialog(
+        LibraryFilterSheet(
             scope = scope,
             base = games.orEmpty(),
             query = state.query,
@@ -626,15 +632,30 @@ internal fun PcGamesSection(
                 state.filterOpen = false
                 state.searchOpen = true
             },
-            onSaveView = { name ->
-                LibraryViewPrefs.saveView(context, scope.id, NamedLibraryView(name, state.query))
-                savedViews = LibraryViewPrefs.savedViews(context, scope.id)
-            },
-            onForgetView = { name ->
-                LibraryViewPrefs.removeView(context, scope.id, name)
-                savedViews = LibraryViewPrefs.savedViews(context, scope.id)
-            },
+            onSaveView = { name -> savedViews.save(name, state.query) },
+            onForgetView = { name -> savedViews.forget(name) },
             onDismiss = { state.filterOpen = false },
+            // The list's own options (jump to a letter, scrape, PC setup and
+            // the stores) are one row from here, and from Select when no
+            // game is under the cursor.
+            footerActions = listOf(
+                SheetAction("List options", "Jump to a letter, scrape, game folders and stores") {
+                    state.filterOpen = false
+                    state.optionsOpen = true
+                },
+            ),
+        )
+    }
+    if (state.sortOpen) {
+        LibrarySortSheet(
+            scope = scope,
+            query = state.query,
+            onQueryChange = { query ->
+                state.query = query
+                state.home = false
+                state.itemIndex = 0
+            },
+            onDismiss = { state.sortOpen = false },
         )
     }
     if (state.searchOpen) {
@@ -667,7 +688,6 @@ internal fun PcGamesSection(
             groupKey = "PC",
             groupLabel = "PC Games",
             systemId = PC_SYSTEM_ID,
-            onSortChanged = {},
             onScraped = onRequestRescan,
             onDismiss = { state.optionsOpen = false },
             games = listed,
@@ -718,6 +738,10 @@ internal fun PcGamesSection(
             // Sideways, not deeper: another folder of the same game
             // replaces which entry this SAME menu is showing.
             onOpenOther = { state.menuId = it.id },
+            onOpenPage = {
+                state.menuId = null
+                state.pageId = menuEntry.id
+            },
         )
     }
 }
@@ -791,10 +815,3 @@ private fun PcShelvesHome(
         }
     }
 }
-
-/** The grid's one line of state: how many games, the sort, the search. Pure, for the tests. */
-internal fun gridSummary(query: LibraryQuery, shown: Int): String = buildList {
-    add(if (shown == 1) "1 game" else "$shown games")
-    add("Sort: ${query.sort.label}")
-    query.text.takeIf { it.isNotBlank() }?.let { add("\"$it\"") }
-}.joinToString(" · ")

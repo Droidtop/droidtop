@@ -133,6 +133,9 @@ internal fun PcGameMenu(
     onOpenOther: (LibraryEntry) -> Unit = {},
     // A part was marked finished or not: the tab folds again, so Play moves on (docs/SPEC.md 7n).
     onProgressChanged: () -> Unit = {},
+    // The game's own page (the list's A is Play now, so the page's route from
+    // the pad is this row); null where the caller has no page to open.
+    onOpenPage: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -551,6 +554,7 @@ internal fun PcGameMenu(
         onToggleFavorite = {
             scope.launch { library.toggleFavorite(entry)?.let { favorite = it } }
         },
+        onOpenPage = onOpenPage,
         engineRow = runners.engine.let { engine ->
             if (engineChoice.folder == null || !loaded) {
                 null
@@ -994,6 +998,7 @@ private fun rememberPcActions(
     onCollections: () -> Unit,
     favorite: Boolean,
     onToggleFavorite: () -> Unit,
+    onOpenPage: (() -> Unit)?,
     engineRow: PcActionRow?,
     onEnginehost: (android.content.Intent) -> Unit,
     onOpenAppScreen: (className: String, extras: Map<String, String>) -> Unit,
@@ -1012,6 +1017,7 @@ private fun rememberPcActions(
         // anything for a store game; a folder game keeps the row,
         // disabled, saying droidtop does not manage it.
         play = listOfNotNull(
+            onOpenPage?.let { PcActionRow("Game page", "Its artwork, facts and the one Play button", it) },
             // One row, not three: install, verify, update, DLC and
             // delete are one screen on the store's side, and that
             // screen is the store's own (gamenative's AppScreen for
