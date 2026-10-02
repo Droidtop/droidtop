@@ -2605,8 +2605,9 @@ a close path of its own. Every call works off the main thread.
   (the shell and the companion).
 - **The outcome is stated, never assumed** (`CloseOutcome`): `Closed` only when a provider confirmed
   the force-stop; `Requested` when droidtop only asked Android and cannot tell; `Failed` with the
-  provider's own words. `Requested` and `Failed` always end with the same plain sentence
-  (`TaskPolicy.ENABLE_HINT`): what Android does not allow and that Shizuku lifts it. A
+  provider's own words. `Requested` says "Not confirmed" (`TaskPolicy.NOT_CONFIRMED`), with
+  `NOT_CONFIRMED_TIP` as the tooltip saying what Android does not report and that an elevated backend
+  closes apps for real. A
   surface never does nothing silently, and only `Closed` is the Quick Menu's `QuitResult.Ended`
   (droidtop's running-game state clears on that alone, as the rule above already says).
 - **The app in front is what droidtop last started.** `LaunchDisplay.dispatch`, the one point every
@@ -2646,7 +2647,7 @@ a close path of its own. Every call works off the main thread.
 - **Clear all apps: one action, four surfaces** (tracker#252). `TaskManager.clearAllTargets` reads the
   list fresh and applies `TaskPolicy.clearAllTargets`; `TaskManager.clearAll` closes each target by the
   one close path and returns a `ClearAllSummary` whose sentence says how many were closed, how many
-  were only asked, and how many failed (and, for the last two, `ENABLE_HINT`). Every surface calls those
+  were only asked, and how many failed. Every surface calls those
   two functions and adds only its own presentation:
   - **Never closed by Clear all:** droidtop (its shell and the companion are its own tasks), Enginehost
     (it may be hosting a running game; closing it by name from the list is still allowed), the system UI,
