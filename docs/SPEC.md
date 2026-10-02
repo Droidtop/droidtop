@@ -9211,7 +9211,7 @@ that follow are decisions, and each is in the code it names:
   thing done per folder (it opens files), is remembered with the listing and, for
   the restart case, in a file (below).
 - **An engine check reads each folder once and asks about names first**
-  (`FolderFacts`, `EngineDetectRules`). The first cold run on the console spent
+  (`FolderListing`, `EngineDetectRules`). The first cold run on the console spent
   140 s on 44 engine checks in one folder (about 3 s each) because every
   condition of every database row listed the folder again and `stat`ed all its
   entries. Now a folder's names come from one `readdir`; a path or name rule is

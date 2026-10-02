@@ -211,10 +211,10 @@ object EngineRegistryParser {
  * (Droidtop/tracker#275). A facts object is for one detection pass on one
  * thread; it is never shared.
  */
-class FolderFacts(val folder: File) {
+class FolderListing(val folder: File) {
     private val names: Array<String> by lazy { folder.list() ?: emptyArray() }
     private val kinds = HashMap<String, Int>()
-    private val children = HashMap<String, FolderFacts>()
+    private val children = HashMap<String, FolderListing>()
 
     /** The folder's entry names, unsorted, files and folders alike. */
     fun entryNames(): Array<String> = names
@@ -240,7 +240,7 @@ class FolderFacts(val folder: File) {
     fun isFolder(name: String): Boolean = kindOf(name) == KIND_FOLDER
 
     /** The facts of the subfolder [name] (which must be one of this folder's entries). */
-    fun child(name: String): FolderFacts = children.getOrPut(name) { FolderFacts(File(folder, name)) }
+    fun child(name: String): FolderListing = children.getOrPut(name) { FolderListing(File(folder, name)) }
 
     /** Whether a FILE whose name passes [test] is here; only names that pass are `stat`ed. */
     fun hasFile(test: (String) -> Boolean): Boolean = names.any { test(it) && isFile(it) }
@@ -270,7 +270,7 @@ class FolderFacts(val folder: File) {
  * name fails its rule (soundness over optimism, same as the parser's
  * unknown-type handling).
  *
- * Every condition is answered from a [FolderFacts], so a caller that asks
+ * Every condition is answered from a [FolderListing], so a caller that asks
  * several rows about one folder passes ONE facts object and the folder is
  * read once, whatever the number of rows and conditions.
  */
@@ -296,16 +296,16 @@ object EngineDetectRules {
      */
     fun matches(
         rules: List<DetectRule>,
-        facts: FolderFacts,
-        builtinProbe: (String, FolderFacts, Boolean) -> Boolean,
+        facts: FolderListing,
+        builtinProbe: (String, FolderListing, Boolean) -> Boolean,
         atThisFolderOnly: Boolean = false,
     ): Boolean =
         rules.any { rule -> rule.all.all { condition -> holds(condition, facts, builtinProbe, atThisFolderOnly) } }
 
     private fun holds(
         condition: DetectCondition,
-        facts: FolderFacts,
-        builtinProbe: (String, FolderFacts, Boolean) -> Boolean,
+        facts: FolderListing,
+        builtinProbe: (String, FolderListing, Boolean) -> Boolean,
         atThisFolderOnly: Boolean,
     ): Boolean =
         when (condition) {
@@ -342,7 +342,7 @@ object EngineDetectRules {
      * level is one listing, and a subfolder's kind is only asked when the
      * level above did not already answer.
      */
-    private fun anyFileExtensionWithin(facts: FolderFacts, extension: String, maxDepth: Int): Boolean {
+    private fun anyFileExtensionWithin(facts: FolderListing, extension: String, maxDepth: Int): Boolean {
         if (facts.hasFile { it.substringAfterLast('.', "").lowercase() == extension }) return true
         if (maxDepth <= 0) return false
         return facts.entryNames().any { facts.isFolder(it) && anyFileExtensionWithin(facts.child(it), extension, maxDepth - 1) }

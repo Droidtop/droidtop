@@ -337,7 +337,7 @@ class PcFolderScanTest {
     fun `folder facts read a folder once and ask the disk about a name only when it is listed`() {
         file("Probe/Game.exe", "MZ")
         file("Probe/data.pck")
-        val facts = FolderFacts(File(temp.root, "Probe"))
+        val facts = FolderListing(File(temp.root, "Probe"))
         assertEquals(setOf("Game.exe", "data.pck"), facts.entryNames().toSet())
         // Added after the listing was read: the one read is what every rule is answered from.
         file("Probe/late.exe", "MZ")

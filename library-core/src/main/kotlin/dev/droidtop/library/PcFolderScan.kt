@@ -453,7 +453,7 @@ object PcFolderScan {
          * two subfolders at all (it needs two games below). Probing a
          * subfolder for engine evidence is the costliest thing a walk does
          * per folder, so it is bounded to marker names in one read of each
-         * subfolder ([FolderFacts]), a few subfolders are looked at at once,
+         * subfolder ([FolderListing]), a few subfolders are looked at at once,
          * and the verdict is kept per folder across restarts
          * ([EngineVerdicts]); [Work] counts it for that reason.
          */

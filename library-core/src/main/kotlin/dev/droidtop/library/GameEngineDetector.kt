@@ -97,7 +97,7 @@ object GameEngineDetector {
         folder: File,
         defs: List<EngineDef>,
         atThisFolderOnly: Boolean = false,
-        facts: FolderFacts = FolderFacts(folder),
+        facts: FolderListing = FolderListing(folder),
         ruleFilter: (DetectRule) -> Boolean,
     ): GameEngine? =
         defs.firstOrNull { def ->
@@ -105,7 +105,7 @@ object GameEngineDetector {
                 EngineDetectRules.matches(def.detect.filter(ruleFilter), facts, ::builtinProbe, atThisFolderOnly)
         }?.engine
 
-    private fun builtinProbe(name: String, facts: FolderFacts, atThisFolderOnly: Boolean): Boolean = when (name) {
+    private fun builtinProbe(name: String, facts: FolderListing, atThisFolderOnly: Boolean): Boolean = when (name) {
         "godot" -> isGodot(facts)
         "html" -> isHtml(facts)
         // Unity's probe is the one that searches below itself, so it is
@@ -130,7 +130,7 @@ object GameEngineDetector {
      */
     private const val GODOT_MAX_TRAILER_READS = 4
 
-    private fun isGodot(facts: FolderFacts): Boolean {
+    private fun isGodot(facts: FolderListing): Boolean {
         if (facts.hasFile { it.substringAfterLast('.', "").lowercase() == "pck" }) return true
         return facts.entryNames().asSequence()
             .filter { it.substringAfterLast('.', "").lowercase() in GODOT_EXECUTABLE_SUFFIXES && facts.isFile(it) }
@@ -165,7 +165,7 @@ object GameEngineDetector {
     private const val HTML_MAX_HEAD_READS = 4
 
     /** A web page alone may be a tool or launcher; Twine's story data identifies a game. */
-    private fun isHtml(facts: FolderFacts): Boolean =
+    private fun isHtml(facts: FolderListing): Boolean =
         facts.entryNames()
             .asSequence()
             .filter { it.substringAfterLast('.', "").lowercase() in HTML_EXTENSIONS }
@@ -205,9 +205,9 @@ object GameEngineDetector {
 
     private val UNITY_PLAYER_FILENAMES = setOf("UnityPlayer.dll", "UnityPlayer.so", "UnityPlayer.dylib")
 
-    private fun isUnity(facts: FolderFacts): Boolean = hasUnityPlayerRuntime(facts, maxDepth = 3)
+    private fun isUnity(facts: FolderListing): Boolean = hasUnityPlayerRuntime(facts, maxDepth = 3)
 
-    private fun hasUnityPlayerRuntime(facts: FolderFacts, maxDepth: Int): Boolean {
+    private fun hasUnityPlayerRuntime(facts: FolderListing, maxDepth: Int): Boolean {
         if (facts.hasFile { it in UNITY_PLAYER_FILENAMES }) return true
         if (maxDepth <= 0) return false
         return facts.entryNames().any { facts.isFolder(it) && hasUnityPlayerRuntime(facts.child(it), maxDepth - 1) }
@@ -439,7 +439,7 @@ object GameEngineDetector {
         // BEFORE the subtree rules because it is the cheap half of the
         // answer: the subtree rules read below the folder, and a folder with
         // nothing to run is no game root whatever they find.
-        val facts = FolderFacts(folder)
+        val facts = FolderListing(folder)
         return detect(folder, defs, facts = facts) { !it.readsUnnamedSubtree }
             ?: if (GameExecutableResolver.hasExecutable(facts)) {
                 detect(folder, defs, atThisFolderOnly = true, facts = facts) { it.readsUnnamedSubtree }
