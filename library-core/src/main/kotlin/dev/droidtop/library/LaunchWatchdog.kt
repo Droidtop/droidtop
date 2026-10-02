@@ -1,11 +1,11 @@
 package dev.droidtop.library
 
-import android.app.ActivityManager
 import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.view.Display
+import dev.droidtop.library.consoles.RetroArchCores
 import dev.droidtop.runtime.tasks.CloseOutcome
 import dev.droidtop.runtime.tasks.Fidelity
 import dev.droidtop.runtime.tasks.TaskManager
@@ -39,6 +39,8 @@ data class LaunchAlert(
     val message: String,
     /** Where droidtop wrote down what it saw, for someone who has to ask for help. */
     val logPath: String,
+    /** For a stuck RetroArch launch, the core it was given unless that core is confirmed installed. */
+    val retroArchCore: RetroArchCores.Need? = null,
 )
 
 /** One look at a launched app, as [LaunchWatchPolicy] reads it. */
@@ -46,7 +48,7 @@ internal data class WatchObservation(
     val elapsedMs: Long,
     /** droidtop's shell was started again after the launch began (the existing bounce signal). */
     val shellCameBack: Boolean,
-    /** Android lists the app's process as not responding. */
+    /** Android lists the app's process as not responding (read through the privileged helper; false without one). */
     val notResponding: Boolean,
     /** Whether the system's task list holds the app; null when droidtop cannot read that list (no privileged helper). */
     val taskListed: Boolean?,
@@ -55,15 +57,24 @@ internal data class WatchObservation(
 internal sealed interface WatchVerdict {
     data object Keep : WatchVerdict
     data object Stop : WatchVerdict
+
+    /**
+     * The app is listed and alive past [LaunchWatchPolicy.SETTLED_MS]: the task list has nothing more
+     * to say, but the watch goes on for the not-responding state until [LaunchWatchPolicy.WATCH_MS],
+     * because an app that hangs with nobody touching it only becomes "not responding" once a key or
+     * a focus change reaches it, which may be well after it settled (console, build 1397: RetroArch's
+     * ANR came 44 s after the launch).
+     */
+    data object Settled : WatchVerdict
     data class Trouble(val trouble: LaunchTrouble) : WatchVerdict
 }
 
 /**
  * The watchdog's whole decision, pure so it can be tested without a device
- * (docs/SPEC.md "The launch watchdog"). It claims only what a non-root app can
- * see: Android's own not-responding state for the app, whether the shell was
- * started again, and, when the privileged helper is running, whether the task
- * is still open. A silent black window of a live, responsive app is
+ * (docs/SPEC.md "The launch watchdog"). It claims only what droidtop can see:
+ * whether the shell was started again and, when the privileged helper is
+ * running, Android's not-responding state for the app and whether its task is
+ * still open. A silent black window of a live, responsive app is
  * indistinguishable from a game that is simply running, so it is never claimed.
  */
 internal object LaunchWatchPolicy {
@@ -75,7 +86,7 @@ internal object LaunchWatchPolicy {
     /** How long a launch is given to show up in the task list before its absence counts. */
     const val APPEAR_GRACE_MS = 9_000L
 
-    /** An app listed and still alive this long after launch is left alone. */
+    /** An app listed and still alive this long after launch is no longer checked against the task list. */
     const val SETTLED_MS = 30_000L
 
     /** The most the watchdog ever watches; after this a stuck app is the person's to notice. */
@@ -86,11 +97,18 @@ internal object LaunchWatchPolicy {
         o.shellCameBack ->
             if (o.taskListed != true && o.elapsedMs <= EXIT_WINDOW_MS) WatchVerdict.Trouble(LaunchTrouble.EXITED_AT_ONCE)
             else WatchVerdict.Stop
-        o.taskListed == false && o.elapsedMs >= APPEAR_GRACE_MS -> WatchVerdict.Trouble(LaunchTrouble.GONE_WHILE_AWAY)
-        o.taskListed == true && o.elapsedMs >= SETTLED_MS -> WatchVerdict.Stop
         o.elapsedMs >= WATCH_MS -> WatchVerdict.Stop
+        o.taskListed == false && o.elapsedMs >= APPEAR_GRACE_MS -> WatchVerdict.Trouble(LaunchTrouble.GONE_WHILE_AWAY)
+        o.taskListed == true && o.elapsedMs >= SETTLED_MS -> WatchVerdict.Settled
         else -> WatchVerdict.Keep
     }
+
+    /**
+     * Whether `dumpsys activity processes <package>` reports one of the package's processes as not
+     * responding: ProcessErrorStateRecord.dump prints " mNotResponding=true" for such a process
+     * (AOSP android13-release). Pure, for tests.
+     */
+    fun dumpShowsNotResponding(dump: String): Boolean = "mNotResponding=true" in dump
 
     /** The plain sentence for [trouble], naming the app and what to do. */
     fun message(appName: String, trouble: LaunchTrouble): String = when (trouble) {
@@ -146,6 +164,7 @@ object LaunchWatchdog {
         job = scope.launch {
             val appName = TaskManager.appLabel(appContext, packageName) ?: packageName
             val started = System.currentTimeMillis()
+            var settled = false
             while (isActive) {
                 delay(LaunchWatchPolicy.POLL_MS)
                 val elapsed = System.currentTimeMillis() - started
@@ -153,8 +172,8 @@ object LaunchWatchdog {
                 val observation = WatchObservation(
                     elapsedMs = elapsed,
                     shellCameBack = shellCameBack,
-                    notResponding = isNotResponding(appContext, packageName),
-                    taskListed = if (shellCameBack || elapsed >= LaunchWatchPolicy.APPEAR_GRACE_MS) {
+                    notResponding = isNotResponding(packageName),
+                    taskListed = if (!settled && (shellCameBack || elapsed >= LaunchWatchPolicy.APPEAR_GRACE_MS)) {
                         taskListed(appContext, packageName)
                     } else {
                         null
@@ -162,18 +181,19 @@ object LaunchWatchdog {
                 )
                 when (val verdict = LaunchWatchPolicy.judge(observation)) {
                     WatchVerdict.Keep -> Unit
+                    WatchVerdict.Settled -> settled = true
                     WatchVerdict.Stop -> return@launch
                     is WatchVerdict.Trouble -> {
                         ScanLog.write("launch watchdog: $packageName ${verdict.trouble} after $elapsed ms")
-                        val coreHint = retroArchCorePath?.let {
-                            runCatching { dev.droidtop.library.consoles.RetroArchCores.troubleHint(packageName, it) }.getOrNull()
-                        }
+                        val core = retroArchCorePath?.let { runCatching { RetroArchCores.suspect(packageName, it) }.getOrNull() }
                         alertFlow.value = LaunchAlert(
                             packageName,
                             appName,
                             verdict.trouble,
-                            listOfNotNull(LaunchWatchPolicy.message(appName, verdict.trouble), coreHint).joinToString(" "),
+                            listOfNotNull(LaunchWatchPolicy.message(appName, verdict.trouble), core?.let(RetroArchCores::troubleHint))
+                                .joinToString(" "),
                             ScanLog.logPath(appContext),
+                            core,
                         )
                         return@launch
                     }
@@ -192,6 +212,25 @@ object LaunchWatchdog {
         return outcome
     }
 
+    /**
+     * The alert's "Get the core" for a stuck RetroArch launch ([LaunchAlert.retroArchCore]): closes the
+     * stuck RetroArch by the one close path, then hands the core to [RetroArchCores.ensure], which
+     * installs it without opening RetroArch where the root helper can place it, and otherwise opens
+     * RetroArch for its Core Downloader (RetroArch has no command that installs a core). Returns the
+     * line to show; null when there is nothing to say.
+     */
+    suspend fun getCore(context: Context, alert: LaunchAlert): String? {
+        val need = alert.retroArchCore ?: return null
+        val closed = TaskManager.close(context.applicationContext, alert.packageName)
+        if (closed is CloseOutcome.Closed) LaunchDisplay.clearRunning()
+        dismiss()
+        return when (val outcome = RetroArchCores.ensure(context.applicationContext, need)) {
+            RetroArchCores.Outcome.Ready -> "${need.core} is installed. Start the game again."
+            is RetroArchCores.Outcome.Manual -> outcome.line
+            is RetroArchCores.Outcome.Failed -> outcome.line
+        }
+    }
+
     /** The alert's "Return to droidtop": brings the shell back to the built-in screen. */
     fun returnToShell(context: Context) {
         val intent = Intent().setClassName(context.packageName, SHELL_ACTIVITY)
@@ -201,14 +240,20 @@ object LaunchWatchdog {
         }.onFailure { Log.w(TAG, "Could not bring the shell back", it) }
     }
 
-    /** Android's own error state for the app's processes: the one cross-app signal a normal app can read. */
-    private fun isNotResponding(context: Context, packageName: String): Boolean = runCatching {
-        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        am.processesInErrorState.orEmpty().any {
-            it.condition == ActivityManager.ProcessErrorStateInfo.NOT_RESPONDING &&
-                (it.processName == packageName || it.processName.startsWith("$packageName:"))
-        }
-    }.getOrDefault(false)
+    /**
+     * Android's not-responding state for the app's processes, read by the privileged helper; false
+     * without one. Not ActivityManager.getProcessesInErrorState: it returns only the caller's own
+     * processes unless the caller holds DUMP (ActivityManagerService.getProcessesInErrorState,
+     * `if (!hasDumpPermission && app.info.uid != callingUid) return;`, AOSP android13-release), so
+     * droidtop never saw another app's ANR through it (console, build 1397: RetroArch's system
+     * not-responding dialog, no alert). The shell user the helper runs as holds DUMP.
+     */
+    private fun isNotResponding(packageName: String): Boolean {
+        val shell = TaskManager.shell
+        if (!shell.capabilities().shell) return false
+        val out = runCatching { shell.exec(listOf("dumpsys", "activity", "processes", packageName)) }.getOrNull()
+        return out != null && out.exit == 0 && LaunchWatchPolicy.dumpShowsNotResponding(out.stdout)
+    }
 
     /** Whether the task list holds the package; null when it cannot be read exactly (no privileged helper running). */
     private suspend fun taskListed(context: Context, packageName: String): Boolean? {

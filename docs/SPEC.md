@@ -6178,10 +6178,17 @@ is not listed beside an installed one of the same name (ARMSX2 is published as `
 
 **The launch watchdog** (`LaunchWatchdog`, `LaunchWatchPolicy`). `LaunchDisplay.dispatch`, the one point
 every launch passes, starts it for a game launch. It runs off the main thread, every 3 s for at most 90 s,
-and ends the moment the launch is settled (`clearRunning`, a quit, or a listed and live app after 30 s). It
-uses only what a non-root app can see:
+and ends early when the launch ends (`clearRunning`, a quit, the shell coming back). A listed and live app
+after 30 s is settled: the task list is no longer read, but the not-responding check goes on to 90 s,
+because an app that hangs with nobody touching it is only declared not responding once a key or focus
+change reaches it (console, build 1397: RetroArch's system dialog came 44 s after the launch). It uses:
 
-- Android's own not-responding state for the app's processes (`ActivityManager.getProcessesInErrorState`);
+- when a `priv.shell` provider runs, Android's not-responding state for the app's processes
+  (`dumpsys activity processes <package>`, a ` mNotResponding=true` line). Not
+  `ActivityManager.getProcessesInErrorState`: it returns only the caller's own processes unless the
+  caller holds DUMP (ActivityManagerService.getProcessesInErrorState, android13-release), so droidtop never saw another
+  app's not-responding state through it (Droidtop/tracker#271, build 1397: two RetroArch ANR dialogs, no
+  alert). The shell user the provider runs as holds DUMP. Without a provider this is unknown and claims nothing;
 - whether the shell was started again after the launch began (`LaunchDisplay.shellStartedMs`, the same
   signal as the bounce check);
 - when a `priv.shell` provider runs, whether the app's task is in the system's task list
@@ -6455,8 +6462,12 @@ Owner: "do this over the API. We want retroarch to TRY to be touchless" and, on 
   not installed. Nothing without root tells that apart from a running game, so the launch watchdog's
   report for a RetroArch launch (not responding, closed at once, gone) adds one sentence naming the core
   and RetroArch's Core Downloader unless the root helper confirmed the core is there
-  (`RetroArchCores.troubleHint`, from the launch intent's LIBRETRO extra), and the system's "RetroArch
-  core" row says that games staying black means the core is missing.
+  (`RetroArchCores.suspect` and `troubleHint`, from the launch intent's LIBRETRO extra), and the system's
+  "RetroArch core" row says that games staying black means the core is missing. That report also offers
+  **Get the core** first (owner: "if it fails, we can always tell RetroArch to install it"): it closes the
+  stuck RetroArch by the task manager's close path and hands the core to `RetroArchCores.ensure`, the same
+  path as the emulator screen's row, which installs it touchlessly with the root helper and otherwise opens
+  RetroArch and names the core for its Core Downloader (RetroArch has no command that installs a core).
 
 ## 7e3. Lutris install-script integration (directed 2026-08-30, scoped and built 2026-09-25)
 

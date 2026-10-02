@@ -83,13 +83,19 @@ object RetroArchCores {
      * The sentence the launch watchdog adds when a RetroArch launch is stuck: RetroArch shows no
      * error for a missing core, it sits black and stops answering (console, build 1386: a Game Boy
      * Color game with gambatte, which RetroArch never loaded, while mGBA ran through the same
-     * launch). Null when the core is known to be installed. Background only (it may ask the root helper).
+     * launch). [suspect] decides whether it applies. Pure.
      */
-    fun troubleHint(packageName: String, corePath: String): String? {
+    fun troubleHint(need: Need): String =
+        "RetroArch shows a black screen when the core it is given is not installed: " +
+            "install ${need.core} in RetroArch (Online Updater > Core Downloader), or choose Get the core."
+
+    /**
+     * The core a stuck RetroArch launch may be missing: [corePath]'s core unless the root helper
+     * confirmed it is installed. Background only (it may ask the root helper).
+     */
+    fun suspect(packageName: String, corePath: String): Need? {
         val need = needForPath(packageName, corePath) ?: return null
-        if (state(need) == State.INSTALLED) return null
-        return "RetroArch shows a black screen when the core it is given is not installed: " +
-            "install ${need.core} in RetroArch (Online Updater > Core Downloader)."
+        return need.takeIf { state(it) != State.INSTALLED }
     }
 
     private val CORE_ID = Regex("[a-z0-9_]+")

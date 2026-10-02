@@ -1083,7 +1083,17 @@ private fun GamepadShellBody(
                         dev.droidtop.library.LaunchWatchdog.returnToShell(context)
                         dev.droidtop.library.LaunchWatchdog.dismiss()
                     },
-                ),
+                ).let { ways ->
+                    // A stuck RetroArch whose core is not confirmed installed: getting the core is the likely fix, so it comes first.
+                    val core = alert.retroArchCore?.let {
+                        LaunchFailureAction("Get the core") {
+                            scope.launch {
+                                dev.droidtop.library.LaunchWatchdog.getCore(context, alert)?.let { launchError = it }
+                            }
+                        }
+                    }
+                    listOfNotNull(core) + ways
+                },
                 detail = "What droidtop saw is written to ${alert.logPath}",
                 onDismiss = dev.droidtop.library.LaunchWatchdog::dismiss,
             )

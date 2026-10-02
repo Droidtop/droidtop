@@ -51,9 +51,27 @@ class LaunchWatchdogTest {
     }
 
     @Test
-    fun anAppThatIsListedAndHasSettledIsLeftAlone() {
+    fun anAppThatIsListedAndHasSettledIsStillWatchedForNotResponding() {
         assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.SETTLED_MS - 1, taskListed = true))
-        assertEquals(WatchVerdict.Stop, look(LaunchWatchPolicy.SETTLED_MS, taskListed = true))
+        assertEquals(WatchVerdict.Settled, look(LaunchWatchPolicy.SETTLED_MS, taskListed = true))
+        // After settling the task list is no longer read (taskListed null); an ANR a key press causes later still counts.
+        assertEquals(WatchVerdict.Keep, look(44_000))
+        assertEquals(WatchVerdict.Trouble(LaunchTrouble.NOT_RESPONDING), look(44_000, notResponding = true))
+        assertEquals(WatchVerdict.Stop, look(LaunchWatchPolicy.WATCH_MS))
+    }
+
+    @Test
+    fun theNotRespondingStateIsReadFromTheProcessDump() {
+        val stuck = """
+            ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)
+              *APP* UID 10115 ProcessRecord{8e50827 15378:com.retroarch.aarch64/u0a115}
+                user #0 uid=10115 gids={3003}
+                 mCrashing=false null mNotResponding=true [] bad=false
+        """.trimIndent()
+        assertTrue(LaunchWatchPolicy.dumpShowsNotResponding(stuck))
+        val fine = stuck.lines().dropLast(1).joinToString("\n")
+        assertEquals(false, LaunchWatchPolicy.dumpShowsNotResponding(fine))
+        assertEquals(false, LaunchWatchPolicy.dumpShowsNotResponding(" mCrashing=true null mNotResponding=false [] bad=false"))
     }
 
     @Test
