@@ -22,6 +22,11 @@ object FieldSources {
     /** The source recorded for a field imported from an external scraper's gamelist.xml. */
     const val GAMELIST = "gamelist.xml"
 
+    // The ROM scrape's sources, by the names recorded against each field.
+    const val SCREENSCRAPER = "ScreenScraper"
+    const val THEGAMESDB = "TheGamesDB"
+    const val LIBRETRO_DATABASE = "libretro database"
+
     // The field names, one vocabulary for every writer and reader.
     const val DESCRIPTION = "description"
     const val DEVELOPER = "developer"
@@ -39,6 +44,19 @@ object FieldSources {
 
     /** The fields the metadata editor can change, which are the ones [EDITED] can protect. */
     val EDITABLE = listOf(DESCRIPTION, DEVELOPER, PUBLISHER, GENRE, RELEASE_DATE, RATING, PLAYERS)
+
+    /**
+     * The editable fields each ROM source can supply, from what its client reads
+     * (ScreenScraperClient.parseGameXml, TheGamesDbClient.findMetadata, LibretroMetadata's find):
+     * the one place [superseded] learns what a match may replace. A source not listed replaces nothing.
+     */
+    val CAN_SUPPLY: Map<String, Set<String>> by lazy {
+        mapOf(
+            SCREENSCRAPER to setOf(DESCRIPTION, DEVELOPER, PUBLISHER, GENRE, RELEASE_DATE, RATING, PLAYERS),
+            THEGAMESDB to setOf(DESCRIPTION, DEVELOPER, PUBLISHER, GENRE, RELEASE_DATE, PLAYERS),
+            LIBRETRO_DATABASE to setOf(DEVELOPER, PUBLISHER, GENRE, RELEASE_DATE, PLAYERS),
+        )
+    }
 
     /** Human names, for the line that says where each field came from. */
     val LABELS = mapOf(
@@ -105,16 +123,20 @@ object FieldSources {
         decode(existing).filter { (field, from) -> from == source && field in EDITABLE }.keys
 
     /**
-     * The editable fields a fresh match of the game replaces, of those that hold a value ([filled]):
-     * every one but the person's edits and an imported gamelist.xml. A value with no recorded
+     * The editable fields a fresh match by [source] replaces, of those that hold a value ([filled]):
+     * the ones [source] can supply at all ([CAN_SUPPLY]), but never the person's edits or an
+     * imported gamelist.xml. A field the source never carries is not its to take away: a libretro
+     * database match never clears a description, because that database has none, while a
+     * ScreenScraper or TheGamesDB match that comes back without one does. A value with no recorded
      * source predates this record (9359390c, 2026-09-25) and was written by a scrape, because the
      * editor has recorded [EDITED] since the same commit. The caller removes the fields the match
      * itself supplies; the rest are cleared rather than left holding an earlier source's answer,
      * which may have been another game (Droidtop/tracker#251).
      */
-    fun superseded(existing: String?, filled: Set<String>): Set<String> {
+    fun superseded(existing: String?, filled: Set<String>, source: String): Set<String> {
         val from = decode(existing)
-        return filled.filter { it in EDITABLE && from[it] != EDITED && from[it] != GAMELIST }.toSet()
+        val capable = CAN_SUPPLY[source].orEmpty()
+        return filled.filter { it in capable && from[it] != EDITED && from[it] != GAMELIST }.toSet()
     }
 
     /** The editable fields of [row] that hold a value. */

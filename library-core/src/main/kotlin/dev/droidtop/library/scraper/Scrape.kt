@@ -299,9 +299,9 @@ suspend fun scrapeSystemArtwork(
                     sources[field] = source
                     value
                 }
-            val ss = "ScreenScraper"
-            val tgdb = "TheGamesDB"
-            val libretro = "libretro database"
+            val ss = FieldSources.SCREENSCRAPER
+            val tgdb = FieldSources.THEGAMESDB
+            val libretro = FieldSources.LIBRETRO_DATABASE
             val description = pick(
                 FieldSources.DESCRIPTION,
                 ss to screenScraperResult?.description, tgdb to gamesDbResult?.description, *plugin { it.description },
@@ -364,7 +364,15 @@ suspend fun scrapeSystemArtwork(
             // so a field it does not supply is not left holding an earlier, other source's (or another
             // game's) value (Droidtop/tracker#251: a match on Pokemon Crystal that supplied no description
             // or date left an old TheGamesDB fan game's description and date in place).
-            val matched = wantMetadata && (screenScraperResult != null || gamesDbResult != null || libretroResult != null)
+            // The one selected source that found it (exactly one source is asked per pass).
+            val matchedBy = when {
+                !wantMetadata -> null
+                screenScraperResult != null -> ss
+                gamesDbResult != null -> tgdb
+                libretroResult != null -> libretro
+                else -> null
+            }
+            val matched = matchedBy != null
             val existing = if (hasAnyMetadata || coverWritten || matched || (wantMetadata && unmatchedSource != null)) {
                 dao.getGameMetadataSingle(romFile.absolutePath)
             } else {
@@ -373,7 +381,7 @@ suspend fun scrapeSystemArtwork(
             val had = existing?.fieldSources
             val dropped = when {
                 existing == null -> emptySet()
-                matched -> FieldSources.superseded(had, FieldSources.filled(existing))
+                matchedBy != null -> FieldSources.superseded(had, FieldSources.filled(existing), matchedBy)
                 wantMetadata && unmatchedSource != null -> FieldSources.retracted(had, unmatchedSource)
                 else -> emptySet()
             } - sources.keys

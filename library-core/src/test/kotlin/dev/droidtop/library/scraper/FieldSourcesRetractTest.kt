@@ -36,8 +36,22 @@ class FieldSourcesRetractTest {
         )
         // The release date has a value but no recorded source: written before sources were recorded, by a scrape.
         val filled = setOf(FieldSources.DESCRIPTION, FieldSources.GENRE, FieldSources.PUBLISHER, FieldSources.RELEASE_DATE)
-        assertEquals(setOf(FieldSources.DESCRIPTION, FieldSources.RELEASE_DATE), FieldSources.superseded(sources, filled))
-        assertEquals(emptySet<String>(), FieldSources.superseded(sources, emptySet()))
+        assertEquals(
+            setOf(FieldSources.DESCRIPTION, FieldSources.RELEASE_DATE),
+            FieldSources.superseded(sources, filled, FieldSources.SCREENSCRAPER),
+        )
+        assertEquals(emptySet<String>(), FieldSources.superseded(sources, emptySet(), FieldSources.SCREENSCRAPER))
+    }
+
+    @Test
+    fun aMatchNeverClearsAFieldItsSourceCannotSupply() {
+        // The libretro database has no descriptions, so its match leaves one alone; it can replace a date.
+        val filled = setOf(FieldSources.DESCRIPTION, FieldSources.RELEASE_DATE)
+        assertEquals(setOf(FieldSources.RELEASE_DATE), FieldSources.superseded(null, filled, FieldSources.LIBRETRO_DATABASE))
+        // TheGamesDB carries no rating.
+        assertEquals(emptySet<String>(), FieldSources.superseded(null, setOf(FieldSources.RATING), FieldSources.THEGAMESDB))
+        // An unknown source replaces nothing.
+        assertEquals(emptySet<String>(), FieldSources.superseded(null, filled, "somewhere else"))
     }
 
     @Test

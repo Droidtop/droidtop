@@ -9244,9 +9244,14 @@ the same care as the art.
   written on "Pokemon - Crystal Version" in place, because a no match wrote nothing.
 - **A fresh match replaces the scraped text** (console, build 1397). When the selected ROM source
   (ScreenScraper, TheGamesDB or the libretro database) finds the game, its answer replaces the
-  game's scraped text: every editable field holding a value that the pass does not fill is
-  cleared with its source (`FieldSources.superseded`), except fields the person edited and fields
-  imported from a gamelist.xml. A value with no recorded source predates the record and was
+  game's scraped text: every editable field holding a value that the pass does not fill, and that
+  the answering source is capable of supplying, is cleared with its source
+  (`FieldSources.superseded`), except fields the person edited and fields imported from a
+  gamelist.xml. What each source can supply is declared once, `FieldSources.CAN_SUPPLY`
+  (ScreenScraper: all seven editable fields; TheGamesDB: all but rating; the libretro database:
+  developer, publisher, genre, release date and players). So a libretro match never clears a
+  description, which that database never has, while a ScreenScraper or TheGamesDB match that comes
+  back without one does (coordinator decision, 2026-10-02: no data loss from switching sources). A value with no recorded source predates the record and was
   written by a scrape, so it is replaced too. Before this, a per-game Scrape whose match
   supplied no description or date reported "found 1" and left an old TheGamesDB fan game's
   description and 2023 date on Pokemon Crystal. Each written game leaves one `scrape:` line in
