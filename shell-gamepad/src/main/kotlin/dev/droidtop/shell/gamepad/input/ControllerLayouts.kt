@@ -87,6 +87,7 @@ object ControllerLayouts {
     private var signature = ""
     private var toggleValue: String? = null
     private var privilegedToggleValue: String? = null
+    private var toggleVia = "app"
     private var active: ActivePad? = null
     private var recaptureDismissed by mutableStateOf(false)
     private var heavyRunning = false
@@ -242,6 +243,9 @@ object ControllerLayouts {
                 )
             }
             console = loadedState.first
+            if (console == null) {
+                Log.i(TAG, "no console table row for '${android.os.Build.MANUFACTURER}' '${android.os.Build.MODEL}'")
+            }
             captures = loadedState.second
             snapshot = loadedState.third
             signature = LayoutSignals.signature(snapshot)
@@ -258,6 +262,7 @@ object ControllerLayouts {
         val property = console?.toggle?.property ?: return
         val inProcess = LayoutSignals.readInProcess(property)
         toggleValue = inProcess ?: privilegedToggleValue
+        toggleVia = if (inProcess != null) "app" else "privileged helper"
         // SELinux can hide the property from the app: ask the privileged helper, off the main thread.
         if (inProcess == null) scheduleHeavy(app, force = false)
     }
@@ -300,7 +305,10 @@ object ControllerLayouts {
                         .putString(KEY_SNAPSHOT, formatSnapshot(fresh)).apply()
                 }
             }
-            if (toggleValue == null) toggleValue = privilegedToggleValue
+            if (toggleValue == null && privilegedToggleValue != null) {
+                toggleValue = privilegedToggleValue
+                toggleVia = "privileged helper"
+            }
             recompute()
         }
     }
@@ -332,10 +340,16 @@ object ControllerLayouts {
     private fun recompute() {
         val pad = active ?: firstAttachedPad()
         val def = console
-        val builtIn = def != null && (pad == null || def.pad?.matches(pad.name, pad.vendorId, pad.productId) == true)
+        val attached = attachedPads()
+        val reason = LayoutResolver.isBuiltIn(
+            console = def,
+            activeMatchesTable = pad?.let { def?.pad?.matches(it.name, it.vendorId, it.productId) == true },
+            attachedGamepads = attached.size,
+            anyAttachedMatchesTable = attached.any { def?.pad?.matches(it.name, it.vendorId, it.productId) == true },
+        )
         val facts = PadFacts(
             console = def,
-            builtIn = builtIn,
+            builtIn = reason.builtIn,
             externalFamily = pad?.let { ControllerClassifier.classify(it.vendorId, it.productId, it.name) },
             toggleValue = toggleValue,
             capture = pad?.let { captures[it.descriptor] },
@@ -346,7 +360,41 @@ object ControllerLayouts {
         layoutState = resolved
         recaptureState = LayoutResolver.needsRecapture(facts, resolved)
         activeNameState = pad?.name
+        logDecision(pad, reason, facts, resolved)
     }
+
+    private var lastDecision: String? = null
+
+    /**
+     * One line per CHANGE of the decision (tag droidtop.ControllerLayout), so a
+     * console check can read which pad was active, whether it counted as the
+     * built-in one and why, what the toggle read as and through which route, and
+     * the layout that came out, without a line per key press.
+     */
+    private fun logDecision(pad: ActivePad?, reason: LayoutResolver.BuiltInReason, facts: PadFacts, resolved: FaceLayout) {
+        val property = console?.toggle?.property
+        val toggle = when {
+            property == null -> "no toggle"
+            facts.toggleValue == null -> "$property unreadable (app and privileged helper)"
+            else -> "$property=${facts.toggleValue} via $toggleVia"
+        }
+        val padText = pad?.let { "'${it.name}' %04x:%04x".format(it.vendorId, it.productId) } ?: "none"
+        val capture = facts.capture?.let { with(LayoutResolver) { if (it.isCurrent(facts.signature)) "current" else "stale" } } ?: "none"
+        val decision = "pad $padText; console ${console?.id ?: "not in table"}; built-in $reason; " +
+            "family ${facts.externalFamily ?: "unknown"}; $toggle; capture $capture -> " +
+            "${resolved.family} confirmOnRight=${resolved.confirmOnRight} keysSwapped=${resolved.keysSwapped} source=${resolved.source}"
+        if (decision == lastDecision) return
+        lastDecision = decision
+        Log.i(TAG, "layout decision: $decision")
+    }
+
+    private fun attachedPads(): List<ActivePad> =
+        InputDevice.getDeviceIds().asSequence()
+            .mapNotNull { InputDevice.getDevice(it) }
+            .filter { it.isGamepad() }
+            .map { it.toActivePad() }
+            .distinctBy { it.descriptor }
+            .toList()
 
     private fun parseSnapshot(text: String?): Map<String, String> =
         text?.lineSequence()?.mapNotNull { line ->

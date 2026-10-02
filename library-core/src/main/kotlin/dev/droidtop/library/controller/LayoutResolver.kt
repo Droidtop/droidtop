@@ -44,6 +44,41 @@ object LayoutResolver {
         return FaceLayout.DEFAULT
     }
 
+    /** Why [isBuiltIn] answered as it did, for the one log line per decision. */
+    enum class BuiltInReason(val builtIn: Boolean) {
+        NO_CONSOLE(false),
+        NO_PAD_YET(true),
+        TABLE_IDENTITY(true),
+        ONLY_PAD(true),
+        OTHER_PAD(false),
+    }
+
+    /**
+     * Whether the active pad is the console's own pad. By the table's ids or
+     * name; and, on a console in the table, also when it is the ONE gamepad
+     * attached and no attached pad has the table's identity. A handheld's own
+     * pad is always attached, and a handheld can re-present it under another
+     * identity when its layout toggle changes: the Retroid Pocket 5 with
+     * `persist.sys.gamepad.type=1` reports its pad as "Xbox Wireless
+     * Controller" (console, build 1386), which the table's "Retroid Pocket
+     * Controller" identity did not match, so the external-pad rule took over
+     * and the console table, the only thing that can follow the toggle, was
+     * never consulted. With a second pad attached and neither matching, nothing
+     * is assumed.
+     */
+    fun isBuiltIn(
+        console: ConsoleDef?,
+        activeMatchesTable: Boolean?,
+        attachedGamepads: Int,
+        anyAttachedMatchesTable: Boolean,
+    ): BuiltInReason = when {
+        console == null -> BuiltInReason.NO_CONSOLE
+        activeMatchesTable == null -> BuiltInReason.NO_PAD_YET
+        activeMatchesTable -> BuiltInReason.TABLE_IDENTITY
+        attachedGamepads == 1 && !anyAttachedMatchesTable -> BuiltInReason.ONLY_PAD
+        else -> BuiltInReason.OTHER_PAD
+    }
+
     /**
      * A capture that changed under the person: flagged by a device change or
      * recorded against other property values than now. It is then ignored,

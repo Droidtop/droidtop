@@ -5630,6 +5630,17 @@ answer is resolved live, by ONE resolver (`ControllerLayouts` in shell-gamepad, 
 is read, so the first press from a new pad is already read with its layout). Before any input it is the
 console's built-in pad when this device is in the console table, else the first attached pad.
 
+**Which pad is the built-in one** (`LayoutResolver.isBuiltIn`): the one with the table's ids or name; and,
+on a device in the table, also the ONE gamepad attached when no attached pad has the table's identity. A
+handheld's own pad is always attached, and a handheld can re-present it under another identity when its
+layout toggle changes: the Retroid Pocket 5 with `persist.sys.gamepad.type=1` reports its pad as "Xbox
+Wireless Controller" (console, build 1386), so the identity check alone handed it to the external-pad rule
+and the console table, the only thing that follows the toggle, was never asked. With two pads attached and
+neither matching, nothing is assumed. Every change of the decision is logged once (tag
+`droidtop.ControllerLayout`, "layout decision: ..."): the active pad's name and ids, the built-in reason, the
+SDL family, the toggle's value and whether the app or the privileged helper read it (or that neither could),
+the capture, and the resulting layout, so a console check reads the whole chain from one line.
+
 **The layout** (`FaceLayout`) is two facts: `confirmOnRight` (the layout in use confirms with the right
 face button, the Nintendo convention) and `keysSwapped` (the system reports the pad's face keys swapped
 against their position; Android's key codes are positional, `BUTTON_A` bottom, `BUTTON_B` right,
