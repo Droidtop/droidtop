@@ -3,6 +3,7 @@ package dev.droidtop.library
 import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.util.Log
 import android.view.Display
 import dev.droidtop.runtime.AudioHandOff
@@ -10,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Launcher-wide launch-display targeting (docs/SPEC.md section 4,
@@ -73,13 +75,19 @@ object LaunchDisplay {
      * this persists for as long as [parkedDisplayId] does, so the Quick
      * Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82) knows WHICH
      * entry to show resume/quit for after the user has come back to the
-     * shell (a Home press, per [parkedDisplayId]'s own doc comment) while
-     * it is still running in the background. Set alongside
+     * shell (a Home press, per [parkedDisplayId]'s own doc comment). The
+     * shell checks the resolved package's stopped flag while the Quick
+     * Menu is open; Android does not expose general process/task liveness
+     * to this app. Set alongside
      * [parkedDisplayId] in [startOn]; cleared with it, together, by
      * [clearRunning].
      */
     @Volatile
     var runningGame: LaunchContext? = null
+
+    /** Package resolved for the parked launch; used to notice Android's force-stop state. */
+    @Volatile
+    var runningPackageName: String? = null
 
     /**
      * Installed by the shell owning launch UI: presents [askOptions] and
@@ -141,6 +149,7 @@ object LaunchDisplay {
 
     fun start(context: Context, intent: Intent) {
         val ctx = launchContext
+        runningPackageName = null
         val remembered = ctx?.let { LaunchScreenMemory.choiceFor(context, it.gameId, it.systemId) }
         val options = askOptions
         val ask = chooser
@@ -177,6 +186,7 @@ object LaunchDisplay {
     fun clearRunning() {
         parkedDisplayId = null
         runningGame = null
+        runningPackageName = null
     }
 
     /** Told when a launch fails after the audio hand-off, which runs asynchronously (the shell shows the error). */
@@ -208,7 +218,14 @@ object LaunchDisplay {
         }
     }
 
-    private fun dispatch(context: Context, intent: Intent, displayId: Int?) {
+    private suspend fun dispatch(context: Context, intent: Intent, displayId: Int?) {
+        val packageName = withContext(Dispatchers.IO) {
+            intent.component?.packageName
+                ?: intent.`package`
+                ?: runCatching {
+                    context.packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName
+                }.getOrNull()
+        }
         coverVacatedDisplays?.invoke(displayId)
         // Always pin an explicit display, even for the "default display"
         // decision (displayId == null): leaving ActivityOptions off
@@ -226,7 +243,21 @@ object LaunchDisplay {
         // lands where we actually asked, and parkedDisplayId tracks it.
         val resolvedDisplayId = displayId ?: Display.DEFAULT_DISPLAY
         context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(resolvedDisplayId).toBundle())
+        runningPackageName = packageName
         parkedDisplayId = resolvedDisplayId
         onLaunched?.invoke(resolvedDisplayId)
+    }
+
+    /** True when Android marked the target force-stopped or it has been uninstalled. */
+    suspend fun isRunningPackageForceStopped(context: Context): Boolean = withContext(Dispatchers.IO) {
+        val packageName = runningPackageName ?: return@withContext false
+        val info = try {
+            context.packageManager.getApplicationInfo(packageName, 0)
+        } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+            return@withContext true
+        } catch (_: Exception) {
+            return@withContext false
+        }
+        info.flags and ApplicationInfo.FLAG_STOPPED != 0
     }
 }

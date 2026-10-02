@@ -75,11 +75,13 @@ import kotlinx.coroutines.launch
  * item's own write path.
  *
  * A third tab, Game, exists only while [runningEntry] is non-null --
- * exactly when the shell is showing but the most recent launch is still
- * parked rather than explicitly reclaimed (see
- * [dev.droidtop.library.LaunchDisplay.parkedDisplayId]'s own doc
- * comment: a Home press returns here without reclaiming a running
- * game, an explicit shell entry does reclaim it). Before this the menu
+ * while the most recent launch is still parked rather than explicitly
+ * reclaimed (see [dev.droidtop.library.LaunchDisplay.parkedDisplayId]'s
+ * own doc comment). The shell checks Android's package force-stop flag
+ * off the main thread while the menu is open and clears the parked launch
+ * when it is set. This cannot detect ordinary process death or a task
+ * swipe; Android exposes no general task/process query to this app.
+ * Before this the menu
  * showed the exact same Notifications/System pair whether or not a game
  * was running (Droidtop/tracker#82) -- no "you are in a game" surface
  * at all, unlike every console this mode is modeled on. When present,
@@ -147,6 +149,11 @@ internal fun QuickMenu(
                     else -> QuickTab.NOTIFICATIONS
                 }
             )
+        }
+        LaunchedEffect(visibleTabs, tab) {
+            if (tab !in visibleTabs) {
+                tab = if (!granted) QuickTab.SYSTEM else QuickTab.NOTIFICATIONS
+            }
         }
 
         val window = currentShellWindow()

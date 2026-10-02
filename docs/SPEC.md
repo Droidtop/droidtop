@@ -2396,12 +2396,19 @@ the `ContainerRuntime` interface that already exists (§3):
   game was running — no "you are in a game" surface at all, against
   every console this mode is modeled on (this section's own Steam Deck
   QAM survey concluded exactly that and was never built into a third
-  tab). A **Game** tab now exists whenever the shell is showing but the
-  most recent launch is still parked rather than explicitly reclaimed
-  (`LaunchDisplay.parkedDisplayId`/`runningGame`: non-null exactly when
-  a Home press brought the shell back over a game still running in the
-  background, per the previous bullet's own field — an explicit shell
-  entry clears both together, `LaunchDisplay.clearRunning`). When
+  tab). A **Game** tab now exists while the most recent launch is parked
+  rather than explicitly reclaimed (`LaunchDisplay.parkedDisplayId`/
+  `runningGame`; an explicit shell entry clears both together,
+  `LaunchDisplay.clearRunning`). While the menu is open, it resolves the
+  launch intent's package and checks that package on an IO thread. If
+  Android reports `ApplicationInfo.FLAG_STOPPED`, droidtop clears the
+  parked launch. This catches a force-stopped game without
+  `runningAppProcesses`, which does not expose other apps' processes on
+  Android 11 and later. Android provides no general third-party process
+  or task liveness query to this ordinary app: a crash, normal process
+  eviction, or a task removed from Recents without force-stop can leave
+  the tab present until an explicit shell entry or successful quit. An
+  unresolved implicit launch also cannot be checked. When
   present it is the tab that opens first, not something shoulder-cycled
   to: the point of a distinct in-game menu is that it greets you. Two
   rows today, in the same `MenuRow` tile shape Settings and every other

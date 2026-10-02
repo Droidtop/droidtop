@@ -564,8 +564,30 @@ private fun GamepadShellBody(
     // plain process state, not a flow, read the same "ask when you need
     // it" way LaunchDisplay's chooser/askOptions already are elsewhere
     // in this file, rather than a second observable copy of it.
-    val runningEntry = remember(quickMenuOpen, gameEntries, appEntries) {
+    val forceStoppedLaunch by produceState(
+        initialValue = false,
+        quickMenuOpen,
+        dev.droidtop.library.LaunchDisplay.runningPackageName,
+    ) {
+        value = false
+        while (
+            quickMenuOpen &&
+            dev.droidtop.library.LaunchDisplay.runningGame != null &&
+            dev.droidtop.library.LaunchDisplay.runningPackageName != null
+        ) {
+            val stopped = dev.droidtop.library.LaunchDisplay.isRunningPackageForceStopped(context)
+            if (stopped) {
+                dev.droidtop.library.LaunchDisplay.clearRunning()
+                value = true
+                break
+            }
+            kotlinx.coroutines.delay(1_000)
+        }
+    }
+    val runningEntry = remember(quickMenuOpen, forceStoppedLaunch, gameEntries, appEntries) {
         if (!quickMenuOpen) {
+            null
+        } else if (forceStoppedLaunch) {
             null
         } else {
             dev.droidtop.library.LaunchDisplay.runningGame?.gameId?.let { id ->
