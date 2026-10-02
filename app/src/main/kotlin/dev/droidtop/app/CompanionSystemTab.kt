@@ -159,7 +159,7 @@ private fun RadioRows() {
     var tick by remember { mutableIntStateOf(0) }
     var shell by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) { shell = withContext(Dispatchers.IO) { TaskManager.ops.available().shell } }
+    LaunchedEffect(Unit) { shell = withContext(Dispatchers.IO) { TaskManager.shell.capabilities().shellCommand } }
     SystemControls.Radio.entries.forEach { radio ->
         val on = remember(tick) { SystemControls.radioOn(context, radio) }
         Row(
@@ -175,7 +175,7 @@ private fun RadioRows() {
             CompanionPill(if (shell && on != null) (if (on) "Turn off" else "Turn on") else "Open") {
                 if (shell && on != null) {
                     scope.launch {
-                        val out = withContext(Dispatchers.IO) { TaskManager.ops.exec(SystemControls.radioCommand(radio, !on)) }
+                        val out = withContext(Dispatchers.IO) { TaskManager.shell.exec(SystemControls.radioCommand(radio, !on)) }
                         note = if (out != null && out.exit == 0) null else "${radio.label} could not be switched by the provider."
                         delay(RADIO_SETTLE_MS)
                         tick++
@@ -247,4 +247,3 @@ private fun JobsLines() {
 }
 
 private const val MAX_JOB_LINES = 4
-

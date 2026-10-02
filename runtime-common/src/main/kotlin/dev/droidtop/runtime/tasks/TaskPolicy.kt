@@ -27,8 +27,18 @@ data class RunningSnapshot(
     val note: String? = null,
 )
 
-/** What privileged helpers are running right now (a `priv.packages` and a `priv.shell` provider plugin). */
-data class TaskPrivileges(val forceStop: Boolean, val shell: Boolean) {
+/** Capabilities available through the active [PrivilegedShell] provider. */
+data class TaskPrivileges(
+    val forceStop: Boolean,
+    val shell: Boolean,
+    val grantPermission: Boolean = false,
+) {
+    /** A task snapshot requires shell access to read the system task dump. */
+    val listTasks: Boolean get() = shell
+
+    /** General shell commands are provided by the same `priv.shell` capability. */
+    val shellCommand: Boolean get() = shell
+
     companion object {
         val NONE = TaskPrivileges(forceStop = false, shell = false)
     }

@@ -27,17 +27,17 @@ object TaskManager {
     private const val TAG = "droidtop.TaskManager"
 
     @Volatile
-    var ops: PrivilegedOps = NoPrivilegedOps
+    var shell: PrivilegedShell = NoPrivilegedOps
         private set
 
     /** :app installs the plugin-backed helper once, at start. */
-    fun install(ops: PrivilegedOps) {
-        this.ops = ops
+    fun install(shell: PrivilegedShell) {
+        this.shell = shell
     }
 
     private fun closer(context: Context): AppCloser {
         val am = context.applicationContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        return AppCloser(ops, killBackground = { pkg ->
+        return AppCloser(shell, killBackground = { pkg ->
             try {
                 am.killBackgroundProcesses(pkg)
                 true
@@ -95,7 +95,7 @@ object TaskManager {
         TaskPolicy.protectedPackages(context.packageName, homePackages(context), ProtectedApps.get(context))
 
     /** What the user can do right now, so a surface can say what is missing. Asks the plugin registry, so not for the main thread. */
-    fun privileges(): TaskPrivileges = ops.available()
+    fun privileges(): TaskPrivileges = shell.capabilities()
 
     /** Reads the list once and publishes it. */
     suspend fun refresh(context: Context) {
@@ -129,11 +129,11 @@ object TaskManager {
         val fromLedger = { note: String ->
             RunningSnapshot(RunningListing.fromLedger(LaunchLedger.entries(), hidden, label), Fidelity.LAUNCHED_ONLY, note)
         }
-        if (!ops.available().shell) {
+        if (!shell.capabilities().listTasks) {
             return fromLedger("Without the Shizuku plugin droidtop can list only the apps it opened itself, and cannot tell which of them you have since closed.")
         }
         val out = try {
-            ops.exec(ActivityDump.COMMAND)
+            shell.exec(ActivityDump.COMMAND)
         } catch (t: Throwable) {
             Log.d(TAG, "The task list could not be read", t)
             null

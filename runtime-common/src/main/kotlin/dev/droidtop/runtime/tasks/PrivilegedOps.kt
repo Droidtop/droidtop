@@ -14,22 +14,32 @@ sealed interface ForceStopResult {
 data class ShellOutput(val exit: Int, val stdout: String, val stderr: String)
 
 /**
- * What the task manager asks of a privileged helper (Shizuku, or a root provider plugin).
+ * What the app asks of a privileged helper (Shizuku, local adb, or a root provider plugin).
  * The task manager lives below the plugin host, so :app installs the implementation
  * ([TaskManager.install]) and everything here stays a plain interface. [forceStop] and [exec] block on
  * a provider process: callers run them off the main thread. [available] is cheap and does no IPC.
  * [exec] is null when no provider could run the command.
  */
-interface PrivilegedOps {
-    fun available(): TaskPrivileges
+interface PrivilegedShell {
+    /** Capabilities are cheap to inspect and must not perform provider IPC. */
+    fun capabilities(): TaskPrivileges = available()
+
+    /** Compatibility entry point for existing provider adapters. */
+    fun available(): TaskPrivileges = TaskPrivileges.NONE
 
     fun forceStop(packageName: String): ForceStopResult
 
     fun exec(argv: List<String>): ShellOutput?
+
+    /** Grant a runtime permission to an installed package when the provider supports it. */
+    fun grantPermission(packageName: String, permission: String): Boolean = false
 }
 
+/** Existing name retained for callers while all task management moves to [PrivilegedShell]. */
+typealias PrivilegedOps = PrivilegedShell
+
 /** No helper installed: every call is "nothing to ask". */
-object NoPrivilegedOps : PrivilegedOps {
+object NoPrivilegedOps : PrivilegedShell {
     override fun available(): TaskPrivileges = TaskPrivileges.NONE
 
     override fun forceStop(packageName: String): ForceStopResult = ForceStopResult.NoProvider

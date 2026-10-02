@@ -2,7 +2,7 @@ package dev.droidtop.pluginhost
 
 import android.content.Context
 import dev.droidtop.runtime.tasks.ForceStopResult
-import dev.droidtop.runtime.tasks.PrivilegedOps
+import dev.droidtop.runtime.tasks.PrivilegedShell
 import dev.droidtop.runtime.tasks.ShellOutput
 import dev.droidtop.runtime.tasks.TaskPrivileges
 import org.json.JSONArray
@@ -14,7 +14,7 @@ import org.json.JSONObject
  * or a root provider, plug in here without the task manager knowing which; with none, [available] says so
  * and the task manager says what to enable. Calls block on the provider's process.
  */
-class PluginPrivilegedOps(private val context: Context) : PrivilegedOps {
+class PluginPrivilegedOps(private val context: Context) : PrivilegedShell {
     // Built on first use: the broker environment is not something application start should pay for.
     private val caller by lazy { PluginBrokers.hostCaller(context.applicationContext) }
 

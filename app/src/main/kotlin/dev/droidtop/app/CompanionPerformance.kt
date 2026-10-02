@@ -56,11 +56,11 @@ internal fun CompanionPerformanceTab() {
             launch {
                 while (true) {
                     topApps = withContext(Dispatchers.IO) {
-                        val ops = TaskManager.ops
-                        if (!ops.available().shell) {
+                        val shell = TaskManager.shell
+                        if (!shell.capabilities().shellCommand) {
                             null
                         } else {
-                            val out = ops.exec(listOf("dumpsys", "cpuinfo"))
+                            val out = shell.exec(listOf("dumpsys", "cpuinfo"))
                             PerformanceMonitor.parseTopApps(out?.takeIf { it.exit == 0 }?.stdout)
                         }
                     }
