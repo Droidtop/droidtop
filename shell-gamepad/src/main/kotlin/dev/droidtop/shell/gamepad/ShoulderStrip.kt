@@ -12,9 +12,8 @@ import androidx.compose.runtime.setValue
  * Who L1/R1 belong to on the page in front (docs/SPEC.md 7j, "Gaming
  * controls", Droidtop/tracker#258).
  *
- * The shoulders step the NEAREST tab strip: a page that carries a strip
- * (PC Games' views) claims them with [OwnShoulders]; a page with none
- * leaves them to the top bar, which cycles the sections as it always did.
+ * The shoulders step the nearest page tab strip. Pages without a strip
+ * leave L1/R1 unhandled; they never change the shell destination.
  * One mechanism for the whole shell: the shell's root handler asks
  * [shoulderRoute] and nothing else keeps a shoulder list of its own.
  */
@@ -59,17 +58,15 @@ internal fun OwnShoulders(step: (Int) -> Unit) {
     }
 }
 
-internal enum class ShoulderRoute { STRIP, TOP_BAR, NONE }
+internal enum class ShoulderRoute { STRIP, NONE }
 
 /**
- * Where an L1/R1 press goes. Over a game's detail the shoulders mean
- * nothing (the detail is drawn over the section, not part of it); else
- * a page's strip takes them; else the top bar does.
+ * Where an L1/R1 press goes. Details and pages without strips leave it alone.
  */
 internal fun shoulderRoute(stripOwned: Boolean, detailOpen: Boolean): ShoulderRoute = when {
     detailOpen -> ShoulderRoute.NONE
     stripOwned -> ShoulderRoute.STRIP
-    else -> ShoulderRoute.TOP_BAR
+    else -> ShoulderRoute.NONE
 }
 
 /**

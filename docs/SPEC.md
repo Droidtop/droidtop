@@ -10248,91 +10248,23 @@ reservation was added for the pills --- the decision two paragraphs up
 holds --- because the real bug was never the layout, it was believing a
 dense small landscape panel was a phone.
 
-### Gaming controls: Start is the left menu, L1/R1 are contextual (owner, 2026-10-01, Droidtop/tracker#258)
+### Gaming controls: the left menu is navigation (owner direction, 2026-10-02, Droidtop/tracker#273)
 
-There are two side menus and they split the work: the **left menu** is
-navigation and where things live; the **right menu** (the Quick Menu, R2)
-is quick management only. ("The QAM is for quick management stuff, the
-left menu is for navigation.") Principles are taken from Big Picture's
-side menu, not its code, art, names or layout; droidtop's own design
-language applies.
+The Gaming shell has no top navigation bar. Start opens the left menu on every
+Gaming screen; the hint row begins with a tappable Start / Menu pill. The menu
+is the only route between destinations. The Quick Menu (R2) remains the right
+menu for quick management. Select is Options and the Home button is never used.
 
-- **Start opens the left menu**, from every Gaming screen (`LeftMenu`,
-  `GamepadShell`'s root `onPad`). It opens on the destination the user is
-  on (focus memory, `leftMenuStartIndex`), dims the page behind it with a
-  scrim (not a blur: the page may be a themed canvas with video, and a
-  per-frame blur is not worth it on a handheld) and slides in. D-pad
-  Up/Down move, A goes there, B or Start closes it, R2 swaps to the Quick
-  Menu; Start inside the Quick Menu swaps to the left menu. A tap on a row
-  is A, a tap on the dimmed page is B, and the header's Start pill and the
-  hint row's Start chip are its touch routes. It lists the destinations
-  the UI mode allows (`menuSectionsFor`: the top bar's tabs, then the
-  places below, then Settings); running apps and individual libraries join
-  as those screens exist -- a row appears only when what it opens exists.
-- **Start is the shell's, not a running game's.** The shell receives input
-  only while it is the foreground window; once a launched game or any other
-  app is in front, Start belongs to it and droidtop does nothing.
-  **Home is never used** (droidtop will not always be the home provider),
-  and **Select stays Options**.
-- **The menus take their colours and type from the theme tokens.** The
-  ES-DE theme supplies colour and type tokens to the whole shell and the
-  layout of the Retro Games view only; the left menu, the Quick Menu and
-  the PC Games surface have their own layout and draw only `MenuTokens`
-  and `TypeRole`, so they follow a theme switch. No hard-coded colour.
-- **L1/R1 are contextual: they step the nearest tab strip.** A page that
-  carries a strip claims the shoulders (`OwnShoulders`, held in the
-  shell's `ShoulderStripRegistry`); a page with none leaves them to the top
-  bar, which cycles the sections as before. Where a strip owns them the
-  glyphs sit at the ends of that strip (`ShoulderGlyph`, drawn only when a
-  pad is present, as the top bar's are) and the top bar stops naming them;
-  the hint row says what they do on that page ("Previous view" and "Next
-  view" on PC Games). A strip owns the press even at its end, so a shoulder
-  never moves the whole page away from under the user; to change section
-  from a strip page, use the left menu or the top bar by touch. Who gets a
-  press is one pure function (`shoulderRoute`): nothing over a game's
-  detail, else the page's strip, else the top bar. PC Games' strip is
-  Home and the saved and built-in views (the Filters chip is a dialog, not
-  a view, and is skipped); the cursor does not move when L1/R1 change the
-  view.
-- **The D-pad never reaches the top bar** (below); the top bar is reached
-  by touch, or by L1/R1 (Page Up/Page Down) where no strip owns them.
+L1/R1 step the nearest tab strip on the current page. A page with no strip
+leaves those presses unhandled; Retro Games gamelists keep ES-DE's own
+behaviour inside the theme. The D-pad never reaches a header or status cluster.
+The hint row and the left menu are touch routes to their corresponding actions.
 
-**The top bar is reached by touch, L1/R1, or Page Up/Page Down -- never
-by the D-pad itself (owner, 2026-09-27).** "Pressing up IMMEDIATELY jumps
-up to the top bar, scrolling up in a list is impossible" -- reproduced on
-the rig from the Games carousel's very first row and from the top of the
-Settings list: Compose's own default 2D focus search (the same mechanism
-section 7j already leans on for card-to-card navigation, see
-`GamepadShell`'s own doc comment) has no notion of a screen boundary, so
-an Up press with nothing focusable above the current row happily picked
-the nearest tab bar `Text` by screen position instead of stopping. The
-fix is in the one shared component every Gaming-mode screen sits under,
-not per screen: `SectionTabBar`'s tab labels are no longer `.focusable()`
-at all -- they take `onClick` for touch and nothing else, and carry no
-`FocusRequester` -- so they simply do not exist as directional-search
-candidates from anywhere, on any screen. The current tab still shows by
-its raised fill; a focus RING there is no longer possible because a pad
-can never park on it. L1/R1 (`SectionTabBar`'s own `ShoulderGlyph`,
-`GamepadShell`'s onKeyEvent) remain the dedicated route to switch
-sections on a page with no tab strip of its own (see "Gaming controls"
-above), and a keyboard's equivalent is Page Up/Page Down
-(`GamepadKeyMap.DEFAULT`) -- the same key a browser or an IDE already
-uses to move between tabs/panes, rather than inventing a droidtop-only
-binding. A screen's own onKeyEvent handlers see focus arrive from
-somewhere real, and Up at the very first row of a list now does nothing
-(`FocusManager.moveFocus` returns false, same as it already did at a
-grid's left/right edge, section 7f's "System → Game" drill-down) rather
-than escaping the screen -- the list simply does not scroll further, it
-does not jump anywhere. The one thing Up can ever find above a list is
-the safe-mode banner's action (§10c), which is the point of that
-follow-up: it is focusable only while safe mode is on, and the tab bar
-it covers is not. Because the shell still needs *something*
-focused before any real content loads (an empty library, or the very
-first frame -- see `GamepadShell`'s own comment on `tabBarFocus`), the
-initial-focus anchor moved off the tab bar entirely, onto an invisible,
-zero-size `Spacer` living in the content area itself; it is requested
-once and abandoned the moment a screen's own first row steals focus, the
-same as before.
+The status cluster (clock, connectivity and battery) floats at the top right
+over Gaming content on a soft token-based scrim. It is not focusable and a tap
+opens the Quick Menu. Retro Games continues to use the selected ES-DE theme for
+its layout, colours and type; it is rendered as one destination inside the
+Gaming frame. PC Games, Apps, places and Settings use droidtop's own layouts.
 
 **A virtual-cursor menu must scroll its own selection into view (owner,
 2026-09-27).** `MenuPanel`/`MenuRow` (Quick Menu, every Settings screen,
@@ -10549,20 +10481,8 @@ uses), so the drawn pill shrinks without shrinking what a finger can hit. On a p
 (no `heightIn` on that outer `Box`) the chip is simply the compact legend, no invisible padding
 at all. One set of tokens, so every screen with a hint bar changed at once.
 
-**Section switching is named beside the tabs, not as a hint-bar pill (owner direction
-2026-09-25, "Can remove the next/previous section pills").** L1/R1 still cycle the top-level
-Games/Apps/Settings tabs exactly as before; only where that fact was SHOWN changed. `ShoulderGlyph`
-(`:shell-gamepad`, `TouchActions.kt`) draws a small, unbordered "L1"/"R1" label -- no pill, no tap
-target of its own, since the tab row it flanks already shows the switch's state -- and
-`SectionTabBar` places one on each side of the scrolling tab row (`GamepadShell.kt`) whenever
-there is more than one section to switch to. `ButtonHintFooter`'s `showSectionSwitch` hints
-("Previous section"/"Next section" pills) are gone; the one place a screen names how to reach a
-top-level tab row is now this one glyph, reused everywhere L1/R1 switches tabs (the shell's
-section tabs, and the Quick Menu's own Notifications/System tabs, `QuickMenu.kt`, which dropped
-its own ad hoc `tabHint` pill for the same `ShoulderGlyph`). The themed system carousel's own
-`<helpsystem>` legend text ("R Switch section") is unchanged: that text is the THEME's own
-render, styled by the theme rather than droidtop's pill chrome, so it was never one of the pills
-being asked about.
+**Destination navigation lives in the left menu (owner direction 2026-10-02, Droidtop/tracker#273).** There is no Gaming section tab row. Start and the hint row's leading Start / Menu control open the left menu; L1/R1 step only a page's own nearest strip and never change destination.
+
 
 **D-pad Up never leaves a grid for the top menu; the top menu has its own button (owner direction
 2026-09-25, "don't let dpad up navigate to the top menu, it needs to be separate").** The Games
@@ -10936,14 +10856,17 @@ even." The rule, in the shared components (`MenuRow`, `SettingsCatalogView`):
   row height derived above, is a bug. Text fields (`singleLine` input) are
   exempt.
 
-**Header and footer are one frame; L2 and R2 mark the header's two ends (owner decision, 2026-10-01, Droidtop/tracker#157).** Gaming's own chrome (the section tabs on top, the hint bar below) is drawn by droidtop over every theme; a themed view's own canvas is not touched.
-
-- *One frame.* Both bars are `ShellWindow.frameBarHeight` tall at least (`MenuTokens.FrameBarHeight` 44dp, `FrameBarHeightTouch` 52dp on a touch-first window so a hint's 48dp tap target fits), use the screen-edge gutter, and end in the same hairline (`MenuTokens.FrameHairline`, `Modifier.frameEdge`) on the side facing the content. The footer keeps its own plate (`MenuTokens.HintBar`): the owner keeps that as the SteamOS cue. The header deliberately has no plate, because a plate on top reads as a status area; the shared height, gutter, hairline and the shared pill height below are what make the two read as one frame. The footer draws no hairline when it has no plate (over a theme's canvas).
-- *The selected tab's pill* is a fixed height (`TabPillHeight`, 32dp) with the label centred on the middle of its capitals (`Modifier.opticallyCentred`: first baseline minus 0.36 em), not on the line box, whose descender room made the pill bottom-heavy. The L1/R1 badges are the same height, drawn at the tabs' weight with the same centring, so they sit on the pill's line (`ShoulderGlyph(badge = true)`). L1/R1 are not drawn on a touch-first window with no pad attached; the Quick Menu's tab row keeps the small unbadged glyph.
-- *Centred.* L2 Options is at the left end and R2 Quick Menu is at the right end, each the same 32dp pill height and badge style as L1/R1. L2 opens the focused PC/engine game's `PcGameMenu` where that action applies; elsewhere it remains visible and dimmed. The status readout sits just before R2 in the right slot, leaving equal weighted slots at both ends so the tabs stay centred. The clock, connectivity and battery readout is kept out of the left slot because it would displace L2 from the requested left end. On compact widths the menu labels shorten to L2 and R2, the readout omits battery percentage, and tabs scroll rather than clip. For tracker#165, the tab estimate is scaled by live `fontScale` so Largest text selects the scrolling layout; the selected tab scrolls fully into view, with the status readout omitting battery percentage and R2's label shortened when space is tight.
-- *Status readout* (`StatusCluster`): clock in the system's 12 or 24 hour format, a connectivity glyph (Wi-Fi arcs scaled by signal, bars for wired and mobile, a slash for none, tinted `Danger` when there is no connection or no internet) and a battery glyph with the percentage (tinted `Affirmative` while charging, `Danger` at 15% or less). One muted colour otherwise, no plate, no notification icons, no SSID: it is three facts, not an Android status bar. It reads the same `SystemStatus` source as the Quick Menu and the companion (off the main thread), ticks on the minute boundary, speaks as one line to a screen reader, and a tap opens the Quick Menu. It is not a focus target, like the rest of the top bar.
-- *Section headings* ("Apps", a games row's title) leave the room to the bar above them (`SectionListTopGap` 8dp, `SectionHeadingTopGap` 4dp) and sit `SectionHeadingGap` (16dp) clear of what they head.
-
+**Gaming navigation and hint row (owner direction, 2026-10-02, Droidtop/tracker#273).**
+Gaming screens have no top bar. Their content uses the available space above the
+hint row, and a non-focusable status cluster floats over the top-right content
+on a token-based soft scrim. Tapping the cluster opens the Quick Menu (R2).
+The hint row retains its footer plate and starts with the Start / Menu touch
+control; the left menu is the only destination navigation. L1/R1 belong only
+to the current page's nearest strip, and do nothing to navigation on pages
+without one. The status cluster remains three quiet facts from `SystemStatus`;
+its shared source, accessibility description and off-main-thread reads are
+unchanged. ES-DE themes continue to own the Retro Games view's layout, colours
+and type.
 
 ### Gaming motion and focus (directed 2026-10-01, Droidtop/tracker#256)
 
