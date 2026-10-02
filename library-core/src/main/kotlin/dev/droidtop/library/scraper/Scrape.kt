@@ -360,20 +360,26 @@ suspend fun scrapeSystemArtwork(
             // principle RomEntity/GameMetadataEntity's own doc
             // comments already establish for the filesystem-scan
             // side of this database.
-            val existing = if (hasAnyMetadata || coverWritten || (wantMetadata && unmatchedSource != null)) {
+            // The selected source found this game: its answer replaces the scraped text the game had,
+            // so a field it does not supply is not left holding an earlier, other source's (or another
+            // game's) value (Droidtop/tracker#251: a match on Pokemon Crystal that supplied no description
+            // or date left an old TheGamesDB fan game's description and date in place).
+            val matched = wantMetadata && (screenScraperResult != null || gamesDbResult != null || libretroResult != null)
+            val existing = if (hasAnyMetadata || coverWritten || matched || (wantMetadata && unmatchedSource != null)) {
                 dao.getGameMetadataSingle(romFile.absolutePath)
             } else {
                 null
             }
             val had = existing?.fieldSources
-            val retracted = if (wantMetadata && unmatchedSource != null) {
-                FieldSources.retracted(had, unmatchedSource) - sources.keys
-            } else {
-                emptySet()
-            }
-            if (hasAnyMetadata || coverWritten || retracted.isNotEmpty()) {
+            val dropped = when {
+                existing == null -> emptySet()
+                matched -> FieldSources.superseded(had, FieldSources.filled(existing))
+                wantMetadata && unmatchedSource != null -> FieldSources.retracted(had, unmatchedSource)
+                else -> emptySet()
+            } - sources.keys
+            if (hasAnyMetadata || coverWritten || dropped.isNotEmpty()) {
                 fun <T> field(name: String, scraped: T?, current: T?): T? =
-                    if (name in retracted) null else FieldSources.keep(had, name, scraped, current)
+                    if (name in dropped) null else FieldSources.keep(had, name, scraped, current)
                 dao.upsertGameMetadata(
                     (existing ?: GameMetadataEntity(id = romFile.absolutePath)).copy(
                         scrapeConfidence = confidence ?: existing?.scrapeConfidence,
@@ -384,8 +390,14 @@ suspend fun scrapeSystemArtwork(
                         releaseDate = field(FieldSources.RELEASE_DATE, text(releaseDate), existing?.releaseDate),
                         rating = field(FieldSources.RATING, text(rating), existing?.rating),
                         players = field(FieldSources.PLAYERS, text(players), existing?.players),
-                        fieldSources = FieldSources.withdraw(FieldSources.merge(had, sources), retracted),
+                        fieldSources = FieldSources.withdraw(FieldSources.merge(had, sources), dropped),
                     ),
+                )
+                // Which source answered and what it changed, for someone asking why a game shows what it shows.
+                dev.droidtop.library.ScanLog.write(
+                    "scrape: ${romFile.name} [${system.id}] via ${source.name.lowercase()}: " +
+                        "wrote ${sources.entries.joinToString(",") { "${it.key}=${it.value}" }.ifEmpty { "nothing" }}" +
+                        if (dropped.isEmpty()) "" else "; cleared ${dropped.sorted().joinToString(",")}",
                 )
             }
             // Each ROM lands in exactly one bucket. A refused ROM that the
@@ -514,7 +526,7 @@ suspend fun importGamelistXml(
         val had = existing?.fieldSources
         // An imported gamelist is recorded as the source it is: whichever
         // scraper wrote it is not named in the file.
-        val source = "gamelist.xml"
+        val source = FieldSources.GAMELIST
         val written = buildMap {
             if (entry.description != null) put(FieldSources.DESCRIPTION, source)
             if (entry.developer != null) put(FieldSources.DEVELOPER, source)

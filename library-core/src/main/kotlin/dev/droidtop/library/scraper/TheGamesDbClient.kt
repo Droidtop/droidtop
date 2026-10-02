@@ -212,9 +212,15 @@ object TheGamesDbClient {
         ))
     }
 
-    /** A title as compared: accents folded, case dropped, every run of punctuation one space (dash versus colon). */
+    /** No-Intro's trailing article ("Legend of Zelda, The - ..."), moved to the front where a database title has it. */
+    private val TRAILING_ARTICLE = Regex("""^(.+?), (The|A|An)\b(.*)$""", RegexOption.IGNORE_CASE)
+
+    /**
+     * A title as compared: a No-Intro trailing article moved to the front, accents folded, case
+     * dropped, every run of punctuation one space (dash versus colon).
+     */
     internal fun normalizeTitle(value: String): String =
-        java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
+        java.text.Normalizer.normalize(TRAILING_ARTICLE.replace(value, "$2 $1$3"), java.text.Normalizer.Form.NFD)
             .replace(Regex("\\p{M}+"), "")
             .lowercase()
             .replace(Regex("[^a-z0-9]+"), " ")
@@ -239,6 +245,10 @@ object TheGamesDbClient {
         }
         return best
     }
+
+    /** Whether a search result's own platform id ([resultPlatform], blank when the API left it out) is the system searched. */
+    internal fun onPlatform(resultPlatform: String, wanted: String): Boolean =
+        resultPlatform.isBlank() || resultPlatform == wanted
 
     fun findMetadata(
         apiKey: String,
@@ -270,8 +280,14 @@ object TheGamesDbClient {
         // falling back to its first result wrote another game's description and
         // date onto the ROM (tracker#251). The response is ranked here, and a
         // response with no title that is the game is no match.
-        val index = bestMatchIndex((0 until games.length()).map { games.getJSONObject(it).optString("game_title", "") }, gameTitle)
-            ?: return ScrapeLookup.NoMatch
+        // A result on another platform is another game whatever its title (the search's platform
+        // filter is a request, the result's own platform is the fact): it is given no title, so it
+        // can never be the match.
+        val titles = (0 until games.length()).map { i ->
+            val game = games.getJSONObject(i)
+            if (onPlatform(game.optString("platform", ""), thegamesdbSystemId)) game.optString("game_title", "") else ""
+        }
+        val index = bestMatchIndex(titles, gameTitle) ?: return ScrapeLookup.NoMatch
         val game = games.getJSONObject(index)
 
         val gameId = game.optInt("id", -1)

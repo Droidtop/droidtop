@@ -9222,6 +9222,20 @@ the same care as the art.
   touched and media files stay. TheGamesDB's name search used to take the API's first result,
   and fixing the search (tracker#251) left the fan game's description and date it had already
   written on "Pokemon - Crystal Version" in place, because a no match wrote nothing.
+- **A fresh match replaces the scraped text** (console, build 1397). When the selected ROM source
+  (ScreenScraper, TheGamesDB or the libretro database) finds the game, its answer replaces the
+  game's scraped text: every editable field holding a value that the pass does not fill is
+  cleared with its source (`FieldSources.superseded`), except fields the person edited and fields
+  imported from a gamelist.xml. A value with no recorded source predates the record and was
+  written by a scrape, so it is replaced too. Before this, a per-game Scrape whose match
+  supplied no description or date reported "found 1" and left an old TheGamesDB fan game's
+  description and 2023 date on Pokemon Crystal. Each written game leaves one `scrape:` line in
+  `logs/scan.log` naming the source, the fields written and the fields cleared. The Crystal
+  banner the console showed then was Crystal's own libretro Named_Snaps screenshot (a battle
+  with a Hoppip nicknamed "FOURARSED"), not another game's.
+- **TheGamesDB matches only on its platform.** A name search result whose own `platform` is not
+  the system searched is never the match, whatever its title; titles are compared with a
+  No-Intro trailing article ("Legend of Zelda, The") moved to the front.
 - **A refusal on the way is reported, not swallowed.** A source asked by identity that
   refuses is not asked again in that pass once it rejected its key (401, 403, or the
   Twitch sign-in's 400 for a wrong IGDB Client ID or Secret) or refused five

@@ -19,6 +19,9 @@ object FieldSources {
     /** The source recorded for a field changed in the metadata editor. */
     const val EDITED = "you"
 
+    /** The source recorded for a field imported from an external scraper's gamelist.xml. */
+    const val GAMELIST = "gamelist.xml"
+
     // The field names, one vocabulary for every writer and reader.
     const val DESCRIPTION = "description"
     const val DEVELOPER = "developer"
@@ -100,6 +103,30 @@ object FieldSources {
      */
     fun retracted(existing: String?, source: String): Set<String> =
         decode(existing).filter { (field, from) -> from == source && field in EDITABLE }.keys
+
+    /**
+     * The editable fields a fresh match of the game replaces, of those that hold a value ([filled]):
+     * every one but the person's edits and an imported gamelist.xml. A value with no recorded
+     * source predates this record (9359390c, 2026-09-25) and was written by a scrape, because the
+     * editor has recorded [EDITED] since the same commit. The caller removes the fields the match
+     * itself supplies; the rest are cleared rather than left holding an earlier source's answer,
+     * which may have been another game (Droidtop/tracker#251).
+     */
+    fun superseded(existing: String?, filled: Set<String>): Set<String> {
+        val from = decode(existing)
+        return filled.filter { it in EDITABLE && from[it] != EDITED && from[it] != GAMELIST }.toSet()
+    }
+
+    /** The editable fields of [row] that hold a value. */
+    fun filled(row: dev.droidtop.library.consoles.GameMetadataEntity): Set<String> = buildSet {
+        if (row.description != null) add(DESCRIPTION)
+        if (row.developer != null) add(DEVELOPER)
+        if (row.publisher != null) add(PUBLISHER)
+        if (row.genre != null) add(GENRE)
+        if (row.releaseDate != null) add(RELEASE_DATE)
+        if (row.rating != null) add(RATING)
+        if (row.players != null) add(PLAYERS)
+    }
 
     /** [existing] without [fields]: they have no source any more. */
     fun withdraw(existing: String?, fields: Set<String>): String? =

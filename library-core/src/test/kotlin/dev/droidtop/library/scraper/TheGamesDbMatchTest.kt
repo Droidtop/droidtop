@@ -36,6 +36,20 @@ class TheGamesDbMatchTest {
     }
 
     @Test
+    fun `a No-Intro trailing article matches the database title`() {
+        assertEquals(0, TheGamesDbClient.bestMatchIndex(listOf("The Golf Story: Gold"), "Golf Story, The - Gold"))
+    }
+
+    @Test
+    fun `a result on another platform is never the game`() {
+        assertEquals(true, TheGamesDbClient.onPlatform("41", "41"))
+        assertEquals(true, TheGamesDbClient.onPlatform("", "41"))
+        assertEquals(false, TheGamesDbClient.onPlatform("8", "41"))
+        // findMetadata gives an off-platform result an empty title, which matches nothing.
+        assertNull(TheGamesDbClient.bestMatchIndex(listOf(""), "Alpha Quest"))
+    }
+
+    @Test
     fun `a partial word is not a prefix`() {
         assertNull(TheGamesDbClient.bestMatchIndex(listOf("Foxtrot Racing Deluxe"), "Foxtrot Racing Delux"))
     }
