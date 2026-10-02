@@ -3311,8 +3311,8 @@ private fun AppsSection(
                         dev.droidtop.library.integrations.GetGamesContext.APPS,
                         modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding),
                     )
-            }
                 }
+            }
         }
     }
 
