@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -81,10 +82,10 @@ import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.DeclareLayerHints
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.input.HintBinding
-import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.ownPadButtons
@@ -104,17 +105,18 @@ import java.util.concurrent.ConcurrentHashMap
  * the structure a storefront game page has, drawn in droidtop's own
  * tokens. From the top:
  *
- * - **The hero band**: the game's hero art full-bleed with its logo (or its
- *   name) and where it came from. With the cursor down in the tab content
- *   the band compresses to a strip, so the content gets the screen.
- * - **The action band**: ONE large primary action that says what A does
- *   (Play, or the one setup step that makes it Play, or why it cannot --
- *   [PcPlayState]), a small Favourite and Options icon button beside it,
- *   and a quiet facts strip ([factsStrip]: last played, play time, the
- *   version installed against the latest known, size, what runs it), with
- *   the one-line reason under it.
+ * - **The hero band**: the game's hero art full-bleed, 44 percent of the
+ *   height in landscape, with its large logo (or its name) bottom-left. With
+ *   the cursor down in the tab content the hero and the action band go and
+ *   the tab strip is the top edge, so the content gets the screen.
+ * - **The action band**, one row: ONE large primary action that says what A
+ *   does (Play, or the one setup step that makes it Play, or why it cannot --
+ *   [PcPlayState]), a quiet facts strip beside it ([factsStrip]: last
+ *   played, play time, the version installed against the latest known, size,
+ *   what runs it), small Favourite and Options icon buttons at the right
+ *   edge, and the one-line reason under it.
  * - **The tab strip** (Overview, Versions and updates, Extras, Details),
- *   pinned under the band. It OWNS L1/R1 while the page is open: the page
+ *   centred and pinned under the band. It OWNS L1/R1 while the page is open: the page
  *   is a window of its own over the library, so its one `onPad` handler is
  *   what the shoulders reach, the same "nearest strip takes them" rule the
  *   shell applies (docs/SPEC.md 7j, "Gaming controls"). The glyphs sit at
@@ -137,7 +139,9 @@ import java.util.concurrent.ConcurrentHashMap
  * menu, and B closes from the outermost node ([ownPadButtons]) -- so the
  * face-button swap applies to every button here, and no control takes
  * Compose focus of its own. A tap on a button, a tab or a row is the same
- * press. The D-pad never reaches the top bar: this window has none.
+ * press. The D-pad never reaches the top bar: this window has none. The page
+ * draws no hint row: it is a layer on the shell's one footer
+ * ([DeclareLayerHints]) and stays clear of it.
  *
  * No disk work while drawing: everything shown is already on the
  * [LibraryEntry]; the lookups, the resolved runner, the folder's size and
@@ -274,13 +278,32 @@ internal fun PcGamePage(
     }
 
     val compact = zone == PageZone.CONTENT
-    val fullHero = (window.heightDp * (if (window.portrait) 0.26f else 0.36f)).dp
+    val fullHero = (window.heightDp * (if (window.portrait) 0.30f else 0.44f)).dp
     val heroHeight by animateDpAsState(
-        targetValue = if (compact) COMPACT_HERO_HEIGHT else fullHero,
+        targetValue = if (compact) 0.dp else fullHero,
         animationSpec = Motion.panelIn(),
         label = "page hero",
     )
     val shoulderGlyphs = window.showsShoulderGlyphs()
+
+    // The shell's one footer names this page's buttons (a layer on the hint
+    // bar); the page draws no hint row of its own. L1/R1 are named by the
+    // glyphs at the tab strip's ends.
+    val verb = play.verb
+    val hints = remember(zone, button, row, tab, verb, play.pressable, current) {
+        listOf(
+            HintBinding(GamepadAction.A, if (zone == PageZone.ACTIONS) pageActionLabel(button, verb) else "Select") {
+                when (zone) {
+                    PageZone.ACTIONS -> button != 0 || play.pressable
+                    PageZone.TABS -> current.isNotEmpty()
+                    PageZone.CONTENT -> current.getOrNull(row)?.onActivate != null
+                }
+            },
+            HintBinding(GamepadAction.X, "Favourite"),
+            HintBinding(GamepadAction.L2, "Game options"),
+            HintBinding(GamepadAction.B, "Back"),
+        )
+    }
 
     Dialog(
         onDismissRequest = onClose,
@@ -288,9 +311,12 @@ internal fun PcGamePage(
     ) {
         GatePadInThisDialog()
         HideSystemBarsInThisDialog()
+        DeclareLayerHints(hints)
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                // Clear of the shell's footer, which stays visible under the page.
+                .padding(bottom = window.frameBarHeight)
                 // B from the outermost node; the cursor's own presses
                 // nearer the focus target, so they are answered first.
                 .ownPadButtons(onBack = onClose)
@@ -364,21 +390,25 @@ internal fun PcGamePage(
                 .focusable()
                 .groundBackground(),
         ) {
-            PageHero(entry, heroHeight, compact)
+            if (heroHeight > 0.dp) PageHero(entry, heroHeight)
             Column(modifier = Modifier.padding(horizontal = window.edgePadding)) {
-                PageActionBand(
-                    play = play,
-                    favourite = entry.favorite,
-                    selectedButton = if (zone == PageZone.ACTIONS) button else null,
-                    strip = strip,
-                    compact = compact,
-                    portrait = window.portrait,
-                    onPress = { index ->
-                        zone = PageZone.ACTIONS
-                        button = index
-                        pressButton(index)
-                    },
-                )
+                // While the cursor is in the rows the hero and this band
+                // are gone and the tab strip is the top edge, as on
+                // Steam's scrolled page.
+                if (!compact) {
+                    PageActionBand(
+                        play = play,
+                        favourite = entry.favorite,
+                        selectedButton = if (zone == PageZone.ACTIONS) button else null,
+                        strip = strip,
+                        portrait = window.portrait,
+                        onPress = { index ->
+                            zone = PageZone.ACTIONS
+                            button = index
+                            pressButton(index)
+                        },
+                    )
+                }
                 PageTabStrip(
                     tabs = tabs,
                     tab = tab,
@@ -454,24 +484,6 @@ internal fun PcGamePage(
                     }
                 }
             }
-            val verb = play.verb
-            val hints = remember(zone, button, row, tab, verb, play.pressable, current) {
-                listOf(
-                    HintBinding(GamepadAction.A, if (zone == PageZone.ACTIONS) pageActionLabel(button, verb) else "Select") {
-                        when (zone) {
-                            PageZone.ACTIONS -> button != 0 || play.pressable
-                            PageZone.TABS -> current.isNotEmpty()
-                            PageZone.CONTENT -> current.getOrNull(row)?.onActivate != null
-                        }
-                    },
-                    HintBinding(GamepadAction.X, "Favourite"),
-                    HintBinding(GamepadAction.L2, "Game options"),
-                    HintBinding(GamepadAction.L, "Previous tab") { tab > 0 },
-                    HintBinding(GamepadAction.R, "Next tab") { tab < tabs.lastIndex },
-                    HintBinding(GamepadAction.B, "Back"),
-                )
-            }
-            HintRow(bindings = hints)
         }
     }
     if (editingThread && library != null) {
@@ -494,20 +506,17 @@ internal fun PcGamePage(
 /** Where the page's one cursor is: the action band's buttons, the tab strip, or the tab's rows. */
 private enum class PageZone { ACTIONS, TABS, CONTENT }
 
-/** The hero band shrinks to this when the cursor goes down into the tab's rows. */
-private val COMPACT_HERO_HEIGHT = 64.dp
-
 /**
  * The hero band: the game's hero art edge to edge, darkened toward the
  * page's ground so what is laid over it stays legible whatever the art is,
- * with the logo (or the name) and where the game came from bottom-left.
+ * with the logo (or the name) bottom-left.
  * With only portrait art that art sits at its own shape on the right of a
  * plate, never stretched across the band; with none, the plate carries the
- * name, never a stand-in cover. [compact] is the band while the cursor is
- * in the tab's rows: one line.
+ * name, never a stand-in cover. The logo is large, bottom-left, as on
+ * Steam's page; nothing else is stacked on the art.
  */
 @Composable
-private fun PageHero(entry: LibraryEntry, height: Dp, compact: Boolean) {
+private fun PageHero(entry: LibraryEntry, height: Dp) {
     val window = LocalShellWindow.current
     val title = GameNaming.displayName(entry.title)
     val hero = entry.heroUri
@@ -537,33 +546,25 @@ private fun PageHero(entry: LibraryEntry, height: Dp, compact: Boolean) {
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(horizontal = window.edgePadding, vertical = if (compact) Space.Sm else Space.Md),
+                .padding(horizontal = window.edgePadding, vertical = Space.Md),
         ) {
             val logo = entry.logoUri
-            if (logo != null && !compact) {
+            if (logo != null) {
                 AsyncImage(
                     model = logo,
                     contentDescription = title,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.CenterStart,
-                    modifier = Modifier.height(56.dp).widthIn(max = 280.dp),
+                    modifier = Modifier.height(96.dp).widthIn(max = 360.dp),
                 )
             } else {
                 Text(
                     title,
                     color = MenuTokens.OnSurface,
-                    style = if (compact) TypeRole.rowTitle else TypeRole.screenTitle,
+                    style = TypeRole.screenTitle,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = if (compact) 1 else 2,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (!compact) {
-                Text(
-                    listOfNotNull(entry.sourceLabel(), entry.engineLabel()).joinToString(" · "),
-                    color = MenuTokens.OnSurfaceMuted,
-                    style = TypeRole.supporting,
-                    modifier = Modifier.padding(top = Space.Xs),
                 )
             }
         }
@@ -571,12 +572,12 @@ private fun PageHero(entry: LibraryEntry, height: Dp, compact: Boolean) {
 }
 
 /**
- * The action band: the one large primary action, Favourite and Options as
- * small icon buttons, the quiet facts strip, and under them the one line
- * saying why the primary action is what it is. [selectedButton] is the
- * button the cursor is on (0 primary, 1 Favourite, 2 Options), null when
- * the cursor is elsewhere. [compact] drops the strip and the line while
- * the cursor is in the rows below.
+ * The action band, one row as on Steam's page: the ONE large primary action
+ * at the left, the quiet facts strip beside it, Favourite and Options as
+ * small icon buttons at the right edge, and under them the one line saying
+ * why the primary action is what it is. [selectedButton] is the button the
+ * cursor is on (0 primary, 1 Favourite, 2 Options), null when the cursor is
+ * elsewhere. In portrait the strip sits under the buttons.
  */
 @Composable
 private fun PageActionBand(
@@ -584,29 +585,30 @@ private fun PageActionBand(
     favourite: Boolean,
     selectedButton: Int?,
     strip: List<Pair<String, String>>,
-    compact: Boolean,
     portrait: Boolean,
     onPress: (Int) -> Unit,
 ) {
-    val buttons: @Composable () -> Unit = {
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.Md), verticalAlignment = Alignment.CenterVertically) {
-            ShellChip(
-                play.verb,
-                primary = true,
-                large = true,
-                enabled = play.pressable,
-                selected = selectedButton == 0,
-                onClick = { onPress(0) },
-            )
+    val primary: @Composable () -> Unit = {
+        ShellChip(
+            play.verb,
+            primary = true,
+            large = true,
+            enabled = play.pressable,
+            selected = selectedButton == 0,
+            onClick = { onPress(0) },
+        )
+    }
+    val icons: @Composable () -> Unit = {
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.Sm), verticalAlignment = Alignment.CenterVertically) {
             PageIconButton(
-                glyph = if (favourite) "★" else "☆",
+                glyph = if (favourite) "\u2605" else "\u2606",
                 description = if (favourite) "Remove from favourites" else "Add to favourites",
                 on = favourite,
                 selected = selectedButton == 1,
                 onClick = { onPress(1) },
             )
             PageIconButton(
-                glyph = "⋯",
+                glyph = "\u22EF",
                 description = "Game options",
                 on = false,
                 selected = selectedButton == 2,
@@ -616,17 +618,24 @@ private fun PageActionBand(
     }
     Column(modifier = Modifier.padding(top = Space.Sm)) {
         if (portrait) {
-            buttons()
-            if (!compact && strip.isNotEmpty()) PageFactsStrip(strip, Modifier.fillMaxWidth().padding(top = Space.Sm))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                primary()
+                Spacer(Modifier.weight(1f))
+                icons()
+            }
+            if (strip.isNotEmpty()) PageFactsStrip(strip, Modifier.fillMaxWidth().padding(top = Space.Sm))
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                buttons()
-                if (!compact && strip.isNotEmpty()) {
-                    PageFactsStrip(strip, Modifier.weight(1f).padding(start = Space.Xl))
+                primary()
+                if (strip.isNotEmpty()) {
+                    PageFactsStrip(strip, Modifier.weight(1f).padding(horizontal = Space.Xl))
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
+                icons()
             }
         }
-        if (!compact && play.detail.isNotBlank()) {
+        if (play.detail.isNotBlank()) {
             Text(
                 play.detail,
                 color = if (play.pressable) MenuTokens.Value else MenuTokens.OnSurfaceDisabled,
@@ -692,7 +701,7 @@ private fun PageTabStrip(
         LazyRow(
             state = state,
             contentPadding = PaddingValues(vertical = Space.Sm),
-            horizontalArrangement = Arrangement.spacedBy(Space.Sm),
+            horizontalArrangement = Arrangement.spacedBy(Space.Sm, Alignment.CenterHorizontally),
             modifier = Modifier.weight(1f),
         ) {
             items(count = tabs.size, key = { "tab:$it" }) { index ->

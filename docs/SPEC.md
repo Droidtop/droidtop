@@ -9444,16 +9444,20 @@ structure, top to bottom, drawn only from theme tokens:
 - **The hero band** (`PageHero`): the game's hero art edge to edge, darkened
   toward the ground by a gradient so what is laid over it stays legible on
   any art, with the game's logo (`logoUri`) or, without one, its name, and
-  where it came from. Only portrait art: that art at its own shape on the
+  nothing else stacked on the art (the source and engine are rows, not a
+  line on the hero). Only portrait art: that art at its own shape on the
   right of a plate, never stretched across the band. No art: the plate and
-  the name. Its height is a share of the window's (36 percent landscape, 26
-  percent portrait) and it compresses to a 64dp strip while the cursor is
-  down in the tab's rows, so the rows get the screen (`Motion.panelIn`).
+  the name. Its height is a share of the window's (44 percent landscape,
+  30 percent portrait, Steam's hero ends at about 46) and it goes, with the
+  action band, while the cursor is down in the tab's rows, so the tab strip
+  is the top edge and the rows get the screen, as on Steam's scrolled page
+  (`Motion.panelIn`).
 - **The action band** (`PageActionBand`): ONE large primary action
   (`ShellChip(large)`, the same `PcPlayState` verb and detail the card's A
-  hint and the menu's first row use, so the three cannot disagree), Favourite
-  and Options as small round icon buttons (`PageIconButton`, with a spoken
-  description), and the quiet **facts strip** (`factsStrip`): Last played,
+  hint and the menu's first row use, so the three cannot disagree), the
+  quiet **facts strip** beside it, and Favourite and Options as small round
+  icon buttons (`PageIconButton`, with a spoken description) at the right
+  edge, all in one row (`factsStrip`): Last played,
   Play time, Version (the installed version against the latest known:
   "0.9.5, v0.9.6 is available", the one wording of `GameUpdates.line`), Size
   and Runs with, only those that exist. It scrolls sideways rather than
@@ -9461,12 +9465,12 @@ structure, top to bottom, drawn only from theme tokens:
   same two functions (`lastPlayedPhrase`, `playtimeLine`) in the strip and in
   the Details tab, so the two never disagree. Under it the one line saying why the
   primary action is what it is. In portrait the strip sits under the
-  buttons. While the cursor is in the rows the band keeps only the buttons.
+  buttons. While the cursor is in the rows the band is gone.
   Store games have no installed or latest version until #222 gives them
   one; the strip simply has no Version fact for them.
 - **The tab strip** (`PageTabStrip`): Overview, Versions and updates, Extras,
-  Details, scrolling sideways, pinned under the band, L1/R1 glyphs at its
-  ends. `pageTabOf` is the one place that says which tab a row lives under,
+  Details, centred, scrolling sideways when it must, pinned under the band
+  (the top edge once the band is gone), L1/R1 glyphs at its ends. `pageTabOf` is the one place that says which tab a row lives under,
   by its title; a title no tab names is a detail, so a new row is never
   lost. Overview: About, Runs with, Compatibility, the unscraped game's
   Scrape row, and for a game of several parts the **part list** first
@@ -9500,10 +9504,14 @@ direction stops at an edge instead of running through the page. Left/Right
 move along the buttons or the tabs. A presses what the cursor is on (on a
 tab it enters the rows), X toggles favourite, L2 opens the game's menu, B
 closes the page and returns to the same card. This window has no top bar,
-so the D-pad never reaches one. The page draws its own hint row
-(`HintRow`, gated bindings: A names the button under the cursor, X, L2,
-Previous/Next tab only where there is one, B). A tap on a button, tab or row
-is the same press.
+so the D-pad never reaches one. The page draws no hint row: it is a layer on
+the shell's one footer (`DeclareLayerHints`, the way a sheet is; the window
+stays clear of the footer by `frameBarHeight`), with gated bindings: A names
+the button under the cursor, X, L2, B. L1/R1 are named by the glyphs at the
+strip's ends. Like every layer it shows no Start pill, since Start's menu
+does nothing behind a window. A on a capsule in the library still plays
+(owner decision, 2026-10-02); the page is reached through the game's menu.
+A tap on a button, tab or row is the same press.
 
 **Not on the page yet:** the Saves and Activity tabs (#229, #230), and the
 Install, Update and Downloading verbs of the primary action (#223), which
