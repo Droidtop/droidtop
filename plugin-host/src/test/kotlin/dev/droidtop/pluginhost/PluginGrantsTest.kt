@@ -30,6 +30,19 @@ class PluginGrantsTest {
     }
 
     @Test
+    fun `category and call choices persist and reset reveals broader choice`() {
+        grants.setCategory("acme.tool", "network", GrantState.DENIED)
+        grants.setCall("acme.tool", "net.request", GrantState.GRANTED)
+        val request = PluginPermissionRequest("network", "net.request", GrantState.ASK)
+        val reopened = PluginGrants(dir)
+        assertEquals(GrantState.GRANTED, reopened.resolve("acme.tool", request))
+        reopened.resetChoice("acme.tool", PluginPermissionPolicy.callKey(request.call))
+        assertEquals(GrantState.DENIED, reopened.resolve("acme.tool", request))
+        reopened.resetChoice("acme.tool", PluginPermissionPolicy.categoryKey(request.category))
+        assertEquals(GrantState.ASK, reopened.resolve("acme.tool", request))
+    }
+
+    @Test
     fun `approval grants what was ticked, asks for an unticked dangerous one and denies an unticked normal one`() {
         val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any"), obj("id" to "clipboard.read"), obj("id" to "containers.exec"))
         grants.initialiseOnApproval(record, ticked = setOf("net.state", "clipboard.read"))

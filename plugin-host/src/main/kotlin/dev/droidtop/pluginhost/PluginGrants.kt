@@ -136,6 +136,25 @@ class PluginGrants(private val dir: File) {
         )
     }
 
+    /** Stores a category choice in the plugin's grant file. */
+    fun setCategory(pluginId: String, category: String, state: GrantState) =
+        set(pluginId, PluginPermissionPolicy.categoryKey(category), state)
+
+    /** Stores one API call choice, which takes precedence over its category. */
+    fun setCall(pluginId: String, call: String, state: GrantState) =
+        set(pluginId, PluginPermissionPolicy.callKey(call), state)
+
+    /** Removes one category or call override so resolution falls back to the next level. */
+    fun resetChoice(pluginId: String, key: String) = synchronized(LOCK) {
+        val snap = readLocked(pluginId)
+        if (key !in snap.states) return@synchronized
+        writeLocked(pluginId, snap.copy(states = snap.states - key, wanted = snap.wanted - key, fresh = snap.fresh - key))
+    }
+
+    /** Resolves the request against this plugin's persisted per-plugin choices. */
+    fun resolve(pluginId: String, request: PluginPermissionRequest): GrantState =
+        PluginPermissionPolicy.resolve(request, read(pluginId).states)
+
     /** Records that a call reached [permission] while it was still `ask` and could not prompt (a background call). */
     fun noteWanted(pluginId: String, permission: String) = synchronized(LOCK) {
         val snap = readLocked(pluginId)
