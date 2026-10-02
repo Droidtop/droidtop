@@ -6189,6 +6189,21 @@ beyond Play (GitHub releases in the players DB), and applying
 recommended per-emulator settings where an emulator exposes a real
 configuration surface.
 
+**A failed launch is a focused dialog, not a dead end (2026-10-02,
+Droidtop/tracker#171).** A launch that fails in the Gaming shell used
+to end in the raw exception line on the shell's failure banner -- and
+on a pad, B did nothing there. Now the failure surfaces in a focused
+dialog built on the shell's one modal panel (§6e): one plain sentence
+mapped from the cause in one place (`LaunchFailureMessage.userMessage`,
+:shell-gamepad) -- a missing emulator named by system ("No Nintendo 64
+emulator is installed yet."), anything else "the game couldn't be
+started" -- with the cause's full detail kept only in the shell's
+`Log.e`. The dialog takes focus, its rows are "OK" plus "Get an
+emulator" (this section's market:// action) only when the cause is no
+installed emulator for the system, and the pad's B, a row tap or a tap
+outside dismisses it; the shell stays visible behind it, never a black
+full-screen state.
+
 ## 7f. Gaming mode: real, generic ES-DE theme engine
 
 **Status as of 2026-08-29 — this is Gaming's actual, current, singular
