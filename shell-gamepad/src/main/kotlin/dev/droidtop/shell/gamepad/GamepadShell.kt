@@ -414,7 +414,15 @@ private fun GamepadShellBody(
     // the Switch-mode dialog resumed the SAME composition with the old
     // Quick Menu still stacked on top, which read as "Gaming never
     // appears" even though mode had actually already resolved correctly.
-    LaunchedEffect(deepLinkToken) { quickMenuOpen = false }
+    // The left menu (Start; docs/SPEC.md 7j "Gaming controls") closes for
+    // the same reason.
+    var leftMenuOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(deepLinkToken) {
+        quickMenuOpen = false
+        leftMenuOpen = false
+    }
+    // Which page, if any, has claimed L1/R1 for a tab strip of its own.
+    val shoulderStrips = remember { ShoulderStripRegistry() }
     var displayChoice by remember {
         mutableStateOf<DisplayChoiceRequest?>(null)
     }
@@ -635,7 +643,26 @@ private fun GamepadShellBody(
                     }
                 }
             },
+            onOpenLeftMenu = {
+                quickMenuOpen = false
+                leftMenuOpen = true
+            },
             onDismiss = { quickMenuOpen = false },
+        )
+    }
+    if (leftMenuOpen) {
+        LeftMenu(
+            entries = leftMenuEntries(sectionsFor(uiMode)),
+            current = section,
+            onSelect = { target ->
+                leftMenuOpen = false
+                selectSection(target)
+            },
+            onOpenQuickMenu = {
+                leftMenuOpen = false
+                quickMenuOpen = true
+            },
+            onDismiss = { leftMenuOpen = false },
         )
     }
     // Anchor for [requestFocusWhenAttached] below -- attached to the
@@ -762,6 +789,7 @@ private fun GamepadShellBody(
     androidx.compose.runtime.CompositionLocalProvider(
         LocalShellWindow provides shellWindow,
         LocalHelpRowOwner provides helpRowOwner,
+        LocalShoulderStrips provides shoulderStrips,
         LocalHelpRowSlotReport provides { slot -> helpRowSlotReport = currentScreenKey to slot },
     ) {
     Column(
@@ -793,7 +821,7 @@ private fun GamepadShellBody(
             // act on it (Modifier.ownPadButtons).
             .ownPadButtons { backDispatcher?.onBackPressed() }
             // What the whole shell means by a press, wherever it is: the
-            // Quick Menu and the sections. Closest to the content, so a
+            // two menus and the shoulders. Closest to the content, so a
             // screen that wants one of these presses for itself takes it
             // first (docs/SPEC.md 6e).
             .onPad { press ->
@@ -801,28 +829,41 @@ private fun GamepadShellBody(
                     // R2, the Quick Menu's own button (named by the R2 pill
                     // in the top-right corner); a held Select arrives here
                     // as R2 too, made by the pipeline's front (PadGate) for
-                    // pads whose triggers send no key. Start opens the same
-                    // menu (owner direction: "one obvious, consistent way
-                    // into Settings" -- the button most pads already read
-                    // as "menu"). The press opens; its release is this
-                    // owner's and goes nowhere, and a fresh press inside
-                    // the menu closes it there.
-                    GamepadAction.R2, GamepadAction.START -> {
+                    // pads whose triggers send no key. The press opens; its
+                    // release is this owner's and goes nowhere, and a fresh
+                    // press inside the menu closes it there.
+                    GamepadAction.R2 -> {
                         if (!quickMenuOpen) quickMenuOpen = true
                         true
                     }
-                    // L1/R1 cycle the sections -- the standard console-UI
-                    // pattern (Daijisho and most console launchers), which
-                    // works whatever has focus. Not over a game's detail.
+                    // Start, the left menu's button: navigation, where the
+                    // Quick Menu is quick management (docs/SPEC.md 7j,
+                    // "Gaming controls"). Only this window ever sees it:
+                    // once a launched game is in front the shell is not
+                    // the foreground and receives no input.
+                    GamepadAction.START -> {
+                        if (!leftMenuOpen) leftMenuOpen = true
+                        true
+                    }
+                    // L1/R1 step the nearest tab strip: the page's own when
+                    // it has claimed them (PC Games' views), else the top
+                    // bar's sections -- the standard console-UI pattern
+                    // (Daijisho and most console launchers), which works
+                    // whatever has focus. Not over a game's detail.
                     GamepadAction.L, GamepadAction.R -> {
-                        if (detailEntry != null) {
-                            false
-                        } else {
-                            val sections = sectionsFor(uiMode)
-                            val currentIndex = sections.indexOf(section)
-                            val step = if (press.action == GamepadAction.L) -1 else 1
-                            selectSection(sections[(currentIndex + step + sections.size) % sections.size])
-                            true
+                        val step = if (press.action == GamepadAction.L) -1 else 1
+                        when (shoulderRoute(stripOwned = shoulderStrips.current != null, detailOpen = detailEntry != null)) {
+                            ShoulderRoute.STRIP -> {
+                                shoulderStrips.current?.step?.invoke(step)
+                                true
+                            }
+                            ShoulderRoute.TOP_BAR -> {
+                                val sections = sectionsFor(uiMode)
+                                val currentIndex = sections.indexOf(section)
+                                selectSection(sections[(currentIndex + step + sections.size) % sections.size])
+                                true
+                            }
+                            ShoulderRoute.NONE -> false
                         }
                     }
                     else -> false
@@ -848,6 +889,10 @@ private fun GamepadShellBody(
                 current = section,
                 onSelect = selectSection,
                 onQuickMenu = { quickMenuOpen = true },
+                onLeftMenu = { leftMenuOpen = true },
+                // A page's own tab strip, when it has claimed L1/R1, takes
+                // the glyphs from the bar: the bar says only what it does.
+                shouldersOnBar = shoulderStrips.current == null,
                 // L2 is a PC game's own menu (docs/SPEC.md 7i): live on the
                 // PC Games tab while a game is under its cursor.
                 contextMenuEnabled = section == GamingSection.PC_GAMES && detailEntry == null && focusedContextEntry != null,
@@ -1581,6 +1626,9 @@ private fun ButtonHintFooter(
         background = background,
         bindings = listOf(
             HintBinding(GamepadAction.A, aLabel),
+            // Start is the left menu on every screen the shell draws; the
+            // chip is also its touch route.
+            HintBinding(GamepadAction.START, "Menu"),
             HintBinding(GamepadAction.Y, "Info") { showInfo },
             // B is the hint row's own touch route to back.
             HintBinding(GamepadAction.B, "Back") { canGoBack },

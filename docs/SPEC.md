@@ -4578,8 +4578,9 @@ leaving the shell's `StatusCluster` under a second OS clock (`tracker#169`).
 **2. One table: key to meaning (`GamepadKeyMap`).** `GamepadAction` is
 the vocabulary (ES-DE's own `es_input.xml` names, logical rather than
 physical): A accept, B back one level, X the focused thing's toggle, Y its
-detail, the four directions, L/R previous/next tab, R2 and Start the Quick
-Menu, Select options for where you are, L2 a PC game's own menu. Pad
+detail, the four directions, L/R previous/next tab (the nearest strip's, §7j
+"Gaming controls"), R2 the Quick Menu, Start the left menu, Select options
+for where you are, L2 a PC game's own menu. Pad
 buttons and the keyboard are in the same table -- arrows, Enter = A,
 Escape = B, Space = X, Backspace = Y, the menu key = Select, F10 = R2, Page
 Up/Page Down and Shift+Tab/Tab = L1/R1 -- so no screen keeps a key list of
@@ -7304,11 +7305,9 @@ Gaming, where the owner's ask was sharpest:
 
 **What changed, no new mechanism added:**
 
-- **Start/Menu opens the Quick Menu**, exactly like R2 (`GamepadShell`'s
-  key handler, `QuickMenu`'s own toggle-closed check) -- additive, since
-  Start dispatched nothing in the shell before this. R2 stays the one
-  named on screen (the R2 pill); Start needs no pill because most pads
-  already read it as "menu" without one.
+- **Start opened the Quick Menu, exactly like R2** -- superseded
+  2026-10-01 (Droidtop/tracker#258): Start now opens the left menu, and R2
+  stays the Quick Menu's one button (§7j, "Gaming controls").
 - **The Quick Menu's System tab gained a "Settings" tile**
   (`GamingSettingsCatalog.ID_SYSTEM_OPEN_SETTINGS`, in the existing
   `quickOnly` System group, right after "Switch mode") that deep-links
@@ -8906,6 +8905,10 @@ the pipeline applies it.
   where its cursor was, as the Deck's rows do) and the grid's rows; at the
   top the cursor lands on the strip, and Up on the strip is consumed: the
   D-pad never reaches the tab bar (§7j; owner, 2026-09-27).
+- **L1/R1** step the strip's views (Home, then each view; not the Filters
+  chip), because this tab's strip owns the shoulders (`OwnShoulders`, §7j
+  "Gaming controls"); the glyphs sit at the strip's ends and the hint row
+  names them ("Previous view", "Next view"). **Start** opens the left menu.
 - **Left/Right** move along the strip, along a shelf, or along a grid row
   (`gridPadTarget`, the one card-grid edge rule), never wrapping
   (`menuStep`: ES-DE's menus do not loop). A held direction repeats at
@@ -8935,7 +8938,8 @@ the pipeline applies it.
 - **The hint row is the tab's own** (`HelpRowClaim.SCREEN`, so the shell
   draws no second bar): A names the focused game's primary action from
   `PcPlayState` ("Select" on the strip), Y Game page, X Favourite, L2
-  Game options, Select Options, B Back when there is a level to leave.
+  Game options, Select Options, B Back when there is a level to leave,
+  Start Menu, L1/R1 Previous/Next view.
   Each is a `HintBinding` gated on its action really dispatching (§7j).
   Over the PC setup screen the claim is `NONE` and the shell's bar draws,
   because that screen has no row of its own.
@@ -9517,6 +9521,57 @@ reservation was added for the pills --- the decision two paragraphs up
 holds --- because the real bug was never the layout, it was believing a
 dense small landscape panel was a phone.
 
+### Gaming controls: Start is the left menu, L1/R1 are contextual (owner, 2026-10-01, Droidtop/tracker#258)
+
+There are two side menus and they split the work: the **left menu** is
+navigation and where things live; the **right menu** (the Quick Menu, R2)
+is quick management only. ("The QAM is for quick management stuff, the
+left menu is for navigation.") Principles are taken from Big Picture's
+side menu, not its code, art, names or layout; droidtop's own design
+language applies.
+
+- **Start opens the left menu**, from every Gaming screen (`LeftMenu`,
+  `GamepadShell`'s root `onPad`). It opens on the destination the user is
+  on (focus memory, `leftMenuStartIndex`), dims the page behind it with a
+  scrim (not a blur: the page may be a themed canvas with video, and a
+  per-frame blur is not worth it on a handheld) and slides in. D-pad
+  Up/Down move, A goes there, B or Start closes it, R2 swaps to the Quick
+  Menu; Start inside the Quick Menu swaps to the left menu. A tap on a row
+  is A, a tap on the dimmed page is B, and the header's Start pill and the
+  hint row's Start chip are its touch routes. It lists the destinations
+  the UI mode allows (`sectionsFor`: Retro Games, PC Games, Apps,
+  Settings); it grows with stores (a page per store with its login and its
+  own library), individual libraries, downloads and jobs, running apps and
+  a Plugins entry as those screens exist -- a row appears only when what it
+  opens exists.
+- **Start is the shell's, not a running game's.** The shell receives input
+  only while it is the foreground window; once a launched game or any other
+  app is in front, Start belongs to it and droidtop does nothing.
+  **Home is never used** (droidtop will not always be the home provider),
+  and **Select stays Options**.
+- **The menus take their colours and type from the theme tokens.** The
+  ES-DE theme supplies colour and type tokens to the whole shell and the
+  layout of the Retro Games view only; the left menu, the Quick Menu and
+  the PC Games surface have their own layout and draw only `MenuTokens`
+  and `TypeRole`, so they follow a theme switch. No hard-coded colour.
+- **L1/R1 are contextual: they step the nearest tab strip.** A page that
+  carries a strip claims the shoulders (`OwnShoulders`, held in the
+  shell's `ShoulderStripRegistry`); a page with none leaves them to the top
+  bar, which cycles the sections as before. Where a strip owns them the
+  glyphs sit at the ends of that strip (`ShoulderGlyph`, drawn only when a
+  pad is present, as the top bar's are) and the top bar stops naming them;
+  the hint row says what they do on that page ("Previous view" and "Next
+  view" on PC Games). A strip owns the press even at its end, so a shoulder
+  never moves the whole page away from under the user; to change section
+  from a strip page, use the left menu or the top bar by touch. Who gets a
+  press is one pure function (`shoulderRoute`): nothing over a game's
+  detail, else the page's strip, else the top bar. PC Games' strip is
+  Home and the saved and built-in views (the Filters chip is a dialog, not
+  a view, and is skipped); the cursor does not move when L1/R1 change the
+  view.
+- **The D-pad never reaches the top bar** (below); the top bar is reached
+  by touch, or by L1/R1 (Page Up/Page Down) where no strip owns them.
+
 **The top bar is reached by touch, L1/R1, or Page Up/Page Down -- never
 by the D-pad itself (owner, 2026-09-27).** "Pressing up IMMEDIATELY jumps
 up to the top bar, scrolling up in a list is impossible" -- reproduced on
@@ -9533,8 +9588,9 @@ at all -- they take `onClick` for touch and nothing else, and carry no
 candidates from anywhere, on any screen. The current tab still shows by
 its raised fill; a focus RING there is no longer possible because a pad
 can never park on it. L1/R1 (`SectionTabBar`'s own `ShoulderGlyph`,
-`GamepadShell`'s onKeyEvent) remain the one dedicated route to switch
-sections, and a keyboard's equivalent is Page Up/Page Down
+`GamepadShell`'s onKeyEvent) remain the dedicated route to switch
+sections on a page with no tab strip of its own (see "Gaming controls"
+above), and a keyboard's equivalent is Page Up/Page Down
 (`GamepadKeyMap.DEFAULT`) -- the same key a browser or an IDE already
 uses to move between tabs/panes, rather than inventing a droidtop-only
 binding. A screen's own onKeyEvent handlers see focus arrive from
@@ -12942,7 +12998,7 @@ deliberately, mode by mode, instead of letting the next surface reinvent it.
 **Today.** Real per §7f/§7i/§7j: a Retro Games tab with the themed carousel and gamelists, a
 PC Games tab after the Steam Deck's library (shelves, a view strip, a game page), `PcGameMenu`
 on L2, Quick Menu with a Settings tile (`## One consistent way into
-Settings`, above), Start opening the Quick Menu.
+Settings`, above), Start opening the left menu (§7j, "Gaming controls").
 
 **What still reads as accumulation:**
 - Three different entry points into "configure this system" exist because

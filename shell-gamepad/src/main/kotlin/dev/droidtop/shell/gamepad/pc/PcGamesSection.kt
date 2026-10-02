@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -47,10 +48,13 @@ import dev.droidtop.shell.gamepad.GamelistOptionsMenu
 import dev.droidtop.shell.gamepad.HelpRowClaim
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.OwnShoulders
 import dev.droidtop.shell.gamepad.ShellChip
+import dev.droidtop.shell.gamepad.ShoulderGlyph
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.gridPadTarget
+import dev.droidtop.shell.gamepad.showsShoulderGlyphs
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
@@ -293,6 +297,25 @@ internal fun PcGamesSection(
         return
     }
 
+    // L1/R1 step the strip's views: Home, then each view in order, not the
+    // Filters chip (a dialog, not a view) and never wrapping (menuStep). The
+    // strip owns the press even at its end, so the shoulders never move the
+    // whole page to another tab from here (docs/SPEC.md 7j, "Gaming
+    // controls"). The cursor stays where it is: stepping a view from the
+    // grid does not pull the cursor up onto the strip.
+    OwnShoulders { step ->
+        val active = when {
+            state.home -> 0
+            currentView != null -> views.indexOf(currentView) + 1
+            else -> state.stripIndex.coerceIn(0, filtersChip - 1)
+        }
+        val next = menuStep(active, filtersChip, step)
+        if (next != active) {
+            EsDeNavigationSounds.play("scroll")
+            activateChip(next)
+        }
+    }
+
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "PC Games") }
     var heldStep by remember { mutableStateOf(false) }
@@ -315,6 +338,12 @@ internal fun PcGamesSection(
             }
             else -> if (grid.isNotEmpty()) gridState.keepInView(state.itemIndex, animate = !heldStep)
         }
+    }
+
+    // L1/R1 change the view while the cursor is elsewhere: the chip they
+    // landed on is kept in view too, not only when the cursor is on the strip.
+    LaunchedEffect(state.stripIndex) {
+        if (!state.stripFocused) stripState.keepInView(state.stripIndex, animate = true)
     }
 
     fun moveTo(shelf: Int, item: Int) {
@@ -385,36 +414,45 @@ internal fun PcGamesSection(
                     true
                 },
         ) {
-            // The view strip.
-            LazyRow(
-                state = stripState,
-                contentPadding = PaddingValues(horizontal = window.edgePadding, vertical = Space.Sm),
-                horizontalArrangement = Arrangement.spacedBy(Space.Sm),
-                modifier = Modifier.fillMaxWidth(),
+            // The view strip, with L1 and R1 at its ends: it owns the
+            // shoulders while this tab is up (OwnShoulders above).
+            val shoulderGlyphs = window.showsShoulderGlyphs()
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = window.edgePadding),
             ) {
-                items(count = stripCount, key = { "chip:$it" }) { index ->
-                    run {
-                        val label = when (index) {
-                            0 -> "Home"
-                            filtersChip -> "Filters and sort"
-                            else -> views[index - 1].name
+                if (shoulderGlyphs) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = Space.Sm))
+                LazyRow(
+                    state = stripState,
+                    contentPadding = PaddingValues(vertical = Space.Sm),
+                    horizontalArrangement = Arrangement.spacedBy(Space.Sm),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    items(count = stripCount, key = { "chip:$it" }) { index ->
+                        run {
+                            val label = when (index) {
+                                0 -> "Home"
+                                filtersChip -> "Filters and sort"
+                                else -> views[index - 1].name
+                            }
+                            val on = when (index) {
+                                0 -> state.home
+                                filtersChip -> !state.home && currentView == null
+                                else -> !state.home && currentView === views[index - 1]
+                            }
+                            ShellChip(
+                                label,
+                                on = on,
+                                selected = state.stripFocused && state.stripIndex == index,
+                                onClick = {
+                                    state.stripFocused = true
+                                    activateChip(index)
+                                },
+                            )
                         }
-                        val on = when (index) {
-                            0 -> state.home
-                            filtersChip -> !state.home && currentView == null
-                            else -> !state.home && currentView === views[index - 1]
-                        }
-                        ShellChip(
-                            label,
-                            on = on,
-                            selected = state.stripFocused && state.stripIndex == index,
-                            onClick = {
-                                state.stripFocused = true
-                                activateChip(index)
-                            },
-                        )
                     }
                 }
+                if (shoulderGlyphs) ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = Space.Sm))
             }
             when {
                 games == null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -480,6 +518,11 @@ internal fun PcGamesSection(
                 HintBinding(GamepadAction.L2, "Game options") { focusedEntry != null },
                 HintBinding(GamepadAction.SELECT, "Options"),
                 HintBinding(GamepadAction.B, "Back") { !state.home },
+                // Start is the shell's left menu; L1/R1 step this strip's
+                // views (OwnShoulders), so the row names what they do HERE.
+                HintBinding(GamepadAction.START, "Menu"),
+                HintBinding(GamepadAction.L, "Previous view"),
+                HintBinding(GamepadAction.R, "Next view"),
             )
         }
         HintRow(bindings = hints)

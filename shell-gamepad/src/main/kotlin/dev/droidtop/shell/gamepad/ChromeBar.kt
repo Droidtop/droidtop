@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import kotlin.math.roundToInt
 
 internal data class NarrowChromeSlots(
@@ -74,8 +76,9 @@ internal fun narrowChromeSlots(
 
 /**
  * The Gaming shell's header: section tabs, the L1/R1 glyphs that step
- * them, the L2 context-menu and R2 Quick Menu indicators (docs/SPEC.md
- * 7k, "Header and footer are one frame").
+ * them (only while no page tab strip owns the shoulders, ShoulderStrip.kt),
+ * the Start left-menu pill, the L2 context-menu and R2 Quick Menu
+ * indicators (docs/SPEC.md 7k, "Header and footer are one frame").
  *
  * Where there is room the tabs sit in the exact middle of the bar, with
  * the status readout in an equal slot on the left and the R2 indicator in
@@ -96,16 +99,20 @@ internal fun SectionTabBar(
     current: GamingSection,
     onSelect: (GamingSection) -> Unit,
     onQuickMenu: () -> Unit,
+    onLeftMenu: () -> Unit,
     contextMenuEnabled: Boolean,
     onContextMenu: () -> Unit,
     sections: List<GamingSection> = GamingSection.entries,
+    // False while the page in front has claimed L1/R1 for a tab strip of
+    // its own (ShoulderStrip.kt): the bar then does not name them.
+    shouldersOnBar: Boolean = true,
 ) {
     val window = LocalShellWindow.current
     val tabStyle = MaterialTheme.typography.titleMedium
     val textMeasurer = rememberTextMeasurer()
     // L1/R1 only mean something with a pad; on a touch phone with none
     // attached they are noise in the bar, so they are not drawn there.
-    val shoulders = sections.size > 1 && (!window.touchFirst || window.padPresent)
+    val shoulders = sections.size > 1 && shouldersOnBar && window.showsShoulderGlyphs()
     // Measure the actual labels with the live theme font and text scale.
     // A per-tab estimate can say the centered layout fits while its last
     // selected label is already outside the screen at Largest text.
@@ -166,6 +173,9 @@ internal fun SectionTabBar(
             onClick = onQuickMenu,
         )
     }
+    // The left menu's control, at the left end where the menu opens from;
+    // the pill alone, so it never crowds the L2 indicator beside it.
+    val leftMenu: @Composable () -> Unit = { LeftMenuIndicator(onLeftMenu) }
     val contextMenu: @Composable () -> Unit = { ContextMenuIndicator(contextMenuEnabled, !window.compact, onContextMenu) }
 
     Row(
@@ -178,7 +188,10 @@ internal fun SectionTabBar(
     ) {
         if (centred) {
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                contextMenu()
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    leftMenu()
+                    contextMenu()
+                }
             }
             if (shoulders) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = 6.dp))
             Row(
@@ -193,7 +206,8 @@ internal fun SectionTabBar(
                 }
             }
         } else {
-            if (narrowSlots.context) contextMenu()
+            leftMenu()
+            if (narrowSlots.context) Box(Modifier.padding(start = 8.dp)) { contextMenu() }
             if (shoulders && narrowSlots.shoulders) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = 6.dp))
             // The tabs scroll and the Quick Menu control stays pinned beside
             // them. On a phone the names do not fit across 411dp, and a plain
@@ -240,6 +254,36 @@ internal fun SectionTabBar(
                 scrollState.scrollBy(delta)
             }
         }
+    }
+}
+
+/**
+ * On-screen indicator for the left menu: the pill names the button that
+ * opens it (Start) with a pad, and says "Menu" without one; tapping it
+ * opens the menu either way. Like the other indicators it is never a
+ * D-pad focus target.
+ */
+@Composable
+private fun LeftMenuIndicator(onClick: () -> Unit) {
+    val window = LocalShellWindow.current
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
+            .focusProperties { canFocus = false }
+            .clickable(onClick = onClick),
+    ) {
+        Text(
+            if (window.showsShoulderGlyphs()) GamepadKeyMap.labelFor(GamepadAction.START) else "Menu",
+            color = MenuTokens.OnSurface,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier
+                .border(1.dp, MenuTokens.HintPillOutline, RoundedCornerShape(50))
+                .padding(horizontal = 9.dp)
+                .opticallyCentred(MenuTokens.TabPillHeight, MaterialTheme.typography.labelLarge.fontSize),
+        )
     }
 }
 

@@ -18,10 +18,10 @@ import androidx.compose.ui.input.key.nativeKeyCode
  * - [A] accept, [B] back one level, [X] the focused thing's toggle
  *   (favourite), [Y] the focused thing's detail or info;
  * - [UP]/[DOWN]/[LEFT]/[RIGHT] move;
- * - [L]/[R] previous/next tab (a keyboard's Page Up/Page Down and
- *   Shift+Tab/Tab);
+ * - [L]/[R] previous/next tab of the nearest tab strip, else of the top
+ *   bar (a keyboard's Page Up/Page Down and Shift+Tab/Tab);
  * - [R2] the Quick Menu (a held Select is the same press, for pads whose
- *   triggers send no key), [START] the same menu, [SELECT] options for
+ *   triggers send no key), [START] the left menu, [SELECT] options for
  *   where you are, [L2] a PC game's own menu;
  * - [BACK] the system back key. It belongs to the back dispatcher
  *   (`BackHandler`), never to a key handler, so a long press of it still

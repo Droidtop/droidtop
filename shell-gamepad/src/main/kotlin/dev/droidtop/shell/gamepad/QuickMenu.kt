@@ -59,11 +59,10 @@ import kotlinx.coroutines.launch
  * top-right corner. Hold-SELECT remains only as the fallback for pads
  * whose triggers are analog-only and never emit an R2 key event
  * (short-press SELECT keeps its existing meaning; chords were rejected
- * as undiscoverable). START/Menu opens and toggles it too (owner
- * direction, "one obvious, consistent way into Settings"): unlike R2 it
- * carries no on-screen pill of its own, because most pads already read
- * Start as "menu" without one -- it is muscle-memory support on top of
- * the named trigger, not a second thing to discover.
+ * as undiscoverable). Start is NOT this menu's button: it opens the left
+ * menu ([LeftMenu], owner 2026-10-01, Droidtop/tracker#258). The two
+ * split the work -- the left menu is navigation, this one is quick
+ * management -- and Start inside this sheet swaps to the left menu.
  *
  * ENTIRELY controller-driven, per direction: L1/R1 switch tabs, D-pad
  * moves, A opens, X dismisses, Y clears all, B closes. The System tab
@@ -115,6 +114,7 @@ internal fun QuickMenu(
     onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
     onQuit: (dev.droidtop.library.LibraryEntry) -> Unit,
     quitOutcome: dev.droidtop.library.QuitResult?,
+    onOpenLeftMenu: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     Dialog(
@@ -181,15 +181,19 @@ internal fun QuickMenu(
                     .align(if (window.portrait) Alignment.BottomCenter else Alignment.CenterEnd)
                     // Preview: tab switching and closing win over the tab
                     // inside, which holds focus and takes its own presses.
-                    // R2 (or Start) closes: the press that OPENED the sheet
-                    // belonged to the shell underneath, so its release never
-                    // acts here (docs/SPEC.md 6e) and only a fresh press
-                    // closes. A held Select arrives as R2 too, so holding it
-                    // again closes the sheet it opened.
+                    // R2 closes: the press that OPENED the sheet belonged to
+                    // the shell underneath, so its release never acts here
+                    // (docs/SPEC.md 6e) and only a fresh press closes. A held
+                    // Select arrives as R2 too, so holding it again closes the
+                    // sheet it opened. Start is the left menu's button, so it
+                    // swaps to that menu rather than closing this one.
                     .onPad(preview = true) { press ->
                         when (press.action) {
-                            GamepadAction.R2, GamepadAction.START -> {
+                            GamepadAction.R2 -> {
                                 onDismiss(); true
+                            }
+                            GamepadAction.START -> {
+                                onOpenLeftMenu(); true
                             }
                             GamepadAction.L, GamepadAction.R -> {
                                 val i = visibleTabs.indexOf(tab)
