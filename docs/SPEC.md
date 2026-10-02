@@ -6112,8 +6112,8 @@ validate-before-replace:
 
 One call refreshes all four (`PlatformDatabases.refresh`), and every
 "Update platform databases" runs it: the console-systems settings row,
-the Gaming gamelist menu's item, each BIOS screen's row, and the update
-schedule. None of them refreshes a single database on its own.
+the Gaming gamelist menu's item, and the update schedule (the BIOS
+screens carry no row of their own: one place per setting, Droidtop/tracker#290). None of them refreshes a single database on its own.
 
 ### Which system a ROM belongs to (2026-08-31)
 
@@ -12887,6 +12887,10 @@ the secondary path for sources that publish no key.
   A pasted token is never widened this way; paste a new one. Signing out removes
   the token from the device; GitHub keeps the authorisation until the person
   revokes it in their GitHub settings.
+  **Copy (Droidtop/tracker#290, rule of #285).** Settings rows carry a short label
+  and value; a screen has at most one short helper line. Plugins and Plugin
+  repositories follow it; no info affordance exists, so long explanations were
+  cut rather than moved.
 - **Plugin repositories (owner, 2026-10-01, Droidtop/tracker#259: add the
   repository, trust its key automatically, and auto-update).** Plugins screen,
   "Plugin repositories": the person types `owner/name` (or pastes the address

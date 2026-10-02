@@ -302,11 +302,9 @@ object AppSettingsCatalogs {
                     AsyncActionItem(
                         id = "console_systems_update_players",
                         title = "Update platform databases",
-                        subtitle = "Refresh the players, platforms, engine routing and BIOS files " +
-                            "from GitHub. This build started from " +
+                        subtitle = "Players, platforms, engine routing and BIOS files; built from " +
                             (PlatformDatabaseSnapshot.shortCommit(context)
-                                ?.let { "snapshot $it" } ?: "an unrecorded snapshot") +
-                            "; the same refresh also runs on the update schedule",
+                                ?.let { "snapshot $it" } ?: "an unrecorded snapshot"),
                         run = { ctx, onStatus ->
                             withContext(Dispatchers.IO) {
                                 PlatformDatabases.refresh(ctx, onStatus)
@@ -656,20 +654,6 @@ object AppSettingsCatalogs {
                                 run = {},
                             )
                         },
-                    ),
-                    CatalogGroup(
-                        id = "bios_tools",
-                        title = null,
-                        items = listOf(
-                            // The one refresh (SPEC 7e2): the BIOS registry is
-                            // one of the four databases it brings up to date.
-                            AsyncActionItem(
-                                id = "bios_update_db",
-                                title = "Update platform databases",
-                                subtitle = "Refresh the BIOS registry, with players, platforms and engine routing, from droidtop-platforms on GitHub",
-                                run = { ctx, onStatus -> PlatformDatabases.refresh(ctx, onStatus) },
-                            ),
-                        ),
                     ),
                 )
             }
@@ -1708,7 +1692,7 @@ object AppSettingsCatalogs {
     private fun pluginsScreen() = CatalogScreen(
         id = SCREEN_PLUGINS,
         title = "Plugins",
-        subtitle = "Real code, run in its own process and approved by you — for crash containment, not as a security sandbox",
+        subtitle = "Run in their own process, only after you approve them",
         groups = { context -> pluginsGroups(context) },
         // A plugin's own page opens the Permissions screen of one plugin through here (a denied plugin view's way to change it).
         forDeepLink = { pluginId -> pluginPermissionsScreen(pluginId) },
@@ -1736,7 +1720,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "plugins_none",
                                 title = "No plugins installed",
-                                subtitle = "Add one below. A plugin never runs until you approve it on its own page",
+                                subtitle = "Approve a plugin on its own page",
                                 run = {},
                             ),
                         )
@@ -1803,13 +1787,13 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "plugins_add_catalog",
                         title = "Browse catalog",
-                        subtitle = "Plugins published by droidtop-platforms and any third-party origin you've trusted",
+                        subtitle = "From droidtop-platforms and origins you trust",
                         inline = PluginCatalogScreen.screen(),
                     ),
                     DocumentPickItem(
                         id = "plugins_add_file",
                         title = "Install plugin file",
-                        subtitle = "Pick a signed .droidplugin.tar.xz bundle. It is checked first and never runs until you approve it",
+                        subtitle = "A signed .droidplugin.tar.xz bundle",
                         mimeType = "*/*",
                         onPicked = { ctx, uri -> PluginStore.importFromPicker(ctx, uri) },
                     ),
@@ -1827,7 +1811,7 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "plugins_keys_you_trust",
                         title = "Keys you trust",
-                        subtitle = "Origins whose plugin signatures droidtop verifies: the official one, and any you add",
+                        subtitle = "Origins whose signatures are accepted",
                         registryId = SCREEN_PLUGIN_KEYS,
                         valueLabel = {
                             if (userKeys.isEmpty()) "Official only" else "Official + ${userKeys.size} added by you"
@@ -1990,7 +1974,7 @@ object AppSettingsCatalogs {
                     ActionItem(
                         id = "plugin_${m.id}_waiting",
                         title = "Needs " + missing.joinToString { it.api },
-                        subtitle = "Waiting: no running plugin provides this. It is not disabled and resumes by itself when one does.",
+                        subtitle = "Waiting for a running plugin",
                         run = {},
                     ),
                 )
@@ -2000,7 +1984,7 @@ object AppSettingsCatalogs {
                     ActionItem(
                         id = "plugin_${m.id}_new_access",
                         title = "Wants new access",
-                        subtitle = "An update asks for more than you allowed. Nothing new is on until you choose below.",
+                        subtitle = "An update asks for more; nothing new is on until you choose",
                         run = {},
                     ),
                 )
@@ -2059,7 +2043,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "plugin_${m.id}_approve_root",
                             title = "Approve and allow root",
-                            subtitle = "Only takes effect if this device actually has root; root stays an enhancement, never a requirement",
+                            subtitle = "Only used if this device has root",
                             confirmTitle = "Let \"${m.label}\" use root on this device?",
                             run = { ctx -> approve(ctx, true) },
                         ),
@@ -2069,7 +2053,7 @@ object AppSettingsCatalogs {
                     ActionItem(
                         id = "plugin_${m.id}_deny",
                         title = "Deny",
-                        subtitle = "Stays installed but never runs. A future update (a new signed archive) can be approved again.",
+                        subtitle = "Stays installed, never runs",
                         run = { ctx -> pendingTicks.remove(m.id); PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
                     ),
                 )
@@ -2089,7 +2073,7 @@ object AppSettingsCatalogs {
                     ActionItem(
                         id = "plugin_${m.id}_new_access_save",
                         title = "Allow what is ticked",
-                        subtitle = "Only these new items change; what you allowed before stays as it was",
+                        subtitle = "Changes only the new items",
                         run = { ctx ->
                             PluginGrants.forContext(ctx).answerNew(record, freshIds, newTicks.toSet())
                             pendingTicks.remove(newKey)
@@ -2148,7 +2132,7 @@ object AppSettingsCatalogs {
                     AsyncActionItem(
                         id = "plugin_${m.id}_call_status_tile",
                         title = "Call its status tile",
-                        subtitle = "Runs a real invoke() through the isolated plugin process and shows what it returns",
+                        subtitle = "Runs a real call and shows the result",
                         run = { ctx, _ ->
                             val policy = PluginCrashPolicy(ctx.applicationContext)
                             try {
@@ -2169,7 +2153,7 @@ object AppSettingsCatalogs {
                         AsyncActionItem(
                             id = "plugin_${m.id}_force_crash",
                             title = "Debug: force a crash",
-                            subtitle = "Checks crash containment: droidtop should survive and disable this plugin",
+                            subtitle = "droidtop should survive and disable this plugin",
                             confirmTitle = "Force ${m.label} to crash now?",
                             run = { ctx, _ ->
                                 val policy = PluginCrashPolicy(ctx.applicationContext)
@@ -2294,7 +2278,7 @@ object AppSettingsCatalogs {
             return AsyncActionItem(
                 id = "plugins_${need.runtime.lowercase()}_runtime_download",
                 title = need.actionLabel,
-                subtitle = "Press A to start. $forPluginLabel cannot run until it is installed. Downloaded once and checked against a SHA-256 before it is used.",
+                subtitle = "Press A to download; $forPluginLabel needs it",
                 run = { ctx, onStatus -> PluginRuntimeNeeds.install(ctx, need, onStatus) ?: "${need.runtime} runtime installed" },
             )
         }
@@ -2302,14 +2286,14 @@ object AppSettingsCatalogs {
             PluginKind.PYTHON -> ActionItem(
                 id = "plugins_python_runtime_remove",
                 title = "Python runtime: installed",
-                subtitle = "CPython ${PythonRuntimeManager.installedVersion(context) ?: PythonRuntimeManager.pinnedVersion(context)} (${PythonRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other python-kind plugin) until it is downloaded again; you are asked to confirm first.",
+                subtitle = "CPython ${PythonRuntimeManager.installedVersion(context) ?: PythonRuntimeManager.pinnedVersion(context)} (${PythonRuntimeManager.currentAbi()}); Python plugins stop until it is downloaded again",
                 confirmTitle = "Remove the downloaded Python runtime?",
                 run = { ctx -> PythonRuntimeManager.remove(ctx) },
             )
             PluginKind.FLUTTER_EMBED -> ActionItem(
                 id = "plugins_flutter_runtime_remove",
                 title = "Flutter runtime: installed",
-                subtitle = "Flutter engine ${FlutterRuntimeManager.pinnedVersion(context)} (${FlutterRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other flutter_embed-kind plugin) until it is downloaded again; you are asked to confirm first.",
+                subtitle = "Flutter engine ${FlutterRuntimeManager.pinnedVersion(context)} (${FlutterRuntimeManager.currentAbi()}); Flutter plugins stop until it is downloaded again",
                 confirmTitle = "Remove the downloaded Flutter runtime?",
                 run = { ctx -> FlutterRuntimeManager.remove(ctx) },
             )
@@ -2401,7 +2385,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "plugin_permissions_older_row",
                             title = "Full access (older plugin)",
-                            subtitle = "Written before permissions existed: it holds what it could always do. You can still turn any of it off below.",
+                            subtitle = "Written before permissions existed; turn any of it off below",
                             run = {},
                         ),
                     ),
