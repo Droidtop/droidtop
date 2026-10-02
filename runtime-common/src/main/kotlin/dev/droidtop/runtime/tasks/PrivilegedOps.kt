@@ -14,7 +14,7 @@ sealed interface ForceStopResult {
 data class ShellOutput(val exit: Int, val stdout: String, val stderr: String)
 
 /**
- * What the app asks of a privileged helper (Shizuku, local adb, or a root provider plugin).
+ * What the app asks of a privileged helper (Shizuku or Sui, through the official provider plugin).
  * The task manager lives below the plugin host, so :app installs the implementation
  * ([TaskManager.install]) and everything here stays a plain interface. [forceStop] and [exec] block on
  * a provider process: callers run them off the main thread. [available] is cheap and does no IPC.
