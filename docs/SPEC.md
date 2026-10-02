@@ -12579,6 +12579,13 @@ of what is built. The decisions, briefly:
   high-risk extension point is a consent item too. A same-key update
   keeps its approval, but any dangerous access it newly asks for waits
   for the user.
+- **Three-state plugin access choices** (Droidtop/tracker#263): each
+  category and each individual host API call can be Allow, Ask, or Never.
+  Unticked or untouched risky access is Ask; Never is an explicit choice
+  that refuses without prompting. A call-level choice overrides its
+  category choice, which overrides the manifest's declared default
+  (risky defaults to Ask; harmless defaults to Allow). The same resolver
+  governs approval, stored choices, plugin settings, and runtime checks.
 - **Honest enforcement.** Today's `:pluginhost` shares droidtop's UID,
   so permissions bound only what the host does on a plugin's behalf.
   The proposed contained tier closes that: one `isolatedProcess` per
