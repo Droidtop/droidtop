@@ -15,12 +15,14 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import dev.droidtop.library.EngineVerdictStore
 import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.PcCompatibility
 import dev.droidtop.library.PcFolderScan
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.ScanActivity
+import dev.droidtop.library.ScanBudget
 import dev.droidtop.library.ScanLog
 import dev.droidtop.library.ScanSkips
 import dev.droidtop.library.StoreInstall
@@ -485,13 +487,6 @@ object PcLibrary {
      */
     private val listingCache = PcFolderScan.ListingCache()
 
-    /**
-     * Where rule 6's verdicts are kept in droidtop's own files, so the first
-     * rescan after a restart re-checks only the folders that changed
-     * ([PcFolderScan.EngineVerdicts]).
-     */
-    private const val ENGINE_VERDICTS_FILE = "pc-engine-verdicts.tsv"
-
     /** [block]'s answer, or [default] when it throws. A cancellation is never swallowed. */
     private suspend fun <T> orDefault(default: T, block: suspend () -> T): T =
         try {
@@ -557,10 +552,10 @@ object PcLibrary {
             dev.droidtop.library.consoles.ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         }
         val job = currentCoroutineContext()[Job]
-        // Rule 6's verdicts survive a restart; loaded and saved off the main
-        // thread, and saved even when the scan is cancelled part way.
-        val verdictsFile = File(context.filesDir, ENGINE_VERDICTS_FILE)
-        val verdicts = withContext(Dispatchers.IO) { PcFolderScan.EngineVerdicts.load(verdictsFile, defs) }
+        // The engine verdicts survive a restart and are the same ones the
+        // engine walk reads ([EngineVerdictStore]); loaded and saved off the
+        // main thread, and saved even when the scan is cancelled part way.
+        val verdicts = withContext(Dispatchers.IO) { EngineVerdictStore.forRules(context, defs) }
         val tops = withContext(Dispatchers.IO) {
             roots.flatMap { root -> PcFolderScan.topLevelFolders(root).map { root to it } }
         }
@@ -577,6 +572,7 @@ object PcLibrary {
             cache = listingCache,
             cancelled = { job?.isActive == false },
             verdicts = verdicts,
+            folderBudgetMs = ScanBudget.DEFAULT_TOP_FOLDER_BUDGET_MS,
             onEngineWork = { planned, finished ->
                 enginePlanned.addAndGet(planned)
                 engineFinished.addAndGet(finished)
@@ -598,7 +594,9 @@ object PcLibrary {
                             // Unwalked, not empty: what the last walk found there is kept.
                             PcFolderScan.TopLevelFolder(folder, emptyList(), folder.lastModified(), skipped = true)
                         }
-                        if (!top.skipped) {
+                        if (!top.skipped || top.slow) {
+                            // A slow folder is logged too, with the reason, and not published:
+                            // what the last walk found there is kept and the next scan retries it.
                             ScanLog.write(
                                 label = "pc folder ${folder.absolutePath}",
                                 games = top.games.size,
@@ -622,7 +620,7 @@ object PcLibrary {
                 }
             }.awaitAll()
         } finally {
-            withContext(NonCancellable + Dispatchers.IO) { verdicts.save(verdictsFile) }
+            withContext(NonCancellable + Dispatchers.IO) { EngineVerdictStore.save(context) }
         }
         val skips = ScanSkips()
         for (folder in scanned) skips.addAll(folder.skips)

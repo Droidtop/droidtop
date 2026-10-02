@@ -82,6 +82,19 @@ class ScanBudget private constructor(
          */
         const val DEFAULT_FOLDER_BUDGET_MS = 20_000L
 
+        /**
+         * How long ONE top-level folder's whole walk may take before it is
+         * abandoned and walked again by the next scan (docs/SPEC.md 7g).
+         * Unlike [DEFAULT_FOLDER_BUDGET_MS], which bounds one folder's own
+         * step, this bounds the folder's whole subtree: the console's
+         * 1335 rescan spent 86 to 94 s in one root folder holding 77
+         * games, every step of it within its own budget. A minute is
+         * past every folder that walks in a normal time, and what the
+         * walk finished is kept as verdicts, so the next scan starts
+         * where this one stopped.
+         */
+        const val DEFAULT_TOP_FOLDER_BUDGET_MS = 60_000L
+
         fun start(
             budgetMs: Long = DEFAULT_FOLDER_BUDGET_MS,
             clock: () -> Long = { System.currentTimeMillis() },

@@ -349,6 +349,150 @@ class PcFolderScanTest {
         assertFalse(facts.hasPath("Game.exe", folderWanted = true))
     }
 
+    // --- one set of verdicts for both walks (Droidtop/tracker#275) ------------
+
+    private fun freshVerdicts(name: String = "none.tsv") = PcFolderScan.EngineVerdicts.load(File(temp.root, name), defs)
+
+    private fun titles(vararg indexes: Int) = indexes.map { "Title$it" }
+
+    @Test
+    fun `a second engine walk of unchanged folders makes no engine check at all`() {
+        categoryWithEngineFolders("Cat", count = 6)
+        val folder = File(temp.root, "Cat")
+        val options = GameEngineDetector.EngineWalkOptions(verdicts = freshVerdicts())
+
+        val cold = GameEngineDetector.scanFolder(folder, emptyMap(), defs, options = options)
+        assertTrue(cold.engineChecks > 0)
+        assertEquals(titles(1, 2, 3, 4, 5, 6), cold.games.map { it.displayFolder.name }.sorted())
+
+        val warm = GameEngineDetector.scanFolder(folder, emptyMap(), defs, options = options)
+        assertEquals(0, warm.engineChecks)
+        assertTrue(warm.engineVerdictsKept > 0)
+        assertEquals(cold.games.map { it.displayFolder.name }, warm.games.map { it.displayFolder.name })
+    }
+
+    @Test
+    fun `an engine walk after a restart is answered from the file`() {
+        categoryWithEngineFolders("Cat", count = 6)
+        val folder = File(temp.root, "Cat")
+        val kept = File(temp.root, "verdicts.tsv")
+        val first = PcFolderScan.EngineVerdicts.load(kept, defs)
+        GameEngineDetector.scanFolder(folder, emptyMap(), defs, options = GameEngineDetector.EngineWalkOptions(verdicts = first))
+        first.save(kept)
+
+        val restarted = PcFolderScan.EngineVerdicts.load(kept, defs)
+        val warm = GameEngineDetector.scanFolder(
+            folder,
+            emptyMap(),
+            defs,
+            options = GameEngineDetector.EngineWalkOptions(verdicts = restarted),
+        )
+        assertEquals(0, warm.engineChecks)
+        assertEquals(titles(1, 2, 3, 4, 5, 6), warm.games.map { it.displayFolder.name }.sorted())
+    }
+
+    @Test
+    fun `what the PC walk checked is not checked again by the engine walk`() {
+        categoryWithEngineFolders("Cat", count = 6)
+        val folder = File(temp.root, "Cat")
+        val verdicts = freshVerdicts()
+        PcFolderScan.scanTopLevel(folder, defs, PcFolderScan.Options(verdicts = verdicts))
+
+        val engine = GameEngineDetector.scanFolder(
+            folder,
+            emptyMap(),
+            defs,
+            options = GameEngineDetector.EngineWalkOptions(verdicts = verdicts),
+        )
+        assertTrue(engine.engineVerdictsKept > 0)
+    }
+
+    @Test
+    fun `a changed folder is checked again by the engine walk`() {
+        categoryWithEngineFolders("Cat", count = 6)
+        val folder = File(temp.root, "Cat")
+        val options = GameEngineDetector.EngineWalkOptions(verdicts = freshVerdicts())
+        GameEngineDetector.scanFolder(folder, emptyMap(), defs, options = options)
+
+        file("Cat/Title7/data.pck")
+        val changed = GameEngineDetector.scanFolder(folder, emptyMap(), defs, options = options)
+        assertTrue(changed.engineChecks > 0)
+        assertEquals(titles(1, 2, 3, 4, 5, 6, 7), changed.games.map { it.displayFolder.name }.sorted())
+    }
+
+    @Test
+    fun `the engine walk reports the engine checks it plans and finishes`() {
+        categoryWithEngineFolders("Cat", count = 6)
+        val planned = java.util.concurrent.atomic.AtomicInteger()
+        val finished = java.util.concurrent.atomic.AtomicInteger()
+        GameEngineDetector.scanFolder(
+            File(temp.root, "Cat"),
+            emptyMap(),
+            defs,
+            options = GameEngineDetector.EngineWalkOptions(
+                verdicts = freshVerdicts(),
+                onEngineWork = { p, f ->
+                    planned.addAndGet(p)
+                    finished.addAndGet(f)
+                },
+            ),
+        )
+        assertTrue(planned.get() > 0)
+        assertTrue(finished.get() > 0)
+    }
+
+    @Test
+    fun `an engine walk over its folder budget is abandoned, says so, and the retry finishes it`() {
+        categoryWithEngineFolders("Cat", count = 6)
+        val folder = File(temp.root, "Cat")
+        val verdicts = freshVerdicts()
+
+        // Every folder's override check takes a few milliseconds, so the 1 ms budget is gone by the second folder.
+        val slow = GameEngineDetector.scanFolder(
+            folder,
+            emptyMap(),
+            defs,
+            override = {
+                Thread.sleep(5)
+                null
+            },
+            options = GameEngineDetector.EngineWalkOptions(verdicts = verdicts, folderBudgetMs = 1L),
+        )
+        assertTrue(slow.slow)
+        assertTrue(slow.games.isEmpty())
+        assertEquals(listOf(PcFolderScan.SLOW_FOLDER_REASON), slow.skipped.counts().keys.toList())
+
+        val retry = GameEngineDetector.scanFolder(
+            folder,
+            emptyMap(),
+            defs,
+            options = GameEngineDetector.EngineWalkOptions(verdicts = verdicts, folderBudgetMs = 60_000L),
+        )
+        assertFalse(retry.slow)
+        assertEquals(titles(1, 2, 3, 4, 5, 6), retry.games.map { it.displayFolder.name }.sorted())
+    }
+
+    @Test
+    fun `a PC walk over its folder budget is abandoned unwalked and flagged slow`() {
+        game("Cat/First Game")
+        game("Cat/Second Game")
+        val top = PcFolderScan.scanTopLevel(
+            File(temp.root, "Cat"),
+            defs,
+            PcFolderScan.Options(
+                folderBudgetMs = 1L,
+                cancelled = {
+                    Thread.sleep(5)
+                    false
+                },
+            ),
+        )
+        assertTrue(top.slow)
+        assertTrue(top.skipped)
+        assertTrue(top.games.isEmpty())
+        assertEquals(listOf(PcFolderScan.SLOW_FOLDER_REASON), top.skips.counts().keys.toList())
+    }
+
     @Test
     fun `a folder that holds nothing to run is not an engine game root by its subtree evidence`() {
         // The compiled Ren'Py archive two levels down names a game only beside a program.

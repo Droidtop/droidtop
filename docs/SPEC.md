@@ -8897,13 +8897,15 @@ identity line.
   the main executable, the Steam download marker for a recognised Steam
   install) are not covered by this decision.
 
-**Persisted engine verdicts are observable and must be reusable.** The PC
-folder walk keeps a verdict for a folder only when its path, modification
-time, entry count and engine-rule fingerprint still match. Its per-folder
-`droidtop.ScanLog` line reports cache hits and misses alongside actual
-engine checks; an unchanged second walk must report zero engine checks for
-folders with reusable verdicts. A cache miss is evidence to investigate,
-not a successful cache operation merely because the cache file exists.
+**Persisted engine verdicts are observable and must be reusable.** The
+engine verdicts (`PcFolderScan.EngineVerdicts`, one per process through
+`EngineVerdictStore`) keep a verdict for a folder only when its path,
+modification time, entry count and engine-rule fingerprint still match.
+The per-folder `droidtop.ScanLog` line of the PC walk and of the engine
+walk reports cache hits and misses alongside actual engine checks; an
+unchanged second walk must report zero engine checks for folders with
+reusable verdicts. A cache miss is evidence to investigate, not a
+successful cache operation merely because the cache file exists.
 
 ## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
 
@@ -9318,16 +9320,46 @@ that follow are decisions, and each is in the code it names:
   whole process, used from four subfolders up) and stops asking once two games
   are known; the cost is latency and latency overlaps, and more than four only
   queue behind the card's FUSE daemon.
-- **Engine verdicts persist across restarts** (`PcFolderScan.EngineVerdicts`,
-  `pc-engine-verdicts.tsv` in the app's own files, loaded and saved off the main
-  thread, saved even when a rescan is cancelled). A verdict is valid for the
+- **Engine verdicts persist across restarts and are shared by every walk**
+  (`PcFolderScan.EngineVerdicts`, `engine-verdicts.tsv` in the app's own files,
+  held for the process by `EngineVerdictStore`, loaded and saved off the main
+  thread, saved after every folder and even when a rescan is cancelled). The
+  console's 1335 rescan spent 86 to 94 s in one root folder because the ENGINE
+  walk (`GameEngineDetector.scanFolder`, the slow one) kept no verdict at all,
+  the cache was wired to the PC walk's rule 6 alone, and a root nested inside
+  another root was walked a second time (the second `games root` line of the
+  same scan). Now the store keeps, per folder, what every walk asks and that
+  does not depend on where the walk met the folder: whether it holds several
+  games (one answer for the PC walk and one for the engine walk, which also
+  leaves ROM system folders out), the engine its own files name, the engine a
+  subtree rule finds below it, and whether it is a plain PC game. The PC walk's
+  probes and the engine walk's read and write the same entries, so a folder one
+  has checked is not checked by the other, by the second pass over an
+  overlapping root, or by the next scan; the walks stay two (they produce
+  different entries) but the checking is done once. A verdict is valid for the
   same folder path, modification time, entry count and engine rules; any change
-  is a miss. A cold start after a restart re-checks only changed folders. Like
-  the listing cache it does not notice a change inside a subfolder that leaves
-  the parent untouched.
+  is a miss, and an answer found after a folder's own step or the folder budget
+  ran out is never kept. A cold start after a restart re-checks only changed
+  folders. Like the listing cache it does not notice a change inside a
+  subfolder that leaves the parent untouched.
+- **One top-level folder cannot hold a scan for minutes**
+  (`ScanBudget.DEFAULT_TOP_FOLDER_BUDGET_MS`, 60 s, for the PC walk's
+  `Options.folderBudgetMs` and the engine walk's `EngineWalkOptions.folderBudgetMs`).
+  This bounds the folder's whole subtree, unlike the 20 s per-step budget that
+  keeps a folder's own evidence honest. A folder over it is abandoned: its log
+  line says "skipped: slow, kept as it was and walked again next scan", nothing
+  of it is published (the index keeps what the last walk found there and
+  nothing is marked missing), and every verdict it finished is kept, so the
+  next scan, which retries it, starts where this one stopped. A first scan of a
+  very large new folder can therefore take two or three rescans to show all of
+  it.
 - **Progress inside a slow folder:** the row reads "Looking at PC game folders:
   12 of 21, checking engines: 40 of 130", the second figure counting subfolders
-  looked at over those the checks have so far planned to look at.
+  looked at over those the checks have so far planned to look at. The engine
+  walk, which runs after the PC walk and is where the 1335 rescan sat for five
+  minutes behind a finished "Reading PC game details: 2 of 2 folders", has its
+  own line, "Looking for engine games in <root>: folder 3 of 21, checking
+  engines: 40 of 130" (`ScanActivity` source `engines`), and the row shows both.
 - **Top-level folders are walked three at a time** (`PcLibrary.scanGameFolders`);
   the cost is latency and latency overlaps.
 - **A folder game's cover or icon is remembered by the game folder's
