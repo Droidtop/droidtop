@@ -245,8 +245,10 @@ fun CatalogNavigator(
         pendingFolderPick = null
         if (uri == null || item == null) return@rememberLauncherForActivityResult
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        statusById[item.id] = "Working..."
         scope.launch {
-            val error = item.onPicked(context, uri)
+            val error = runCatching { item.onPicked(context, uri) }
+                .getOrElse { "Couldn't share that folder: ${it.message ?: "an unknown error"}" }
             if (error != null) statusById[item.id] = error else statusById.remove(item.id)
             refresh()
         }
@@ -265,7 +267,10 @@ fun CatalogNavigator(
     fun adjust(item: CatalogItem, direction: Int) {
         if (item is ToggleItem) {
             scope.launch {
-                item.onToggle(context, !item.current)
+                statusById[item.id] = "Working..."
+                runCatching { item.onToggle(context, !item.current) }
+                    .onFailure { statusById[item.id] = "Failed: ${it.message ?: "an unknown error"}" }
+                if (statusById[item.id] == "Working...") statusById.remove(item.id)
                 refresh()
             }
         } else if (adjustCatalogItem(context, item, direction)) refresh()

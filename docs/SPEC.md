@@ -2050,6 +2050,13 @@ the `ContainerRuntime` interface that already exists (§3):
   that module the desktop log says "microphone not bridged" and audio out
   is unaffected. plugin-api D9's refusal of `audio.record` to plugins is a
   different question and stands.
+  **Settings operations stay asynchronous (decided 2026-10-01, Droidtop/tracker#47).**
+  Catalog toggle and folder-pick handlers are suspend functions. Both settings
+  renderers invoke them from a screen-lifecycle coroutine, show "Working..."
+  on the affected row while the handler runs, and reread the screen once it
+  completes. Container runtime and storage work stays inside
+  `withContext(Dispatchers.IO)` in the catalog handler; the UI callback never
+  waits for it synchronously. Leaving the screen cancels its pending UI update.
   Still not built: Start with droidtop (autostart with the session).
   **Backup (Droidtop/tracker#81, 2026-09-28).** A container's own data
   (what was installed and made inside it: programs, config, a Wine prefix,

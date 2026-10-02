@@ -134,8 +134,12 @@ class CatalogPreferenceNavigator(
             if (uri == null || item == null) return@registerForActivityResult
             val context = fragment.requireContext()
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            fragment.lifecycleScope.launch {
-                val error = item.onPicked(context, uri)
+            statusById[item.id] = "Working..."
+            rebuild()
+            fragment.viewLifecycleOwner.lifecycleScope.launch {
+                val error = runCatching { item.onPicked(context, uri) }
+                    .getOrElse { "Couldn't share that folder: ${it.message ?: "an unknown error"}" }
+                if (error != null) statusById[item.id] = error else statusById.remove(item.id)
                 if (error != null) {
                     AlertDialog.Builder(context).setMessage(error).setPositiveButton(android.R.string.ok, null).show()
                 }
@@ -511,13 +515,18 @@ class CatalogPreferenceNavigator(
         is ToggleItem -> SwitchPreferenceCompat(context).apply {
             key = item.id
             title = item.title
-            summary = item.subtitle
+            summary = statusById[item.id] ?: item.subtitle
             isPersistent = false
             isIconSpaceReserved = false
             isChecked = item.current
             setOnPreferenceChangeListener { _, newValue ->
-                this@CatalogPreferenceNavigator.fragment.lifecycleScope.launch {
-                    item.onToggle(context, newValue as Boolean)
+                val requestedValue = newValue as Boolean
+                statusById[item.id] = "Working..."
+                summary = "Working..."
+                this@CatalogPreferenceNavigator.fragment.viewLifecycleOwner.lifecycleScope.launch {
+                    runCatching { item.onToggle(context, requestedValue) }
+                        .onFailure { statusById[item.id] = "Failed: ${it.message ?: "an unknown error"}" }
+                    if (statusById[item.id] == "Working...") statusById.remove(item.id)
                     rebuild()
                 }
                 true
@@ -563,7 +572,7 @@ class CatalogPreferenceNavigator(
         is FolderPickItem -> Preference(context).apply {
             key = item.id
             title = item.title
-            summary = item.subtitle
+            summary = statusById[item.id] ?: item.subtitle
             isIconSpaceReserved = false
             setOnPreferenceClickListener {
                 pendingFolderPick = item
