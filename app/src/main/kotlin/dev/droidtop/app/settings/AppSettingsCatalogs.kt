@@ -302,8 +302,8 @@ object AppSettingsCatalogs {
                     AsyncActionItem(
                         id = "console_systems_update_players",
                         title = "Update platform databases",
-                        subtitle = "Refresh players, platforms, engine routing, and BIOS registry from " +
-                            "droidtop-platforms on GitHub. This build was seeded from " +
+                        subtitle = "Refresh the players, platforms, engine routing and BIOS files " +
+                            "from GitHub. This build started from " +
                             (PlatformDatabaseSnapshot.shortCommit(context)
                                 ?.let { "snapshot $it" } ?: "an unrecorded snapshot") +
                             "; the same refresh also runs on the update schedule",
@@ -322,7 +322,7 @@ object AppSettingsCatalogs {
                     TextInputItem(
                         id = "console_systems_db_source",
                         title = "Platform database source",
-                        subtitle = "Base URL the database index and its files are fetched from; blank restores the default",
+                        subtitle = "Web address the platform database is downloaded from; blank restores the default",
                         value = PlatformDatabaseSource.baseUrl(context)
                             .takeIf { it != PlatformDatabaseSource.DEFAULT_BASE_URL }
                             .orEmpty(),
@@ -342,7 +342,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "console_systems_no_folders",
                             title = "No console system folders found",
-                            subtitle = "Name a folder after its system (snes, psx, ...) inside a games folder, or choose one below",
+                            subtitle = "Name a folder after its system (snes, psx, ...) inside a Game folder, or choose one below",
                             run = {},
                         ),
                     )
@@ -382,8 +382,8 @@ object AppSettingsCatalogs {
                                 val picked = GamesRootPrefs.resolveStoragePath(uri)
                                 val roots = GamesRootPrefs.gamesRootPaths(ctx).map { it.trimEnd('/') + "/" }
                                 when {
-                                    picked == null -> "Couldn't resolve that folder to a real path on this device"
-                                    roots.none { picked.absolutePath.startsWith(it) } -> "That folder is not inside one of your game folders"
+                                    picked == null -> "Couldn't get that folder's real path on this device; pick a folder on this device's storage"
+                                    roots.none { picked.absolutePath.startsWith(it) } -> "That folder is not inside one of your Game folders; choose a folder inside one"
                                     else -> {
                                         if (SystemOverridePrefs.get(ctx, picked.absolutePath) == null) {
                                             SystemOverridePrefs.set(ctx, picked.absolutePath, SystemOverridePrefs.NOT_SET)
@@ -451,7 +451,7 @@ object AppSettingsCatalogs {
                                             id = "folder_pc_store_info",
                                             title = "${kind.storeName} library",
                                             subtitle = "PC games from ${kind.storeName} are detected per game ($gameText). " +
-                                                "They appear in the PC games list (Gaming shell > PC tab).",
+                                                "They appear in the PC Games tab in Gaming.",
                                             run = {},
                                         ),
                                     ),
@@ -471,7 +471,7 @@ object AppSettingsCatalogs {
                                             id = "folder_engine_info",
                                             title = "Engine games folder",
                                             subtitle = "Engine games (Ren'Py, RPG Maker, etc.) are detected per game ($gameText). " +
-                                                "They appear in the PC games list (Gaming shell > PC tab) and launch via Enginehost.",
+                                                "They appear in the PC Games tab in Gaming and launch via Enginehost.",
                                             run = {},
                                         ),
                                     ),
@@ -526,7 +526,7 @@ object AppSettingsCatalogs {
                                                 NestedScreenItem(
                                                     id = "folder_add_player_${resolved.id}",
                                                     title = "Add a custom player",
-                                                    subtitle = "Point ${resolved.displayName} at any installed app via am start arguments",
+                                                    subtitle = "Point ${resolved.displayName} at any installed app by its launch command",
                                                     inline = addCustomPlayerScreen(resolved),
                                                 ),
                                             )
@@ -545,8 +545,8 @@ object AppSettingsCatalogs {
                                                 AsyncActionItem(
                                                     id = "folder_gamelist_${folder.absolutePath}",
                                                     title = "Import gamelist.xml",
-                                                    subtitle = "Ingests an external scraper's output (Skraper, Skyscraper, ARRM, ES-DE) " +
-                                                        "for this folder: metadata into droidtop, media referenced where it sits",
+                                                    subtitle = "Bring in another scraper's results (Skraper, Skyscraper, ARRM, ES-DE) " +
+                                                        "for this folder: game details go into droidtop, artwork is used from where it sits",
                                                     run = { ctx, _ -> importGamelistXml(ctx, folder) },
                                                 ),
                                             )
@@ -563,7 +563,7 @@ object AppSettingsCatalogs {
                                                 NestedScreenItem(
                                                     id = "folder_acquire_${resolved.id}",
                                                     title = "Get games",
-                                                    subtitle = "Search an installed acquire_content plugin or integration for ${resolved.displayName}",
+                                                    subtitle = "Search an installed plugin or integration for ${resolved.displayName}",
                                                     inline = AcquireContentSources.systemScreen(resolved.id, resolved.displayName, folder),
                                                 ),
                                             )
