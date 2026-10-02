@@ -381,7 +381,7 @@ class PcGameProvider(
                         "Can't launch ${entry.title}: couldn't identify which executable to run in " +
                             "${gameRoot.absolutePath}. Pick one explicitly for this game.",
                     )
-                runtime.launchWindows(windows.executable, gameRoot, windows.workingDir, windows.arguments)
+                runtime.launchWindows(windows.executable, gameRoot, windows.workingDir, windows.arguments, entry.id)
             }
             // An engine this provider does not own (see
             // notOwnedByAnEngine) cannot resolve here; saying so beats

@@ -159,6 +159,9 @@ internal fun PcGameMenu(
     var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
     var importingLutris by remember(entry) { mutableStateOf(false) }
     var gettingGames by remember(entry) { mutableStateOf(false) }
+    // This game's Wine and graphics settings (docs/SPEC.md 5a), in a sheet
+    // over the menu; null when it is closed.
+    var wineScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     // The free-space offer before a store install or update opens its own
     // window over the menu (Droidtop/tracker#227); null when it is closed.
     var storeOffer by remember(entry) { mutableStateOf<StoreInstallOffer?>(null) }
@@ -316,6 +319,17 @@ internal fun PcGameMenu(
         dev.droidtop.shell.gamepad.GetGamesSheet(
             dev.droidtop.library.integrations.GetGamesContext.PC,
             onDismiss = { gettingGames = false },
+        )
+        return
+    }
+    wineScreen?.let { screen ->
+        dev.droidtop.shell.gamepad.CatalogSheet(
+            root = screen,
+            onExit = {
+                wineScreen = null
+                // "Use separate settings" moves the game to its own prefix.
+                reloadToken++
+            },
         )
         return
     }
@@ -567,11 +581,11 @@ internal fun PcGameMenu(
                 null
             }.getOrElse { "Enginehost didn't take that: ${it.message}" }
         },
-        // Both of these open UI :runtime-windows already compiles from the
+        // The store page: UI :runtime-windows already compiles from the
         // vendored gamenative tree, hosted by an :app Activity (build-plan
-        // steps 5 and 7). Started by explicit class name because this
-        // module cannot depend on :app -- the same route every other
-        // cross-module screen here takes.
+        // step 5). Started by explicit class name because this module
+        // cannot depend on :app -- the same route every other cross-module
+        // screen here takes.
         onOpenAppScreen = { className, extras ->
             status = runCatching {
                 context.startActivity(
@@ -584,6 +598,15 @@ internal fun PcGameMenu(
             }.getOrElse { "droidtop couldn't open that screen: ${it.message}" }
         },
         hasWindowsRoute = hasWindowsRoute,
+        // The registered settings screen :app builds (WineOptionsCatalog),
+        // by id and deep-linked to this game, in a sheet over the menu.
+        onOpenWineSettings = {
+            val screen = dev.droidtop.library.settings.SettingsScreenRegistry.get(
+                dev.droidtop.library.WineSettingsScreen.ID,
+                dev.droidtop.library.WineSettingsScreen.argument(entry.id, gameName),
+            )
+            if (screen != null) wineScreen = screen else status = "Wine settings aren't available in this build"
+        },
         wineSettings = wineSettings,
         onImportLutris = { importingLutris = true },
         onClearWineSettings = {
@@ -1078,6 +1101,7 @@ private fun rememberPcActions(
     onEnginehost: (android.content.Intent) -> Unit,
     onOpenAppScreen: (className: String, extras: Map<String, String>) -> Unit,
     hasWindowsRoute: Boolean,
+    onOpenWineSettings: () -> Unit,
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
     onClearWineSettings: () -> Unit,
@@ -1186,12 +1210,7 @@ private fun rememberPcActions(
                 hasWindowsRoute = hasWindowsRoute,
                 isEngineGame = isEngineGame,
                 onEnginehost = onEnginehost,
-                onOpenPrefix = {
-                    onOpenAppScreen(
-                        PC_CONTAINER_CONFIG_ACTIVITY,
-                        mapOf(EXTRA_PC_ENTRY_ID to entry.id, EXTRA_PC_TITLE to entry.title),
-                    )
-                },
+                onOpenPrefix = onOpenWineSettings,
                 wineSettings = wineSettings,
                 onImportLutris = onImportLutris,
                 onClearWineSettings = onClearWineSettings,
@@ -1315,8 +1334,8 @@ private fun runnerRows(
     )
     hasWindowsRoute -> listOfNotNull(
         PcActionRow(
-            "Prefix and graphics",
-            "The Windows prefix this game runs in: graphics driver, DXVK, Box64 and FEX, components, drives and the rest",
+            "Wine and graphics",
+            "Wine build, FEXCore or Box64, graphics driver and DXVK for this game, and all its prefix settings",
             onOpenPrefix,
         ),
         // The game's own program, when an import chose one; selecting
@@ -1337,8 +1356,8 @@ private fun runnerRows(
             "Reads a Wine script from lutris.net into this game's settings and shows every change first; nothing in it is run",
             onImportLutris,
         ),
-        PcActionRow("Saves", "This game's saves live inside its prefix, under Prefix and graphics", null),
-        PcActionRow("Controls", "This game's controls are its prefix's controller tab, under Prefix and graphics", null),
+        PcActionRow("Saves", "This game's saves live inside the Windows prefix it runs in (Wine and graphics says which)", null),
+        PcActionRow("Controls", "This game's controls are its prefix's controller tab, under Wine and graphics > All prefix settings", null),
     )
     else -> null
 }
@@ -1394,9 +1413,7 @@ private val STORE_PREFIXES = setOf("steam", "gog", "epic", "amazon")
 // because this module cannot depend on :app. Kept together so the two
 // sides are one edit apart if a class ever moves.
 internal const val PC_STORE_ACTIVITY = "dev.droidtop.app.PcStoreActivity"
-private const val PC_CONTAINER_CONFIG_ACTIVITY = "dev.droidtop.app.PcContainerConfigActivity"
 internal const val EXTRA_PC_ENTRY_ID = "dev.droidtop.app.extra.PC_ENTRY_ID"
-private const val EXTRA_PC_TITLE = "dev.droidtop.app.extra.PC_TITLE"
 
 
 /** The ProtonDB row's states: nothing is fetched until the person asks. */

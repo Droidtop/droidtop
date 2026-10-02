@@ -1,10 +1,8 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.data.GameSource
 import app.gamenative.service.SteamService
 import app.gamenative.utils.ContainerUtils
-import app.gamenative.utils.LaunchDependencies
 import app.gamenative.utils.X86_64GuestLibs
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
@@ -105,33 +103,42 @@ class DroidtopPcGameRuntime(
         val manager = runCatching { ContainerManager(context) }
             .getOrElse { return@withContext failed("opening container storage", it, it.message ?: "couldn't open container storage") }
 
-        val existing = manager.containers.firstOrNull()
+        // droidtop's own environment, the one every game without Wine
+        // settings of its own runs in; a game's own container (made from
+        // its Wine settings) is not this.
+        val existing = manager.containers.let { all -> all.firstOrNull { it.id == CONTAINER_ID } ?: all.firstOrNull() }
 
-        // What this device's Wine environment should be, stated before
-        // any of it exists. A container object is the only way gamenative
-        // expresses that -- its installer and its launch dependencies
-        // both read the wine version and the variant off one -- so an
-        // unsaved instance carries the answer through the steps that run
-        // before there is anything on disk to save.
-        //
-        // Those two fields are deliberately not left to the defaults.
-        // `Container.DEFAULT_VARIANT` reads `DefaultVersion.VARIANT`,
-        // which is `glibc` at class-load time and only becomes bionic
-        // once gamenative's own startup code has mutated the static -- so
-        // an environment built from the defaults would provision the
-        // glibc rootfs, whose execution model is proot, which does not
-        // exist on arm64 (docs/SPEC.md 5b).
+        // What this device's Wine environment should be: upstream
+        // GameNative's own per-device defaults (ContainerUtils.
+        // setContainerDefaults, which only GameNative's MainActivity ever
+        // ran): on arm64 the arm64ec Proton with FEXCore, the Wrapper
+        // driver and the DXVK picked for the GPU; on x86_64 the x86_64
+        // Proton run directly with software Vulkan. Every one of them is a
+        // choice under Settings > Windows games and each game's Wine
+        // settings (docs/SPEC.md 5a); these are only where they start.
+        val defaults = runCatching { ContainerUtils.deviceDefaultContainerData(context) }
+            .getOrElse { return@withContext failed("reading this device's defaults", it, it.message ?: "couldn't read this device's defaults") }
+
+        // Stated before any of it exists. A container object is the only
+        // way gamenative expresses that -- its installer and its launch
+        // dependencies both read the wine version and the variant off one
+        // -- so an unsaved instance carries the answer through the steps
+        // that run before there is anything on disk to save. The variant
+        // is bionic by name: the glibc variant's execution model is proot,
+        // which does not exist on arm64 (docs/SPEC.md 5b).
         val wanted = existing ?: Container(CONTAINER_ID).apply {
             containerVariant = Container.BIONIC
-            wineVersion = WINE_VERSION
+            wineVersion = defaults.wineVersion
         }
         // A container made before droidtop asked for bionic by name is a
         // glibc one. Repointing it is the repair; deleting the user's
-        // prefix and starting again is not.
+        // prefix and starting again is not. An existing bionic
+        // environment keeps the Wine it has: switching a prefix's Wine is
+        // the person's choice, made in its settings.
         if (existing != null && existing.containerVariant != Container.BIONIC) {
             onStatus("Switching the Windows environment to the no-root runtime…")
             existing.containerVariant = Container.BIONIC
-            existing.wineVersion = WINE_VERSION
+            existing.wineVersion = defaults.wineVersion
             runCatching { existing.saveData() }
         }
 
@@ -143,58 +150,11 @@ class DroidtopPcGameRuntime(
         // failed: Attempt to get length of null array". Upstream never
         // hits it because its system files are installed at startup and
         // its containers are created later; droidtop does both here, so
-        // it has to do them in that order.
-        //
-        // This is gamenative's own launch dependency set
-        // (BionicDefaultProtonDependency and friends), used rather than
-        // reimplemented: it is what knows which archive a given wine
-        // version needs and where it unpacks to.
-        // The one piece of that dependency droidtop cannot use: it
-        // fetches the archive through SteamService.downloadFile, which
-        // dereferences the running SteamService instance, and droidtop
-        // never starts that service. Confirmed on hardware -- the whole
-        // step failed with a KotlinNullPointerException carrying no
-        // message at all ("Setup failed: couldn't install Wine").
-        //
-        // Fetching it here with the instance-free downloader (the same
-        // one the base system uses below) makes the dependency's own
-        // isFileInstallable check short-circuit, so it still owns the
-        // extraction and the on-disk layout. The archive is named after
-        // the wine version, exactly as ImageFsInstaller's own
-        // installWineFromDownloads assumes.
-        val wineArchive = File(context.filesDir, "$WINE_VERSION.txz")
-        if (!(wineArchive.isFile && wineArchive.length() > 0)) {
-            onStatus("Downloading Wine…")
-            val fetched = runCatching {
-                SteamService.fetchFileWithFallback(wineArchive.name, wineArchive, context) { fraction ->
-                    onStatus("Downloading Wine… ${(fraction * 100).toInt()}%")
-                }
-            }
-            if (fetched.isFailure) {
-                return@withContext PcProvisionResult(
-                    false,
-                    fetched.exceptionOrNull()?.message
-                        ?: "couldn't download Wine -- check the network and retry",
-                )
-            }
-        }
-
-        val dependencies = runCatching {
-            LaunchDependencies().ensureLaunchDependencies(
-                context = context,
-                container = wanted,
-                gameSource = GameSource.CUSTOM_GAME,
-                gameId = 0,
-                setLoadingMessage = { message -> onStatus(message) },
-                setLoadingProgress = { fraction ->
-                    if (fraction >= 0f) onStatus("Installing Wine… ${(fraction * 100).toInt()}%")
-                },
-            )
-        }
-        if (dependencies.isFailure) {
-            val error = dependencies.exceptionOrNull()
-            return@withContext failed("installing Wine", error, error?.message ?: "couldn't install Wine")
-        }
+        // it has to do them in that order. WineComponents.ensureWine owns
+        // where a build comes from (gamenative's launch dependency for the
+        // two Proton 9 builds, upstream's component list for the rest).
+        runCatching { WineComponents.ensureWine(context, wanted, onStatus) }
+            .onFailure { return@withContext failed("installing Wine", it, it.message ?: "couldn't install Wine -- check the network and retry") }
 
         // The installer only EXTRACTS the base-system archive -- from the
         // bundled assets (where it has never shipped, upstream included)
@@ -260,25 +220,6 @@ class DroidtopPcGameRuntime(
         // "Download now" ran the full install a second time).
         imageFs.createVariantFile(wanted.containerVariant)
 
-        // An x86_64 device runs the x86_64 Wine directly, without box64, and
-        // the image above is an aarch64 userland: the libraries Wine opens
-        // come from the fork's own x86_64 build instead (X86_64GuestLibs,
-        // docs/SPEC.md "The x86_64 Windows runtime"). Nothing on arm64.
-        if (X86_64GuestLibs.isX86_64Host() && !X86_64GuestLibs.isInstalled(context)) {
-            onStatus("Downloading the x86_64 Windows libraries…")
-            runCatching {
-                X86_64GuestLibs.ensureInstalled(context) { fraction ->
-                    onStatus("Downloading the x86_64 Windows libraries… ${(fraction * 100).toInt()}%")
-                }
-            }.getOrElse {
-                return@withContext failed(
-                    "installing the x86_64 libraries",
-                    it,
-                    it.message ?: "couldn't install the x86_64 Windows libraries -- check the network and retry",
-                )
-            }
-        }
-
         // Only now: the prefix is stamped out of the Wine build that is
         // by this point actually on disk.
         onStatus("Creating the Windows environment…")
@@ -321,10 +262,28 @@ class DroidtopPcGameRuntime(
                 JSONObject().apply {
                     put("name", CONTAINER_NAME)
                     put("containerVariant", Container.BIONIC)
-                    put("wineVersion", WINE_VERSION)
+                    put("wineVersion", defaults.wineVersion)
                     put("drives", drivesFor(gamesRoots))
                 },
-            )
+            )?.also { created ->
+                // The rest of the device's defaults (emulator, its
+                // versions, graphics driver, DXVK/VKD3D), through
+                // gamenative's own save path; every other field stays
+                // the container's own default, as before.
+                ContainerUtils.applyToContainer(
+                    context,
+                    created,
+                    ContainerUtils.toContainerData(created).copy(
+                        emulator = defaults.emulator,
+                        box64Version = defaults.box64Version,
+                        fexcoreVersion = defaults.fexcoreVersion,
+                        graphicsDriver = defaults.graphicsDriver,
+                        graphicsDriverConfig = defaults.graphicsDriverConfig,
+                        dxwrapper = defaults.dxwrapper,
+                        dxwrapperConfig = defaults.dxwrapperConfig,
+                    ),
+                )
+            }
         }
             .getOrElse { return@withContext failed("creating the container", it, it.message ?: "container creation threw") }
             ?: return@withContext PcProvisionResult(
@@ -332,11 +291,24 @@ class DroidtopPcGameRuntime(
                 "couldn't create the Wine prefix (the container pattern may have failed to download)",
             )
 
-        // Last: this points the environment's own "xuser" home at this
+        // This points the environment's own "xuser" home at this
         // container, and anything reading container-relative paths
         // depends on it having happened.
         runCatching { manager.activateContainer(container) }
             .getOrElse { return@withContext failed("activating the container", it, it.message ?: "couldn't activate the container") }
+
+        // Last: everything the environment's settings name beyond Wine
+        // itself -- on x86_64 the guest libraries and the graphics driver,
+        // anywhere the DXVK, VKD3D, FEXCore or Box64 version and the driver
+        // build -- the same step every launch runs (WineComponents).
+        runCatching { WineComponents.ensure(context, container, onStatus) }
+            .onFailure {
+                return@withContext failed(
+                    "downloading the Windows components",
+                    it,
+                    it.message ?: "couldn't download the Windows components -- check the network and retry",
+                )
+            }
 
         when (val readiness = wineEngine.readiness(container)) {
             // Ready only if the container reads back the way every later
@@ -382,10 +354,14 @@ class DroidtopPcGameRuntime(
         gameRoot: File,
         workingDir: File,
         arguments: List<String>,
+        entryId: String?,
     ): PcLaunchResult {
-        // The same rule the configuration screen resolves with, so the
-        // prefix somebody edited is the prefix this starts in.
-        val container = PcContainers.forGame(context, entryId = null)
+        // The same rule the game's Wine settings resolve with, so the
+        // prefix somebody edited is the prefix this starts in: the game's
+        // own when it has one, droidtop's shared one otherwise. (This used
+        // to ask for the shared one always, so a game's own prefix was
+        // configurable but never launched into.)
+        val container = PcContainers.forGame(context, entryId)
             ?: return PcLaunchResult(
                 false,
                 // Names the real action that now exists. This used to say
@@ -477,28 +453,6 @@ class DroidtopPcGameRuntime(
         /** gamenative's id for Wine's own Direct3D, the one wrapper that is not DXVK-based. */
         private const val WINED3D = "wined3d"
         const val CONTAINER_NAME = "droidtop"
-
-        /**
-         * The Wine build droidtop provisions.
-         *
-         * One of `R.array.bionic_wine_entries`, which is what makes it
-         * installable without anyone touching a UI: gamenative's own
-         * `BionicDefaultProtonDependency` knows how to fetch exactly
-         * those two, whereas its newer default (`proton-10.0-arm64ec-2`)
-         * is a `.wcp` a user installs by hand through the Wine/Proton
-         * manager dialog, and provisioning cannot assume that happened.
-         *
-         * x86_64 rather than arm64ec, and the same build on both ABIs. It
-         * is an x86_64 Android (bionic) Wine: on arm64 it runs entirely
-         * under box64, whose payload ships in this module's assets; on an
-         * x86_64 device it runs directly, with the fork's x86_64 guest
-         * libraries in place of the image's aarch64 ones (no box64). An
-         * arm64ec build would be faster on arm64 but cannot run on x86_64
-         * at all, and additionally needs the emulator DLL set and a chosen
-         * emulator backend -- worth doing deliberately, not as a side
-         * effect of picking a default.
-         */
-        const val WINE_VERSION = "proton-9.0-x86_64"
     }
 }
 
@@ -506,8 +460,8 @@ class DroidtopPcGameRuntime(
  * WHICH Wine container a PC game runs in, in one place.
  *
  * Two shapes exist and both are real. gamenative keys a container by the
- * store's own app id, so a game somebody configured under GameNative (or
- * through the per-game config screen droidtop now opens) has a prefix of
+ * store's own app id, so a game somebody configured under GameNative, or
+ * gave Wine settings of its own in droidtop ([createOwn]), has a prefix of
  * its own; droidtop provisions ONE container (id [DroidtopPcGameRuntime]
  * writes) for everything else, because a person setting up Windows games
  * once should not be asked to set one up per game. This answers "the
@@ -526,7 +480,7 @@ object PcContainers {
      */
     fun forGame(context: Context, entryId: String?): Container? {
         val manager = runCatching { ContainerManager(context) }.getOrNull() ?: return null
-        val perGame = entryId?.let { gamenativeAppId(it) }
+        val perGame = entryId?.let { ownId(it) }
         if (perGame != null && runCatching { manager.hasContainer(perGame) }.getOrDefault(false)) {
             return runCatching { manager.getContainerById(perGame) }.getOrNull()
         }
@@ -536,13 +490,46 @@ object PcContainers {
 
     /** Whether [container] is [entryId]'s own prefix rather than the one every other game shares. */
     fun isOwnPrefix(entryId: String?, container: Container): Boolean =
-        entryId?.let { gamenativeAppId(it) } == container.id
+        entryId?.let { ownId(it) } == container.id
 
     /**
-     * The id gamenative would have given this game's own container:
-     * "STEAM_440" for a store entry, and nothing at all for a detected
-     * folder game, which never had a gamenative identity to key one by.
+     * Gives [entryId] a container of its own: a new prefix, made from the
+     * Wine build the shared environment uses and then given the shared
+     * environment's current settings, named [title]. From then on the game
+     * starts in it and its Wine settings edit it (docs/SPEC.md 5a). Returns
+     * the existing one if the game already has its own. Disk work, and a
+     * whole new prefix: never on the main thread.
      */
+    fun createOwn(context: Context, entryId: String, title: String): Container {
+        val manager = ContainerManager(context)
+        val id = ownId(entryId)
+        if (manager.hasContainer(id)) return manager.getContainerById(id)
+        val shared = forGame(context, entryId = null)
+            ?: error("There is no Windows environment yet. Set up Windows games first.")
+        val settings = ContainerUtils.toContainerData(shared)
+        val created = manager.createContainer(
+            id,
+            JSONObject().apply {
+                put("name", title)
+                put("containerVariant", settings.containerVariant)
+                put("wineVersion", settings.wineVersion)
+                put("drives", settings.drives)
+            },
+        ) ?: error("couldn't create a prefix for $title")
+        ContainerUtils.applyToContainer(context, created, settings.copy(name = title))
+        return created
+    }
+
+    /**
+     * The id of [entryId]'s own container: the one gamenative would have
+     * given it ("STEAM_440" for a store entry, the scanner's own app id for
+     * a folder game), so a prefix GameNative made for the game is the one
+     * it uses; for anything gamenative never had an identity for, one
+     * derived from droidtop's own entry id.
+     */
+    private fun ownId(entryId: String): String = gamenativeAppId(entryId)
+        ?: "DROIDTOP_" + java.util.zip.CRC32().apply { update(entryId.toByteArray()) }.value
+
     private fun gamenativeAppId(entryId: String): String? {
         val source = entryId.substringBefore(':')
         val nativeId = entryId.substringAfter(':', "")

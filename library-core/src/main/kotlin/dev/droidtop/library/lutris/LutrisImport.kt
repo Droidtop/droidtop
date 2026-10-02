@@ -125,11 +125,11 @@ object LutrisImport {
                     "overrides" -> prefix.overrides(value)
                     "version" -> notImported += ImportLine(
                         "Wine build \"$value\"",
-                        "Choose the Wine build under Prefix and graphics; a script does not pick one",
+                        "Choose the Wine build under Wine and graphics; a script does not pick one",
                     )
                     "dxvk_version" -> notImported += ImportLine(
                         "DXVK version \"$value\"",
-                        "Choose the DXVK version under Prefix and graphics",
+                        "Choose the DXVK version under Wine and graphics",
                     )
                     else -> notImported += ImportLine("Wine option \"$key\"", "droidtop has no setting for this")
                 }

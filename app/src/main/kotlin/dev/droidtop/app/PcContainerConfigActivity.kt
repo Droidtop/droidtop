@@ -33,8 +33,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Prefix and graphics for one PC game -- build-plan step 7 of the PC
- * surface (docs/SPEC.md 7i's "prefix and graphics" row).
+ * All prefix settings for one PC game, or for the shared environment -- the
+ * "All prefix settings" row of Wine and graphics (docs/SPEC.md 5a, 7c). The
+ * options most games need (Wine build, emulation, graphics driver,
+ * Direct3D) are droidtop's own rows there (WineOptionsCatalog); this is
+ * everything else.
  *
  * The screen itself is gamenative's own `ContainerConfigDialog` and its
  * nine tabs (General, Graphics, Emulation, Controller, Wine,

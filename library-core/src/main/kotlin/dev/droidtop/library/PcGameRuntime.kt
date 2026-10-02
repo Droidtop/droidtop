@@ -93,13 +93,17 @@ interface PcGameRuntime {
      * game's folder unless the game's own settings name another inside
      * it), with [arguments] handed to it one by one, never through a
      * shell. Which program, folder and arguments is
-     * [WindowsLaunchResolver]'s answer.
+     * [WindowsLaunchResolver]'s answer. [entryId] is the game's library
+     * id: a game with Wine settings of its own starts in its own prefix,
+     * every other game in the shared one, the same rule [prefixState]
+     * and the game's Wine settings resolve with.
      */
     suspend fun launchWindows(
         executable: File,
         gameRoot: File,
         workingDir: File = gameRoot,
         arguments: List<String> = emptyList(),
+        entryId: String? = null,
     ): PcLaunchResult
 
     /** Runs a native Linux executable directly inside the container. */
@@ -107,7 +111,7 @@ interface PcGameRuntime {
 
     /**
      * What the Wine prefix [entryId] runs in is set to -- the same
-     * prefix its "Prefix and graphics" row opens -- or null when no prefix
+     * prefix its "Wine and graphics" row opens -- or null when no prefix
      * exists yet. Disk work.
      */
     fun prefixState(entryId: String?): PcPrefixState?

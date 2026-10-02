@@ -181,6 +181,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(pluginKeysScreen())
         SettingsScreenRegistry.register(PluginJobsScreen.screen(extraGroups = { _ -> pcInstallsGroups() }))
         SettingsScreenRegistry.register(windowsGamesScreen())
+        SettingsScreenRegistry.register(WineOptionsCatalog.gameScreen())
         SettingsScreenRegistry.register(pcStoresScreen())
         SettingsScreenRegistry.register(StoresCatalog.screen())
         SettingsScreenRegistry.register(accountsAndSourcesScreen())
@@ -1187,11 +1188,15 @@ object AppSettingsCatalogs {
     private fun windowsGamesScreen() = CatalogScreen(
         id = SCREEN_WINDOWS_GAMES,
         title = "Windows games",
-        subtitle = "The Wine environment Windows games run inside, and the folders it can reach",
+        subtitle = "The Wine environment Windows games run inside, its Wine build and graphics, and the folders it can reach",
         groups = { context -> windowsGamesGroups(context) },
+        // The Wine option rows read the installed components and upstream's
+        // component list (a network fetch once a day); search does not wait
+        // on that.
+        indexGroups = { context -> windowsGamesGroups(context, wineOptions = false) },
     )
 
-    private suspend fun windowsGamesGroups(context: Context): List<CatalogGroup> {
+    private suspend fun windowsGamesGroups(context: Context, wineOptions: Boolean = true): List<CatalogGroup> {
         val runtime = dev.droidtop.library.PcGameRuntimeRegistry.runtime
         val roots = withContext(Dispatchers.IO) { GamesRootPrefs.gamesRootPaths(context).sorted() }
         val provisioned = withContext(Dispatchers.IO) { runtime?.isProvisioned == true }
@@ -1252,6 +1257,12 @@ object AppSettingsCatalogs {
                     )
                 },
             ),
+        ) + (
+            // The shared environment's Wine build, emulation, graphics
+            // driver and Direct3D: the default every game without settings
+            // of its own runs with (docs/SPEC.md 5a).
+            if (wineOptions && runtime != null && provisioned) WineOptionsCatalog.groups(context, entryId = null, title = null) else emptyList()
+        ) + listOf(
             CatalogGroup(
                 id = "windows_drives",
                 title = "Folders Wine can reach",

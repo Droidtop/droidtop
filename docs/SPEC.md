@@ -4045,15 +4045,60 @@ source in [vendor/gamenative](../vendor/gamenative):
   build loads `wowbox64.dll` or `libwow64fex.dll` as its `HODLL` according
   to that field, while an **x86_64** Wine build runs as `box64 <guest>` on
   arm64 and directly, with no translator, on an x86_64 device ("The x86_64
-  Windows runtime", §10b). droidtop's launch (`WineXSession`) hands the launcher
-  the prefix's own Box64 version and preset and FEXCore preset, and the
-  per-game Wine configuration screen (gamenative's `ContainerConfigDialog`,
-  opened through `PcContainerConfigActivity`) is where a person changes
-  them. droidtop provisions `proton-9.0-x86_64` (the one build that
-  installs without a hand-installed `.wcp`, see `DroidtopPcGameRuntime.
-  WINE_VERSION`), so the **default is Box64**; FEX applies once a prefix
-  is switched to an arm64ec build with FEXCore as its emulator. FEX's
-  separate value for Linux software is §3c.
+  Windows runtime", §10b). For an arm64ec build, 64-bit code always runs
+  through FEXCore and the `emulator` field picks FEXCore or Box64
+  (WowBox64) for 32-bit code; for an x86_64 build on arm64 Box64 is the
+  only translator the fork has (it has no FEX for a whole x86_64 Wine).
+  FEX's separate value for Linux software is §3c.
+- **Options, with defaults, not one hard-coded path (owner, 2026-10-02,
+  Droidtop/tracker#242).** "Hardcoding defaults is fine, but we get better
+  compatibility by exposing options." The Wine build, the x86 emulation
+  and its FEXCore/Box64/WowBox64 version, the graphics driver (and on arm64
+  the Turnip/Qualcomm build the Wrapper drivers load), and Direct3D
+  (WineD3D, DXVK, VKD3D, CNC DDraw) with the DXVK and VKD3D versions are
+  all choices:
+  - **One store, the prefix.** Every option is a field of gamenative's
+    `Container` that the fork's launcher already reads, written through
+    `ContainerUtils.applyToContainer`, the save path gamenative's own
+    dialog uses. `WineOptions` (`:runtime-windows`) reads and writes them;
+    `WineOptionPlan` holds which apply to which Wine build on which CPU and
+    how they couple, copied from the fork (`ContainerConfigDialog`'s
+    emulator/Wine coupling, `buildDxvkContext`'s DXVK 2.1 floor for VKD3D),
+    and is unit-tested. An x86_64 device is never offered an arm64ec build;
+    the launcher's refusal of one there stays as the message for a prefix
+    carried over from an arm64 device, since ARM code cannot run on x86.
+  - **Global default = the shared environment** (container 1), edited in
+    Settings > Windows games. **Per game = the game's own container**: the
+    game's "Wine and graphics" row (`WineOptionsCatalog`, a registered
+    catalog screen deep-linked by entry id) shows the shared values
+    read-only until "Use separate settings for this game" makes it a prefix
+    of its own (`PcContainers.createOwn`, the id `forGame` already resolves
+    first), copied from the shared settings; from then on the rows edit that
+    prefix and the game launches in it (`launchWindows` takes the entry id;
+    it used to launch every game in the shared prefix, so a game's own
+    prefix was configurable but never used). A Wine build belongs to the
+    prefix it boots, which is why per-game choice is a per-game prefix
+    rather than a per-launch override. Going back to the shared settings
+    (removing the game's prefix and the saves in it) is not built.
+    gamenative's full dialog stays reachable as "All prefix settings" for
+    everything else.
+  - **Defaults are upstream's, per device.** `ContainerUtils.
+    deviceDefaultContainerData` (the fork) runs GameNative's own
+    `setContainerDefaults`, which droidtop never ran before: on arm64 the
+    arm64ec `proton-10.0-arm64ec-2` with FEXCore, the Wrapper driver with
+    the Turnip build picked for the GPU class, and that class's DXVK; on
+    x86_64 the fork's own branch, `proton-9.0-x86_64` run directly with
+    software Vulkan. A new environment starts there; an existing one keeps
+    the Wine it has (switching a prefix's Wine is the person's choice).
+  - **Components arrive on demand, never in an image.** One step,
+    `WineComponents.ensure`, runs at setup, before every launch and from the
+    settings' "Download what these settings need" row: the two Proton 9
+    builds through gamenative's launch dependency, everything else through
+    upstream GameNative's component list (`ManifestRepository`, hosted on
+    downloads.gamenative.app and the hosts it names) by
+    `BestConfigService.resolveMissingManifestInstallRequests` and
+    `ManifestInstaller`, the same pair GameNative's own pre-launch runs. The
+    x86_64 pieces are the fork's own release assets (§10b).
 - **Prefer a native Linux build over Wine+translation when one exists
   and can run.** Some games ship a genuine Linux build alongside (or
   instead of) Windows. Running it as a normal process inside a Linux
@@ -4116,7 +4161,8 @@ picked it. They are now real launches, through a seam:
 - droidtop reuses an existing Wine container rather than creating one per
   game: an engine game should run in the environment the user already
   configured, and spawning multi-hundred-megabyte prefixes per title
-  uninvited would be its own bug.
+  uninvited would be its own bug. A game gets a prefix of its own only
+  when the person asks for separate Wine settings for it (§5a).
 - Per-game choice is exposed as a "Runs with: <backend>" chip in the game
   detail screen, backed by `LaunchStrategyOverridePrefs`. Engine games
   and store/folder games launch with what that row resolves, not with a
@@ -5760,11 +5806,15 @@ Two concrete references to build from rather than design blind:
   (see §9), so this UI is already built into droidtop's APK.
   `DroidtopApplication` carries the Hilt graph, the store and
   container-configuration activities are `:app` hosts
-  (`PcContainerConfigActivity` and the store hosts, §7i), and the
-  entry points are two: a game's own "Prefix and graphics" row on the PC
-  surface, and the Windows games row of Desktop settings, which opens
-  the same activity for droidtop's provisioned environment so a prefix
-  can be configured without going through a game.
+  (`PcContainerConfigActivity` and the store hosts, §7i). **Since
+  2026-10-02 the options most games need are droidtop's own settings
+  rows** (§5a "Options, with defaults"): Wine build, x86 emulation,
+  graphics driver and Direct3D, drawn by droidtop's two-pane settings
+  in Settings > Windows games (the shared environment) and in a game's
+  "Wine and graphics" sheet (that game's own prefix), from the fork's
+  lists and component manifest, not from gamenative's Android-styled
+  dialog. The dialog remains the "All prefix settings" row of both, for
+  the rest (controller, drives, environment, components).
 - **Linux container management**: distrobox itself is CLI-only (no
   official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
   real, actively-maintained GTK4 GUI for it — confirmed feature set:
@@ -10423,13 +10473,13 @@ and engine settings; a game taking the Windows route gets its prefix, and
 where saves and controls live inside it; a game with neither gets no
 runner section at all, because the primary button already says a game
 cannot run and a section of dead rows repeating that is not information.
-No section is titled like its own first row -- "Prefix and graphics" over
-a row called "Prefix and graphics" says one thing twice.
+No section is titled like its own first row -- "Wine and graphics" over
+a row called "Wine and graphics" says one thing twice.
 
 **The Lutris import entry point sits beside the per-game override it
 sets (§7e3, built 2026-09-25).** A game taking the Windows route gets an
 "Import a Lutris install script" row in its "Runs on Windows" section,
-next to "Prefix and graphics" — the same section, because setting a
+next to "Wine and graphics" — the same section, because setting a
 game's program from an imported script is the same kind of act as
 picking one by hand, not a separate mechanism. Once an import has set a
 game's program, that same section shows it as its own row ("Program:
@@ -12550,12 +12600,15 @@ x86_64 userland too, because the base system droidtop installs
 Wine's library calls onto it. The shape, all in the fork so the standalone
 app gets it too:
 
-- **Same Wine on both ABIs.** `proton-9.0-x86_64` is an x86_64 Android
-  (bionic) build; on an x86_64 device `BionicProgramLauncherComponent`
-  starts `<wine>/bin/wine` directly through `/system/bin/linker64`, with no
-  box64 extraction, no Box64/FEX environment and no aarch64 preloads. An
-  arm64ec Wine is refused there with a message (it is ARM code). The host
-  ABI is `AppUtils.getArchName()`, the fork's one ABI check.
+- **x86_64 Wine, run directly.** `proton-9.0-x86_64` (the default there)
+  and the manifest's later x86_64 Protons are x86_64 Android (bionic)
+  builds; on an x86_64 device `BionicProgramLauncherComponent` starts
+  `<wine>/bin/wine` directly through `/system/bin/linker64`, with no box64
+  extraction, no Box64/FEX environment and no aarch64 preloads. The Wine
+  list never offers an arm64ec build there (§5a); a prefix that names one
+  anyway (carried over from an arm64 device) is refused with a message,
+  because it is ARM code. The host ABI is `AppUtils.getArchName()`, the
+  fork's one ABI check.
 - **The x86_64 guest libraries** (`X86_64GuestLibs`): the X11 client
   libraries winex11 opens, freetype, fontconfig and their dependencies,
   built from upstream sources by the fork's `tools/x86_64-guest-libs` in its
@@ -12583,11 +12636,30 @@ app gets it too:
   from `Droidtop/proton-wine-tux`, built into the same asset.
 - **Audio**: the PulseAudio modules extracted for a Wine launch are the
   x86_64 asset on an x86_64 device.
-- **Graphics is not decided.** x86 has no Turnip or Vortek, and Android's
-  own Vulkan loader offers no X11 surface, so after the above a guest draws
-  2D and GDI through the X server but Direct3D has no device. The candidates
-  (software Vulkan through Mesa lavapipe with the Khronos loader, a Vulkan
-  wrapper ICD over the device's own driver, or VirGL) are the owner's choice.
+- **Graphics is a choice per prefix (owner, 2026-10-02: "the graphics path
+  should be configurable").** x86 has no Turnip, Wrapper or Vortek, and
+  Android's own Vulkan loader offers no X11 surface, so the fork's
+  `X86_64Graphics` offers what can run there, and `extractGraphicsDriverFiles`
+  skips the aarch64 drivers on x86_64:
+  - **Software Vulkan (`lavapipe`, the default):** the Khronos loader and
+    Mesa's lavapipe ICD from Termux's x86_64 packages, packed with their
+    library closure (minus what the guest libraries and Android provide) by
+    the fork's `tools/x86_64-lavapipe` in its CI, published as a release
+    asset (`x86_64-lavapipe-*`, about 35 MB) and downloaded when a prefix
+    first uses it. At launch its directory leads `LD_LIBRARY_PATH` (its
+    `libvulkan.so.1` must outrank the guest libraries' link to Android's
+    loader), `VK_ICD_FILENAMES` names its manifest rewritten to this app's
+    path, and presentation is Mesa's socket copy (`MESA_VK_WSI_DEBUG=sw,
+    noshm`). The X server answers `PresentQueryCapabilities`, which Mesa's
+    X11 WSI needs for a swapchain. Slow (CPU rendering) but on every x86_64
+    device. The approach follows Bliss-Bass/GameNative-x64, which runs it on
+    x86_64 tablets.
+  - **None:** no guest Vulkan driver; 2D and GDI only.
+  - **Not offered until they exist:** a hardware Vulkan ICD with X11 WSI
+    (Mesa ANV/RADV built for bionic, or a wrapper ICD over the device's own
+    driver) and VirGL (guest Mesa virpipe against the host
+    `libvirglrenderer` droidtop already builds). Each becomes a value of the
+    same option, fetched the same way, when its component is built.
 
 **Steam on x86_64 is the Linux client in proot (user, 2026-09-24).** On
 arm64, `libsteambootstrap` brings up Valve's Android arm64

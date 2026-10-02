@@ -3,8 +3,6 @@ package dev.droidtop.runtime.windows
 import android.content.Context
 import app.gamenative.utils.X86_64GuestLibs
 import com.winlator.container.Container
-import com.winlator.contents.ContentsManager
-import com.winlator.core.WineInfo
 import com.winlator.xenvironment.ImageFs
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.PcLaunchResult
@@ -38,9 +36,10 @@ import kotlinx.coroutines.withContext
  * `ContainerRuntime.exec`. That made Windows games root-only by
  * accident (the no-root backend's `exec` was a `TODO()`), and had it
  * ever worked, it would have run downloaded binaries as root. The
- * seam stays because execution *mechanism* can still vary (box64
- * today, arm64ec/FEX deliberately later) -- but every variant runs as
- * the app's own uid.
+ * seam stays because the execution *mechanism* varies per prefix (an
+ * x86_64 Wine under Box64, an arm64ec Wine with FEXCore or Box64 as its
+ * emulator DLL, an x86_64 Wine run directly on an x86_64 device) -- but
+ * every variant runs as the app's own uid.
  */
 sealed interface WineEngine {
 
@@ -106,7 +105,7 @@ class BionicWineEngine(private val context: Context) : WineEngine {
                 "the Windows system files are not installed yet -- run \"Set up Windows games\" in Settings",
             )
         }
-        val wine = wineBinary(prefix, imageFs)
+        val wine = WineComponents.wineBinary(context, prefix.wineVersion)
         if (!wine.isFile) {
             return WineEngineReadiness.Missing(
                 "no wine binary at ${wine.absolutePath} for ${prefix.wineVersion} " +
@@ -127,6 +126,12 @@ class BionicWineEngine(private val context: Context) : WineEngine {
         workingDir: File,
         arguments: List<String>,
     ): PcLaunchResult {
+        // Whatever this prefix's settings name and the device lacks (a Wine
+        // build, a DXVK or FEXCore version, a graphics driver chosen in its
+        // Wine settings) is fetched first, the same step setup and the
+        // settings screen's Download row run.
+        runCatching { WineComponents.ensure(context, prefix) {} }
+            .onFailure { return PcLaunchResult(false, "couldn't download what this game's Wine settings need: ${it.message ?: it}") }
         // Readiness reads the contents store off disk, so it does not run
         // on whatever thread the caller happens to be on.
         val missing = withContext(Dispatchers.IO) { readiness(prefix) as? WineEngineReadiness.Missing }
@@ -144,17 +149,4 @@ class BionicWineEngine(private val context: Context) : WineEngine {
         )
     }
 
-    /**
-     * Where this prefix's wine binary should be. A proton build resolves
-     * to `opt/<version>` (a symlink into the shared proton store, so two
-     * containers on the same build share one copy); the plain default
-     * resolves to `opt/wine`.
-     */
-    private fun wineBinary(prefix: Container, imageFs: ImageFs): File {
-        val contentsManager = ContentsManager(context).apply { syncContents() }
-        val info = runCatching { WineInfo.fromIdentifier(context, contentsManager, prefix.wineVersion) }.getOrNull()
-        val root = info?.path?.takeIf { it.isNotEmpty() }
-            ?: return File(imageFs.rootDir, "opt/wine/bin/wine")
-        return File(root, "bin/wine")
-    }
 }

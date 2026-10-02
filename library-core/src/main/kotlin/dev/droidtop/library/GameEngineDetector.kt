@@ -1717,7 +1717,7 @@ class EngineGameProvider(
         )
 
         val result = if (windows) {
-            runtime.launchWindows(executable, gameRoot, windowsLaunch?.workingDir ?: gameRoot, windowsLaunch?.arguments.orEmpty())
+            runtime.launchWindows(executable, gameRoot, windowsLaunch?.workingDir ?: gameRoot, windowsLaunch?.arguments.orEmpty(), entryId)
         } else {
             runtime.launchLinux(executable, gameRoot)
         }

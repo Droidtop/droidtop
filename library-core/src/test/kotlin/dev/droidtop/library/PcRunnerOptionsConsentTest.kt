@@ -45,6 +45,7 @@ class PcRunnerOptionsConsentTest {
             gameRoot: File,
             workingDir: File,
             arguments: List<String>,
+            entryId: String?,
         ): PcLaunchResult = PcLaunchResult(false, "not launched")
 
         override suspend fun launchLinux(executable: File, gameRoot: File): PcLaunchResult =

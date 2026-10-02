@@ -51,6 +51,24 @@ object WineGameSettingsPrefs {
     }
 }
 
+/**
+ * The settings screen a game's "Wine and graphics" row opens: Wine build,
+ * x86 emulation, graphics driver and Direct3D for the prefix it runs in
+ * (docs/SPEC.md 5a). Registered by `:app` (WineOptionsCatalog) and opened
+ * by id from the game's page, deep-linked with [argument].
+ */
+object WineSettingsScreen {
+    const val ID = "windows_game_wine"
+    private const val SEPARATOR = "\n"
+
+    /** The deep-link argument for one game: its library id and its title. */
+    fun argument(entryId: String, title: String): String = entryId + SEPARATOR + title
+
+    /** [argument] read back: the entry id, then the title. */
+    fun parse(argument: String): Pair<String, String> =
+        argument.substringBefore(SEPARATOR) to argument.substringAfter(SEPARATOR, argument.substringBefore(SEPARATOR))
+}
+
 /** What a Windows launch of one game runs: the program, where it starts, and its arguments. */
 data class WindowsLaunch(val executable: File, val workingDir: File, val arguments: List<String>)
 

@@ -179,10 +179,12 @@ class WineXSession(
             WineLaunchPlan.AudioDriver.NONE -> Unit
         }
 
-        // The GPU side. Vortek is the container default and is backed by
-        // libvortekrenderer.so, which this module already packages; virgl
-        // is the OpenGL passthrough path and needs the GL view, which the
-        // host Activity picks by the same field.
+        // The GPU side, for the drivers that need a host component: Vortek
+        // is backed by libvortekrenderer.so, which this module already
+        // packages; virgl is the OpenGL passthrough path and needs the GL
+        // view, which the host Activity picks by the same field. The
+        // Wrapper family (upstream's arm64 default) and the x86_64 drivers
+        // (X86_64Graphics) run inside the guest and need none.
         when {
             prefix.graphicsDriver == "virgl" -> environment.addComponent(
                 VirGLRendererComponent(
