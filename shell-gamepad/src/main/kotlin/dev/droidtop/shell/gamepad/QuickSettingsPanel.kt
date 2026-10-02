@@ -75,10 +75,11 @@ import kotlinx.coroutines.withContext
 import java.util.Date
 
 /**
- * The Quick Menu's System tab: Android's quick-settings shape (directed
- * 2026-09-10) -- a status header, brightness and volume as sliders, then
- * a grid of large tiles -- over the settings catalog's own System group
- * plus the display-role rows ([QuickTiles.systemGroups]). It replaces a
+ * The Quick Menu's tile sections, System, Audio and Display: Android's
+ * quick-settings shape (directed 2026-09-10) -- a status header (System
+ * only), sliders, then a grid of large tiles -- over the settings
+ * catalog's own System group plus the display-role rows, split between
+ * the three by [QuickTiles.sectionGroups]. It replaces a
  * narrow centred list of settings ROWS; what it renders is unchanged,
  * because it is still a view of the catalog and every press goes back to
  * the catalog item's own write path.
@@ -90,6 +91,7 @@ import java.util.Date
  */
 @Composable
 internal fun QuickSettingsPanel(
+    section: QuickSection,
     sheetWidthDp: Int,
     onDismiss: () -> Unit,
 ) {
@@ -108,7 +110,7 @@ internal fun QuickSettingsPanel(
     // battery broadcast and a connectivity query.
     val groups by produceState(initialValue = emptyList<CatalogGroup>(), version) {
         value = withContext(Dispatchers.IO) {
-            QuickTiles.systemGroups(GamingSettingsCatalog.groups(context))
+            QuickTiles.sectionGroups(GamingSettingsCatalog.groups(context), section)
         }
     }
     val panel = remember(groups) { QuickTiles.panel(groups) }
@@ -234,7 +236,7 @@ internal fun QuickSettingsPanel(
                 true
             },
     ) {
-        QuickStatusHeader()
+        if (section == QuickSection.SYSTEM) QuickStatusHeader()
         panel.sliders.forEachIndexed { index, item ->
             QuickSliderRow(
                 item = item,
@@ -658,6 +660,42 @@ internal fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier =
             QuickGlyph.GENERIC -> {
                 ring(12f, 12f, 8f)
                 dot(12f, 12f, 2.2f)
+            }
+            QuickGlyph.APPS -> {
+                listOf(4f to 4f, 13f to 4f, 4f to 13f, 13f to 13f).forEach { (x, y) ->
+                    drawRoundRect(
+                        tint,
+                        topLeft = p(x, y),
+                        size = Size(7f * u, 7f * u),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.5f * u, 1.5f * u),
+                        style = stroke,
+                    )
+                }
+            }
+            QuickGlyph.BELL -> {
+                arc(12f, 10f, 6f, 180f, 180f)
+                line(6f, 10f, 6f, 16f); line(18f, 10f, 18f, 16f)
+                line(4f, 17f, 20f, 17f)
+                dot(12f, 20.5f, 1.5f)
+            }
+            QuickGlyph.GAUGE -> {
+                arc(12f, 15f, 9f, 180f, 180f)
+                line(12f, 15f, 17f, 9f)
+                dot(12f, 15f, 1.8f)
+            }
+            QuickGlyph.DOWNLOAD -> {
+                line(12f, 4f, 12f, 15f)
+                line(8f, 11f, 12f, 15f); line(16f, 11f, 12f, 15f)
+                line(5f, 19f, 19f, 19f)
+            }
+            QuickGlyph.POWER -> {
+                arc(12f, 13f, 7.5f, -60f, 300f)
+                line(12f, 3f, 12f, 11f)
+            }
+            QuickGlyph.AIRPLANE -> {
+                line(12f, 3f, 12f, 20f)
+                line(4f, 13f, 12f, 9f); line(20f, 13f, 12f, 9f)
+                line(8f, 21f, 12f, 18f); line(16f, 21f, 12f, 18f)
             }
         }
     }

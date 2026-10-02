@@ -28,6 +28,26 @@ import dev.droidtop.library.settings.ToggleItem
 enum class QuickGlyph {
     NETWORK, VOLUME, BRIGHTNESS, MOON, ROTATE, TIMER, BLUETOOTH, VPN,
     DISPLAY, GAMEPAD, SWAP, UPDATE, ANDROID, EXIT, SETTINGS, BATTERY, GENERIC,
+    // The rail's own marks and the rows added with the branching panel.
+    APPS, BELL, GAUGE, DOWNLOAD, POWER, AIRPLANE,
+}
+
+/**
+ * The Quick Menu's sections: the icon rail (docs/SPEC.md "Quick Menu: a
+ * branching panel", Droidtop/tracker#258). Order is rail order. The rail is
+ * for quick management only; destinations and the places things live are
+ * the left menu's, and Get games is a contextual action that is not here.
+ */
+enum class QuickSection(val label: String, val glyph: QuickGlyph) {
+    GAME("Game", QuickGlyph.GAMEPAD),
+    APPS("Running apps", QuickGlyph.APPS),
+    NOTIFICATIONS("Notifications", QuickGlyph.BELL),
+    SYSTEM("System", QuickGlyph.SETTINGS),
+    PERFORMANCE("Performance", QuickGlyph.GAUGE),
+    AUDIO("Audio", QuickGlyph.VOLUME),
+    DISPLAY("Display", QuickGlyph.DISPLAY),
+    DOWNLOADS("Downloads and jobs", QuickGlyph.DOWNLOAD),
+    PLUGINS("Plugins", QuickGlyph.GENERIC),
 }
 
 /**
@@ -55,6 +75,75 @@ data class QuickPanel(val sliders: List<SliderItem>, val tiles: List<QuickTile>)
 enum class QuickMove { UP, DOWN, LEFT, RIGHT }
 
 object QuickTiles {
+
+    /**
+     * What the Audio and Display sections claim from the catalog's quick
+     * System group (and, for the display rows, from Settings' own screens
+     * group), by id. Everything else in that group stays on System, so an
+     * item added to the catalog still appears somewhere with no edit here.
+     */
+    val AUDIO_IDS = listOf(
+        GamingSettingsCatalog.ID_SYSTEM_VOLUME,
+        GamingSettingsCatalog.ID_AUDIO_OUTPUT,
+        GamingSettingsCatalog.ID_SYSTEM_DND,
+        GamingSettingsCatalog.ID_SYSTEM_DND_GRANT,
+    )
+
+    val DISPLAY_IDS = listOf(
+        GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
+        GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS_GRANT,
+        GamingSettingsCatalog.ID_SYSTEM_ADAPTIVE,
+        GamingSettingsCatalog.ID_SYSTEM_ROTATE,
+        GamingSettingsCatalog.ID_SYSTEM_TIMEOUT,
+        GamingSettingsCatalog.ID_ORIENTATION,
+        GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
+        GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
+        GamingSettingsCatalog.ID_DISPLAY_SWAP,
+        GamingSettingsCatalog.ID_DISPLAY_REINIT,
+    )
+
+    /** The sections the rail shows now: Game only while a game runs, Plugins only when a plugin offers tiles. */
+    fun visibleSections(gameRunning: Boolean, hasPluginTiles: Boolean): List<QuickSection> =
+        QuickSection.entries.filter {
+            (it != QuickSection.GAME || gameRunning) && (it != QuickSection.PLUGINS || hasPluginTiles)
+        }
+
+    /**
+     * Where the menu opens: the running game, else Notifications once
+     * notification access is granted, else System rather than an empty
+     * Notifications list (Droidtop/tracker#180).
+     */
+    fun initialSection(gameRunning: Boolean, notificationsGranted: Boolean): QuickSection = when {
+        gameRunning -> QuickSection.GAME
+        notificationsGranted -> QuickSection.NOTIFICATIONS
+        else -> QuickSection.SYSTEM
+    }
+
+    /** L1/R1 on the rail: the neighbouring section, wrapping at the ends; [current] missing from [visible] lands on the first. */
+    fun stepSection(visible: List<QuickSection>, current: QuickSection, step: Int): QuickSection {
+        if (visible.isEmpty()) return current
+        val i = visible.indexOf(current)
+        if (i < 0) return visible.first()
+        return visible[(i + step + visible.size) % visible.size]
+    }
+
+    /**
+     * The catalog items one tile-grid section shows (System, Audio or
+     * Display), as the single group [panel] takes. Pulled from the live
+     * Gaming catalog by id, never copied.
+     */
+    fun sectionGroups(all: List<CatalogGroup>, section: QuickSection): List<CatalogGroup> {
+        val system = all.firstOrNull { it.id == GamingSettingsCatalog.GROUP_SYSTEM }?.items.orEmpty()
+        val claimed = AUDIO_IDS + DISPLAY_IDS
+        val byId = (system + all.filter { it.id != GamingSettingsCatalog.GROUP_SYSTEM }.flatMap { it.items })
+            .associateBy { it.id }
+        val items = when (section) {
+            QuickSection.AUDIO -> AUDIO_IDS.mapNotNull { byId[it] }
+            QuickSection.DISPLAY -> DISPLAY_IDS.mapNotNull { byId[it] }
+            else -> systemGroups(all).flatMap { it.items }.filter { it.id !in claimed }
+        }
+        return listOf(CatalogGroup(id = "quick_${section.name.lowercase()}", title = null, items = items))
+    }
 
     /**
      * The configuration rows the System tab shows besides the catalog's
@@ -138,12 +227,13 @@ object QuickTiles {
         GamingSettingsCatalog.ID_SYSTEM_BLUETOOTH -> QuickGlyph.BLUETOOTH
         GamingSettingsCatalog.ID_SYSTEM_VPN -> QuickGlyph.VPN
         GamingSettingsCatalog.ID_SYSTEM_BATTERY -> QuickGlyph.BATTERY
+        GamingSettingsCatalog.ID_SYSTEM_AIRPLANE -> QuickGlyph.AIRPLANE
+        GamingSettingsCatalog.ID_SYSTEM_POWER_MENU -> QuickGlyph.POWER
+        GamingSettingsCatalog.ID_AUDIO_OUTPUT -> QuickGlyph.VOLUME
+        GamingSettingsCatalog.ID_ORIENTATION -> QuickGlyph.ROTATE
         GamingSettingsCatalog.ID_SYSTEM_UPDATES -> QuickGlyph.UPDATE
         GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS -> QuickGlyph.ANDROID
-        GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE,
-        GamingSettingsCatalog.ID_SYSTEM_CLOSE_APP,
-        GamingSettingsCatalog.ID_SYSTEM_CLEAR_ALL,
-        -> QuickGlyph.EXIT
+        GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE -> QuickGlyph.EXIT
         GamingSettingsCatalog.ID_SYSTEM_SWITCH_MODE -> QuickGlyph.SWAP
         GamingSettingsCatalog.ID_SYSTEM_OPEN_SETTINGS -> QuickGlyph.SETTINGS
         GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET -> QuickGlyph.DISPLAY

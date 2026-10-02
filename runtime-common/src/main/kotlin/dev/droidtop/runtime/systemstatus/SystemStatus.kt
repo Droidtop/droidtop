@@ -196,6 +196,20 @@ object SystemControls {
     fun bluetoothSettingsIntent(): Intent =
         Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+    /** Airplane mode as the system holds it; an app can read it, never write it. */
+    fun airplaneModeOn(context: Context): Boolean = runCatching {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON) == 1
+    }.getOrDefault(false)
+
+    fun airplaneModeSettingsIntent(): Intent =
+        Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** The output switcher panel (API 29), else the Sound screen it grew out of. */
+    fun audioOutputIntent(): Intent =
+        Intent(
+            if (android.os.Build.VERSION.SDK_INT >= 29) Settings.Panel.ACTION_VOLUME else Settings.ACTION_SOUND_SETTINGS,
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
     /** The system's own Battery Saver screen (ACTION_BATTERY_SAVER_SETTINGS, API 22). */
     fun batterySaverSettingsIntent(): Intent =
         Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

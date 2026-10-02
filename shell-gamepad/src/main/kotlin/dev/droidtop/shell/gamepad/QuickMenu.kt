@@ -2,7 +2,9 @@ package dev.droidtop.shell.gamepad
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,12 +13,17 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -26,19 +33,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.message
+import dev.droidtop.pluginhost.JobsSummary
+import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.runtime.systemstatus.NotificationsStore
+import dev.droidtop.runtime.systemstatus.PerformanceMonitor
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
@@ -49,61 +67,65 @@ import dev.droidtop.shell.gamepad.input.onPad
 import kotlinx.coroutines.launch
 
 /**
- * The Quick Menu: press R2 anywhere in the Gaming shell (docs/
- * SPEC.md §4, quick-menu paradigm). A right-edge sheet in the Steam
- * Deck QAM family — the paradigm survey that picked it is in the SPEC:
- * the Deck's quick access menu (dedicated button, right sheet, vertical
- * tabs) is the strongest prior art for glanceable-while-playing, iiSU's
- * trigger menu is the same family on Android handhelds, and a
- * dedicated button here is R2, named by the R2 pill in the shell's
- * top-right corner. Hold-SELECT remains only as the fallback for pads
- * whose triggers are analog-only and never emit an R2 key event
- * (short-press SELECT keeps its existing meaning; chords were rejected
- * as undiscoverable). Start is NOT this menu's button: it opens the left
- * menu ([LeftMenu], owner 2026-10-01, Droidtop/tracker#258). The two
- * split the work -- the left menu is navigation, this one is quick
- * management -- and Start inside this sheet swaps to the left menu.
+ * The Quick Menu: press R2 anywhere in the Gaming shell (docs/SPEC.md
+ * "Quick Menu: a branching panel"). The right-hand panel of the shell's
+ * two menus: quick management lives here, and destinations live in the
+ * left menu (Start). A right-edge sheet in the Steam Deck QAM family
+ * (the paradigm survey is in the SPEC), a bottom sheet on a screen held
+ * upright, and since 2026-10-02 a branching panel: an ICON RAIL of
+ * sections ([QuickSection]) beside the section's own content, instead of
+ * one flat tab row. Hold-SELECT remains the fallback for pads whose
+ * triggers are analog-only and never emit an R2 key event. Start is NOT
+ * this menu's button: it opens the left menu ([LeftMenu]), and Start inside
+ * this sheet swaps to it.
  *
- * ENTIRELY controller-driven, per direction: L1/R1 switch tabs, D-pad
- * moves, A opens, X dismisses, Y clears all, B closes. The System tab
- * is Android's quick-settings shape (status header, brightness and
- * volume sliders, a grid of large tiles -- see [QuickSettingsPanel]),
- * and it is still a VIEW of the settings catalog's own System group,
- * never a second quick-settings implementation with its own values: the
- * tiles carry the catalog's items and every press goes back to the
- * item's own write path.
+ * Sections: Game (only while a game runs), Running apps (the task
+ * manager), Notifications, System, Performance, Audio, Display, Downloads
+ * and jobs, and Plugins (only while a running plugin offers tiles). Which
+ * are shown, where the menu opens and how L1/R1 step the rail are pure
+ * rules in [QuickTiles] (QuickTilesTest). Get games is deliberately not a
+ * section: it is a contextual action on the pages that need it.
  *
- * A third tab, Game, exists only while [runningEntry] is non-null --
- * while the most recent launch is still parked rather than explicitly
- * reclaimed (see [dev.droidtop.library.LaunchDisplay.parkedDisplayId]'s
- * own doc comment). The shell checks Android's package force-stop flag
- * off the main thread while the menu is open and clears the parked launch
- * when it is set. This cannot detect ordinary process death or a task
- * swipe; Android exposes no general task/process query to this app.
- * Before this the menu
- * showed the exact same Notifications/System pair whether or not a game
- * was running (Droidtop/tracker#82) -- no "you are in a game" surface
- * at all, unlike every console this mode is modeled on. When present,
- * Game opens first: the point of a distinct in-game menu is that it is
- * what greets you, not something you have to shoulder-cycle to find.
- * Its rows are resume and quit to library.
+ * ENTIRELY controller-driven, per direction: L1/R1 step the rail, D-pad
+ * moves inside the section, A acts, X and Y are the section's own
+ * actions, B closes -- and fully reachable by touch: the rail icons tap,
+ * the hint row dispatches the real presses it names. The rail is not a
+ * focus target (the pad's focus stays in the section); it carries a dot
+ * where something is waiting (notifications, running jobs).
  *
- * A fourth tab, Plugins, exists only while a running plugin provides a
- * `ui.status_tile@1` or `ui.quick_tile@1` for this menu (docs/plugin-api.md
- * C2, C3, Droidtop/tracker#73): the same [MenuRow] shape, one row per tile.
- * What tiles exist is read from manifests when the sheet opens, their
- * state is asked once per opening and never while drawing, and a quick
- * tile's A press is the only other call. A status tile is read-only.
+ * The System, Audio and Display sections are quick-settings tile grids
+ * and each is still a VIEW of the settings catalog's own groups
+ * ([QuickSettingsPanel]), never a second implementation: the tiles carry
+ * the catalog's items and every press goes back to the item's own write
+ * path. Downloads and jobs is the same jobs screen Settings opens
+ * ([PluginJobsScreen]), hosted in the sheet.
+ *
+ * The Game section exists only while [runningEntry] is non-null -- while
+ * the most recent launch is still parked rather than explicitly reclaimed
+ * (see [dev.droidtop.library.LaunchDisplay.parkedDisplayId]'s own doc
+ * comment). The shell checks Android's package force-stop flag off the
+ * main thread while the menu is open and clears the parked launch when it
+ * is set. This cannot detect ordinary process death or a task swipe;
+ * Android exposes no general task/process query to this app. When
+ * present, Game opens first: the point of a distinct in-game section is
+ * that it is what greets you, not something you have to cycle to find
+ * (Droidtop/tracker#82). Its rows are resume, restart and quit to library.
+ *
+ * The Plugins section: one [MenuRow] per `ui.status_tile@1` or
+ * `ui.quick_tile@1` a running plugin provides (docs/plugin-api.md C2, C3,
+ * Droidtop/tracker#73). What tiles exist is read from manifests when the
+ * sheet opens, their state is asked once per opening and never while
+ * drawing, and a quick tile's A press is the only other call. A status
+ * tile is read-only.
  *
  * WHERE the sheet sits follows the shape of the screen, because the
  * reason it is an edge sheet is that it must not cover the shell behind
- * it. On a landscape screen that edge is the right one, the Steam Deck
- * QAM shape, sized by what the tile grid needs. On a screen held
+ * it. On a landscape screen that edge is the right one, with the rail down
+ * its left side, sized by what the tile grid needs. On a screen held
  * upright, a full-height right-edge sheet is the whole screen, so it
  * becomes a BOTTOM sheet instead: full width, sized by its content, the
- * shell still visible above it and the tabs within thumb reach rather
- * than at the far top corner. Same sheet, same tabs, same contents,
- * measured differently.
+ * rail across its top within thumb reach. Same sheet, same sections, same
+ * contents, measured differently.
  *
  * A Compose [Dialog] on purpose: its window owns input while open, so
  * modality costs no key-event fencing in the shell underneath.
@@ -111,8 +133,9 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun QuickMenu(
     runningEntry: dev.droidtop.library.LibraryEntry?,
+    library: dev.droidtop.library.Library,
     onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
-    onQuit: (dev.droidtop.library.LibraryEntry) -> Unit,
+    onQuit: (entry: dev.droidtop.library.LibraryEntry, restart: Boolean) -> Unit,
     quitOutcome: dev.droidtop.library.QuitResult?,
     onOpenLeftMenu: () -> Unit,
     onDismiss: () -> Unit,
@@ -131,29 +154,27 @@ internal fun QuickMenu(
         // opening, same as runningEntry itself is (GamepadShell only
         // re-resolves it when quickMenuOpen flips true).
         val context = androidx.compose.ui.platform.LocalContext.current
-        // Read from manifests off the main thread; the tab appears only when there is something to show.
+        // Read from manifests off the main thread; the section appears only when there is something to show.
         val pluginTiles by androidx.compose.runtime.produceState(emptyList<dev.droidtop.library.integrations.PluginTiles.Tile>()) {
             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 dev.droidtop.library.integrations.PluginTiles.tilesFor(context)
             }
         }
         val granted = remember { NotificationsStore.isGranted(context) }
-        val visibleTabs = remember(runningEntry != null, pluginTiles.isNotEmpty()) {
-            QuickTab.entries.filter { (it != QuickTab.GAME || runningEntry != null) && (it != QuickTab.PLUGINS || pluginTiles.isNotEmpty()) }
+        val gameRunning = runningEntry != null
+        val sections = remember(gameRunning, pluginTiles.isNotEmpty()) {
+            QuickTiles.visibleSections(gameRunning, pluginTiles.isNotEmpty())
         }
-        var tab by remember {
-            mutableStateOf(
-                when {
-                    runningEntry != null -> QuickTab.GAME
-                    !granted -> QuickTab.SYSTEM
-                    else -> QuickTab.NOTIFICATIONS
-                }
-            )
+        var section by remember { mutableStateOf(QuickTiles.initialSection(gameRunning, granted)) }
+        LaunchedEffect(sections, section) {
+            if (section !in sections) section = QuickTiles.initialSection(gameRunning, granted)
         }
-        LaunchedEffect(visibleTabs, tab) {
-            if (tab !in visibleTabs) {
-                tab = if (!granted) QuickTab.SYSTEM else QuickTab.NOTIFICATIONS
-            }
+        // What is waiting, for the rail's dots: read while the sheet is open, never polled.
+        val notifications by NotificationsStore.items.collectAsState()
+        val jobs by PluginJobsCenter.entries().collectAsState()
+        val dots = buildSet {
+            if (granted && notifications.isNotEmpty()) add(QuickSection.NOTIFICATIONS)
+            if (JobsSummary.runningCount(jobs) > 0) add(QuickSection.DOWNLOADS)
         }
 
         val window = currentShellWindow()
@@ -179,14 +200,15 @@ internal fun QuickMenu(
                         },
                     )
                     .align(if (window.portrait) Alignment.BottomCenter else Alignment.CenterEnd)
-                    // Preview: tab switching and closing win over the tab
-                    // inside, which holds focus and takes its own presses.
-                    // R2 closes: the press that OPENED the sheet belonged to
-                    // the shell underneath, so its release never acts here
-                    // (docs/SPEC.md 6e) and only a fresh press closes. A held
-                    // Select arrives as R2 too, so holding it again closes the
-                    // sheet it opened. Start is the left menu's button, so it
-                    // swaps to that menu rather than closing this one.
+                    // Preview: stepping the rail and closing win over the
+                    // section inside, which holds focus and takes its own
+                    // presses. R2 closes: the press that OPENED the sheet
+                    // belonged to the shell underneath, so its release never
+                    // acts here (docs/SPEC.md 6e) and only a fresh press
+                    // closes. A held Select arrives as R2 too, so holding it
+                    // again closes the sheet it opened. Start is the left
+                    // menu's button, so it swaps to that menu rather than
+                    // closing this one (Droidtop/tracker#258).
                     .onPad(preview = true) { press ->
                         when (press.action) {
                             GamepadAction.R2 -> {
@@ -196,9 +218,8 @@ internal fun QuickMenu(
                                 onOpenLeftMenu(); true
                             }
                             GamepadAction.L, GamepadAction.R -> {
-                                val i = visibleTabs.indexOf(tab)
                                 val step = if (press.action == GamepadAction.L) -1 else 1
-                                tab = visibleTabs[(i + step + visibleTabs.size) % visibleTabs.size]
+                                section = QuickTiles.stepSection(sections, section, step)
                                 true
                             }
                             else -> false
@@ -216,53 +237,53 @@ internal fun QuickMenu(
                 color = MenuTokens.OverlaySurface,
                 tonalElevation = 0.dp,
             ) {
-                Column(
-                    modifier = Modifier
-                        .then(if (window.portrait) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
-                        .padding(16.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // L1/R1 switches tabs; the glyphs beside the row say
-                        // so instead of a "Switch tab" hint-bar pill (owner,
-                        // 2026-09-25: "Can remove the next/previous section
-                        // pills").
-                        ShoulderGlyph("L1", modifier = Modifier.padding(end = 6.dp))
-                        visibleTabs.forEach { t ->
+                val rail: @Composable () -> Unit = {
+                    QuickRail(sections, section, dots, vertical = !window.portrait) { section = it }
+                }
+                val pane: @Composable (Modifier) -> Unit = { paneModifier ->
+                    Column(modifier = paneModifier.padding(16.dp)) {
+                        // L1/R1 step the rail; the glyphs beside the section's
+                        // name say so instead of a "Switch tab" hint-bar pill
+                        // (owner, 2026-09-25).
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                            ShoulderGlyph("L1", modifier = Modifier.padding(end = 8.dp))
                             Text(
-                                t.label,
+                                section.label,
                                 style = MaterialTheme.typography.titleMedium,
-                                color = if (t == tab) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
-                                // The tabs were nameplates: L1/R1 switched
-                                // them and a tap did nothing, so on a phone
-                                // the System tab was unreachable. The
-                                // current one carries the raised fill the
-                                // shell's section tabs use; the focus ring
-                                // stays on the one thing the pad is on.
-                                modifier = Modifier
-                                    .padding(end = 8.dp)
-                                    .clip(RoundedCornerShape(50))
-                                    .background(if (t == tab) MenuTokens.SurfaceSelected else androidx.compose.ui.graphics.Color.Transparent)
-                                    .clickable { tab = t }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                color = MenuTokens.OnSurface,
                             )
+                            ShoulderGlyph("R1", modifier = Modifier.padding(start = 8.dp))
                         }
-                        ShoulderGlyph("R1", modifier = Modifier.padding(start = 2.dp))
+                        // Closing's touch route is the hint row's own "B Close"
+                        // pill, which dispatches a real B into this window.
+                        // key(): sections share one composable (the tile
+                        // grids), and a cursor must not carry from one to
+                        // the next.
+                        key(section) {
+                            when (section) {
+                                QuickSection.GAME -> runningEntry?.let {
+                                    GameTab(it, library, onResume, onQuit, quitOutcome, onDismiss)
+                                }
+                                QuickSection.APPS -> AppsTab(onDismiss)
+                                QuickSection.NOTIFICATIONS -> NotificationsTab(onDismiss)
+                                QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
+                                    QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, onDismiss)
+                                QuickSection.PERFORMANCE -> PerformanceSection(onDismiss)
+                                QuickSection.DOWNLOADS -> DownloadsSection(onDismiss)
+                                QuickSection.PLUGINS -> PluginTilesTab(pluginTiles, onDismiss)
+                            }
+                        }
                     }
-                    Spacer(Modifier.padding(4.dp))
-                    // Closing's touch route is the hint row's own "B Close"
-                    // pill, which dispatches a real B into this window; a
-                    // separate "Close" text in the corner was a second
-                    // control for the same press (UI pass 2026-09-24, M12).
-                    // L1/R1 switches tabs; the ShoulderGlyph pair above the
-                    // tab row names that now, not a hint-bar pill.
-                    when (tab) {
-                        QuickTab.GAME -> runningEntry?.let {
-                            GameTab(it, onResume, onQuit, quitOutcome, onDismiss)
-                        }
-                        QuickTab.NOTIFICATIONS -> NotificationsTab(onDismiss)
-                        QuickTab.SYSTEM -> QuickSettingsPanel(sheetWidth.value.toInt(), onDismiss)
-                        QuickTab.APPS -> AppsTab(onDismiss)
-                        QuickTab.PLUGINS -> PluginTilesTab(pluginTiles, onDismiss)
+                }
+                if (window.portrait) {
+                    Column(Modifier.fillMaxWidth()) {
+                        rail()
+                        pane(Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Row(Modifier.fillMaxSize()) {
+                        rail()
+                        pane(Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }
@@ -270,14 +291,226 @@ internal fun QuickMenu(
     }
 }
 
-private enum class QuickTab(val label: String) {
-    // Listed first: see QuickMenu's own doc comment on why Game opens
-    // before Notifications when it's shown at all.
-    GAME("Game"),
-    NOTIFICATIONS("Notifications"),
-    SYSTEM("System"),
-    APPS("Apps"),
-    PLUGINS("Plugins"),
+/** The landscape rail's width: an icon target plus its padding. */
+private const val RailWidthDp = 64
+
+/**
+ * The icon rail: one drawn glyph per section, the current one lit. A column down the sheet's left
+ * edge, or a row across the top of a bottom sheet. It scrolls if the sections outnumber the room
+ * and keeps the current one in view. Not a focus target: L1/R1 step it, and a tap selects.
+ */
+@Composable
+private fun QuickRail(
+    sections: List<QuickSection>,
+    selected: QuickSection,
+    dots: Set<QuickSection>,
+    vertical: Boolean,
+    onSelect: (QuickSection) -> Unit,
+) {
+    val window = currentShellWindow()
+    val target = window.minTouchTarget.coerceAtLeast(44.dp)
+    val items: @Composable () -> Unit = {
+        sections.forEach { s -> key(s) {
+            val current = s == selected
+            val requester = remember { BringIntoViewRequester() }
+            LaunchedEffect(current) { if (current) requester.bringIntoView() }
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .bringIntoViewRequester(requester)
+                    .size(target)
+                    .clip(MenuTokens.RowShape)
+                    .background(if (current) MenuTokens.SurfaceSelected else Color.Transparent)
+                    // Ahead of the clickable: a plain clickable is still a
+                    // focus target, and the pad's focus belongs to the section.
+                    .focusProperties { canFocus = false }
+                    .clickable { onSelect(s) }
+                    .semantics {
+                        contentDescription = s.label
+                        this.selected = current
+                    },
+            ) {
+                QuickGlyphIcon(
+                    glyph = s.glyph,
+                    tint = if (current) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
+                    modifier = Modifier.size(22.dp),
+                )
+                if (s in dots && !current) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(MenuTokens.Accent),
+                    )
+                }
+            }
+        } }
+    }
+    if (vertical) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(RailWidthDp.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 12.dp, horizontal = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) { items() }
+    } else {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) { items() }
+    }
+}
+
+/**
+ * The Performance section: what a non-root app can read about how the device is doing, as readouts.
+ * It reads the shared sampler ([PerformanceMonitor], the one the companion's Performance tab reads
+ * too), which takes a sample every two seconds only while some surface runs [PerformanceMonitor.watch]:
+ * here that is this section's own composition, so with the sheet closed or another section showing,
+ * nothing polls. Readings Android does not give an app are named as such, never drawn as a number.
+ */
+@Composable
+private fun PerformanceSection(onDismiss: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val history by PerformanceMonitor.history.collectAsState()
+    val s = history.lastOrNull()
+    val focusRequester = remember { FocusRequester() }
+    val scroll = rememberScrollState()
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(Unit) { PerformanceMonitor.watch(context) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .focusRequester(focusRequester)
+            .focusable()
+            .onPad { press ->
+                when (press.action) {
+                    GamepadAction.UP -> scope.launch { scroll.animateScrollTo((scroll.value - 240).coerceAtLeast(0)) }
+                    GamepadAction.DOWN -> scope.launch { scroll.animateScrollTo(scroll.value + 240) }
+                    GamepadAction.B -> onDismiss()
+                    else -> Unit
+                }
+                true
+            },
+    ) {
+        Column(
+            modifier = Modifier.weight(1f).verticalScroll(scroll),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (s == null) {
+                Text("Reading the device...", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
+            } else {
+                val device = s.deviceCpuPercent
+                val clock = s.cpuMhz?.let { "Fastest core $it MHz" }
+                when {
+                    device != null -> ReadoutRow("Processor", "$device% busy", device, clock)
+                    else -> ReadoutRow(
+                        "Processor",
+                        s.cpuMhz?.let { "$it MHz fastest core" } ?: "Not readable by an app",
+                        null,
+                        "Android hides whole-device load from apps." + (s.ownCpuPercent?.let { " droidtop itself uses $it%." } ?: ""),
+                    )
+                }
+                ReadoutRow(
+                    "Memory",
+                    "${s.memTotalMb - s.memAvailMb} of ${s.memTotalMb} MB",
+                    s.memUsedPercent,
+                    if (s.lowMemory) "Android reports low memory" else null,
+                    alarm = s.lowMemory,
+                )
+                ReadoutRow(
+                    "Battery",
+                    (s.batteryPercent?.let { "$it%" } ?: "Unknown") + if (s.charging) ", charging" else "",
+                    s.batteryPercent,
+                    listOfNotNull(
+                        s.batteryTempTenthC?.let { PerformanceMonitor.tempText(it) },
+                        s.batteryMilliamps?.let { "$it mA" },
+                    ).joinToString("   ").ifEmpty { null },
+                )
+                ReadoutRow(
+                    "Heat",
+                    PerformanceMonitor.thermalLabel(s.thermalStatus),
+                    null,
+                    null,
+                    alarm = (s.thermalStatus ?: 0) >= 3,
+                )
+                ReadoutRow("GPU and frame rate", "Needs privilege", null, "Android gives an app neither; a privilege helper plugin could.")
+            }
+        }
+        HintRow(
+            bindings = listOf(HintBinding(GamepadAction.B, "Close")),
+            background = Color.Transparent,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+/** One readout: a name, its value, an optional fill (0..100) and an optional supporting line. */
+@Composable
+private fun ReadoutRow(label: String, value: String, fill: Int?, detail: String?, alarm: Boolean = false) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(MenuTokens.RowShape)
+            .background(MenuTokens.Surface)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.weight(1f))
+            Text(
+                value,
+                color = if (alarm) MenuTokens.Danger else MenuTokens.Value,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        if (fill != null) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(MenuTokens.SurfaceSelected),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(fill.coerceIn(0, 100) / 100f)
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(if (alarm) MenuTokens.Danger else MenuTokens.Accent),
+                )
+            }
+        }
+        if (detail != null) {
+            Text(
+                detail,
+                color = MenuTokens.OnSurfaceMuted,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Downloads and jobs: the one jobs screen ([PluginJobsScreen], the same as Settings' "Downloads and
+ * installs") hosted in the sheet through the catalog's own navigator, so a job reads the same here
+ * as there and nothing is listed twice by two mechanisms.
+ */
+@Composable
+private fun DownloadsSection(onDismiss: () -> Unit) {
+    CatalogNavigator(root = remember { PluginJobsScreen.screen() }, onExit = onDismiss)
 }
 
 @Composable
@@ -444,12 +677,12 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
 
 
 /**
- * One row this tab can show. Deliberately the same shape a plugin's
+ * One row the Game section can show. Deliberately the same shape a plugin's
  * `ui.quick_tile@1` op (`state -> {label, value, on?, icon}` plus
  * `toggle`/`action`, docs/plugin-api.md C2) hands over -- [dangerAction]
  * is this list's `danger` styling, not a fourth quick-tile kind. Only
- * droidtop's own two core rows are here: plugin tiles have the Plugins
- * tab ([PluginTilesTab]).
+ * droidtop's own core rows are here: plugin tiles have the Plugins
+ * section ([PluginTilesTab]).
  */
 private data class GameQuickTile(
     val title: String,
@@ -462,30 +695,8 @@ private data class GameQuickTile(
 internal fun quitNeedsConfirmation(armed: Boolean): Boolean = !armed
 
 /**
- * The Quick Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82): who is
- * running, and the two actions a console's in-game overlay always
- * offers -- resume and quit to library. Same interaction model as
- * [NotificationsTab]: a virtual cursor over [MenuRow] tiles, A activates
- * the focused one, B/Back closes the whole sheet (there is nothing to
- * back OUT to within this tab -- unlike Notifications' list, one level
- * is all there is).
- *
- * [onResume] is `GamepadShell`'s real `onLaunch`, the one entry point
- * every launch in the shell already goes through (console ROM, PC and
- * engine games alike) -- relaunching the SAME entry is what real ES-DE's
- * own planned Recents tab (docs/SPEC.md, "Recents (decided 2026-08-30)")
- * already decided "resume" means here, reused rather than invented a
- * second time. [onQuit] fires [dev.droidtop.library.Library.quit] and
- * reports its outcome through [quitOutcome], which this tab shows in the
- * quit row's subtitle: droidtop clears its own running-game state only
- * when that outcome is [QuitResult.Ended], so a quit that left the
- * emulator alive (the Android 13 case, Droidtop/tracker#82) is shown
- * honestly instead of being reported as a success. See
- * [dev.droidtop.library.LibraryProvider.quit]'s own doc comment.
- */
-/**
- * The Plugins tab: one row per status or quick tile a running plugin provides. The state is
- * refreshed once when the tab opens (droidtop decides when, the plugin never runs its own loop),
+ * The Plugins section: one row per status or quick tile a running plugin provides. The state is
+ * refreshed once when the section opens (droidtop decides when, the plugin never runs its own loop),
  * a tile that does not answer in time keeps its last value, and only a quick tile answers to A.
  */
 @Composable
@@ -585,44 +796,105 @@ private fun PluginTilesTab(
     }
 }
 
+/**
+ * The Quick Menu's Game section (docs/SPEC.md, Droidtop/tracker#82): who is
+ * running, and the actions a console's in-game overlay always offers --
+ * resume, restart and quit to library. Same interaction model as
+ * [NotificationsTab]: a virtual cursor over [MenuRow] tiles, A activates
+ * the focused one, B/Back closes the whole sheet (there is nothing to
+ * back OUT to within this section -- unlike Notifications' list, one level
+ * is all there is).
+ *
+ * [onResume] is `GamepadShell`'s real `onLaunch`, the one entry point
+ * every launch in the shell already goes through (console ROM, PC and
+ * engine games alike) -- relaunching the SAME entry is what real ES-DE's
+ * own planned Recents tab (docs/SPEC.md, "Recents (decided 2026-08-30)")
+ * already decided "resume" means here, reused rather than invented a
+ * second time. [onQuit] fires [dev.droidtop.library.Library.quit] and
+ * reports its outcome through [quitOutcome], which this section shows in
+ * the pressed row's subtitle: droidtop clears its own running-game state
+ * only when that outcome is [dev.droidtop.library.QuitResult.Ended], so a
+ * quit that left the emulator alive (the Android 13 case,
+ * Droidtop/tracker#82) is shown honestly instead of being reported as a
+ * success. Restart is quit with `restart = true`: the shell starts the
+ * entry again only once the quit really ended, so a game that would not
+ * end is never launched twice. Both ending rows need a second A press,
+ * since unsaved progress may be lost. See
+ * [dev.droidtop.library.LibraryProvider.quit]'s own doc comment.
+ */
 @Composable
 private fun GameTab(
     entry: dev.droidtop.library.LibraryEntry,
+    library: dev.droidtop.library.Library,
     onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
-    onQuit: (dev.droidtop.library.LibraryEntry) -> Unit,
+    onQuit: (entry: dev.droidtop.library.LibraryEntry, restart: Boolean) -> Unit,
     quitOutcome: dev.droidtop.library.QuitResult?,
     onDismiss: () -> Unit,
 ) {
     var focusIndex by remember(entry.id) { mutableStateOf(0) }
     val focusRequester = remember { FocusRequester() }
     val press = rememberGamepadTouch()
-    var quitConfirmArmed by remember(entry.id) { mutableStateOf(false) }
+    // The row waiting for its second press (Restart or Quit), and the one whose outcome the subtitle reports.
+    var armed by remember(entry.id) { mutableStateOf<GameEnding?>(null) }
+    var lastEnding by remember(entry.id) { mutableStateOf<GameEnding?>(null) }
+    // The per-game emulator (Droidtop/tracker#248): the installed candidates for a console game's
+    // system, loaded off the main thread, and the game's own stored choice (null follows the system).
+    val scope = rememberCoroutineScope()
+    val emulators = rememberSystemEmulators(entry)
+    var emulatorChoice by remember(entry.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(entry.id) { emulatorChoice = library.getMetadataForEditing(entry)?.altEmulator }
 
-    val tiles = remember(entry.id, quitOutcome, quitConfirmArmed) {
-        listOf(
-            GameQuickTile(
-                title = "Resume",
-                subtitle = "Back to ${entry.title}",
-                action = { onResume(entry) },
-            ),
-            GameQuickTile(
-                title = "Kill",
-                subtitle = quitOutcome?.message ?: if (quitConfirmArmed) {
-                    "Press A again to end ${entry.title}; unsaved progress may be lost"
+    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice) {
+        fun ending(kind: GameEnding, title: String, idle: String, restart: Boolean) = GameQuickTile(
+            title = title,
+            subtitle = when {
+                armed == kind -> "Press A again to end ${entry.title}; unsaved progress may be lost"
+                lastEnding == kind && quitOutcome != null -> quitOutcome.message
+                else -> idle
+            },
+            dangerAction = true,
+            action = {
+                if (quitNeedsConfirmation(armed == kind)) {
+                    armed = kind
                 } else {
-                    "End ${entry.title}"
-                },
-                dangerAction = true,
-                action = {
-                    if (quitNeedsConfirmation(quitConfirmArmed)) {
-                        quitConfirmArmed = true
-                    } else {
-                        quitConfirmArmed = false
-                        onQuit(entry)
-                    }
-                },
-            ),
+                    armed = null
+                    lastEnding = kind
+                    onQuit(entry, restart)
+                }
+            },
         )
+        buildList {
+            add(
+                GameQuickTile(
+                    title = "Resume",
+                    subtitle = "Back to ${entry.title}",
+                    action = { onResume(entry) },
+                ),
+            )
+            // Only for a console game with something installed to choose from. A cycles Follow the
+            // system, then each installed emulator; the launch reads it, so it applies from the next start.
+            if (emulators != null && emulators.candidates.isNotEmpty()) {
+                add(
+                    GameQuickTile(
+                        title = "Emulator",
+                        subtitle = gameEmulatorSummary(emulators, emulatorChoice) + ". A cycles; applies from the next start.",
+                        action = {
+                            val ids = listOf<String?>(null) + emulators.candidates.map { it.id }
+                            val own = dev.droidtop.library.consoles.EmulatorResolution
+                                .matchGameChoice(emulators.candidates, emulatorChoice)?.id
+                            val next = ids[(ids.indexOf(own).coerceAtLeast(0) + 1) % ids.size]
+                            scope.launch {
+                                val meta = library.getMetadataForEditing(entry)
+                                    ?: dev.droidtop.library.consoles.GameMetadataEntity(id = entry.id)
+                                if (library.saveMetadata(entry, meta.copy(altEmulator = next))) emulatorChoice = next
+                            }
+                        },
+                    ),
+                )
+            }
+            add(ending(GameEnding.RESTART, "Restart", "End ${entry.title} and start it again", restart = true))
+            add(ending(GameEnding.KILL, "Kill", "End ${entry.title}", restart = false))
+        }
     }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -636,7 +908,7 @@ private fun GameTab(
                 when (press.action) {
                     GamepadAction.UP, GamepadAction.DOWN ->
                         {
-                            quitConfirmArmed = false
+                            armed = null
                             focusIndex = menuStep(focusIndex, tiles.size, if (press.action == GamepadAction.UP) -1 else 1)
                         }
                     GamepadAction.B -> onDismiss()
@@ -654,7 +926,7 @@ private fun GameTab(
             modifier = Modifier.padding(bottom = 12.dp),
         )
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             tiles.forEachIndexed { index, tile ->
@@ -680,3 +952,6 @@ private fun GameTab(
         )
     }
 }
+
+/** The two rows of the Game section that end the game, so each can wait for its own second press. */
+private enum class GameEnding { RESTART, KILL }

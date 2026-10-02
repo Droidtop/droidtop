@@ -227,4 +227,81 @@ class QuickTilesTest {
         assertEquals("12%, saver on", controls.batteryValue(12, charging = false, saverOn = true))
         assertEquals("Unknown", controls.batteryValue(null, charging = false, saverOn = false))
     }
+
+    @Test
+    fun `the rail shows Game only while a game runs and Plugins only with tiles`() {
+        val bare = QuickTiles.visibleSections(gameRunning = false, hasPluginTiles = false)
+        assertFalse(QuickSection.GAME in bare)
+        assertFalse(QuickSection.PLUGINS in bare)
+        val full = QuickTiles.visibleSections(gameRunning = true, hasPluginTiles = true)
+        assertEquals(QuickSection.entries, full)
+        // Get games is a contextual action, never a rail section.
+        assertTrue(QuickSection.entries.none { it.label.contains("Get games", ignoreCase = true) })
+    }
+
+    @Test
+    fun `the menu opens on the game, else notifications when granted, else system`() {
+        assertEquals(QuickSection.GAME, QuickTiles.initialSection(gameRunning = true, notificationsGranted = false))
+        assertEquals(QuickSection.NOTIFICATIONS, QuickTiles.initialSection(gameRunning = false, notificationsGranted = true))
+        assertEquals(QuickSection.SYSTEM, QuickTiles.initialSection(gameRunning = false, notificationsGranted = false))
+    }
+
+    @Test
+    fun `L1 and R1 step the rail and wrap at its ends`() {
+        val visible = QuickTiles.visibleSections(gameRunning = false, hasPluginTiles = false)
+        assertEquals(QuickSection.NOTIFICATIONS, QuickTiles.stepSection(visible, QuickSection.APPS, +1))
+        assertEquals(QuickSection.APPS, QuickTiles.stepSection(visible, QuickSection.NOTIFICATIONS, -1))
+        assertEquals(visible.first(), QuickTiles.stepSection(visible, visible.last(), +1))
+        assertEquals(visible.last(), QuickTiles.stepSection(visible, visible.first(), -1))
+        // A section that left the rail (the game ended) lands on the first one.
+        assertEquals(visible.first(), QuickTiles.stepSection(visible, QuickSection.GAME, +1))
+    }
+
+    @Test
+    fun `audio and display claim their rows and system keeps the rest, each item once`() {
+        val ids = listOf(
+            GamingSettingsCatalog.ID_SYSTEM_NETWORK,
+            GamingSettingsCatalog.ID_SYSTEM_VOLUME,
+            GamingSettingsCatalog.ID_SYSTEM_DND,
+            GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
+            GamingSettingsCatalog.ID_SYSTEM_TIMEOUT,
+            GamingSettingsCatalog.ID_SYSTEM_BLUETOOTH,
+            GamingSettingsCatalog.ID_SYSTEM_AIRPLANE,
+            GamingSettingsCatalog.ID_SYSTEM_POWER_MENU,
+            GamingSettingsCatalog.ID_DISPLAY_SWAP,
+            // Not known to any list: it must still land on System.
+            "pref_future_system_row",
+        )
+        val groups = listOf(
+            CatalogGroup(
+                GamingSettingsCatalog.GROUP_SYSTEM, "System",
+                ids.map { ActionItem(id = it, title = it, run = {}) },
+            ),
+            CatalogGroup(
+                GamingSettingsCatalog.GROUP_SCREENS, "Screens",
+                listOf(ActionItem(id = GamingSettingsCatalog.ID_ORIENTATION, title = "Screen orientation", run = {})),
+            ),
+        )
+        fun idsOf(section: QuickSection) = QuickTiles.sectionGroups(groups, section).single().items.map { it.id }
+
+        assertEquals(
+            listOf(GamingSettingsCatalog.ID_SYSTEM_VOLUME, GamingSettingsCatalog.ID_SYSTEM_DND),
+            idsOf(QuickSection.AUDIO),
+        )
+        assertEquals(
+            listOf(
+                GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
+                GamingSettingsCatalog.ID_SYSTEM_TIMEOUT,
+                GamingSettingsCatalog.ID_ORIENTATION,
+                GamingSettingsCatalog.ID_DISPLAY_SWAP,
+            ),
+            idsOf(QuickSection.DISPLAY),
+        )
+        val system = idsOf(QuickSection.SYSTEM)
+        assertTrue(GamingSettingsCatalog.ID_SYSTEM_AIRPLANE in system)
+        assertTrue(GamingSettingsCatalog.ID_SYSTEM_POWER_MENU in system)
+        assertTrue("pref_future_system_row" in system)
+        val claimed = QuickTiles.AUDIO_IDS + QuickTiles.DISPLAY_IDS
+        assertTrue(system.none { it in claimed })
+    }
 }

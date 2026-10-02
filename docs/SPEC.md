@@ -2331,7 +2331,9 @@ the `ContainerRuntime` interface that already exists (§3):
   there is one layout, not one per display role. droidtop's info stays
   the BACKGROUND layer; user content composites above it.
 - **Gaming Quick Menu (directed 2026-08-31, iiSU-inspired)**: a
-  trigger-opened overlay with a Notifications tab and a System tab.
+  trigger-opened overlay with a Notifications tab and a System tab
+  (since 2026-10-02 a branching panel with an icon rail, see "Quick Menu:
+  a branching panel" below; the paragraphs here describe the tabs it grew from).
   Paradigm survey behind the design (knowledge-based; no iiSU decompile
   artifacts exist in the container): the Steam Deck QAM (dedicated
   button → right-edge sheet, vertical tabs: notifications / quick
@@ -2411,8 +2413,14 @@ the `ContainerRuntime` interface that already exists (§3):
   the tab present until an explicit shell entry or successful quit. An
   unresolved implicit launch also cannot be checked. When
   present it is the tab that opens first, not something shoulder-cycled
-  to: the point of a distinct in-game menu is that it greets you. Two
-  rows today, in the same `MenuRow` tile shape Settings and every other
+  to: the point of a distinct in-game menu is that it greets you. Three
+  rows (a **Restart** row, quit then launch again only once the quit
+  really ended, joined Resume and Kill on 2026-10-02 and takes the same two A
+  presses as Kill; a console game with an installed emulator also gets an
+  **Emulator** row, whose A cycles Follow the system and each installed
+  emulator and writes the game's own choice, the third level of the order in
+  "Launch resolution", read at the next start, Droidtop/tracker#248),
+  in the same `MenuRow` tile shape Settings and every other
   menu in this shell already uses: **Resume** relaunches the entry
   through the shell's one real launch path (`GamepadShell.onLaunch` —
   console ROM, PC and engine games alike, the same mechanism already
@@ -2431,6 +2439,52 @@ the `ContainerRuntime` interface that already exists (§3):
   append to once that extension point's host exists, so it extends this
   tab instead of needing a second in-game menu built to compete with
   it.
+- **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
+  Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
+  navigation and the places things live. The owner's direction: "branch our quick menu out a
+  lot more", more granular instead of one flat list. So the tab row above is replaced by an
+  **icon rail** of sections beside the section's own content (a column down the sheet's left
+  edge in landscape, a row across the top of the bottom sheet in portrait). One menu, the existing
+  tabs migrated into it, not a second one. Sections, in rail order, and what each is:
+  - **Game** (only while a game is parked, first when present): the Game section below.
+  - **Running apps**: the task manager's list with Close and Clear all (`AppsTab`, #245, #252).
+  - **Notifications**: unchanged (`NotificationsTab`, grant row when access is missing, #180).
+  - **System**: the quick-settings tile grid over the catalog's quick System group with its
+    status header: Network (Wi-Fi), Bluetooth, **Airplane mode**, VPN, Battery, **Power menu**,
+    Switch mode, Settings, updates and the Android settings index. Android gives an ordinary app
+    no write to airplane mode and no call that opens the power menu, so Airplane mode shows the
+    real state and opens the system screen, and Power menu is a tile marked "Needs privilege"
+    that says so when pressed (a privilege helper plugin is the route that could do it); nothing
+    pretends.
+  - **Performance**: readouts a non-root app can honestly read, from the one shared sampler
+    (`PerformanceMonitor`, which the companion's Performance tab reads too, one sampler and one
+    buffer): processor busy share where `/proc/stat` is readable (it is closed to apps from
+    Android 8, then the fastest core clock and droidtop's own share, with the reason), memory,
+    battery level, temperature and current magnitude, and Android's own thermal status. A reading
+    Android does not give an app is named as such, never drawn as a number; GPU load and frame rate
+    are one muted "Needs privilege" row. The section runs `PerformanceMonitor.watch` in its own
+    composition, so a sample every two seconds is taken only while the section shows, off the main
+    thread: nothing polls with the sheet closed or another section showing.
+  - **Audio**: volume, the output switcher (`Settings.Panel.ACTION_VOLUME`, API 29, else the
+    Sound screen) and Do Not Disturb (with its grant row).
+  - **Display**: brightness, adaptive brightness, auto-rotate, screen timeout, the Gaming
+    shell's orientation (`GamingSettingsCatalog.ID_ORIENTATION`, the current mode's own per-mode
+    setting; Standard and Desktop keep theirs on their own screens) and the screen assignment
+    rows (shell display, game launch display, swap, reinitialize).
+  - **Downloads and jobs**: the one jobs screen (`PluginJobsScreen`, the same as Settings'
+    "Downloads and installs") hosted in the sheet by `CatalogNavigator`.
+  - **Plugins**: unchanged, only while a running plugin offers tiles.
+  Which sections show, where the menu opens (the running game; else Notifications once access is
+  granted; else System) and how the shoulders step the rail are pure rules in `QuickTiles`
+  (`visibleSections`, `initialSection`, `stepSection`) with unit tests. System, Audio and Display
+  are views of the settings catalog (`QuickTiles.sectionGroups`): Audio and Display claim their
+  items by id and System keeps every other quick System item, so an item added to the catalog
+  still appears with no edit to the menu, and none appears twice. **L1/R1 step the rail** (the
+  panel is its own window and owns the shoulders), wrapping at the ends; the rail is not a focus
+  target (the pad's focus stays in the section) and its icons tap for touch; a dot on a rail icon
+  says something is waiting (notifications, running jobs). B closes; R2 closes. **Get games is
+  not in the Quick Menu**: it is a contextual action on the pages that need it (#151, #258).
+  Colours and type come from `MenuTokens` only, so the panel follows the theme.
 - **Quit to Library says what it did (decided 2026-09-29, Droidtop/tracker#82)**: on the owner's
   console (Android 13) the first version of this tab did not end the game — after Quit the
   emulator's process and its Recents task both stayed alive, yet droidtop had already dropped its
@@ -2545,10 +2599,10 @@ a close path of its own. Every call works off the main thread.
   restart forgets it, which is the honest direction). The Quick Menu's Quit row closes
   `LaunchLedger.last` whatever kind of entry it was: a ROM's player, an engine game's host, a plain
   app. `Library.quit` stays only as the fallback when no launch was noted.
-- **Close current app, on the System tab.** The Quick Menu's System group carries a "Close <app>" row
-  while `LaunchLedger.last` is set: the same close the Game tab's Quit row runs, reachable from the
-  System tab alone, in the confirm-then-act shape the other destructive tiles use. It runs
-  `TaskManager.close` and shows the outcome sentence.
+- **Close current app (superseded 2026-10-02).** A "Close <app>" tile on the System tab ran the same
+  `TaskManager.close` as the Game section's Kill row and the Running apps list's X. With the Quick Menu
+  branching into sections it was a third route to one job and is gone: the app in front is closed from
+  Running apps, and a game that is parked from the Game section.
 - **One running-apps list, and what a non-privileged app can know** (`TaskManager.snapshot`,
   `RunningApp`: name, package, display id, task id). Android hides other apps' tasks from a normal app:
   `getRunningTasks` and `getRunningAppProcesses` return only the caller's own, `getAppTasks` only
@@ -2586,11 +2640,10 @@ a close path of its own. Every call works off the main thread.
     any installed home app, and packages in `ProtectedApps` (the user's own set, a string set in
     droidtop's preferences); marking a package protected has no screen yet.
   - **A confirm only when it matters:** more than `CONFIRM_CLEAR_ALL_ABOVE` (3) targets, the count in the
-    question. The Quick Menu's Apps tab and the System tab use the shell's arm-then-press-again step
-    (System arms when the last read is not known either); the companion asks inline with Close them and
-    Cancel; Standard shows a dialog.
-  - **Quick Menu:** the first row of the Apps tab, and a "Close all apps" tile on the System tab beside
-    "Close <app>". **Companion:** a "Clear all apps" pill above the running-apps row; touch only, no
+    question. The Quick Menu's Running apps section uses the shell's arm-then-press-again step; the
+    companion asks inline with Close them and Cancel; Standard shows a dialog.
+  - **Quick Menu:** the first row of the Running apps section (no second tile on the System section:
+    one mechanism per job, 2026-10-02). **Companion:** a "Clear all apps" pill above the running-apps row; touch only, no
     controller focus (tracker#186), and the switch tap launches on the app's own screen so the
     companion never moves what the user opened (tracker#243). **Standard:** "Close all apps" in the mode
     switcher's menu (the dialog the home screen's long-press, long Back and the taskbar already open)

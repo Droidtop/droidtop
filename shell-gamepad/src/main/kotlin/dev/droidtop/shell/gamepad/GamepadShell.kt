@@ -616,6 +616,7 @@ private fun GamepadShellBody(
     if (quickMenuOpen) {
         QuickMenu(
             runningEntry = runningEntry,
+            library = library,
             // The same launch path every entry already goes through
             // (console ROM, PC and engine games alike) -- relaunching the
             // entry is what "resume" already means for the planned
@@ -626,7 +627,7 @@ private fun GamepadShellBody(
                 quickMenuOpen = false
                 onLaunch(entry)
             },
-            onQuit = { entry ->
+            onQuit = { entry, restart ->
                 // The sheet stays open until the game really ended, so a
                 // quit that could not end it shows its reason in the row.
                 scope.launch {
@@ -652,6 +653,9 @@ private fun GamepadShellBody(
                     if (outcome is dev.droidtop.library.QuitResult.Ended) {
                         dev.droidtop.library.LaunchDisplay.clearRunning()
                         quickMenuOpen = false
+                        // Restart (the Quick Menu's Game section): start the
+                        // entry again, but only now that it really ended.
+                        if (restart) onLaunch(entry)
                     }
                 }
             },

@@ -90,13 +90,6 @@ object TaskManager {
             summary
         }
 
-    /**
-     * How many apps Clear all would close by the last list read, null before any read. For a surface that
-     * must decide whether to ask first without waiting for a fresh read: it asks when this is null.
-     */
-    fun knownClearAllCount(context: Context): Int? =
-        snapshot.value?.let { TaskPolicy.clearAllTargets(it.apps, protectedNow(context)).size }
-
     /** The packages Clear all leaves alone: see [TaskPolicy.protectedPackages]. */
     fun protectedNow(context: Context): Set<String> =
         TaskPolicy.protectedPackages(context.packageName, homePackages(context), ProtectedApps.get(context))

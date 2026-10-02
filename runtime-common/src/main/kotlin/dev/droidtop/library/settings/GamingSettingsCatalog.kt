@@ -59,8 +59,6 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_LEAVE_UI_MODE = "pref_gaming_system_leave_ui_mode"
     const val ID_SYSTEM_SWITCH_MODE = "pref_gaming_system_switch_mode"
     const val ID_SYSTEM_OPEN_SETTINGS = "pref_gaming_system_open_settings"
-    const val ID_SYSTEM_CLOSE_APP = "action_system_close_app"
-    const val ID_SYSTEM_CLEAR_ALL = "action_system_clear_all_apps"
     const val ID_SYSTEM_DND = "pref_gaming_system_dnd"
     const val ID_SYSTEM_DND_GRANT = "pref_gaming_system_dnd_grant"
     const val ID_SYSTEM_ADAPTIVE = "pref_gaming_system_adaptive"
@@ -68,6 +66,10 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_TIMEOUT = "pref_gaming_system_timeout"
     const val ID_SYSTEM_ANDROID_LINKS = "pref_gaming_system_android_links"
     const val ID_SYSTEM_UPDATES = "pref_gaming_system_updates"
+    const val ID_SYSTEM_AIRPLANE = "pref_gaming_system_airplane"
+    const val ID_SYSTEM_POWER_MENU = "pref_gaming_system_power_menu"
+    const val ID_AUDIO_OUTPUT = "pref_gaming_audio_output"
+    const val ID_ORIENTATION = "pref_screen_orientation_gaming"
 
     private val TIMEOUT_OPTIONS = dev.droidtop.runtime.systemstatus.SystemControls.SCREEN_TIMEOUTS
     const val ID_DOWNLOADS = "pref_gaming_downloads"
@@ -271,15 +273,15 @@ object GamingSettingsCatalog {
             title = "System",
             items = buildList {
                 add(ChoiceItem(
-                    id = "pref_screen_orientation_gaming",
+                    id = ID_ORIENTATION,
                     title = "Screen orientation",
                     options = listOf(
                         ChoiceOption("follow", "Follow device"),
                         ChoiceOption("landscape", "Landscape"),
                         ChoiceOption("landscape_flipped", "Landscape (flipped)"),
                     ),
-                    current = CatalogPrefs.prefs(context).getString("pref_screen_orientation_gaming", "follow"),
-                    onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString("pref_screen_orientation_gaming", value).apply() },
+                    current = CatalogPrefs.prefs(context).getString(ID_ORIENTATION, "follow"),
+                    onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(ID_ORIENTATION, value).apply() },
                 ))
                 add(displayShellTargetItem(context))
                 add(displayGameLaunchTargetItem(context))
@@ -429,36 +431,6 @@ object GamingSettingsCatalog {
                             "dev.droidtop.app.EXTRA_MODE" to "gaming",
                             "dev.droidtop.app.EXTRA_GAMING_START_SECTION" to "SETTINGS",
                         ),
-                    ),
-                )
-                // The app in front, ended (docs/SPEC.md "The task manager", tracker#245): there while droidtop
-                // knows which app it last started, which is the one a Home press left running behind the shell.
-                dev.droidtop.runtime.tasks.LaunchLedger.last?.let { running ->
-                    val name = dev.droidtop.runtime.tasks.TaskManager.appLabel(context, running.packageName) ?: running.packageName
-                    add(
-                        AsyncActionItem(
-                            id = ID_SYSTEM_CLOSE_APP,
-                            title = "Close $name",
-                            subtitle = "Ends the app you left running; unsaved progress in it is lost",
-                            confirmTitle = "Close $name?",
-                            run = { ctx, _ -> dev.droidtop.runtime.tasks.TaskManager.close(ctx, running.packageName).text },
-                        ),
-                    )
-                }
-                // Every app but droidtop, Enginehost and what the user protected (docs/SPEC.md "The task
-                // manager", tracker#252). The arm-then-confirm step applies when more than a few would
-                // close, or when the last list read is not known yet, since the count is not known either.
-                val known = dev.droidtop.runtime.tasks.TaskManager.knownClearAllCount(context)
-                add(
-                    AsyncActionItem(
-                        id = ID_SYSTEM_CLEAR_ALL,
-                        title = "Close all apps",
-                        subtitle = "Ends every other app, except Enginehost and the ones you protected",
-                        confirmTitle = if (known == null || dev.droidtop.runtime.tasks.TaskPolicy.needsClearAllConfirm(known)) "Close all apps?" else null,
-                        run = { ctx, _ ->
-                            val targets = dev.droidtop.runtime.tasks.TaskManager.clearAllTargets(ctx)
-                            dev.droidtop.runtime.tasks.TaskManager.clearAll(ctx, targets).message
-                        },
                     ),
                 )
                 add(
@@ -662,6 +634,43 @@ object GamingSettingsCatalog {
                         title = "Bluetooth",
                         subtitle = "Pair controllers and audio in the system Bluetooth screen",
                         run = { ctx -> ctx.startActivity(controls.bluetoothSettingsIntent()) },
+                    ),
+                )
+                // Airplane mode: Android gives an app no write to it (the
+                // radios are the system's), so like Network and Bluetooth the
+                // row shows the real state and opens the real screen.
+                add(
+                    ActionItem(
+                        id = ID_SYSTEM_AIRPLANE,
+                        title = "Airplane mode",
+                        subtitle = "Opens the system screen: Android does not let an app switch it",
+                        value = if (controls.airplaneModeOn(context)) "On" else "Off",
+                        run = { ctx -> ctx.startActivity(controls.airplaneModeSettingsIntent()) },
+                    ),
+                )
+                // The power menu (shut down, restart) belongs to the system
+                // and to accessibility services; a plain app has no call that
+                // opens it. Said on the tile when it is pressed, never a
+                // silent nothing.
+                add(
+                    AsyncActionItem(
+                        id = ID_SYSTEM_POWER_MENU,
+                        title = "Power menu",
+                        subtitle = "Hold the power button",
+                        value = "Needs privilege",
+                        run = { _, _ ->
+                            "Android only lets the system open it. Hold the power button; a privilege helper plugin is the route that can do it from here."
+                        },
+                    ),
+                )
+                // Where the sound goes (speaker, headphones, Bluetooth): the
+                // system's own output switcher, which an app cannot replace.
+                add(
+                    ActionItem(
+                        id = ID_AUDIO_OUTPUT,
+                        title = "Audio output",
+                        subtitle = "Opens Android's output switcher",
+                        run = { ctx -> ctx.startActivity(controls.audioOutputIntent()) },
                     ),
                 )
             },
