@@ -249,6 +249,11 @@ class CatalogScreen(
      * not to settings search. Null = the index reads [groups] itself.
      */
     val indexGroups: (suspend (Context) -> List<CatalogGroup>)? = null,
+    /**
+     * Runs when the person leaves this screen (B, or backing out of Settings): a screen that started
+     * something which waits on them, like a GitHub sign-in showing a code, stops it here.
+     */
+    val onLeave: (() -> Unit)? = null,
 )
 
 /**

@@ -313,7 +313,7 @@ class CatalogPreferenceNavigator(
     }
 
     private fun pop() {
-        stack.removeLastOrNull()
+        stack.removeLastOrNull()?.onLeave?.invoke()
         rebuild()
     }
 

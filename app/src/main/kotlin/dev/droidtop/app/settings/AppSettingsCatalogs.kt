@@ -57,6 +57,7 @@ import dev.droidtop.pluginhost.PythonRuntimeManager
 import dev.droidtop.pluginhost.RuntimeNeed
 import dev.droidtop.pluginhost.FlutterRuntimeManager
 import dev.droidtop.pluginhost.UserOriginKey
+import dev.droidtop.pluginhost.UserOriginKey
 import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.pluginhost.AddKeyOutcome
 import dev.droidtop.library.consoles.resolvePlayer
@@ -1322,7 +1323,6 @@ object AppSettingsCatalogs {
 
         val activeIntegrations = IntegrationStore.available(context).size
         val installedPlugins = PluginStore.installed(context)
-        val githubTokenLabel = if (dev.droidtop.net.GitHubTokenStore.isSet(context)) "Set" else "Not set"
         val pluginsValueLabel = when {
             installedPlugins.isEmpty() -> "none"
             installedPlugins.any { it.trust == PluginTrustState.PENDING } ->
@@ -1464,13 +1464,7 @@ object AppSettingsCatalogs {
                         valueLabel = { if (activeIntegrations == 0) "none" else "$activeIntegrations active" },
                         icon = CatalogIcon.INTEGRATIONS,
                     ),
-                    NestedScreenItem(
-                        id = "accounts_github_token",
-                        title = "GitHub token",
-                        subtitle = "Your own token: lifts GitHub's request limit for plugin updates and reaches plugin sources in private repositories",
-                        inline = githubTokenScreen(),
-                        valueLabel = { githubTokenLabel },
-                    ),
+                    GitHubAccountCatalog.accountRow(context),
                 ),
             ),
         )
@@ -1551,74 +1545,6 @@ object AppSettingsCatalogs {
                             onChange = { c, v -> ScraperPrefs.set(c, ScraperPrefs.clientId(c), v.trim()) },
                         ),
                     ),
-                ),
-            )
-        },
-    )
-
-    /**
-     * The user's own GitHub token for plugin sources (docs/SPEC.md 12a
-     * "GitHub token"). Pasted by the person, never created or filled by
-     * droidtop; stored Keystore-encrypted, never in the settings backup,
-     * shown masked, removable, and testable against api.github.com.
-     */
-    private fun githubTokenScreen() = CatalogScreen(
-        id = "accounts_github_token_edit",
-        title = "GitHub token",
-        subtitle = "Sent only to api.github.com, github.com and raw.githubusercontent.com, only for plugin sources",
-        groups = { context ->
-            val (token, stored) = withContext(Dispatchers.IO) {
-                dev.droidtop.net.GitHubTokenStore.get(context) to dev.droidtop.net.GitHubTokenStore.isSet(context)
-            }
-            listOf(
-                CatalogGroup(
-                    id = "accounts_github_token_fields",
-                    title = null,
-                    items = buildList {
-                        add(
-                            TextInputItem(
-                                id = "github_token_value",
-                                title = "Token",
-                                subtitle = when {
-                                    token != null -> "Stored encrypted on this device: ${dev.droidtop.net.GitHubTokenStore.masked(token)}"
-                                    stored -> "A token is stored but can no longer be read on this device; paste it again"
-                                    else -> "A fine-grained token with read access to the plugin repositories, or a classic token with repo scope for private ones"
-                                },
-                                // Never shows the stored value back: the field is for pasting a new one.
-                                value = "",
-                                secret = true,
-                                onChange = { c, v ->
-                                    if (v.isNotBlank()) {
-                                        withContext(Dispatchers.IO) { dev.droidtop.net.GitHubTokenStore.set(c, v) }
-                                    }
-                                },
-                            ),
-                        )
-                        if (token != null) {
-                            add(
-                                AsyncActionItem(
-                                    id = "github_token_test",
-                                    title = "Test",
-                                    subtitle = "Asks api.github.com who this token is and how many requests it allows",
-                                    run = { _, onStatus ->
-                                        onStatus("Asking GitHub...")
-                                        dev.droidtop.net.GitHubTokenStore.test(token)
-                                    },
-                                ),
-                            )
-                        }
-                        if (stored) {
-                            add(
-                                ActionItem(
-                                    id = "github_token_remove",
-                                    title = "Remove token",
-                                    subtitle = "Plugin sources go back to unauthenticated requests",
-                                    confirmTitle = "Remove the GitHub token from this device?",
-                                    run = { ctx -> dev.droidtop.net.GitHubTokenStore.clear(ctx) },
-                                ),
-                            )
-                        }
-                    },
                 ),
             )
         },
@@ -1744,7 +1670,7 @@ object AppSettingsCatalogs {
         // Read once here, off the main thread; valueLabel below is a
         // plain (non-suspend) closure the renderer may call on the main
         // thread, so it must not touch the key store itself.
-        val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+        val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
         val resolution = PluginApiResolver.current(context)
         val grantStore = PluginGrants.forContext(context)
         val providerChoices = PluginProviderChoices.forContext(context).all()
@@ -1839,6 +1765,11 @@ object AppSettingsCatalogs {
                 ),
             ),
             CatalogGroup(
+                id = "plugins_repositories",
+                title = null,
+                items = listOf(GitHubAccountCatalog.reposRow(userKeys.values.count { it.repo != null })),
+            ),
+            CatalogGroup(
                 id = "plugins_advanced",
                 title = "Advanced",
                 items = listOf(
@@ -1856,16 +1787,16 @@ object AppSettingsCatalogs {
         )
     }
 
-    private fun pluginTrustBadge(origin: String, userKeys: Map<String, String>): String = when {
+    private fun pluginTrustBadge(origin: String, userKeys: Map<String, UserOriginKey>): String = when {
         PluginOriginKeys.isOfficial(origin) -> "Official"
-        userKeys.containsKey(origin) -> "Added by you"
+        userKeys.containsKey(origin) -> userKeys.getValue(origin).repo?.let { "Verified by: $it" } ?: "Added by you"
         else -> "NOT TRUSTED"
     }
 
     /** The installed-plugins list row: what it's called, what it adds in plain words, its trust badge and its state -- the whole card, one tap into [pluginDetailScreen]. */
     private fun pluginCard(
         record: dev.droidtop.pluginhost.PluginRecord,
-        userKeys: Map<String, String>,
+        userKeys: Map<String, UserOriginKey>,
         waiting: List<dev.droidtop.pluginhost.RequiredApi>?,
         grants: PluginGrants.Snapshot,
         runtimeNeed: RuntimeNeed?,
@@ -1942,7 +1873,7 @@ object AppSettingsCatalogs {
                         ),
                     )
                 } else {
-                    val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+                    val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
                     pluginDetailGroups(context, record, userKeys)
                 }
             }
@@ -1952,7 +1883,7 @@ object AppSettingsCatalogs {
     private fun pluginDetailGroups(
         context: Context,
         record: dev.droidtop.pluginhost.PluginRecord,
-        userKeys: Map<String, String>,
+        userKeys: Map<String, UserOriginKey>,
     ): List<CatalogGroup> {
         val m = record.manifest
         val resolution = PluginApiResolver.current(context)
@@ -1970,7 +1901,7 @@ object AppSettingsCatalogs {
             }
             val trustLine = when {
                 PluginOriginKeys.isOfficial(m.origin) -> "Official"
-                userKeys.containsKey(m.origin) -> "Added by you"
+                userKeys.containsKey(m.origin) -> userKeys.getValue(m.origin).repo?.let { "Verified by: $it" } ?: "Added by you"
                 else -> "NOT TRUSTED: no trusted key for this origin anymore (see Keys you trust)"
             }
             // A pending status used to look like a button but had no action. The approval controls below
@@ -2488,7 +2419,7 @@ object AppSettingsCatalogs {
     private fun pluginConsentGroups(
         context: Context,
         record: dev.droidtop.pluginhost.PluginRecord,
-        userKeys: Map<String, String>,
+        userKeys: Map<String, UserOriginKey>,
         ticks: MutableSet<String>? = null,
         only: Set<String>? = null,
     ): List<CatalogGroup> {

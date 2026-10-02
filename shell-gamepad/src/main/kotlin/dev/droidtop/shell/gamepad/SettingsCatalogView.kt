@@ -255,6 +255,7 @@ fun CatalogNavigator(
     }
 
     fun pop() {
+        stack.lastOrNull()?.onLeave?.invoke()
         when {
             stack.size > 1 -> {
                 stack.removeAt(stack.lastIndex)

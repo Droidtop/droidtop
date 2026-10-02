@@ -12,6 +12,7 @@ import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginOriginKeys
 import dev.droidtop.pluginhost.PluginTrustState
+import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.runtime.util.Versions
 import java.io.File
 import kotlin.math.sign
@@ -230,7 +231,8 @@ object PluginCatalog {
         DownloadJobs.registerPost(DOWNLOAD_POST) { context, file, args ->
             val label = args[ARG_LABEL] ?: "The plugin"
             val version = args[ARG_VERSION].orEmpty()
-            when (val result = PluginBundleInstaller.install(file, PluginStore.root(context))) {
+            // The user-trusted keys too: a bundle from an origin the person trusted verifies like an official one.
+            when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context)))) {
                 is PluginInstallResult.Installed ->
                     if (result.record.trust == PluginTrustState.APPROVED) {
                         "Updated $label to $version"

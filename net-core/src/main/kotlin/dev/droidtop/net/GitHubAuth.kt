@@ -41,15 +41,17 @@ object GitHubAuth {
     /**
      * Opens [url] and returns a connection whose response code is a final
      * one (redirects followed by hand, https only, at most [MAX_REDIRECTS]
-     * hops). The caller reads the body and calls `disconnect()`.
+     * hops). The caller reads the body and calls `disconnect()`. [headers] go on the first request
+     * only (a conditional `If-None-Match`, an `Accept`); a redirect hop gets the token decision alone.
      */
-    fun open(url: String, token: String?, connectTimeoutMs: Int, readTimeoutMs: Int): HttpURLConnection {
+    fun open(url: String, token: String?, connectTimeoutMs: Int, readTimeoutMs: Int, headers: Map<String, String> = emptyMap()): HttpURLConnection {
         var current = url
-        repeat(MAX_REDIRECTS + 1) {
+        repeat(MAX_REDIRECTS + 1) { hop ->
             val connection = URL(current).openConnection() as HttpURLConnection
             connection.connectTimeout = connectTimeoutMs
             connection.readTimeout = readTimeoutMs
             connection.instanceFollowRedirects = false
+            if (hop == 0) headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
             authorizationFor(current, token)?.let { header ->
                 connection.setRequestProperty("Authorization", header)
                 if (isApiAssetUrl(current)) connection.setRequestProperty("Accept", "application/octet-stream")

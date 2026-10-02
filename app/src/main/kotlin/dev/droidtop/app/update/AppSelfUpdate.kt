@@ -190,6 +190,14 @@ object AppSelfUpdate {
             // and validate-before-replace means a bad download changes
             // nothing. The manual button in Settings runs the same call.
             runCatching { dev.droidtop.library.consoles.PlatformDatabases.refresh(application) }
+            // Plugins from repositories the person trusts ride along too (docs/SPEC.md 12a "Plugin
+            // repositories"): one cheap release listing per repository, bundles only on an
+            // unmetered connection, and a notification when something was updated.
+            runCatching {
+                dev.droidtop.library.integrations.PluginRepoUpdates.runDue(application, isMetered(application)) { repo, result ->
+                    PluginRepoUpdateNotification.show(application, repo, result)
+                }
+            }
             runCatching { fetch(application) }.onSuccess { info ->
                 prefs(application).edit()
                     .putLong(KEY_SEEN_CODE, info.versionCode)

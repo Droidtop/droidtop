@@ -12004,9 +12004,11 @@ the secondary path for sources that publish no key.
   and the user confirms once. https only: a plaintext fetch would make
   the TOFU step itself the attack.
 - **The user's own GitHub token for plugin sources (owner, 2026-09-28,
-  Droidtop/tracker#16).** Accounts and sources has a "GitHub token" row: the
-  person pastes a fine-grained or classic token themselves (droidtop never
-  creates, fetches or fills one). It lifts GitHub's unauthenticated request
+  Droidtop/tracker#16; one sign-in control since 2026-10-01,
+  Droidtop/tracker#259).** Accounts and sources has one "GitHub" row, which
+  replaced the token text field: the person signs in with GitHub ("Signing in
+  with GitHub" below) or pastes a fine-grained or classic token themselves
+  (droidtop never fills one in by itself). It lifts GitHub's unauthenticated request
   limit for update checks and reaches plugin sources in private repositories:
   the source key file, the catalog index and the bundle download. Stored
   AES-256-GCM under a non-exportable Android Keystore key in a private
@@ -12023,7 +12025,12 @@ the secondary path for sources that publish no key.
   `Accept: application/octet-stream`) redirects to a pre-signed URL there, and
   that host rejects a request carrying both the signature and a token. No token
   set means exactly the unauthenticated request of before; the token is never
-  logged and never in a URL.
+  logged and never in a URL. The screen shows "Signed in as <login>" (the login
+  is stored in plain beside the ciphertext, since it is not a secret, so the
+  Accounts row can show it without decrypting anything), says how the token was
+  obtained, and has a Sign out row that removes it from the device. A pasted
+  token is checked with GitHub before it is kept (a 401 is refused, an offline
+  check keeps it unlabelled).
   `:net-core` is the one HTTP and single-file download mechanism. It owns
   bounded responses, streamed digest-checked downloads, GitHub token storage,
   and per-hop authorization. The ES-DE theme repository itself remains a JGit
@@ -12050,6 +12057,89 @@ the secondary path for sources that publish no key.
   paste/file path never replaces at all — a different key for an origin
   you already trust is refused with that reason; rotating by hand means
   removing the origin and adding it again, two explicit steps.
+- **Signing in with GitHub (owner, 2026-10-01, Droidtop/tracker#259: "we
+  don't wanna make users type API keys").** The OAuth device flow (RFC 8628)
+  against droidtop's registered OAuth app. Its client id is a public identifier
+  compiled in (`GitHubOAuth.CLIENT_ID`); the device flow needs no client secret
+  and droidtop holds none. The screen asks GitHub for a device code and shows
+  the short user code and `github.com/login/device`, with a countdown and a row
+  that opens that page in this device's browser (the code can equally be typed
+  on any other device); B, or leaving the screen (`CatalogScreen.onLeave`),
+  cancels. Polling runs off the main thread, waits the interval GitHub states,
+  lengthens it on `slow_down` (to the value GitHub sends, otherwise by five
+  seconds), and ends as: signed in, denied, expired, cancelled, offline (three
+  failed or 5xx polls in a row; one dropped poll is ridden out), or failed with
+  GitHub's reason. The verification address must be on github.com or the flow
+  is refused. State handling lives in `GitHubDeviceFlow`, one store seam
+  (`GitHubCredentialStore`, Keystore-backed on the device) and one
+  orchestrator (`GitHubAccount`) that both ways in use, so a token is checked,
+  labelled with its login and stored the same way however it arrived.
+  **Scope.** Two rows, so the person chooses: "Sign in with GitHub" asks for no
+  scope (public information, and the higher request limit) and is all that
+  public repositories need; "Sign in, with access to private repositories" asks
+  for `repo`, the smallest scope GitHub offers for private repositories. GitHub
+  has no read-only variant for an OAuth app, so the row says on screen that the
+  permission also allows changes, that droidtop only reads, and that a pasted
+  fine-grained read-only token is the narrower alternative. Signing out removes
+  the token from the device; GitHub keeps the authorisation until the person
+  revokes it in their GitHub settings, and the screen says that too.
+- **Plugin repositories (owner, 2026-10-01, Droidtop/tracker#259: add the
+  repository, trust its key automatically, and auto-update).** Plugins screen,
+  "Plugin repositories": the person types `owner/name` (or pastes the address
+  from a browser). The key is read from the repository the way every source's key
+  is (the existing `droidtop-plugin-key.json` at the root of its default
+  branch, fetched with the person's token so a private repository works; there is
+  no second key mechanism). droidtop then shows a plain confirmation: the
+  repository name, the origin id, the key fingerprint and what trusting means
+  (plugins signed with this key can be installed and are updated automatically,
+  each still runs only after the person approves it, anything an update newly
+  asks for asks first, droidtop has not vetted the repository and cannot tell
+  whose key it is). Confirming stores an ordinary "Keys you trust" entry with the
+  repository's name beside it (`UserOriginKey.repo`), so there is one trust store
+  and "Stop trusting" in either place is the same removal. A plugin signed by
+  that origin shows "Verified by: <owner/name>" on the Plugins screen instead of
+  "Added by you". `PluginRepos.decide` is the rule: a key already trusted for the
+  same repository is a no-op; the same key trusted earlier without a repository is
+  adopted (the repository is recorded after a confirmation); and a DIFFERENT key
+  for a trusted origin, or a repository that now names another origin than the
+  one trusted for it, or an origin already trusted for another repository, is
+  REFUSED and surfaced with both fingerprints. Unlike "Keys you trust", the
+  repository path has no replace button: from a repository added by name a
+  different key is what a hijacked repository looks like, so the person removes
+  the repository and adds it again. droidtop never creates, searches for or
+  handles a signing key anywhere in this: it only verifies what a repository
+  publishes against what the person confirmed.
+- **Auto-update from a trusted repository (Droidtop/tracker#259).**
+  `PluginRepoUpdates.runDue` rides on the Software updates pass
+  (`AppSelfUpdate.maybeCheck`: its frequency, its off switch, its process-start
+  trigger), off the main thread, and has its own switch under Plugin
+  repositories ("Update plugins from these repositories automatically", on by
+  default). Per repository it makes one conditional request for the release list
+  (`ETag`/`If-None-Match`, so an unchanged repository answers 304, which costs no
+  request allowance; the person's token raises the limit) and remembers the
+  newest release it has dealt with. Bundles (`*.droidplugin.tar.xz`, at most eight
+  per release, 512 MiB each, checked against GitHub's own sha256 when it gives one)
+  are downloaded only on an UNMETERED connection; on a metered one the pass
+  leaves the release for the next pass on an unmetered one. Pre-releases are
+  ignored unless the person turns them on. A bundle is applied only when ALL of
+  this holds (`PluginRepos.decide`): it is signed for the origin this repository was
+  trusted for, the signature verifies against the key the person confirmed, the
+  plugin is already installed from that origin, and the version is newer. A
+  plugin that is not installed is only offered (a row under the repository installs
+  it by hand, arriving unapproved like any new plugin); the pass never installs
+  something the person did not choose. The install itself is
+  `PluginBundleInstaller.install`, which verifies everything again, so approval
+  carries over exactly as under "Trust over updates" below, and what an update adds
+  (a permission, an extension point, an export) is put at "ask" by
+  `PluginGrants.applyUpdate` and asked about on the plugin's page ("Wants new
+  access"). A notification (when notifications are already allowed for droidtop)
+  and a "Checked ..." line on the repository's screen say what happened: updated,
+  needs approval, wants new access, refused and why, rate-limited, sign in again
+  (HTTP 401), or not found. A repository's key being removed ends the updates at
+  once. Fixed on the way: `PluginBundleInstaller` used to compute the
+  approved-key fingerprint from the pinned keys only, so a plugin from a
+  user-trusted origin never carried its approval to an update; it now uses the
+  user-trusted key too.
 - **Removal is real.** Removing a user-trusted key makes every plugin
   signed by it untrusted at once: updates are refused (install fails
   signature verification again, the same "unknown origin" refusal),
@@ -12070,7 +12160,11 @@ the secondary path for sources that publish no key.
   `{ "<origin>": { "key": "<SPKI base64>", "source": "<url it was fetched from, absent when pasted by hand>" } }`.
   The official origin has no entry there and never can.
 
-Unit-tested in `plugin-host` (`UserOriginKeysTest`, `PluginSourceKeysTest`,
+Unit-tested in `net-core` (`GitHubDeviceFlowTest`: interval, `slow_down`, denial,
+expiry, cancel, offline; `GitHubAccountTest`: the credential store seam), in
+`plugin-host` (`PluginReposTest`: repository names, the trust decisions, update
+eligibility) and in `library-core` (`PluginRepoUpdatesTest`: release reading and
+wording), and earlier in `plugin-host` (`UserOriginKeysTest`, `PluginSourceKeysTest`,
 `BundleSignatureTest`, `PluginBundleInstallerTest`): official verify,
 user-key verify, unknown origin refused, user key removed then refused,
 user origin claiming "droidtop" refused, official-first resolution, and
