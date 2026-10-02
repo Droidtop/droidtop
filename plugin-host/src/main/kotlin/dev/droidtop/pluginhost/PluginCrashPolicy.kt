@@ -28,14 +28,12 @@ class PluginCrashPolicy(
 
     private fun onCrash(pluginId: String, capability: String, reason: String) {
         if (pluginId.isEmpty()) {
-            // The whole process died -- every plugin this runner had
-            // loaded is affected, but this object only tracks the
-            // connection, not which ids were live; the next call from
-            // each affected row will itself fail through invoke()'s own
-            // timeout/exception path and disable that specific id then.
-            // A blanket "the plugin process died" is still worth one
-            // disable pass so a repeatedly-crashing plugin doesn't keep
-            // restarting the process on every call.
+            // A process death during a call is evidence against that plugin;
+            // an idle death is a system kill and must reconnect without disabling.
+            disableInFlight(PluginBrokers.inFlightPluginIds()) { affectedId ->
+                Log.w("droidtop.plugin", "$affectedId disabled: $reason")
+                PluginStore.disableWithReason(context, affectedId, PluginLoadErrorMessage.userMessage(reason))
+            }
             return
         }
         Log.w("droidtop.plugin", "$pluginId disabled: $reason")
@@ -207,6 +205,10 @@ class PluginCrashPolicy(
     }
 
     companion object {
+        internal fun disableInFlight(pluginIds: Set<String>, disable: (String) -> Unit) {
+            pluginIds.forEach(disable)
+        }
+
         // Kinds with a real runner behind NativePluginRunner. Found stale
         // 2026-09-26: this list still named only NATIVE_BUNDLE/PYTHON after
         // flutter_embed's runner landed (63627015) -- PluginRuntimeService's

@@ -2213,6 +2213,12 @@ chose not to wait. A plugin that misses them was slow, not broken.
   death: in-flight calls fail, but **it does not disable the plugin**
   when the system (not the plugin) killed it (see P1-12).
 
+When the shared `:pluginhost` process dies, the host disables exactly the
+plugins with calls in flight at the time of death. A process death while
+idle disables none, so the next call can reconnect after a low-memory kill.
+An ordinary `PluginResult.failure` is a plugin-reported result, not a crash,
+and does not disable the plugin.
+
 ---
 
 ## 9. Roadmap

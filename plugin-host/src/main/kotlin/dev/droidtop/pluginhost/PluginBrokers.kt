@@ -252,6 +252,9 @@ object PluginBrokers {
         }
     }
 
+    /** Plugin ids with host-to-plugin calls currently in flight. */
+    internal fun inFlightPluginIds(): Set<String> = active.filterValues { it.isNotEmpty() }.keys.toSet()
+
     fun userInitiated(pluginId: String): Boolean = active[pluginId]?.any { it.user } == true
 
     fun remainingMs(pluginId: String): Long? =

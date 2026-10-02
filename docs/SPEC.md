@@ -11299,8 +11299,11 @@ separate process), reached over one binder interface
 (`IPluginRuntime`/`IPluginRuntimeCallback`, `plugin-host` module). A
 plugin that throws, hangs, or native-crashes takes `:pluginhost` down,
 never `:app`; the binder `DeathRecipient` and a per-plugin crash
-callback both funnel into `PluginCrashPolicy`, which disables that one
-plugin and shows why, and the launcher keeps working. This is
+callback both funnel into `PluginCrashPolicy`. A per-plugin crash disables
+that plugin; whole-process death disables exactly the plugins with calls in
+flight, while an idle death disables none so a system low-memory kill can
+reconnect on the next call. An ordinary plugin failure result does not
+disable it. The launcher keeps working. This is
 deliberately weaker than Enginehost's own "no internet, no arbitrary
 file access" runtime sandbox direction (§7d) — droidtop's plugins share
 droidtop's actual permissions — and every doc comment on the binder
