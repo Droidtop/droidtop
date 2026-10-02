@@ -159,6 +159,9 @@ internal fun PcGameMenu(
     var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
     var importingLutris by remember(entry) { mutableStateOf(false) }
     var gettingGames by remember(entry) { mutableStateOf(false) }
+    // The free-space offer before a store install or update opens its own
+    // window over the menu (Droidtop/tracker#227); null when it is closed.
+    var storeOffer by remember(entry) { mutableStateOf<StoreInstallOffer?>(null) }
     var wineSettings by remember(entry) { mutableStateOf<WineGameSettings?>(null) }
     var protonDb by remember(entry) { mutableStateOf<ProtonDbState>(ProtonDbState.NotAsked) }
     // Which page of the menu is showing and which row of it the cursor is
@@ -657,18 +660,29 @@ internal fun PcGameMenu(
                         detail = playState.detail,
                         onSelect = if (loaded && playState.pressable) {
                             {
-                                if (playState.store != null) {
-                                    // Install, Update, Downloading: the store's own screen.
-                                    status = openStoreScreen(context, entry)
-                                } else if (isReady) {
-                                    onClose()
-                                    onLaunch()
-                                } else if (setupAction != null) {
-                                    scope.launch {
-                                        status = "Working…"
-                                        val failure = PcRunnerOptions.runAction(context, entry, setupAction) { status = it }
-                                        status = failure
-                                        reloadToken++
+                                when (val store = playState.store) {
+                                    // Install and Update stop on the free-space
+                                    // offer first: the size and the room the
+                                    // chosen volume has are named before the
+                                    // store's screen opens (Droidtop/tracker#227).
+                                    StoreStage.INSTALL, StoreStage.UPDATE ->
+                                        storeOffer = StoreInstallOffer(entry, store)
+                                    // Downloading, Paused: the download is already
+                                    // in flight; the store's queue is the place for it.
+                                    null -> Unit
+                                    else -> status = openStoreScreen(context, entry)
+                                }
+                                if (store == null) {
+                                    if (isReady) {
+                                        onClose()
+                                        onLaunch()
+                                    } else if (setupAction != null) {
+                                        scope.launch {
+                                            status = "Working…"
+                                            val failure = PcRunnerOptions.runAction(context, entry, setupAction) { status = it }
+                                            status = failure
+                                            reloadToken++
+                                        }
                                     }
                                 }
                             }
@@ -887,6 +901,17 @@ internal fun PcGameMenu(
             dev.droidtop.shell.gamepad.MenuHint(if (page == PcMenuPage.Root) "Up/Down moves, A activates, B closes" else "Up/Down moves, A activates, B goes back")
         }
     }
+    // The free-space offer before a store install or update: its own
+    // window over the menu, the one place the volume is chosen
+    // (Droidtop/tracker#227).
+    StoreInstallOfferSheet(
+        offer = storeOffer,
+        onProceed = { o ->
+            storeOffer = null
+            status = openStoreScreen(context, o.entry)
+        },
+        onDismiss = { storeOffer = null },
+    )
 }
 
 /** A minimal full-bleed [Dialog] host for a screen written as a plain fillMaxSize() composable (see the call sites above). */

@@ -282,15 +282,22 @@ internal fun PcGamesSection(
     // update, download), the same answer the capsule badge and the page
     // button read ([storeStageOf]); everything else launches, a multi-part
     // game's card launching the part to continue with, not always the first
-    // (docs/SPEC.md 7n).
+    // (docs/SPEC.md 7n). An install or update stops on the free-space
+    // offer first (Droidtop/tracker#227): the size and the room the chosen
+    // volume has are named before the store's screen opens; a download
+    // already running goes straight to the store's queue.
     val downloads by StoreDownloads.active.collectAsState()
+    var storeOffer by remember { mutableStateOf<StoreInstallOffer?>(null) }
+    fun openStore(entry: LibraryEntry) {
+        openStoreScreen(context, entry)?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
     val launch: (LibraryEntry) -> Unit = { entry ->
-        if (storeStageOf(entry, entry.downloadKey()?.let { downloads[it] }) != null) {
-            openStoreScreen(context, entry)?.let {
-                android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
-            }
-        } else {
-            onLaunch(folded?.continuing?.get(entry.id) ?: entry)
+        when (val stage = storeStageOf(entry, entry.downloadKey()?.let { downloads[it] })) {
+            StoreStage.INSTALL, StoreStage.UPDATE -> storeOffer = StoreInstallOffer(entry, stage)
+            null -> onLaunch(folded?.continuing?.get(entry.id) ?: entry)
+            else -> openStore(entry)
         }
     }
     // The backdrop follows the game under the cursor (docs/SPEC.md 7i, "Home
@@ -744,6 +751,17 @@ internal fun PcGamesSection(
             },
         )
     }
+    // The free-space offer before a store install or update: its own
+    // window over the tab, the one place the volume is chosen
+    // (Droidtop/tracker#227).
+    StoreInstallOfferSheet(
+        offer = storeOffer,
+        onProceed = { o ->
+            storeOffer = null
+            openStore(o.entry)
+        },
+        onDismiss = { storeOffer = null },
+    )
 }
 
 /** The shelves, one horizontal row of capsules each, with the cursor's shelf heading drawn brighter. */

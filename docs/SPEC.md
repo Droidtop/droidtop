@@ -9375,15 +9375,42 @@ button reads Install (with the download size), Update ("A newer build is
 available"), Downloading (percent) or Resume; the capsule badge, the page's
 big button, the menu's first row and the hint pill all read that one
 answer, and `capsuleStatusOf` is built on the same stage. A on a capsule,
-the page button and the menu's first row for such a game open the game's
+the page button and the menu's first row for such a game go to the game's
 own store screen (`openStoreScreen`, `PcStoreActivity`), the one place
-install, update, pause, verify, extras and remove happen, so the size and
-free space are named by the store's own install dialog and not by a second
-consent sheet of droidtop's; "Manage install" stays in the menu for the
-rest, and an installed game with an update also gets "Play without
-updating". Epic downloads are not mapped yet (its service keys a download
-by a row number the library does not carry), so an Epic game shows Install
-or Update but not Downloading.
+install, update, pause, verify, extras and remove happen; "Manage install"
+stays in the menu for the rest, and an installed game with an update also
+gets "Play without updating". Epic downloads are not mapped yet (its
+service keys a download by a row number the library does not carry), so an
+Epic game shows Install or Update but not Downloading.
+
+**The free-space offer before an install or update** (decided 2026-10-02,
+Droidtop/tracker#227, superseding #223's "the store's own dialog is the
+consent"): an `Install` or `Update` press does not open the store's screen
+directly. It stops on droidtop's own one-screen offer
+(`StoreInstallOfferSheet`, shell-gamepad), which names the download's size
+when the library knows it (`PcInfo.sizeBytes`) and the free space of the
+volume the install goes to (`installVolumes`, `StoreInstallVolumes.kt`
+in :library-core: the app's own directory on the internal storage and on
+every mounted SD card, read with `StatFs` on IO, the sheet's one disk
+read), warns in plain words when the download will not fit, and offers
+the other volumes. The chosen volume is remembered per store
+(`StoreInstallVolumePrefs`, the store's own display name as the key), so
+the next install from the same store names that volume first; until one
+is chosen the primary is the store's own default. The offer's fit check
+is the library's answer, not the store's: an update's download is the
+store's delta, which the library does not carry, so an update gets the
+free space named but never a fit warning, and an install of unknown size
+is never refused on its behalf. A picks a volume and opens the store's
+screen; B closes with nothing opened. Downloads already in flight
+(`Downloading`, `Paused`) skip the offer and open the store's queue,
+where the download is looked after; the store's own screen still does
+the installing, and droidtop supplies the check before it, not a second
+implementation of it. The remembered choice is droidtop's answer to
+"which volume"; making the store service itself install there (the fork's
+install roots are one global external/internal switch, not one per
+store), and the Storage view — bytes per store and per game, sorted by
+size, free space per volume, an uninstall per row — are the rest of
+Droidtop/tracker#227.
 
 **Live downloads.** `StoreDownloads` (`:library-core`) is an in-memory map
 by store id, written by `StoreDownloadWatch` (`:runtime-windows`) from the
