@@ -41,14 +41,17 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.droidtop.library.AppCategoryRules
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.PartProgress
 import dev.droidtop.library.StoreDownloads
+import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.settings.SettingsScreenRegistry
+import dev.droidtop.shell.gamepad.AppOptionsMenu
 import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.GamelistOptionsMenu
 import dev.droidtop.shell.gamepad.HelpRowClaim
@@ -197,10 +200,14 @@ private class FoldedPcLibrary(
 @Composable
 internal fun PcGamesSection(
     entries: List<LibraryEntry>,
+    /** The Retro library and the launcher apps: Home's Continue playing and Recently added merge them in (docs/SPEC.md 7i, "Home art"). */
+    retro: List<LibraryEntry>,
+    apps: List<LibraryEntry>,
     library: Library,
     state: PcGamesState,
     onLaunch: (LibraryEntry) -> Unit,
     onToggleFavorite: (LibraryEntry) -> Unit,
+    onShowDetail: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
     onHelpRowClaim: (HelpRowClaim) -> Unit,
     onCanGoBackChanged: (Boolean) -> Unit,
@@ -266,10 +273,31 @@ internal fun PcGamesSection(
     val savedViews = rememberSavedViews(scope.id)
     val views = pcStripViews(counts, savedViews.views)
 
+    // What Home's Continue playing and Recently added take besides PC games:
+    // Retro games that have a time to be placed by, and the launcher apps that
+    // are games (the person's marks and Android's own flag, from the rules
+    // loaded once with the system names the badges read). All off the main
+    // thread; the entries already carry play history and added time, so
+    // there is no per-card lookup.
+    var systemNames by remember { mutableStateOf(emptyMap<String, String>()) }
+    var others by remember { mutableStateOf(emptyList<LibraryEntry>()) }
+    LaunchedEffect(retro, apps) {
+        val loaded = withContext(Dispatchers.IO) {
+            val rules = if (apps.isEmpty()) null else AppCategoryRules.load(context)
+            val names = if (retro.isEmpty()) emptyMap<String, String>() else ConsoleSystemsRepository.allSystems(context).associate { it.id to it.displayName }
+            val gameApps = if (rules == null) emptyList<LibraryEntry>() else apps.filter { rules.isGame(it.id, it.appFacts) }
+            names to (retro.filter { !it.hidden && it.addedEpochMs() + (it.lastPlayedEpochMs ?: 0L) > 0L } + gameApps)
+        }
+        systemNames = loaded.first
+        others = loaded.second
+    }
     var shelves by remember { mutableStateOf(emptyList<PcShelf>()) }
+    LaunchedEffect(games, others) {
+        val all = games ?: return@LaunchedEffect
+        shelves = withContext(Dispatchers.Default) { withRetroHero(pcShelves(all, others = others)) }
+    }
     LaunchedEffect(games) {
         val all = games ?: return@LaunchedEffect
-        shelves = withContext(Dispatchers.Default) { pcShelves(all) }
         counts = withContext(Dispatchers.Default) { pcViewCounts(all, scope) }
     }
     var grid by remember { mutableStateOf(emptyList<LibraryEntry>()) }
@@ -288,7 +316,8 @@ internal fun PcGamesSection(
     }
     val focusedEntry = if (state.stripFocused) null else currentList.getOrNull(state.itemIndex)
     LaunchedEffect(focusedEntry?.id) { onFocusedEntryChanged(focusedEntry) }
-    val focusedPlay = focusedEntry?.let { rememberPcPlayState(it) }
+    // Only a PC game has a runner to resolve; a Retro game or app just plays.
+    val focusedPlay = focusedEntry?.takeIf { it.inPcFold }?.let { rememberPcPlayState(it) }
 
     // A store game's primary action is its store's own screen (install,
     // update, download), the same answer the capsule badge and the page
@@ -311,6 +340,16 @@ internal fun PcGamesSection(
             null -> onLaunch(folded?.continuing?.get(entry.id) ?: entry)
             else -> openStore(entry)
         }
+    }
+    // Select and a long press on a PC game open its menu and page; on a Retro
+    // game or an app from Home's mixed shelves, a small options menu that
+    // launches through the same path as its own tab.
+    var otherMenu by remember { mutableStateOf<LibraryEntry?>(null) }
+    fun openOptions(entry: LibraryEntry) {
+        if (entry.inPcFold) state.menuId = entry.id else otherMenu = entry
+    }
+    fun openPage(entry: LibraryEntry) {
+        if (entry.inPcFold) state.pageId = entry.id else otherMenu = entry
     }
     // The backdrop follows the game under the cursor (docs/SPEC.md 7i, "Home
     // art"); while the cursor is on the strip it keeps the last game's, and
@@ -499,7 +538,7 @@ internal fun PcGamesSection(
                         // alias); with no game under the cursor it is the
                         // list's own options.
                         GamepadAction.SELECT, GamepadAction.L2 ->
-                            focusedEntry?.let { state.menuId = it.id } ?: run { state.optionsOpen = true }
+                            focusedEntry?.let(::openOptions) ?: run { state.optionsOpen = true }
                         else -> return@onPad false
                     }
                     true
@@ -536,9 +575,10 @@ internal fun PcGamesSection(
                         state.stripFocused = false
                         if (state.shelfIndex == shelf && state.itemIndex == item) launch(entry) else moveTo(shelf, item)
                     },
-                    onLongPressCapsule = { state.pageId = it.id },
+                    onLongPressCapsule = ::openPage,
                     downloads = downloads,
                     partsOf = ::partsOf,
+                    systemNames = systemNames,
                 )
                 else -> {
                     if (grid.isEmpty()) {
@@ -719,6 +759,21 @@ internal fun PcGamesSection(
             },
         )
     }
+    otherMenu?.let { entry ->
+        AppOptionsMenu(
+            entry = entry,
+            detailsLabel = if (entry.appFacts != null) "App details" else "Game details",
+            onDetails = {
+                otherMenu = null
+                onShowDetail(entry)
+            },
+            onToggleFavorite = {
+                otherMenu = null
+                onToggleFavorite(entry)
+            },
+            onDismiss = { otherMenu = null },
+        )
+    }
     // The free-space offer before a store install or update: its own
     // window over the tab, the one place the volume is chosen
     // (Droidtop/tracker#227).
@@ -743,6 +798,7 @@ private fun PcShelvesHome(
     onLongPressCapsule: (LibraryEntry) -> Unit,
     downloads: Map<String, StoreDownloads.Progress>,
     partsOf: (LibraryEntry) -> Int,
+    systemNames: Map<String, String>,
 ) {
     val window = LocalShellWindow.current
     if (shelves.isEmpty()) {
@@ -794,6 +850,8 @@ private fun PcShelvesHome(
                             download = entry.downloadKey()?.let { downloads[it] },
                             parts = partsOf(entry),
                             hero = hero,
+                            // The two shelves that mix sources say where each is from.
+                            badge = if (shelf.id == SHELF_CONTINUE || shelf.id == SHELF_RECENTLY_ADDED) homeSourceLabel(entry, systemNames) else null,
                         )
                     }
                 }

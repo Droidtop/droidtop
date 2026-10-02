@@ -43,8 +43,10 @@ internal const val SHELF_INSTALLED = "installed"
  * - **Continue playing**: every game with a last-played time, newest
  *   first; the first shelf, led by a hero card (docs/SPEC.md 7i, "Home
  *   art"). The Deck's "Recent games" row, under the name the owner gave it.
- * - **Recently added**: indexed games with a nonzero first-seen time,
- *   newest first. Legacy rows with no timestamp do not appear.
+ *   [others] (Retro games and launcher apps that are games) join this shelf
+ *   and Recently added, merged by the same times, and no other shelf.
+ * - **Recently added**: indexed games with a nonzero added time
+ *   ([addedEpochMs]), newest first. Legacy rows with no timestamp do not appear.
  * - **Update available**: a source knows a newer version than any folder
  *   here (docs/SPEC.md 7g), only when there is one.
  * - **Favourites**, only when there is one.
@@ -60,7 +62,11 @@ internal const val SHELF_INSTALLED = "installed"
  * shelf shows what the person touches rather than the start of the
  * alphabet.
  */
-internal fun pcShelves(games: List<LibraryEntry>, now: Long = System.currentTimeMillis()): List<PcShelf> {
+internal fun pcShelves(
+    games: List<LibraryEntry>,
+    now: Long = System.currentTimeMillis(),
+    others: List<LibraryEntry> = emptyList(),
+): List<PcShelf> {
     val byRecency = compareByDescending<LibraryEntry> { it.lastPlayedEpochMs ?: 0L }.thenBy { it.title.lowercase() }
     fun shelf(id: String, title: String, all: List<LibraryEntry>): PcShelf? {
         if (all.isEmpty()) return null
@@ -72,16 +78,17 @@ internal fun pcShelves(games: List<LibraryEntry>, now: Long = System.currentTime
         // with `hero`), the game the person most likely wants.
         // Local vals, not smart casts: LibraryEntry's properties are
         // declared in another module, which Kotlin will not smart-cast.
+        val activity = games + others
         shelf(
             SHELF_CONTINUE,
             "Continue playing",
-            games.filter { entry ->
+            activity.filter { entry ->
                 val last = entry.lastPlayedEpochMs
                 last != null && last <= now
             },
         )?.let(::add)
-        val recentlyAdded = games.filter { it.firstSeenEpochMs > 0L }
-            .sortedWith(compareByDescending<LibraryEntry> { it.firstSeenEpochMs }.thenBy { it.title.lowercase() })
+        val recentlyAdded = activity.filter { it.addedEpochMs() > 0L }
+            .sortedWith(compareByDescending<LibraryEntry> { it.addedEpochMs() }.thenBy { it.title.lowercase() })
         if (recentlyAdded.isNotEmpty()) {
             add(PcShelf(SHELF_RECENTLY_ADDED, "Recently added", recentlyAdded.take(SHELF_LIMIT), recentlyAdded.size))
         }
@@ -100,6 +107,50 @@ internal fun pcShelves(games: List<LibraryEntry>, now: Long = System.currentTime
             .entries
             .sortedWith(compareByDescending<Map.Entry<String, List<LibraryEntry>>> { it.value.size }.thenBy { it.key })
             .forEach { (family, rows) -> shelf("kind:$family", family, rows)?.let(::add) }
+    }
+}
+
+/**
+ * When the library first saw this entry; an installed app the library index
+ * has not stamped falls back to the package manager's install time. 0 when
+ * neither is known. Pure.
+ */
+internal fun LibraryEntry.addedEpochMs(): Long =
+    firstSeenEpochMs.takeIf { it > 0L } ?: appFacts?.firstInstalledEpochMs ?: 0L
+
+/**
+ * The small badge a Home card carries to say where it is from (docs/SPEC.md
+ * 7i, "Home art"): "PC" for a PC or engine game, "App" for a launcher app,
+ * and a Retro game's system name from [systemNames] (system id to display
+ * name, loaded once). A map read, never a lookup per card. Pure.
+ */
+internal fun homeSourceLabel(entry: LibraryEntry, systemNames: Map<String, String>): String = when {
+    entry.appFacts != null -> "App"
+    entry.inPcFold -> "PC"
+    else -> entry.systemId?.let { systemNames[it] ?: it } ?: "Retro"
+}
+
+/**
+ * Whether this entry is one of the PC fold's own games (a PC or engine game),
+ * as opposed to a Retro game or a launcher app that Home also shows. A launcher
+ * app has no system id, so [onPcGamesTab] alone would claim it.
+ */
+internal val LibraryEntry.inPcFold: Boolean
+    get() = appFacts == null && onPcGamesTab
+
+/**
+ * Gives the first Continue playing card of a Retro game the landscape art the
+ * PC hero rule asks for (docs/SPEC.md 7i, "Home art"): its scraped fanart, else
+ * its screenshot, from the media layout it already carries. One file lookup for
+ * one card, so the caller runs this off the main thread with the shelves.
+ */
+internal fun withRetroHero(shelves: List<PcShelf>): List<PcShelf> = shelves.map { shelf ->
+    val first = shelf.entries.firstOrNull()
+    if (shelf.id != SHELF_CONTINUE || first == null || first.inPcFold || first.heroUri != null || first.mediaLocator == null) {
+        shelf
+    } else {
+        val art = first.mediaForImageTypes(listOf("fanart", "screenshot"))
+        if (art == null) shelf else shelf.copy(entries = listOf(first.copy(heroUri = art)) + shelf.entries.drop(1))
     }
 }
 

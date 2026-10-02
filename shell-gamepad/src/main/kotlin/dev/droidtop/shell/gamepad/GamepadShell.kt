@@ -1256,10 +1256,19 @@ private fun GamepadShellBody(
                                 entries = foldedGameEntries.orEmpty().let { all ->
                                     if (uiMode.kidGamesOnly) all.filter { it.kidGame } else all
                                 }.filter { it.onPcGamesTab },
+                                // Home's Continue playing and Recently added also take the Retro
+                                // library and the launcher apps (docs/SPEC.md 7i, "Home art").
+                                retro = remember(foldedGameEntries, uiMode.kidGamesOnly) {
+                                    foldedGameEntries.orEmpty().let { all ->
+                                        if (uiMode.kidGamesOnly) all.filter { it.kidGame } else all
+                                    }.filterNot { it.onPcGamesTab }
+                                },
+                                apps = if (uiMode.kidGamesOnly) emptyList() else appEntries.orEmpty(),
                                 library = library,
                                 state = pcGames,
                                 onLaunch = onLaunch,
                                 onToggleFavorite = onToggleFavorite,
+                                onShowDetail = { nav.openDetail(it.id) },
                                 onFocusedEntryChanged = onFocusedEntryChanged,
                                 onHelpRowClaim = { claim ->
                                     if (screenKey == currentScreenKey) {

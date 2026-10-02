@@ -113,6 +113,9 @@ internal fun capsuleStatusOf(entry: LibraryEntry, download: StoreDownloads.Progr
  * the touch route to Y (the game's page), the convention every card in
  * this shell follows.
  *
+ * [badge], set on Home's mixed shelves, names where the game is from in
+ * words at the bottom-left (it replaces the store letter).
+ *
  * [hero] draws the game as a landscape card (docs/SPEC.md 7i, "Home art"):
  * its hero art, or, when only portrait art exists, that art beside the
  * title on the plate, and under it the name and one quiet line of when it
@@ -129,6 +132,7 @@ internal fun PcCapsule(
     download: StoreDownloads.Progress? = null,
     parts: Int = 1,
     hero: Boolean = false,
+    badge: String? = null,
 ) {
     val shape = RoundedCornerShape(8.dp)
     val ring = selected && PadModality.showsFocus
@@ -216,7 +220,7 @@ internal fun PcCapsule(
             )
         }
         CapsuleStatusBadge(entry, download)
-        CapsuleCorners(entry, download, parts)
+        CapsuleCorners(entry, download, parts, badge)
     }
     if (hero) {
         Text(
@@ -266,9 +270,12 @@ internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: StoreDow
  * than one, and a thin bar while a download runs.
  */
 @Composable
-private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownloads.Progress?, parts: Int) {
+private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownloads.Progress?, parts: Int, badge: String?) {
     val source = entry.pcInfo?.source?.firstOrNull()?.uppercaseChar()
-    if (entry.isStoreRow() && source != null) {
+    if (badge != null) {
+        // Home's mixed shelves name the source in words (PC, a system, App).
+        CornerMark(badge, Modifier.align(Alignment.BottomStart))
+    } else if (entry.isStoreRow() && source != null) {
         CornerMark(source.toString(), Modifier.align(Alignment.BottomStart))
     }
     if (parts > 1) CornerMark("×$parts", Modifier.align(Alignment.BottomEnd))
@@ -291,6 +298,7 @@ private fun CornerMark(text: String, modifier: Modifier) {
         color = MenuTokens.OnSurface,
         style = MaterialTheme.typography.labelSmall,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .padding(Space.Sm)
             .background(MenuTokens.Scrim, RoundedCornerShape(50))

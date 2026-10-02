@@ -9602,8 +9602,23 @@ own games, in droidtop's own treatment:
   start never restores the last place (`sessionOnly` drops saved shell state
   from an earlier process; a recreate in the same process keeps it). Home has
   no strip and the shoulders do nothing there; B does nothing on Home (it is
-  the root). Continue playing lists PC games only: the Retro library is not in
-  this fold, so Retro games join it when Home takes them.
+  the root). Home carries no chrome of its own: the shelves and the shell footer.
+- **Home shows all recent activity** (Droidtop/tracker#273): Continue playing
+  and Recently added also take the Retro library and the launcher apps that
+  are games (`AppCategoryRules`: Android's flag and the person's marks),
+  merged with the PC games by last-played and by added time (`pcShelves(...,
+  others)`; an app with no library stamp is placed by its install time,
+  `addedEpochMs`). Every other shelf stays the PC fold's own. The entries
+  already carry play history and added time, so this reads no disk per card;
+  the one lookup (the system names) is made once, off the main thread. Each
+  card on these two shelves has a small badge at its bottom-left, in words:
+  "PC", "App", or the Retro system's name (`homeSourceLabel`). A launches
+  through the shell's one launch path, the same as the game's own tab; Select
+  (or a long press) opens a PC game's menu, and for a Retro game or an app a
+  small options menu (details, favourite). Retro cards use their scraped art
+  (`artworkUri`, the same media the Retro list shows); the hero card of a
+  Retro game takes its fanart, else its screenshot, and without either is
+  drawn as portrait art beside the title, the PC rule (`withRetroHero`).
 - **Continue playing is the first shelf** and its first card is the **hero
   card** (`PcCapsule(hero = true)`): the game's landscape hero art at the
   capsules' own height (`heroWidth`, `HERO_ASPECT` 16:9) so the row keeps

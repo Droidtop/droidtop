@@ -26,20 +26,22 @@ import dev.droidtop.shell.gamepad.input.HintBinding
 @Composable
 internal fun AppOptionsMenu(
     entry: LibraryEntry,
-    isGame: Boolean,
     onDetails: () -> Unit,
     onToggleFavorite: () -> Unit,
-    onMarkGame: () -> Unit,
     onDismiss: () -> Unit,
+    isGame: Boolean = false,
+    // Null where the caller has no category to mark (Home's mixed shelves).
+    onMarkGame: (() -> Unit)? = null,
+    detailsLabel: String = "App details",
 ) {
     class Option(val title: String, val subtitle: String?, val onClick: () -> Unit)
 
-    val options = remember(entry, isGame) {
+    val options = remember(entry, isGame, detailsLabel) {
         buildList<Option> {
-            add(Option("App details", null, onDetails))
+            add(Option(detailsLabel, null, onDetails))
             add(Option(if (entry.favorite) "Remove from favourites" else "Add to favourites", null, onToggleFavorite))
             // Only an installed app has a category to mark; the other kinds of this tab have none.
-            if (entry.appFacts != null) {
+            if (entry.appFacts != null && onMarkGame != null) {
                 add(
                     if (isGame) {
                         Option("Not a game", "Takes it out of Games in the Category filter", onMarkGame)

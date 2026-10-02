@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.InstalledAppFacts
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.PcInfo
@@ -59,6 +60,35 @@ class PcShelvesTest {
 
         assertEquals(listOf(SHELF_CONTINUE, SHELF_RECENTLY_ADDED), shelves.map { it.id }.take(2))
         assertEquals(listOf("/b", "/a"), shelves[1].entries.map { it.id })
+    }
+
+    @Test
+    fun `retro games and game apps merge into continue playing and recently added by their times`() {
+        val pc = game("/pc", lastPlayed = now - 30, firstSeen = now - 300)
+        val rom = game("/rom", kind = LibraryEntryKind.CONSOLE_ROM, lastPlayed = now - 10, firstSeen = now - 200)
+            .copy(systemId = "snes")
+        val app = game("com.example.game", kind = LibraryEntryKind.NATIVE_ANDROID_APP, lastPlayed = now - 20)
+            .copy(appFacts = InstalledAppFacts(firstInstalledEpochMs = now - 5))
+
+        val shelves = pcShelves(listOf(pc), now, others = listOf(rom, app))
+
+        assertEquals(listOf("/rom", "com.example.game", "/pc"), shelves.first { it.id == SHELF_CONTINUE }.entries.map { it.id })
+        // The app has no first-seen stamp, so its install time places it.
+        assertEquals(listOf("com.example.game", "/rom", "/pc"), shelves.first { it.id == SHELF_RECENTLY_ADDED }.entries.map { it.id })
+        // Other shelves are the PC fold's own.
+        assertTrue(shelves.filter { it.id != SHELF_CONTINUE && it.id != SHELF_RECENTLY_ADDED }.flatMap { it.entries }.all { it.id == "/pc" })
+    }
+
+    @Test
+    fun `a home badge names pc, app or the system`() {
+        val names = mapOf("snes" to "Super Nintendo")
+        val rom = game("/rom", kind = LibraryEntryKind.CONSOLE_ROM).copy(systemId = "snes")
+        val app = game("com.example.game", kind = LibraryEntryKind.NATIVE_ANDROID_APP).copy(appFacts = InstalledAppFacts())
+
+        assertEquals("PC", homeSourceLabel(game("/pc"), names))
+        assertEquals("App", homeSourceLabel(app, names))
+        assertEquals("Super Nintendo", homeSourceLabel(rom, names))
+        assertEquals("gba", homeSourceLabel(rom.copy(systemId = "gba"), names))
     }
 
     @Test
