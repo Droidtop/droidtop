@@ -847,6 +847,17 @@ class ConsoleRomProvider(
                 suggestions = usableEmulatorNames(KnownPlayers.forSystem(context, system.id).map { it.label }),
                 message = noEmulatorInstalledMessage(context, system),
             )
+        LaunchFileAccessPrompt.clear()
+        if (needsFileAccessPrompt(context, player)) {
+            // The emulator cannot open a plain path and would get a content URI it may not boot from
+            // (Droidtop/tracker#270): ask first. "Launch anyway" is remembered per emulator.
+            val prompt = EmulatorNeedsFileAccess(player.name, player.packageName) {
+                LaunchAnywayPrefs.set(context, player.packageName)
+                launch(entry)
+            }
+            LaunchFileAccessPrompt.show(prompt)
+            throw prompt
+        }
         val intent = when (val prepared = prepareLaunch(context, system, player, romFile)) {
             is PreparedLaunch.Ready -> prepared.intent
             is PreparedLaunch.Blocked -> error(prepared.reason)

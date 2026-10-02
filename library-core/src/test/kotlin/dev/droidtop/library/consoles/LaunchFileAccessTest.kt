@@ -1,6 +1,7 @@
 package dev.droidtop.library.consoles
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,5 +96,23 @@ class LaunchFileAccessTest {
     @Test
     fun aGameWithoutAFolderHasNoSiblings() {
         assertEquals(emptyList<java.io.File>(), CompanionFiles.candidates(java.io.File("lone.iso")))
+    }
+
+    @Test
+    fun aLaunchAsksForFileAccessOnlyWhenThePathVariantExistsAndCannotBeUsed() {
+        assertTrue(launchNeedsFileAccess(hasPathTemplate = true, emulatorReadsPaths = false, launchAnyway = false))
+        assertFalse(launchNeedsFileAccess(hasPathTemplate = true, emulatorReadsPaths = true, launchAnyway = false))
+        assertFalse(launchNeedsFileAccess(hasPathTemplate = false, emulatorReadsPaths = false, launchAnyway = false))
+    }
+
+    @Test
+    fun launchAnywayStopsTheAsking() {
+        assertFalse(launchNeedsFileAccess(hasPathTemplate = true, emulatorReadsPaths = false, launchAnyway = true))
+    }
+
+    @Test
+    fun theFileAccessLineNamesTheEmulator() {
+        assertEquals("Example Emu can't read your games.", fileAccessMessage("Example Emu"))
+        assertEquals("Example Emu can't read your games.", EmulatorNeedsFileAccess("Example Emu", "a.b") {}.message)
     }
 }
