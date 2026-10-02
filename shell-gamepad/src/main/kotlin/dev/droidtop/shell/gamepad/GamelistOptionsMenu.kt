@@ -249,10 +249,10 @@ internal fun GamelistOptionsMenu(
             // import a gamelist.xml from or a Console systems page to open,
             // and its scrape is the PC one below (Droidtop/tracker#175).
             if (systemId != null && systemId != PC_SYSTEM_ID) {
-                add("Launch screen: " + (systemLaunchScreen?.label ?: "Ask"))
+                add("Launch screen: " + (systemLaunchScreen?.label ?: "Ask which display"))
                 add(SYSTEM_SETTINGS)
                 add("Scrape this system")
-                add("Import gamelist.xml")
+                add("Import game list (gamelist.xml)")
             }
             // Wherever games are listed, not only one console system: All games and the PC list ask
             // which system to download for (rig, 2026-09-30: the entry was unreachable from the Games tab).
@@ -367,7 +367,7 @@ internal fun GamelistOptionsMenu(
                 filter = GamelistFilterPrefs.cycle(context, groupKey)
                 onSortChanged()
             }
-            "Launch screen: " + (systemLaunchScreen?.label ?: "Ask") -> {
+            "Launch screen: " + (systemLaunchScreen?.label ?: "Ask which display") -> {
                 val next = when (systemLaunchScreen) {
                     null -> dev.droidtop.library.LaunchScreen.BUILT_IN
                     dev.droidtop.library.LaunchScreen.BUILT_IN -> dev.droidtop.library.LaunchScreen.SECOND
@@ -404,7 +404,7 @@ internal fun GamelistOptionsMenu(
                     onScraped()
                 }
             }
-            "Import gamelist.xml" -> {
+            "Import game list (gamelist.xml)" -> {
                 if (busy) return
                 busy = true
                 scope.launch {

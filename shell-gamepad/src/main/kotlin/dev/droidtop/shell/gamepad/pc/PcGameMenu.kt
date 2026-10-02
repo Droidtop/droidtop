@@ -910,19 +910,19 @@ private sealed interface PcMenuEntry {
  * big it is -- or, for a game the walk no longer finds, the one fact
  * that matters, in the words the card uses (docs/SPEC.md 7g).
  */
-private fun LibraryEntry.identityLine(update: String?): String = if (missing) "broken - missing" else buildString {
+private fun LibraryEntry.identityLine(update: String?): String = if (missing) "broken · missing" else buildString {
     append(sourceLabel())
-    engineLabel()?.let { append(" - ").append(it) }
+    engineLabel()?.let { append(" · ").append(it) }
     val size = pcInfo?.sizeBytes ?: 0L
     if (size > 0) {
-        append(" - ")
+        append(" · ")
         append(String.format("%.1f GB", size / 1_000_000_000.0))
         append(if (pcInfo?.installed == true) " installed" else " to download")
     } else if (pcInfo?.installed == false) {
-        append(" - not installed")
+        append(" · not installed")
     }
     // The same words as the card's line (docs/SPEC.md 7g).
-    update?.let { append(" - ").append(GameUpdates.line(it)) }
+    update?.let { append(" · ").append(GameUpdates.line(it)) }
 }
 
 /**

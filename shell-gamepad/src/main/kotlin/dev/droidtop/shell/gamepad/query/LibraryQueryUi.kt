@@ -358,7 +358,7 @@ internal fun LibrarySearchDialog(
                     "Type a name, a genre or a developer; ${totalCount} games to search"
                 } else {
                     val shown = "$matchCount ${if (matchCount == 1) "game" else "games"} match"
-                    if (matchCount == 0) "$shown. B closes; the search stays on the chip row" else shown
+                    if (matchCount == 0) "$shown. B closes; the search stays" else shown
                 },
                 color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodySmall,
@@ -474,7 +474,7 @@ internal fun LibrarySearchDialog(
                     Text(line, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                 }
             }
-            MenuHint("B keeps what is typed; clear it from the chip row")
+            MenuHint("B keeps what is typed; delete the text to clear it")
         }
     }
 

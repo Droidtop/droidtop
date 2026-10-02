@@ -654,9 +654,10 @@ fun LibraryEntryKind.displayName(): String = when (this) {
     // HTML moved here with the database's twine -> html rename: the row
     // now matches any game whose root holds a page, not Twine stories
     // alone, so "Visual Novels" would be wrong for most of what it catches.
-    LibraryEntryKind.GODOT, LibraryEntryKind.UNREAL, LibraryEntryKind.UNITY,
-    LibraryEntryKind.HTML,
-    -> "PC Games"
+    LibraryEntryKind.GODOT -> "Godot"
+    LibraryEntryKind.UNREAL -> "Unreal Engine"
+    LibraryEntryKind.UNITY -> "Unity"
+    LibraryEntryKind.HTML -> "HTML"
 }
 
 /**
