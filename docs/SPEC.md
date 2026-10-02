@@ -2474,8 +2474,7 @@ the `ContainerRuntime` interface that already exists (§3):
   - **Downloads and jobs**: the one jobs screen (`PluginJobsScreen`, the same as Settings'
     "Downloads and installs") hosted in the sheet by `CatalogNavigator`, without its own heading
     (`PluginJobsScreen.screen(headed = false)`: the rail header already names it). Its empty state is
-    one short row, "Nothing running", with the longer sentence as its subtitle, so the navigator's
-    detail strip (which repeats only titles a row cuts) does not say it a second time.
+    one short row, "Nothing running", with the longer sentence as its HintTip.
   - **Plugins**: unchanged, only while a running plugin offers tiles.
   Which sections show, where the menu opens (the running game; else Notifications once access is
   granted; else System) and how the shoulders step the rail are pure rules in `QuickTiles`
@@ -11086,20 +11085,22 @@ settings entries are a consistent height, always. It makes scrolling more
 even." The rule, in the shared components (`MenuRow`, `SettingsCatalogView`):
 
 - **Every settings row is the same height, always.** `MenuRow(uniformHeight
-  = true)` (the Settings catalog) is exactly `uniformRowHeight()` tall:
-  two lines of the title style plus two lines of the summary style plus
+  = true)` is exactly `uniformRowHeight(summaryLines)` tall: two lines of
+  the title style plus `summaryLines` lines of the summary style plus
   `MenuTokens.RowVerticalPadding` (14dp) top and bottom, at least
-  `RowMinHeight` (72dp). It is computed from the current type scale in
-  sp, so the Text size setting (the activity's font scale) makes every
-  row taller together, and it never varies per row, in portrait or
-  landscape. A row never grows.
-- **A title wraps to two lines, a summary to two lines; the rest
-  ellipsizes** on the row. The full text of the selected row is in the
-  **detail strip** under the list (`CatalogDetailStrip`: the whole
-  summary, plus the title and value when long; fixed four-line height, so
-  the list never resizes), and in the Y Info sheet. This is the one
-  mechanism for "text that does not fit"; no scrolling text in rows (the
-  tester dislikes it).
+  `RowMinHeight` (72dp). Settings rows pass no summary lines (their
+  explanation is a HintTip, "Settings layout" below); a page that shows
+  summaries (the PC game page's facts) passes two. It is computed from the
+  current type scale in sp, so the Text size setting (the activity's font
+  scale) makes every row taller together, and it never varies per row, in
+  portrait or landscape. A row never grows.
+- **A title wraps to two lines; the rest ellipsizes** on the row. A
+  settings row's whole text is its HintTip and the Y Info sheet. A page
+  that shows summaries keeps its **detail strip** under the list
+  (`CatalogDetailStrip`: the whole summary, plus the title and value when
+  long; fixed four-line height, so the list never resizes); Settings has
+  none (it was the dead band above the hint bar, tracker#294). No
+  scrolling text in rows (the tester dislikes it).
 - **Content-sized, aligned columns.** Every row of a list shares one value
   column (`LocalValueColumnWidth`), sized to the widest value any row can
   show (all labels of a small choice, so cycling never moves it), bounded
@@ -11129,6 +11130,70 @@ without one. The status cluster remains three quiet facts from `SystemStatus`;
 its shared source, accessibility description and off-main-thread reads are
 unchanged. ES-DE themes continue to own the Retro Games view's layout, colours
 and type.
+
+### Settings layout (owner direction, 2026-10-02, Droidtop/tracker#294)
+
+The owner, on the console: "the settings app has some weird dead space on
+the bottom, it cuts off too early. We also really still need to lay it out
+a lot better. A bare list isn't ideal", and "I also don't like too many
+submenus". Settings looks like the Steam Deck's: categories on the left,
+that category's rows on the right, and as flat as the content allows. It
+is built once, in the catalog renderer (`CatalogNavigator`,
+`SettingsCategories.kt`), so every catalog drawn full-page gets it: the
+Settings tab, the left menu's places, Console systems and Containers.
+
+- **Two panes.** A navigator that fills the page (at least 80% of the
+  screen's width; never one inside a sheet or a dialog) whose root has three
+  or more categories draws a **category column** (30% of the width) and a
+  **pane**. The column starts with a Search entry, then one entry per
+  category: a glyph and a name, the current one marked with a fill and an
+  accent rail, the pad's cursor with the shell's one selection ring. The
+  pane holds the current category's rows, grouped under small section
+  labels. Narrower than 600dp (portrait) the two take turns: the category
+  list, then the pane, B or Left back to the list. Anything else (a sheet,
+  a dialog, a root with one or two categories, like Plugins' list and its
+  "Add" group) is the one list it always was.
+- **Categories come from the catalog's groups** (`settingsCategories`). A
+  group made only of links to other screens is a hub, and each link is a
+  category of its own under the group's title (Library: Scraper, Console
+  systems, Emulators, Accounts and sources, ...), whose screen the pane
+  shows directly. Any other group is one category with its own rows, named
+  by its title (the untitled top group by the screen's). A group may name
+  its glyph (`CatalogGroup.icon`); otherwise the first glyph a row carries.
+- **At most two levels: category, then row or detail.** A row opens a
+  further screen only when that screen holds a list or a long form (an
+  account sign-in, a per-emulator page), and that screen replaces the pane,
+  never the column. A short screen is marked `CatalogScreen.merged` and is
+  drawn as sections of the pane that links it instead
+  (`mergeShortScreens`; Standard mode's one row inside Global settings).
+  Merging is one level deep and keeps each row's id and write path.
+- **Rows.** A row is its name and, right-aligned in the screen's one value
+  column, what it is set to: a switch for a toggle, an inline track and the
+  number for a slider, `‹ value ›` for a short choice, a chevron for a row
+  that opens something. No explanation is drawn on a row: it is the row's
+  HintTip, shown while the pad rests on the row, and the Y Info sheet (a
+  long press on touch). A live status (working, a failure) takes the value
+  column while it lasts. Rows are `uniformRowHeight(0)` tall.
+- **The page has no dead space.** The pane's list runs to the bottom of the
+  view (the hint bar is drawn below the view, so no room is kept for it),
+  with no strip under it. A row the viewport cuts fades out at that edge
+  instead of ending in a slice, and the selected row is always scrolled
+  whole into view.
+- **Input.** Up/Down move within the column or the pane; Up at the top does
+  nothing (the D-pad never reaches a header). In the column, A or Right
+  enter the pane, A on Search opens search, B leaves Settings. In the pane,
+  Left/Right step a slider or a short choice in place; on any other row
+  Left moves to the column; A acts; Y is Info; B pops a pushed screen,
+  else returns to the column. Moving the column's cursor changes the pane
+  (a linked screen is built once the cursor rests on it for 120ms) and
+  leaves any screen a row had opened. Start (left menu) and R2 (Quick Menu)
+  are the shell's, unchanged. Touch: a tap on a category shows it (taking
+  turns, it opens it); a tap on a row selects and acts.
+- **Search and deep links.** Picking a search result whose screen is a
+  category's own (its rows, or its linked screen) opens that category with
+  the row selected; a deeper result is pushed onto the pane as before.
+  Deep links into Settings (Browse themes) and the left menu's places are
+  unchanged.
 
 ### Gaming motion and focus (directed 2026-10-01, Droidtop/tracker#256)
 

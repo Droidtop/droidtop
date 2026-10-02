@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -329,9 +330,19 @@ internal fun MenuRow(
     // True for a row in a SCROLLING list that must scroll evenly (the
     // Settings catalog): the row is exactly [uniformRowHeight] tall, a
     // two-line title and a two-line summary fit, and what does not fit is
-    // ellipsized (the full text is in the screen's detail strip and the
-    // Info sheet). Never grows.
+    // ellipsized (the full text is in the row's HintTip and the Info
+    // sheet). Never grows.
     uniformHeight: Boolean = false,
+    // How many summary lines a [uniformHeight] row makes room for: two
+    // where a page shows summaries, none for a settings row, whose
+    // explanation lives in its HintTip (docs/SPEC.md "Settings layout").
+    uniformSummaryLines: Int = 2,
+    // A toggle drawn as a switch in the value column (on/off), instead of
+    // a value text. Null: not a toggle.
+    switchOn: Boolean? = null,
+    // A slider's position (0..1), drawn as a short track before its value.
+    // Null: not a slider.
+    sliderFraction: Float? = null,
     // An [adjustable] row is stepped with Left/Right on the pad. A touch
     // screen has no Left/Right, so on one the two arrows this row
     // already draws become the two targets that call this -- without it
@@ -389,7 +400,7 @@ internal fun MenuRow(
             // with its text, never a fixed height.
             .then(
                 if (uniformHeight) {
-                    Modifier.height(uniformRowHeight())
+                    Modifier.height(uniformRowHeight(uniformSummaryLines))
                 } else {
                     Modifier.heightIn(min = maxOf(MenuTokens.RowMinHeight, if (window.touchFirst) window.minTouchTarget else 0.dp))
                 },
@@ -439,15 +450,19 @@ internal fun MenuRow(
             )
             // Wraps in full: rows grow with their text, so nothing is cut
             // (owner, tracker#154). The Info sheet still shows the row whole.
-            subtitle?.let {
+            subtitle?.takeIf { !uniformHeight || uniformSummaryLines > 0 }?.let {
                 Text(
                     it,
                     color = MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.bodySmall,
-                    maxLines = if (uniformHeight) 2 else subtitleLines,
+                    maxLines = if (uniformHeight) uniformSummaryLines else subtitleLines,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+        if (sliderFraction != null) {
+            Spacer(Modifier.width(16.dp))
+            RowSliderTrack(sliderFraction, selected)
         }
         if (value != null) {
             Spacer(Modifier.width(16.dp))
@@ -497,10 +512,58 @@ internal fun MenuRow(
                 )
             }
         }
+        if (switchOn != null) {
+            Spacer(Modifier.width(16.dp))
+            // In the shared value column, so switches line up with the
+            // values of the rows around them.
+            Box(
+                modifier = LocalValueColumnWidth.current?.let { Modifier.width(it) } ?: Modifier,
+                contentAlignment = Alignment.CenterEnd,
+            ) { RowSwitch(switchOn) }
+        }
         if (chevron) {
             Spacer(Modifier.width(8.dp))
             Text("›", color = MenuTokens.Placeholder, style = MaterialTheme.typography.bodyLarge)
         }
+    }
+}
+
+/** A toggle row's switch: a track that fills with the affirmative colour when on, its knob at that end. */
+@Composable
+private fun RowSwitch(on: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(width = 44.dp, height = 24.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (on) MenuTokens.Affirmative else MenuTokens.Placeholder)
+            .padding(3.dp),
+        contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Box(
+            Modifier
+                .size(18.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(MenuTokens.OnSurface),
+        )
+    }
+}
+
+/** A slider row's position, inline: a thin track filled to [fraction]. */
+@Composable
+private fun RowSliderTrack(fraction: Float, selected: Boolean) {
+    Box(
+        modifier = Modifier
+            .width(120.dp)
+            .height(4.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(MenuTokens.Placeholder),
+    ) {
+        Box(
+            Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                .background(if (selected) MenuTokens.Accent else MenuTokens.Value),
+        )
     }
 }
 
@@ -620,19 +683,19 @@ internal fun Modifier.focusMarquee(active: Boolean): Modifier =
 internal val LocalValueColumnWidth = androidx.compose.runtime.compositionLocalOf<androidx.compose.ui.unit.Dp?> { null }
 
 /**
- * The one height of a [uniformHeight] row: a two-line title plus a
- * two-line summary plus the row's padding, derived from the CURRENT type
- * scale (sp through the font scale the Text size setting drives), so it
- * grows with the setting but never varies per row.
+ * The one height of a [uniformHeight] row: a two-line title plus
+ * [summaryLines] lines of summary plus the row's padding, derived from the
+ * CURRENT type scale (sp through the font scale the Text size setting
+ * drives), so it grows with the setting but never varies per row.
  */
 @Composable
-internal fun uniformRowHeight(): androidx.compose.ui.unit.Dp {
+internal fun uniformRowHeight(summaryLines: Int = 2): androidx.compose.ui.unit.Dp {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val title = MaterialTheme.typography.bodyLarge
     val summary = MaterialTheme.typography.bodySmall
     return with(density) {
         fun line(style: androidx.compose.ui.text.TextStyle) =
             (if (style.lineHeight.isSpecified) style.lineHeight else style.fontSize * 1.4f).toDp()
-        maxOf(MenuTokens.RowMinHeight, line(title) * 2 + line(summary) * 2 + MenuTokens.RowVerticalPadding * 2)
+        maxOf(MenuTokens.RowMinHeight, line(title) * 2 + line(summary) * summaryLines + MenuTokens.RowVerticalPadding * 2)
     }
 }

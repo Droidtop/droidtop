@@ -348,6 +348,13 @@ object MenuTokens {
      */
     val RowMinHeight = 72.dp
 
+    /**
+     * An entry of the settings category column (docs/SPEC.md "Settings
+     * layout"): a glyph and a one- or two-line name, shorter than a row
+     * because it holds no value, still more than a touch target.
+     */
+    val CategoryRowMinHeight = 56.dp
+
     /** Generous vertical padding inside a row (owner, tracker#154). */
     val RowVerticalPadding = 14.dp
 

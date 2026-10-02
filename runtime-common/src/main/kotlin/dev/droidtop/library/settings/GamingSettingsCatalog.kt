@@ -128,6 +128,7 @@ object GamingSettingsCatalog {
         CatalogGroup(
             id = GROUP_GAMING,
             title = "Shell",
+            icon = CatalogIcon.GAMING,
             items = buildList {
                 add(defaultSectionItem(context))
                 add(showHintsItem(context))
@@ -289,6 +290,7 @@ object GamingSettingsCatalog {
         CatalogGroup(
             id = GROUP_SCREENS,
             title = "System",
+            icon = CatalogIcon.DISPLAY,
             items = buildList {
                 add(ChoiceItem(
                     id = ID_ORIENTATION,
@@ -330,6 +332,7 @@ object GamingSettingsCatalog {
         CatalogGroup(
             id = GROUP_INPUT,
             title = "Input",
+            icon = CatalogIcon.INPUT,
             items = buildList {
                 // Onboarding's own Controller step, re-entered (docs/SPEC.md
                 // 7b: every step is re-enterable from the Settings row that
@@ -375,6 +378,7 @@ object GamingSettingsCatalog {
         CatalogGroup(
             id = GROUP_APPEARANCE,
             title = "Appearance",
+            icon = CatalogIcon.APPEARANCE,
             items = buildList {
                 add(themeItem(context))
                 themeColorSchemeItem(context)?.let { add(it) }
@@ -696,6 +700,7 @@ object GamingSettingsCatalog {
         CatalogGroup(
             id = GROUP_OTHER_SHELLS,
             title = "Other shells",
+            icon = CatalogIcon.MODES,
             items = listOf(
                 NestedScreenItem(
                     id = ID_DESKTOP_SETTINGS,

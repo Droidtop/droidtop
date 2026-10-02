@@ -272,6 +272,9 @@ object DroidtopWideSettings {
             id = "standard", title = null,
             items = listOf(orientationChoice(context, Mode.LAUNCHER)),
         )) },
+        // One row: drawn as a section of Global settings, not a level of its own (docs/SPEC.md
+        // "Settings layout").
+        merged = true,
     )
 
     private fun orientationChoice(context: Context, mode: Mode): ChoiceItem {

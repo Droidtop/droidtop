@@ -254,6 +254,13 @@ class CatalogScreen(
      * something which waits on them, like a GitHub sign-in showing a code, stops it here.
      */
     val onLeave: (() -> Unit)? = null,
+    /**
+     * A short screen (a handful of rows, no list of its own) that the Gaming settings renderer draws
+     * as sections inside the pane that links it, instead of as a level of its own (docs/SPEC.md
+     * "Settings layout": at most two levels, category then row or detail). Its rows keep their ids
+     * and write paths; only where they are drawn changes.
+     */
+    val merged: Boolean = false,
 )
 
 /**
@@ -315,6 +322,11 @@ data class CatalogGroup(
      * Settings is configuration (docs/SPEC.md 7f, "Where things live").
      */
     val quickOnly: Boolean = false,
+    /**
+     * The glyph this group shows as an entry of the settings category column (docs/SPEC.md
+     * "Settings layout"). Null: the first glyph one of its rows carries, else none.
+     */
+    val icon: CatalogIcon? = null,
 )
 
 /**

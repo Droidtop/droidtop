@@ -13,27 +13,35 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
@@ -45,18 +53,27 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.window.Dialog
@@ -80,8 +97,11 @@ import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.PadModality
+import dev.droidtop.shell.gamepad.input.PadPress
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -94,11 +114,22 @@ import kotlinx.coroutines.withContext
  * credentials), which push onto a real nav stack in the same visual
  * language instead of bouncing to differently-styled activities.
  *
- * Input: Up/Down move the selection, Left/Right adjust the selected
- * value in place (choices cycle, sliders step -- real ES-DE's own menu
- * convention), A activates (toggles, opens pickers/nested screens/text
- * editors, runs actions), B pops one level and exits at the root.
- * Touch works on every row too.
+ * Layout (docs/SPEC.md "Settings layout"): a navigator that fills the
+ * page and whose root has three or more categories ([settingsCategories])
+ * is two panes, the category column on the left (about 30% of the width,
+ * the current category marked, search at its top) and that category's
+ * rows on the right; a screen a row opens replaces the pane, never the
+ * column. Narrower than [TWO_PANE_MIN_WIDTH] (portrait) the column and
+ * the pane take turns. A navigator inside a sheet or a dialog, or over a
+ * root with fewer categories, is the one list it always was.
+ *
+ * Input: Up/Down move the selection, A activates (toggles, opens
+ * pickers/nested screens/text editors, runs actions), B pops one level
+ * (from the pane's first level, back to the column) and exits at the
+ * root. Left/Right step a slider or a short choice in place; on any other
+ * row Left moves to the category column and Right from the column moves
+ * into the pane. Without a column, Left/Right adjust every adjustable row
+ * as before. Touch works on every row and every category too.
  *
  * B has three routes into here, because on real hardware it arrives as
  * three different things and a screen with no way out is the worst
@@ -148,14 +179,15 @@ fun CatalogNavigator(
     // dq-shell2-02: the Keyboard picker opened instead of Android settings).
     val scrollByDepth = remember { mutableStateMapOf<Int, Pair<Int, Int>>() }
     val listState = rememberLazyListState()
+    val columnState = rememberLazyListState()
     // Live status text per item id (async progress/outcomes, pick errors).
     val statusById = remember { mutableStateMapOf<String, String>() }
     // Two-step confirm: the armed destructive item, reset on any move.
     var confirmArmedId by remember { mutableStateOf<String?>(null) }
     var editingText by remember { mutableStateOf<TextInputItem?>(null) }
     var pickingChoice by remember { mutableStateOf<ChoiceItem?>(null) }
-    // Y's Info sheet: the selected row's whole text. Rows show one line
-    // of explanation; this is where the rest of it is.
+    // Y's Info sheet: the selected row's whole text. Rows show their
+    // name and value; this is where the rest of it is.
     var infoRow by remember { mutableStateOf<CatalogItem?>(null) }
     var pendingFolderPick by remember { mutableStateOf<FolderPickItem?>(null) }
     var searchOpen by remember { mutableStateOf(false) }
@@ -173,36 +205,81 @@ fun CatalogNavigator(
     // (rig, dq-settingsui-02: a picked result landed on the right screen
     // with focus back at "Search settings" instead of on the row found).
     var pendingFocusId by remember { mutableStateOf<String?>(null) }
+    // The category column (docs/SPEC.md "Settings layout"): which category
+    // the pane shows, whether the pad is in the column or the pane, and
+    // whether the column's cursor is on its search entry. Saveable for the
+    // same recreate as the stack above.
+    var categoryKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var inColumn by rememberSaveable { mutableStateOf(true) }
+    var columnOnSearch by rememberSaveable { mutableStateOf(false) }
+    // This navigator's own width, measured: the column is for a navigator
+    // that fills the page, never for one in a sheet or a dialog.
+    var hostWidth by remember { mutableStateOf(0.dp) }
     val scope = rememberCoroutineScope()
 
-    val screen = stack.last()
     val depth = stack.lastIndex
     LaunchedEffect(searchOpen) {
         if (searchOpen && searchIndex == null) {
             searchIndex = withContext(Dispatchers.IO) { SettingsSearchIndex.build(context, root) }
         }
     }
-    // Suspend builder (real screens run Room queries / filesystem walks) --
-    // rebuilt on every navigation and after every value change.
+    // The root's rows, built once per change: they are the category
+    // column, and the pane's rows for a plain category or a navigator
+    // without a column. Suspend builder (real screens run Room queries /
+    // filesystem walks), rebuilt after every value change.
+    val rootGroups by produceState<List<CatalogGroup>?>(null, root, version, refreshKey) {
+        value = mergeShortScreens(root.groups(context)) { it.groups(context) }
+    }
+    val categories = remember(rootGroups, root) {
+        rootGroups?.let { settingsCategories(it, root.title, nativeActions.keys) }.orEmpty()
+    }
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val categoryMode = hostWidth >= screenWidth * PAGE_WIDTH_FRACTION && categories.size >= MIN_SETTINGS_CATEGORIES
+    val twoPane = categoryMode && hostWidth >= TWO_PANE_MIN_WIDTH
+    val categoryIndex = categories.indexOfFirst { it.key == categoryKey }.coerceAtLeast(0)
+    val category = if (categoryMode) categories.getOrNull(categoryIndex) else null
+    // A linked category's screen, resolved once per category: an inline
+    // screen is rebuilt with every root build, and the pane must not
+    // reload for that alone.
+    val linkScreens = remember(root) { mutableMapOf<String, CatalogScreen?>() }
+    fun linkScreen(of: SettingsCategory): CatalogScreen? =
+        of.link?.let { link -> linkScreens.getOrPut(of.key) { link.resolve() } }
+    // What the pane shows: a pushed screen, else the category's linked
+    // screen, else the root's own rows.
+    val screen: CatalogScreen = if (depth > 0) stack.last() else category?.let { linkScreen(it) } ?: root
     // Tagged with the screen they belong to: right after a push or a pop
     // the list must not treat the previous screen's rows as this one's.
-    val loaded by androidx.compose.runtime.produceState<Pair<CatalogScreen, List<CatalogGroup>>?>(null, screen, version, refreshKey) {
-        value = screen to screen.groups(context)
+    val paneLoaded by produceState<Pair<CatalogScreen, List<CatalogGroup>>?>(null, screen, version, refreshKey) {
+        if (screen === root) return@produceState
+        // A linked category loads once the column's cursor rests on it, so
+        // running down the column does not build every screen it passes.
+        if (depth == 0) delay(PANE_LOAD_SETTLE_MS)
+        value = screen to mergeShortScreens(screen.groups(context)) { it.groups(context) }
     }
-    val groups = loaded?.takeIf { it.first == screen }?.second ?: emptyList()
-    val rows = remember(groups, showSearch, depth) {
+    val groups = remember(screen, rootGroups, paneLoaded, category?.key) {
+        when {
+            screen !== root -> paneLoaded?.takeIf { it.first === screen }?.second.orEmpty()
+            // A plain category: its own group, unheaded (the column names it).
+            category != null -> rootGroups.orEmpty().filter { it.id == category.groupId }.map { it.copy(title = null) }
+            else -> rootGroups.orEmpty()
+        }
+    }
+    val rows = remember(groups, showSearch, depth, categoryMode) {
         val built = groups.flatMap { group ->
             group.items.mapIndexed { index, item ->
                 CatalogRow(item, headerAbove = if (index == 0) group.title else null)
             }
         }
-        if (showSearch && depth == 0) {
+            // One key per row in the list below: a merged screen must not
+            // repeat a row the pane already has.
+            .distinctBy { it.item.id }
+        // With a column, search is the column's first entry instead.
+        if (showSearch && depth == 0 && !categoryMode) {
             listOf(
                 CatalogRow(
                     ActionItem(
                         id = SEARCH_ROW_ID,
                         title = "Search settings",
-                        subtitle = "Find any setting by name",
                         icon = CatalogIcon.SEARCH,
                         run = {},
                     ),
@@ -274,6 +351,37 @@ fun CatalogNavigator(
             }
             else -> onExit()
         }
+    }
+
+    // B: a pushed screen pops; the pane's first level hands the pad back
+    // to the column; the column (or a navigator without one) leaves.
+    fun back() {
+        when {
+            stack.size > 1 -> pop()
+            categoryMode && !inColumn -> inColumn = true
+            else -> pop()
+        }
+    }
+
+    fun leavePushedScreens() {
+        while (stack.size > 1) {
+            stack.last().onLeave?.invoke()
+            stack.removeAt(stack.lastIndex)
+        }
+    }
+
+    // Another category: the pane shows it from its top, and whatever a
+    // row of the last one had opened is left.
+    fun chooseCategory(index: Int) {
+        val target = categories.getOrNull(index) ?: return
+        columnOnSearch = false
+        if (target.key == category?.key) return
+        leavePushedScreens()
+        categoryKey = target.key
+        confirmArmedId = null
+        selectionByDepth[0] = 0
+        scrollByDepth.clear()
+        scope.launch { listState.scrollToItem(0) }
     }
 
     fun adjust(item: CatalogItem, direction: Int) {
@@ -352,7 +460,41 @@ fun CatalogNavigator(
         }
     }
 
-    BackHandler { if (searchOpen) { searchOpen = false; searchQuery = "" } else pop() }
+    // A picked search result: with a column, a result on a category's own
+    // screen opens that category (its rows are the pane's first level);
+    // anything deeper is pushed onto the pane as before.
+    fun openSearchResult(result: SettingsSearchResult) {
+        if (categoryMode) {
+            inColumn = false
+            columnOnSearch = false
+            val linked = categories.indexOfFirst { linkScreen(it)?.id == result.target.id }
+            val index = if (linked >= 0) {
+                linked
+            } else if (result.target.id == root.id) {
+                categories.indexOfFirst { cat ->
+                    cat.groupId != null &&
+                        rootGroups.orEmpty().any { group -> group.id == cat.groupId && group.items.any { it.id == result.itemId } }
+                }
+            } else {
+                -1
+            }
+            if (index >= 0) {
+                if (categories[index].key != category?.key) chooseCategory(index) else leavePushedScreens()
+                return
+            }
+        }
+        if (result.target != screen) {
+            scrollByDepth[stack.lastIndex] = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+            stack.add(result.target)
+            selectionByDepth[stack.lastIndex] = 0
+            refresh()
+        }
+        // else: same screen, already showing -- the effect below moves the
+        // selection there once this recomposes past the search overlay's
+        // early return.
+    }
+
+    BackHandler { if (searchOpen) { searchOpen = false; searchQuery = "" } else back() }
 
     if (searchOpen) {
         SettingsSearchOverlay(
@@ -363,15 +505,7 @@ fun CatalogNavigator(
                 searchOpen = false
                 searchQuery = ""
                 pendingFocusId = result.itemId
-                if (result.target != screen) {
-                    scrollByDepth[stack.lastIndex] = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
-                    stack.add(result.target)
-                    selectionByDepth[stack.lastIndex] = 0
-                    refresh()
-                }
-                // else: same screen, already showing -- the effect below
-                // moves the selection there once this recomposes past the
-                // search overlay's early return.
+                openSearchResult(result)
             },
             onClose = { searchOpen = false; searchQuery = "" },
         )
@@ -430,9 +564,9 @@ fun CatalogNavigator(
         }
     }
 
-    val listFocus = remember { FocusRequester() }
+    val navFocus = remember { FocusRequester() }
     LaunchedEffect(screen, textItem == null, infoRow == null) {
-        if (textItem == null && infoRow == null) requestFocusWhenAttached(listFocus, "Settings catalog")
+        if (textItem == null && infoRow == null) requestFocusWhenAttached(navFocus, "Settings catalog")
     }
     // A held direction follows the cursor without animating each step.
     var heldStep by remember { mutableStateOf(false) }
@@ -442,65 +576,207 @@ fun CatalogNavigator(
         scrollByDepth.remove(depth)?.let { (index, offset) -> listState.scrollToItem(index, offset) }
         listState.keepInView(selected.coerceIn(0, rows.lastIndex), animate = !heldStep)
     }
+    // The column's cursor, as an index into its own list (search first).
+    val searchEntries = if (showSearch) 1 else 0
+    val columnCursor = if (columnOnSearch && showSearch) 0 else categoryIndex + searchEntries
+    LaunchedEffect(categoryMode, columnCursor) {
+        if (categoryMode) columnState.keepInView(columnCursor, animate = !heldStep)
+    }
 
     // One value column for the whole screen, content-sized to the widest
     // value any row can show (docs/SPEC.md "Text in rows and tiles").
     val valueMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
     val valueStyle = MaterialTheme.typography.bodyMedium
-    val valueDensity = androidx.compose.ui.platform.LocalDensity.current
+    val valueDensity = LocalDensity.current
     val valueColumnWidth = remember(rows, valueStyle, valueDensity.fontScale) {
         val widest = rows.flatMap { catalogValueCandidates(it.item, context) }
             .maxOfOrNull { valueMeasurer.measure("‹ $it ›", valueStyle, maxLines = 1, softWrap = false).size.width } ?: 0
         with(valueDensity) { widest.toDp() }.coerceIn(MenuTokens.ValueColumnMinWidth, MenuTokens.ValueColumnMaxWidth)
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        if (stack.size > 1 || screen.subtitle != null) {
-            MenuHeader(screen.title, screen.subtitle)
+    // The column's pad: Up/Down choose a category (the pane follows), A or
+    // Right go into the pane, A on the search entry opens search, B leaves.
+    // Up from the top entry is not used, so it never reaches a header.
+    fun onColumnPad(press: PadPress): Boolean {
+        when (press.action) {
+            GamepadAction.UP -> {
+                heldStep = press.repeat
+                when {
+                    columnOnSearch -> return press.repeat
+                    categoryIndex == 0 && showSearch -> columnOnSearch = true
+                    categoryIndex == 0 -> return press.repeat
+                    else -> chooseCategory(categoryIndex - 1)
+                }
+            }
+            GamepadAction.DOWN -> {
+                heldStep = press.repeat
+                if (columnOnSearch) chooseCategory(0) else chooseCategory(categoryIndex + 1)
+            }
+            GamepadAction.A -> if (columnOnSearch) searchOpen = true else inColumn = false
+            GamepadAction.RIGHT -> if (!columnOnSearch) inColumn = false
+            GamepadAction.B -> back()
+            else -> return false
         }
-        androidx.compose.runtime.CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
+        return true
+    }
+
+    // The pane's (or the one list's) pad, through the input pipeline
+    // (docs/SPEC.md 6e): each press acts once, on the press, and a held
+    // direction runs at the chrome cadence. B (and a keyboard's Escape)
+    // goes back a level like the system back key's BackHandler above; its
+    // release belongs to this press, so it can no longer reach the shell's
+    // root and pop a second level (UI pass 2026-09-24, H3).
+    fun onPanePad(press: PadPress): Boolean {
+        val row = rows.getOrNull(selected)
+        when (press.action) {
+            GamepadAction.B -> back()
+            // Y: the selected row's Info sheet.
+            GamepadAction.Y -> row?.let { infoRow = it.item }
+            GamepadAction.DOWN -> {
+                heldStep = press.repeat
+                setSelected((selected + 1).coerceAtMost(rows.lastIndex))
+            }
+            // Owned only while the selection can really move: a fresh Up at
+            // the first row reaches Compose's focus search, which in safe
+            // mode finds the banner's action above (docs/SPEC.md 10c) and
+            // otherwise finds nothing -- the top bar cannot take focus
+            // (docs/SPEC.md 7j). A held Up stops at the first row.
+            GamepadAction.UP -> {
+                if (selected == 0) return press.repeat
+                heldStep = press.repeat
+                setSelected(selected - 1)
+            }
+            GamepadAction.LEFT -> when {
+                categoryMode && (row == null || !row.item.stepsInPlace()) -> inColumn = true
+                row != null -> adjust(row.item, -1)
+            }
+            GamepadAction.RIGHT -> if (row != null && (!categoryMode || row.item.stepsInPlace())) adjust(row.item, +1)
+            GamepadAction.A -> row?.let { activate(it.item) }
+            else -> return false
+        }
+        return true
+    }
+
+    val paneActive = !categoryMode || !inColumn
+    // A pushed screen names itself over the pane; a category's own rows
+    // do not (the column names them). Without a column, as before: a
+    // pushed screen or a root that describes itself.
+    val paneTitle = when {
+        categoryMode -> screen.title.takeIf { depth > 0 }
+        stack.size > 1 || screen.subtitle != null -> screen.title
+        else -> null
+    }
+    val density = LocalDensity.current
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { hostWidth = with(density) { it.width.toDp() } }
+            .focusRequester(navFocus)
+            .focusable()
+            .onPad { press -> if (categoryMode && inColumn) onColumnPad(press) else onPanePad(press) },
+    ) {
+        val pane: @Composable (Modifier, Dp) -> Unit = { modifier, startPadding ->
+            CatalogPane(
+                title = paneTitle,
+                hint = screen.subtitle,
+                rows = rows,
+                selected = selected,
+                active = paneActive,
+                state = listState,
+                confirmArmedId = confirmArmedId,
+                statusById = statusById,
+                startPadding = startPadding,
+                onClick = { index ->
+                    inColumn = false
+                    setSelected(index)
+                    rows.getOrNull(index)?.let { activate(it.item) }
+                },
+                onLongClick = { index ->
+                    inColumn = false
+                    setSelected(index)
+                    rows.getOrNull(index)?.let { infoRow = it.item }
+                },
+                // The touch route to Left/Right. A SliderItem does nothing
+                // at all on activate (there is no "open" for a number), so
+                // without this it was pad-only in a screen a phone user has
+                // to use.
+                onAdjust = { index, direction ->
+                    inColumn = false
+                    setSelected(index)
+                    rows.getOrNull(index)?.let { adjust(it.item, direction) }
+                },
+                modifier = modifier,
+            )
+        }
+        val column: @Composable (Modifier) -> Unit = { modifier ->
+            SettingsCategoryColumn(
+                categories = categories,
+                current = categoryIndex,
+                cursor = columnCursor.takeIf { inColumn },
+                showSearch = showSearch,
+                state = columnState,
+                onSearch = {
+                    columnOnSearch = true
+                    searchOpen = true
+                },
+                onPick = { index ->
+                    chooseCategory(index)
+                    // Side by side the pane is already showing it; taking
+                    // turns, a tap on a category is the way into it.
+                    inColumn = twoPane
+                },
+                modifier = modifier,
+            )
+        }
+        val edge = LocalShellWindow.current.edgePadding
+        CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
+            when {
+                !categoryMode -> pane(Modifier.fillMaxSize(), edge)
+                twoPane -> Row(Modifier.fillMaxSize()) {
+                    column(Modifier.fillMaxHeight().fillMaxWidth(CATEGORY_COLUMN_FRACTION))
+                    pane(Modifier.weight(1f).fillMaxHeight(), 16.dp)
+                }
+                inColumn -> column(Modifier.fillMaxSize())
+                else -> pane(Modifier.fillMaxSize(), edge)
+            }
+        }
+    }
+}
+
+/** The pane: an optional title, then the rows, grouped under small section labels. */
+@Composable
+private fun CatalogPane(
+    title: String?,
+    hint: String?,
+    rows: List<CatalogRow>,
+    selected: Int,
+    active: Boolean,
+    state: LazyListState,
+    confirmArmedId: String?,
+    statusById: Map<String, String>,
+    startPadding: Dp,
+    onClick: (Int) -> Unit,
+    onLongClick: (Int) -> Unit,
+    onAdjust: (Int, Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        if (title != null) HintTip(hint) { MenuHeader(title) }
         LazyColumn(
-            state = listState,
+            state = state,
+            // The list runs to the bottom of the page: no strip under it and
+            // no room left for a bar that is drawn below this view anyway.
+            // A row the edge cuts fades out instead of ending in a slice.
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .focusRequester(listFocus)
-                .focusable()
-                // The pad through the input pipeline (docs/SPEC.md 6e): each
-                // press acts once, on the press, and a held direction runs
-                // at the chrome cadence. B (and a keyboard's Escape) pops a
-                // level like the system back key's BackHandler above; its
-                // release belongs to this press, so it can no longer reach
-                // the shell's root and pop a second level (UI pass
-                // 2026-09-24, H3).
-                .onPad { press ->
-                    when (press.action) {
-                        GamepadAction.B -> pop()
-                        // Y: the selected row's Info sheet.
-                        GamepadAction.Y -> rows.getOrNull(selected)?.let { infoRow = it.item }
-                        GamepadAction.DOWN -> {
-                            heldStep = press.repeat
-                            setSelected((selected + 1).coerceAtMost(rows.lastIndex))
-                        }
-                        // Owned only while the selection can really move:
-                        // a fresh Up at the first row reaches Compose's focus
-                        // search, which in safe mode finds the banner's
-                        // action above (docs/SPEC.md 10c) and otherwise
-                        // finds nothing -- the top bar cannot take focus
-                        // (docs/SPEC.md 7j). A held Up stops at the first row.
-                        GamepadAction.UP -> {
-                            if (selected == 0) return@onPad press.repeat
-                            heldStep = press.repeat
-                            setSelected(selected - 1)
-                        }
-                        GamepadAction.LEFT -> rows.getOrNull(selected)?.let { adjust(it.item, -1) }
-                        GamepadAction.RIGHT -> rows.getOrNull(selected)?.let { adjust(it.item, +1) }
-                        GamepadAction.A -> rows.getOrNull(selected)?.let { activate(it.item) }
-                        else -> return@onPad false
-                    }
-                    true
-                },
-            contentPadding = MenuListContentPadding,
+                .fadingEdges(state),
+            contentPadding = PaddingValues(
+                start = startPadding,
+                end = LocalShellWindow.current.edgePadding,
+                top = 12.dp,
+                bottom = 12.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         ) {
             // A stable key per row (docs/SPEC.md "Settings scrolling
@@ -516,48 +792,153 @@ fun CatalogNavigator(
             // id is already what every other mechanism here keys by
             // (search results, pending focus) -- one identity, reused.
             itemsIndexed(rows, key = { _, row -> row.item.id }) { index, row ->
+                val isSelected = active && index == selected
                 Column {
                     row.headerAbove?.let { header -> MenuSectionLabel(header) }
                     CatalogRowView(
                         row = row,
-                        isSelected = index == selected,
+                        isSelected = isSelected,
                         confirmArmed = confirmArmedId == row.item.id,
                         status = statusById[row.item.id],
-                        onClick = {
-                            setSelected(index)
-                            activate(row.item)
-                        },
-                        onLongClick = {
-                            setSelected(index)
-                            infoRow = row.item
-                        },
-                        // The touch route to Left/Right. A SliderItem
-                        // does nothing at all on activate (there is no
-                        // "open" for a number), so without this it was
-                        // pad-only in a screen a phone user has to use.
-                        onAdjust = { direction ->
-                            setSelected(index)
-                            adjust(row.item, direction)
-                        },
+                        tipShown = isSelected && PadModality.showsFocus,
+                        onClick = { onClick(index) },
+                        onLongClick = { onLongClick(index) },
+                        onAdjust = { direction -> onAdjust(index, direction) },
                     )
                 }
             }
         }
-        }
-        // The selected row's full title and value when the uniform row had
-        // to cut them. Its summary is already visible on the row; repeating
-        // every selected summary here wastes the sheet's content area.
-        val detail = rows.getOrNull(selected)?.item?.let { item ->
-            val v = catalogRowValue(item, context)
-            listOfNotNull(
-                item.title.takeIf { it.length > 28 },
-                v?.takeIf { it.length > 14 },
-                statusById[item.id],
-            ).joinToString("\n")
-        }.orEmpty()
-        CatalogDetailStrip(detail)
     }
 }
+
+/**
+ * The category column: search at its top, then one entry per category,
+ * a hub's links under its title. [current] is marked (a fill and an accent
+ * rail) wherever the pad is; [cursor] is the entry the pad is on while it
+ * is in the column (null while the pane has it), drawn with the shell's
+ * one selection ring.
+ */
+@Composable
+private fun SettingsCategoryColumn(
+    categories: List<SettingsCategory>,
+    current: Int,
+    cursor: Int?,
+    showSearch: Boolean,
+    state: LazyListState,
+    onSearch: () -> Unit,
+    onPick: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val offset = if (showSearch) 1 else 0
+    LazyColumn(
+        state = state,
+        modifier = modifier.fadingEdges(state),
+        contentPadding = PaddingValues(start = LocalShellWindow.current.edgePadding, end = 8.dp, top = 12.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (showSearch) {
+            item(key = SEARCH_ROW_ID) {
+                CategoryEntry(label = "Search", icon = CatalogIcon.SEARCH, current = false, cursor = cursor == 0, onClick = onSearch)
+            }
+        }
+        itemsIndexed(categories, key = { _, category -> category.key }) { index, category ->
+            Column {
+                category.sectionAbove?.let { MenuSectionLabel(it) }
+                CategoryEntry(
+                    label = category.label,
+                    icon = category.icon,
+                    current = index == current,
+                    cursor = cursor == index + offset,
+                    onClick = { onPick(index) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryEntry(label: String, icon: CatalogIcon?, current: Boolean, cursor: Boolean, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = MenuTokens.CategoryRowMinHeight)
+            .clip(MenuTokens.RowShape)
+            .selectionFrame(cursor, MenuTokens.RowShape, rest = if (current) MenuTokens.SurfaceSelected else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Box(
+            Modifier
+                .width(3.dp)
+                .height(20.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(if (current) MenuTokens.Accent else Color.Transparent),
+        )
+        Spacer(Modifier.width(10.dp))
+        if (icon != null) {
+            Icon(
+                icon.glyph(),
+                contentDescription = null,
+                tint = if (current || cursor) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
+                modifier = Modifier.size(22.dp),
+            )
+        } else {
+            Spacer(Modifier.size(22.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            label,
+            color = if (current || cursor) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (current) FontWeight.SemiBold else FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * Fades a scrolling list's content out over [edge] at whichever end has
+ * more to scroll to, so a row the viewport cuts reads as "more this way"
+ * rather than a slice.
+ */
+private fun Modifier.fadingEdges(state: LazyListState, edge: Dp = 24.dp): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val h = edge.toPx().coerceAtMost(size.height / 2)
+        if (state.canScrollBackward) {
+            drawRect(
+                brush = Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = 0f, endY = h),
+                size = Size(size.width, h),
+                blendMode = BlendMode.DstOut,
+            )
+        }
+        if (state.canScrollForward) {
+            drawRect(
+                brush = Brush.verticalGradient(listOf(Color.Transparent, Color.Black), startY = size.height - h, endY = size.height),
+                topLeft = Offset(0f, size.height - h),
+                size = Size(size.width, h),
+                blendMode = BlendMode.DstOut,
+            )
+        }
+    }
+
+/** The navigator fills the page when it is at least this share of the screen's width. */
+private const val PAGE_WIDTH_FRACTION = 0.8f
+
+/** Narrower than this, the column and the pane take turns instead of sitting side by side. */
+private val TWO_PANE_MIN_WIDTH = 600.dp
+
+/** The category column's share of a two-pane navigator's width. */
+private const val CATEGORY_COLUMN_FRACTION = 0.3f
+
+/** How long the column's cursor rests on a linked category before its screen is built. */
+private const val PANE_LOAD_SETTLE_MS = 120L
+
+/** A row Left/Right steps in place (a slider, a short choice); anything else is opened or flipped with A. */
+private fun CatalogItem.stepsInPlace(): Boolean = this is SliderItem || (this is ChoiceItem && options.size <= 6)
 
 /**
  * The settings navigator's screen stack as one savable value: the live
@@ -707,12 +1088,21 @@ private data class CatalogRow(val item: CatalogItem, val headerAbove: String?)
 /** The synthetic root-level row that opens search -- never a real catalog id. */
 private const val SEARCH_ROW_ID = "__settings_search__"
 
+/**
+ * One settings row (docs/SPEC.md "Settings layout"): its name, and what it
+ * is set to in the shared value column -- a switch for a toggle, a track
+ * and a number for a slider, a chevron for a row that opens something. Its
+ * explanation is never a line on the row: it is the row's [HintTip], shown
+ * while the pad rests on it ([tipShown]), and the Y Info sheet. A live
+ * status (working, a failure) takes the value column while it lasts.
+ */
 @Composable
 private fun CatalogRowView(
     row: CatalogRow,
     isSelected: Boolean,
     confirmArmed: Boolean,
     status: String?,
+    tipShown: Boolean,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     onAdjust: ((Int) -> Unit)? = null,
@@ -723,29 +1113,37 @@ private fun CatalogRowView(
     // separate is what stopped nested screens rendering a chevron in
     // the value column.
     val chevron = item is NestedScreenItem || item is SubScreenItem
-    val value = catalogRowValue(item, context)
-    val placeholder = value == null && item is TextInputItem
-    MenuRow(
-        title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
-        subtitle = status ?: item.subtitle,
-        value = value ?: if (placeholder) "not set" else null,
-        placeholder = placeholder,
-        adjustable = (item is ChoiceItem && item.options.size <= 6) || item is ToggleItem || item is SliderItem,
-        chevron = chevron,
-        selected = isSelected,
-        danger = confirmArmed,
-        accent = (item as? NestedScreenItem)?.accent?.let { Color(it) },
-        icon = item.icon,
-        onClick = onClick,
-        onLongClick = onLongClick,
-        onAdjust = onAdjust,
-        // The enclosing LazyColumn (CatalogNavigator, just above) already
-        // runs `listState.keepInView` on every selection change -- see
-        // MenuRow's own `ownScrollKeeping` doc comment for why a second,
-        // independent scroll animation here was the real jank.
-        ownScrollKeeping = true,
-        uniformHeight = true,
-    )
+    val toggle = item as? ToggleItem
+    val slider = item as? SliderItem
+    val value = if (toggle != null) null else catalogRowValue(item, context)
+    val placeholder = status == null && value == null && item is TextInputItem
+    val tip = listOfNotNull(status, item.subtitle).joinToString("
+").ifEmpty { null }
+    HintTip(text = tip, shown = tipShown) {
+        MenuRow(
+            title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
+            value = status ?: value ?: if (placeholder) "not set" else null,
+            placeholder = placeholder,
+            adjustable = status == null && item.stepsInPlace(),
+            chevron = chevron,
+            selected = isSelected,
+            danger = confirmArmed,
+            accent = (item as? NestedScreenItem)?.accent?.let { Color(it) },
+            icon = item.icon,
+            onClick = onClick,
+            onLongClick = onLongClick,
+            onAdjust = onAdjust,
+            // The enclosing LazyColumn (CatalogPane, above) already runs
+            // `listState.keepInView` on every selection change -- see
+            // MenuRow's own `ownScrollKeeping` doc comment for why a second,
+            // independent scroll animation here was the real jank.
+            ownScrollKeeping = true,
+            uniformHeight = true,
+            uniformSummaryLines = 0,
+            switchOn = if (status == null) toggle?.current else null,
+            sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
+        )
+    }
 }
 
 /** What a settings row shows in its value column (null: none). */
@@ -774,10 +1172,12 @@ private fun catalogValueCandidates(item: CatalogItem, context: Context): List<St
 }
 
 /**
- * The detail strip under a settings list: the selected row's whole text
- * (title and value when the row had to cut them, and its full summary),
- * in a fixed-height area so the list above never changes size. Four
- * lines of the summary type scale; Y opens the Info sheet for more.
+ * The detail strip under a page's list (the PC game page's facts): the
+ * selected row's whole text (title and value when the row had to cut
+ * them, and its full summary), in a fixed-height area so the list above
+ * never changes size. Four lines of the summary type scale; Y opens the
+ * Info sheet for more. Settings has none: its rows' explanations are
+ * their HintTips (docs/SPEC.md "Settings layout").
  */
 @Composable
 internal fun CatalogDetailStrip(text: String) {

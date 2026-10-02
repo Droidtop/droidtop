@@ -30,11 +30,31 @@ import kotlinx.coroutines.delay
  * rests on it (mouse), or after focus has stayed on it or a child for a moment (pad). A null [text] draws
  * [content] alone, so a caller can pass the explanation only when there is one. Explanations never appear
  * as visible text on a screen; they live here.
+ *
+ * [shown] is for a caller whose selection is a cursor of its own rather than Compose focus (a settings
+ * row, docs/SPEC.md "Settings layout"): when it is given, the bubble follows it alone, after the same
+ * delay, and this wrapper adds no hover or long-press handling of its own, because the caller's row
+ * already owns its touches (its long press opens the Info sheet).
  */
 @Composable
-fun HintTip(text: String?, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun HintTip(text: String?, modifier: Modifier = Modifier, shown: Boolean? = null, content: @Composable () -> Unit) {
     if (text == null) {
         Box(modifier = modifier) { content() }
+        return
+    }
+    if (shown != null) {
+        var settled by remember { mutableStateOf(false) }
+        LaunchedEffect(shown) {
+            settled = false
+            if (shown) {
+                delay(TIP_DELAY_MS)
+                settled = true
+            }
+        }
+        Box(modifier = modifier) {
+            content()
+            if (shown && settled) TipBubble(text)
+        }
         return
     }
     val source = remember { MutableInteractionSource() }
@@ -62,21 +82,25 @@ fun HintTip(text: String?, modifier: Modifier = Modifier, content: @Composable (
             .pointerInput(Unit) { detectTapGestures(onLongPress = { touched = true }) },
     ) {
         content()
-        if (touched || (settled && (hovered || focused))) {
-            Popup(alignment = Alignment.BottomStart) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.inverseSurface,
-                    modifier = Modifier.padding(top = 4.dp),
-                ) {
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.inverseOnSurface,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                }
-            }
+        if (touched || (settled && (hovered || focused))) TipBubble(text)
+    }
+}
+
+/** The bubble itself, below the wrapped content. */
+@Composable
+private fun TipBubble(text: String) {
+    Popup(alignment = Alignment.BottomStart) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.inverseSurface,
+            modifier = Modifier.padding(top = 4.dp),
+        ) {
+            Text(
+                text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.inverseOnSurface,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            )
         }
     }
 }
