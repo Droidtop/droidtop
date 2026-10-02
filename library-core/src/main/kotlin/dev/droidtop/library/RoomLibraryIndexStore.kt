@@ -57,7 +57,9 @@ class RoomLibraryIndexStore(
             if (parts.isEmpty()) return@withLock null
             val gamesByPart = db.dao().gamesFor(providerKey).groupBy { it.part }
             val segments = parts.map { part ->
-                val entries = gamesByPart[part.key].orEmpty().mapNotNull { row -> records.get(row.id)?.entry }
+                val entries = gamesByPart[part.key].orEmpty().mapNotNull { row ->
+                    records.get(row.id)?.entry?.copy(firstSeenEpochMs = row.firstSeenEpochMs)
+                }
                 ScanStep.Segment(key = part.key, root = part.root, entries = entries)
             }
             val slice = LibrarySlice(segments)

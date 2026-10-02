@@ -22,6 +22,7 @@ class PcShelvesTest {
         id: String,
         kind: LibraryEntryKind = LibraryEntryKind.RENPY,
         lastPlayed: Long? = null,
+        firstSeen: Long = 0L,
         favorite: Boolean = false,
         update: String? = null,
         pcInfo: PcInfo? = null,
@@ -30,6 +31,7 @@ class PcShelvesTest {
         id = id,
         title = id,
         kind = kind,
+        firstSeenEpochMs = firstSeen,
         lastPlayedEpochMs = lastPlayed,
         favorite = favorite,
         availableUpdate = update,
@@ -46,6 +48,28 @@ class PcShelvesTest {
 
         assertEquals(SHELF_CONTINUE, shelves.first().id)
         assertEquals(listOf("/c", "/a"), shelves.first().entries.map { it.id })
+    }
+
+    @Test
+    fun `recently added is newest first and hidden when timestamps are missing`() {
+        val none = pcShelves(listOf(game("/legacy")), now)
+        assertNull(none.firstOrNull { it.id == SHELF_RECENTLY_ADDED })
+
+        val shelf = pcShelves(
+            listOf(game("/old", firstSeen = now - 20), game("/legacy"), game("/new", firstSeen = now - 2)),
+            now,
+        ).first { it.id == SHELF_RECENTLY_ADDED }
+        assertEquals("Recently added", shelf.title)
+        assertEquals(listOf("/new", "/old"), shelf.entries.map { it.id })
+    }
+
+    @Test
+    fun `recently added is capped like other shelves`() {
+        val shelf = pcShelves((1..SHELF_LIMIT + 2).map { game("/g$it", firstSeen = now + it) }, now)
+            .first { it.id == SHELF_RECENTLY_ADDED }
+        assertEquals(SHELF_LIMIT, shelf.entries.size)
+        assertEquals(SHELF_LIMIT + 2, shelf.total)
+        assertEquals("/g${SHELF_LIMIT + 2}", shelf.entries.first().id)
     }
 
     @Test

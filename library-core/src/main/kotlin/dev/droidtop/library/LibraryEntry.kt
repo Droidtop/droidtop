@@ -230,6 +230,8 @@ data class LibraryEntry(
     val heroUri: String? = null,
     val logoUri: String? = null,
     val iconUri: String? = null,
+    /** Persisted library-index time when this entry was first discovered; 0 for legacy/unindexed entries. */
+    val firstSeenEpochMs: Long = 0L,
 ) {
     /**
      * The image file this entry should show for a themed element that

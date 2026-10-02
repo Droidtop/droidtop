@@ -28,6 +28,7 @@ internal const val SHELF_LIMIT = 24
 
 /** Steam's home shelf order: what you were playing, then what needs attention, then by where it came from. */
 internal const val SHELF_CONTINUE = "continue"
+internal const val SHELF_RECENTLY_ADDED = "recently-added"
 internal const val SHELF_UPDATES = "updates"
 internal const val SHELF_FAVOURITES = "favourites"
 internal const val SHELF_INSTALLED = "installed"
@@ -38,6 +39,8 @@ internal const val SHELF_INSTALLED = "installed"
  * it off the main thread (one sort per shelf over the whole library: never
  * while drawing). [now] is the clock, for "recently".
  *
+ * - **Recently added**: indexed games with a nonzero first-seen time,
+ *   newest first. Legacy rows with no timestamp do not appear.
  * - **Continue playing**: every game with a last-played time, newest
  *   first. The Deck's "Recent games" row, under the name the owner gave it.
  * - **Update available**: a source knows a newer version than any folder
@@ -53,8 +56,7 @@ internal const val SHELF_INSTALLED = "installed"
  *
  * Within a shelf: most recently played first, then by name, so a long
  * shelf shows what the person touches rather than the start of the
- * alphabet. "Recently added" is not here: the library keeps no first-seen
- * time for a game yet (docs/SPEC.md 7i says what adding one takes).
+ * alphabet.
  */
 internal fun pcShelves(games: List<LibraryEntry>, now: Long = System.currentTimeMillis()): List<PcShelf> {
     val byRecency = compareByDescending<LibraryEntry> { it.lastPlayedEpochMs ?: 0L }.thenBy { it.title.lowercase() }
@@ -64,6 +66,11 @@ internal fun pcShelves(games: List<LibraryEntry>, now: Long = System.currentTime
         return PcShelf(id, title, ordered.take(SHELF_LIMIT), ordered.size)
     }
     return buildList {
+        val recentlyAdded = games.filter { it.firstSeenEpochMs > 0L }
+            .sortedWith(compareByDescending<LibraryEntry> { it.firstSeenEpochMs }.thenBy { it.title.lowercase() })
+        if (recentlyAdded.isNotEmpty()) {
+            add(PcShelf(SHELF_RECENTLY_ADDED, "Recently added", recentlyAdded.take(SHELF_LIMIT), recentlyAdded.size))
+        }
         // Local vals, not smart casts: LibraryEntry's properties are
         // declared in another module, which Kotlin will not smart-cast.
         shelf(
