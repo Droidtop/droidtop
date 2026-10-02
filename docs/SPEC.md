@@ -2472,7 +2472,10 @@ the `ContainerRuntime` interface that already exists (§3):
     setting; Standard and Desktop keep theirs on their own screens) and the screen assignment
     rows (shell display, game launch display, swap, reinitialize).
   - **Downloads and jobs**: the one jobs screen (`PluginJobsScreen`, the same as Settings'
-    "Downloads and installs") hosted in the sheet by `CatalogNavigator`.
+    "Downloads and installs") hosted in the sheet by `CatalogNavigator`, without its own heading
+    (`PluginJobsScreen.screen(headed = false)`: the rail header already names it). Its empty state is
+    one short row, "Nothing running", with the longer sentence as its subtitle, so the navigator's
+    detail strip (which repeats only titles a row cuts) does not say it a second time.
   - **Plugins**: unchanged, only while a running plugin offers tiles.
   Which sections show, where the menu opens (the running game; else Notifications once access is
   granted; else System) and how the shoulders step the rail are pure rules in `QuickTiles`

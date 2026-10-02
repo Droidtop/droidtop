@@ -36,12 +36,13 @@ object PluginJobsScreen {
     /**
      * [extraGroups] are rows the owner of some other queue adds below the jobs (`:app` adds the
      * store installs queue, which lives in gamenative's own screen), so this stays the one place
-     * the list of "what is running" is reached.
+     * the list of "what is running" is reached. [headed] false is for a host that already
+     * names the screen in its own header (the Quick Menu's panel), so the heading is not said twice.
      */
-    fun screen(extraGroups: suspend (Context) -> List<CatalogGroup> = { emptyList() }): CatalogScreen = CatalogScreen(
+    fun screen(headed: Boolean = true, extraGroups: suspend (Context) -> List<CatalogGroup> = { emptyList() }): CatalogScreen = CatalogScreen(
         id = ID,
         title = "Downloads and installs",
-        subtitle = "Plugin downloads, library scrapes and other long-running actions, wherever they were started from",
+        subtitle = "Plugin downloads, library scrapes and other long-running actions, wherever they were started from".takeIf { headed },
         groups = { context ->
             val snapshot = PluginJobsCenter.entries().value
             listOf(
@@ -49,7 +50,8 @@ object PluginJobsScreen {
                     id = "plugin_jobs_list",
                     title = null,
                     items = if (snapshot.isEmpty()) {
-                        listOf(ActionItem(id = "plugin_jobs_none", title = "No jobs running or recently finished", run = {}))
+                        // A short title: the navigator's detail strip repeats any title longer than a row shows.
+                        listOf(ActionItem(id = "plugin_jobs_none", title = "Nothing running", subtitle = "No jobs running or recently finished", run = {}))
                     } else {
                         snapshot.flatMap { entry -> jobItems(entry) }
                     },

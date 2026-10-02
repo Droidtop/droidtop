@@ -510,7 +510,7 @@ private fun ReadoutRow(label: String, value: String, fill: Int?, detail: String?
  */
 @Composable
 private fun DownloadsSection(onDismiss: () -> Unit) {
-    CatalogNavigator(root = remember { PluginJobsScreen.screen() }, onExit = onDismiss)
+    CatalogNavigator(root = remember { PluginJobsScreen.screen(headed = false) }, onExit = onDismiss)
 }
 
 @Composable

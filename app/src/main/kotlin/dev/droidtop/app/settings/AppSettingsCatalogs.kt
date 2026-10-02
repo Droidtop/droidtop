@@ -176,7 +176,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(AcquireContentSources.chooseSystemScreen())
         SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(pluginKeysScreen())
-        SettingsScreenRegistry.register(PluginJobsScreen.screen { _ -> pcInstallsGroups() })
+        SettingsScreenRegistry.register(PluginJobsScreen.screen(extraGroups = { _ -> pcInstallsGroups() }))
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(pcStoresScreen())
         SettingsScreenRegistry.register(StoresCatalog.screen())
