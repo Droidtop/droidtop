@@ -10,6 +10,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import dev.droidtop.app.ui.PadButton
 
@@ -31,7 +33,7 @@ import dev.droidtop.app.ui.PadButton
  * lists is this button.
  */
 @Composable
-fun SafeModeBanner(onRetry: () -> Unit, modifier: Modifier = Modifier) {
+fun SafeModeBanner(onRetry: () -> Unit, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null) {
     Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.errorContainer) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -43,7 +45,12 @@ fun SafeModeBanner(onRetry: () -> Unit, modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.weight(1f),
             )
-            PadButton(label = "Use the theme again", onClick = onRetry, filled = true)
+            PadButton(
+                label = "Use the theme again",
+                onClick = onRetry,
+                filled = true,
+                modifier = Modifier.then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
+            )
         }
     }
 }

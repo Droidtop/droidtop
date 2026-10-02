@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -359,11 +362,16 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             // reachable over a themed Gaming screen exactly as it is
             // over Desktop's own panels.
             val safeMode by dev.droidtop.library.theme.ThemeSafeMode.activeFlow.collectAsState()
+            val bannerFocus = remember { FocusRequester() }
             if (mode == Mode.GAMING && safeMode) {
                 SafeModeBanner(
                     onRetry = { dev.droidtop.library.diagnostics.CrashRecovery.retryTheme(this@MainActivity) },
                     modifier = Modifier.align(Alignment.TopCenter),
+                    focusRequester = bannerFocus,
                 )
+                LaunchedEffect(safeMode) {
+                    if (safeMode) bannerFocus.requestFocus()
+                }
             }
             if (mode == Mode.GAMING || mode == Mode.DESKTOP) {
                 ReinitializeDisplaysPill(

@@ -11809,10 +11809,16 @@ true top edge, so the pad walks Up through the real rows above each list --
 the filter chips, a "Continue Playing" card -- and ends on the banner's
 action, the topmost row while safe mode is on; the tab bar it covers stays
 unfocusable (§7k), so Up still finds nothing above any list when no banner
-is up. A, Enter and a touch all press the action. Sub-screens that own
+is up. A, Enter and a touch all press the action. When safe mode is on,
+`MainActivity` requests focus on the banner's `PadButton` (`FocusRequester`),
+so the action is immediately reachable by A even before any Up press reaches
+it. Sub-screens that own
 their whole surface (Settings' choice pickers and search results) keep
-their own edges. The Standard launcher entry is not routed through this:
-it does not render themes.
+their own edges. The Standard launcher entry is routed through safe mode
+(`HomeTrampolineActivity`: when `ThemeSafeMode.active`, the trampoline
+redirects to Gaming so the banner is reachable and the recovery action works);
+it does not render themes itself, but the safe-mode banner must still be
+reachable from it.
 
 **Share diagnostics** is one action in Global settings > Data. It zips the
 logs folder, the settings export (§7 Data, with every `droidtop_*`

@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
+import dev.droidtop.library.theme.ThemeSafeMode
 
 /**
  * droidtop's real `CATEGORY_HOME` component for Standard (built
@@ -63,8 +64,8 @@ class HomeTrampolineActivity : Activity() {
             return
         }
 
-        val target = Modes.homeTarget(this)
-        if (target != Mode.LAUNCHER.id) {
+        val target = if (ThemeSafeMode.active) Mode.GAMING.id else Modes.homeTarget(this)
+        if (target != Mode.LAUNCHER.id || ThemeSafeMode.active) {
             val nowMs = SystemClock.elapsedRealtime()
             val doubleTap = nowMs - lastHomePressMs < DOUBLE_TAP_WINDOW_MS
             lastHomePressMs = nowMs
