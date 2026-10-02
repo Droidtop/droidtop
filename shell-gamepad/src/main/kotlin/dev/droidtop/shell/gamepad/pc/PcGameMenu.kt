@@ -599,7 +599,11 @@ internal fun PcGameMenu(
     val isReady = runner?.option?.state == RunnerState.READY
     val setupAction = runner?.option?.action
     val downloads by StoreDownloads.active.collectAsState()
-    val playState = if (loaded) playStateOf(runner, entry, entry.downloadKey()?.let { downloads[it] }) else PcPlayStateLoading
+    val playState = if (loaded) {
+        playStateOf(runner, entry, entry.downloadKey()?.let { downloads[it] }, runners.noRunnerLine)
+    } else {
+        PcPlayStateLoading
+    }
 
     // Flattened once per recomposition into what this Dialog actually
     // draws and what Up/Down/A navigate: a section header (never

@@ -164,8 +164,9 @@ object PcRunnerOptions {
         onStatus: (String) -> Unit = {},
         onFailure: (String) -> Unit = onStatus,
     ) {
-        val runner = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            resolvedFor(context, entry, forEntry(context, entry))
+        val (runners, runner) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val measured = forEntry(context, entry)
+            measured to resolvedFor(context, entry, measured)
         }
         val setupAction = runner?.option?.action
         when {
@@ -174,7 +175,7 @@ object PcRunnerOptions {
                 val failure = runAction(context, entry, setupAction, onStatus)
                 if (failure != null) onFailure(failure)
             }
-            else -> onFailure(runner?.option?.reason ?: "No runner on this device offers this game")
+            else -> onFailure(runner?.option?.reason ?: runners.noRunnerLine)
         }
     }
 
@@ -251,4 +252,18 @@ object PcRunnerOptions {
 }
 
 /** [PcRunnerOptions.forEntry]'s answer: the runner rows and the engine they were computed for. */
-data class PcRunners(val engine: GameEngine?, val options: List<RunnerOption>)
+data class PcRunners(val engine: GameEngine?, val options: List<RunnerOption>) {
+    /**
+     * The one short line for a game no runner can take at all, naming
+     * what is missing instead of "no runner offers this game"
+     * (Droidtop/tracker#287). A game whose engine has an Enginehost
+     * plugin never lands here: it has a setup row ("Install the HTML
+     * plugin") and the action to run it.
+     */
+    val noRunnerLine: String
+        get() = when {
+            options.isEmpty() -> "This game's folder isn't on this device"
+            engine == null -> "No game engine, Windows or Linux build found in this folder"
+            else -> "No Enginehost plugin covers ${engine.displayName()} yet"
+        }
+}

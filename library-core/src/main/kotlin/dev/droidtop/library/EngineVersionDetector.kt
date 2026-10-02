@@ -209,9 +209,9 @@ object EngineVersionDetector {
         val html = gameRoot.listFiles()
             ?.filter { it.isFile && it.extension.lowercase() in setOf("html", "htm") }
             ?.sortedBy { it.name.lowercase() }
-            ?.firstOrNull { readHead(it)?.contains("<tw-storydata") == true }
+            ?.firstOrNull { it.readTwineHead()?.contains("<tw-storydata") == true }
             ?: return null
-        val version = readHead(html)?.let { TWINE_CREATOR_VERSION.find(it) }?.groupValues?.get(1)
+        val version = html.readTwineHead()?.let { TWINE_CREATOR_VERSION.find(it) }?.groupValues?.get(1)
             ?: return null
         return DetectedVersion(version, "twine", "tw-storydata creator-version in ${html.name}")
     }
