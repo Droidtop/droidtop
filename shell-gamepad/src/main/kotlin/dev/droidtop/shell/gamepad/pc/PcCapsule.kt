@@ -1,6 +1,5 @@
 package dev.droidtop.shell.gamepad.pc
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -15,11 +14,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,6 +30,7 @@ import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
+import dev.droidtop.shell.gamepad.focusLift
 import dev.droidtop.shell.gamepad.focusMarquee
 import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.selectionFrame
@@ -83,9 +81,10 @@ internal fun PcCapsule(
 ) {
     val shape = RoundedCornerShape(8.dp)
     val ring = selected && PadModality.showsFocus
-    // The Deck's capsule grows a little under the cursor; the title under
-    // it stays put so the row does not reflow.
-    val scale by animateFloatAsState(if (ring) 1.04f else 1f, label = "capsule scale")
+    // The one focus treatment (docs/SPEC.md "Gaming motion and focus"): the
+    // capsule lifts and gains a shadow under the cursor and the rest sit
+    // slightly dimmed; the title under it stays put so the row does not
+    // reflow.
     val title = GameNaming.displayName(entry.title)
     Column(
         modifier = modifier
@@ -99,11 +98,7 @@ internal fun PcCapsule(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(CAPSULE_ASPECT)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .clip(shape)
+                .focusLift(ring, shape)
                 .selectionFrame(selected, shape, rest = MenuTokens.Card, restOutline = MenuTokens.CardOutline),
         ) {
             if (entry.artworkUri != null) {

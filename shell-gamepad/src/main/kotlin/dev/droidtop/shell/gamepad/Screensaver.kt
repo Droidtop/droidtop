@@ -107,7 +107,7 @@ internal fun Screensaver(entries: List<LibraryEntry>, onDismiss: () -> Unit) {
     val entry = withArt[index.coerceIn(withArt.indices)]
 
     Box(Modifier.fillMaxSize().groundBackground().then(dismissModifier)) {
-        Crossfade(targetState = entry, animationSpec = tween(1200), label = "screensaver-slide") { shown ->
+        Crossfade(targetState = entry, animationSpec = tween(Motion.AmbientFadeMs), label = "screensaver-slide") { shown ->
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AsyncImage(
                     model = shown.artworkUri,

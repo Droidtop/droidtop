@@ -10055,6 +10055,35 @@ even." The rule, in the shared components (`MenuRow`, `SettingsCatalogView`):
 - *Section headings* ("Apps", a games row's title) leave the room to the bar above them (`SectionListTopGap` 8dp, `SectionHeadingTopGap` 4dp) and sit `SectionHeadingGap` (16dp) clear of what they head.
 
 
+### Gaming motion and focus (directed 2026-10-01, Droidtop/tracker#256)
+
+The shell's own chrome (not a themed ES-DE view, which plays the theme's own transitions) has
+one motion vocabulary and one focus treatment. The principles come from studying how Steam Big
+Picture feels, with credit to its designers; the values are droidtop's own, in
+`MotionTokens.kt` (`Motion`, `FocusLook`) beside the other tokens.
+
+- **One mechanism.** Every animation the shell's own chrome plays takes its duration and curve
+  from `Motion` by role (focus lift, release, ring landing, carousel centre, panel in and out,
+  screen crossfade, ambient pulse and fade). A literal `tween(...)` or `spring()` in chrome code
+  is a defect.
+- **Colour answers at once, shape glides.** A focus fill or colour change is instant
+  (`Motion.ColourMs`); lift, shadow and brightness glide in over `LiftMs` and settle back over
+  the longer `ReleaseMs`, because letting go slower than taking reads as weight.
+- **One focus treatment** (`selectionFrame` for the outline and fill, `focusLift` for a
+  capsule): the focused item is slightly larger (5 percent), at full brightness, with a deeper
+  shadow, and its outline lands (thicker and transparent, thinning and fading in over
+  `RingLandMs`); unfocused capsules sit about 10 percent dimmed. It is cheap by construction: no
+  blur, the shadow only on the focused item, every animated value read in the layer or draw
+  phase so a focus move recomposes nothing. Because of that there is no low-performance mode to
+  switch it off; a blur or backdrop effect added later must come with one.
+- **The scroll centres the focus.** A shelf, the view strip and the PC grid scroll the selected
+  item to the middle of the visible span (`keepCentred`), clamped where the list ends, so what is
+  on both sides stays visible. The first press eases; a press arriving while a scroll is moving,
+  and a held direction repeating, is linear (`Motion.scroll(chained)`), so holding a direction is
+  one smooth glide. Tall pages of rows keep the least-scroll rule (`keepInView`, section 6e).
+- Reduced motion (turning the lift and fades into instant changes) is not yet wired; it will read
+  one switch and apply to `Motion` and `FocusLook` only.
+
 ## 7k2. Gaming theming: the active ES-DE theme as droidtop's own design tokens (owner direction 2026-10-01, Droidtop/tracker#185)
 
 Owner: "We can probably borrow theme coloration and assets from the selected ESDE theme. It

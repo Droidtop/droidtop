@@ -60,6 +60,7 @@ import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
+import dev.droidtop.shell.gamepad.keepCentred
 import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryFilterDialog
@@ -326,17 +327,19 @@ internal fun PcGamesSection(
     fun rowState(id: String) = rowStates.getOrPut(id) { LazyListState() }
     fun gridColumns(): Int = (gridState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.column } ?: 0) + 1
 
-    // The selection is always fully on screen, by as little scrolling as it
-    // takes, at once while a direction is held (docs/SPEC.md 6e).
+    // The selection is always on screen: a strip, a shelf or the grid centres
+    // it, eased on the first press and linear while a direction is held; the
+    // page of shelves moves by as little as it takes (docs/SPEC.md 6e and
+    // "Gaming motion and focus").
     LaunchedEffect(state.home, state.stripFocused, state.stripIndex, state.shelfIndex, state.itemIndex, shelves, grid) {
         when {
-            state.stripFocused -> stripState.keepInView(state.stripIndex, animate = !heldStep)
+            state.stripFocused -> stripState.keepCentred(state.stripIndex, chained = heldStep)
             state.home -> {
                 val shelf = shelves.getOrNull(state.shelfIndex) ?: return@LaunchedEffect
                 columnState.keepInView(state.shelfIndex, animate = !heldStep)
-                rowState(shelf.id).keepInView(state.itemIndex, animate = !heldStep)
+                rowState(shelf.id).keepCentred(state.itemIndex, chained = heldStep)
             }
-            else -> if (grid.isNotEmpty()) gridState.keepInView(state.itemIndex, animate = !heldStep)
+            else -> if (grid.isNotEmpty()) gridState.keepCentred(state.itemIndex, chained = heldStep)
         }
     }
 

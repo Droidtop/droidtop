@@ -35,7 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.inset
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -125,17 +131,41 @@ fun Modifier.selectionFrame(
     shape: Shape,
     rest: Color = MenuTokens.Surface,
     restOutline: Color = Color.Transparent,
-): Modifier {
+): Modifier = composed {
     val shown = selected && PadModality.showsFocus
-    return this
-        .background(if (shown) MenuTokens.SurfaceSelected else rest, shape)
-        // Never a 0.dp border: Compose draws 0.dp (Dp.Hairline) as a 1px line,
-        // so "no ring" is a transparent colour, not a zero width.
-        .border(
-            width = if (shown) MenuTokens.FocusRingWidth else 1.dp,
-            color = if (shown) MenuTokens.Accent else restOutline,
-            shape = shape,
-        )
+    val fill = if (shown) MenuTokens.SurfaceSelected else rest
+    val ringColor = MenuTokens.Accent
+    // The fill snaps and the outline lands (docs/SPEC.md "Gaming motion and
+    // focus"): it starts thicker and transparent and thins to its width as
+    // it fades in. Read in the draw phase only, so a focus move recomposes
+    // nothing.
+    val landed = animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = if (shown) Motion.ringLand<Float>() else tween<Float>(Motion.ColourMs),
+        label = "focus ring",
+    )
+    Modifier
+        .background(fill, shape)
+        .drawWithContent {
+            drawContent()
+            // Never a 0.dp stroke: it would draw as a 1px line, so "no
+            // outline" is a transparent colour and nothing is drawn.
+            if (restOutline.alpha > 0f) {
+                val w = 1.dp.toPx()
+                inset(w / 2f) { drawOutline(shape.createOutline(this.size, layoutDirection, this), restOutline, style = Stroke(w)) }
+            }
+            val p = landed.value
+            if (p > 0f) {
+                val w = MenuTokens.FocusRingWidth.toPx() * FocusLook.ringWidthFactor(p)
+                inset(w / 2f) {
+                    drawOutline(
+                        shape.createOutline(this.size, layoutDirection, this),
+                        ringColor.copy(alpha = ringColor.alpha * FocusLook.ringAlpha(p)),
+                        style = Stroke(w),
+                    )
+                }
+            }
+        }
 }
 
 /**

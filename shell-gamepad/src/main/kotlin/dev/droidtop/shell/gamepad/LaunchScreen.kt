@@ -44,7 +44,7 @@ internal fun LaunchScreen(entry: LibraryEntry, via: String? = null) {
     val pulse by transition.animateFloat(
         initialValue = 0.45f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(tween(Motion.AmbientPulseMs), RepeatMode.Reverse),
         label = "launch-pulse-alpha",
     )
 

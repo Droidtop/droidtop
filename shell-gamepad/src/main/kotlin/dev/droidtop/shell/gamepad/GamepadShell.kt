@@ -1670,7 +1670,7 @@ internal enum class GamingSection { GAMES, PC_GAMES, APPS, SETTINGS }
  * enough not to be a cut, short enough that a pad user pressing B twice
  * is never waiting on it.
  */
-private const val SHELL_SCREEN_TRANSITION_MS = 160
+private const val SHELL_SCREEN_TRANSITION_MS = Motion.ScreenMs
 
 /**
  * The sections a given UI mode allows. Kiosk and Kid hide Settings --

@@ -51,7 +51,7 @@ internal suspend fun LazyListState.keepInView(index: Int, animate: Boolean = tru
             row.offset + row.size > bottom -> (row.offset + row.size - bottom).toFloat()
             else -> return
         }
-        if (animate) animateScrollBy(delta) else scrollBy(delta)
+        if (animate) animateScrollBy(delta, Motion.scroll(chained = isScrollInProgress)) else scrollBy(delta)
     }
 }
 
@@ -82,6 +82,78 @@ internal suspend fun LazyGridState.keepInView(index: Int, animate: Boolean = tru
             item.offset.y + item.size.height > bottom -> (item.offset.y + item.size.height - bottom).toFloat()
             else -> return
         }
-        if (animate) animateScrollBy(delta) else scrollBy(delta)
+        if (animate) animateScrollBy(delta, Motion.scroll(chained = isScrollInProgress)) else scrollBy(delta)
+    }
+}
+
+/**
+ * How far to scroll so an item lands in the middle of the visible span:
+ * its own centre minus the span's centre. Positive scrolls forward. Pure,
+ * for the tests.
+ */
+internal fun centreDelta(itemStart: Float, itemSize: Float, spanStart: Float, spanEnd: Float): Float =
+    itemStart + itemSize / 2f - (spanStart + spanEnd) / 2f
+
+/**
+ * Scrolls [index] to the CENTRE of the list (docs/SPEC.md "Gaming motion
+ * and focus"): a shelf or strip then always shows what is on both sides of
+ * the selection, and at either end the scroll simply stops where the list
+ * does. The first press eases; a press that arrives mid-scroll, or
+ * [chained] (a held direction repeating), is linear, so holding a direction
+ * glides ([Motion.scroll]). Nothing here measures anything the lazy list
+ * has not already measured.
+ */
+internal suspend fun LazyListState.keepCentred(index: Int, chained: Boolean = false) {
+    repeat(2) {
+        val info = layoutInfo
+        val visible = info.visibleItemsInfo
+        if (visible.isEmpty()) return
+        val start = (info.viewportStartOffset + info.beforeContentPadding).toFloat()
+        val end = (info.viewportEndOffset - info.afterContentPadding).toFloat()
+        val item = visible.firstOrNull { it.index == index }
+        val delta = if (item != null) {
+            centreDelta(item.offset.toFloat(), item.size.toFloat(), start, end)
+        } else {
+            val first = visible.first()
+            val last = visible.last()
+            val perItem = ((last.offset + last.size - first.offset).coerceAtLeast(1)).toFloat() / visible.size
+            val estimatedStart = if (index > last.index) {
+                last.offset + (index - last.index) * perItem
+            } else {
+                first.offset - (first.index - index) * perItem
+            }
+            centreDelta(estimatedStart, perItem, start, end)
+        }
+        if (kotlin.math.abs(delta) < 1f) return
+        animateScrollBy(delta, Motion.scroll(chained = chained || isScrollInProgress))
+    }
+}
+
+/** [LazyListState.keepCentred] for a grid: the selection's row, centred vertically. */
+internal suspend fun LazyGridState.keepCentred(index: Int, chained: Boolean = false) {
+    repeat(2) {
+        val info = layoutInfo
+        val visible = info.visibleItemsInfo
+        if (visible.isEmpty()) return
+        val start = (info.viewportStartOffset + info.beforeContentPadding).toFloat()
+        val end = (info.viewportEndOffset - info.afterContentPadding).toFloat()
+        val item = visible.firstOrNull { it.index == index }
+        val delta = if (item != null) {
+            centreDelta(item.offset.y.toFloat(), item.size.height.toFloat(), start, end)
+        } else {
+            val first = visible.first()
+            val last = visible.last()
+            val columns = visible.count { it.offset.y == first.offset.y }.coerceAtLeast(1)
+            val rows = ((last.index - first.index) / columns + 1).coerceAtLeast(1)
+            val perRow = ((last.offset.y + last.size.height - first.offset.y).coerceAtLeast(1)).toFloat() / rows
+            val estimatedStart = if (index > last.index) {
+                last.offset.y + ((index - last.index + columns - 1) / columns) * perRow
+            } else {
+                first.offset.y - ((first.index - index + columns - 1) / columns) * perRow
+            }
+            centreDelta(estimatedStart, perRow, start, end)
+        }
+        if (kotlin.math.abs(delta) < 1f) return
+        animateScrollBy(delta, Motion.scroll(chained = chained || isScrollInProgress))
     }
 }

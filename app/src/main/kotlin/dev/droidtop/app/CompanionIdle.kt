@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.shell.gamepad.Motion
 import kotlinx.coroutines.delay
 
 /**
@@ -104,4 +105,4 @@ internal fun CompanionIdle(entries: List<LibraryEntry>) {
 // attention (the §4d "calm technology" constraint), short enough that a
 // glance later shows something new.
 private const val DWELL_MS = 12_000L
-private const val FADE_MS = 1_200
+private const val FADE_MS = Motion.AmbientFadeMs
