@@ -72,4 +72,44 @@ class HintBindingsTest {
         host.release(second)
         assertNull(host.bindings)
     }
+
+    private val menus = ShellMenuHints
+    private val own = listOf(HintBinding(GamepadAction.A, "Select"))
+    private val sheet = listOf(HintBinding(GamepadAction.B, "Back"))
+
+    @Test
+    fun `the menu pills are Start Menu and R2 Quick Menu and nothing else`() {
+        assertEquals(
+            listOf(GamepadAction.START to "Menu", GamepadAction.R2 to "Quick Menu"),
+            activeHintPairs(menus),
+        )
+    }
+
+    @Test
+    fun `a screen's footer begins with both menu pills, then its own hints`() {
+        val row = footerBindings(null, false, null, own, menus, emptyList())
+        assertEquals(menus + own, row)
+    }
+
+    @Test
+    fun `a focused element's declaration replaces the fallback but keeps the menu pills`() {
+        val declared = listOf(HintBinding(GamepadAction.X, "Filter"))
+        assertEquals(menus + declared, footerBindings(null, false, declared, own, menus, emptyList()))
+    }
+
+    @Test
+    fun `a sheet shows its own hints alone, the menus doing nothing behind it`() {
+        assertEquals(sheet, footerBindings(sheet, false, null, own, menus, emptyList()))
+    }
+
+    @Test
+    fun `a layer that answers Start and R2 keeps both pills`() {
+        assertEquals(menus + sheet, footerBindings(sheet, true, null, own, menus, emptyList()))
+    }
+
+    @Test
+    fun `no footer names a shoulder that switches section`() {
+        val pairs = activeHintPairs(footerBindings(null, false, null, own, menus, emptyList()))
+        assertEquals(emptyList<Pair<GamepadAction, String>>(), pairs.filter { it.first == GamepadAction.L || it.first == GamepadAction.R })
+    }
 }

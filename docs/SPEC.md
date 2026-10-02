@@ -10382,14 +10382,27 @@ dense small landscape panel was a phone.
 ### Gaming controls: the left menu is navigation (owner direction, 2026-10-02, Droidtop/tracker#273)
 
 The Gaming shell has no top navigation bar. Start opens the left menu on every
-Gaming screen; the hint row begins with a tappable Start / Menu pill. The menu
-is the only route between destinations. The Quick Menu (R2) remains the right
-menu for quick management. Select is Options and the Home button is never used.
+Gaming screen. The Quick Menu (R2) is the right menu for quick management.
+Select is Options and the Home button is never used.
 
-L1/R1 step the nearest tab strip on the current page. A page with no strip
-leaves those presses unhandled; Retro Games gamelists keep ES-DE's own
-behaviour inside the theme. The D-pad never reaches a header or status cluster.
-The hint row and the left menu are touch routes to their corresponding actions.
+Both menus are named on every Gaming screen by two tappable pills, **Start Menu**
+and **R2 Quick Menu**, that begin the footer (`ShellMenuHints`, one list). Where
+the shell draws the footer they are its first two hints. Where a theme draws the
+help legend itself (Retro Games with a pad attached) the same two pills sit in a
+small plate in the bottom-right corner (`ShellMenuPills`), since a theme's legend
+is neither tappable nor aware of the menus. A modal sheet shows its own hints
+alone, the menus doing nothing behind it; the PC game page is the one layer that
+answers Start and R2 itself (it is a window of its own) and so keeps both pills
+(`DeclareLayerHints(menusReachable = true)`). The menu is the only route between
+destinations.
+
+L1/R1 step the nearest tab strip on the current page and never switch a
+destination or section. A page with no strip (Home, Retro Games, Settings, the
+places) leaves those presses unhandled and draws no shoulder pill or hint: the
+L1/R1 glyphs appear only at the ends of a strip they step (the PC Games and Apps
+view strip, the game page's tabs, the Quick Menu's rail). The D-pad never reaches
+a header or status cluster. The hint row and the left menu are touch routes to
+their corresponding actions.
 
 The left menu's order is Home, PC Games, Retro Games, Apps, the places, then
 Settings. Home (the PC section's shelves, §7i "Home art") is the first row;

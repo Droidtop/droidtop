@@ -128,6 +128,10 @@ import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.FocusedHintRow
 import dev.droidtop.shell.gamepad.input.FocusedHints
 import dev.droidtop.shell.gamepad.input.LocalFocusedHints
+import dev.droidtop.shell.gamepad.input.LocalShellMenus
+import dev.droidtop.shell.gamepad.input.ShellMenuHints
+import dev.droidtop.shell.gamepad.input.ShellMenuPills
+import dev.droidtop.shell.gamepad.input.ShellMenus
 import dev.droidtop.shell.gamepad.input.declaresHints
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
@@ -460,6 +464,8 @@ private fun GamepadShellBody(
     }
     // Which page, if any, has claimed L1/R1 for a tab strip of its own.
     val shoulderStrips = remember { ShoulderStripRegistry() }
+    // The two menus, for a window of its own that answers Start and R2 itself.
+    val shellMenus = remember { ShellMenus(openLeft = { leftMenuOpen = true }, openQuick = { quickMenuOpen = true }) }
     var displayChoice by remember {
         mutableStateOf<DisplayChoiceRequest?>(null)
     }
@@ -891,6 +897,7 @@ private fun GamepadShellBody(
         LocalHelpRowOwner provides helpRowOwner,
         LocalShoulderStrips provides shoulderStrips,
         LocalFocusedHints provides focusedHints,
+        LocalShellMenus provides shellMenus,
         LocalHelpRowSlotReport provides { slot -> helpRowSlotReport = currentScreenKey to slot },
     ) {
     Column(
@@ -927,8 +934,8 @@ private fun GamepadShellBody(
             // first (docs/SPEC.md 6e).
             .onPad { press ->
                 when (press.action) {
-                    // R2, the Quick Menu's own button (named by the R2 pill
-                    // in the top-right corner); a held Select arrives here
+                    // R2, the Quick Menu's own button (named by the R2 Quick
+                    // Menu pill in the footer); a held Select arrives here
                     // as R2 too, made by the pipeline's front (PadGate) for
                     // pads whose triggers send no key. The press opens; its
                     // release is this owner's and goes nowhere, and a fresh
@@ -1333,6 +1340,18 @@ private fun GamepadShellBody(
                 ) {
                     StatusCluster(showBatteryPercent = true, onClick = { quickMenuOpen = true })
                 }
+            }
+            // A theme that draws its own help legend (a pad is attached, so
+            // the legend is the theme's) names nothing of the two menus and
+            // is not tappable: the Start and R2 pills sit in the corner
+            // beside it (docs/SPEC.md 7j, "Gaming controls").
+            if (helpRowOwner == HelpRowOwner.THEME && !screensaverOn) {
+                ShellMenuPills(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = shellWindow.edgePadding, bottom = 4.dp)
+                        .background(MenuTokens.Surface.copy(alpha = 0.58f), RoundedCornerShape(12.dp)),
+                )
             }
             // Over the themed canvas, at the place the theme itself laid
             // out for a help row, rather than under a canvas shortened to
@@ -1788,7 +1807,7 @@ private fun ButtonHintFooter(
     // that can drift from what the key handlers above actually bind.
     FocusedHintRow(
         background = background,
-        leading = listOf(HintBinding(GamepadAction.START, "Menu")),
+        leading = ShellMenuHints,
         fallback = listOf(
             HintBinding(GamepadAction.A, aLabel),
             HintBinding(GamepadAction.Y, "Info") { showInfo },
@@ -2834,13 +2853,11 @@ private fun GamesSection(
                         // carousel nothing is focused that has info -- Y acts on
                         // a focused GAME, in a gamelist or on a card -- and the
                         // row said "Info" to a button that did nothing (UI pass
-                        // 2026-09-24, screenshots 01/06). One shoulder stands for
-                        // L/R here (see EsDeThemedHelpSystem's doc comment); it
-                        // is R, the same button every other screen's hint row
-                        // names for switching section, where this one said L.
+                        // 2026-09-24, screenshots 01/06). No shoulder either: L1/R1
+                        // never switch sections (docs/SPEC.md 7j, "Gaming controls"),
+                        // and nothing here is a tab strip they could step.
                         val systemListHints = listOf(
                             GamepadAction.A to "Select",
-                            GamepadAction.R to "Switch section",
                         )
                         val systemView = theme?.views?.get("system")
                         // Same rule as the gamelist's own claim above: a

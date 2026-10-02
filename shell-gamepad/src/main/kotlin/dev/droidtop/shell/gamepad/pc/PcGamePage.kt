@@ -86,6 +86,7 @@ import dev.droidtop.shell.gamepad.input.DeclareLayerHints
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.LocalShellMenus
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.ownPadButtons
@@ -285,6 +286,7 @@ internal fun PcGamePage(
         label = "page hero",
     )
     val shoulderGlyphs = window.showsShoulderGlyphs()
+    val shellMenus = LocalShellMenus.current
 
     // The shell's one footer names this page's buttons (a layer on the hint
     // bar); the page draws no hint row of its own. L1/R1 are named by the
@@ -311,7 +313,7 @@ internal fun PcGamePage(
     ) {
         GatePadInThisDialog()
         HideSystemBarsInThisDialog()
-        DeclareLayerHints(hints)
+        DeclareLayerHints(hints, menusReachable = true)
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -372,6 +374,10 @@ internal fun PcGamePage(
                         // page, and the strip owns them even at its end.
                         GamepadAction.L -> selectTab(tab - 1)
                         GamepadAction.R -> selectTab(tab + 1)
+                        // This window never reaches the shell's root handler, so
+                        // the two menu pills on the footer are answered here.
+                        GamepadAction.START -> shellMenus?.openLeft?.invoke()
+                        GamepadAction.R2 -> shellMenus?.openQuick?.invoke()
                         GamepadAction.A -> when (zone) {
                             PageZone.ACTIONS -> pressButton(button)
                             PageZone.TABS -> if (current.isNotEmpty()) {

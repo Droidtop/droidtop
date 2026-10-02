@@ -57,6 +57,42 @@ fun rememberHintList(bindings: List<HintBinding>): List<Pair<GamepadAction, Stri
     remember(bindings) { derivedStateOf { activeHintPairs(bindings) } }.value
 
 /**
+ * The two menus every Gaming screen has, as the pills its footer begins with
+ * (docs/SPEC.md 7j, "Gaming controls", Droidtop/tracker#273): Start is the
+ * left menu (navigation), R2 the Quick Menu (quick management). One list for
+ * every row that names them: the shell's footer, a layer that keeps them
+ * reachable, the themed Retro Games screen's corner pair ([ShellMenuPills]).
+ */
+val ShellMenuHints: List<HintBinding> = listOf(
+    HintBinding(GamepadAction.START, "Menu"),
+    HintBinding(GamepadAction.R2, "Quick Menu"),
+)
+
+/**
+ * Opens the shell's two menus, for a window of its own (the PC game page is
+ * a Dialog, so the shell's root handler never sees its presses) that wants
+ * Start and R2 to keep their meaning. Null outside the shell.
+ */
+class ShellMenus(val openLeft: () -> Unit, val openQuick: () -> Unit)
+
+val LocalShellMenus = compositionLocalOf<ShellMenus?> { null }
+
+/**
+ * Just the two menu pills, tappable, in a small plate: for a screen whose
+ * help row is not the shell's (a theme draws the legend itself, and a
+ * legend is not tappable), so Start and R2 still have a touch route there.
+ */
+@Composable
+fun ShellMenuPills(modifier: Modifier = Modifier) {
+    TouchHintBar(
+        hints = rememberHintList(ShellMenuHints),
+        modifier = modifier,
+        background = Color.Transparent,
+        fill = false,
+    )
+}
+
+/**
  * A hint row built from [HintBinding]s: [TouchHintBar] over exactly the
  * actions that are bound on this screen right now, with the same
  * background/modifier shape every other row uses. The shell's own footer
@@ -97,7 +133,7 @@ fun HintRow(
 class FocusedHints {
     private var owner: Any? = null
 
-    private class Layer(val owner: Any, val bindings: List<HintBinding>)
+    private class Layer(val owner: Any, val bindings: List<HintBinding>, val menus: Boolean)
 
     private val layers = mutableStateListOf<Layer>()
 
@@ -111,11 +147,18 @@ class FocusedHints {
     /** The topmost open layer's hints, or null while no layer is open; an empty list means the layer draws its own bar. */
     val layerBindings: List<HintBinding>? get() = layers.lastOrNull()?.bindings
 
-    internal fun pushLayer(owner: Any, bindings: List<HintBinding>) {
+    /**
+     * Whether the topmost layer keeps Start and R2 working (the game page does,
+     * a sheet does not: the menus do nothing behind one).
+     */
+    val layerMenus: Boolean get() = layers.lastOrNull()?.menus == true
+
+    internal fun pushLayer(owner: Any, bindings: List<HintBinding>, menus: Boolean) {
         val index = layers.indexOfFirst { it.owner === owner }
         when {
-            index < 0 -> layers.add(Layer(owner, bindings))
-            layers[index].bindings !== bindings -> layers[index] = Layer(owner, bindings)
+            index < 0 -> layers.add(Layer(owner, bindings, menus))
+            layers[index].bindings !== bindings || layers[index].menus != menus ->
+                layers[index] = Layer(owner, bindings, menus)
         }
     }
 
@@ -171,13 +214,33 @@ fun Modifier.declaresHints(bindings: List<HintBinding>): Modifier = composed {
  * while it is composed, the footer shows [bindings] (the panel's own A and B)
  * instead of the screen's underneath. An empty [bindings] hides the bar for a
  * layer that draws its own. Called once per modal surface, by [MenuPanel].
+ * [menusReachable] keeps the Start and R2 menu pills on the bar, for a layer
+ * that answers those two presses itself (the PC game page).
  */
 @Composable
-fun DeclareLayerHints(bindings: List<HintBinding>) {
+fun DeclareLayerHints(bindings: List<HintBinding>, menusReachable: Boolean = false) {
     val host = LocalFocusedHints.current ?: return
     val token = remember { Any() }
-    SideEffect { host.pushLayer(token, bindings) }
+    SideEffect { host.pushLayer(token, bindings, menusReachable) }
     DisposableEffect(host, token) { onDispose { host.popLayer(token) } }
+}
+
+/**
+ * What the footer promises, as one pure answer: a modal layer's own hints
+ * alone (with the [leading] menu pills only when the layer keeps them
+ * reachable, [layerMenus]), otherwise [leading], the focused element's
+ * [declared] hints or the [fallback], then [trailing].
+ */
+internal fun footerBindings(
+    layer: List<HintBinding>?,
+    layerMenus: Boolean,
+    declared: List<HintBinding>?,
+    fallback: List<HintBinding>,
+    leading: List<HintBinding>,
+    trailing: List<HintBinding>,
+): List<HintBinding> = when {
+    layer != null -> (if (layerMenus) leading else emptyList()) + layer
+    else -> leading + (declared ?: fallback) + trailing
 }
 
 /**
@@ -192,18 +255,23 @@ fun FocusedHintRow(
     fallback: List<HintBinding>,
     modifier: Modifier = Modifier,
     background: Color = MenuTokens.HintBar,
+    // The shell's two menu pills ([ShellMenuHints]): what the shell means on
+    // every screen, so a declaration names only what is the focused
+    // element's own.
     leading: List<HintBinding> = emptyList(),
-    // What the shell means on every screen (Start is the left menu), so a
-    // declaration names only what is the focused element's own.
     trailing: List<HintBinding> = emptyList(),
 ) {
     val host = LocalFocusedHints.current
-    // A modal layer owns the bar while it is open: its hints alone, no
-    // trailing ones (Start's menu does nothing behind a sheet).
-    val layer = host?.layerBindings
-    if (layer != null) {
-        HintRow(bindings = layer, modifier = modifier, background = background)
-        return
-    }
-    HintRow(bindings = leading + (host?.bindings ?: fallback) + trailing, modifier = modifier, background = background)
+    HintRow(
+        bindings = footerBindings(
+            layer = host?.layerBindings,
+            layerMenus = host?.layerMenus == true,
+            declared = host?.bindings,
+            fallback = fallback,
+            leading = leading,
+            trailing = trailing,
+        ),
+        modifier = modifier,
+        background = background,
+    )
 }

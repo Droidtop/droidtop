@@ -268,7 +268,7 @@ fun EsDeThemedView(
     // gameselector elements to feed at all.
     focusedSystemEntries: List<LibraryEntry> = emptyList(),
     // Real, currently-relevant button hints for whatever screen [view] is
-    // rendering (e.g. A/Select, Y/Info, L-R/Switch section) -- the theme's
+    // rendering (e.g. A/Select, Y/Info, B/Back) -- the theme's
     // own real <helpsystem> element (see EsDeTheme.kt's schema) only
     // supplies WHERE/HOW to draw them (pos/origin/colors/font/spacing);
     // WHICH actions are currently valid is app state this renderer has no

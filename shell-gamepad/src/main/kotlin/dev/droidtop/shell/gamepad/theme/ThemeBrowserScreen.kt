@@ -47,6 +47,8 @@ import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
+import dev.droidtop.shell.gamepad.input.LocalShellMenus
+import dev.droidtop.shell.gamepad.input.ShellMenuHints
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -303,8 +305,10 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
         // list already leaves it its room (MenuTokens.HintBarRoom). It had
         // none on its own, opened from Settings or onboarding (rig,
         // dq-onboard-01).
+        // Inside the shell (Settings) this screen draws its own row, so the
+        // two menu pills are on it; onboarding has no menus to name.
         HintRow(
-            bindings = listOf(
+            bindings = (if (LocalShellMenus.current != null) ShellMenuHints else emptyList()) + listOf(
                 HintBinding(GamepadAction.A, "Download or update"),
                 HintBinding(GamepadAction.B, "Back"),
             ),
