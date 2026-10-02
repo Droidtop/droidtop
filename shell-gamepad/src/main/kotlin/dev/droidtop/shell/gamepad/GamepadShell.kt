@@ -455,9 +455,15 @@ private fun GamepadShellBody(
     var displayChoice by remember {
         mutableStateOf<DisplayChoiceRequest?>(null)
     }
+    // The launch-static experiment's variant B (tracker#160): the theme's launch sample is held back from the
+    // A press until the launch is really dispatched, which is after this question has been answered.
+    val pendingLaunchSound = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     androidx.compose.runtime.DisposableEffect(Unit) {
         dev.droidtop.library.LaunchDisplay.chooser = { options, canRemember, onChosen ->
             displayChoice = DisplayChoiceRequest(options, canRemember, onChosen)
+        }
+        dev.droidtop.library.LaunchDisplay.beforeDispatch = {
+            if (pendingLaunchSound.getAndSet(false)) EsDeNavigationSounds.play("launch")
         }
         // The dispatch itself runs after the audio hand-off, so a failure
         // there arrives here rather than through library.launch.
@@ -467,6 +473,7 @@ private fun GamepadShellBody(
         }
         onDispose {
             dev.droidtop.library.LaunchDisplay.chooser = null
+            dev.droidtop.library.LaunchDisplay.beforeDispatch = null
             dev.droidtop.library.LaunchDisplay.onLaunchFailed = null
         }
     }
@@ -478,7 +485,13 @@ private fun GamepadShellBody(
                 displayChoice = null
                 request.onChosen(option, rememberChoice)
             },
-            onCancel = { displayChoice = null },
+            onCancel = {
+                displayChoice = null
+                // Backed out: nothing launches, so nothing stays held back or silenced (tracker#160).
+                dev.droidtop.runtime.AudioHandOff.mark("screen question cancelled")
+                pendingLaunchSound.set(false)
+                dev.droidtop.runtime.AudioHandOff.setQuiet("screen question cancelled", false)
+            },
         )
     }
 
@@ -536,7 +549,17 @@ private fun GamepadShellBody(
         // launch (ViewController.cpp:1064-1066 plays LAUNCHSOUND whether
         // or not a launch transition is configured), so it lives here in
         // the ONE launch handler rather than per key-handling site.
-        EsDeNavigationSounds.play("launch")
+        //
+        // The launch-static experiment (tracker#160, docs/SPEC.md "Launch
+        // audio hand-off") decides here when that sample sounds and whether
+        // the rest of droidtop's sound carries on: see LaunchSoundPlan.
+        val soundVariant = dev.droidtop.runtime.LaunchSoundExperiment.variant(context)
+        dev.droidtop.runtime.AudioHandOff.mark("A pressed on a game: launch begins")
+        if (dev.droidtop.runtime.LaunchSoundPlan.launchSoundAtPress(soundVariant)) EsDeNavigationSounds.play("launch")
+        if (dev.droidtop.runtime.LaunchSoundPlan.launchSoundAtDispatch(soundVariant)) pendingLaunchSound.set(true)
+        if (dev.droidtop.runtime.LaunchSoundPlan.quietFromPress(soundVariant)) {
+            dev.droidtop.runtime.AudioHandOff.setQuiet("A pressed", true)
+        }
         scope.launch {
             launchError = null
             launching = entry
@@ -546,6 +569,8 @@ private fun GamepadShellBody(
             runCatching { library.launch(entry) }
                 .onFailure {
                     android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)
+                    pendingLaunchSound.set(false)
+                    dev.droidtop.runtime.AudioHandOff.setQuiet("launch failed", false)
                     launching = null
                     missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled
                     launchError = LaunchFailureMessage.userMessage(entry.title, it)
@@ -559,6 +584,12 @@ private fun GamepadShellBody(
             // arrives sooner.
             kotlinx.coroutines.delay(2500)
             launching = null
+            // A launch that never reached the dispatch (and is not waiting on the screen question) leaves
+            // nothing silenced or held back by the launch-static experiment.
+            if (displayChoice == null && !dev.droidtop.runtime.AudioHandOff.handedOff.value) {
+                pendingLaunchSound.set(false)
+                dev.droidtop.runtime.AudioHandOff.setQuiet("launch settled", false)
+            }
         }
     }
     // What A actually decides (docs/SPEC.md 7i, redecided 2026-09-26): a

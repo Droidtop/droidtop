@@ -92,15 +92,20 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             private fun Activity.isParkedSurface() =
                 this is CompanionActivity || this is dev.droidtop.display.SecondaryDisplayActivity
+            // The launch audio timeline (tracker#160): every droidtop activity transition, with the screen it is on.
+            private fun Activity.note(what: String) =
+                AudioHandOff.mark("${javaClass.simpleName} $what (display ${window?.decorView?.display?.displayId})")
             override fun onActivityPaused(activity: Activity) {
+                activity.note("paused")
                 if (!activity.isParkedSurface()) AudioHandOff.releaseNow("${activity.javaClass.simpleName} paused")
             }
             override fun onActivityResumed(activity: Activity) {
+                activity.note("resumed")
                 if (!activity.isParkedSurface()) AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
             }
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
-            override fun onActivityStarted(activity: Activity) = Unit
-            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivityStarted(activity: Activity) = activity.note("started")
+            override fun onActivityStopped(activity: Activity) = activity.note("stopped")
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
             override fun onActivityDestroyed(activity: Activity) = Unit
         })

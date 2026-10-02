@@ -6547,6 +6547,49 @@ on the other screen (the companion, the cover a launch places on a
 display it vacates) count for neither. Preview video is `USAGE_MEDIA`
 with ExoPlayer audio-focus handling.
 
+**Launch static experiment (2026-10-02, tracker#160).** The static survived
+the hand-off above, and the owner then placed it: it is heard while droidtop
+is still in front, at the "Launch on which screen?" question. The hand-off
+runs only after that question is answered, so it cannot be the cause; the
+console logs agree (one `hand-off (launch)` line, nothing open afterwards).
+What can sound in that window is the theme's `launch` sample (a SoundPool
+stream started at the A press), the preview video's ExoPlayer behind the
+question, and the system's own reaction to the dialog window taking focus.
+The audio sources droidtop owns are: the navigation SoundPool (opened when a
+theme declaring sounds loads, closed by the hand-off), the themed preview
+videos (opened with the video element, closed by the hand-off), and the
+Desktop audio bridge (open only for a Desktop session, closed by the
+hand-off); the microphone bridge, Wine's PulseAudio and the vendored Windows
+runtime hold an output only inside a container or Windows session of
+droidtop's own process, and nothing else (no screensaver, Quick Menu,
+companion, haptic or notification sound) opens an output. The bundled theme's
+samples are not the suspect: the launch sample is 48 kHz stereo 16-bit PCM,
+4.6 s and 888 KB (under SoundPool's 1 MB sample limit) and decays to silence
+before the 3 s play-out cap, and the other six are 48 kHz 16-bit PCM of
+0.1 to 1.9 s.
+Until the cause is known there is a test row, "Launch sound test" in the
+Shell group of Settings, with four variants that change only the window
+between the A press and the dispatch (`LaunchSoundVariant`, `LaunchSoundPlan`,
+unit-tested): A as it works (default); B holds the launch sample back until
+the launch is really dispatched, which is after the question, and the hand-off
+lets it play out; C plays it at the press but pauses and mutes the preview
+video and mutes the other navigation sounds while the question is up
+(`AudioHandOff.setQuiet`; nothing is released); D plays no droidtop sound
+from the press on (no launch sample, preview silenced). The row is removed
+once the cause is fixed and the variant that cured it becomes the behaviour.
+Every audio open, start, stop and release is logged under `droidtop.audio`
+with `t=` (uptimeMillis) and the variant letter (`AudioHandOff.mark`): the
+A press, the question opening, answering or cancelling, the navigation
+samples (file format, load status, plays, stops, the pool release), the
+preview player (registered, playing changes, fade, release), the dispatch,
+`startActivity` called and returned, and every droidtop activity's
+started, resumed, paused and stopped with its display. When a launch is
+dispatched the audio framework's playback and recording configurations
+(uid, pid, state) are logged at the hand-off and 100, 300 and 1000 ms later
+(`AudioHandOff.traceLaunch`, read-only, off the main thread). The launched
+app's own start is read from the system's ActivityTaskManager line in the
+same logcat.
+
 Full real history/reasoning for each of the above (commit-by-commit,
 with citations to the exact real ES-DE source lines each decision was
 verified against) lives in `/root/coordination/HANDOFF.md`'s own theme-engine

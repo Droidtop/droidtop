@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WavDurationTest {
@@ -30,6 +31,24 @@ class WavDurationTest {
     @Test
     fun oddSizedChunksBeforeDataArePaddedAndSkipped() {
         assertEquals(250L, wavDurationMs(wav(dataBytes = 44100, byteRate = 176400, extraChunk = true)))
+    }
+
+    @Test
+    fun headerFieldsAreReadForTheLog() {
+        val info = wavInfo(wav(dataBytes = 88200, byteRate = 176400, extraChunk = false))!!
+        assertEquals(1, info.formatTag)
+        assertEquals(2, info.channels)
+        assertEquals(44100L, info.sampleRate)
+        assertEquals(16, info.bitsPerSample)
+        assertEquals(88200L, info.dataBytes)
+        assertEquals(500L, info.durationMs)
+        assertEquals("format 1, 2 ch, 44100 Hz, 16 bit, 88200 data bytes, 500 ms", info.describe())
+    }
+
+    @Test
+    fun aSampleOverTheSoundPoolLimitIsFlagged() {
+        val info = wavInfo(wav(dataBytes = 2_000_000, byteRate = 176400, extraChunk = false))!!
+        assertTrue(info.describe().contains("over SoundPool's 1 MB sample size"))
     }
 
     @Test

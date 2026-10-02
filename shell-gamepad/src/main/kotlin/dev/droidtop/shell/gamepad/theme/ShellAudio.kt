@@ -23,9 +23,15 @@ object ShellAudio : AudioHandOff.Holder {
     const val FADE_MS = 120L
     private const val FADE_STEPS = 6
 
-    private class Entry(val baseVolume: () -> Float)
+    private class Entry(val baseVolume: () -> Float, val listener: Player.Listener) {
+        /** Whether the video was playing when it was silenced, so unsilencing resumes it. */
+        var resumeOnUnquiet = false
+    }
 
     private val videos = LinkedHashMap<Player, Entry>()
+
+    /** True while the launch-static experiment has the preview silenced and paused ([setQuiet]). */
+    private var quietNow = false
 
     init {
         AudioHandOff.register(this)
@@ -35,11 +41,46 @@ object ShellAudio : AudioHandOff.Holder {
 
     /** A themed video registers its player with the volume it plays at (0 when the theme sets audio=false). */
     fun register(player: Player, baseVolume: () -> Float) {
-        videos[player] = Entry(baseVolume)
+        // The timeline (tracker#160): when the preview's output starts and stops.
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                AudioHandOff.mark("preview video isPlaying=$isPlaying volume=${player.volume}")
+            }
+        }
+        player.addListener(listener)
+        val entry = Entry(baseVolume, listener)
+        videos[player] = entry
+        AudioHandOff.mark("preview video registered (base volume ${baseVolume()}, ${videos.size} open)")
+        if (quietNow) {
+            entry.resumeOnUnquiet = player.playWhenReady
+            player.volume = 0f
+            player.pause()
+        }
     }
 
     fun unregister(player: Player) {
-        videos.remove(player)
+        videos.remove(player)?.let { player.removeListener(it.listener) }
+    }
+
+    /**
+     * The experiment's silence: every preview video is muted and paused
+     * (its player and AudioTrack stay), and resumed at its own volume when
+     * unsilenced. Not the hand-off: nothing is released here.
+     */
+    override fun setQuiet(quiet: Boolean) {
+        if (quiet == quietNow) return
+        quietNow = quiet
+        for ((player, entry) in videos) {
+            if (quiet) {
+                entry.resumeOnUnquiet = player.playWhenReady
+                player.volume = 0f
+                player.pause()
+            } else {
+                player.volume = entry.baseVolume()
+                if (entry.resumeOnUnquiet) player.play()
+            }
+        }
+        AudioHandOff.mark("preview video ${if (quiet) "paused and muted" else "resumed"} (${videos.size} open)")
     }
 
     /** Players this hand-off already released, so the video element's own disposal does not release them twice. */
@@ -48,13 +89,17 @@ object ShellAudio : AudioHandOff.Holder {
     /** The video element is going away: release its player unless a hand-off already did. */
     fun dispose(player: Player) {
         videos.remove(player)
-        if (!released.remove(player)) player.release()
+        if (!released.remove(player)) {
+            AudioHandOff.mark("preview video released (element left the screen)")
+            player.release()
+        }
     }
 
     override suspend fun release(fade: Boolean): String? {
         if (videos.isEmpty()) return null
         val audible = videos.filter { (player, entry) -> player.isPlaying && entry.baseVolume() > 0f }
         if (fade && audible.isNotEmpty()) {
+            AudioHandOff.mark("preview video fade begins (${audible.size} audible, $FADE_MS ms)")
             for (step in 1..FADE_STEPS) {
                 val left = 1f - step.toFloat() / FADE_STEPS
                 audible.forEach { (player, entry) -> player.volume = entry.baseVolume() * left }
@@ -63,12 +108,14 @@ object ShellAudio : AudioHandOff.Holder {
         }
         val players = videos.keys.toList()
         videos.clear()
+        AudioHandOff.mark("preview video stop and release begin (${players.size} player(s))")
         players.forEach {
             it.volume = 0f
             it.stop()
             it.release()
             released += it
         }
+        AudioHandOff.mark("preview video released")
         return "${players.size} ExoPlayer(s) released, ${audible.size} were audible"
     }
 

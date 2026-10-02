@@ -7,6 +7,8 @@ import android.content.pm.ApplicationInfo
 import android.util.Log
 import android.view.Display
 import dev.droidtop.runtime.AudioHandOff
+import dev.droidtop.runtime.LaunchSoundExperiment
+import dev.droidtop.runtime.LaunchSoundPlan
 import dev.droidtop.runtime.tasks.LaunchLedger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -116,6 +118,15 @@ object LaunchDisplay {
     var onLaunched: ((Int?) -> Unit)? = null
 
     /**
+     * Invoked on the main thread as every launch is dispatched, before the
+     * audio hand-off: the shell plays a held-back launch sample here when
+     * the launch-static experiment is on variant B (docs/SPEC.md "Launch
+     * audio hand-off", Droidtop/tracker#160).
+     */
+    @Volatile
+    var beforeDispatch: (() -> Unit)? = null
+
+    /**
      * Invoked just BEFORE the launch intent is dispatched, with the
      * display the launch is going to. The shell hooks this to place
      * droidtop's idle surface on any secondary display the launch is
@@ -161,16 +172,23 @@ object LaunchDisplay {
                 runningGame = ctx
                 startOn(context, intent, decision.displayId)
             }
-            LaunchScreenResolution.Decision.Ask -> ask!!(options!!, ctx != null) { chosen, remember ->
-                if (remember && ctx != null) {
-                    LaunchScreenMemory.setGameChoice(
-                        context,
-                        ctx.gameId,
-                        LaunchScreenResolution.screenFor(chosen.displayId, secondDisplayId),
-                    )
+            LaunchScreenResolution.Decision.Ask -> {
+                val variant = LaunchSoundExperiment.variant(context)
+                AudioHandOff.mark("screen question opened (${options!!.size} screens)")
+                // Variants C and D: nothing of droidtop's may sound behind the question (tracker#160).
+                if (LaunchSoundPlan.quietWhileChooser(variant)) AudioHandOff.setQuiet("screen question open", true)
+                ask!!(options, ctx != null) { chosen, remember ->
+                    AudioHandOff.mark("screen question answered")
+                    if (remember && ctx != null) {
+                        LaunchScreenMemory.setGameChoice(
+                            context,
+                            ctx.gameId,
+                            LaunchScreenResolution.screenFor(chosen.displayId, secondDisplayId),
+                        )
+                    }
+                    runningGame = ctx
+                    startOn(context, intent, chosen.displayId)
                 }
-                runningGame = ctx
-                startOn(context, intent, chosen.displayId)
             }
         }
     }
@@ -221,11 +239,18 @@ object LaunchDisplay {
      */
     private fun startOn(context: Context, intent: Intent, displayId: Int?) {
         dispatchScope.launch {
+            LaunchSoundExperiment.variant(context)
+            AudioHandOff.mark("launch dispatch: display ${displayId ?: "default"}")
+            // The launch-static experiment's variant B plays the theme's launch sample here, once the launch
+            // is certain, instead of at the A press; the hand-off below lets it play out (docs/SPEC.md).
+            beforeDispatch?.invoke()
+            AudioHandOff.traceLaunch(context)
             AudioHandOff.release("launch")
             try {
                 dispatch(context, intent, displayId)
             } catch (e: Exception) {
                 Log.e("droidtop.LaunchDisplay", "Launch failed", e)
+                AudioHandOff.setQuiet("launch failed", false)
                 AudioHandOff.reopen("launch failed")
                 onLaunchFailed?.invoke(e)
             }
@@ -257,7 +282,9 @@ object LaunchDisplay {
         // lands where we actually asked, and parkedDisplayId tracks it.
         val resolvedDisplayId = displayId ?: Display.DEFAULT_DISPLAY
         val launchedAtMs = System.currentTimeMillis()
+        AudioHandOff.mark("startActivity called (${packageName ?: "unresolved package"}, display $resolvedDisplayId)")
         context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(resolvedDisplayId).toBundle())
+        AudioHandOff.mark("startActivity returned")
         runningPackageName = packageName
         // The one place every app droidtop starts passes: the task manager's list of what droidtop opened,
         // and the app the Quick Menu's Quit row ends (docs/SPEC.md "The task manager").

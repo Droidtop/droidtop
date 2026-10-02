@@ -8,8 +8,11 @@ import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.runtime.AudioHandOff
 import java.io.File
 import java.io.RandomAccessFile
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -115,8 +118,16 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
     @Volatile
     private var soundIdByName: Map<String, Int> = emptyMap()
 
+    /** Quiet: the launch-static experiment mutes every navigation sound but the launch sample ([setQuiet]). */
+    @Volatile private var quiet = false
+
+    /** Paths whose file format [load] already logged (main thread only). */
+    private val describedPaths = mutableSetOf<String>()
+
+    private val ioScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
+
     private fun obtainPool(): SoundPool = soundPool ?: SoundPool.Builder()
-        .setMaxStreams(4)
+        .setMaxStreams(MAX_STREAMS)
         .setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
@@ -124,7 +135,14 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
                 .build(),
         )
         .build()
-        .also { soundPool = it }
+        .also {
+            // A sample the pool cannot decode reports a non-zero status here, and then plays as nothing or noise.
+            it.setOnLoadCompleteListener { _, sampleId, status ->
+                AudioHandOff.mark("navigation sample $sampleId load complete, status $status (0 is ok)")
+            }
+            soundPool = it
+            AudioHandOff.mark("SoundPool created (max $MAX_STREAMS streams, sonification usage)")
+        }
 
     /**
      * (Re)binds the seven navigation-sound names to whatever [theme]
@@ -156,7 +174,20 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
         soundIdByName = buildMap {
             for ((name, path) in declared) {
                 if (!File(path).exists()) continue
-                put(name, soundIdsByPath.getOrPut(path) { pool.load(path, 1) })
+                put(name, soundIdsByPath.getOrPut(path) { pool.load(path, 1).also { AudioHandOff.mark("navigation sample $it = $name, loading") } })
+            }
+        }
+        // What each file really is (format, rate, channels, bit depth, size), read off the main thread (tracker#160).
+        for ((name, path) in declared) {
+            if (!describedPaths.add(path)) continue
+            ioScope.launch {
+                val file = File(path)
+                val info = wavInfo(file)
+                AudioHandOff.mark(
+                    "navigation sample file $name: " +
+                        (info?.describe() ?: "not a plain RIFF wav, SoundPool decodes it itself") +
+                        ", ${file.length()} bytes",
+                )
             }
         }
     }
@@ -167,17 +198,32 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
         // shell, so the user is back even if no activity was paused (a
         // launch onto the other screen of a dual-screen device).
         if (AudioHandOff.handedOff.value) {
+            AudioHandOff.mark("play $name: droidtop is handed off, reopening instead")
             AudioHandOff.reopen("navigation input")
             return
         }
-        val id = soundIdByName[name] ?: return
-        val stream = soundPool?.play(id, 1f, 1f, 1, 0, 1f) ?: return
-        if (stream == 0) return
+        if (quiet && name != "launch") {
+            AudioHandOff.mark("play $name: skipped, droidtop sounds are silenced")
+            return
+        }
+        val id = soundIdByName[name]
+        val stream = if (id != null) soundPool?.play(id, 1f, 1f, 1, 0, 1f) else null
+        if (stream == null || stream == 0) {
+            AudioHandOff.mark("play $name: nothing played (${if (id == null) "no sample bound" else "sample $id refused: not loaded yet, or no stream"})")
+            return
+        }
         val sounding = Sounding(stream, pathByName[name], SystemClock.elapsedRealtime())
-        synchronized(liveStreams) {
+        val live = synchronized(liveStreams) {
             liveStreams.addLast(sounding)
             while (liveStreams.size > MAX_STREAMS) liveStreams.removeFirst()
+            liveStreams.size
         }
+        AudioHandOff.mark("play $name: sample $id stream $stream started ($live live)")
+    }
+
+    /** See [quiet]; the launch sample itself is the one thing it never mutes. */
+    override fun setQuiet(quiet: Boolean) {
+        this.quiet = quiet
     }
 
     /**
@@ -206,13 +252,16 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
             }
             if (left > 0) {
                 waited = left
+                AudioHandOff.mark("navigation sounds: waiting $left ms for the sounding sample")
                 delay(left)
             }
         }
+        AudioHandOff.mark("navigation sounds: stopping ${streams.size} stream(s), releasing the SoundPool")
         streams.forEach { pool.stop(it.streamId) }
         val samples = soundIdsByPath.size
         pool.release()
         soundPool = null
+        describedPaths.clear()
         soundIdsByPath.clear()
         soundIdByName = emptyMap()
         return "SoundPool released ($samples samples; waited ${waited} ms for a sounding sample to finish)"
@@ -229,13 +278,44 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
     private val liveStreams = ArrayDeque<Sounding>()
 }
 
+/** What a .wav file's RIFF header says about it: the format a SoundPool has to decode. */
+internal class WavInfo(
+    val formatTag: Int,
+    val channels: Int,
+    val sampleRate: Long,
+    val byteRate: Long,
+    val bitsPerSample: Int,
+    val dataBytes: Long,
+) {
+    val durationMs: Long? get() = if (byteRate > 0) dataBytes * 1000 / byteRate else null
+
+    /** One line for the log; flags what SoundPool is known to handle badly (anything but 16-bit integer PCM, a big sample). */
+    fun describe(): String {
+        val flags = buildList {
+            if (formatTag != 1) add("format tag $formatTag is not plain integer PCM")
+            if (bitsPerSample != 16) add("$bitsPerSample bit is not 16 bit")
+            if (dataBytes > ONE_MEBIBYTE) add("over SoundPool's 1 MB sample size")
+        }
+        return "format $formatTag, $channels ch, $sampleRate Hz, $bitsPerSample bit, $dataBytes data bytes, " +
+            "${durationMs ?: "unknown"} ms" + if (flags.isEmpty()) "" else " (${flags.joinToString("; ")})"
+    }
+
+    private companion object {
+        const val ONE_MEBIBYTE = 1024L * 1024L
+    }
+}
+
 /**
- * A PCM .wav file's playing time from its RIFF header (the `fmt ` chunk's
- * byte rate and the `data` chunk's size), or null when it is not one.
- * Reads only the chunk headers.
+ * A PCM .wav file's RIFF header (the `fmt ` chunk's fields and the `data`
+ * chunk's size), or null when it is not one. Reads only the chunk headers.
  */
-internal fun wavDurationMs(file: File): Long? = runCatching {
+internal fun wavInfo(file: File): WavInfo? = runCatching {
     RandomAccessFile(file, "r").use { raf ->
+        fun u16(): Int {
+            val b = ByteArray(2)
+            raf.readFully(b)
+            return (b[0].toInt() and 0xFF) or ((b[1].toInt() and 0xFF) shl 8)
+        }
         fun u32(): Long {
             val b = ByteArray(4)
             raf.readFully(b)
@@ -246,20 +326,31 @@ internal fun wavDurationMs(file: File): Long? = runCatching {
         if (tag() != "RIFF") return@use null
         u32()
         if (tag() != "WAVE") return@use null
+        var formatTag = 0
+        var channels = 0
+        var sampleRate = 0L
         var byteRate = 0L
+        var bits = 0
         while (raf.filePointer + 8 <= raf.length()) {
             val id = tag()
             val size = u32()
             val body = raf.filePointer
             when (id) {
                 "fmt " -> {
-                    raf.seek(body + 8)
+                    formatTag = u16()
+                    channels = u16()
+                    sampleRate = u32()
                     byteRate = u32()
+                    u16()
+                    bits = u16()
                 }
-                "data" -> return@use if (byteRate > 0) size * 1000 / byteRate else null
+                "data" -> return@use if (byteRate > 0) WavInfo(formatTag, channels, sampleRate, byteRate, bits, size) else null
             }
             raf.seek(body + size + (size and 1))
         }
         null
     }
 }.getOrNull()
+
+/** A PCM .wav file's playing time, or null when it is not one (see [wavInfo]). */
+internal fun wavDurationMs(file: File): Long? = wavInfo(file)?.durationMs

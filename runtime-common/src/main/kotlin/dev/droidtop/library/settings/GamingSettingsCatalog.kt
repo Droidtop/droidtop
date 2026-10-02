@@ -7,6 +7,9 @@ import dev.droidtop.library.theme.EsDeAspectRatio
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.library.theme.ThemePrefs
+import dev.droidtop.runtime.LaunchSoundExperiment
+import dev.droidtop.runtime.LaunchSoundPlan
+import dev.droidtop.runtime.LaunchSoundVariant
 import dev.droidtop.runtime.tasks.text
 
 /**
@@ -44,6 +47,7 @@ object GamingSettingsCatalog {
     const val ID_SCRAPER = "pref_gaming_scraper"
     const val ID_ACCOUNTS_AND_SOURCES = "pref_gaming_accounts_and_sources"
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
+    const val ID_LAUNCH_SOUND_EXPERIMENT = "pref_gaming_launch_sound_experiment"
     const val ID_UI_MODE = "pref_gaming_ui_mode"
     const val ID_CONSOLE_SYSTEMS = "pref_gaming_console_systems"
     const val ID_EMULATORS = "pref_gaming_emulators"
@@ -166,6 +170,21 @@ object GamingSettingsCatalog {
                                 runCatching { ScreensaverMode.valueOf(value) }.getOrDefault(ScreensaverMode.OFF),
                             )
                         },
+                    ),
+                )
+                // A test, for tracking down the burst of static some people hear when a game starts
+                // (docs/SPEC.md "Launch audio hand-off", tracker#160). Remove once the cause is fixed.
+                add(
+                    ChoiceItem(
+                        id = ID_LAUNCH_SOUND_EXPERIMENT,
+                        title = "Launch sound test",
+                        subtitle = "For finding the burst of static when a game starts. A is how it works. " +
+                            "B plays the launch sound once the screen question is answered. " +
+                            "C silences the preview while that question is up. " +
+                            "D plays no droidtop sound while launching",
+                        options = LaunchSoundVariant.entries.map { ChoiceOption(it.name, it.label) },
+                        current = LaunchSoundExperiment.variant(context).name,
+                        onSelect = { ctx, value -> LaunchSoundExperiment.set(ctx, LaunchSoundPlan.parse(value)) },
                     ),
                 )
             },
