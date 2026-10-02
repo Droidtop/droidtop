@@ -10034,7 +10034,10 @@ the pipeline applies it.
 
 **The art is the interface.** A capsule with art draws the art and its
 corner badges and nothing else; a capsule without art draws a plate with
-the name and kind (never a made-up cover). The corners, each at most one
+the name and kind (never a made-up cover), centred on the plate: a shelf
+low on the screen is cut off by the footer until it is scrolled to, and a
+name on the bottom edge made those plates look empty and collided with the
+bottom corner marks (Droidtop/tracker#273, build 1397). The corners, each at most one
 mark, all from state already on the entry or in the live download map, so
 a card costs no lookup of its own: top-left the game's state
 (`CapsuleStatus`, from `capsuleStatusOf`): a download's percent or Paused,

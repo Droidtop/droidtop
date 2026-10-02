@@ -200,10 +200,15 @@ internal fun PcCapsule(
         } else {
             // No art: the plate carries the name, as the Deck does for
             // a non-Steam shortcut with no artwork. Never a made-up
-            // cover (design language, 2026-09-17).
+            // cover (design language, 2026-09-17). Centred, not on the
+            // bottom edge: a shelf low on the screen shows its cards cut
+            // off by the footer until it is scrolled to, and a name on
+            // the bottom edge left those plates looking empty; the bottom
+            // corner marks (source, copies) also sat on its second line
+            // (console, build 1397, Droidtop/tracker#273).
             Column(
                 modifier = Modifier.fillMaxSize().padding(Space.Md),
-                verticalArrangement = Arrangement.Bottom,
+                verticalArrangement = Arrangement.Center,
             ) {
                 Text(
                     title,
