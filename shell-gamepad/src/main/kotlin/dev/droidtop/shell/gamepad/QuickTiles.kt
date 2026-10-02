@@ -140,7 +140,10 @@ object QuickTiles {
         GamingSettingsCatalog.ID_SYSTEM_BATTERY -> QuickGlyph.BATTERY
         GamingSettingsCatalog.ID_SYSTEM_UPDATES -> QuickGlyph.UPDATE
         GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS -> QuickGlyph.ANDROID
-        GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE -> QuickGlyph.EXIT
+        GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE,
+        GamingSettingsCatalog.ID_SYSTEM_CLOSE_APP,
+        GamingSettingsCatalog.ID_SYSTEM_CLEAR_ALL,
+        -> QuickGlyph.EXIT
         GamingSettingsCatalog.ID_SYSTEM_SWITCH_MODE -> QuickGlyph.SWAP
         GamingSettingsCatalog.ID_SYSTEM_OPEN_SETTINGS -> QuickGlyph.SETTINGS
         GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET -> QuickGlyph.DISPLAY
