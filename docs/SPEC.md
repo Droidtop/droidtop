@@ -12853,9 +12853,8 @@ the secondary path for sources that publish no key.
   against droidtop's registered OAuth app. Its client id is a public identifier
   compiled in (`GitHubOAuth.CLIENT_ID`); the device flow needs no client secret
   and droidtop holds none. The screen asks GitHub for a device code and shows
-  the short user code and `github.com/login/device`, with a countdown and a row
-  that opens that page in this device's browser (the code can equally be typed
-  on any other device); B, or leaving the screen (`CatalogScreen.onLeave`),
+  the short user code and `github.com/login/device`, with a countdown (the code is
+  typed on any device); B, or leaving the screen (`CatalogScreen.onLeave`),
   cancels. Polling runs off the main thread, waits the interval GitHub states,
   lengthens it on `slow_down` (to the value GitHub sends, otherwise by five
   seconds), and ends as: signed in, denied, expired, cancelled, offline (three
@@ -12865,15 +12864,23 @@ the secondary path for sources that publish no key.
   (`GitHubCredentialStore`, Keystore-backed on the device) and one
   orchestrator (`GitHubAccount`) that both ways in use, so a token is checked,
   labelled with its login and stored the same way however it arrived.
-  **Scope.** Two rows, so the person chooses: "Sign in with GitHub" asks for no
-  scope (public information, and the higher request limit) and is all that
-  public repositories need; "Sign in, with access to private repositories" asks
-  for `repo`, the smallest scope GitHub offers for private repositories. GitHub
-  has no read-only variant for an OAuth app, so the row says on screen that the
-  permission also allows changes, that droidtop only reads, and that a pasted
-  fine-grained read-only token is the narrower alternative. Signing out removes
+  **One account row (owner, 2026-10-02, Droidtop/tracker#290: "we should just
+  allow the api token, or an oauth login, and that does NOT require multiple
+  lines"; "that's the menu that SHOULD hold credentials").** GitHub is ONE row,
+  "GitHub", in Accounts and sources, group "Accounts", with the stores. Its value
+  reads "Signed in as <login>" or "Not signed in". Opening it shows the status,
+  "Sign in with GitHub" (the device flow, no scope), "Paste a token" (checked with
+  GitHub before it is kept) and, when signed in, "Sign out". No other screen
+  carries a GitHub sign-in, token, test or scope row: Plugins and Plugin
+  repositories do not repeat it, and a message that needs GitHub names Accounts
+  and sources. **Scope.** The private-repository permission (`repo`, the smallest
+  scope GitHub offers for private repositories; there is no read-only variant for
+  an OAuth app) is asked only when a private repository is added: a look-up that
+  fails while signed out, or signed in without it, offers "Allow private
+  repositories", which repeats the device flow with `repo` and then looks again.
+  A pasted token is never widened this way; paste a new one. Signing out removes
   the token from the device; GitHub keeps the authorisation until the person
-  revokes it in their GitHub settings, and the screen says that too.
+  revokes it in their GitHub settings.
 - **Plugin repositories (owner, 2026-10-01, Droidtop/tracker#259: add the
   repository, trust its key automatically, and auto-update).** Plugins screen,
   "Plugin repositories": the person types `owner/name` (or pastes the address
@@ -12922,11 +12929,7 @@ the secondary path for sources that publish no key.
   rate limit keeps the earlier list. Plugin repositories shows the not-yet-trusted
   ones as "Found for you"; choosing one runs the same committed-key lookup and the
   same confirmation as a typed name, so detection never trusts anything. The private
-  scope is incremental: sign-in asks for none, and "Include private repositories"
-  (shown when the token lacks it, and hinted when a lookup of a private repository
-  fails) repeats the sign-in with `repo`, saying on screen that GitHub only offers a
-  broad read and write scope for private repositories, that droidtop only reads,
-  and that a pasted fine-grained read-only token is the narrower option.
+  scope is incremental, as described under the one account row.
 - **Auto-update from a trusted repository (Droidtop/tracker#259).**
   `PluginRepoUpdates.runDue` rides on the Software updates pass
   (`AppSelfUpdate.maybeCheck`: its frequency, its off switch, its process-start

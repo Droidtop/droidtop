@@ -1445,8 +1445,9 @@ object AppSettingsCatalogs {
         listOf(
             CatalogGroup(
                 id = "accounts_stores",
-                title = "Store accounts",
+                title = "Accounts",
                 items = listOf(
+                    GitHubAccountCatalog.accountRow(context),
                     // Each store's sign-in, library and sync live on its own page in Stores (docs/SPEC.md 7j "Places").
                     NestedScreenItem(
                         id = "accounts_stores_link",
@@ -1515,7 +1516,6 @@ object AppSettingsCatalogs {
                         valueLabel = { if (activeIntegrations == 0) "none" else "$activeIntegrations active" },
                         icon = CatalogIcon.INTEGRATIONS,
                     ),
-                    GitHubAccountCatalog.accountRow(context),
                 ),
             ),
         )
