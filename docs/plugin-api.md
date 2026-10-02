@@ -594,8 +594,11 @@ context/new calls/etc that other plugins can use."*
 
 ### 2.1 What this changes
 
-- **Root and Shizuku are not host features.** The host has no root API
-  and no Shizuku API. Privileged operations come from **provider
+- **Root and Shizuku are not host features for plugins.** The host has
+  no root API and offers no Shizuku API to a plugin. (droidtop itself
+  also reads the system Shizuku API for its own `PrivilegedShell`
+  backend, docs/SPEC.md "The task manager"; that is not exposed to
+  plugins.) Privileged operations come from **provider
   plugins**: the official `droidtop-plugin-shizuku` (ADB-level privilege
   through Shizuku) and the official `droidtop-plugin-mmrl` (root, and
   Magisk/KernelSU/APatch module management), plus any others. What the

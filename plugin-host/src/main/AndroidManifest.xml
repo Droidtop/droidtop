@@ -21,8 +21,10 @@
           and calls sendBinder on it, so the provider has to exist for the
           Shizuku provider plugin to work at all. It lives in :pluginhost, the
           process the plugin runs in, so the binder arrives where it is used.
-          Only the official Shizuku provider plugin uses it (docs/plugin-api.md
-          2.7); every other plugin reaches privilege through the priv.* APIs.
+          The Shizuku provider plugin uses it (docs/plugin-api.md 2.7) and so
+          does droidtop's own main process, which shares the binder through
+          Shizuku's multi-process support (ShizukuTransport, SystemShizukuOps).
+          Every other plugin reaches privilege through the priv.* APIs.
           The permission is the one Shizuku's own documentation asks for: only
           the Shizuku server (the shell or root) holds it.
         -->

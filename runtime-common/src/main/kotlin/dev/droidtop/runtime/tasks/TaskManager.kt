@@ -130,7 +130,7 @@ object TaskManager {
             RunningSnapshot(RunningListing.fromLedger(LaunchLedger.entries(), hidden, label), Fidelity.LAUNCHED_ONLY, note)
         }
         if (!shell.capabilities().listTasks) {
-            return fromLedger("Without the Shizuku plugin droidtop can list only the apps it opened itself, and cannot tell which of them you have since closed.")
+            return fromLedger("Without Shizuku droidtop can list only the apps it opened itself, and cannot tell which of them you have since closed.")
         }
         val out = try {
             shell.exec(ActivityDump.COMMAND)

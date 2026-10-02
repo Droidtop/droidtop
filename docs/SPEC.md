@@ -2592,9 +2592,10 @@ the stack. One mechanism serves every surface: `TaskManager` in `:runtime-common
 a close path of its own. Every call works off the main thread.
 
 - **Ending an app: one path, strongest first** (`TaskPolicy.closeSteps`, `AppCloser`):
-  1. A `priv.packages` provider force-stops the package (the official Shizuku plugin, or a root
-     provider: root and Shizuku are provider plugins reached through `PrivilegedShell`, never code in
-     the task manager, and root is only ever an enhancement behind the same interface).
+  1. The active `PrivilegedShell` backend force-stops the package (the Shizuku app or Sui, or a
+     `priv.packages` provider plugin such as the official Shizuku plugin or a root provider: all are
+     reached through `PrivilegedShell`, never code in the task manager, and root is only ever an
+     enhancement behind the same interface).
   2. `ActivityManager.killBackgroundProcesses` (the `KILL_BACKGROUND_PROCESSES` normal permission),
      always tried last. It ends a process only while it is cached, and nothing confirms the result, so
      it is never reported as a close.
@@ -2605,7 +2606,7 @@ a close path of its own. Every call works off the main thread.
 - **The outcome is stated, never assumed** (`CloseOutcome`): `Closed` only when a provider confirmed
   the force-stop; `Requested` when droidtop only asked Android and cannot tell; `Failed` with the
   provider's own words. `Requested` and `Failed` always end with the same plain sentence
-  (`TaskPolicy.ENABLE_HINT`): what Android does not allow and that the Shizuku plugin lifts it. A
+  (`TaskPolicy.ENABLE_HINT`): what Android does not allow and that Shizuku lifts it. A
   surface never does nothing silently, and only `Closed` is the Quick Menu's `QuitResult.Ended`
   (droidtop's running-game state clears on that alone, as the rule above already says).
 - **The app in front is what droidtop last started.** `LaunchDisplay.dispatch`, the one point every
@@ -2667,15 +2668,23 @@ a close path of its own. Every call works off the main thread.
     include an app the user already closed, so Clear all may ask Android about it too; that is
     harmless.
 
-**Privileged actions go through Shizuku or Sui (Droidtop/tracker#262).** `PrivilegedShell` in
-`:runtime-common` is the only privileged boundary used by task management. Its capability snapshot
-names listing tasks, force-stop, shell commands and permission grants; `:app` installs the active
-implementation. `PluginPrivilegedOps` adapts the existing plugin broker (`priv.packages` and
-`priv.shell`, served by the official Shizuku plugin) to that interface. Sui, the Magisk module,
-exposes the same Shizuku API, so one hook covers both. droidtop has no adb client, no pairing flow and
-no stored adb keys of its own, and makes no `su` call: elevated actions are Shizuku's. The task
-manager does not know which provider supplied a capability. No permission-grant operation is
-advertised by the existing plugin adapter until a provider actually implements one.
+**Privileged actions go through Shizuku or Sui, from one of two backends (Droidtop/tracker#262, #72).**
+`PrivilegedShell` in `:runtime-common` is the only privileged boundary used by task management and the
+companion's controls; its capability snapshot names listing tasks, force-stop, shell commands (appops,
+`svc`/`cmd` radios, package install) and permission grants. `ElevatedShell`, the one instance `TaskManager`
+holds, forwards to the backend the user picked in Settings > Accounts and sources > Elevated access (Auto,
+Shizuku app, Shizuku plugin, Off). The **Shizuku app** backend (`SystemShizukuOps`) uses the official Shizuku
+app, or Sui (the Magisk module, same API), through the Shizuku API in droidtop's own process: the binder
+arrives in `:pluginhost` and `ShizukuTransport` shares it with the main process through Shizuku's built-in
+multi-process support (Sui is asked directly); droidtop asks Shizuku for permission with
+`Shizuku.requestPermission`, and commands run through `Shizuku.newProcess` (private since Shizuku 13, reached
+by reflection as the plugin does). The **Shizuku plugin** backend (`PluginPrivilegedOps`) adapts the plugin
+broker (`priv.packages`, `priv.shell`). The owner's trade-off: the plugin integrates more directly with
+droidtop; the official app gives control and independent updates, updated by its own developers and working
+as it normally would. Auto takes the first backend that is ready, the app before the plugin; a named backend
+is never swapped for the other. The row offers only what is present and is absent when neither is, and a
+privileged control is drawn only while the active backend reports its capability, so with no backend none
+appears. droidtop has no adb client, no pairing flow and no stored adb keys, and makes no `su` call.
 
 ## 4a. Networking & VPN (directed 2026-08-30)
 

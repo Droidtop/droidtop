@@ -74,9 +74,10 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 else -> id
             }
         }
-        // The task manager asks a running provider plugin (Shizuku, or a root one) to force-stop an app and
-        // to read the system's task list; with none, it says what to enable (docs/SPEC.md "The task manager").
-        dev.droidtop.runtime.tasks.TaskManager.install(dev.droidtop.pluginhost.PluginPrivilegedOps(this))
+        // The task manager asks one privileged shell to force-stop an app and to read the system's task list:
+        // the Shizuku app (or Sui) or the Shizuku plugin, whichever the user picked; with none, it says what to
+        // enable (docs/SPEC.md "The task manager"). Runs in every process: the binder is shared across them.
+        dev.droidtop.pluginhost.ElevatedAccessHost.install(this)
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).
         LibraryCore.followGamesRoots(this)

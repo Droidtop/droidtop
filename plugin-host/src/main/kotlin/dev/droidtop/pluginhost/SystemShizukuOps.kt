@@ -1,0 +1,204 @@
+package dev.droidtop.pluginhost
+
+import android.app.Application
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import dev.droidtop.runtime.tasks.BackendState
+import dev.droidtop.runtime.tasks.ElevatedBackend
+import dev.droidtop.runtime.tasks.ForceStopResult
+import dev.droidtop.runtime.tasks.ShellOutput
+import dev.droidtop.runtime.tasks.TaskPrivileges
+import java.io.File
+import java.io.InputStream
+import java.util.concurrent.TimeUnit
+import rikka.shizuku.Shizuku
+import rikka.shizuku.ShizukuProvider
+import rikka.sui.Sui
+
+/**
+ * The system Shizuku as a [PrivilegedShell][dev.droidtop.runtime.tasks.PrivilegedShell] backend: the official Shizuku
+ * app, or Sui (the Magisk module, which exposes the same API), reached through the Shizuku API in droidtop's own
+ * process. It is the other backend beside [PluginPrivilegedOps]; the user picks (docs/SPEC.md "The task manager").
+ * droidtop calls no `su` and holds no root: the commands run in Shizuku's server, as the ADB shell user or as root
+ * where Shizuku itself was started with root.
+ *
+ * Capabilities: force-stop, the system task list and any other command through [exec] (appops, `svc` and `cmd`
+ * radios, package install and uninstall), and [grantPermission]. Calls block on Shizuku's server: callers run them
+ * off the main thread.
+ */
+class SystemShizukuOps : ElevatedBackend {
+    override fun state(): BackendState {
+        ShizukuTransport.ensureStarted()
+        val alive = runCatching { Shizuku.pingBinder() && !Shizuku.isPreV11() }.getOrDefault(false)
+        if (!alive) return BackendState.ABSENT
+        val allowed = runCatching { Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED }.getOrDefault(false)
+        return if (allowed) BackendState.READY else BackendState.NEEDS_PERMISSION
+    }
+
+    override fun capabilities(): TaskPrivileges =
+        if (state() == BackendState.READY) TaskPrivileges(forceStop = true, shell = true, grantPermission = true) else TaskPrivileges.NONE
+
+    override fun available(): TaskPrivileges = capabilities()
+
+    override fun forceStop(packageName: String): ForceStopResult {
+        if (!PACKAGE_NAME.matches(packageName)) return ForceStopResult.Failed("not a package name")
+        notReady()?.let { return ForceStopResult.Failed(it) }
+        val out = run(listOf("am", "force-stop", packageName), STOP_TIMEOUT_MS) ?: return ForceStopResult.Failed("Shizuku did not answer in time")
+        return if (out.exit == 0) ForceStopResult.Stopped else ForceStopResult.Failed(out.stderr.ifBlank { "am force-stop exited with ${out.exit}" })
+    }
+
+    override fun exec(argv: List<String>): ShellOutput? {
+        if (argv.isEmpty() || argv.size > MAX_ARGS || argv.any { it.isEmpty() || it.length > MAX_ARG_LENGTH }) return null
+        if (notReady() != null) return null
+        return run(argv, EXEC_TIMEOUT_MS)
+    }
+
+    override fun grantPermission(packageName: String, permission: String): Boolean {
+        if (!PACKAGE_NAME.matches(packageName) || !PERMISSION_NAME.matches(permission)) return false
+        if (notReady() != null) return false
+        return run(listOf("pm", "grant", packageName, permission), STOP_TIMEOUT_MS)?.exit == 0
+    }
+
+    /**
+     * Asks Shizuku to show its own dialog allowing droidtop. False when there is no Shizuku to ask. The answer is
+     * not awaited: [state] turns READY once the user has said yes.
+     */
+    fun requestPermission(): Boolean =
+        runCatching {
+            if (!Shizuku.pingBinder() || Shizuku.isPreV11()) {
+                false
+            } else {
+                Shizuku.requestPermission(REQUEST_CODE)
+                true
+            }
+        }.getOrDefault(false)
+
+    /** Null when Shizuku can run a command now, otherwise a short reason. */
+    private fun notReady(): String? = when (state()) {
+        BackendState.READY -> null
+        BackendState.NEEDS_PERMISSION -> "droidtop is not allowed in Shizuku"
+        BackendState.ABSENT -> "Shizuku is not running"
+    }
+
+    /**
+     * Runs [argv] in Shizuku's server directly (never through a shell). Null when it does not finish within
+     * [timeoutMs], or Shizuku cannot start it. `Shizuku.newProcess` is private since Shizuku 13, so it is reached by
+     * reflection, as the Shizuku provider plugin does; a user service would add a second process for the same effect.
+     */
+    private fun run(argv: List<String>, timeoutMs: Long): ShellOutput? {
+        val process = try {
+            val method = Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java,
+            )
+            method.isAccessible = true
+            method.invoke(null, argv.toTypedArray(), null, null) as Process
+        } catch (t: Throwable) {
+            return null
+        }
+        val out = Capture(process.inputStream)
+        val err = Capture(process.errorStream)
+        out.start()
+        err.start()
+        return try {
+            if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
+                null
+            } else {
+                out.join(STREAM_JOIN_MS)
+                err.join(STREAM_JOIN_MS)
+                ShellOutput(process.exitValue(), out.text(), err.text())
+            }
+        } finally {
+            runCatching { process.destroy() }
+        }
+    }
+
+    /** Reads one stream on its own thread so a full pipe never stalls the command, keeping the first [MAX_STREAM_CHARS] characters. */
+    private class Capture(private val stream: InputStream) : Thread() {
+        private val text = StringBuilder()
+
+        override fun run() {
+            val buffer = CharArray(4096)
+            runCatching {
+                stream.bufferedReader().use { reader ->
+                    while (true) {
+                        val n = reader.read(buffer)
+                        if (n < 0) break
+                        synchronized(text) { if (text.length < MAX_STREAM_CHARS) text.append(buffer, 0, minOf(n, MAX_STREAM_CHARS - text.length)) }
+                    }
+                }
+            }
+        }
+
+        fun text(): String = synchronized(text) { text.toString().trim() }
+    }
+
+    companion object {
+        private const val REQUEST_CODE = 1
+        private const val MAX_ARGS = 64
+        private const val MAX_ARG_LENGTH = 4096
+        private const val MAX_STREAM_CHARS = 1024 * 1024
+        private const val STREAM_JOIN_MS = 500L
+        private const val STOP_TIMEOUT_MS = 8_000L
+        private const val EXEC_TIMEOUT_MS = 15_000L
+        private val PACKAGE_NAME = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+\$")
+        private val PERMISSION_NAME = Regex("^[A-Za-z][A-Za-z0-9_.]*\$")
+    }
+}
+
+/**
+ * How the system Shizuku's binder reaches droidtop's main process. Shizuku's server pushes it to the one provider
+ * named `<applicationId>.shizuku`, which lives in `:pluginhost` (plugin-host's manifest, docs/plugin-api.md 2.7).
+ * Shizuku's built-in multi-process support then shares it: the provider process rebroadcasts the binder, and any
+ * other process asks the provider for it. Sui needs no provider: it hands the binder to any process that asks, so
+ * each process asks once. Everything here is idempotent and safe to call from any process.
+ */
+object ShizukuTransport {
+    private const val PROVIDER_PROCESS_SUFFIX = ":pluginhost"
+
+    @Volatile
+    private var started = false
+
+    /**
+     * Declares which process this is, before any binder can arrive, and keeps the application context the binder
+     * request needs. Cheap and with no IPC: call it from `Application.onCreate` in every process. The provider
+     * process must know it is one, or it never rebroadcasts the binder.
+     */
+    fun install(context: Context) {
+        appContext = context.applicationContext
+        val name = if (Build.VERSION.SDK_INT >= 28) Application.getProcessName() else legacyProcessName()
+        ShizukuProvider.enableMultiProcessSupport(name?.endsWith(PROVIDER_PROCESS_SUFFIX) == true)
+    }
+
+    /** The process name before API 28: the first NUL-terminated entry of the process's own command line. */
+    private fun legacyProcessName(): String? =
+        runCatching { File("/proc/self/cmdline").readText().substringBefore('\u0000') }.getOrNull()
+
+    /**
+     * Asks for the binder from outside the provider process, once, on a background thread: the provider call can
+     * start `:pluginhost`, which must not happen on the main thread. A binder that arrives later is picked up by the
+     * receiver this registers. In the provider process this does nothing but try Sui.
+     */
+    fun ensureStarted() {
+        if (started) return
+        val context = appContext ?: return
+        synchronized(this) {
+            if (started) return
+            started = true
+        }
+        Thread {
+            runCatching { if (!Sui.isSui()) Sui.init(context.packageName) }
+            runCatching { ShizukuProvider.requestBinderForNonProviderProcess(context) }
+        }.apply {
+            name = "droidtop-shizuku-binder"
+            isDaemon = true
+            start()
+        }
+    }
+
+    @Volatile
+    private var appContext: Context? = null
+}

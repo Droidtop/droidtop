@@ -1484,7 +1484,7 @@ object AppSettingsCatalogs {
             CatalogGroup(
                 id = "accounts_plugins",
                 title = "Plugins and integrations",
-                items = listOf(
+                items = ElevatedAccessCatalog.rows(context) + listOf(
                     NestedScreenItem(
                         id = "accounts_plugins_screen",
                         title = "Plugins",
