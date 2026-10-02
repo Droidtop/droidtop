@@ -237,7 +237,7 @@ object PluginCatalog {
                     if (result.record.trust == PluginTrustState.APPROVED) {
                         "Updated $label to $version"
                     } else {
-                        "$label $version installed -- approve it on the Plugins screen before it runs"
+                        "$label $version installed. Approve it on the Plugins screen before it runs"
                     }
                 is PluginInstallResult.Refused -> "Not installed: ${result.error.reason}"
             }
