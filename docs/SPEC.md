@@ -10480,14 +10480,29 @@ ones). Its first level also lists the saved views, "Clear filters" while
 anything is on (X does the same), "Save this view" and any list-specific
 rows (the Apps view's Usage access row, the PC library's "List options").
 The Sort By sheet marks the active sort with its direction.
-**Under the list's title** one state line says "12 of 80 apps · Sort:
-Name, A to Z" and, while anything filters, one chip per active filter with
-a leading Clear chip (`QueryChipRow`). Chips are a touch shortcut (a tap
-takes that filter off) and are never a D-pad stop: the pad reaches the same
-things through X and Y. The PC library is the exception: its strip carries one filter pill instead (§7i).
+**Above the list** sits ONE strip (`ViewStrip`, shared by the PC library
+and Apps): a chip per view with L1 and R1 at its ends, and the filters no
+view stands for as a single pill at its end ("Running, 2 of 40 ✕", from
+`LibraryQuery.pillText`), cleared by one press. There is no count line and
+no chip row on either page (the Filter sheet keeps its chips and its count).
+The pill and the chips are a touch shortcut and never a D-pad stop: the pad
+reaches the same things through X and Y.
 
 **Apps** are one list over the model: **All apps, A to Z** until the
-person says otherwise. Facets, in order: **Category** (Games, Emulators,
+person says otherwise. **The strip** (Droidtop/tracker#273 slice 7,
+#260) is All, Games, Emulators, Tools and Recently used, each with its
+count ("Games · 12"), then the person's saved views. Each built-in view is
+a plain query over the Category and Recently used facets (Tools is the
+System and Other categories), so the strip, the Filter sheet and the saved
+views are one mechanism (`appsBuiltInViews`). The lit view follows the
+filters, not the sort; picking a built-in view keeps the sort the person
+chose, picking a saved view brings its own. **L1/R1** step the strip (the
+page owns the shoulders, never wrapping; with a pill showing and no view lit
+the first press lands on All); the chips take no D-pad focus. The footer is
+the shell's one footer: A Open, X Filter, Y Sort By, Select Options. The
+list below the strip is still sectioned by kind (a section per kind, a
+dense icon grid for installed apps). "Marked as a game" is a short toast now
+that the line it used to ride on is gone. Facets, in order: **Category** (Games, Emulators,
 System, Other), **Running** (the task manager's list), **Recently used**
 (last 7 days), **Recently installed** (last 7 days), **Favourites**,
 **Hidden** (the drawer's own hidden apps) and **Source** (Play Store,

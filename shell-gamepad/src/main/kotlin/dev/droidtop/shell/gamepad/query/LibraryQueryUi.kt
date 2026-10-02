@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -334,48 +333,6 @@ internal fun LibrarySortSheet(
                         onDismiss()
                     },
                 )
-            }
-        }
-    }
-}
-
-/**
- * The state line and the active-filter chips under a list's title: "12 of
- * 80 apps · Sort: Name, A to Z" always, and while anything filters one chip
- * per filter plus a leading Clear chip. Chips are a touch shortcut (a tap
- * takes that filter off) and are never a D-pad stop: the pad reaches the
- * same things through X (Filter) and Y (Sort By). [message] is a short
- * transient notice appended to the line.
- */
-@Composable
-internal fun QueryChipRow(
-    scope: LibraryQueryScope,
-    query: LibraryQuery,
-    shown: Int,
-    total: Int,
-    onChange: (LibraryQuery) -> Unit,
-    modifier: Modifier = Modifier,
-    message: String? = null,
-) {
-    val chips = query.activeChips(scope)
-    Column(modifier = modifier) {
-        Text(
-            querySummaryLine(shown, total, query, scope) + (message?.let { " · $it" } ?: ""),
-            color = MenuTokens.OnSurfaceMuted,
-            style = dev.droidtop.shell.gamepad.TypeRole.supporting,
-        )
-        if (chips.isNotEmpty()) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(dev.droidtop.shell.gamepad.Space.Sm),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(top = dev.droidtop.shell.gamepad.Space.Xs),
-            ) {
-                ShellChip("Clear", selected = false, onClick = { onChange(query.cleared) })
-                chips.forEach { chip ->
-                    ShellChip(chip.label, on = true, selected = false, onClick = { onChange(query.without(chip)) })
-                }
             }
         }
     }

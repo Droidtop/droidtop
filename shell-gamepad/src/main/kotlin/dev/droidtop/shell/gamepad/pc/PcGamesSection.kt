@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -56,12 +55,10 @@ import dev.droidtop.shell.gamepad.HelpRowClaim
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.OwnShoulders
-import dev.droidtop.shell.gamepad.ShellChip
-import dev.droidtop.shell.gamepad.ShoulderGlyph
+import dev.droidtop.shell.gamepad.ViewStrip
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.gridPadTarget
-import dev.droidtop.shell.gamepad.showsShoulderGlyphs
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.declaresHints
@@ -70,6 +67,7 @@ import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.keepCentred
 import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.query.LibraryFacet
+import dev.droidtop.shell.gamepad.query.pillText
 import dev.droidtop.shell.gamepad.query.LibraryFilterSheet
 import dev.droidtop.shell.gamepad.query.LibrarySortSheet
 import dev.droidtop.shell.gamepad.query.PersistQuery
@@ -338,9 +336,7 @@ internal fun PcGamesSection(
     // pill at the strip's end: its text and a count, cleared by one press.
     val filterPill = remember(grid, games, state.query, state.home, currentView != null) {
         if (state.home || currentView != null) return@remember null
-        val chips = state.query.activeChips(scope)
-        if (chips.isEmpty()) null
-        else chips.joinToString(", ") { it.label } + ", ${grid.size} of ${state.query.totalIn(games.orEmpty(), scope)}"
+        state.query.pillText(scope, grid.size, state.query.totalIn(games.orEmpty(), scope))
     }
 
     // Which level B leaves (docs/SPEC.md 6e: B always goes back one level).
@@ -512,46 +508,21 @@ internal fun PcGamesSection(
             // The one strip above the grid, with L1 and R1 at its ends: it
             // owns the shoulders while this tab is up (OwnShoulders above),
             // and the active filter is its last pill.
-            val shoulderGlyphs = window.showsShoulderGlyphs()
-            if (!state.home) Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = window.edgePadding),
-            ) {
-                if (shoulderGlyphs) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = Space.Sm))
-                LazyRow(
-                    state = stripState,
-                    contentPadding = PaddingValues(vertical = Space.Xs),
-                    horizontalArrangement = Arrangement.spacedBy(Space.Sm),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    items(count = stripCount, key = { "chip:$it" }) { index ->
-                        ShellChip(
-                            pcStripLabel(views[index], counts),
-                            on = !state.home && currentView === views[index],
-                            selected = state.stripFocused && state.stripIndex == index,
-                            onClick = {
-                                state.stripFocused = true
-                                activateChip(index)
-                            },
-                        )
-                    }
-                }
-                filterPill?.let { text ->
-                    // Touch's one-press clear; the pad reaches the filters
-                    // through X. Never a D-pad stop.
-                    ShellChip(
-                        "$text  \u2715",
-                        primary = true,
-                        selected = false,
-                        modifier = Modifier.padding(start = Space.Sm).widthIn(max = (window.widthDp * 0.4f).dp),
-                        onClick = {
-                            state.query = state.query.cleared
-                            state.itemIndex = 0
-                        },
-                    )
-                }
-                if (shoulderGlyphs) ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = Space.Sm))
-            }
+            if (!state.home) ViewStrip(
+                labels = views.map { pcStripLabel(it, counts) },
+                active = views.indexOfFirst { it === currentView },
+                focused = if (state.stripFocused) state.stripIndex else null,
+                pill = filterPill,
+                onSelect = { index ->
+                    state.stripFocused = true
+                    activateChip(index)
+                },
+                onClearPill = {
+                    state.query = state.query.cleared
+                    state.itemIndex = 0
+                },
+                state = stripState,
+            )
             when {
                 games == null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MenuTokens.OnSurface)

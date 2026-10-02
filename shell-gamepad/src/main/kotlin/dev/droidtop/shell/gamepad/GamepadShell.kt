@@ -71,6 +71,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import coil3.compose.AsyncImage
 import dev.droidtop.library.settings.CatalogPrefs
 import dev.droidtop.library.settings.GamingSettingsCatalog
@@ -91,7 +92,12 @@ import dev.droidtop.shell.gamepad.query.LibraryViewPrefs
 import dev.droidtop.shell.gamepad.query.retroQueryScope
 import dev.droidtop.shell.gamepad.query.LibrarySortSheet
 import dev.droidtop.shell.gamepad.query.PersistQuery
-import dev.droidtop.shell.gamepad.query.QueryChipRow
+import dev.droidtop.shell.gamepad.query.appsActiveView
+import dev.droidtop.shell.gamepad.query.appsStripLabel
+import dev.droidtop.shell.gamepad.query.appsStripViews
+import dev.droidtop.shell.gamepad.query.appsViewCounts
+import dev.droidtop.shell.gamepad.query.appsViewQuery
+import dev.droidtop.shell.gamepad.query.pillText
 import dev.droidtop.shell.gamepad.query.SheetAction
 import dev.droidtop.shell.gamepad.query.appsQueryScope
 import dev.droidtop.shell.gamepad.query.rememberSavedViews
@@ -123,6 +129,7 @@ import dev.droidtop.shell.gamepad.input.FocusedHintRow
 import dev.droidtop.shell.gamepad.input.FocusedHints
 import dev.droidtop.shell.gamepad.input.LocalFocusedHints
 import dev.droidtop.shell.gamepad.input.declaresHints
+import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.ownPadButtons
 import dev.droidtop.shell.gamepad.input.rememberHintList
@@ -3197,9 +3204,11 @@ private val APP_TILE_HINTS = listOf(
  * says otherwise; X opens the Filter sheet (Category, Running, Recently
  * used, Recently installed, Favourites, Hidden, Source, each with counts),
  * Y Sort By, Select the focused app's options, and a long press marks an
- * app as a game. The view's filters and sort are remembered, the chips
- * under the title say what is on, and nothing here reads a disk while
- * drawing: the category rules, the usage log and the filtered list are
+ * app as a game. One strip sits above the list ([ViewStrip]): All, Games,
+ * Emulators, Tools and Recently used with their counts, stepped by L1/R1,
+ * and the filters no view stands for as its one pill. The view's filters
+ * and sort are remembered, and nothing here reads a disk while drawing:
+ * the category rules, the usage log, the counts and the filtered list are
  * worked out off the main thread.
  */
 @Composable
@@ -3247,18 +3256,16 @@ private fun AppsSection(
         value = withContext(Dispatchers.Default) { query.applyTo(entries, scope) }
     }
     val total = remember(entries, query, scope) { query.totalIn(entries, scope) }
+    // The strip's views and their counts (docs/SPEC.md 7j).
+    val views = remember(savedViews.views) { appsStripViews(savedViews.views) }
+    val counts by produceState(emptyMap<String, Int>(), entries, scope, views) {
+        value = withContext(Dispatchers.Default) { appsViewCounts(entries, scope, views) }
+    }
 
     var filterOpen by remember { mutableStateOf(false) }
     var sortOpen by remember { mutableStateOf(false) }
     LaunchedEffect(filterOpen) { TaskManager.refresh(context) }
     var optionsFor by remember { mutableStateOf<LibraryEntry?>(null) }
-    var notice by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(notice) {
-        if (notice != null) {
-            delay(3_000)
-            notice = null
-        }
-    }
 
     // "Mark as game" from a long press and from the app's options: the
     // one answer is stored, then the category rules reload.
@@ -3268,7 +3275,11 @@ private fun AppsSection(
             coroutineScope.launch {
                 withContext(Dispatchers.IO) { AppGameMarks.set(context, entry.id, nowGame) }
                 marksTick++
-                notice = if (nowGame) "${entry.title} marked as a game" else "${entry.title} is not a game"
+                Toast.makeText(
+                    context,
+                    if (nowGame) "${entry.title} marked as a game" else "${entry.title} is not a game",
+                    Toast.LENGTH_SHORT,
+                ).show()
             }
         }
     }
@@ -3291,6 +3302,18 @@ private fun AppsSection(
         if (list.isEmpty()) requestFocusWhenAttached(emptyFocus, "Apps") else requestFocusWhenAttached(firstFocus, "Sections")
     }
 
+    // L1/R1 step the strip's views, never wrapping; the strip owns the
+    // press even at its end (docs/SPEC.md 7j, "Gaming controls"). With a
+    // pill showing (no view lit) the first press lands on All.
+    val activeView = appsActiveView(views, query)
+    OwnShoulders { step ->
+        val next = if (activeView < 0) 0 else menuStep(activeView, views.size, step)
+        if (next != activeView) {
+            EsDeNavigationSounds.play("scroll")
+            query = appsViewQuery(views[next], query)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -3308,18 +3331,14 @@ private fun AppsSection(
                 }
             },
     ) {
-        QueryChipRow(
-            scope = scope,
-            query = query,
-            shown = list.size,
-            total = total,
-            onChange = { query = it },
-            message = notice,
-            modifier = Modifier.padding(
-                start = LocalShellWindow.current.edgePadding,
-                end = LocalShellWindow.current.edgePadding,
-                top = MenuTokens.SectionListTopGap,
-            ),
+        ViewStrip(
+            labels = views.map { appsStripLabel(it, counts) },
+            active = activeView,
+            focused = null,
+            pill = if (activeView >= 0) null else query.pillText(scope, list.size, total),
+            onSelect = { query = appsViewQuery(views[it], query) },
+            onClearPill = { query = query.cleared },
+            modifier = Modifier.padding(top = MenuTokens.SectionListTopGap),
         )
         if (list.isEmpty()) {
             val emptyHints = remember {

@@ -352,12 +352,9 @@ class LibraryQueryTest {
     }
 
     @Test
-    fun `the state line names the count, the sort and its direction`() {
-        assertEquals("171 games \u00b7 Sort: Name, A to Z", querySummaryLine(171, 171, LibraryQuery(), scope))
-        assertEquals(
-            "1 of 80 games \u00b7 Sort: Last played, Earliest first",
-            querySummaryLine(1, 80, LibraryQuery(text = "quest", sort = LibrarySortKey.RECENT, reversed = true), scope),
-        )
+    fun `the count line says how many of the list show`() {
+        assertEquals("171 games", queryCountLine(171, 171, filtering = false, scope = scope))
+        assertEquals("1 of 80 games", queryCountLine(1, 80, filtering = true, scope = scope))
         assertEquals("1 game", queryCountLine(1, 1, filtering = false, scope = scope))
     }
 

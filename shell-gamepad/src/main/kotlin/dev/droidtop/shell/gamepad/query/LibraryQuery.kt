@@ -299,10 +299,14 @@ data class QueryChip(val facet: LibraryFacet?, val value: String) {
     val label: String get() = if (facet == null) "\"$value\"" else value
 }
 
-/** The one state line under a list's title: the count, then the sort and its direction. Pure, for the tests. */
-fun querySummaryLine(shown: Int, total: Int, query: LibraryQuery, scope: LibraryQueryScope): String =
-    queryCountLine(shown, total, !query.isEmpty, scope) +
-        " \u00b7 Sort: ${scope.sortLabel(query.sort)}, ${query.sort.orderLabel(query.reversed)}"
+/**
+ * The filters no strip view stands for, as the strip's ONE pill ("Running,
+ * 2 of 40"), or null while nothing filters. PC Games and Apps both draw it.
+ */
+fun LibraryQuery.pillText(scope: LibraryQueryScope, shown: Int, total: Int): String? {
+    val chips = activeChips(scope)
+    return if (chips.isEmpty()) null else chips.joinToString(", ") { it.label } + ", $shown of $total"
+}
 
 /** "12 of 80 apps" while something filters, "80 apps" while nothing does. Pure, for the header and the sheets. */
 fun queryCountLine(shown: Int, total: Int, filtering: Boolean, scope: LibraryQueryScope): String {
