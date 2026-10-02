@@ -7,7 +7,7 @@ class NarrowChromeSlotsTest {
     @Test
     fun keepsSelectedTabRoomByDroppingSideSlotsInPriorityOrder() {
         assertEquals(
-            NarrowChromeSlots(context = false, shoulders = false, status = true, quickMenu = true),
+            NarrowChromeSlots(context = false, shoulders = false, status = true, quickMenu = false),
             narrowChromeSlots(
                 availableWidthDp = 250f,
                 selectedTabWidthDp = 110f,
