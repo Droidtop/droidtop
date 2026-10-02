@@ -1,8 +1,6 @@
 package dev.droidtop.app.settings
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import dev.droidtop.library.integrations.PluginRepoDetection
 import dev.droidtop.library.integrations.PluginRepoUpdates
 import dev.droidtop.library.settings.ActionItem
@@ -15,7 +13,6 @@ import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.net.DeviceCode
 import dev.droidtop.net.DeviceFlowOutcome
-import dev.droidtop.net.GitHubCredential
 import dev.droidtop.net.GitHubOAuth
 import dev.droidtop.net.GitHubTokenOrigin
 import dev.droidtop.net.GitHubTokenStore
@@ -41,7 +38,6 @@ import kotlinx.coroutines.withContext
 object GitHubAccountCatalog {
     const val SCREEN_ACCOUNT = "accounts_github"
     const val SCREEN_REPOS = "plugin_repositories"
-    private const val DEVICE_PAGE = "https://github.com/login/device"
 
     // ----- the sign-in in progress (one at a time, process-wide) -----
 
@@ -113,7 +109,6 @@ object GitHubAccountCatalog {
         return NestedScreenItem(
             id = "accounts_github_token",
             title = "GitHub",
-            subtitle = "Sign in to update plugins from repositories you trust, including private ones. Nothing is sent to GitHub otherwise",
             inline = accountScreen(),
             valueLabel = {
                 when {
@@ -125,68 +120,53 @@ object GitHubAccountCatalog {
         )
     }
 
+    /**
+     * The one GitHub account screen (docs/SPEC.md 12a): who is signed in, a way in (the device flow or a pasted
+     * token) and Sign out. The private-repository permission is asked from the repository screen, only when a
+     * private repository is added.
+     */
     fun accountScreen() = CatalogScreen(
         id = SCREEN_ACCOUNT,
         title = "GitHub",
-        subtitle = "Sent only to api.github.com, github.com and raw.githubusercontent.com, only for plugin sources",
+        subtitle = "Used only for plugin sources on GitHub",
         onLeave = ::cancelSignIn,
         groups = { context ->
             val (credential, stored) = withContext(Dispatchers.IO) {
                 GitHubTokenStore.credential(context) to GitHubTokenStore.isSet(context)
             }
             listOf(
-                CatalogGroup(id = "github_status", title = null, items = statusItems(credential, stored)),
                 CatalogGroup(
-                    id = "github_signin",
-                    title = "Sign in with GitHub",
-                    items = listOf(
-                        AsyncActionItem(
-                            id = "github_signin_public",
-                            title = "Sign in with GitHub",
-                            subtitle = "A short code to enter at github.com/login/device on any device. Reads public information only, " +
-                                "and lifts GitHub's request limit for plugin checks",
-                            run = { ctx, onStatus -> signIn(ctx, GitHubOAuth.SCOPE_PUBLIC, onStatus) },
-                        ),
-                        AsyncActionItem(
-                            id = "github_signin_private",
-                            title = "Sign in, with access to private repositories",
-                            subtitle = "Needed only for a private plugin repository. GitHub has no read-only choice for it, so this permission " +
-                                "also lets a token change those repositories; droidtop only ever reads. A pasted fine-grained token " +
-                                "with read-only access is the narrower way",
-                            run = { ctx, onStatus -> signIn(ctx, GitHubOAuth.SCOPE_PRIVATE_REPOS, onStatus) },
-                        ),
-                        ActionItem(
-                            id = "github_signin_open",
-                            title = "Open the sign-in page on this device",
-                            subtitle = "github.com/login/device in this device's browser, for when the code is shown here",
-                            run = { ctx ->
-                                val address = Session.code?.verificationUri ?: DEVICE_PAGE
-                                runCatching {
-                                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(address)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                                }
-                            },
-                        ),
-                        ActionItem(
-                            id = "github_signin_cancel",
-                            title = "Cancel sign-in",
-                            subtitle = "Stops waiting for the code. Leaving this screen does the same",
-                            run = { cancelSignIn() },
-                        ),
-                    ),
-                ),
-                CatalogGroup(
-                    id = "github_paste",
-                    title = "Or paste a token",
+                    id = "github_account",
+                    title = null,
                     items = buildList {
+                        add(
+                            ActionItem(
+                                id = "github_status",
+                                title = when {
+                                    credential != null -> credential.login?.let { "Signed in as $it" } ?: "Signed in"
+                                    stored -> "Saved token unreadable"
+                                    else -> "Not signed in"
+                                },
+                                subtitle = if (stored && credential == null) "Sign in again" else null,
+                                run = {},
+                            ),
+                        )
+                        add(
+                            AsyncActionItem(
+                                id = "github_signin_public",
+                                title = "Sign in with GitHub",
+                                subtitle = "Enter a short code at github.com/login/device",
+                                run = { ctx, onStatus -> signIn(ctx, GitHubOAuth.SCOPE_PUBLIC, onStatus) },
+                            ),
+                        )
                         Session.pasteResult?.let { message ->
                             add(ActionItem(id = "github_paste_result", title = message, run = { Session.pasteResult = null }))
                         }
                         add(
                             TextInputItem(
                                 id = "github_token_value",
-                                title = "Token",
-                                subtitle = "A fine-grained token with read access to the plugin repositories, or a classic token. " +
-                                    "droidtop checks it with GitHub before keeping it",
+                                title = "Paste a token",
+                                subtitle = "Checked with GitHub before it is kept",
                                 // Never shows a stored value back: the field is for pasting a new one.
                                 value = "",
                                 secret = true,
@@ -197,6 +177,16 @@ object GitHubAccountCatalog {
                                 },
                             ),
                         )
+                        if (stored) {
+                            add(
+                                ActionItem(
+                                    id = "github_token_remove",
+                                    title = "Sign out",
+                                    confirmTitle = "Sign out of GitHub on this device?",
+                                    run = { ctx -> GitHubTokenStore.clear(ctx) },
+                                ),
+                            )
+                        }
                     },
                 ),
             )
@@ -211,67 +201,6 @@ object GitHubAccountCatalog {
         SaveTokenResult.Blank -> "Nothing to save."
     }
 
-    private fun statusItems(credential: GitHubCredential?, stored: Boolean): List<CatalogItem> = buildList {
-        when {
-            credential != null -> {
-                add(
-                    ActionItem(
-                        id = "github_status_login",
-                        title = credential.login?.let { "Signed in as $it" } ?: "Signed in",
-                        subtitle = buildString {
-                            append(if (credential.origin == GitHubTokenOrigin.DEVICE_FLOW) "Through GitHub sign-in" else "With a pasted token")
-                            append(". Stored encrypted on this device: ").append(GitHubTokenStore.masked(credential.token)).append(".")
-                            when (credential.scope) {
-                                null -> Unit
-                                "" -> append(" Public information only.")
-                                else -> append(" Permission: ${credential.scope}.")
-                            }
-                        },
-                        run = {},
-                    ),
-                )
-                add(
-                    AsyncActionItem(
-                        id = "github_token_test",
-                        title = "Test",
-                        subtitle = "Asks GitHub who this is and how many requests it allows",
-                        run = { _, onStatus ->
-                            onStatus("Asking GitHub...")
-                            GitHubTokenStore.test(credential.token)
-                        },
-                    ),
-                )
-            }
-            stored -> add(
-                ActionItem(
-                    id = "github_status_unreadable",
-                    title = "Signed in, but this device can no longer read the saved token",
-                    subtitle = "Sign in again below",
-                    run = {},
-                ),
-            )
-            else -> add(
-                ActionItem(
-                    id = "github_status_none",
-                    title = "Not signed in",
-                    subtitle = "Public repositories work without it. Signing in raises GitHub's request limit and reaches private ones",
-                    run = {},
-                ),
-            )
-        }
-        if (stored) {
-            add(
-                ActionItem(
-                    id = "github_token_remove",
-                    title = "Sign out",
-                    subtitle = "Removes the token from this device. GitHub keeps the permission you gave until you revoke it at github.com/settings/applications",
-                    confirmTitle = "Sign out of GitHub on this device?",
-                    run = { ctx -> GitHubTokenStore.clear(ctx) },
-                ),
-            )
-        }
-    }
-
     // ----- plugin repositories -----
 
     /** What the person asked to trust, held between "look up its key" and the confirmation. */
@@ -279,6 +208,9 @@ object GitHubAccountCatalog {
 
     private var pendingRepoName = ""
     private var pendingProposal: Proposal? = null
+
+    /** Set when the last look-up failed in a way a private-repository permission could fix; asked for only then. */
+    private var pendingNeedsPrivate = false
 
     /** What the repositories screen reads from stores and preferences, once, off the main thread. */
     private class RepoScreenData(
@@ -288,7 +220,6 @@ object GitHubAccountCatalog {
         val auto: Boolean,
         val prereleases: Boolean,
         val found: List<dev.droidtop.library.integrations.DetectedRepo>,
-        val hasPrivateScope: Boolean,
     )
 
     private fun fingerprintOf(keyBase64: String) = UserOriginKeys.fingerprint(keyBase64) ?: "unreadable"
@@ -304,7 +235,7 @@ object GitHubAccountCatalog {
     fun reposScreen() = CatalogScreen(
         id = SCREEN_REPOS,
         title = "Plugin repositories",
-        subtitle = "A repository publishes one key; plugins signed with it show \"Verified by\" its name",
+        subtitle = "Plugins signed with a repository's key show its name",
         groups = { context ->
             // Stores and preferences are read once here, off the main thread; the closures below only use the results.
             val read = withContext(Dispatchers.IO) {
@@ -317,24 +248,10 @@ object GitHubAccountCatalog {
                     auto = PluginRepoUpdates.autoUpdate(context),
                     prereleases = PluginRepoUpdates.includePrereleases(context),
                     found = PluginRepoDetection.cached(context),
-                    hasPrivateScope = GitHubTokenStore.credential(context)?.scope == GitHubOAuth.SCOPE_PRIVATE_REPOS,
                 )
             }
             val repos = read.repos
-            val signedIn = read.signedIn
             listOfNotNull(
-                CatalogGroup(
-                    id = "repos_account",
-                    title = null,
-                    items = listOf(
-                        NestedScreenItem(
-                            id = "repos_account_row",
-                            title = "GitHub sign-in",
-                            subtitle = if (signedIn) "Used for repository requests" else "Not signed in: only public repositories can be added",
-                            inline = accountScreen(),
-                        ),
-                    ),
-                ),
                 CatalogGroup(
                     id = "repos_list",
                     title = "Repositories you trust",
@@ -359,8 +276,7 @@ object GitHubAccountCatalog {
                         TextInputItem(
                             id = "repos_add_name",
                             title = "Repository",
-                            subtitle = "owner/name, or the address from your browser. droidtop reads droidtop-plugin-key.json from its default branch " +
-                                "(with your sign-in, if it is private) and shows you the key before trusting anything",
+                            subtitle = "owner/name, or its address",
                             value = pendingRepoName,
                             onChange = { _, v -> pendingRepoName = v.trim() },
                         ),
@@ -369,6 +285,21 @@ object GitHubAccountCatalog {
                             title = "Look up its key",
                             subtitle = "Trusts nothing yet",
                             run = { ctx, onStatus -> lookUp(ctx, pendingRepoName, onStatus) },
+                        ),
+                    ) + listOfNotNull(
+                        if (!pendingNeedsPrivate) null else AsyncActionItem(
+                            id = "repos_add_private",
+                            title = "Allow private repositories",
+                            subtitle = "Asks GitHub for read access to private repositories, then looks again",
+                            run = { ctx, onStatus ->
+                                val message = signIn(ctx, GitHubOAuth.SCOPE_PRIVATE_REPOS, onStatus)
+                                if (GitHubTokenStore.credential(ctx)?.scope == GitHubOAuth.SCOPE_PRIVATE_REPOS) {
+                                    pendingNeedsPrivate = false
+                                    message + " " + lookUp(ctx, pendingRepoName, onStatus)
+                                } else {
+                                    message
+                                }
+                            },
                         ),
                     ),
                 ),
@@ -381,15 +312,14 @@ object GitHubAccountCatalog {
                         ToggleItem(
                             id = "repos_auto",
                             title = "Update plugins from these repositories automatically",
-                            subtitle = "Checked on the Software updates schedule, and bundles are fetched on unmetered connections only. An update must be signed " +
-                                "with the key you trusted; anything new it asks for still waits for your answer",
+                            subtitle = "On the Software updates schedule, unmetered connections only",
                             current = read.auto,
                             onToggle = { c, value -> PluginRepoUpdates.setAutoUpdate(c, value) },
                         ),
                         ToggleItem(
                             id = "repos_prereleases",
                             title = "Include pre-releases",
-                            subtitle = "Off: a release its author marked as a pre-release is ignored",
+                            subtitle = "Off: pre-releases are ignored",
                             current = read.prereleases,
                             onToggle = { c, value -> PluginRepoUpdates.setIncludePrereleases(c, value) },
                         ),
@@ -430,20 +360,6 @@ object GitHubAccountCatalog {
                     },
                 ),
             )
-            if (!read.hasPrivateScope) {
-                add(
-                    AsyncActionItem(
-                        id = "repos_found_private",
-                        title = "Include private repositories",
-                        subtitle = "Only needed for a private repository. GitHub offers private repositories only as a broad read and write permission, " +
-                            "which droidtop uses only to read. A pasted fine-grained token with read-only access is the narrower option",
-                        run = { ctx, onStatus ->
-                            val message = signIn(ctx, GitHubOAuth.SCOPE_PRIVATE_REPOS, onStatus)
-                            message + " " + describeDetection(PluginRepoDetection.refresh(ctx, force = true))
-                        },
-                    ),
-                )
-            }
         }
         return CatalogGroup(id = "repos_found", title = "Found for you", items = items)
     }
@@ -459,15 +375,14 @@ object GitHubAccountCatalog {
         val repo = PluginRepos.parse(input) ?: return "Type the repository as owner/name, like octocat/hello-world."
         onStatus("Reading the key committed to $repo...")
         pendingProposal = null
+        pendingNeedsPrivate = false
         val credential = GitHubTokenStore.credential(context)
         return when (val fetched = PluginRepoKeys.fetch(repo, credential?.token)) {
             is PluginRepoKeys.Result.Failed -> {
-                val privateHint = when {
-                    credential == null -> " If $repo is private, sign in to GitHub first."
-                    credential.origin == GitHubTokenOrigin.DEVICE_FLOW && credential.scope != GitHubOAuth.SCOPE_PRIVATE_REPOS ->
-                        " If $repo is private, use \"Include private repositories\" below."
-                    else -> ""
-                }
+                // Only a device-flow sign-in (or none) can be widened here; a pasted token is replaced under Accounts and sources.
+                pendingNeedsPrivate = credential == null ||
+                    (credential.origin == GitHubTokenOrigin.DEVICE_FLOW && credential.scope != GitHubOAuth.SCOPE_PRIVATE_REPOS)
+                val privateHint = if (pendingNeedsPrivate) " If $repo is private, allow private repositories below." else ""
                 "Refused: " + fetched.reason + privateHint
             }
             is PluginRepoKeys.Result.Fetched -> {
