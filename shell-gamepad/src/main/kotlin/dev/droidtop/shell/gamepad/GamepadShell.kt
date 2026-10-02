@@ -432,8 +432,6 @@ private fun GamepadShellBody(
     // below. Installed only while this composition is live.
     // Quick Menu (hold SELECT) -- see QuickMenu.kt for the paradigm.
     var quickMenuOpen by remember { mutableStateOf(false) }
-    var contextMenuRequest by remember { mutableIntStateOf(0) }
-    var focusedContextEntry by remember { mutableStateOf<LibraryEntry?>(null) }
     // A quick menu left open when this shell lost the foreground (the
     // Switch-mode dialog's own "Android"/"Desktop" rows, or Home) must not
     // still be showing when a fresh, real deep-link brings this same
@@ -1228,10 +1226,7 @@ private fun GamepadShellBody(
                                 nav = nav,
                                 onShowDetail = { nav.rememberFocus(it.id); nav.openDetail(it.id) },
                                 onDrillDownChanged = { canGoBack = it },
-                                onFocusedEntryChanged = { entry ->
-                                    focusedContextEntry = null
-                                    onFocusedEntryChanged(entry)
-                                },
+                                onFocusedEntryChanged = onFocusedEntryChanged,
                                 // Scoped to the screen that says it: a
                                 // claim from a copy the Crossfade is
                                 // still drawing on its way out cannot
@@ -1252,11 +1247,7 @@ private fun GamepadShellBody(
                                 state = pcGames,
                                 onLaunch = onLaunch,
                                 onToggleFavorite = onToggleFavorite,
-                                onFocusedEntryChanged = { entry ->
-                                    focusedContextEntry = entry
-                                    onFocusedEntryChanged(entry)
-                                },
-                                contextMenuRequest = contextMenuRequest,
+                                onFocusedEntryChanged = onFocusedEntryChanged,
                                 onHelpRowClaim = { claim ->
                                     if (screenKey == currentScreenKey) {
                                         helpRowClaimant = screenKey to claim

@@ -8,7 +8,6 @@ import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.isSp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 

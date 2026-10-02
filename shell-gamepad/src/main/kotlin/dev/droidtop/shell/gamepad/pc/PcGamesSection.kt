@@ -192,7 +192,6 @@ internal fun PcGamesSection(
     onLaunch: (LibraryEntry) -> Unit,
     onToggleFavorite: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
-    contextMenuRequest: Int,
     onHelpRowClaim: (HelpRowClaim) -> Unit,
     onCanGoBackChanged: (Boolean) -> Unit,
     onRequestRescan: () -> Unit,
@@ -345,15 +344,6 @@ internal fun PcGamesSection(
     BackHandler(enabled = canGoBack && !showingSetup) {
         EsDeNavigationSounds.play("back")
         state.home = true
-    }
-
-    // The header's L2 pill: the focused game's own menu.
-    var handledContextMenuRequest by remember { mutableIntStateOf(contextMenuRequest) }
-    LaunchedEffect(contextMenuRequest) {
-        if (contextMenuRequest != handledContextMenuRequest) {
-            handledContextMenuRequest = contextMenuRequest
-            focusedEntry?.let { state.menuId = it.id }
-        }
     }
 
     if (showingSetup) {
