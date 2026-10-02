@@ -61,6 +61,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // unconditionally, in every mode; it now starts only for the two
         // modes that use it. See ModeStartup.
         ModeStartup.install(this)
+        // PC game folders get their ids from droidtop's own storage, never from a
+        // .gamenative file written into the user's folder (SPEC 7g, tracker#269).
+        dev.droidtop.runtime.windows.DroidtopGameIdStore.install(this)
         ScreenOrientationPrefs.install(this)
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)

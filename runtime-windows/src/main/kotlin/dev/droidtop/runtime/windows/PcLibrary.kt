@@ -145,6 +145,7 @@ object PcLibrary {
      * are one group rather than per folder.
      */
     suspend fun storeGames(context: Context): List<Game> {
+        DroidtopGameIdStore.install(context)
         val dao = daos(context)
         // What the stores last said about newer builds, and the downloads
         // they are running: files and memory only, no network here.
@@ -201,6 +202,7 @@ object PcLibrary {
         context: Context,
         skip: (folder: File, mtime: Long) -> Boolean = { _, _ -> false },
     ): List<FolderGroup> {
+        DroidtopGameIdStore.install(context)
         // The scanner looks in its own managed folders plus whatever
         // roots it has been told about. droidtop already asks the user
         // for their games folders ONCE, so those are the roots -- without
@@ -505,6 +507,7 @@ object PcLibrary {
      * for each source so the screens get exactly what they expect.
      */
     suspend fun libraryItemFor(context: Context, entryId: String): LibraryItem? {
+        DroidtopGameIdStore.install(context)
         val nativeId = entryId.substringAfter(':')
         val dao = daos(context)
         return runCatching {

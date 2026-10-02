@@ -8684,6 +8684,27 @@ identity line.
   when the person comes back to the shell), and no round starts while
   the device is in battery saver.
 
+- **droidtop never writes into a user's game folder to remember a game
+  (directed 2026-10-01, tracker#269).** The vendored gamenative scanner
+  gives every PC game folder a numeric id and, by default, keeps it in a
+  `.gamenative` file inside the folder. gamenative-tux as its own app
+  keeps doing that (it detects games by those files and must work on its
+  own), so the fork makes the place an id is kept replaceable
+  (`CustomGameIdStore`, default unchanged) and droidtop installs its own
+  (`DroidtopGameIdStore`, backed by `GameFolderIds` in `:library-core`).
+  The ids live in droidtop's own `pc-game-ids.tsv`; a scan leaves the
+  scanned folders byte for byte as they were. Identity without a file is
+  the folder's path, then (for a remembered folder whose path is gone)
+  its device and inode or its content shape, so a renamed or moved game
+  keeps its id, and with it its history and art. A `.gamenative` file
+  that is already there is READ as legacy identity and adopted into the
+  store; droidtop never writes it and never deletes it. The scan itself
+  stays [PcFolderScan]'s question (and the title parser's, tracker#264):
+  the id store is the only thing the vendored scanner is still asked.
+  The scanner's other writes into a folder (an extracted `.ico` beside
+  the main executable, the Steam download marker for a recognised Steam
+  install) are not covered by this decision.
+
 ## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
 
 **PC games get PC-native sources (directed 2026-09-24).** PC and engine games are scraped from the
