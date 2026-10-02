@@ -33,7 +33,7 @@ object PluginCatalogScreen {
     fun screen(): CatalogScreen = CatalogScreen(
         id = ID,
         title = "Catalog",
-        subtitle = "What the plugin catalog lists -- nothing here runs until you approve it on the Plugins screen",
+        subtitle = "What the plugin catalog lists. Nothing here runs until you approve it on the Plugins screen",
         groups = { context -> catalogGroups(context) },
     )
 

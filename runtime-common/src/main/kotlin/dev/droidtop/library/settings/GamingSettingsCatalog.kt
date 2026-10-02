@@ -211,7 +211,7 @@ object GamingSettingsCatalog {
                     NestedScreenItem(
                         id = ID_ACCOUNTS_AND_SOURCES,
                         title = "Accounts and sources",
-                        subtitle = "Store sign-ins, scraper credentials, plugins and app integrations -- one row per source",
+                        subtitle = "Store sign-ins, scraper credentials, plugins and app integrations, one row per source",
                         registryId = "accounts_and_sources",
                         icon = CatalogIcon.INTEGRATIONS,
                     ),

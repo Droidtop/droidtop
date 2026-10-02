@@ -1031,7 +1031,7 @@ private fun SettingsSearchOverlay(
         when {
             query.trim().length < 2 ->
                 Text(
-                    "Keep typing -- at least two letters",
+                    "Keep typing: at least two letters",
                     color = MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 12.dp),

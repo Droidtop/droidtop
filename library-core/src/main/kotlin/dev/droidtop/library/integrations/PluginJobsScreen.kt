@@ -110,7 +110,7 @@ object PluginJobsScreen {
             id = "plugin_job_${entry.jobId}_cancel",
             title = "Cancel \"${entry.title}\"",
             subtitle = when (entry.nativeKind) {
-                null -> "Best-effort -- the plugin decides whether it actually stops"
+                null -> "Best effort: the plugin decides whether it actually stops"
                 DownloadJobs.KIND -> "Stops the download and deletes what was downloaded so far"
                 else -> "Stops at the next game"
             },

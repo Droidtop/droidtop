@@ -1474,7 +1474,7 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "accounts_thegamesdb",
                         title = "TheGamesDB",
-                        subtitle = "Free API key from thegamesdb.net -- required before it can scrape at all",
+                        subtitle = "A free API key from thegamesdb.net is needed before it can scrape",
                         inline = theGamesDbAccountScreen(),
                         valueLabel = { if (TheGamesDbPrefs.apiKey(context).isBlank()) "Not set" else "Configured" },
                     ),
@@ -1503,7 +1503,7 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "accounts_plugins_screen",
                         title = "Plugins",
-                        subtitle = "Installed plugin code -- searched, approved and run in its own process, never droidtop's databases",
+                        subtitle = "Installed plugin code: searched, approved and run in its own process, never in droidtop's databases",
                         registryId = SCREEN_PLUGINS,
                         valueLabel = { pluginsValueLabel },
                     ),
@@ -1524,7 +1524,7 @@ object AppSettingsCatalogs {
     private fun screenScraperAccountScreen() = CatalogScreen(
         id = "accounts_screenscraper_edit",
         title = "ScreenScraper account",
-        subtitle = "Account fields only -- the developer ID droidtop registers with ScreenScraper is compiled in, never a user-facing field",
+        subtitle = "Your account details only; droidtop's own developer ID is built in",
         groups = { context ->
             listOf(
                 CatalogGroup(
@@ -1556,7 +1556,7 @@ object AppSettingsCatalogs {
                         TextInputItem(
                             id = "tgdb_api_key",
                             title = "API key",
-                            subtitle = "Free at thegamesdb.net -- required before TheGamesDB can scrape at all",
+                            subtitle = "Free at thegamesdb.net; TheGamesDB cannot scrape without it",
                             value = TheGamesDbPrefs.apiKey(context),
                             onChange = { c, v -> TheGamesDbPrefs.set(c, v.trim()) },
                         ),
@@ -1583,7 +1583,7 @@ object AppSettingsCatalogs {
                         TextInputItem(
                             id = "igdb_client_id",
                             title = "Client ID",
-                            subtitle = "Create an application at dev.twitch.tv/console -- free, instant, no approval queue",
+                            subtitle = "Create an application at dev.twitch.tv/console: it is free and instant",
                             value = ScraperPrefs.clientId(context),
                             onChange = { c, v -> ScraperPrefs.set(c, v.trim(), ScraperPrefs.clientSecret(c)) },
                         ),
@@ -1736,7 +1736,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "plugins_none",
                                 title = "No plugins installed",
-                                subtitle = "Add one below -- a plugin never runs until you approve it on its own page",
+                                subtitle = "Add one below. A plugin never runs until you approve it on its own page",
                                 run = {},
                             ),
                         )
@@ -1809,7 +1809,7 @@ object AppSettingsCatalogs {
                     DocumentPickItem(
                         id = "plugins_add_file",
                         title = "Install plugin file",
-                        subtitle = "Pick a signed .droidplugin.tar.xz bundle -- validated before anything runs, never run until approved",
+                        subtitle = "Pick a signed .droidplugin.tar.xz bundle. It is checked first and never runs until you approve it",
                         mimeType = "*/*",
                         onPicked = { ctx, uri -> PluginStore.importFromPicker(ctx, uri) },
                     ),
@@ -2024,7 +2024,7 @@ object AppSettingsCatalogs {
                     ActionItem(
                         id = "plugin_${m.id}_root",
                         title = if (record.rootApproved) "Uses root" else "Can use root",
-                        subtitle = if (record.rootApproved) "Approved" else "Not granted -- approve with root above to allow it",
+                        subtitle = if (record.rootApproved) "Approved" else "Not granted: approve with root above to allow it",
                         run = {},
                     ),
                 )
@@ -2169,7 +2169,7 @@ object AppSettingsCatalogs {
                         AsyncActionItem(
                             id = "plugin_${m.id}_force_crash",
                             title = "Debug: force a crash",
-                            subtitle = "Confirms crash containment -- droidtop should survive and disable this plugin",
+                            subtitle = "Checks crash containment: droidtop should survive and disable this plugin",
                             confirmTitle = "Force ${m.label} to crash now?",
                             run = { ctx, _ ->
                                 val policy = PluginCrashPolicy(ctx.applicationContext)
@@ -2243,7 +2243,7 @@ object AppSettingsCatalogs {
                     ActionItem(
                         id = "plugin_${m.id}_version",
                         title = "Version ${m.version}",
-                        subtitle = if (index == null) "Catalog not fetched yet -- open Add > Browse catalog to check" else "Matches the catalog's latest stable release",
+                        subtitle = if (index == null) "Catalog not fetched yet: open Add > Browse catalog to check" else "Matches the catalog's latest stable release",
                         run = {},
                     )
                 },
