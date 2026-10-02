@@ -28,45 +28,67 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
 
 /**
- * Continue-playing rail: the companion's one interactive element that
- * earns the touchscreen it sits on. The lower panel is a touch surface
- * the user's thumbs already rest near, and "tap the game I was playing
- * yesterday" is the single most common launcher action -- so it lives
- * here, glanceable and one tap deep, instead of only behind gamepad
- * navigation on the other screen (docs/SPEC.md section 4d).
+ * The companion Home's two game rails, one mechanism ([CompanionRail]): Continue playing (the games last
+ * played, newest first) and Recently added (the games the library saw most recently). The rails are the
+ * companion's one interactive element that earns the touchscreen it sits on: "tap the game I was playing
+ * yesterday" is the most common launcher action, so it is glanceable and one tap deep (docs/SPEC.md
+ * section 4d, "The companion's tabs").
  *
- * Data comes from [CompanionState.libraryEntries] -- the same feed the
- * idle rotation uses, published by whatever drives the shell; the
- * companion never runs its own scan. A tap goes through
- * [CompanionState.onLaunchEntry], which is the ordinary Library.launch
- * path (launch-screen memory and the chooser included), not a second
- * launch mechanism.
+ * Data comes from [CompanionState.libraryEntries] -- the same feed the idle rotation uses, published by
+ * whatever drives the shell; the companion never runs its own scan. A tap goes through
+ * [CompanionState.onLaunchEntry], which is the ordinary Library.launch path (launch-screen memory and the
+ * chooser included), not a second launch mechanism.
  */
 @Composable
 internal fun CompanionRecents() {
     val entries by CompanionState.libraryEntries.collectAsState()
-    val recents = remember(entries) {
-        entries.filter { it.lastPlayedEpochMs != null }
-            .sortedByDescending { it.lastPlayedEpochMs }
-            // Real, reported bug (rig, p1-dt-companion-text-overlap): the
-            // same game showed twice in this rail. A rescan can hand back
-            // two LibraryEntry ids for one game while its id is settling
-            // (the exact case PlayHistoryDatabase.moveTo exists to
-            // reconcile once it does), so this rail -- sorted by recency,
-            // shown to the user directly -- dedupes defensively rather
-            // than trusting every id in the feed to be unique per game:
-            // first by id (a literal duplicate), then by title+system
-            // (two ids, one game), keeping the more-recently-played of
-            // each pair since the list is already sorted that way.
-            .distinctBy { it.id }
-            .distinctBy { it.title.trim().lowercase() to it.systemId }
-            .take(MAX_RECENTS)
-    }
+    val recents = remember(entries) { companionRecents(entries) }
+    CompanionRail("Continue playing", recents, showLaunchError = true)
+}
+
+@Composable
+internal fun CompanionRecentlyAdded() {
+    val entries by CompanionState.libraryEntries.collectAsState()
+    val added = remember(entries) { companionRecentlyAdded(entries) }
+    CompanionRail("Recently added", added, showLaunchError = false)
+}
+
+/** The games last played, newest first, one card per game, at most [MAX_RECENTS]. Pure. */
+internal fun companionRecents(entries: List<LibraryEntry>): List<LibraryEntry> =
+    entries.filter { it.lastPlayedEpochMs != null }
+        .sortedByDescending { it.lastPlayedEpochMs }
+        .distinctGames()
+        .take(MAX_RECENTS)
+
+/**
+ * The games the library saw most recently, newest first (an installed app falls back to its install time,
+ * the same rule as Home's own Recently added shelf), at most [MAX_RECENTS]. Rows with no timestamp are left
+ * out. Pure.
+ */
+internal fun companionRecentlyAdded(entries: List<LibraryEntry>): List<LibraryEntry> =
+    entries.filter { addedEpochMs(it) > 0L }
+        .sortedByDescending { addedEpochMs(it) }
+        .distinctGames()
+        .take(MAX_RECENTS)
+
+private fun addedEpochMs(entry: LibraryEntry): Long =
+    entry.firstSeenEpochMs.takeIf { it > 0L } ?: entry.appFacts?.firstInstalledEpochMs ?: 0L
+
+// Real, reported bug (rig, p1-dt-companion-text-overlap): the same game showed twice in the rail. A rescan can
+// hand back two LibraryEntry ids for one game while its id is settling (the exact case
+// PlayHistoryDatabase.moveTo exists to reconcile once it does), so a rail -- sorted by recency, shown to the
+// user directly -- dedupes defensively: first by id (a literal duplicate), then by title+system (two ids,
+// one game), keeping the first of each pair since the list is already in its order.
+private fun List<LibraryEntry>.distinctGames(): List<LibraryEntry> =
+    distinctBy { it.id }.distinctBy { it.title.trim().lowercase() to it.systemId }
+
+@Composable
+private fun CompanionRail(title: String, recents: List<LibraryEntry>, showLaunchError: Boolean) {
     if (recents.isEmpty()) return
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text(
-            "Continue playing",
+            title,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 6.dp),
@@ -76,6 +98,7 @@ internal fun CompanionRecents() {
                 RecentCard(entry)
             }
         }
+        if (!showLaunchError) return@Column
         val launchError by CompanionState.launchError.collectAsState()
         launchError?.let { message ->
             // Tap to dismiss; the next launch from the rail clears it too.

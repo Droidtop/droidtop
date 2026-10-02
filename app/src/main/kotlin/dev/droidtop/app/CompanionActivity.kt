@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -75,21 +77,12 @@ class CompanionActivity : AppCompatActivity() {
                             widgetManager = widgetManager,
                             widgetHost = widgetHost,
                         ) {
-                            androidx.compose.foundation.layout.BoxWithConstraints {
-                                val portrait = maxHeight > maxWidth
-                                val buttons: @Composable () -> Unit = {
-                                    TextButton(onClick = { pickWidget() }) { Text("Add widget") }
-                                    if (widgetIds.isNotEmpty()) {
-                                        TextButton(onClick = { removeLastWidget() }) {
-                                            Text("Remove widget", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    }
-                                }
-                                if (portrait) {
-                                    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) { buttons() }
-                                } else {
-                                    androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) { buttons() }
-                                }
+                            androidx.compose.foundation.layout.Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(vertical = 8.dp),
+                            ) {
+                                CompanionPill("Add widget") { pickWidget() }
+                                if (widgetIds.isNotEmpty()) CompanionPill("Remove widget") { removeLastWidget() }
                             }
                         }
                     }
@@ -255,45 +248,88 @@ object CompanionWidgetPrefs {
 internal fun CompanionNotifications() {
     val items by dev.droidtop.runtime.systemstatus.NotificationsStore.items.collectAsState()
     if (items.isEmpty()) return
+    // One compact group, closed until tapped: its header is the count and the newest notification's own
+    // line, so a busy device never pushes the sections around it out of view (tracker#285). Opened, every
+    // notification is a row in the page's own flow and the page scrolls.
+    var open by androidx.compose.runtime.remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        items.take(4).forEach { item ->
-            androidx.compose.foundation.layout.Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable(enabled = item.contentIntent != null) {
-                            runCatching { item.contentIntent?.send() }
-                        },
-                ) {
-                    Text(
-                        listOfNotNull(item.appLabel, item.title).joinToString(": "),
-                        color = MaterialTheme.colorScheme.onBackground,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    // Local val, not the property: cross-module
-                    // properties don't smart-cast.
-                    val body = item.text
-                    if (!body.isNullOrBlank()) {
-                        Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-                if (item.clearable) {
-                    TextButton(onClick = {
-                        dev.droidtop.runtime.systemstatus.NotificationsStore.controller?.dismiss(item.key)
-                    }) { Text("Dismiss", style = MaterialTheme.typography.labelSmall) }
-                }
+        androidx.compose.foundation.layout.Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clickable { open = !open },
+        ) {
+            Text("Notifications", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.labelLarge)
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 6.dp))
+            Text(items.size.toString(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+            if (!open) {
+                androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 6.dp))
+                val newest = items.first()
+                Text(
+                    listOfNotNull(newest.appLabel, newest.title).joinToString(": "),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
-        if (items.size > 4) {
-            Text("+" + (items.size - 4) + " more", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+        if (open) {
+            items.take(MAX_LISTED_NOTIFICATIONS).forEach { item ->
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .clickable(enabled = item.contentIntent != null) {
+                                runCatching { item.contentIntent?.send() }
+                            },
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            listOfNotNull(item.appLabel, item.title).joinToString(": "),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        // Local val, not the property: cross-module
+                        // properties don't smart-cast.
+                        val body = item.text
+                        if (!body.isNullOrBlank()) {
+                            Text(
+                                body,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (item.clearable) {
+                        TextButton(onClick = {
+                            dev.droidtop.runtime.systemstatus.NotificationsStore.controller?.dismiss(item.key)
+                        }) { Text("Dismiss", style = MaterialTheme.typography.labelSmall) }
+                    }
+                }
+            }
+            if (items.size > MAX_LISTED_NOTIFICATIONS) {
+                Text(
+                    "+" + (items.size - MAX_LISTED_NOTIFICATIONS) + " more",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
         }
     }
 }
+
+private const val MAX_LISTED_NOTIFICATIONS = 12
 
 @androidx.compose.runtime.Composable
 internal fun CompanionSystemBar(showControls: Boolean = true) {

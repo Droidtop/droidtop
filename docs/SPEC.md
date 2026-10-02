@@ -2950,6 +2950,18 @@ picks the tab it opens on. Standard's own second screen keeps its launcher-style
   (#243); Tasks' switch tap launches on the app's own screen and its arrow pair is an explicit request.
   The strip scrolls sideways and the Performance and System pages lay out in one column in portrait and two on
   a wide window, from the window's own bounds (#213).
+- **Home is one scrolling column (Droidtop/tracker#285).** `CompanionSurface` draws a single vertically
+  scrolling page over the idle art; nothing is stacked over anything else, and whatever does not fit is a swipe
+  away. Order: status line, Continue playing, Recently added (both are `CompanionRail`: ten cards, tap
+  launches through the one launch path; Recently added uses the library's first-seen time, an app's install
+  time as the fallback, and leaves out rows with neither), the notification group, the game focused on the
+  other screen (an in-flow section, no longer a background panel), the user's widgets, then the host's own
+  add/remove widget pills as ordinary rows. The notification group (`CompanionNotifications`, also used by
+  Standard's second screen) is one compact row, "Notifications" and a count with the newest line, closed
+  until tapped; opened it lists up to twelve with Dismiss, so notifications never push the rails out of
+  view. A host that cannot bind widgets shows no add line at all. Every tab scrolls with the same
+  vertical scroll (`CompanionPanels` for Performance and System, the Tasks page, this Home); Input is the
+  one fixed surface because a trackpad must not scroll.
 - **Tasks** is `CompanionTasks`, the task manager's row (switch, ask for the other screen, close, Clear
   all apps with an inline confirm) using `SharedRunningAppsList`; see "The task manager".
 - **Performance** (`CompanionPerformanceTab`) reads `PerformanceMonitor` in `:runtime-common`, the one shared

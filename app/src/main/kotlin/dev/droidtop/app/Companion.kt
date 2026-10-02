@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -152,41 +153,34 @@ internal fun settledFocusedEntry(): LibraryEntry? {
 // stopping on a game feels immediate.
 private const val FOCUS_SETTLE_MS = 350L
 
+/**
+ * The companion Home's ground: the idle art rotation while nothing is focused on the other screen
+ * (docs/SPEC.md section 4d, from iiSU's "Show Hero on Idle Bottom Screen"; it used to paint a "droidtop"
+ * wordmark, the one thing a glanceable surface must never do), else the plain ground. The focused game's
+ * facts are not drawn here: they are a section of the scrolling Home ([CompanionFocusedInfo]), so no text
+ * is ever drawn under another block (rig, p1-dt-companion-text-overlap).
+ */
 @Composable
-internal fun CompanionContent(entry: LibraryEntry?, topInset: androidx.compose.ui.unit.Dp = 0.dp) {
+internal fun CompanionContent(entry: LibraryEntry?) {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // Nothing focused: a slow rotation of the user's own library
-        // artwork (docs/SPEC.md section 4d, from iiSU's "Show Hero on Idle
-        // Bottom Screen"). This used to paint a "droidtop" wordmark, which
-        // is the one thing a glanceable surface must never do: occupy a
-        // whole panel and say nothing. Its own caption sits at the
-        // bottom already (CompanionIdle), clear of [topInset].
         if (entry == null) {
             val entries by CompanionState.libraryEntries.collectAsState()
             CompanionIdle(entries)
-            return@Box
         }
-        // Companion redesign (docs/SPEC.md 4d, 2026-09-25 owner review:
-        // "a bunch of images and some white text"): the focused panel
-        // used to carry no art at all, just the text column below --
-        // exactly the gap the review's info_d0/info_d5 capture showed
-        // (the addon never changed when a game's info opened on the
-        // main screen). A real thumbnail earns the row's own space
-        // rather than filling the backdrop, which stays this panel's
-        // ambient art (idle rotation) rather than a second copy of
-        // the shell's own hero art.
-        //
-        // [topInset] is the measured height of the foreground status
-        // bar / notifications / "Continue playing" rail block
-        // (CompanionSurface), so this Row's own title/description text
-        // never draws underneath it -- found overlapping it directly on
-        // the console (rig, p1-dt-companion-text-overlap): this panel is
-        // the background layer by direction, but "background" never
-        // meant "drawn under other text".
+    }
+}
+
+/**
+ * The game focused on the other screen, as an in-flow section of the scrolling Home (docs/SPEC.md 4d,
+ * 2026-09-25 owner review: "a bunch of images and some white text"): a thumbnail and the facts beside it.
+ */
+@Composable
+internal fun CompanionFocusedInfo(entry: LibraryEntry) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(top = topInset + 48.dp, start = 48.dp, end = 48.dp, bottom = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(40.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.Top,
         ) {
             val thumbnailUri = entry.artworkUri ?: entry.heroUri
             if (!thumbnailUri.isNullOrBlank()) {
@@ -194,17 +188,17 @@ internal fun CompanionContent(entry: LibraryEntry?, topInset: androidx.compose.u
                     model = thumbnailUri,
                     contentDescription = entry.title,
                     modifier = Modifier
-                        .width(220.dp)
-                        .height(300.dp)
-                        .clip(RoundedCornerShape(12.dp)),
+                        .width(120.dp)
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(10.dp)),
                     contentScale = ContentScale.Crop,
                 )
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(entry.title, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineLarge)
+                Text(entry.title, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleLarge)
                 // Real system name (Nintendo 64, PlayStation 2) when this
                 // is a console ROM; the shared kind grouping name otherwise.
                 val systemName = entry.systemId
