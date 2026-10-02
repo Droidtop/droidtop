@@ -11,8 +11,8 @@ import androidx.compose.runtime.setValue
  * ONE place in the Gaming shell, and one key for it.
  *
  * The shell is three levels deep and no deeper: a section (Games, Apps,
- * Settings), a group inside Games (a console system, a collection, the PC
- * category) and one game's detail. Everything else -- the Quick Menu, the
+ * Settings), a group inside Games (a console system or collection) and
+ * one game's detail. Everything else -- the Quick Menu, the
  * launch screen, the screensaver, a settings sub-screen -- is drawn over
  * wherever the user is rather than being somewhere else.
  */
@@ -23,7 +23,7 @@ internal sealed interface ShellPlace {
         override val key get() = "section:${section.name}"
     }
 
-    /** A group inside the Games section: `system:pc`, `collection:all`, ... */
+    /** A group inside the Games section: `system:snes`, `collection:all`, ... */
     data class Group(val groupKey: String) : ShellPlace {
         override val key get() = "group:$groupKey"
     }
@@ -201,17 +201,31 @@ internal class ShellBackStack(initialSection: GamingSection) {
                 ?.let { name -> runCatching { GamingSection.valueOf(name) }.getOrNull() }
                 ?: return null
             val nav = ShellBackStack(section)
-            nav.groupKey = (values.getOrNull(1) as? String)?.takeIf { it.isNotEmpty() }
+            // Saved places for the removed Retro Games PC card have no
+            // destination, so restore at the section root.
+            nav.groupKey = (values.getOrNull(1) as? String)
+                ?.takeIf { it.isNotEmpty() && it !in REMOVED_PC_SYSTEM_PLACES }
             nav.detailId = (values.getOrNull(2) as? String)?.takeIf { it.isNotEmpty() }
             nav.optionsOpen = values.getOrNull(3) as? Boolean ?: false
+            if (nav.groupKey == null) {
+                nav.detailId = null
+                nav.optionsOpen = false
+            }
             var i = 4
             while (i + 1 < values.size) {
                 val place = values[i] as? String ?: break
                 val entryId = values[i + 1] as? String ?: break
-                nav.focus[place] = entryId
+                if (place !in REMOVED_PC_SAVED_PLACES) {
+                    nav.focus[place] = entryId
+                }
                 i += 2
             }
             return nav
+        }
+
+        private val REMOVED_PC_SYSTEM_PLACES = setOf("system:pc", "system:windows")
+        private val REMOVED_PC_SAVED_PLACES = REMOVED_PC_SYSTEM_PLACES.flatMapTo(mutableSetOf()) {
+            listOf("group:$it", "options:$it")
         }
     }
 }

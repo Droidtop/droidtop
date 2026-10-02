@@ -8846,6 +8846,12 @@ Gaming has two game tabs now, `GamingSection.GAMES` ("Retro Games") and
   wordmarks or system art around PC content. The tab reads tokens only;
   it names no colour or size of its own.
 
+**Retro Games has no PC or Windows system entry** (owner, 2026-10-01,
+Droidtop/tracker#244): its carousel is built from console systems only.
+The old `pc`/`windows` Retro Games place is removed, with no deep-link
+redirect or compatibility route; a saved place for that card restores at
+the Retro Games section root. PC games are reached from the PC Games tab.
+
 **One rule decides the tab a game is on** (`LibraryEntry.onPcGamesTab`,
 `pc/PcSurface.kt`): PC Games holds every game that is not a console
 system's ROM -- a detected engine game (which carries no systemId), a

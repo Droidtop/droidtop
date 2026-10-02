@@ -74,7 +74,6 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
-import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
 import dev.droidtop.shell.gamepad.pc.onPcGamesTab
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.PlatformsDatabase
@@ -1696,19 +1695,12 @@ private sealed interface GameGroup {
      * The ES-DE `${system.theme}` folder this group themes as -- real
      * ES-DE's own es_systems.xml `<theme>` mechanism (`SystemData::
      * mThemeFolder`), where a system's theme folder is a separate,
-     * declared value rather than always its id. Droidtop's engine
-     * buckets (Ren'Py, RPG Maker, ...) and Linux-container games have
-     * no ES-DE platform identity of their own, so they all theme as
-     * "pc" -- the one metacategory every real theme already ships art
-     * for -- instead of each needing per-engine theme patches (WINE
-     * profiles already carry systemId = "pc" directly, same category).
+     * declared value rather than always its id.
      */
     val systemThemeFolder: String?
 
-    // There is no PC group here (docs/SPEC.md 7i, 2026-10-01): every PC
-    // and engine game is on the PC Games tab, droidtop's own library,
-    // which no ES-DE theme draws. The Retro Games tab holds console
-    // systems and collections of them only.
+    // Retro Games holds console systems and collections only; PC and
+    // engine games belong to the separate PC Games tab (docs/SPEC.md 7i).
 
     data class System(val systemId: String) : GameGroup {
         override val key get() = "system:$systemId"
@@ -1892,19 +1884,18 @@ internal object CollectionsRefresh {
  * Which carousel card a Retro Games entry belongs to: its console system.
  * The entries this tab is handed have already passed
  * [LibraryEntry.onPcGamesTab]'s complement, so every one carries a real
- * systemId; the fallback only keeps the type total.
+ * console systemId.
  */
-private fun LibraryEntry.gameGroup(): GameGroup = GameGroup.System(systemId ?: PC_SYSTEM_ID)
+private fun LibraryEntry.gameGroup(): GameGroup =
+    GameGroup.System(checkNotNull(systemId) { "Retro Games entries must have a console system id" })
 
-/**
- * Where an entry lands, as a plain string, reachable from a unit test:
- * `system:pc` for everything the PC Games tab owns (a detected engine game
- * with no systemId, a store or Wine title, a ROM in a `pc` folder --
- * [LibraryEntry.onPcGamesTab], one rule for both tabs), else its console
- * system's card.
- */
-internal fun gameGroupKey(entry: LibraryEntry): String =
-    if (entry.onPcGamesTab) "system:$PC_SYSTEM_ID" else entry.gameGroup().key
+/** System cards shown by Retro Games after applying its PC Games ownership rule. */
+internal fun retroGamesSystemIds(entries: List<LibraryEntry>): List<String> =
+    entries.asSequence()
+        .filterNot { it.onPcGamesTab }
+        .mapNotNull { it.systemId }
+        .distinct()
+        .toList()
 
 /**
  * System-first, then per-system game grid — ES-DE's System → Game
@@ -1992,10 +1983,8 @@ private fun GamesSection(
     // system ids and froze "switch" at the end of the carousel
     // (observed live) instead of "Nintendo Switch" among the Nintendos.
     val platformsLoadVersion by dev.droidtop.library.consoles.PlatformsDatabase.loadVersion.collectAsState()
-    val orderedSystemGroups = remember(byGroup, platformsLoadVersion) {
-        byGroup.keys
-            .filterNot { it is GameGroup.Collection }
-            .sortedBy { it.label.lowercase() }
+    val orderedSystemGroups = remember(entries, platformsLoadVersion) {
+        retroGamesSystemIds(entries).map(::GameGroup.System).sortedBy { it.label.lowercase() }
     }
     // Carousel order, per direction (2026-08-31): "All games" leads
     // straight into the real systems -- Favorites/Last played/custom
@@ -2527,7 +2516,7 @@ private fun GamesSection(
                         // system's games (SystemView.cpp's mSystemElements is
                         // parsed and fed per system).
                         //
-                        // byGroup only partitions System and Pc groups --
+                        // byGroup only partitions system groups --
                         // a Collection's members live in collectionGroupMembers
                         // (cross-cutting, see GameGroup.Collection's own doc
                         // comment). Reading byGroup for a collection returned

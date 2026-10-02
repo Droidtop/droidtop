@@ -12,6 +12,7 @@ import dev.droidtop.library.scraper.isPcOrEngineGame
  * tab's scraped media and gamelist.xml live.
  */
 internal const val PC_SYSTEM_ID = "pc"
+private const val WINDOWS_SYSTEM_ID = "windows"
 
 /**
  * :app's "PC setup" settings screen (game folders, the Windows system
@@ -31,7 +32,8 @@ internal const val PC_STORES_SCREEN_ID = "pc_stores"
  * can be on both or on neither.
  */
 internal val LibraryEntry.onPcGamesTab: Boolean
-    get() = isPcOrEngineGame || systemId == null || systemId == PC_SYSTEM_ID
+    get() = isPcOrEngineGame || systemId == null ||
+        systemId == PC_SYSTEM_ID || systemId == WINDOWS_SYSTEM_ID
 
 /** Where this game came from. A store row says so itself; anything else is a folder droidtop found. */
 internal fun LibraryEntry.sourceLabel(): String = pcInfo?.source ?: "Folder"
