@@ -129,9 +129,13 @@ object StoreIdentity {
             if (ra != rb) parent[maxOf(ra, rb)] = minOf(ra, rb)
         }
         val byDir = HashMap<String, Int>()
+        // A directory joins rows only when an installed row stands on it: an
+        // uninstalled store row's path is the store's would-be folder, which
+        // can be one shared value for the whole catalogue (docs/SPEC.md 7m).
+        val installedDirs = rows.mapNotNullTo(HashSet()) { row -> row.pcInfo?.takeIf { it.installed }?.installPath?.asInstallKey() }
         val byTitle = HashMap<String, Int>()
         rows.forEachIndexed { index, row ->
-            row.pcInfo?.installPath?.asInstallKey()?.let { dir -> union(index, byDir.getOrPut(dir) { index }) }
+            row.pcInfo?.installPath?.asInstallKey()?.takeIf { it in installedDirs }?.let { dir -> union(index, byDir.getOrPut(dir) { index }) }
             titleKey(row.gameName ?: row.title).takeIf { it.isNotEmpty() }
                 ?.let { key -> union(index, byTitle.getOrPut(key) { index }) }
         }

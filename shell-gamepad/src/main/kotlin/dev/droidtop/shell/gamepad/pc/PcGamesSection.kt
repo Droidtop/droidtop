@@ -224,9 +224,12 @@ internal fun PcGamesSection(
         }
     }
     val games = folded?.games
-    // How many folders or store copies one drawn game stands for, from the
-    // fold already made: a map read, never a lookup on disk.
-    fun partsOf(entry: LibraryEntry): Int = folded?.siblings?.get(entry.id)?.size ?: 1
+    // How many folders or store copies of one drawn game are on this device,
+    // from the fold already made: a map read, never a lookup on disk. A store
+    // row that is not installed is a game the person owns, not a copy they
+    // have, so it is not counted (docs/SPEC.md 7m).
+    fun partsOf(entry: LibraryEntry): Int =
+        folded?.siblings?.get(entry.id)?.count { it.pcInfo?.installed != false } ?: 1
 
     val scope = remember {
         LibraryQueryScope(

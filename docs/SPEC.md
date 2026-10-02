@@ -9361,8 +9361,10 @@ Update, Not installed, Missing (a folder the walk lost), or an installed
 tick for a store game (a folder game that is simply here needs no mark);
 top-right the favourite star; bottom-left the store it is from, one letter
 (droidtop draws no store's own artwork); bottom-right "x3" when the card
-stands for several folders or store copies (`LibraryGameGroup`'s
-entries). A running download also draws a thin progress bar along the
+stands for several folders or store copies ON THIS DEVICE (installed
+entries of `LibraryGameGroup`; an owned store game that is not installed
+is not a copy, so it carries no count, and `StoreIdentity` joins rows by an
+install directory only when an installed row stands on it). A running download also draws a thin progress bar along the
 bottom edge. The focus treatment is the one `focusLift` of "Gaming motion
 and focus"; `GameCard` (the launcher and library tiles that are not
 theme-rendered) takes the same `focusLift` and the same state badge, and
