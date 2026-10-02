@@ -154,16 +154,24 @@ class PcCapsuleStateTest {
         assertEquals(3, counts[VIEW_INSTALLED])
         assertEquals(1, counts[VIEW_UPDATES])
         assertEquals(1, counts[VIEW_FAVOURITES])
-        assertEquals(0, counts[VIEW_CONTINUE])
+        assertEquals(3, counts["Steam"])
+        assertNull(counts["Folder"])
     }
 
     @Test
     fun `updates and favourites chips appear only when they hold something`() {
         val none = pcStripViews(mapOf(VIEW_ALL to 2, VIEW_UPDATES to 0, VIEW_FAVOURITES to 0), emptyList()).map { it.name }
-        assertEquals(listOf(VIEW_ALL, VIEW_INSTALLED, VIEW_CONTINUE), none)
+        assertEquals(listOf(VIEW_ALL, VIEW_INSTALLED), none)
 
         val some = pcStripViews(mapOf(VIEW_UPDATES to 1, VIEW_FAVOURITES to 3), emptyList()).map { it.name }
-        assertEquals(listOf(VIEW_ALL, VIEW_INSTALLED, VIEW_UPDATES, VIEW_FAVOURITES, VIEW_CONTINUE), some)
+        assertEquals(listOf(VIEW_ALL, VIEW_INSTALLED, VIEW_UPDATES, VIEW_FAVOURITES), some)
+    }
+
+    @Test
+    fun `each store gets a view after the built-in ones, largest first`() {
+        val counts = mapOf(VIEW_ALL to 9, VIEW_INSTALLED to 4, "GOG" to 2, "Steam" to 5)
+        val names = pcStripViews(counts, listOf(dev.droidtop.shell.gamepad.query.NamedLibraryView("Mine", LibraryQuery()))).map { it.name }
+        assertEquals(listOf(VIEW_ALL, VIEW_INSTALLED, "Steam", "GOG", "Mine"), names)
     }
 
     @Test

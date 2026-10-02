@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -40,6 +41,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
@@ -71,7 +73,6 @@ import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryFilterSheet
 import dev.droidtop.shell.gamepad.query.LibrarySortSheet
 import dev.droidtop.shell.gamepad.query.PersistQuery
-import dev.droidtop.shell.gamepad.query.QueryChipRow
 import dev.droidtop.shell.gamepad.query.SheetAction
 import dev.droidtop.shell.gamepad.query.rememberSavedViews
 import dev.droidtop.shell.gamepad.query.LibraryQuery
@@ -162,9 +163,9 @@ private class FoldedPcLibrary(
  * Big Picture rather than after an ES-DE theme. Three parts, top to
  * bottom:
  *
- * - **The view strip**: Home, the built-in views (All games, Installed,
- *   Continue playing), the person's saved views, and Filters and sort --
- *   the Deck's library tabs, with the filter one press away.
+ * - **The view strip**: the built-in views (All games, Installed, Updates,
+ *   Favourites), one per store and the person's saved views, with the
+ *   active filter as one pill at its end -- the Deck's library tabs.
  * - **Home**: shelves, each a horizontal row of large capsules
  *   ([pcShelves]). **A view**: the same capsules as a grid over the one
  *   shared [LibraryQuery].
@@ -310,24 +311,26 @@ internal fun PcGamesSection(
     LaunchedEffect(focusedEntry?.id) { focusedEntry?.let { backdropArt = it.backdropArt() } }
     PreloadBackdrops(remember(currentList, state.itemIndex) { neighbourBackdrops(currentList, state.itemIndex) })
 
-    // The strip: Home, every view, Filters and sort.
-    val stripCount = views.size + 2
-    val filtersChip = stripCount - 1
+    // The strip: one chip per view (built-in, store, saved). Home is not on
+    // it; B from a view returns to the shelves.
+    val stripCount = views.size
     fun activateChip(index: Int) {
+        val view = views.getOrNull(index) ?: return
         state.stripIndex = index
-        when {
-            index == 0 -> state.home = true
-            index == filtersChip -> state.filterOpen = true
-            else -> {
-                val view = views[index - 1]
-                if (!state.home && state.query == view.query) return
-                state.query = view.query
-                state.home = false
-                state.itemIndex = 0
-            }
-        }
+        if (!state.home && state.query == view.query) return
+        state.query = view.query
+        state.home = false
+        state.itemIndex = 0
     }
     val currentView = views.firstOrNull { it.query == state.query }
+    // The filters the person set that no strip view stands for, as the one
+    // pill at the strip's end: its text and a count, cleared by one press.
+    val filterPill = remember(grid, games, state.query, state.home, currentView != null) {
+        if (state.home || currentView != null) return@remember null
+        val chips = state.query.activeChips(scope)
+        if (chips.isEmpty()) null
+        else chips.joinToString(", ") { it.label } + ", ${grid.size} of ${state.query.totalIn(games.orEmpty(), scope)}"
+    }
 
     // Which level B leaves (docs/SPEC.md 6e: B always goes back one level).
     val storesScreen = remember { SettingsScreenRegistry.get(PC_STORES_SCREEN_ID) }
@@ -355,20 +358,20 @@ internal fun PcGamesSection(
         return
     }
 
-    // L1/R1 step the strip's views: Home, then each view in order, not the
-    // Filters chip (a dialog, not a view) and never wrapping (menuStep). The
-    // strip owns the press even at its end, so the shoulders never move the
-    // whole page to another tab from here (docs/SPEC.md 7j, "Gaming
+    // L1/R1 step the strip's views in order, never wrapping (menuStep). From
+    // the shelves (no view is showing) R1 enters the first view and L1 stays.
+    // The strip owns the press even at its end, so the shoulders never move
+    // the whole page to another tab from here (docs/SPEC.md 7j, "Gaming
     // controls"). The cursor stays where it is: stepping a view from the
     // grid does not pull the cursor up onto the strip.
     OwnShoulders { step ->
         val active = when {
-            state.home -> 0
-            currentView != null -> views.indexOf(currentView) + 1
-            else -> state.stripIndex.coerceIn(0, filtersChip - 1)
+            state.home -> -1
+            currentView != null -> views.indexOf(currentView)
+            else -> state.stripIndex.coerceIn(0, (stripCount - 1).coerceAtLeast(0))
         }
-        val next = menuStep(active, filtersChip, step)
-        if (next != active) {
+        val next = if (active < 0) (if (step > 0) 0 else -1) else menuStep(active, stripCount, step)
+        if (next >= 0 && next != active) {
             EsDeNavigationSounds.play("scroll")
             activateChip(next)
         }
@@ -379,16 +382,15 @@ internal fun PcGamesSection(
     // dispatches, re-read as the cursor moves.
     val verb = focusedPlay?.first?.verb
     val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.home) {
+        // Steam's order: the list's own actions, then A and B. Start (Menu)
+        // is the shell's, drawn at the row's left; L1/R1 are the glyphs at
+        // the strip's ends, not hints.
         listOf(
-            HintBinding(GamepadAction.A, if (state.stripFocused) "Select" else verb ?: "Play") { state.stripFocused || focusedEntry != null },
             HintBinding(GamepadAction.X, "Filter"),
             HintBinding(GamepadAction.Y, "Sort By"),
             HintBinding(GamepadAction.SELECT, "Options"),
+            HintBinding(GamepadAction.A, if (state.stripFocused) "Select" else verb ?: "Play") { state.stripFocused || focusedEntry != null },
             HintBinding(GamepadAction.B, "Back") { !state.home },
-            // L1/R1 step this strip's views (OwnShoulders), so the row names
-            // what they do HERE; Start is the shell's, drawn by the footer.
-            HintBinding(GamepadAction.L, "Previous view"),
-            HintBinding(GamepadAction.R, "Next view"),
         )
     }
 
@@ -498,8 +500,9 @@ internal fun PcGamesSection(
                     true
                 },
         ) {
-            // The view strip, with L1 and R1 at its ends: it owns the
-            // shoulders while this tab is up (OwnShoulders above).
+            // The one strip above the grid, with L1 and R1 at its ends: it
+            // owns the shoulders while this tab is up (OwnShoulders above),
+            // and the active filter is its last pill.
             val shoulderGlyphs = window.showsShoulderGlyphs()
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -508,33 +511,35 @@ internal fun PcGamesSection(
                 if (shoulderGlyphs) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = Space.Sm))
                 LazyRow(
                     state = stripState,
-                    contentPadding = PaddingValues(vertical = Space.Sm),
+                    contentPadding = PaddingValues(vertical = Space.Xs),
                     horizontalArrangement = Arrangement.spacedBy(Space.Sm),
                     modifier = Modifier.weight(1f),
                 ) {
                     items(count = stripCount, key = { "chip:$it" }) { index ->
-                        run {
-                            val label = when (index) {
-                                0 -> "Home"
-                                filtersChip -> "Filters and sort"
-                                else -> pcStripLabel(views[index - 1], counts)
-                            }
-                            val on = when (index) {
-                                0 -> state.home
-                                filtersChip -> !state.home && currentView == null
-                                else -> !state.home && currentView === views[index - 1]
-                            }
-                            ShellChip(
-                                label,
-                                on = on,
-                                selected = state.stripFocused && state.stripIndex == index,
-                                onClick = {
-                                    state.stripFocused = true
-                                    activateChip(index)
-                                },
-                            )
-                        }
+                        ShellChip(
+                            pcStripLabel(views[index], counts),
+                            on = !state.home && currentView === views[index],
+                            selected = state.stripFocused && state.stripIndex == index,
+                            onClick = {
+                                state.stripFocused = true
+                                activateChip(index)
+                            },
+                        )
                     }
+                }
+                filterPill?.let { text ->
+                    // Touch's one-press clear; the pad reaches the filters
+                    // through X. Never a D-pad stop.
+                    ShellChip(
+                        "$text  \u2715",
+                        primary = true,
+                        selected = false,
+                        modifier = Modifier.padding(start = Space.Sm).widthIn(max = (window.widthDp * 0.4f).dp),
+                        onClick = {
+                            state.query = state.query.cleared
+                            state.itemIndex = 0
+                        },
+                    )
                 }
                 if (shoulderGlyphs) ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = Space.Sm))
             }
@@ -556,17 +561,6 @@ internal fun PcGamesSection(
                     partsOf = ::partsOf,
                 )
                 else -> {
-                    QueryChipRow(
-                        scope = scope,
-                        query = state.query,
-                        shown = grid.size,
-                        total = state.query.totalIn(games.orEmpty(), scope),
-                        onChange = {
-                            state.query = it
-                            state.itemIndex = 0
-                        },
-                        modifier = Modifier.padding(horizontal = window.edgePadding, vertical = Space.Xs),
-                    )
                     if (grid.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("No games match this view", color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
