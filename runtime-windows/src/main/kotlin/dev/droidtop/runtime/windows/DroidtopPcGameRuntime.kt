@@ -75,6 +75,16 @@ class DroidtopPcGameRuntime(
     override val isProvisioned: Boolean
         get() = runCatching { ContainerManager(context).containers.isNotEmpty() }.getOrDefault(false)
 
+    /**
+     * A failed setup step: the whole exception goes to the log (the screen
+     * gets [line] only), because "Attempt to get length of null array" with
+     * no frame was all the console ever reported (Droidtop/tracker#249).
+     */
+    private fun failed(step: String, error: Throwable?, line: String): PcProvisionResult {
+        android.util.Log.w(TAG, "Windows setup: $step failed", error)
+        return PcProvisionResult(false, line)
+    }
+
     // The primary container session IS the Linux runtime: launchLinux
     // runs inside it and nothing else can. It exists only while Desktop
     // mode's container is up (droidspaces with root, proot without), which
@@ -88,7 +98,7 @@ class DroidtopPcGameRuntime(
         onStatus: (String) -> Unit,
     ): PcProvisionResult = withContext(Dispatchers.IO) {
         val manager = runCatching { ContainerManager(context) }
-            .getOrElse { return@withContext PcProvisionResult(false, it.message ?: "couldn't open container storage") }
+            .getOrElse { return@withContext failed("opening container storage", it, it.message ?: "couldn't open container storage") }
 
         val existing = manager.containers.firstOrNull()
 
@@ -177,10 +187,8 @@ class DroidtopPcGameRuntime(
             )
         }
         if (dependencies.isFailure) {
-            return@withContext PcProvisionResult(
-                false,
-                dependencies.exceptionOrNull()?.message ?: "couldn't install Wine",
-            )
+            val error = dependencies.exceptionOrNull()
+            return@withContext failed("installing Wine", error, error?.message ?: "couldn't install Wine")
         }
 
         // The installer only EXTRACTS the base-system archive -- from the
@@ -233,11 +241,19 @@ class DroidtopPcGameRuntime(
             ImageFsInstaller.installIfNeededFuture(context, context.assets, wanted) { percent ->
                 onStatus("Installing Windows system files… $percent%")
             }.get()
-        }.getOrElse { return@withContext PcProvisionResult(false, it.message ?: "system file install threw") }
+        }.getOrElse { return@withContext failed("installing the system files", it, it.message ?: "system file install threw") }
 
         if (installed != true) {
-            return@withContext PcProvisionResult(false, "the Windows system files failed to install")
+            return@withContext failed("installing the system files", null, "the Windows system files failed to install")
         }
+        // The image is now the variant it was installed as, and says so.
+        // gamenative writes this marker in its own pre-launch screen
+        // (XServerScreen.setImagefsContainerVariant), which droidtop never
+        // runs; without it ImageFs.variant reads "" and every later setup,
+        // here and in installIfNeededFuture, sees a mismatch and installs
+        // the whole image again (Droidtop/tracker#249: the second
+        // "Download now" ran the full install a second time).
+        imageFs.createVariantFile(wanted.containerVariant)
 
         // Only now: the prefix is stamped out of the Wine build that is
         // by this point actually on disk.
@@ -286,7 +302,7 @@ class DroidtopPcGameRuntime(
                 },
             )
         }
-            .getOrElse { return@withContext PcProvisionResult(false, it.message ?: "container creation threw") }
+            .getOrElse { return@withContext failed("creating the container", it, it.message ?: "container creation threw") }
             ?: return@withContext PcProvisionResult(
                 false,
                 "couldn't create the Wine prefix (the container pattern may have failed to download)",
@@ -296,10 +312,23 @@ class DroidtopPcGameRuntime(
         // container, and anything reading container-relative paths
         // depends on it having happened.
         runCatching { manager.activateContainer(container) }
-            .getOrElse { return@withContext PcProvisionResult(false, it.message ?: "couldn't activate the container") }
+            .getOrElse { return@withContext failed("activating the container", it, it.message ?: "couldn't activate the container") }
 
         when (val readiness = wineEngine.readiness(container)) {
-            is WineEngineReadiness.Ready -> PcProvisionResult(true, "Windows environment ready")
+            // Ready only if the container reads back the way every later
+            // decision reads it ([isProvisioned], the game page's Set up
+            // row): a prefix whose config did not land on disk loads as
+            // nothing, and reporting success then is the silent "Set up"
+            // loop of Droidtop/tracker#249.
+            is WineEngineReadiness.Ready -> if (isProvisioned) {
+                PcProvisionResult(true, "Windows environment ready")
+            } else {
+                failed(
+                    "reading the new container back",
+                    null,
+                    "Windows setup finished, but its environment could not be read back. Try Set up again.",
+                )
+            }
             // Deliberately reported as a failure: everything downloaded
             // and the user would otherwise be told they are set up, then
             // hit the same missing piece on their first launch.
@@ -418,6 +447,8 @@ class DroidtopPcGameRuntime(
         // parses a trailing numeric run out of the id, and returns 0 for
         // anything that does not parse.
         const val CONTAINER_ID = "1"
+
+        private const val TAG = "droidtop.WineSetup"
 
         /** gamenative's id for Wine's own Direct3D, the one wrapper that is not DXVK-based. */
         private const val WINED3D = "wined3d"

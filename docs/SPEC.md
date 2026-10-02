@@ -4241,6 +4241,27 @@ beyond the missing natives:
   archive with the instance-free downloader and lets the dependency do
   the rest.
 
+What gamenative's own pre-launch screen does and droidtop does not run
+has to be done by droidtop, and only that (Droidtop/tracker#249,
+2026-10-02):
+
+- after the system image installs, droidtop writes the image's variant
+  marker (`ImageFs.createVariantFile`, which upstream calls from
+  `XServerScreen`). Without it the variant reads empty, and every setup
+  reinstalls the whole image;
+- setup succeeds only when the new container reads back through the same
+  `ContainerManager` load that the Set up decision uses, so a container
+  whose config never landed ends in a message, not in the same offer
+  again;
+- each failed step logs its whole exception under `droidtop.WineSetup`;
+  the screen gets one line.
+
+The fork derives every path to the app's own data from the `Context`, never
+from the upstream package name (`/data/data/app.gamenative`): the gamepad
+shared memory (`EVSHIM_BASE_PATH`), the DXVK state cache and the default E:
+drive. Under the upstream package these resolve to the same folders, so the
+change goes upstream as it is.
+
 **Milestone 1 is met.** On build 388 the ImageFs rootfs installs for the
 first time: 175MB base system downloaded and extracted to a 947MB rootfs
 with `bin`/`etc`/`lib`/`usr`/`opt`, `opt/proton-9.0-x86_64` symlinked
