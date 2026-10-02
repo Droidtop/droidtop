@@ -6,6 +6,7 @@ import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.resolveSystem
 import java.io.File
 import java.io.RandomAccessFile
+import java.util.concurrent.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -96,21 +97,22 @@ object GameEngineDetector {
         folder: File,
         defs: List<EngineDef>,
         atThisFolderOnly: Boolean = false,
+        facts: FolderFacts = FolderFacts(folder),
         ruleFilter: (DetectRule) -> Boolean,
     ): GameEngine? =
         defs.firstOrNull { def ->
             def.engine != null &&
-                EngineDetectRules.matches(def.detect.filter(ruleFilter), folder, ::builtinProbe, atThisFolderOnly)
+                EngineDetectRules.matches(def.detect.filter(ruleFilter), facts, ::builtinProbe, atThisFolderOnly)
         }?.engine
 
-    private fun builtinProbe(name: String, folder: File, atThisFolderOnly: Boolean): Boolean = when (name) {
-        "godot" -> isGodot(folder)
-        "html" -> isHtml(folder)
+    private fun builtinProbe(name: String, facts: FolderFacts, atThisFolderOnly: Boolean): Boolean = when (name) {
+        "godot" -> isGodot(facts)
+        "html" -> isHtml(facts)
         // Unity's probe is the one that searches below itself, so it is
         // the one the narrow question changes: at depth 0 it asks for
         // Unity's own root layout, the runtime beside the executable
         // (see [EngineDetectRules.matches]).
-        "unity" -> if (atThisFolderOnly) hasUnityPlayerRuntime(folder, maxDepth = 0) else isUnity(folder)
+        "unity" -> if (atThisFolderOnly) hasUnityPlayerRuntime(facts, maxDepth = 0) else isUnity(facts)
         // An unknown builtin fails its rule rather than matching: a
         // newer database referencing a probe this app doesn't ship must
         // not misdetect.
@@ -120,10 +122,20 @@ object GameEngineDetector {
     private val GODOT_EXECUTABLE_SUFFIXES = setOf("exe", "x86_64", "x86", "")
     private val GODOT_EMBEDDED_PCK_MAGIC = byteArrayOf('G'.code.toByte(), 'D'.code.toByte(), 'P'.code.toByte(), 'C'.code.toByte())
 
-    private fun isGodot(folder: File): Boolean {
-        val candidates = folder.listFiles()?.filter { it.isFile } ?: return false
-        if (candidates.any { it.extension.lowercase() == "pck" }) return true
-        return candidates.any { it.extension.lowercase() in GODOT_EXECUTABLE_SUFFIXES && hasEmbeddedPckTrailer(it) }
+    /**
+     * How many executables are opened to look for Godot's embedded `.pck`
+     * trailer. An export is one executable; a folder with more than a few
+     * is not telling its engine by them, and each one is an open, a size
+     * and two seeks on a slow card.
+     */
+    private const val GODOT_MAX_TRAILER_READS = 4
+
+    private fun isGodot(facts: FolderFacts): Boolean {
+        if (facts.hasFile { it.substringAfterLast('.', "").lowercase() == "pck" }) return true
+        return facts.entryNames().asSequence()
+            .filter { it.substringAfterLast('.', "").lowercase() in GODOT_EXECUTABLE_SUFFIXES && facts.isFile(it) }
+            .take(GODOT_MAX_TRAILER_READS)
+            .any { hasEmbeddedPckTrailer(File(facts.folder, it)) }
     }
 
     private fun hasEmbeddedPckTrailer(file: File): Boolean {
@@ -150,13 +162,20 @@ object GameEngineDetector {
     }
 
     private val HTML_EXTENSIONS = setOf("html", "htm")
+    private const val HTML_MAX_HEAD_READS = 4
 
     /** A web page alone may be a tool or launcher; Twine's story data identifies a game. */
-    private fun isHtml(folder: File): Boolean =
-        folder.listFiles()
-            ?.asSequence()
-            ?.filter { it.isFile && it.extension.lowercase() in HTML_EXTENSIONS }
-            ?.any { file ->
+    private fun isHtml(facts: FolderFacts): Boolean =
+        facts.entryNames()
+            .asSequence()
+            .filter { it.substringAfterLast('.', "").lowercase() in HTML_EXTENSIONS }
+            // The page a game opens with is read first, and only a few are
+            // opened: each is a read on a slow card.
+            .sortedBy { !it.equals("index.html", ignoreCase = true) }
+            .filter { facts.isFile(it) }
+            .take(HTML_MAX_HEAD_READS)
+            .map { File(facts.folder, it) }
+            .any { file ->
                 try {
                     file.bufferedReader().use { reader ->
                         val head = CharArray(8 * 1024)
@@ -171,7 +190,7 @@ object GameEngineDetector {
                 } catch (_: java.io.IOException) {
                     false
                 }
-            } == true
+            }
 
     private fun ByteArray.indexOfSubsequence(needle: ByteArray): Int {
         if (needle.isEmpty() || needle.size > size) return -1
@@ -186,13 +205,12 @@ object GameEngineDetector {
 
     private val UNITY_PLAYER_FILENAMES = setOf("UnityPlayer.dll", "UnityPlayer.so", "UnityPlayer.dylib")
 
-    private fun isUnity(folder: File): Boolean = hasUnityPlayerRuntime(folder, maxDepth = 3)
+    private fun isUnity(facts: FolderFacts): Boolean = hasUnityPlayerRuntime(facts, maxDepth = 3)
 
-    private fun hasUnityPlayerRuntime(folder: File, maxDepth: Int): Boolean {
-        val entries = folder.listFiles() ?: return false
-        if (entries.any { it.isFile && it.name in UNITY_PLAYER_FILENAMES }) return true
+    private fun hasUnityPlayerRuntime(facts: FolderFacts, maxDepth: Int): Boolean {
+        if (facts.hasFile { it in UNITY_PLAYER_FILENAMES }) return true
         if (maxDepth <= 0) return false
-        return entries.any { it.isDirectory && hasUnityPlayerRuntime(it, maxDepth - 1) }
+        return facts.entryNames().any { facts.isFolder(it) && hasUnityPlayerRuntime(facts.child(it), maxDepth - 1) }
     }
 
     /** How many folders below a games root [scan] looks for games. */
@@ -416,10 +434,19 @@ object GameEngineDetector {
      * precise there, the container sees a precise game below it, and the
      * container goes back to being a container.
      */
-    fun engineHere(folder: File, defs: List<EngineDef>): GameEngine? =
-        detect(folder, defs) { !it.readsUnnamedSubtree }
-            ?: detect(folder, defs, atThisFolderOnly = true) { it.readsUnnamedSubtree }
-                ?.takeIf { GameExecutableResolver.hasExecutable(folder) }
+    fun engineHere(folder: File, defs: List<EngineDef>): GameEngine? {
+        // One read of the folder serves every row. The executable is asked
+        // BEFORE the subtree rules because it is the cheap half of the
+        // answer: the subtree rules read below the folder, and a folder with
+        // nothing to run is no game root whatever they find.
+        val facts = FolderFacts(folder)
+        return detect(folder, defs, facts = facts) { !it.readsUnnamedSubtree }
+            ?: if (GameExecutableResolver.hasExecutable(facts)) {
+                detect(folder, defs, atThisFolderOnly = true, facts = facts) { it.readsUnnamedSubtree }
+            } else {
+                null
+            }
+    }
 
     /**
      * THE "this folder is a plain PC game" rule, in one place: it holds an
@@ -463,17 +490,81 @@ object GameEngineDetector {
         folder: File,
         defs: List<EngineDef>,
         systemsById: Map<String, ConsoleSystemDef> = emptyMap(),
+        subfolders: List<File>? = null,
+        hooks: ProbeHooks = ProbeHooks(),
     ): Boolean {
-        var found = 0
-        for (child in folder.listFiles().orEmpty()) {
-            if (!child.isDirectory) continue
-            if (!ScanPrune.isScannableFolder(child)) continue
-            if (resolveSystem(child.name, systemsById) != null) continue
-            if (isGameRoot(child, defs)) {
-                found++
-                if (found >= 2) return true
+        val children = (subfolders ?: folder.listFiles().orEmpty().filter { it.isDirectory })
+            .filter { ScanPrune.isScannableFolder(it) && resolveSystem(it.name, systemsById) == null }
+        // Two are needed, so fewer than two cannot answer yes.
+        if (children.size < 2) return false
+        hooks.planned(children.size)
+        if (children.size < PARALLEL_PROBE_MIN) {
+            var found = 0
+            for (child in children) {
+                if (hooks.cancelled()) throw CancellationException("engine check cancelled")
+                val isGame = isGameRoot(child, defs)
+                hooks.finished()
+                if (isGame && ++found >= 2) return true
             }
+            return false
         }
+        return probeConcurrently(children, defs, hooks)
+    }
+
+    /**
+     * What a caller may hook into an engine check: [planned] is told how
+     * many folders the check is about to look at, [finished] each time one
+     * is done (from any thread), and [cancelled] is asked before each
+     * looks, so a long check can show its progress and be abandoned.
+     */
+    class ProbeHooks(
+        val cancelled: () -> Boolean = { false },
+        val planned: (Int) -> Unit = {},
+        val finished: () -> Unit = {},
+    )
+
+    /**
+     * How many folders a check needs before they are looked at in
+     * parallel, and how many looks run at once. The cost of a look is
+     * latency on a card behind a user-space daemon, so a few at once
+     * overlap it; more only queue behind the daemon, and the bound is
+     * shared by every check in the process.
+     */
+    private const val PARALLEL_PROBE_MIN = 4
+    private const val PROBE_THREADS = 4
+
+    private val probePool: java.util.concurrent.ExecutorService by lazy {
+        java.util.concurrent.ThreadPoolExecutor(
+            PROBE_THREADS, PROBE_THREADS, 20L, java.util.concurrent.TimeUnit.SECONDS,
+            java.util.concurrent.LinkedBlockingQueue<Runnable>(),
+            java.util.concurrent.ThreadFactory { task -> Thread(task, "droidtop-engine-probe").apply { isDaemon = true } },
+        )
+            .apply { allowCoreThreadTimeOut(true) }
+    }
+
+    /** The probes of [holdsSeveralGames], run on [probePool]; stops asking once two games are known. */
+    private fun probeConcurrently(children: List<File>, defs: List<EngineDef>, hooks: ProbeHooks): Boolean {
+        val enough = java.util.concurrent.atomic.AtomicBoolean(false)
+        val futures = children.map { child ->
+            probePool.submit(java.util.concurrent.Callable<Boolean> {
+                try {
+                    !enough.get() && !hooks.cancelled() && isGameRoot(child, defs)
+                } finally {
+                    hooks.finished()
+                }
+            })
+        }
+        var found = 0
+        try {
+            for (future in futures) {
+                if (future.get() && ++found >= 2) return true
+            }
+        } catch (failed: java.util.concurrent.ExecutionException) {
+            throw failed.cause ?: failed
+        } finally {
+            enough.set(true)
+        }
+        if (hooks.cancelled()) throw CancellationException("engine check cancelled")
         return false
     }
 

@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -484,6 +485,13 @@ object PcLibrary {
      */
     private val listingCache = PcFolderScan.ListingCache()
 
+    /**
+     * Where rule 6's verdicts are kept in droidtop's own files, so the first
+     * rescan after a restart re-checks only the folders that changed
+     * ([PcFolderScan.EngineVerdicts]).
+     */
+    private const val ENGINE_VERDICTS_FILE = "pc-engine-verdicts.tsv"
+
     /** [block]'s answer, or [default] when it throws. A cancellation is never swallowed. */
     private suspend fun <T> orDefault(default: T, block: suspend () -> T): T =
         try {
@@ -549,51 +557,73 @@ object PcLibrary {
             dev.droidtop.library.consoles.ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         }
         val job = currentCoroutineContext()[Job]
+        // Rule 6's verdicts survive a restart; loaded and saved off the main
+        // thread, and saved even when the scan is cancelled part way.
+        val verdictsFile = File(context.filesDir, ENGINE_VERDICTS_FILE)
+        val verdicts = withContext(Dispatchers.IO) { PcFolderScan.EngineVerdicts.load(verdictsFile, defs) }
+        val tops = withContext(Dispatchers.IO) {
+            roots.flatMap { root -> PcFolderScan.topLevelFolders(root).map { root to it } }
+        }
+        val done = AtomicInteger()
+        val enginePlanned = AtomicInteger()
+        val engineFinished = AtomicInteger()
+        fun showProgress() {
+            val planned = enginePlanned.get()
+            val engines = if (planned > 0) ", checking engines: ${engineFinished.get()} of $planned" else ""
+            ScanActivity.set(SCAN_SOURCE, "Looking at PC game folders: ${done.get()} of ${tops.size}$engines")
+        }
         val options = PcFolderScan.Options(
             systemsById = systems,
             cache = listingCache,
             cancelled = { job?.isActive == false },
+            verdicts = verdicts,
+            onEngineWork = { planned, finished ->
+                enginePlanned.addAndGet(planned)
+                engineFinished.addAndGet(finished)
+                showProgress()
+            },
         )
-        val tops = withContext(Dispatchers.IO) {
-            roots.flatMap { root -> PcFolderScan.topLevelFolders(root).map { root to it } }
-        }
         val gate = Semaphore(SCAN_PARALLELISM)
-        val done = AtomicInteger()
-        ScanActivity.set(SCAN_SOURCE, "Looking at PC game folders: 0 of ${tops.size}")
-        val scanned = tops.map { (root, folder) ->
-            async(Dispatchers.IO) {
-                gate.withPermit {
-                    val top = try {
-                        PcFolderScan.scanTopLevel(folder, defs, options, skip)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (t: Throwable) {
-                        android.util.Log.w(TAG, "Walking ${folder.absolutePath} for PC games failed", t)
-                        // Unwalked, not empty: what the last walk found there is kept.
-                        PcFolderScan.TopLevelFolder(folder, emptyList(), folder.lastModified(), skipped = true)
-                    }
-                    if (!top.skipped) {
-                        ScanLog.write(
-                            label = "pc folder ${folder.absolutePath}",
-                            games = top.games.size,
-                            skipped = top.skips,
-                            durationMs = top.work.millis,
-                            note = top.work.describe(),
-                            base = folder,
+        showProgress()
+        val scanned = try {
+            tops.map { (root, folder) ->
+                async(Dispatchers.IO) {
+                    gate.withPermit {
+                        val top = try {
+                            PcFolderScan.scanTopLevel(folder, defs, options, skip)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (t: Throwable) {
+                            android.util.Log.w(TAG, "Walking ${folder.absolutePath} for PC games failed", t)
+                            // Unwalked, not empty: what the last walk found there is kept.
+                            PcFolderScan.TopLevelFolder(folder, emptyList(), folder.lastModified(), skipped = true)
+                        }
+                        if (!top.skipped) {
+                            ScanLog.write(
+                                label = "pc folder ${folder.absolutePath}",
+                                games = top.games.size,
+                                skipped = top.skips,
+                                durationMs = top.work.millis,
+                                note = top.work.describe(),
+                                base = folder,
+                            )
+                        }
+                        done.incrementAndGet()
+                        showProgress()
+                        ScannedFolder(
+                            root = root.absolutePath,
+                            topFolder = folder.absolutePath,
+                            gameFolders = top.games.map { it.absolutePath },
+                            mtime = top.mtime,
+                            skipped = top.skipped,
+                            skips = top.skips,
                         )
                     }
-                    ScanActivity.set(SCAN_SOURCE, "Looking at PC game folders: ${done.incrementAndGet()} of ${tops.size}")
-                    ScannedFolder(
-                        root = root.absolutePath,
-                        topFolder = folder.absolutePath,
-                        gameFolders = top.games.map { it.absolutePath },
-                        mtime = top.mtime,
-                        skipped = top.skipped,
-                        skips = top.skips,
-                    )
                 }
-            }
-        }.awaitAll()
+            }.awaitAll()
+        } finally {
+            withContext(NonCancellable + Dispatchers.IO) { verdicts.save(verdictsFile) }
+        }
         val skips = ScanSkips()
         for (folder in scanned) skips.addAll(folder.skips)
         // A scan that finds nothing and a scan that never ran look the

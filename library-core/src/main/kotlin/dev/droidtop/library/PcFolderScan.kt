@@ -121,6 +121,10 @@ object PcFolderScan {
         val systemsById: Map<String, ConsoleSystemDef> = emptyMap(),
         val cache: ListingCache? = null,
         val cancelled: () -> Boolean = { false },
+        /** Rule 6's verdicts kept across restarts ([EngineVerdicts]); null keeps none. */
+        val verdicts: EngineVerdicts? = null,
+        /** Told how many folders an engine check is about to look at and how many it has finished, as (planned, finished) deltas from any thread. */
+        val onEngineWork: (planned: Int, finished: Int) -> Unit = { _, _ -> },
     )
 
     /**
@@ -136,10 +140,11 @@ object PcFolderScan {
         val engineChecks: Int = 0,
         val engineMs: Long = 0L,
         val millis: Long = 0L,
+        val engineVerdictsKept: Int = 0,
     ) {
         fun describe(): String =
             "$listings listings, $entriesStatted entries statted, $cachedListings listings from cache, " +
-                "$engineChecks engine checks ($engineMs ms)"
+                "$engineChecks engine checks ($engineMs ms), $engineVerdictsKept engine verdicts remembered"
     }
 
     /**
@@ -240,6 +245,8 @@ object PcFolderScan {
         internal val folders: List<File>,
         internal val hasProgram: Boolean,
         internal val hasOwnFile: Boolean,
+        /** How many entries the folder held, which with [mtime] tells [EngineVerdicts] the folder is the one it judged. */
+        internal val entryCount: Int,
     ) {
         /** Rule 6's answer for this folder, with the engine rules it was asked under; filled in when first needed. */
         @Volatile
@@ -275,6 +282,86 @@ object PcFolderScan {
         }
     }
 
+    /**
+     * Rule 6's verdict per folder, kept across restarts: a cold start after
+     * the app was closed re-checks only the folders that changed. A verdict
+     * is for one folder path, one modification time, one entry count and one
+     * set of engine rules ([fingerprintOf]); a change to any of them is a
+     * miss. As with [ListingCache], what happens INSIDE a game folder
+     * without touching its parent is not noticed until the parent changes.
+     * The caller loads it once, hands it to every walk, and saves it after
+     * the scan, off the main thread ([load], [save]); it is safe to share
+     * between walks and bounded like the listing cache.
+     */
+    class EngineVerdicts private constructor(private val fingerprint: String) {
+        private class Verdict(val mtime: Long, val entries: Int, val holds: Boolean)
+
+        private val verdicts = ConcurrentHashMap<String, Verdict>()
+
+        @Volatile
+        private var dirty = false
+
+        internal fun get(folder: File, listing: Listing): Boolean? =
+            verdicts[folder.path]?.takeIf { listing.mtime != 0L && it.mtime == listing.mtime && it.entries == listing.entryCount }?.holds
+
+        internal fun put(folder: File, listing: Listing, holds: Boolean) {
+            if (listing.mtime == 0L) return
+            if (verdicts.size >= ListingCache.MAX_ENTRIES) verdicts.clear()
+            verdicts[folder.path] = Verdict(listing.mtime, listing.entryCount, holds)
+            dirty = true
+        }
+
+        /** Writes the verdicts when any were added since they were loaded; a failed write loses only the saving. */
+        fun save(file: File) {
+            if (!dirty) return
+            try {
+                val tmp = File(file.path + ".tmp")
+                tmp.bufferedWriter().use { out ->
+                    out.write(fingerprint)
+                    out.newLine()
+                    for ((path, v) in verdicts) {
+                        out.write("${v.mtime}\t${v.entries}\t${if (v.holds) 1 else 0}\t$path")
+                        out.newLine()
+                    }
+                }
+                if (!tmp.renameTo(file)) {
+                    file.delete()
+                    tmp.renameTo(file)
+                }
+                dirty = false
+            } catch (_: java.io.IOException) {
+                // Nothing to keep; the next scan checks again.
+            }
+        }
+
+        companion object {
+            /** The same rules give the same fingerprint in every process, which a hash of the rules' own objects would not. */
+            fun fingerprintOf(defs: List<EngineDef>): String =
+                "engine-verdicts-1 " + defs.joinToString("|") { "${it.id}:${it.detect}" }.hashCode()
+
+            /** The verdicts [file] kept for [defs], or none when it is missing, unreadable, or was written for other rules. */
+            fun load(file: File, defs: List<EngineDef>): EngineVerdicts {
+                val fingerprint = fingerprintOf(defs)
+                val result = EngineVerdicts(fingerprint)
+                try {
+                    file.bufferedReader().use { input ->
+                        if (input.readLine() != fingerprint) return result
+                        input.forEachLine { line ->
+                            val parts = line.split('\t', limit = 4)
+                            if (parts.size != 4) return@forEachLine
+                            val mtime = parts[0].toLongOrNull() ?: return@forEachLine
+                            val entries = parts[1].toIntOrNull() ?: return@forEachLine
+                            result.verdicts[parts[3]] = Verdict(mtime, entries, parts[2] == "1")
+                        }
+                    }
+                } catch (_: java.io.IOException) {
+                    result.verdicts.clear()
+                }
+                return result
+            }
+        }
+    }
+
     /** One top-level folder's walk: the rules, and the counts [Work] reports. */
     private class Walk(private val defs: List<EngineDef>, private val options: Options) {
         val skips = ScanSkips()
@@ -284,8 +371,10 @@ object PcFolderScan {
         private var cachedListings = 0
         private var engineChecks = 0
         private var engineNanos = 0L
+        private var verdictsKept = 0
 
-        fun work(millis: Long) = Work(listings, entriesStatted, cachedListings, engineChecks, engineNanos / 1_000_000L, millis)
+        fun work(millis: Long) =
+            Work(listings, entriesStatted, cachedListings, engineChecks, engineNanos / 1_000_000L, millis, verdictsKept)
 
         fun walk(folder: File, depth: Int): List<File> {
             if (!walkable(folder, depth)) return emptyList()
@@ -362,16 +451,36 @@ object PcFolderScan {
         /**
          * Rule 6, asked at most once per folder and only when the folder has
          * two subfolders at all (it needs two games below). Probing a
-         * subfolder for engine evidence opens files, so it is the costliest
-         * thing a walk does per folder; [Work] counts it for that reason.
+         * subfolder for engine evidence is the costliest thing a walk does
+         * per folder, so it is bounded to marker names in one read of each
+         * subfolder ([FolderFacts]), a few subfolders are looked at at once,
+         * and the verdict is kept per folder across restarts
+         * ([EngineVerdicts]); [Work] counts it for that reason.
          */
         private fun holdsEngineGames(folder: File, listing: Listing): Boolean {
             if (defs.isEmpty() || listing.folders.size < 2) return false
             if (listing.engineDefs === defs) return listing.holdsEngineGames
-            val startedAt = System.nanoTime()
-            val holds = GameEngineDetector.holdsSeveralGames(folder, defs)
-            engineNanos += System.nanoTime() - startedAt
-            engineChecks++
+            val kept = options.verdicts?.get(folder, listing)
+            val holds = if (kept != null) {
+                verdictsKept++
+                kept
+            } else {
+                val startedAt = System.nanoTime()
+                val asked = GameEngineDetector.holdsSeveralGames(
+                    folder,
+                    defs,
+                    subfolders = listing.folders,
+                    hooks = GameEngineDetector.ProbeHooks(
+                        cancelled = options.cancelled,
+                        planned = { options.onEngineWork(it, 0) },
+                        finished = { options.onEngineWork(0, 1) },
+                    ),
+                )
+                engineNanos += System.nanoTime() - startedAt
+                engineChecks++
+                options.verdicts?.put(folder, listing, asked)
+                asked
+            }
             listing.holdsEngineGames = holds
             listing.engineDefs = defs
             return holds
@@ -382,7 +491,7 @@ object PcFolderScan {
             val cache = options.cache
             // Read BEFORE the listing: a change during it then moves the
             // time past the one stored, and the next walk reads again.
-            val mtime = if (cache != null) folder.lastModified() else 0L
+            val mtime = if (cache != null || options.verdicts != null) folder.lastModified() else 0L
             if (cache != null && mtime != 0L) {
                 cache.get(folder, mtime)?.let {
                     cachedListings++
@@ -393,7 +502,8 @@ object PcFolderScan {
             val folders = ArrayList<File>()
             var hasProgram = false
             var hasOwnFile = false
-            for (entry in folder.listFiles() ?: emptyArray()) {
+            val entries = folder.listFiles() ?: emptyArray()
+            for (entry in entries) {
                 entriesStatted++
                 if (entry.isDirectory) {
                     folders += entry
@@ -403,7 +513,7 @@ object PcFolderScan {
                 if (!hasProgram && GameExecutableResolver.isProgram(entry)) hasProgram = true
             }
             folders.sortBy { it.name.lowercase() }
-            val listing = Listing(mtime, folders, hasProgram, hasOwnFile)
+            val listing = Listing(mtime, folders, hasProgram, hasOwnFile, entries.size)
             if (cache != null && mtime != 0L) cache.put(folder, listing)
             return listing
         }

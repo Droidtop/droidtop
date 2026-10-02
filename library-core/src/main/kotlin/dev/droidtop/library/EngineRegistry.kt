@@ -199,11 +199,80 @@ object EngineRegistryParser {
 }
 
 /**
+ * One folder as a detection pass sees it: its entry NAMES from a single
+ * `readdir`, and the kind of an entry only when a rule needs it. Every
+ * condition below is a question about names first (a marker file, an
+ * extension, a prefix), so the common answer, "no such name here", costs
+ * nothing; an entry is `stat`ed once, and only when its name could matter,
+ * and the answer is kept for every later rule asked of the same folder.
+ * The rules used to list the folder again and `stat` all of its entries for
+ * each condition of each of the database's rows, which on an SD card behind
+ * Android's FUSE layer made one engine check cost seconds
+ * (Droidtop/tracker#275). A facts object is for one detection pass on one
+ * thread; it is never shared.
+ */
+class FolderFacts(val folder: File) {
+    private val names: Array<String> by lazy { folder.list() ?: emptyArray() }
+    private val kinds = HashMap<String, Int>()
+    private val children = HashMap<String, FolderFacts>()
+
+    /** The folder's entry names, unsorted, files and folders alike. */
+    fun entryNames(): Array<String> = names
+
+    private fun kindOf(name: String): Int = kinds.getOrPut(name) {
+        try {
+            val attributes = java.nio.file.Files.readAttributes(
+                File(folder, name).toPath(),
+                java.nio.file.attribute.BasicFileAttributes::class.java,
+            )
+            when {
+                attributes.isRegularFile -> KIND_FILE
+                attributes.isDirectory -> KIND_FOLDER
+                else -> KIND_OTHER
+            }
+        } catch (_: java.io.IOException) {
+            KIND_OTHER
+        }
+    }
+
+    fun isFile(name: String): Boolean = kindOf(name) == KIND_FILE
+
+    fun isFolder(name: String): Boolean = kindOf(name) == KIND_FOLDER
+
+    /** The facts of the subfolder [name] (which must be one of this folder's entries). */
+    fun child(name: String): FolderFacts = children.getOrPut(name) { FolderFacts(File(folder, name)) }
+
+    /** Whether a FILE whose name passes [test] is here; only names that pass are `stat`ed. */
+    fun hasFile(test: (String) -> Boolean): Boolean = names.any { test(it) && isFile(it) }
+
+    /** Whether the relative [path] (slash separated) names a file, or a folder when [folderWanted]. */
+    fun hasPath(path: String, folderWanted: Boolean): Boolean {
+        val first = path.substringBefore('/')
+        // Names are compared without case here and the real path is asked
+        // only for a name that matches, so a card that ignores case still
+        // answers the way the direct question did.
+        if (names.none { it.equals(first, ignoreCase = true) }) return false
+        val target = File(folder, path)
+        return if (folderWanted) target.isDirectory else target.isFile
+    }
+
+    private companion object {
+        const val KIND_FILE = 1
+        const val KIND_FOLDER = 2
+        const val KIND_OTHER = 3
+    }
+}
+
+/**
  * Evaluates one [DetectRule] list against a real game folder. Pure and
  * context-free so the JVM unit tests exercise the exact shipped JSON.
  * [builtinProbe] resolves [DetectCondition.Builtin] names; an unknown
  * name fails its rule (soundness over optimism, same as the parser's
  * unknown-type handling).
+ *
+ * Every condition is answered from a [FolderFacts], so a caller that asks
+ * several rows about one folder passes ONE facts object and the folder is
+ * read once, whatever the number of rows and conditions.
  */
 object EngineDetectRules {
     private const val FILE_HEAD_BYTES = 4096
@@ -227,53 +296,55 @@ object EngineDetectRules {
      */
     fun matches(
         rules: List<DetectRule>,
-        folder: File,
-        builtinProbe: (String, File, Boolean) -> Boolean,
+        facts: FolderFacts,
+        builtinProbe: (String, FolderFacts, Boolean) -> Boolean,
         atThisFolderOnly: Boolean = false,
     ): Boolean =
-        rules.any { rule -> rule.all.all { condition -> holds(condition, folder, builtinProbe, atThisFolderOnly) } }
+        rules.any { rule -> rule.all.all { condition -> holds(condition, facts, builtinProbe, atThisFolderOnly) } }
 
     private fun holds(
         condition: DetectCondition,
-        folder: File,
-        builtinProbe: (String, File, Boolean) -> Boolean,
+        facts: FolderFacts,
+        builtinProbe: (String, FolderFacts, Boolean) -> Boolean,
         atThisFolderOnly: Boolean,
     ): Boolean =
         when (condition) {
-            is DetectCondition.DirExists -> File(folder, condition.path).isDirectory
-            is DetectCondition.FileExists -> File(folder, condition.path).isFile
+            is DetectCondition.DirExists -> facts.hasPath(condition.path, folderWanted = true)
+            is DetectCondition.FileExists -> facts.hasPath(condition.path, folderWanted = false)
             is DetectCondition.AnyFileNameContains ->
-                folder.listFiles()?.any { it.isFile && it.name.lowercase().contains(condition.value) } == true
+                facts.hasFile { it.lowercase().contains(condition.value) }
             is DetectCondition.AnyFileExtension ->
-                folder.listFiles()?.any { it.isFile && it.extension.lowercase() == condition.value } == true
+                facts.hasFile { it.substringAfterLast('.', "").lowercase() == condition.value }
             is DetectCondition.AnyFileExtensionDeep ->
-                anyFileExtensionWithin(folder, condition.value, condition.maxDepth)
+                anyFileExtensionWithin(facts, condition.value, condition.maxDepth)
             is DetectCondition.AnyFileNameIn ->
-                folder.listFiles()?.any { it.isFile && it.name.lowercase() in condition.values } == true
+                facts.hasFile { it.lowercase() in condition.values }
             is DetectCondition.DirNamePrefixCount ->
-                (folder.listFiles()?.count { it.isDirectory && it.name.lowercase().startsWith(condition.prefix) } ?: 0) >= condition.min
+                facts.entryNames().count { it.lowercase().startsWith(condition.prefix) && facts.isFolder(it) } >= condition.min
             is DetectCondition.FileHeadRegex -> {
-                val file = File(folder, condition.path)
-                file.isFile && runCatching {
-                    val head = file.inputStream().use { input ->
+                // The name is the cheap test: a file the folder does not
+                // list is never opened.
+                facts.hasPath(condition.path, folderWanted = false) && runCatching {
+                    val head = File(facts.folder, condition.path).inputStream().use { input ->
                         String(input.readHeadBytes(FILE_HEAD_BYTES), Charsets.ISO_8859_1)
                     }
                     condition.regex.containsMatchIn(head)
                 }.getOrDefault(false)
             }
-            is DetectCondition.Builtin -> builtinProbe(condition.name, folder, atThisFolderOnly)
+            is DetectCondition.Builtin -> builtinProbe(condition.name, facts, atThisFolderOnly)
         }
 
     /**
      * [DetectCondition.AnyFileExtensionDeep]: like AnyFileExtension but
      * descending [maxDepth] directory levels (maxDepth 0 = root only).
      * Depth-capped for the same reason Unity's builtin probe is: this
-     * runs against every scanned folder, some of which are huge.
+     * runs against every scanned folder, some of which are huge. Each
+     * level is one listing, and a subfolder's kind is only asked when the
+     * level above did not already answer.
      */
-    private fun anyFileExtensionWithin(folder: File, extension: String, maxDepth: Int): Boolean {
-        val entries = folder.listFiles() ?: return false
-        if (entries.any { it.isFile && it.extension.lowercase() == extension }) return true
+    private fun anyFileExtensionWithin(facts: FolderFacts, extension: String, maxDepth: Int): Boolean {
+        if (facts.hasFile { it.substringAfterLast('.', "").lowercase() == extension }) return true
         if (maxDepth <= 0) return false
-        return entries.any { it.isDirectory && anyFileExtensionWithin(it, extension, maxDepth - 1) }
+        return facts.entryNames().any { facts.isFolder(it) && anyFileExtensionWithin(facts.child(it), extension, maxDepth - 1) }
     }
 }

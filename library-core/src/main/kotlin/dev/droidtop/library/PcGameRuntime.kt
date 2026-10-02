@@ -198,6 +198,18 @@ object GameExecutableResolver {
         (gameRoot.listFiles() ?: emptyArray()).any { it.isFile && isProgram(it) }
 
     /**
+     * [hasExecutable] for a caller that holds the folder's [FolderFacts]:
+     * only a name that could be a program (a program extension, or none) is
+     * `stat`ed, and the kinds are kept for the rules asked after it.
+     */
+    fun hasExecutable(facts: FolderFacts): Boolean =
+        facts.entryNames().any { name ->
+            val extension = name.substringAfterLast('.', "").lowercase()
+            (extension == "exe" || extension == "sh" || extension in LINUX_ELF_EXTENSIONS || extension.isEmpty()) &&
+                facts.isFile(name) && isProgram(File(facts.folder, name))
+        }
+
+    /**
      * Whether [file], a plain file, is a program a game folder can hold:
      * the one test [hasExecutable] and [PcFolderScan]'s own listing share,
      * so a scan that already has a folder's entries in hand does not list

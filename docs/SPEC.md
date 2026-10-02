@@ -9208,7 +9208,34 @@ that follow are decisions, and each is in the code it names:
   directory's time moves when an entry is added, removed or renamed in it, so an
   unchanged folder costs one `stat` on the next rescan. The cache is in memory;
   the first rescan after a restart is cold. Rule 6's engine probe, the costliest
-  thing done per folder (it opens files), is remembered with the listing.
+  thing done per folder (it opens files), is remembered with the listing and, for
+  the restart case, in a file (below).
+- **An engine check reads each folder once and asks about names first**
+  (`FolderFacts`, `EngineDetectRules`). The first cold run on the console spent
+  140 s on 44 engine checks in one folder (about 3 s each) because every
+  condition of every database row listed the folder again and `stat`ed all its
+  entries. Now a folder's names come from one `readdir`; a path or name rule is
+  answered from the names and only a name that could match is `stat`ed (once,
+  kept for the other rows); a subtree rule reads one listing per level; no file
+  is opened unless its name already qualifies, and then at most four executables
+  for Godot's embedded archive and four web pages for Twine's story data. The
+  executable test is asked before the subtree rules in `engineHere`, since a
+  folder with nothing to run is no game root by them. `holdsSeveralGames` takes
+  the folder's already-read subfolders.
+- **A check looks at its subfolders four at a time** (`probePool`, shared by the
+  whole process, used from four subfolders up) and stops asking once two games
+  are known; the cost is latency and latency overlaps, and more than four only
+  queue behind the card's FUSE daemon.
+- **Engine verdicts persist across restarts** (`PcFolderScan.EngineVerdicts`,
+  `pc-engine-verdicts.tsv` in the app's own files, loaded and saved off the main
+  thread, saved even when a rescan is cancelled). A verdict is valid for the
+  same folder path, modification time, entry count and engine rules; any change
+  is a miss. A cold start after a restart re-checks only changed folders. Like
+  the listing cache it does not notice a change inside a subfolder that leaves
+  the parent untouched.
+- **Progress inside a slow folder:** the row reads "Looking at PC game folders:
+  12 of 21, checking engines: 40 of 130", the second figure counting subfolders
+  looked at over those the checks have so far planned to look at.
 - **Top-level folders are walked three at a time** (`PcLibrary.scanGameFolders`);
   the cost is latency and latency overlaps.
 - **A folder game's cover or icon is remembered by the game folder's

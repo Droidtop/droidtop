@@ -231,4 +231,129 @@ class PcFolderScanTest {
         game("Stop/Some Game")
         PcFolderScan.scanTopLevel(File(temp.root, "Stop"), defs, PcFolderScan.Options(cancelled = { true }))
     }
+
+    /** A category folder with a program of its own (so rule 6 is asked) and [count] engine folders below it. */
+    private fun categoryWithEngineFolders(path: String, count: Int, engineFolders: Int = count) {
+        file("$path/Game.exe", "MZ")
+        for (i in 1..count) {
+            if (i <= engineFolders) file("$path/Title$i/data.pck") else file("$path/Title$i/notes.txt")
+        }
+    }
+
+    @Test
+    fun `an engine verdict kept in a file answers a cold start without checking the folder again`() {
+        categoryWithEngineFolders("Cat", count = 6)
+        val folder = File(temp.root, "Cat")
+        val kept = File(temp.root, "verdicts.tsv")
+        val first = PcFolderScan.EngineVerdicts.load(kept, defs)
+        val cold = PcFolderScan.scanTopLevel(folder, defs, PcFolderScan.Options(verdicts = first))
+        assertTrue(cold.work.engineChecks > 0)
+        first.save(kept)
+
+        // A new process: no listing cache, only the file.
+        val restarted = PcFolderScan.EngineVerdicts.load(kept, defs)
+        val warm = PcFolderScan.scanTopLevel(folder, defs, PcFolderScan.Options(verdicts = restarted))
+        assertEquals(0, warm.work.engineChecks)
+        assertTrue(warm.work.engineVerdictsKept > 0)
+        assertEquals(cold.games, warm.games)
+    }
+
+    @Test
+    fun `a kept engine verdict is dropped when the folder or the rules changed`() {
+        categoryWithEngineFolders("Cat", count = 6)
+        val folder = File(temp.root, "Cat")
+        val kept = File(temp.root, "verdicts.tsv")
+        val first = PcFolderScan.EngineVerdicts.load(kept, defs)
+        PcFolderScan.scanTopLevel(folder, defs, PcFolderScan.Options(verdicts = first))
+        first.save(kept)
+
+        // Other engine rules: the file was written for different ones.
+        val otherRules = PcFolderScan.EngineVerdicts.load(kept, defs.drop(1))
+        val otherRun = PcFolderScan.scanTopLevel(folder, defs.drop(1), PcFolderScan.Options(verdicts = otherRules))
+        assertTrue(otherRun.work.engineChecks > 0)
+
+        // An entry added to the folder changes its entry count, even when its time is unchanged.
+        val sameRules = PcFolderScan.EngineVerdicts.load(kept, defs)
+        val stamp = folder.lastModified()
+        file("Cat/Extra/readme.txt")
+        folder.setLastModified(stamp)
+        val changed = PcFolderScan.scanTopLevel(folder, defs, PcFolderScan.Options(verdicts = sameRules))
+        assertTrue(changed.work.engineChecks > 0)
+    }
+
+    @Test
+    fun `a file of verdicts that is missing or garbled is simply empty`() {
+        val garbled = File(temp.root, "garbled.tsv")
+        garbled.writeText("not a fingerprint\nnonsense")
+        categoryWithEngineFolders("Cat", count = 3)
+        val top = PcFolderScan.scanTopLevel(
+            File(temp.root, "Cat"),
+            defs,
+            PcFolderScan.Options(verdicts = PcFolderScan.EngineVerdicts.load(garbled, defs)),
+        )
+        assertTrue(top.work.engineChecks > 0)
+        assertEquals(0, top.work.engineVerdictsKept)
+        PcFolderScan.EngineVerdicts.load(File(temp.root, "missing.tsv"), defs)
+    }
+
+    @Test
+    fun `an engine check counts engine folders the same sequentially and in parallel`() {
+        // Three folders are checked one after another, six at once.
+        for (count in listOf(3, 6)) {
+            categoryWithEngineFolders("Two$count", count = count, engineFolders = 2)
+            categoryWithEngineFolders("One$count", count = count, engineFolders = 1)
+            assertTrue(GameEngineDetector.holdsSeveralGames(File(temp.root, "Two$count"), defs))
+            assertFalse(GameEngineDetector.holdsSeveralGames(File(temp.root, "One$count"), defs))
+        }
+    }
+
+    @Test
+    fun `an engine check reports every folder it was going to look at`() {
+        categoryWithEngineFolders("Cat", count = 6, engineFolders = 1)
+        val planned = java.util.concurrent.atomic.AtomicInteger()
+        val finished = java.util.concurrent.atomic.AtomicInteger()
+        val hooks = GameEngineDetector.ProbeHooks(planned = { planned.addAndGet(it) }, finished = { finished.incrementAndGet() })
+        assertFalse(GameEngineDetector.holdsSeveralGames(File(temp.root, "Cat"), defs, hooks = hooks))
+        assertEquals(6, planned.get())
+        assertEquals(6, finished.get())
+    }
+
+    @Test
+    fun `a cancelled engine check stops whether it runs one by one or at once`() {
+        for (count in listOf(3, 6)) {
+            categoryWithEngineFolders("Cat$count", count = count)
+            val hooks = GameEngineDetector.ProbeHooks(cancelled = { true })
+            val stopped = try {
+                GameEngineDetector.holdsSeveralGames(File(temp.root, "Cat$count"), defs, hooks = hooks)
+                false
+            } catch (_: java.util.concurrent.CancellationException) {
+                true
+            }
+            assertTrue("count $count", stopped)
+        }
+    }
+
+    @Test
+    fun `folder facts read a folder once and ask the disk about a name only when it is listed`() {
+        file("Probe/Game.exe", "MZ")
+        file("Probe/data.pck")
+        val facts = FolderFacts(File(temp.root, "Probe"))
+        assertEquals(setOf("Game.exe", "data.pck"), facts.entryNames().toSet())
+        // Added after the listing was read: the one read is what every rule is answered from.
+        file("Probe/late.exe", "MZ")
+        assertFalse(facts.hasFile { it == "late.exe" })
+        assertTrue(facts.hasFile { it.endsWith(".pck") })
+        assertFalse(facts.hasPath("nothing/here.txt", folderWanted = false))
+        assertTrue(facts.hasPath("Game.exe", folderWanted = false))
+        assertFalse(facts.hasPath("Game.exe", folderWanted = true))
+    }
+
+    @Test
+    fun `a folder that holds nothing to run is not an engine game root by its subtree evidence`() {
+        // The compiled Ren'Py archive two levels down names a game only beside a program.
+        file("Compiled/game/archive.rpa")
+        assertNull(GameEngineDetector.engineHere(File(temp.root, "Compiled"), defs))
+        file("Compiled/Start.exe", "MZ")
+        assertEquals(GameEngine.RENPY, GameEngineDetector.engineHere(File(temp.root, "Compiled"), defs))
+    }
 }
