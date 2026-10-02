@@ -262,4 +262,21 @@ class GamingThemeMappingTest {
         }
         assertTrue(m.ratio(d.onSurfaceMuted, d.overlaySurface) >= 3.0)
     }
+
+    @Test
+    fun aThemeThatDrawsItsOwnClockOrStatusIsSaid() {
+        assertFalse(GamingThemeMapping.drawsOwnStatus(null))
+        assertFalse(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(element("image", "logo", *fullScreen)))))
+        assertTrue(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(element("clock", "clock")))))
+        assertTrue(GamingThemeMapping.drawsOwnStatus(theme(gamelist = listOf(element("systemstatus", "status")))))
+    }
+
+    @Test
+    fun aClockThatNeverShowsInAViewDoesNotCountAsDrawn() {
+        val menuOnly = element("clock", "clock", "scope" to EsDeThemeValue.Str("menu"))
+        val never = element("systemstatus", "status", "scope" to EsDeThemeValue.Str("none"))
+        assertFalse(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(menuOnly, never))))
+        val inView = element("clock", "clock", "scope" to EsDeThemeValue.Str("view"))
+        assertTrue(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(inView))))
+    }
 }

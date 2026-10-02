@@ -48,7 +48,7 @@ class LeftMenuTest {
     @Test
     fun `every place names a registered screen and no tab does`() {
         GamingSection.entries.forEach { section ->
-            assertEquals(section.name, !section.inTopBar, section.placeScreenId != null)
+            assertEquals(section.name, section.isPlace, section.placeScreenId != null)
         }
     }
 

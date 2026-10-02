@@ -259,6 +259,22 @@ object GamingThemeMapping {
                 accent != null || bodyFont != null || displayFont != null
     }
 
+    /**
+     * Whether the theme draws its own clock or system status in a view the
+     * Gaming shell shows (docs/SPEC.md 7k2, "Gaming theming"). The shell's own
+     * floating status cluster yields to it, so the two never overlap. A
+     * `scope` that keeps the element out of a plain view (`menu`, `none`)
+     * does not count: it would not be on screen to overlap.
+     */
+    fun drawsOwnStatus(theme: EsDeTheme?): Boolean {
+        if (theme == null) return false
+        return listOfNotNull(theme.views["system"], theme.views["all"], theme.views["gamelist"]).any { view ->
+            view.elements.values.any {
+                (it.type == "clock" || it.type == "systemstatus") && esDeScopeAllows(it, menuOpen = false)
+            }
+        }
+    }
+
     fun map(theme: EsDeTheme?): GamingThemeColors {
         if (theme == null) return GamingThemeColors.DEFAULT
         val declared = read(theme)

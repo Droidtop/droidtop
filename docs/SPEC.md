@@ -2492,7 +2492,9 @@ the `ContainerRuntime` interface that already exists (§3):
   full-height panel about a third of the width (34%, 300 to 440 dp), sliding in from the right edge over a
   dimmed page (tapping the page closes it, as B and R2 do), the icon rail along its inner (left) edge,
   L1/R1 stepping the sections and Start swapping to the left menu; the left menu is the same shape on
-  the other edge. The tile sections follow the pane width (`QuickTiles.columnsFor`: one column under
+  the other edge, and both are drawn by the one side-panel frame (`SidePanelFrame`, SidePanel.kt: edge,
+  width fraction and clamps, the tap-to-close scrim, slide in and slide out; B, R2, a tap on the page and a
+  hint-row tap all close through it, so the panel always slides back out). The tile sections follow the pane width (`QuickTiles.columnsFor`: one column under
   300 dp, two, three from 620). Rows carry a name and a value or control, not explanatory sentences:
   idle subtitles on the Game rows, the notification grant row and the Performance readouts were removed;
   only a prompt that changes what the next press does ("Press A again") stays. Portrait is still a bottom
@@ -10386,13 +10388,17 @@ from the one Material set (`LeftMenuEntry.glyph`, CatalogIconGlyphs.kt). There i
 no Power row: Android gives an app no call that opens the power menu (the Quick
 Menu marks its Power menu tile as needing privilege), so a row would be a button that cannot work.
 Up/Down move, A goes, B or Start closes, R2 swaps to the Quick Menu, a tap on a
-row goes and a tap on the dimmed page closes.
+row goes and a tap on the dimmed page closes. The panel frame (scrim, slide in and
+out) is the one the Quick Menu uses on the other edge (`SidePanelFrame`).
 
 The status cluster (clock, connectivity and battery) floats at the top right
 over Gaming content on a soft token-based scrim. It is not focusable and a tap
-opens the Quick Menu. Retro Games continues to use the selected ES-DE theme for
-its layout, colours and type; it is rendered as one destination inside the
-Gaming frame. PC Games, Apps, places and Settings use droidtop's own layouts.
+opens the Quick Menu. On Retro Games it yields to a theme that draws its own
+`clock` or `systemstatus` in a view it shows (`GamingThemeMapping.drawsOwnStatus`,
+read once with the palette; an element whose `scope` keeps it out of a plain view
+does not count), so the two never overlap. Retro Games continues to use the
+selected ES-DE theme for its layout, colours and type; it is rendered as one
+destination inside the Gaming frame. PC Games, Apps, places and Settings use droidtop's own layouts.
 
 **A virtual-cursor menu must scroll its own selection into view (owner,
 2026-09-27).** `MenuPanel`/`MenuRow` (Quick Menu, every Settings screen,
@@ -10891,7 +10897,7 @@ The left menu is where things live. Beside the three tabs it lists four
 **places**, each one a registered settings screen drawn in the shell's
 content area by the same navigator Settings uses (`PlaceCatalogView`, so
 the same B, Info sheet and touch behaviour). A place is a `GamingSection`
-with `inTopBar = false` (the flag now only orders the left menu: the
+with `isPlace = true` (the flag only orders the left menu: the
 main destinations first, then the places, then Settings), and a mode
 that hides Settings (Kiosk, Kid) hides the places too, because they are
 device management (`GamingSection.managesDevice`). The list is one pure

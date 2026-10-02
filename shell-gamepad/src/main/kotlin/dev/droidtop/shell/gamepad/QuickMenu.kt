@@ -1,14 +1,10 @@
 package dev.droidtop.shell.gamepad
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,7 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,13 +42,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.message
 import dev.droidtop.pluginhost.JobsSummary
@@ -62,8 +53,6 @@ import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.runtime.systemstatus.NotificationsStore
 import dev.droidtop.runtime.systemstatus.PerformanceMonitor
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
-import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.menuStep
@@ -144,15 +133,16 @@ internal fun QuickMenu(
     onOpenLeftMenu: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        // The sheet is a window of its own: the same front of the input
-        // pipeline as the shell's (docs/SPEC.md 6e), so the stick, the
-        // repeat cadence and a held Select behave here as they do there.
-        GatePadInThisDialog()
-        HideSystemBarsInThisDialog()
+    val window = currentShellWindow()
+    // The shared side-panel frame (SidePanel.kt): a right-edge panel, or a bottom sheet on a screen held upright.
+    // Its close slides the panel out first, so every way out here (B, R2, the hint row, the scrim) goes through it.
+    SidePanelFrame(
+        edge = if (window.portrait) PanelEdge.BOTTOM else PanelEdge.RIGHT,
+        onDismiss = onDismiss,
+        // About a third of the screen, the left menu's width on the other side: a side panel, not a
+        // screen. The tile grids drop to one column when that leaves them little room.
+        panelWidth = { screen -> sidePanelWidth(screen, 0.34f, 300.dp, 440.dp) },
+    ) { sheetWidth, close ->
         // Game only while a game is actually running (see this
         // function's own doc comment) -- computed once per sheet
         // opening, same as runningEntry itself is (GamepadShell only
@@ -181,128 +171,78 @@ internal fun QuickMenu(
             if (JobsSummary.runningCount(jobs) > 0) add(QuickSection.DOWNLOADS)
         }
 
-        val window = currentShellWindow()
-        // The panel slides in from its edge over a dimmed page, as the left menu does from the other one.
-        val enter = remember { Animatable(0f) }
-        LaunchedEffect(Unit) { enter.animateTo(1f, tween(QUICK_MENU_SLIDE_MS)) }
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            // The dimmed page: tapping it closes, as B does.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = enter.value }
-                    .background(MenuTokens.Scrim.copy(alpha = QUICK_MENU_SCRIM_ALPHA))
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
-            )
-            // About a third of the screen, the left menu's width on the other side: a side panel, not a
-            // screen. The tile grids drop to one column when that leaves them little room.
-            val sheetWidth = if (window.portrait) {
-                maxWidth
-            } else {
-                (maxWidth * 0.34f).coerceIn(300.dp, 440.dp).coerceAtMost(maxWidth)
+        // Preview: stepping the rail and closing win over the
+        // section inside, which holds focus and takes its own
+        // presses. R2 closes: the press that OPENED the sheet
+        // belonged to the shell underneath, so its release never
+        // acts here (docs/SPEC.md 6e) and only a fresh press
+        // closes. A held Select arrives as R2 too, so holding it
+        // again closes the sheet it opened. Start is the left
+        // menu's button, so it swaps to that menu rather than
+        // closing this one (Droidtop/tracker#258).
+        val keys = Modifier.onPad(preview = true) { press ->
+            when (press.action) {
+                GamepadAction.R2 -> {
+                    close(); true
+                }
+                GamepadAction.START -> {
+                    onOpenLeftMenu(); true
+                }
+                GamepadAction.L, GamepadAction.R -> {
+                    val step = if (press.action == GamepadAction.L) -1 else 1
+                    section = QuickTiles.stepSection(sections, section, step)
+                    true
+                }
+                else -> false
             }
-            Surface(
-                modifier = Modifier
-                    .then(
-                        if (window.portrait) {
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = maxHeight * 0.72f)
-                        } else {
-                            Modifier.fillMaxHeight().width(sheetWidth)
-                        },
+        }
+        val rail: @Composable () -> Unit = {
+            QuickRail(sections, section, dots, vertical = !window.portrait) { section = it }
+        }
+        val pane: @Composable (Modifier) -> Unit = { paneModifier ->
+            Column(modifier = paneModifier.padding(16.dp)) {
+                // L1/R1 step the rail; the glyphs beside the section's
+                // name say so instead of a "Switch tab" hint-bar pill
+                // (owner, 2026-09-25).
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                    ShoulderGlyph("L1", modifier = Modifier.padding(end = 8.dp))
+                    Text(
+                        section.label,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MenuTokens.OnSurface,
                     )
-                    .align(if (window.portrait) Alignment.BottomCenter else Alignment.CenterEnd)
-                    .graphicsLayer {
-                        if (window.portrait) translationY = (1f - enter.value) * size.height
-                        else translationX = (1f - enter.value) * size.width
-                    }
-                    // Preview: stepping the rail and closing win over the
-                    // section inside, which holds focus and takes its own
-                    // presses. R2 closes: the press that OPENED the sheet
-                    // belonged to the shell underneath, so its release never
-                    // acts here (docs/SPEC.md 6e) and only a fresh press
-                    // closes. A held Select arrives as R2 too, so holding it
-                    // again closes the sheet it opened. Start is the left
-                    // menu's button, so it swaps to that menu rather than
-                    // closing this one (Droidtop/tracker#258).
-                    .onPad(preview = true) { press ->
-                        when (press.action) {
-                            GamepadAction.R2 -> {
-                                onDismiss(); true
-                            }
-                            GamepadAction.START -> {
-                                onOpenLeftMenu(); true
-                            }
-                            GamepadAction.L, GamepadAction.R -> {
-                                val step = if (press.action == GamepadAction.L) -1 else 1
-                                section = QuickTiles.stepSection(sections, section, step)
-                                true
-                            }
-                            else -> false
-                        }
-                    },
-                // The shell's own overlay surface, not the platform's
-                // colour scheme. Every token this sheet's contents draw
-                // with (MenuTokens: white label text, a 5%-white row
-                // fill) is defined against THIS surface; painting the
-                // sheet with MaterialTheme.colorScheme.surface meant a
-                // device in a light colour state got a white panel with
-                // white-on-white tile labels, the System tab's own
-                // contents rendered illegible by a background the rest
-                // of the shell never uses (emulator rig, 2026-09-10).
-                color = MenuTokens.OverlaySurface,
-                tonalElevation = 0.dp,
-            ) {
-                val rail: @Composable () -> Unit = {
-                    QuickRail(sections, section, dots, vertical = !window.portrait) { section = it }
+                    ShoulderGlyph("R1", modifier = Modifier.padding(start = 8.dp))
                 }
-                val pane: @Composable (Modifier) -> Unit = { paneModifier ->
-                    Column(modifier = paneModifier.padding(16.dp)) {
-                        // L1/R1 step the rail; the glyphs beside the section's
-                        // name say so instead of a "Switch tab" hint-bar pill
-                        // (owner, 2026-09-25).
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-                            ShoulderGlyph("L1", modifier = Modifier.padding(end = 8.dp))
-                            Text(
-                                section.label,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MenuTokens.OnSurface,
-                            )
-                            ShoulderGlyph("R1", modifier = Modifier.padding(start = 8.dp))
+                // Closing's touch route is the hint row's own "B Close"
+                // pill, which dispatches a real B into this window.
+                // key(): sections share one composable (the tile
+                // grids), and a cursor must not carry from one to
+                // the next.
+                key(section) {
+                    when (section) {
+                        QuickSection.GAME -> runningEntry?.let {
+                            GameTab(it, library, onResume, onQuit, quitOutcome, close)
                         }
-                        // Closing's touch route is the hint row's own "B Close"
-                        // pill, which dispatches a real B into this window.
-                        // key(): sections share one composable (the tile
-                        // grids), and a cursor must not carry from one to
-                        // the next.
-                        key(section) {
-                            when (section) {
-                                QuickSection.GAME -> runningEntry?.let {
-                                    GameTab(it, library, onResume, onQuit, quitOutcome, onDismiss)
-                                }
-                                QuickSection.APPS -> AppsTab(onDismiss)
-                                QuickSection.NOTIFICATIONS -> NotificationsTab(onDismiss)
-                                QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
-                                    QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, onDismiss)
-                                QuickSection.PERFORMANCE -> PerformanceSection(onDismiss)
-                                QuickSection.DOWNLOADS -> DownloadsSection(onDismiss)
-                                QuickSection.PLUGINS -> PluginTilesTab(pluginTiles, onDismiss)
-                            }
-                        }
+                        QuickSection.APPS -> AppsTab(close)
+                        QuickSection.NOTIFICATIONS -> NotificationsTab(close)
+                        QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
+                            QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, close)
+                        QuickSection.PERFORMANCE -> PerformanceSection(close)
+                        QuickSection.DOWNLOADS -> DownloadsSection(close)
+                        QuickSection.PLUGINS -> PluginTilesTab(pluginTiles, close)
                     }
                 }
-                if (window.portrait) {
-                    Column(Modifier.fillMaxWidth()) {
-                        rail()
-                        pane(Modifier.fillMaxWidth())
-                    }
-                } else {
-                    Row(Modifier.fillMaxSize()) {
-                        rail()
-                        pane(Modifier.weight(1f).fillMaxHeight())
-                    }
-                }
+            }
+        }
+        if (window.portrait) {
+            Column(Modifier.fillMaxWidth().then(keys)) {
+                rail()
+                pane(Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(Modifier.fillMaxSize().then(keys)) {
+                rail()
+                pane(Modifier.weight(1f).fillMaxHeight())
             }
         }
     }
@@ -310,10 +250,6 @@ internal fun QuickMenu(
 
 /** The landscape rail's width: an icon target plus its padding. */
 private const val RailWidthDp = 64
-
-/** The panel's slide-in and the dimmed page behind it, the left menu's own values. */
-private const val QUICK_MENU_SLIDE_MS = 160
-private const val QUICK_MENU_SCRIM_ALPHA = 0.55f
 
 /**
  * The icon rail: one drawn glyph per section, the current one lit. A column down the sheet's left

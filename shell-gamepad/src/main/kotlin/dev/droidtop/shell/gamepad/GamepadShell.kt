@@ -1305,7 +1305,9 @@ private fun GamepadShellBody(
             }
             // Float status over the page rather than reserving a header
             // band; it is a readout and the tap route to the Quick Menu.
-            if (!screensaverOn) {
+            // On Retro Games it yields to a theme that draws its own clock
+            // or system status (docs/SPEC.md 7k2), so the two never overlap.
+            if (!screensaverOn && !(section == GamingSection.GAMES && GamingTheme.palette.drawsOwnStatus)) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -1801,7 +1803,7 @@ private fun ButtonHintFooter(
  * theme draws. The enum name GAMES is kept so a saved place and the
  * Settings deep link that name it keep working.
  */
-internal enum class GamingSection(val inTopBar: Boolean = true) {
+internal enum class GamingSection(val isPlace: Boolean = false) {
     GAMES, PC_GAMES, APPS, SETTINGS,
 
     /**
@@ -1809,14 +1811,14 @@ internal enum class GamingSection(val inTopBar: Boolean = true) {
      * reached from the left menu only, never as top-bar tabs, each one a
      * registered settings catalog screen drawn in place ([PlaceCatalogView]).
      */
-    STORES(inTopBar = false),
-    DOWNLOADS(inTopBar = false),
-    UPDATES(inTopBar = false),
-    PLUGINS(inTopBar = false),
+    STORES(isPlace = true),
+    DOWNLOADS(isPlace = true),
+    UPDATES(isPlace = true),
+    PLUGINS(isPlace = true),
     ;
 
     /** A place or Settings: device management, which Kiosk and Kid hide. */
-    val managesDevice: Boolean get() = this == SETTINGS || !inTopBar
+    val managesDevice: Boolean get() = this == SETTINGS || isPlace
 
     /** The settings-registry screen a place draws, null for a tab with a view of its own. */
     val placeScreenId: String?
@@ -1853,17 +1855,17 @@ private const val SHELL_SCREEN_TRANSITION_MS = Motion.ScreenMs
  * over the device's configuration.
  */
 internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> =
-    GamingSection.entries.filter { it.inTopBar && !(mode.hidesSettings && it.managesDevice) }
+    GamingSection.entries.filter { !it.isPlace && !(mode.hidesSettings && it.managesDevice) }
 
 /**
- * The destinations the left menu lists: the top bar's tabs, then the
+ * The destinations the left menu lists: the main tabs, then the
  * places things live, with Settings last. A mode that hides Settings
  * hides the places too -- stores, downloads, updates and plugins are the
  * device's configuration as much as Settings is.
  */
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
-    val places = GamingSection.entries.filter { !it.inTopBar && !(mode.hidesSettings && it.managesDevice) }
+    val places = GamingSection.entries.filter { it.isPlace && !(mode.hidesSettings && it.managesDevice) }
     // PC Games leads (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
     val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy { if (it == GamingSection.PC_GAMES) 0 else 1 }
     return main + places + tabs.filter { it == GamingSection.SETTINGS }

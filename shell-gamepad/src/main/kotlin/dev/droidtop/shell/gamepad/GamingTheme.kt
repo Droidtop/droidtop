@@ -76,6 +76,8 @@ class GamingPalette internal constructor(
     internal val bodyFamily: FontFamily?,
     internal val displayFamily: FontFamily?,
     internal val textureBrush: Brush?,
+    /** The theme draws its own clock or system status, so the shell's floating cluster yields (docs/SPEC.md 7k2). */
+    internal val drawsOwnStatus: Boolean = false,
 ) {
     val ground = Color(colors.ground)
     val overlaySurface = Color(colors.overlaySurface)
@@ -230,14 +232,16 @@ object GamingTheme {
         // process the way ThemeAssets itself refuses to cache one.
         if (name != null && theme == null) return GamingPalette.Default
         val colors = GamingThemeMapping.map(theme)
-        val palette = if (!colors.declared) {
-            GamingPalette.Default
-        } else {
-            GamingPalette(
+        val drawsOwnStatus = GamingThemeMapping.drawsOwnStatus(theme)
+        val palette = when {
+            !colors.declared && !drawsOwnStatus -> GamingPalette.Default
+            !colors.declared -> GamingPalette(GamingThemeColors.DEFAULT, null, null, null, drawsOwnStatus = true)
+            else -> GamingPalette(
                 colors = colors,
                 bodyFamily = loadFamily(colors.bodyFontPath),
                 displayFamily = loadFamily(colors.displayFontPath),
                 textureBrush = loadTexture(colors.textureImagePath),
+                drawsOwnStatus = drawsOwnStatus,
             )
         }
         cache[key] = palette

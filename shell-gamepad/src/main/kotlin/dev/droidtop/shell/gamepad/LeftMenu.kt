@@ -1,19 +1,14 @@
 package dev.droidtop.shell.gamepad
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,7 +22,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,16 +36,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
-import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.menuStep
@@ -84,15 +73,6 @@ internal fun leftMenuEntries(sections: List<GamingSection>): List<LeftMenuEntry>
 internal fun leftMenuStartIndex(entries: List<LeftMenuEntry>, current: GamingSection, atHome: Boolean = false): Int =
     entries.indexOfFirst { it.isAt(current, atHome) }.coerceAtLeast(0)
 
-// How long the panel takes to slide in and the page behind it to dim.
-// Local until the shared motion tokens land (Droidtop/tracker#256).
-private const val LEFT_MENU_SLIDE_MS = 160
-
-// How dark the page behind goes. A plain scrim, not a blur: a real blur
-// of a themed canvas with video and animation on it is a per-frame cost
-// the handheld should not pay for a menu that is open for seconds.
-private const val LEFT_MENU_SCRIM_ALPHA = 0.55f
-
 // A side-menu row is this tall (a touch window raises it to one touch target).
 private val LEFT_MENU_ROW_HEIGHT = 48.dp
 
@@ -122,13 +102,13 @@ internal fun LeftMenu(
     onOpenQuickMenu: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        GatePadInThisDialog()
-        HideSystemBarsInThisDialog()
-        val window = currentShellWindow()
+    val window = currentShellWindow()
+    // The frame's close slides the panel out first; every way out here goes through it.
+    SidePanelFrame(
+        edge = PanelEdge.LEFT,
+        onDismiss = onDismiss,
+        panelWidth = { screen -> if (window.portrait) screen * 0.72f else sidePanelWidth(screen, 0.28f, 224.dp, 360.dp) },
+    ) { _, close ->
         // A tap moves the cursor and sends the real press, so the one key
         // handler below is the only place that says what a row does.
         val press = rememberGamepadTouch()
@@ -136,83 +116,60 @@ internal fun LeftMenu(
         var heldStep by remember { mutableStateOf(false) }
         val listState = rememberLazyListState()
         val focusRequester = remember { FocusRequester() }
-        val enter = remember { Animatable(0f) }
-        LaunchedEffect(Unit) { enter.animateTo(1f, tween(LEFT_MENU_SLIDE_MS)) }
         LaunchedEffect(Unit) { requestFocusWhenAttached(focusRequester, "Left menu") }
         LaunchedEffect(focusIndex, entries.size) {
             if (entries.isNotEmpty()) listState.keepInView(focusIndex.coerceIn(0, entries.size - 1), animate = !heldStep)
         }
 
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            // The dimmed page: tapping it closes, as B does.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = enter.value }
-                    .background(MenuTokens.Scrim.copy(alpha = LEFT_MENU_SCRIM_ALPHA))
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
-            )
-            val panelWidth = if (window.portrait) maxWidth * 0.72f else (maxWidth * 0.28f).coerceIn(224.dp, 360.dp)
-            Surface(
-                color = MenuTokens.OverlaySurface,
-                tonalElevation = 0.dp,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .fillMaxHeight()
-                    .width(panelWidth)
-                    .graphicsLayer { translationX = -(1f - enter.value) * size.width }
-                    // Preview, like the Quick Menu's sheet: the panel takes
-                    // its own presses before the focused column inside it.
-                    .onPad(preview = true) { p ->
-                        when (p.action) {
-                            GamepadAction.UP, GamepadAction.DOWN -> {
-                                heldStep = p.repeat
-                                val next = menuStep(focusIndex, entries.size, if (p.action == GamepadAction.UP) -1 else 1)
-                                if (next != focusIndex) EsDeNavigationSounds.play("scroll")
-                                focusIndex = next
-                            }
-                            GamepadAction.A -> entries.getOrNull(focusIndex)?.let(onSelect)
-                            GamepadAction.B, GamepadAction.START -> onDismiss()
-                            GamepadAction.R2 -> onOpenQuickMenu()
-                            else -> return@onPad false
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                // Preview, like the Quick Menu's sheet: the panel takes
+                // its own presses before the focused column inside it.
+                .onPad(preview = true) { p ->
+                    when (p.action) {
+                        GamepadAction.UP, GamepadAction.DOWN -> {
+                            heldStep = p.repeat
+                            val next = menuStep(focusIndex, entries.size, if (p.action == GamepadAction.UP) -1 else 1)
+                            if (next != focusIndex) EsDeNavigationSounds.play("scroll")
+                            focusIndex = next
                         }
-                        true
-                    },
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .focusRequester(focusRequester)
-                        .focusable(),
-                ) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(Space.Hair),
-                        contentPadding = PaddingValues(vertical = Space.Lg),
-                    ) {
-                        itemsIndexed(entries, key = { _, entry -> entry.key }) { index, entry ->
-                            SideMenuRow(
-                                entry = entry,
-                                isCurrent = entry.isAt(current, atHome),
-                                selected = index == focusIndex,
-                                onClick = {
-                                    focusIndex = index
-                                    press(GamepadAction.A)
-                                },
-                            )
-                        }
+                        GamepadAction.A -> entries.getOrNull(focusIndex)?.let(onSelect)
+                        GamepadAction.B, GamepadAction.START -> close()
+                        GamepadAction.R2 -> onOpenQuickMenu()
+                        else -> return@onPad false
                     }
-                    HintRow(
-                        bindings = listOf(
-                            HintBinding(GamepadAction.A, "Open"),
-                            HintBinding(GamepadAction.R2, "Quick Menu"),
-                            HintBinding(GamepadAction.B, "Close"),
-                        ),
-                        background = Color.Transparent,
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable(),
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(Space.Hair),
+                contentPadding = PaddingValues(vertical = Space.Lg),
+            ) {
+                itemsIndexed(entries, key = { _, entry -> entry.key }) { index, entry ->
+                    SideMenuRow(
+                        entry = entry,
+                        isCurrent = entry.isAt(current, atHome),
+                        selected = index == focusIndex,
+                        onClick = {
+                            focusIndex = index
+                            press(GamepadAction.A)
+                        },
                     )
                 }
             }
+            HintRow(
+                bindings = listOf(
+                    HintBinding(GamepadAction.A, "Open"),
+                    HintBinding(GamepadAction.R2, "Quick Menu"),
+                    HintBinding(GamepadAction.B, "Close"),
+                ),
+                background = Color.Transparent,
+            )
         }
     }
 }
