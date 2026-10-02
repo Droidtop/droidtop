@@ -8,7 +8,7 @@ class AppCloserTest {
     private class FakeOps(
         private val privileges: TaskPrivileges,
         private val result: ForceStopResult = ForceStopResult.NoProvider,
-    ) : PrivilegedOps {
+    ) : PrivilegedShell {
         val forceStops = mutableListOf<String>()
 
         override fun available() = privileges
@@ -24,7 +24,7 @@ class AppCloserTest {
     private val killed = mutableListOf<String>()
     private val closed = mutableListOf<String>()
 
-    private fun closer(ops: PrivilegedOps, killWorks: Boolean = true) =
+    private fun closer(ops: PrivilegedShell, killWorks: Boolean = true) =
         AppCloser(ops, killBackground = { killed += it; killWorks }, onClosed = { closed += it })
 
     @Test
