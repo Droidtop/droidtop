@@ -2,9 +2,11 @@ package dev.droidtop.runtime.tasks
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The task manager: the one place that ends another app (docs/SPEC.md, "The task manager"). The Quick
@@ -37,6 +39,17 @@ object TaskManager {
             }
         })
     }
+
+    private val labels = ConcurrentHashMap<String, String>()
+
+    /** An installed app's name, cached; null when the package is not installed. A package-manager lookup, so not for the main thread's hot path. */
+    fun appLabel(context: Context, packageName: String): String? =
+        labels[packageName] ?: try {
+            val pm = context.packageManager
+            pm.getApplicationInfo(packageName, 0).loadLabel(pm).toString().also { labels[packageName] = it }
+        } catch (e: PackageManager.NameNotFoundException) {
+            null
+        }
 
     /** Closes one app by the strongest path available, and says what that achieved. */
     suspend fun close(context: Context, packageName: String): CloseOutcome =

@@ -7,6 +7,7 @@ import dev.droidtop.library.theme.EsDeAspectRatio
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.library.theme.ThemePrefs
+import dev.droidtop.runtime.tasks.text
 
 /**
  * The Gaming mode settings catalog -- the single definition of what
@@ -58,6 +59,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_LEAVE_UI_MODE = "pref_gaming_system_leave_ui_mode"
     const val ID_SYSTEM_SWITCH_MODE = "pref_gaming_system_switch_mode"
     const val ID_SYSTEM_OPEN_SETTINGS = "pref_gaming_system_open_settings"
+    const val ID_SYSTEM_CLOSE_APP = "action_system_close_app"
     const val ID_SYSTEM_DND = "pref_gaming_system_dnd"
     const val ID_SYSTEM_DND_GRANT = "pref_gaming_system_dnd_grant"
     const val ID_SYSTEM_ADAPTIVE = "pref_gaming_system_adaptive"
@@ -437,6 +439,20 @@ object GamingSettingsCatalog {
                         ),
                     ),
                 )
+                // The app in front, ended (docs/SPEC.md "The task manager", tracker#245): there while droidtop
+                // knows which app it last started, which is the one a Home press left running behind the shell.
+                dev.droidtop.runtime.tasks.LaunchLedger.last?.let { running ->
+                    val name = dev.droidtop.runtime.tasks.TaskManager.appLabel(context, running.packageName) ?: running.packageName
+                    add(
+                        AsyncActionItem(
+                            id = ID_SYSTEM_CLOSE_APP,
+                            title = "Close $name",
+                            subtitle = "Ends the app you left running; unsaved progress in it is lost",
+                            confirmTitle = "Close $name?",
+                            run = { ctx, _ -> dev.droidtop.runtime.tasks.TaskManager.close(ctx, running.packageName).text },
+                        ),
+                    )
+                }
                 add(
                     ActionItem(
                         id = ID_SYSTEM_NETWORK,

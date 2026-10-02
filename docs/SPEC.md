@@ -2544,6 +2544,10 @@ a close path of its own. Every call works off the main thread.
   restart forgets it, which is the honest direction). The Quick Menu's Quit row closes
   `LaunchLedger.last` whatever kind of entry it was: a ROM's player, an engine game's host, a plain
   app. `Library.quit` stays only as the fallback when no launch was noted.
+- **Close current app, on the System tab.** The Quick Menu's System group carries a "Close <app>" row
+  while `LaunchLedger.last` is set: the same close the Game tab's Quit row runs, reachable from the
+  System tab alone, in the confirm-then-act shape the other destructive tiles use. It runs
+  `TaskManager.close` and shows the outcome sentence.
 
 ## 4a. Networking & VPN (directed 2026-08-30)
 
