@@ -282,7 +282,7 @@ class PadGate(
     private val focused: () -> Boolean = { true },
 ) {
     private val handler = Handler(Looper.getMainLooper())
-    private val core = PadGateCore(
+    private val core: PadGateCore = PadGateCore(
         scheduler = object : PadScheduler {
             override fun now(): Long = SystemClock.uptimeMillis()
 
