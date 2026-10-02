@@ -351,6 +351,9 @@ internal fun MenuRow(
     // own (Quick Menu, PcGameMenu, GamelistOptionsMenu and friends),
     // which still need MenuRow to scroll itself into view.
     ownScrollKeeping: Boolean = false,
+    // A leading picture the caller draws (an app's own icon in the task manager's list); [accent] and
+    // [icon] win when given, since a row carries one leading mark at most.
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val window = LocalShellWindow.current
     // Real bug this fixes (owner, 2026-09-27): every menu built from
@@ -418,6 +421,9 @@ internal fun MenuRow(
                 tint = if (selected) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                 modifier = Modifier.size(24.dp),
             )
+            Spacer(Modifier.width(16.dp))
+        } else if (leading != null) {
+            leading()
             Spacer(Modifier.width(16.dp))
         }
         Column(Modifier.weight(1f)) {

@@ -261,6 +261,7 @@ internal fun QuickMenu(
                         }
                         QuickTab.NOTIFICATIONS -> NotificationsTab(onDismiss)
                         QuickTab.SYSTEM -> QuickSettingsPanel(sheetWidth.value.toInt(), onDismiss)
+                        QuickTab.APPS -> AppsTab(onDismiss)
                         QuickTab.PLUGINS -> PluginTilesTab(pluginTiles, onDismiss)
                     }
                 }
@@ -275,6 +276,7 @@ private enum class QuickTab(val label: String) {
     GAME("Game"),
     NOTIFICATIONS("Notifications"),
     SYSTEM("System"),
+    APPS("Apps"),
     PLUGINS("Plugins"),
 }
 

@@ -2548,6 +2548,33 @@ a close path of its own. Every call works off the main thread.
   while `LaunchLedger.last` is set: the same close the Game tab's Quit row runs, reachable from the
   System tab alone, in the confirm-then-act shape the other destructive tiles use. It runs
   `TaskManager.close` and shows the outcome sentence.
+- **One running-apps list, and what a non-privileged app can know** (`TaskManager.snapshot`,
+  `RunningApp`: name, package, display id, task id). Android hides other apps' tasks from a normal app:
+  `getRunningTasks` and `getRunningAppProcesses` return only the caller's own, `getAppTasks` only
+  droidtop's own, and `UsageStatsManager` needs the special Usage access grant and says nothing about
+  displays or whether a task is still open. droidtop does not request accessibility window retrieval
+  for this. So the list has two sources, and says which it used (`Fidelity`):
+  - `EXACT`: a running `priv.shell` provider runs `dumpsys activity activities` filtered to its
+    `Display #N` and `Task{...}` lines (`ActivityDump`; the filter keeps the output under the provider's
+    64 KiB cap) and the standard tasks are read from that, one row per package and display, in the
+    system's order. Home, recents and system surfaces are not apps and are left out.
+  - `LAUNCHED_ONLY`: the apps droidtop itself started (`LaunchLedger`), minus any no longer installed,
+    with the note "Without the Shizuku plugin droidtop can list only the apps it opened itself, and
+    cannot tell which of them you have since closed." The same note names a provider that could not
+    answer. A list is never padded with a guess.
+  Never listed or closed by Clear all: droidtop's own tasks (shell and companion), home apps, the
+  system UI, and (Clear all only) Enginehost, which may be hosting a game.
+- **Nothing polls while the list is hidden.** `TaskManager.watch` is a loop the surface runs in the
+  scope that owns its visibility (the Apps tab's `LaunchedEffect`, the companion panel's); leaving
+  composition ends it. Reads run on `Dispatchers.IO`.
+- **Switch to and Move to the other screen are launches.** `TaskActions.bringTo` starts the app's launcher
+  activity on a display through `LaunchDisplay.startOnDisplay`, the same dispatch point as every launch
+  (audio hand-off, display cover, ledger). For an open app that resumes its task; whether Android also
+  moves the task to the other display is Android's decision, so the UI says "asked", not "moved". There
+  is no shell-side `move-task` fallback.
+- **The Quick Menu's Apps tab.** One row per running app (icon, name, which screen). A switches to it
+  on the screen it is on, X closes it, Y asks for it on the other screen when there is one, B closes
+  the menu. The same rows are touch targets, and the hint row's pills are the touch route to X and Y.
 
 ## 4a. Networking & VPN (directed 2026-08-30)
 

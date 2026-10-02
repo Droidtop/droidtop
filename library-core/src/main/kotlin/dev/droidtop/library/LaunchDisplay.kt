@@ -176,6 +176,18 @@ object LaunchDisplay {
     }
 
     /**
+     * Starts [intent] on [displayId] with no asking and no remembered choice: the task manager's "switch
+     * to" and "move to the other screen" (docs/SPEC.md "The task manager"), where the person has already
+     * said which app and which screen. [ctx], when given, is the app the Quick Menu's Game tab then
+     * names; it still passes the one dispatch point, so the audio hand-off, the display cover and the
+     * launch ledger all happen as for any other launch.
+     */
+    fun startOnDisplay(context: Context, intent: Intent, displayId: Int, ctx: LaunchContext?) {
+        runningGame = ctx
+        startOn(context, intent, displayId)
+    }
+
+    /**
      * Clears [parkedDisplayId] and [runningGame] together -- the one
      * signal an explicit shell entry (BackButtonMenu's Gaming item) or a
      * hard reinit uses to say "nothing is running any more" (see each
