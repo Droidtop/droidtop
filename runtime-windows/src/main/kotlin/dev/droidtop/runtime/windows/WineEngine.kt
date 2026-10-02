@@ -1,6 +1,7 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
+import app.gamenative.utils.X86_64GuestLibs
 import com.winlator.container.Container
 import com.winlator.contents.ContentsManager
 import com.winlator.core.WineInfo
@@ -110,6 +111,11 @@ class BionicWineEngine(private val context: Context) : WineEngine {
             return WineEngineReadiness.Missing(
                 "no wine binary at ${wine.absolutePath} for ${prefix.wineVersion} " +
                     "-- run \"Set up Windows games\" in Settings",
+            )
+        }
+        if (X86_64GuestLibs.isX86_64Host() && !X86_64GuestLibs.isInstalled(context)) {
+            return WineEngineReadiness.Missing(
+                "the x86_64 Windows libraries are not installed yet -- run \"Set up Windows games\" in Settings",
             )
         }
         return WineEngineReadiness.Ready

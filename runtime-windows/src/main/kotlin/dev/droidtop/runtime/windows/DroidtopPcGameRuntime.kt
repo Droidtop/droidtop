@@ -5,6 +5,7 @@ import app.gamenative.data.GameSource
 import app.gamenative.service.SteamService
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.LaunchDependencies
+import app.gamenative.utils.X86_64GuestLibs
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
 import com.winlator.core.KeyValueSet
@@ -72,8 +73,12 @@ class DroidtopPcGameRuntime(
     override val isAvailable: Boolean
         get() = isProvisioned || primarySession() != null
 
+    // On an x86_64 device the environment also needs the x86_64 guest
+    // libraries; a device set up before they existed is offered Set up again,
+    // which fetches only them (Droidtop/tracker#242).
     override val isProvisioned: Boolean
-        get() = runCatching { ContainerManager(context).containers.isNotEmpty() }.getOrDefault(false)
+        get() = runCatching { ContainerManager(context).containers.isNotEmpty() }.getOrDefault(false) &&
+            (!X86_64GuestLibs.isX86_64Host() || X86_64GuestLibs.isInstalled(context))
 
     /**
      * A failed setup step: the whole exception goes to the log (the screen
@@ -254,6 +259,25 @@ class DroidtopPcGameRuntime(
         // the whole image again (Droidtop/tracker#249: the second
         // "Download now" ran the full install a second time).
         imageFs.createVariantFile(wanted.containerVariant)
+
+        // An x86_64 device runs the x86_64 Wine directly, without box64, and
+        // the image above is an aarch64 userland: the libraries Wine opens
+        // come from the fork's own x86_64 build instead (X86_64GuestLibs,
+        // docs/SPEC.md "The x86_64 Windows runtime"). Nothing on arm64.
+        if (X86_64GuestLibs.isX86_64Host() && !X86_64GuestLibs.isInstalled(context)) {
+            onStatus("Downloading the x86_64 Windows libraries…")
+            runCatching {
+                X86_64GuestLibs.ensureInstalled(context) { fraction ->
+                    onStatus("Downloading the x86_64 Windows libraries… ${(fraction * 100).toInt()}%")
+                }
+            }.getOrElse {
+                return@withContext failed(
+                    "installing the x86_64 libraries",
+                    it,
+                    it.message ?: "couldn't install the x86_64 Windows libraries -- check the network and retry",
+                )
+            }
+        }
 
         // Only now: the prefix is stamped out of the Wine build that is
         // by this point actually on disk.
@@ -464,12 +488,15 @@ class DroidtopPcGameRuntime(
          * is a `.wcp` a user installs by hand through the Wine/Proton
          * manager dialog, and provisioning cannot assume that happened.
          *
-         * x86_64 rather than arm64ec: it runs entirely under box64, whose
-         * payload ships in this module's assets, so it depends on nothing
-         * else being fetched or configured. arm64ec is the faster of the
-         * two and is where this should end up, but it additionally needs
-         * the emulator DLL set and a chosen emulator backend -- worth
-         * doing deliberately, not as a side effect of picking a default.
+         * x86_64 rather than arm64ec, and the same build on both ABIs. It
+         * is an x86_64 Android (bionic) Wine: on arm64 it runs entirely
+         * under box64, whose payload ships in this module's assets; on an
+         * x86_64 device it runs directly, with the fork's x86_64 guest
+         * libraries in place of the image's aarch64 ones (no box64). An
+         * arm64ec build would be faster on arm64 but cannot run on x86_64
+         * at all, and additionally needs the emulator DLL set and a chosen
+         * emulator backend -- worth doing deliberately, not as a side
+         * effect of picking a default.
          */
         const val WINE_VERSION = "proton-9.0-x86_64"
     }

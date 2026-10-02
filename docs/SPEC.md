@@ -4043,8 +4043,9 @@ source in [vendor/gamenative](../vendor/gamenative):
   backend is the prefix's own `emulator` field, and the vendored
   `BionicProgramLauncherComponent` is what honours it: an **arm64ec** Wine
   build loads `wowbox64.dll` or `libwow64fex.dll` as its `HODLL` according
-  to that field, while an **x86_64** Wine build always runs as
-  `box64 <guest>`. droidtop's launch (`WineXSession`) hands the launcher
+  to that field, while an **x86_64** Wine build runs as `box64 <guest>` on
+  arm64 and directly, with no translator, on an x86_64 device ("The x86_64
+  Windows runtime", §10b). droidtop's launch (`WineXSession`) hands the launcher
   the prefix's own Box64 version and preset and FEXCore preset, and the
   per-game Wine configuration screen (gamenative's `ContainerConfigDialog`,
   opened through `PcContainerConfigActivity`) is where a person changes
@@ -12526,8 +12527,8 @@ gamenative's code actually calls:
   x86 has no Adreno driver to redirect to.
 - `libkgslshim`: an `ioctl` that forwards to libc; x86 has no KGSL.
 - `libvortekrenderer`: its JNI reports no context, so
-  `VortekRendererComponent` never starts; x86_64 Wine reaches Vulkan
-  directly.
+  `VortekRendererComponent` never starts (how x86_64 Wine reaches a GPU
+  instead is the open item under "Inside the guest" below).
 - `libsteambootstrap`: see Steam below.
 - upstream projects: lsfg-vk (`liblsfg-vk-layer`, the fork's submodule),
   `libevshim` (the fork's source against `vendor/SDL2`'s headers; it
@@ -12541,6 +12542,52 @@ gamenative's code actually calls:
   arguments GameNative's `default.pa` passes; its modules and `pactl` go
   in `pulseaudio-gamenative-x86_64.tzst`, the x86_64 counterpart of the
   arm64 asset.
+
+**Inside the guest on x86_64 (decided 2026-10-02, Droidtop/tracker#242).**
+The list above is the app's own natives; the guest process needs its own
+x86_64 userland too, because the base system droidtop installs
+(`imagefs_bionic.txz`, GameNative's) is aarch64 and on arm64 box64 maps
+Wine's library calls onto it. The shape, all in the fork so the standalone
+app gets it too:
+
+- **Same Wine on both ABIs.** `proton-9.0-x86_64` is an x86_64 Android
+  (bionic) build; on an x86_64 device `BionicProgramLauncherComponent`
+  starts `<wine>/bin/wine` directly through `/system/bin/linker64`, with no
+  box64 extraction, no Box64/FEX environment and no aarch64 preloads. An
+  arm64ec Wine is refused there with a message (it is ARM code). The host
+  ABI is `AppUtils.getArchName()`, the fork's one ABI check.
+- **The x86_64 guest libraries** (`X86_64GuestLibs`): the X11 client
+  libraries winex11 opens, freetype, fontconfig and their dependencies,
+  built from upstream sources by the fork's `tools/x86_64-guest-libs` in its
+  own CI and published as a release asset; provisioning downloads it on
+  x86_64 only (pinned tag and SHA-256) into `files/x86_64-guest-libs`,
+  beside the image. The aarch64 image stays installed for its data (fonts,
+  shared files, the Windows-side extras); an x86_64 launch never puts its
+  library directory on the search path. Stock builds, not Termux's: Termux
+  builds hard-code `/data/data/com.termux/files/usr`, which on arm64 the
+  closed `libredirect` redirects and on x86_64 nothing would, so the launch
+  names the X socket by its absolute path in `DISPLAY` and writes a
+  `fonts.conf` pointing at the image's own font directory. A device set up
+  before this is offered Set up again, which fetches only the libraries.
+  An x86_64 twin of the whole image built from Termux's x86_64 packages was
+  the alternative, and was rejected for exactly the path problem.
+- **Starting Wine's own children.** Android 10+ refuses exec() of
+  app-private files to apps targeting SDK 29+, and the aarch64
+  `libredirect-bionic-wx.so` that works around it has no source and no
+  x86_64 build. The guest libraries carry the fork's own `exec-redirect`
+  preload instead: an exec that failed with EACCES on an app-private ELF is
+  retried as `linker64 <path>`, and `/proc/self/exe` answers with the real
+  program when the kernel's answer is the linker. Where exec is allowed it
+  changes nothing.
+- **SysV shared memory** for the X server's MIT-SHM is `libandroid-sysvshm`
+  from `Droidtop/proton-wine-tux`, built into the same asset.
+- **Audio**: the PulseAudio modules extracted for a Wine launch are the
+  x86_64 asset on an x86_64 device.
+- **Graphics is not decided.** x86 has no Turnip or Vortek, and Android's
+  own Vulkan loader offers no X11 surface, so after the above a guest draws
+  2D and GDI through the X server but Direct3D has no device. The candidates
+  (software Vulkan through Mesa lavapipe with the Khronos loader, a Vulkan
+  wrapper ICD over the device's own driver, or VirGL) are the owner's choice.
 
 **Steam on x86_64 is the Linux client in proot (user, 2026-09-24).** On
 arm64, `libsteambootstrap` brings up Valve's Android arm64
