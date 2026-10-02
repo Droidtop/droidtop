@@ -73,6 +73,8 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
     val scope = rememberCoroutineScope()
     var loaded by remember { mutableStateOf<GameMetadataEntity?>(null) }
     var pickingController by remember { mutableStateOf(false) }
+    var pickingEmulator by remember { mutableStateOf(false) }
+    val emulators = rememberSystemEmulators(entry)
 
     LaunchedEffect(entry) {
         loaded = library.getMetadataForEditing(entry) ?: GameMetadataEntity(id = entry.id)
@@ -82,6 +84,20 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
         Column(modifier = Modifier.fillMaxSize().groundBackground().padding(LocalShellWindow.current.edgePadding)) {
             Text("Loading...", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
         }
+        return
+    }
+
+    if (pickingEmulator && emulators != null) {
+        GameEmulatorPicker(
+            entry = entry,
+            emulators = emulators,
+            choice = current.altEmulator,
+            onPick = { id ->
+                loaded = current.copy(altEmulator = id)
+                pickingEmulator = false
+            },
+            onDismiss = { pickingEmulator = false },
+        )
         return
     }
 
@@ -161,9 +177,11 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
                     pickingController = true
                 }
             }
-            item {
-                MetadataTextRow("Alternative emulator", current.altEmulator ?: "") {
-                    loaded = current.copy(altEmulator = it.ifBlank { null })
+            if (entry.systemId != null) {
+                item {
+                    MetadataPickerRow("Emulator", gameEmulatorSummary(emulators, current.altEmulator)) {
+                        if (emulators != null) pickingEmulator = true
+                    }
                 }
             }
             item {

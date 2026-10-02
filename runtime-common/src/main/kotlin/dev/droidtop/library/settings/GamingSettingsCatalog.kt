@@ -45,6 +45,7 @@ object GamingSettingsCatalog {
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
     const val ID_UI_MODE = "pref_gaming_ui_mode"
     const val ID_CONSOLE_SYSTEMS = "pref_gaming_console_systems"
+    const val ID_EMULATORS = "pref_gaming_emulators"
     const val ID_WINDOWS_GAMES = "pref_gaming_windows_games"
     const val GROUP_SYSTEM = "gaming_system"
     const val ID_SYSTEM_NETWORK = "pref_gaming_system_network"
@@ -192,6 +193,15 @@ object GamingSettingsCatalog {
                         title = "Console systems",
                         subtitle = "Folders, per-system emulators, artwork scraping, platforms",
                         registryId = "console_systems",
+                        icon = CatalogIcon.CONSOLE_SYSTEMS,
+                    ),
+                )
+                add(
+                    NestedScreenItem(
+                        id = ID_EMULATORS,
+                        title = "Emulators",
+                        subtitle = "Default emulator, which one runs each system, and a launch test",
+                        registryId = "emulators",
                         icon = CatalogIcon.CONSOLE_SYSTEMS,
                     ),
                 )

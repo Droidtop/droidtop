@@ -12,7 +12,6 @@ import dev.droidtop.library.consoles.ConsoleSystemEntity
 import dev.droidtop.library.consoles.ConsoleSystemsDatabase
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.CustomPlayerPrefs
-import dev.droidtop.library.consoles.PlayerOverridePrefs
 import dev.droidtop.library.consoles.PlatformDatabaseSnapshot
 import dev.droidtop.library.consoles.PlatformDatabaseSource
 import dev.droidtop.library.consoles.PlatformDatabases
@@ -22,12 +21,10 @@ import dev.droidtop.library.consoles.BiosDatabase
 import dev.droidtop.library.consoles.KnownPlayers
 import dev.droidtop.library.consoles.SystemBiosSpec
 import dev.droidtop.library.consoles.availablePlayers
-import dev.droidtop.library.consoles.libretroCoreId
 import dev.droidtop.library.integrations.IntegrationCapability
 import dev.droidtop.library.integrations.IntegrationPlaceholders
 import dev.droidtop.library.integrations.IntegrationStore
 import dev.droidtop.library.integrations.AcquireContentSources
-import dev.droidtop.library.integrations.PluginEventBus
 import dev.droidtop.library.integrations.PluginAppStatus
 import dev.droidtop.library.integrations.PluginCatalog
 import dev.droidtop.library.integrations.PluginCatalogScreen
@@ -166,6 +163,7 @@ object AppSettingsCatalogs {
         if (registered) return
         registered = true
         SettingsScreenRegistry.register(consoleSystemsScreen())
+        SettingsScreenRegistry.register(EmulatorsCatalog.screen())
         SettingsScreenRegistry.register(romFoldersScreen())
         SettingsScreenRegistry.register(scraperScreen())
         SettingsScreenRegistry.register(platformsScreen())
@@ -488,7 +486,7 @@ object AppSettingsCatalogs {
                                     items = buildList {
                                         add(systemChoiceItem(context, folder, systems))
                                         if (resolved != null) {
-                                            add(playerChoiceItem(context, resolved))
+                                            add(EmulatorsCatalog.systemPlayerChoiceItem(context, resolved))
                                             // docs/SPEC.md 12a "app_status": where droidtop
                                             // shows an installed app -- here, the emulator
                                             // this system's player choice actually resolved
@@ -511,6 +509,14 @@ object AppSettingsCatalogs {
                                                     )
                                                 }
                                             }
+                                            add(
+                                                NestedScreenItem(
+                                                    id = "folder_emulator_setup_${resolved.id}",
+                                                    title = "Emulator setup and test",
+                                                    subtitle = "What runs ${resolved.displayName}, what to install, and a launch test",
+                                                    inline = EmulatorsCatalog.systemScreen(resolved),
+                                                ),
+                                            )
                                             add(
                                                 NestedScreenItem(
                                                     id = "folder_add_player_${resolved.id}",
@@ -665,7 +671,7 @@ object AppSettingsCatalogs {
         },
     )
 
-    private fun installPackageAction(pkg: String): (Context) -> Unit = { ctx ->
+    internal fun installPackageAction(pkg: String): (Context) -> Unit = { ctx ->
         val market = android.content.Intent(
             android.content.Intent.ACTION_VIEW,
             Uri.parse("market://details?id=$pkg"),
@@ -697,45 +703,6 @@ object AppSettingsCatalogs {
             SystemOverridePrefs.set(ctx, folder.absolutePath, value.ifEmpty { null })
         },
     )
-
-    private fun playerChoiceItem(context: Context, system: ConsoleSystemDef): ChoiceItem {
-        val players = availablePlayers(context, system)
-        return ChoiceItem(
-            id = "system_player_${system.id}",
-            title = "Player",
-            subtitle = if (players.isEmpty()) {
-                "No installed emulator can run ${system.displayName} yet — add a custom player below, or install one"
-            } else {
-                "Which installed emulator launches ${system.displayName}"
-            },
-            options = listOf(ChoiceOption("", "(first installed)")) + players.map { ChoiceOption(it.id, it.name) },
-            current = PlayerOverridePrefs.get(context, system.id) ?: "",
-            onSelect = { ctx, value ->
-                PlayerOverridePrefs.set(ctx, system.id, value.ifEmpty { null })
-                // docs/SPEC.md 12a "Event hooks": this is THE write path
-                // that changes a system's default player, so it is the
-                // one place that fires PluginEvent.DEFAULT_PLAYER_CHANGED
-                // -- a resolved player (the one actually chosen, "first
-                // installed" included, not just an explicit override) so
-                // a subscribed plugin sees the real effective choice, and
-                // a resolved core: the chosen entry's own LIBRETRO core
-                // when its template names one, else the system's
-                // configured core.
-                val chosenPlayer = players.firstOrNull { it.id == value } ?: players.firstOrNull()
-                if (chosenPlayer != null) {
-                    PluginEventBus.notifyDefaultPlayerChangedAsync(
-                        context = ctx,
-                        systemId = system.id,
-                        systemName = system.displayName,
-                        playerId = chosenPlayer.id,
-                        playerName = chosenPlayer.name,
-                        playerPackage = (chosenPlayer as? dev.droidtop.library.consoles.Player.AmStart)?.packageName,
-                        core = libretroCoreId(chosenPlayer, system.retroArchCore),
-                    )
-                }
-            },
-        )
-    }
 
     // Pending-buffer form: fields buffer here, Save commits atomically.
     private fun addCustomPlayerScreen(system: ConsoleSystemDef): CatalogScreen {
