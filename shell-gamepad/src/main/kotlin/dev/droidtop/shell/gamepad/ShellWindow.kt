@@ -6,7 +6,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.droidtop.shell.gamepad.input.ControllerPrefs
+import dev.droidtop.shell.gamepad.input.ControllerLayouts
 
 /**
  * The one place the Gaming shell asks "how much room is there, and is
@@ -38,7 +38,7 @@ data class ShellWindow(
     val heightDp: Int,
     /**
      * Whether a real, non-virtual gamepad or joystick is registered with
-     * Android right now -- [ControllerPrefs.attachedControllers], the one
+     * Android right now -- [ControllerLayouts.attachedControllers], the one
      * gamepad-detection rule droidtop has. A Retroid console's own face
      * buttons and sticks ARE such a device: they show up exactly like an
      * external pad would, which is what [touchFirst] uses them for.
@@ -77,7 +77,7 @@ data class ShellWindow(
      * theme's own thin `<helpsystem>` legend -- sized and positioned for
      * a legend, not for 48dp touch targets, so they visually overlapped
      * the system carousel it sits above (docs/SPEC.md 7j). [padPresent]
-     * is [ControllerPrefs.attachedControllers], the one existing
+     * is [ControllerLayouts.attachedControllers], the one existing
      * gamepad-detection rule; a console's own buttons answer it exactly
      * like an external pad would, so this reuses that answer instead of
      * guessing again from geometry.
@@ -273,6 +273,6 @@ fun currentShellWindow(): ShellWindow {
     return ShellWindow(
         widthDp = configuration.screenWidthDp,
         heightDp = configuration.screenHeightDp,
-        padPresent = ControllerPrefs.attachedControllers().isNotEmpty(),
+        padPresent = ControllerLayouts.attachedControllers().isNotEmpty(),
     )
 }

@@ -89,7 +89,12 @@ import dev.droidtop.shell.gamepad.Measure
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.currentShellWindow
-import dev.droidtop.shell.gamepad.input.ControllerPrefs
+import dev.droidtop.library.controller.FaceLayout
+import dev.droidtop.library.controller.FacePosition
+import dev.droidtop.library.controller.FaceRole
+import dev.droidtop.library.controller.GlyphFamily
+import dev.droidtop.library.controller.LayoutSource
+import dev.droidtop.shell.gamepad.input.ControllerLayouts
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.ThemeSystemPreview
 import dev.droidtop.shell.standard.BackButtonMenu
@@ -176,9 +181,9 @@ class OnboardingActivity : AppCompatActivity() {
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
         val startStep = OnboardingStep.byName(intent.getStringExtra(EXTRA_START_STEP))
         val firstRun = !GamesRootPrefs.isOnboardingComplete(this)
-        // The pad's face-button answer, if one was given, before the
+        // The face-button layout of the pad in use, resolved before the
         // first key is read.
-        GamepadKeyMap.load(this)
+        ControllerLayouts.attach(this)
         if (firstRun && startStep == null) {
             // Recents names what this task is. It said "Games", the label
             // of the drawer icon that had started it (rig, dq-coordinator-24).
@@ -191,7 +196,7 @@ class OnboardingActivity : AppCompatActivity() {
         // the plan differ by orientation.
         onboardingRun.start(
             startStep,
-            controllerAttached = ControllerPrefs.attachedControllers().isNotEmpty(),
+            controllerAttached = ControllerLayouts.attachedControllers().isNotEmpty(),
             // A rerun, or one step opened from Settings, starts from the
             // setup as it is, so walking through it again changes nothing
             // that is not changed on the way.
@@ -912,7 +917,7 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             gamesSoFar = rootProgress.filterKeys { it !in rootReports.keys }.values.sumOf { it.gamesSoFar },
             noFolders = roots.isEmpty(),
             storageGranted = storageAccessGranted,
-            controllerAnswered = ControllerPrefs.asked(context),
+            controllerAnswered = ControllerLayouts.isAnswered(),
             keyboardSkipped = run.configureDesktop && !dev.droidtop.library.settings.Keyboards.ownKeyboardActive(context),
             onAddGames = { goTo(OnboardingStep.GAMES) },
             onFinish = {
@@ -1662,17 +1667,20 @@ internal fun suggestedGameFolders(): List<String> {
 }
 
 /**
- * CONTROLLER. One question, with the common answer preselected: which
- * face button confirms. Android reports a pad's buttons by POSITION, so
- * KEYCODE_BUTTON_A is the bottom face button whatever is printed on it,
- * and on a Nintendo-style pad the button that confirms is the one
- * labelled B; no detection can answer this, so it is asked. The step also
+ * CONTROLLER. droidtop works out which of the pad's buttons confirms
+ * instead of asking (docs/SPEC.md 7b, "Console and controller detection"):
+ * a known console's own pad from the console table with its layout toggle
+ * read live, an external pad from SDL's vendor and product ids, and, only
+ * when neither knows, a capture: "press the button labelled A". The step
  * names the attached pad (the shell's own detector,
- * [ControllerPrefs.attachedControllers], which the Quick Menu's status
- * header asks too) and lets one press confirm that the pad is read.
+ * [ControllerLayouts.attachedControllers], which the Quick Menu's status
+ * header asks too), says what was concluded and from what, and keeps the
+ * button test.
  *
- * Next commits whichever answer is marked, the default included, so the
- * question counts as asked and Settings does not raise it again.
+ * Skipping is not an answer: with an unknown pad the forward action reads
+ * "Skip this step" until a press has been captured, and a skipped step is
+ * listed on the last screen with where to find it again (Quick Menu,
+ * "Controller buttons").
  */
 @Composable
 private fun ControllerStep(
@@ -1682,8 +1690,13 @@ private fun ControllerStep(
     onContinue: () -> Unit,
 ) {
     val context = LocalContext.current
-    val controllers = remember { ControllerPrefs.attachedControllers() }
-    var swapped by remember { mutableStateOf(ControllerPrefs.swapConfirmCancel(context)) }
+    val controllers = remember { ControllerLayouts.attachedControllers() }
+    LaunchedEffect(Unit) { ControllerLayouts.attach(context) }
+    // Read in composition: the layout is snapshot state, so this step redraws when it resolves or changes.
+    val layout = ControllerLayouts.layout
+    val ready = ControllerLayouts.ready
+    var recapturing by remember { mutableStateOf(false) }
+    val capturing = ready && controllers.isNotEmpty() && (recapturing || !layout.known)
     var pressed by remember { mutableStateOf<String?>(null) }
     // Focus does NOT start in the test box. It used to, and inside the box
     // every button is a test press, B included: opened from Settings, the
@@ -1698,29 +1711,49 @@ private fun ControllerStep(
         title = "Your controller",
         body = when {
             controllers.isEmpty() -> "No controller is connected right now. You can carry on with touch and set " +
-                "one up later in Settings, under Input."
-            else -> "droidtop sees $names. Which of its buttons confirms a choice? You can change this later in Settings."
+                "one up later in the Quick Menu, under System."
+            !ready -> "droidtop sees $names."
+            layout.known -> "droidtop sees $names. ${controllerConclusion(layout)} You can change this at any " +
+                "time in the Quick Menu, under System."
+            else -> "droidtop sees $names but cannot tell which of its buttons confirms."
         },
         progress = progress,
         onBack = onBack,
-        primary = StepAction(if (isReEntry) "Done" else "Next") {
-            ControllerPrefs.setSwapConfirmCancel(context, swapped)
+        primary = StepAction(if (isReEntry) "Done" else if (layout.known || controllers.isEmpty()) "Next" else "Skip this step") {
             onContinue()
         },
         focusContentFirst = true,
     ) {
-        SelectableRow(
-            title = "The bottom button",
-            supporting = "A confirms and B goes back. Xbox-style pads and most Android controllers.",
-            selected = !swapped,
-            onClick = { swapped = false },
-        )
-        SelectableRow(
-            title = "The right button",
-            supporting = "B confirms and A goes back. Nintendo-style pads, where the bottom button is labelled B.",
-            selected = swapped,
-            onClick = { swapped = true },
-        )
+        if (capturing) {
+            StepSectionLabel("Press the button labelled A")
+            // A real key event, caught where it lands, read BEFORE the layout's swap: the press of the
+            // button the person calls A is what tells droidtop how this pad reports it.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = currentShellWindow().minTouchTarget + Space.Lg)
+                    .background(MenuTokens.Surface, MenuTokens.RowShape)
+                    .focusable()
+                    .onKeyEvent { event ->
+                        ControllerLayouts.handleCaptureKey(context, event.nativeKeyEvent) { recapturing = false }
+                    }
+                    .padding(Space.Lg),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    "Move here with the D-pad, then press the button labelled A on your controller.",
+                    color = MenuTokens.OnSurfaceMuted,
+                    style = TypeRole.supporting,
+                )
+            }
+        } else if (ready && controllers.isNotEmpty()) {
+            SelectableRow(
+                title = "Not right? Press the button labelled A instead",
+                supporting = "Use this when droidtop has the buttons the wrong way round.",
+                selected = false,
+                onClick = { recapturing = true },
+            )
+        }
 
         StepSectionLabel("Test your buttons")
         // A real key event, caught where it lands: the box takes focus and
@@ -1753,6 +1786,25 @@ private fun ControllerStep(
                 style = TypeRole.supporting,
             )
         }
+    }
+}
+
+/** What the resolver concluded, in a sentence, and from what. */
+private fun controllerConclusion(layout: FaceLayout): String {
+    val confirm = layout.glyph(FaceRole.CONFIRM)
+    val cancel = layout.glyph(FaceRole.CANCEL)
+    val where = if (layout.positionOf(FaceRole.CONFIRM) == FacePosition.RIGHT) "the right button" else "the bottom button"
+    val facts = "$confirm ($where) confirms and $cancel goes back."
+    val style = when (layout.family) {
+        GlyphFamily.XBOX -> "an Xbox-style"
+        GlyphFamily.PLAYSTATION -> "a PlayStation-style"
+        GlyphFamily.NINTENDO -> "a Nintendo-style"
+    }
+    return when (layout.source) {
+        LayoutSource.CONSOLE -> "It knows this device: $facts"
+        LayoutSource.FAMILY -> "It is $style pad: $facts"
+        LayoutSource.CAPTURED -> "You set it: $facts"
+        LayoutSource.UNKNOWN -> facts
     }
 }
 

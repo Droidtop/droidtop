@@ -310,6 +310,8 @@ class PadGate(
 
     /** A key event for this window; returns whether it was handled (or dropped). */
     fun dispatchKey(event: KeyEvent): Boolean {
+        // The pad that just pressed something is the one whose layout applies, before the key is read.
+        ControllerLayouts.noteInput(event)
         if (!enabled()) return deliver(event)
         if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return deliver(event)
         val pass = core.onKey(
@@ -429,7 +431,7 @@ class PadGate(
     }
 
     init {
-        PadModality.assumeOnce { ControllerPrefs.attachedControllers().isNotEmpty() }
+        PadModality.assumeOnce { ControllerLayouts.attachedControllers().isNotEmpty() }
     }
 
     companion object {

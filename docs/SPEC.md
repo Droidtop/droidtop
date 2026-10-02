@@ -2310,7 +2310,7 @@ the `ContainerRuntime` interface that already exists (§3):
   route the trackpad's focus steps take, §6c) so the shell, the Quick
   Menu and every hint row see a pad and nothing knows the difference.
   It is offered — a one-time notice on the companion with "Use the
-  screen as a controller" — when `ControllerPrefs.attachedControllers`
+  screen as a controller" — when `ControllerLayouts.attachedControllers`
   is empty and a second display is present, and chosen from the same
   per-mode second-screen setting as the other two roles. On a
   single-screen device there is no virtual pad over droidtop's own
@@ -4828,7 +4828,7 @@ for where you are, L2 a PC game's own menu. Pad
 buttons and the keyboard are in the same table -- arrows, Enter = A,
 Escape = B, Space = X, Backspace = Y, the menu key = Select, F10 = R2, Page
 Up/Page Down and Shift+Tab/Tab = L1/R1 -- so no screen keeps a key list of
-its own. The face-button swap (§7b) applies to the pad's buttons and to
+its own. The face-button layout (§7b, "Console and controller detection") applies to the pad's buttons and to
 DPAD_CENTER, which is what Android re-sends for an unhandled bottom face
 button; a keyboard's Enter always confirms and its Escape always cancels.
 The system back key is not a pad action: it belongs to the back
@@ -5452,18 +5452,21 @@ what happens.
    "Switch to it") with "Skip this step" beside it until Hacker's Keyboard is active, when the forward
    action becomes "Next". Declining is a real answer, not a nag.
 7. **Your controller** (`CONTROLLER`; only when a controller was attached when the run started, since
-   with none there is nothing to test or map; Settings > Input > Controller opens the same step
-   later). Body: "droidtop sees <pad name>. Which of its buttons confirms a choice? You can change this
-   later in Settings." Rows: **The bottom button** ("A confirms and B goes back. Xbox-style pads and
-   most Android controllers."; preselected unless the swap is already on) and **The right button** ("B
-   confirms and A goes back. Nintendo-style pads, where the bottom button is labelled B."). Under "Test
-   your buttons", a box that names any button pressed while it has the selection, by POSITION, because
-   that is what Android's key codes mean and the whole point of the question is that droidtop does not
-   know what is printed on the pad; it takes the selection only when moved into, so B elsewhere on the
-   step is Back. Forward: Next, which commits the marked answer, the default included
-   (`ControllerPrefs.setSwapConfirmCancel`), so the question counts as asked. Detection is the shell's
-   own (`ControllerPrefs.attachedControllers`); the swap is REAL, applied in `GamepadKeyMap.applySwap`
-   to the meaning of a press, with `BACK` untouched.
+   with none there is nothing to test or map). It no longer asks whether the face buttons are
+   Nintendo-style: a stored answer went stale the moment a handheld's own layout toggle was flipped.
+   droidtop works the layout out (see "Console and controller detection" below) and the step says what
+   it concluded and from what: "droidtop sees <pad name>. It knows this device: A (the bottom button)
+   confirms and B goes back." / "It is a Nintendo-style pad: A (the right button) confirms and B goes
+   back." / "You set it: ...". Only when nothing knows the pad does the step become the capture: "droidtop
+   sees <pad name> but cannot tell which of its buttons confirms", a box that takes the selection by
+   D-pad and reads the next face-button press as "the button labelled A", and the forward action is
+   "Skip this step" until that press has been made (then "Next"): a skipped step is not an answer, and
+   the last screen lists it ("Controller: Input"). When the layout is known, a row "Not right? Press the
+   button labelled A instead" runs the same capture. Under "Test your buttons", a box that names any
+   button pressed while it has the selection, by POSITION; it takes the selection only when moved into,
+   so B elsewhere on the step is Back. The step is only a view: everything it shows is
+   `ControllerLayouts`, the same resolver the key map and every hint pill read, so there is no separate
+   onboarding answer and no one-time flag.
 8. **All done!** (`DONE`). "What's set up": the Home button's outcome when droidtop holds Home ("Home
    button: opens Gaming." / "... droidtop's home screen." / "... Pixel Launcher."); Gaming's count,
    stated as what it knows ("Gaming: 12 games found." / "Gaming: still counting your folders, 3 games so
@@ -5568,6 +5571,90 @@ Two real mechanisms exist to build import on rather than invent from scratch:
   than inventing one: several compatible launchers are already built around it and
   RetroArch/libretro core naming lines up closely. Each importer translates its own format into
   that set; droidtop does not carry several incompatible per-source taxonomies side by side.
+
+
+### Console and controller detection (directed 2026-10-02)
+
+"We want to do console and controller detection to try to handle map displays and stuff correctly."
+What a hint pill draws and what the face buttons do both depend on two facts about the pad in use, and
+neither can be asked once and kept: the printed glyph family, and whether the layout is swapped. A
+handheld such as the Retroid Pocket 5 has a system toggle that changes the layout at any time, so the
+answer is resolved live, by ONE resolver (`ControllerLayouts` in shell-gamepad, the rule in
+`LayoutResolver` in library-core), and the key map (`GamepadKeyMap`) and every hint pill (the hint row,
+`HintTip`, the theme helpsystem, touch affordances) read only it. The one-time flag
+(`ControllerPrefs.swapConfirmCancel`, `asked`) is removed.
+
+**The active pad** is the last gamepad that produced input (noted in `PadGate.dispatchKey`, before the key
+is read, so the first press from a new pad is already read with its layout). Before any input it is the
+console's built-in pad when this device is in the console table, else the first attached pad.
+
+**The layout** (`FaceLayout`) is two facts: `confirmOnRight` (the layout in use confirms with the right
+face button, the Nintendo convention) and `keysSwapped` (the system reports the pad's face keys swapped
+against their position; Android's key codes are positional, `BUTTON_A` bottom, `BUTTON_B` right,
+`BUTTON_X` left, `BUTTON_Y` top). The key map swaps A with B and X with Y (the diamond turns as a whole)
+exactly when the two differ; a keyboard's Enter and Escape and the system back key are never swapped. A
+pill draws the glyph PRINTED on the button that does the job: Xbox A/B/X/Y, PlayStation cross, circle,
+square, triangle, Nintendo with A on the right. So on an Xbox-printed handheld toggled to the Nintendo
+layout the confirm pill says B, because that is what the plastic says on the right button; pills always
+point at a real button. Resolution order, strongest first:
+
+1. **A capture** the person made for this pad that still holds (below).
+2. **The console table**, for the pad built into a known console.
+3. **The glyph family of an external pad**, from SDL's controller list.
+4. **Unknown**: Xbox-style, flagged as not established (only unknown asks anything of the person).
+
+**Console table (data-driven).** The `hardware` collection of droidtop-platforms
+(`hardware/<device>.json`, composed into `hardware-database.json`; the same bundled-seed, index-refresh and
+validate-before-replace mechanism as the engines and players databases: `HardwareDatabase`,
+`PlatformDatabaseIndex`). A row: `match.model` (`ro.product.model`, case-insensitive; `match.manufacturer`
+optional), `gamepad.name`/`vendorId`/`productId` (the built-in pad's identity) and `gamepad.glyphFamily`
+(`xbox`, `playstation` or `nintendo`: what is printed on the face buttons), and optionally `layoutToggle`
+`{property, values{<value>: {keysSwapped, confirmOn: bottom|right}}}` for a system setting that changes
+the layout while the device runs. A value the table does not list is unknown and is never guessed. Rows
+exist only for devices someone has read: the first is the Retroid Pocket 5 (`ro.product.model=Retroid
+Pocket 5`; `persist.sys.gamepad.type` 0 is the default Xbox-style layout; 1 is the value the owner's swap
+wrote, its meaning marked `verified: false` until confirmed on the console). The property is read live,
+never once: `LayoutSignals.readInProcess` (`android.os.SystemProperties` by reflection, an in-memory read);
+when SELinux hides it from the app (it reads as empty, and empty is never taken as a value) the same read
+goes through the privileged helper (`TaskManager.shell`, Shizuku or Sui) off the main thread and is cached;
+with neither the layout is unknown. Never `su`.
+
+**External pads.** `ControllerClassifier` classifies by USB or Bluetooth vendor and product id, then by
+name, with SDL's own rules and ids (`SdlControllerIds`, generated by
+`build-scripts/gen_sdl_controller_families.py` from SDL's `src/joystick/controller_list.h`, zlib licence,
+credited in NOTICE.md): Xbox 360/One and the pads SDL gives their own type (Luna, Stadia, Shield) are
+Xbox-style; PS3/PS4/PS5 are PlayStation; Switch Pro, Switch clones and Joy-Con are Nintendo, which confirms
+on the right button (Android reports such pads by position). An id SDL does not list is unknown.
+
+**Fallback capture.** For an unknown pad the onboarding question is replaced by "press the button labelled
+A" (capture style, `PadCapturePrompt` and onboarding's Controller step), re-runnable from the Quick Menu's
+System tab ("Controller buttons"), with "Swap A and B" beside it as the one-press escape hatch for when
+detection is wrong and a press is not wanted; both write the same capture. The press is read as the raw key
+code BEFORE the swap: `BUTTON_A` means the confirm button is the plain one, `BUTTON_B` that the pad
+reports its A as B. A capture is stored per pad (Android's device descriptor), as key codes (not scan
+codes), together with a signature of the readable system properties that look like a layout toggle.
+
+**Staying current.** The check (`ControllerLayouts.recheck`) is an in-memory property read plus a recompute
+of the layout and is cheap enough to run on every shell destination change, every opening or closing of
+the left menu, Quick Menu or a dialog, on resume and on window-focus regain, so a toggle flipped from the
+system quick-settings shade while droidtop stays in front is followed without leaving it. The layout is
+Compose snapshot state: only what reads it recomposes, and the key map changes at the same instant.
+Anything heavier (the privileged read, a `getprop` snapshot) runs on IO, one at a time, throttled to one
+per 1.5 s, and is cached; no file, process or shell work happens on the main thread.
+
+**What a capture cannot see, and how it is invalidated.** A capture records what a button arrived as; it
+cannot notice that something later remapped it. A system toggle that swaps inside the kernel driver or
+firmware changes the scancode as well as the keycode, so nothing on the app side sees it: for a built-in
+pad only the console table (with its property) can follow such a toggle, which is why a console gets a row.
+For everything else a capture is invalidated by change triggers: (a) `InputManager.InputDeviceListener`
+`onInputDeviceChanged` for that device marks its capture stale; (b) the snapshot of readable properties
+whose names look like a layout toggle (`persist.`, `vendor.` and similar, never `ro.`, matching gamepad,
+joystick, abxy, swap or keymap, taken with `getprop`) is compared with the one the capture was made
+against, and a difference makes it stale. A stale capture is ignored: a pad that something else identifies
+falls back to that, and a pad nothing identifies gets a light one-press re-confirm ("Your controller
+changed", press the button labelled A; "Not now" keeps the best guess and stays quiet until something
+changes again), not the onboarding step. A watched property that changed is written to the log (tag
+`droidtop.ControllerLayout`) so a toggle that turns out to matter can be added to the console table.
 
 ## 7c. Wine prefix / container configuration UI
 
@@ -10467,7 +10554,7 @@ put the shell's touch-sized pills (`ButtonHintFooter`, `minTouchTarget`
 the legend to draw --- the pills are sized and padded for a fingertip,
 the legend is not, so the substituted bar visually overlapped the system
 carousel and the gamelist above it. The fix reuses the one existing
-gamepad-detection rule (`ControllerPrefs.attachedControllers`, already
+gamepad-detection rule (`ControllerLayouts.attachedControllers`, already
 how droidtop asks "is a pad attached" everywhere else) rather than adding
 a second, geometry-based guess: `ShellWindow.padPresent` carries that
 answer, and the short-side branch of `touchFirst` only fires when no pad

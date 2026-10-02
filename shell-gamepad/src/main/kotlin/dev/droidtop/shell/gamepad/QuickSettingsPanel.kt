@@ -112,7 +112,11 @@ internal fun QuickSettingsPanel(
     // battery broadcast and a connectivity query.
     val groups by produceState(initialValue = emptyList<CatalogGroup>(), version) {
         value = withContext(Dispatchers.IO) {
-            QuickTiles.sectionGroups(GamingSettingsCatalog.groups(context), section)
+            val base = QuickTiles.sectionGroups(GamingSettingsCatalog.groups(context), section)
+            // The System tab also carries the two controller tiles (SPEC 7b), which live in this
+            // module because they act on the shell's own controller resolver.
+            if (section != QuickSection.SYSTEM) base
+            else base.map { it.copy(items = it.items + ControllerLayoutTiles.items()) }
         }
     }
     val panel = remember(groups) { QuickTiles.panel(groups) }
@@ -703,9 +707,9 @@ internal fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier =
 
 /**
  * Gamepads Android currently reports. One detector for the whole app:
- * [dev.droidtop.shell.gamepad.input.ControllerPrefs.attachedControllers]
+ * [dev.droidtop.shell.gamepad.input.ControllerLayouts.attachedControllers]
  * answers this here and in onboarding's Controller step.
  */
 private fun connectedControllerNames(): List<String> =
-    dev.droidtop.shell.gamepad.input.ControllerPrefs.attachedControllers().map { it.name }
+    dev.droidtop.shell.gamepad.input.ControllerLayouts.attachedControllers().map { it.name }
 

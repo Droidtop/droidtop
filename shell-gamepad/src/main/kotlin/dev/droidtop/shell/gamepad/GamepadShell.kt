@@ -123,7 +123,7 @@ import dev.droidtop.library.scanFollowingGamesRoots
 import dev.droidtop.library.theme.EsDeTransitionAnimation
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.ControllerLayouts
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.FocusedHintRow
 import dev.droidtop.shell.gamepad.input.FocusedHints
@@ -406,11 +406,6 @@ private fun GamepadShellBody(
     // when the Quick Menu changes it (UiModeRefresh).
     val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
     LaunchedEffect(Unit) { dev.droidtop.library.settings.UiModeRefresh.load(context) }
-    // The face-button layout the person answered for (onboarding's
-    // Controller step, or the Settings row that re-opens it). Loaded once
-    // here because GamepadKeyMap.actionFor is on every screen's key path
-    // and has no Context of its own.
-    LaunchedEffect(Unit) { GamepadKeyMap.load(context) }
     // Idle tracking for the screensaver: every key press the shell sees
     // bumps this, and the timer below restarts from it. A launch counts
     // as activity too (the shell is not idle, it is behind a game).
@@ -463,6 +458,36 @@ private fun GamepadShellBody(
     LaunchedEffect(deepLinkToken) {
         quickMenuOpen = false
         leftMenuOpen = false
+    }
+    // The face-button layout of the pad in use (SPEC 7b, "Console and controller detection"),
+    // followed live because a handheld's own toggle can flip it while this shell stays in front.
+    // The check is an in-memory read and is repeated on every destination change, every menu and
+    // dialog opening or closing, resume, and window-focus regain; the glyphs and the key map both
+    // read ControllerLayouts.layout, so they change together and nothing else recomposes.
+    LaunchedEffect(Unit) { ControllerLayouts.attach(context) }
+    LaunchedEffect(nav.place.key, quickMenuOpen, leftMenuOpen, focusedHints.layerOpen) {
+        ControllerLayouts.recheck(context)
+    }
+    val windowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
+    LaunchedEffect(windowInfo) {
+        androidx.compose.runtime.snapshotFlow { windowInfo.isWindowFocused }.collect { focused ->
+            if (focused) ControllerLayouts.recheck(context)
+        }
+    }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) ControllerLayouts.recheck(context)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    // "Press the button labelled A": asked for from the Quick Menu, or lightly when the pad's
+    // earlier answer no longer holds and nothing else says what it is.
+    if (ControllerLayouts.captureRequested || ControllerLayouts.needsRecapture) {
+        PadCapturePrompt(light = !ControllerLayouts.captureRequested) {
+            ControllerLayouts.endCaptureRequest()
+        }
     }
     // Which page, if any, has claimed L1/R1 for a tab strip of its own.
     val shoulderStrips = remember { ShoulderStripRegistry() }

@@ -1,6 +1,9 @@
 package dev.droidtop.shell.gamepad.input
 
 import android.view.KeyEvent
+import dev.droidtop.library.controller.FaceLayout
+import dev.droidtop.library.controller.GlyphFamily
+import dev.droidtop.library.controller.LayoutSource
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -14,9 +17,10 @@ import org.junit.Test
  * every screen gets from `Modifier.onPad`.
  */
 class PadInputTest {
+    private val NINTENDO = FaceLayout.forFamily(GlyphFamily.NINTENDO, LayoutSource.FAMILY)
 
     @After
-    fun resetSwap() = GamepadKeyMap.useSwap(false)
+    fun resetSwap() = ControllerLayouts.useLayoutForTest(FaceLayout.DEFAULT)
 
     // ---- the table ----
 
@@ -47,7 +51,7 @@ class PadInputTest {
 
     @Test
     fun `swapped, the pad's face buttons trade meanings`() {
-        GamepadKeyMap.useSwap(true)
+        ControllerLayouts.useLayoutForTest(NINTENDO)
         assertEquals(GamepadAction.B, GamepadKeyMap.actionFor(KeyEvent.KEYCODE_BUTTON_A))
         assertEquals(GamepadAction.A, GamepadKeyMap.actionFor(KeyEvent.KEYCODE_BUTTON_B))
     }
@@ -56,7 +60,7 @@ class PadInputTest {
     fun `swapped, a keyboard's Enter still confirms and Escape still cancels`() {
         // The swap answers what is printed on a PAD; a keyboard has no
         // such question, and Escape confirming would be a trap.
-        GamepadKeyMap.useSwap(true)
+        ControllerLayouts.useLayoutForTest(NINTENDO)
         assertEquals(GamepadAction.A, GamepadKeyMap.actionFor(KeyEvent.KEYCODE_ENTER))
         assertEquals(GamepadAction.B, GamepadKeyMap.actionFor(KeyEvent.KEYCODE_ESCAPE))
     }

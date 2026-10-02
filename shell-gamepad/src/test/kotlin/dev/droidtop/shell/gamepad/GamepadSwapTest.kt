@@ -1,6 +1,10 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.ui.input.key.Key
+import dev.droidtop.library.controller.FaceLayout
+import dev.droidtop.library.controller.GlyphFamily
+import dev.droidtop.library.controller.LayoutSource
+import dev.droidtop.shell.gamepad.input.ControllerLayouts
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import org.junit.Assert.assertEquals
@@ -9,9 +13,9 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The face-button question onboarding asks, and what answering it does
- * (see GamepadKeyMap). The swap is a process-level value, so each test
- * sets it through the same entry point the app uses and puts it back.
+ * What the resolved face-button layout does to the key map and the hints
+ * (see GamepadKeyMap and ControllerLayouts). The layout is a process-level
+ * value, so each test sets it directly and puts it back.
  */
 class GamepadSwapTest {
 
@@ -24,8 +28,12 @@ class GamepadSwapTest {
         }
     }
 
-    /** GamepadKeyMap.load reads a preference; this is the same value, set directly. */
-    private fun setSwap(swapped: Boolean) = GamepadKeyMap.useSwap(swapped)
+    /** A swapped layout is what a Nintendo-style pad resolves to. */
+    private fun setSwap(swapped: Boolean) = setLayout(
+        if (swapped) FaceLayout.forFamily(GlyphFamily.NINTENDO, LayoutSource.FAMILY) else FaceLayout.DEFAULT,
+    )
+
+    private fun setLayout(layout: FaceLayout) = ControllerLayouts.useLayoutForTest(layout)
 
     @Test
     fun `by default the bottom face button confirms`() {
@@ -40,9 +48,10 @@ class GamepadSwapTest {
     }
 
     @Test
-    fun `the swap reaches nothing else`() = withSwap(true) {
-        assertEquals(GamepadAction.X, GamepadKeyMap.actionFor(Key.ButtonX))
-        assertEquals(GamepadAction.Y, GamepadKeyMap.actionFor(Key.ButtonY))
+    fun `the swap turns the whole diamond and nothing else`() = withSwap(true) {
+        // Android's key codes are positional, so a Nintendo-style pad's X is the top button: Y's key code.
+        assertEquals(GamepadAction.Y, GamepadKeyMap.actionFor(Key.ButtonX))
+        assertEquals(GamepadAction.X, GamepadKeyMap.actionFor(Key.ButtonY))
         assertEquals(GamepadAction.UP, GamepadKeyMap.actionFor(Key.DirectionUp))
         assertEquals(GamepadAction.L, GamepadKeyMap.actionFor(Key.ButtonL1))
     }
@@ -60,8 +69,50 @@ class GamepadSwapTest {
             android.view.KeyEvent.KEYCODE_BUTTON_B,
             GamepadKeyMap.keyCodeFor(GamepadAction.A),
         )
-        assertEquals("B", GamepadKeyMap.labelFor(GamepadAction.A))
-        assertEquals("A", GamepadKeyMap.labelFor(GamepadAction.B))
+        // A Nintendo pad prints A on the button that confirms, and B on the one that cancels.
+        assertEquals("A", GamepadKeyMap.labelFor(GamepadAction.A))
+        assertEquals("B", GamepadKeyMap.labelFor(GamepadAction.B))
+        assertEquals("X", GamepadKeyMap.labelFor(GamepadAction.X))
+        assertEquals(android.view.KeyEvent.KEYCODE_BUTTON_Y, GamepadKeyMap.keyCodeFor(GamepadAction.X))
+    }
+
+    @Test
+    fun `a PlayStation pad's hints name its own symbols`() {
+        setLayout(FaceLayout.forFamily(GlyphFamily.PLAYSTATION, LayoutSource.FAMILY))
+        try {
+            assertEquals(GamepadAction.A, GamepadKeyMap.actionFor(Key.ButtonA))
+            assertEquals("✕", GamepadKeyMap.labelFor(GamepadAction.A))
+            assertEquals("○", GamepadKeyMap.labelFor(GamepadAction.B))
+        } finally {
+            setSwap(false)
+        }
+    }
+
+    @Test
+    fun `a handheld toggled to the Nintendo layout confirms on the right button and names what is printed there`() {
+        // Retroid-style: Xbox print, the system reports the keys swapped and the right button confirms.
+        setLayout(FaceLayout(GlyphFamily.XBOX, confirmOnRight = true, keysSwapped = true, source = LayoutSource.CONSOLE))
+        try {
+            // The system already calls the right button A, so there is nothing to swap in the key map.
+            assertEquals(GamepadAction.A, GamepadKeyMap.actionFor(Key.ButtonA))
+            assertEquals(GamepadAction.B, GamepadKeyMap.actionFor(Key.ButtonB))
+            // The pill points at the right-hand button, whose plastic says B.
+            assertEquals("B", GamepadKeyMap.labelFor(GamepadAction.A))
+            assertEquals("A", GamepadKeyMap.labelFor(GamepadAction.B))
+        } finally {
+            setSwap(false)
+        }
+    }
+
+    @Test
+    fun `a captured answer makes the button the person calls A confirm`() {
+        setLayout(FaceLayout.captured(confirmKeyCodeIsB = true))
+        try {
+            assertEquals(GamepadAction.A, GamepadKeyMap.actionFor(Key.ButtonB))
+            assertEquals("A", GamepadKeyMap.labelFor(GamepadAction.A))
+        } finally {
+            setSwap(false)
+        }
     }
 
     @Test

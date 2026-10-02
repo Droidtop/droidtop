@@ -1,10 +1,9 @@
 package dev.droidtop.shell.gamepad.input
 
-import android.content.Context
 import android.view.KeyEvent
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.nativeKeyCode
+import dev.droidtop.library.controller.FaceRole
 
 /**
  * What a press MEANS -- the one vocabulary every screen in the shell reads
@@ -92,52 +91,13 @@ object GamepadKeyMap {
         keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_TAB
 
     /**
-     * Whether the two face buttons are swapped: A cancels and B confirms,
-     * the Nintendo-style layout half the pads in the world ship.
-     *
-     * Held here rather than read per press because [actionFor] is on the
-     * key path of every screen and has no Context. [load] is called when
-     * the shell starts and whenever the answer changes (onboarding's
-     * Controller step, the Settings row), which is every time it can
-     * change -- the preference is never written by anything else.
-     *
-     * A SNAPSHOT state, not a plain `@Volatile` field, and that is the
-     * whole of build 546's "changing the confirm button does not refresh
-     * the hint row". The mapping and the legend are the same fact --
-     * [labelFor] and [keyCodeFor] are what the hint bar draws and dispatches
-     * -- but a plain field read inside a composition subscribes to nothing,
-     * so the buttons changed meaning at once while the legend kept drawing
-     * the old letters until the process was killed. Reading a snapshot
-     * state inside composition subscribes to it, and writing it invalidates
-     * every reader; reading it OFF the composition -- which is what the key
-     * path does -- is an ordinary field read with no subscription and no
-     * cost. One source of truth, observed by everything that draws it.
-     */
-    private val swappedState = mutableStateOf(false)
-    private var swapped: Boolean
-        get() = swappedState.value
-        set(value) { swappedState.value = value }
-
-    fun load(context: Context) {
-        useSwap(ControllerPrefs.swapConfirmCancel(context))
-    }
-
-    /** [load] without a Context, for the unit tests that exercise the rule. */
-    internal fun useSwap(swapConfirmCancel: Boolean) {
-        // Only on a real change: a write to a snapshot state invalidates
-        // every reader even when the value is identical, and `load` is
-        // called on every shell start.
-        if (swappedState.value != swapConfirmCancel) swappedState.value = swapConfirmCancel
-    }
-
-    /**
-     * The action [keyCode] means, the swap applied. The swap is a question
-     * about the PAD's two face buttons (onboarding asks what is printed on
-     * them), so a keyboard's own Enter and Escape are outside it: Enter
-     * confirms and Escape cancels whatever a pad's buttons say. DPAD_CENTER
-     * stays inside it, because it is what Android re-sends for a pad's
-     * unhandled bottom face button (`Generic.kcm`), and the system back key
-     * stays back.
+     * The action [keyCode] means, the swap applied. The swap is a fact about
+     * the active PAD's face buttons ([ControllerLayouts], read live: a
+     * handheld's own layout toggle changes it at any time), so a keyboard's
+     * own Enter and Escape are outside it: Enter confirms and Escape cancels
+     * whatever a pad's buttons say. DPAD_CENTER stays inside it, because it
+     * is what Android re-sends for a pad's unhandled bottom face button
+     * (`Generic.kcm`), and the system back key stays back.
      */
     fun actionFor(keyCode: Int, shift: Boolean = false): GamepadAction? {
         val action = physicalAction(keyCode, shift) ?: return null
@@ -152,14 +112,21 @@ object GamepadKeyMap {
 
     /**
      * The swap, in ONE place, applied to the meaning rather than to the
-     * table: A and B trade what they mean, and every other action is
-     * untouched.
+     * table: A and B trade what they mean, and so do X and Y (the four
+     * buttons are one diamond, and the layout turns it as a whole); every
+     * other action is untouched. [ControllerLayouts.layout] is snapshot
+     * state, so a composable that reaches here through [labelFor] redraws
+     * when the layout changes, and the key path reads the same value.
      */
-    private fun applySwap(action: GamepadAction): GamepadAction = when {
-        !swapped -> action
-        action == GamepadAction.A -> GamepadAction.B
-        action == GamepadAction.B -> GamepadAction.A
-        else -> action
+    private fun applySwap(action: GamepadAction): GamepadAction {
+        if (!ControllerLayouts.layout.swapped) return action
+        return when (action) {
+            GamepadAction.A -> GamepadAction.B
+            GamepadAction.B -> GamepadAction.A
+            GamepadAction.X -> GamepadAction.Y
+            GamepadAction.Y -> GamepadAction.X
+            else -> action
+        }
     }
 
     /**
@@ -219,31 +186,35 @@ object GamepadKeyMap {
     }
 
     /**
-     * The label the hint bar shows for [action]. Like [keyCodeFor] this
-     * answers in PHYSICAL terms -- which button to press -- so with the
-     * face buttons swapped a hint for "confirm" names the button that now
-     * confirms.
+     * The label the hint bar shows for [action]: what is PRINTED on the
+     * button that does it on the active pad ([ControllerLayouts.layout]).
+     * An Xbox pad says A, a Nintendo pad says A on the right-hand button, a
+     * PlayStation pad says its cross, and a handheld whose layout toggle is
+     * flipped names the button that now confirms, so a hint for "confirm"
+     * always points at a real button.
      */
-    fun labelFor(action: GamepadAction): String = when (applySwap(action)) {
-        GamepadAction.A -> "A"
-        GamepadAction.B -> "B"
-        GamepadAction.X -> "X"
-        GamepadAction.Y -> "Y"
-        GamepadAction.START -> "Start"
-        GamepadAction.SELECT -> "Select"
-        GamepadAction.UP -> "▲"
-        GamepadAction.DOWN -> "▼"
-        GamepadAction.LEFT -> "◄"
-        GamepadAction.RIGHT -> "►"
-        // The printed names: the shoulders carry "L1"/"R1" beside
-        // "L2"/"R2" on the pads droidtop targets, and a hint reading "R"
-        // next to an "R2" chip left which one was meant to the reader.
-        GamepadAction.L -> "L1"
-        GamepadAction.R -> "R1"
-        GamepadAction.L2 -> "L2"
-        GamepadAction.R2 -> "R2"
-        GamepadAction.L3 -> "L3"
-        GamepadAction.R3 -> "R3"
-        GamepadAction.BACK -> "B"
+    fun labelFor(action: GamepadAction): String {
+        val layout = ControllerLayouts.layout
+        return when (action) {
+            GamepadAction.A -> layout.glyph(FaceRole.CONFIRM)
+            GamepadAction.B, GamepadAction.BACK -> layout.glyph(FaceRole.CANCEL)
+            GamepadAction.X -> layout.glyph(FaceRole.X)
+            GamepadAction.Y -> layout.glyph(FaceRole.Y)
+            GamepadAction.START -> "Start"
+            GamepadAction.SELECT -> "Select"
+            GamepadAction.UP -> "▲"
+            GamepadAction.DOWN -> "▼"
+            GamepadAction.LEFT -> "◄"
+            GamepadAction.RIGHT -> "►"
+            // The printed names: the shoulders carry "L1"/"R1" beside
+            // "L2"/"R2" on the pads droidtop targets, and a hint reading "R"
+            // next to an "R2" chip left which one was meant to the reader.
+            GamepadAction.L -> "L1"
+            GamepadAction.R -> "R1"
+            GamepadAction.L2 -> "L2"
+            GamepadAction.R2 -> "R2"
+            GamepadAction.L3 -> "L3"
+            GamepadAction.R3 -> "R3"
+        }
     }
 }
