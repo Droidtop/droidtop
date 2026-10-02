@@ -212,6 +212,34 @@ object TheGamesDbClient {
         ))
     }
 
+    /** A title as compared: accents folded, case dropped, every run of punctuation one space (dash versus colon). */
+    internal fun normalizeTitle(value: String): String =
+        java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{M}+"), "")
+            .lowercase()
+            .replace(Regex("[^a-z0-9]+"), " ")
+            .trim()
+
+    /**
+     * Which of [titles] (a name search's results, in the API's order) is the game named [wanted], or null
+     * when none is. An exact title wins; otherwise a title that is the other one plus further whole words
+     * (a subtitle or version) counts, when the shared part is at least two words. One word is as likely
+     * another game's whole title, and a blank description is better than another game's.
+     */
+    internal fun bestMatchIndex(titles: List<String>, wanted: String): Int? {
+        val target = normalizeTitle(wanted)
+        if (target.isEmpty()) return null
+        var best: Int? = null
+        for ((index, title) in titles.withIndex()) {
+            val name = normalizeTitle(title)
+            if (name == target) return index
+            if (best != null) continue
+            val (shorter, longer) = if (name.length <= target.length) name to target else target to name
+            if (shorter.contains(' ') && longer.startsWith("$shorter ")) best = index
+        }
+        return best
+    }
+
     fun findMetadata(
         apiKey: String,
         cacheDir: File,
@@ -238,31 +266,13 @@ object TheGamesDbClient {
         val searchResponse = JSONObject(searchConnection.inputStream.bufferedReader().readText())
         val games = searchResponse.optJSONObject("data")?.optJSONArray("games") ?: return ScrapeLookup.NoMatch
         if (games.length() == 0) return ScrapeLookup.NoMatch
-        // The API's fuzzy ordering put a fan game ("Pokemon Black and
-        // White 3: Genesis") above Pokemon Crystal on a real pass --
-        // rank the response ourselves: exact title match first, then
-        // prefix, then the API's own first result. Comparison ignores
-        // case and the punctuation that legitimately differs between
-        // No-Intro naming and TGDB titles (dashes vs colons).
-        fun normalize(value: String): String =
-            value.lowercase().replace(Regex("[^a-z0-9]+"), " ").trim()
-        val wanted = normalize(gameTitle)
-        var game = games.getJSONObject(0)
-        var bestScore = -1
-        for (i in 0 until games.length()) {
-            val candidate = games.getJSONObject(i)
-            val candidateName = normalize(candidate.optString("game_title", ""))
-            val score = when {
-                candidateName == wanted -> 2
-                candidateName.startsWith(wanted) || wanted.startsWith(candidateName) -> 1
-                else -> 0
-            }
-            if (score > bestScore) {
-                bestScore = score
-                game = candidate
-                if (score == 2) break
-            }
-        }
+        // The API's fuzzy ordering puts unrelated games (a fan game) first, and
+        // falling back to its first result wrote another game's description and
+        // date onto the ROM (tracker#251). The response is ranked here, and a
+        // response with no title that is the game is no match.
+        val index = bestMatchIndex((0 until games.length()).map { games.getJSONObject(it).optString("game_title", "") }, gameTitle)
+            ?: return ScrapeLookup.NoMatch
+        val game = games.getJSONObject(index)
 
         val gameId = game.optInt("id", -1)
         val name = game.optString("game_title", "").ifBlank { null }

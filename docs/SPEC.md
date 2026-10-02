@@ -6317,7 +6317,11 @@ summary):
   ROM scrapers) and the keyless libretro database — not Lutris/IGDB/the
   Steam store, which are reserved for PC/engine content per §7h — wired into `ConsoleSystemsActivity.kt`'s manual
   per-folder scrape action, single-selected-source only (real ES-DE has
-  no automatic multi-source fallback chain).
+  no automatic multi-source fallback chain). A TheGamesDB name search takes a result only
+  when its title is the ROM's (`TheGamesDbClient.bestMatchIndex`: accents, case and
+  punctuation folded; an exact title, else the same words plus whole further words when two
+  or more are shared); with none it is no match, never the API's first result, which wrote
+  another game's description and date (tracker#251).
 - Real element rendering: `image`/`text`/`carousel`/`grid`/`textlist`/
   `video`/`animation` (both played, see below)/
   `clock`/`datetime`/`rating`/`helpsystem`/`badges` (a real, full
