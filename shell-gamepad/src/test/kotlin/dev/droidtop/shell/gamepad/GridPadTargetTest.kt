@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.ui.focus.FocusDirection
+import dev.droidtop.shell.gamepad.input.GamepadAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -67,5 +68,16 @@ class GridPadTargetTest {
     fun `an out-of-range focused index never moves`() {
         assertNull(gridPadTarget(at = -1, count = count, cols = cols, direction = FocusDirection.Up))
         assertNull(gridPadTarget(at = count, count = count, cols = cols, direction = FocusDirection.Left))
+    }
+
+    @Test
+    fun `the four direction actions map to their focus directions and no other action does`() {
+        assertEquals(FocusDirection.Up, gridDirection(GamepadAction.UP))
+        assertEquals(FocusDirection.Down, gridDirection(GamepadAction.DOWN))
+        assertEquals(FocusDirection.Left, gridDirection(GamepadAction.LEFT))
+        assertEquals(FocusDirection.Right, gridDirection(GamepadAction.RIGHT))
+        assertNull(gridDirection(GamepadAction.A))
+        assertNull(gridDirection(GamepadAction.B))
+        assertNull(gridDirection(GamepadAction.L))
     }
 }
