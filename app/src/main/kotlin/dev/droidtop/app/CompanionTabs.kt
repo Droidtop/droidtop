@@ -19,8 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -98,16 +96,8 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
 /** The task manager's own row (reused from the first slice, not rebuilt) in a scrolling page, with a line for nothing running. */
 @Composable
 private fun CompanionTasksTab() {
-    val snapshot by TaskManager.snapshot.collectAsState()
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         CompanionTasks()
-        if (snapshot?.apps.isNullOrEmpty()) {
-            Text(
-                "No other apps are running.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 

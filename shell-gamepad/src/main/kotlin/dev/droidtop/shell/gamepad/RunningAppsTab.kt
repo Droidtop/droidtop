@@ -1,10 +1,18 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,12 +25,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.tasks.TaskActions
 import dev.droidtop.runtime.tasks.TaskManager
+import dev.droidtop.runtime.tasks.RunningApp
 import dev.droidtop.runtime.tasks.TaskPolicy
 import dev.droidtop.runtime.tasks.text
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -54,6 +65,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
     var message by remember { mutableStateOf<String?>(null) }
     // Clear all, waiting for its second press: set when it found more than a few apps to close.
     var clearAllArmed by remember { mutableStateOf(false) }
+    var showDetails by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val press = rememberGamepadTouch()
     // Row 0 is Clear all apps, then one row per app.
@@ -113,13 +125,13 @@ internal fun AppsTab(onDismiss: () -> Unit) {
                 true
             },
     ) {
-        snapshot?.note?.let {
-            Text(
-                it,
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
+        snapshot?.note?.let { note ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Limited app list", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
+                Text("  Info", color = MenuTokens.Value, style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.clickable { showDetails = !showDetails }.padding(8.dp))
+            }
+            if (showDetails) Text(note, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
         }
         // Scrolls, and MenuRow brings the selected row into view itself.
         Column(
@@ -131,30 +143,19 @@ internal fun AppsTab(onDismiss: () -> Unit) {
             if (snapshot == null) {
                 Text("Reading the running apps...", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             } else if (apps.isEmpty()) {
-                Text("Nothing is running that droidtop can see.", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
+                Text("No apps running", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             }
-            MenuRow(
-                title = "Clear all apps",
-                subtitle = if (index == 0 && message != null) message else "Closes every app below except Enginehost and the ones you protected",
-                danger = true,
-                selected = index == 0,
-                onClick = {
-                    focusIndex = 0
-                    press(GamepadAction.A)
-                },
+            SharedRunningAppsList(
+                apps = apps,
+                displays = TaskManager.displayIds(context),
+                selectedIndex = index,
+                clearLabel = if (index == 0 && message != null) message else "Clear all",
+                rowMessage = { i -> if (i + 1 == index) message else null },
+                onClear = { focusIndex = 0; press(GamepadAction.A) },
+                onSwitch = { i, app -> focusIndex = i + 1; press(GamepadAction.A) },
+                onClose = { i, app -> focusIndex = i + 1; press(GamepadAction.X) },
+                onMove = { i, app -> focusIndex = i + 1; press(GamepadAction.Y) },
             )
-            apps.forEachIndexed { i, app ->
-                MenuRow(
-                    title = app.label,
-                    subtitle = if (i + 1 == index && message != null) message else TaskPolicy.displayLabel(app.displayId),
-                    selected = i + 1 == index,
-                    leading = { AppIcon(app.packageName) },
-                    onClick = {
-                        focusIndex = i + 1
-                        press(GamepadAction.A)
-                    },
-                )
-            }
         }
         HintRow(
             bindings = listOf(
@@ -167,5 +168,51 @@ internal fun AppsTab(onDismiss: () -> Unit) {
             background = androidx.compose.ui.graphics.Color.Transparent,
             modifier = Modifier.padding(top = 8.dp),
         )
+    }
+}
+
+/** Shared task rows for the Quick Menu and touch-only companion. [selectedIndex] is pad focus; buttons remain touch targets. */
+@Composable
+fun SharedRunningAppsList(
+    apps: List<RunningApp>,
+    displays: List<Int>,
+    modifier: Modifier = Modifier,
+    selectedIndex: Int? = null,
+    clearLabel: String = "Clear all",
+    rowMessage: (Int) -> String? = { null },
+    onClear: () -> Unit,
+    onSwitch: (Int, RunningApp) -> Unit,
+    onClose: (Int, RunningApp) -> Unit,
+    onMove: (Int, RunningApp) -> Unit,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing)) {
+        SharedTaskAction(clearLabel, selectedIndex == 0, onClear)
+        apps.forEachIndexed { i, app ->
+            val selected = selectedIndex == i + 1
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(MenuTokens.RowShape)
+                    .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
+                    .clickable { onSwitch(i, app) }.heightIn(min = MenuTokens.RowMinHeight),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppIcon(app.packageName, modifier = Modifier.padding(start = 12.dp))
+                Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text(app.label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                    Text(rowMessage(i) ?: TaskPolicy.displayLabel(app.displayId), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                }
+                if (displays.any { it != app.displayId }) SharedTaskAction("Switch to", false) { onMove(i, app) }
+                SharedTaskAction("Close", false) { onClose(i, app) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SharedTaskAction(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(modifier = Modifier.padding(horizontal = 4.dp).clip(RoundedCornerShape(8.dp))
+        .background(if (selected) MenuTokens.Selected else MenuTokens.CardInset)
+        .clickable(onClick = onClick).heightIn(min = 48.dp).widthIn(min = 64.dp).padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center) {
+        Text(label, color = if (selected) MenuTokens.OnSelected else MenuTokens.OnSurface, style = MaterialTheme.typography.labelMedium)
     }
 }
