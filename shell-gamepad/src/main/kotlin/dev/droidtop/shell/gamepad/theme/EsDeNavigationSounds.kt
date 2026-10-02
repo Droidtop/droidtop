@@ -221,6 +221,12 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
         AudioHandOff.mark("play $name: sample $id stream $stream started ($live live)")
     }
 
+    override fun status(): String = if (soundPool == null) {
+        "no SoundPool open"
+    } else {
+        "SoundPool open, ${synchronized(liveStreams) { liveStreams.size }} recent stream(s)" + if (quiet) ", muted" else ""
+    }
+
     /** See [quiet]; the launch sample itself is the one thing it never mutes. */
     override fun setQuiet(quiet: Boolean) {
         this.quiet = quiet

@@ -23,21 +23,20 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * The launch-static experiment (docs/SPEC.md "Launch audio hand-off",
- * Droidtop/tracker#160): which of four ways droidtop treats its own sound
- * between the A press on a game and the launch itself. The owner listens to
- * each on the console and says which one stops the burst; every line logged
- * under [AudioHandOff.TAG] carries the letter. The setting is a row in the
- * Shell group of Settings, default [A].
+ * Droidtop/tracker#160): which of three ways droidtop treats the theme's
+ * launch sample between the A press on a game and the launch itself. The
+ * owner listens to each on the console and says which one stops the burst;
+ * every line logged under [AudioHandOff.TAG] carries the letter. The setting
+ * is a row in the Shell group of Settings, default [A]. (Silencing the
+ * preview and the theme sounds while a modal layer is open is not a variant
+ * but a rule, see [AudioHandOff.setQuiet].)
  */
 enum class LaunchSoundVariant(val label: String) {
-    /** The launch sample plays at the A press; the preview video keeps playing behind the screen question. */
-    A("A: as it works now"),
+    /** The launch sample plays at the A press. */
+    A("A: launch sound at the press (as now)"),
 
     /** The launch sample waits until the launch is really dispatched, after the screen question. */
     B("B: launch sound after the screen question"),
-
-    /** The launch sample plays at the A press; preview video and theme sounds are silenced while the screen question is up. */
-    C("C: silence the preview while asking which screen"),
 
     /** Nothing of droidtop's sound from the A press on (a control: no launch sample, preview silenced). */
     D("D: no droidtop sound while launching"),
@@ -46,18 +45,21 @@ enum class LaunchSoundVariant(val label: String) {
 /** What each [LaunchSoundVariant] does; pure, so the table is unit-tested. */
 object LaunchSoundPlan {
     /** The theme's launch sample is played the moment A is pressed. */
-    fun launchSoundAtPress(variant: LaunchSoundVariant) =
-        variant == LaunchSoundVariant.A || variant == LaunchSoundVariant.C
+    fun launchSoundAtPress(variant: LaunchSoundVariant) = variant == LaunchSoundVariant.A
 
     /** The theme's launch sample is held back until the launch is really dispatched. */
     fun launchSoundAtDispatch(variant: LaunchSoundVariant) = variant == LaunchSoundVariant.B
 
-    /** The preview video is paused and the navigation sounds are muted while "Launch on which screen?" is up. */
-    fun quietWhileChooser(variant: LaunchSoundVariant) =
-        variant == LaunchSoundVariant.C || variant == LaunchSoundVariant.D
-
-    /** The same silence, from the A press itself (before any screen question). */
+    /** Everything of droidtop's is silenced from the A press itself (before any screen question). */
     fun quietFromPress(variant: LaunchSoundVariant) = variant == LaunchSoundVariant.D
+
+    /**
+     * Whether droidtop's themed sound is silenced: while a modal layer is
+     * open (a rule, whatever the variant) and, in the control variant, from
+     * the A press on. Handed off means another app has the audio and the
+     * layer no longer matters.
+     */
+    fun silenced(layerOpen: Boolean, handedOff: Boolean) = layerOpen && !handedOff
 
     /** The stored value back to a variant; anything unknown is [LaunchSoundVariant.A]. */
     fun parse(stored: String?): LaunchSoundVariant =
@@ -127,6 +129,9 @@ object AudioHandOff {
          * Called on the main thread.
          */
         fun setQuiet(quiet: Boolean) = Unit
+
+        /** What this holder has open right now, for the launch timeline; null when it does not say. */
+        fun status(): String? = null
     }
 
     /** The experiment letter every line of the timeline carries; see [LaunchSoundExperiment]. */
@@ -150,17 +155,37 @@ object AudioHandOff {
     private val scope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
     private val traceScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
 
-    /** Silences or restores every holder's open streams without closing them (see [Holder.setQuiet]). Main thread. */
+    /** Why droidtop's sounds are silenced right now; main thread only. */
+    private val quietReasons = mutableSetOf<String>()
+
+    /**
+     * Silences or restores every holder's open streams without closing them
+     * (see [Holder.setQuiet]): the preview video pauses and mutes, the
+     * theme's navigation sounds mute. A rule, not a variant: it is on while
+     * any modal layer is open (the shell reports it, [LaunchSoundPlan.silenced])
+     * and, in the control variant, from the A press. Sounds are restored when
+     * the last reason is withdrawn. Main thread.
+     */
     fun setQuiet(reason: String, quiet: Boolean) {
+        val wasQuiet = quietReasons.isNotEmpty()
+        val changed = if (quiet) quietReasons.add(reason) else quietReasons.remove(reason)
+        if (!changed) return
         mark("droidtop sounds ${if (quiet) "silenced" else "restored"} ($reason)")
+        val nowQuiet = quietReasons.isNotEmpty()
+        if (nowQuiet == wasQuiet) return
         for (holder in holders) {
             try {
-                holder.setQuiet(quiet)
+                holder.setQuiet(nowQuiet)
             } catch (e: Exception) {
-                Log.w(TAG, "${holder.name}: could not ${if (quiet) "silence" else "restore"}: ${e.message}")
+                Log.w(TAG, "${holder.name}: could not ${if (nowQuiet) "silence" else "restore"}: ${e.message}")
             }
         }
     }
+
+    /** What every holder has open right now, for the timeline: "no preview player" is said plainly. */
+    fun openStreams(): String =
+        holders.joinToString("; ") { "${it.name}: ${it.status() ?: "not reporting"}" }
+            .ifEmpty { "no audio holders registered" }
 
     private val PLAYER_SNAPSHOTS_MS = longArrayOf(100L, 300L, 1000L)
 
@@ -232,6 +257,7 @@ object AudioHandOff {
         }
         // Whatever the experiment silenced is gone now; the flags must not
         // outlive the streams, or the sounds opened on return stay muted.
+        quietReasons.clear()
         for (holder in holders) holder.setQuiet(false)
         mark("hand-off ($reason): " + closed.ifEmpty { listOf("no audio holders registered") }.joinToString("; "))
     }

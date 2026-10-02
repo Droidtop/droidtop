@@ -180,7 +180,6 @@ object GamingSettingsCatalog {
                         title = "Launch sound test",
                         subtitle = "For finding the burst of static when a game starts. A is how it works. " +
                             "B plays the launch sound once the screen question is answered. " +
-                            "C silences the preview while that question is up. " +
                             "D plays no droidtop sound while launching",
                         options = LaunchSoundVariant.entries.map { ChoiceOption(it.name, it.label) },
                         current = LaunchSoundExperiment.variant(context).name,

@@ -477,6 +477,19 @@ private fun GamepadShellBody(
             dev.droidtop.library.LaunchDisplay.onLaunchFailed = null
         }
     }
+    // Nothing may play beneath a modal layer (docs/SPEC.md "Launch audio hand-off", tracker#160): while any
+    // layer on the hint bar's list is open (the screen question, sheets, menus, dialogs) the preview video is
+    // paused and muted and the theme's navigation sounds are muted; it all comes back when the last layer
+    // closes, whether it was answered or cancelled. A hand-off supersedes it (another app has the audio).
+    LaunchedEffect(focusedHints) {
+        kotlinx.coroutines.flow.combine(
+            androidx.compose.runtime.snapshotFlow { focusedHints.layerOpen },
+            dev.droidtop.runtime.AudioHandOff.handedOff,
+            dev.droidtop.runtime.LaunchSoundPlan::silenced,
+        ).collectLatest { silenced ->
+            dev.droidtop.runtime.AudioHandOff.setQuiet("modal layer open", silenced)
+        }
+    }
     displayChoice?.let { request ->
         LaunchDisplayChooserDialog(
             options = request.options,
@@ -490,7 +503,7 @@ private fun GamepadShellBody(
                 // Backed out: nothing launches, so nothing stays held back or silenced (tracker#160).
                 dev.droidtop.runtime.AudioHandOff.mark("screen question cancelled")
                 pendingLaunchSound.set(false)
-                dev.droidtop.runtime.AudioHandOff.setQuiet("screen question cancelled", false)
+                dev.droidtop.runtime.AudioHandOff.setQuiet("A pressed", false)
             },
         )
     }
@@ -554,7 +567,9 @@ private fun GamepadShellBody(
         // audio hand-off") decides here when that sample sounds and whether
         // the rest of droidtop's sound carries on: see LaunchSoundPlan.
         val soundVariant = dev.droidtop.runtime.LaunchSoundExperiment.variant(context)
-        dev.droidtop.runtime.AudioHandOff.mark("A pressed on a game: launch begins")
+        dev.droidtop.runtime.AudioHandOff.mark(
+            "A pressed on a game: launch begins; open: ${dev.droidtop.runtime.AudioHandOff.openStreams()}",
+        )
         if (dev.droidtop.runtime.LaunchSoundPlan.launchSoundAtPress(soundVariant)) EsDeNavigationSounds.play("launch")
         if (dev.droidtop.runtime.LaunchSoundPlan.launchSoundAtDispatch(soundVariant)) pendingLaunchSound.set(true)
         if (dev.droidtop.runtime.LaunchSoundPlan.quietFromPress(soundVariant)) {
@@ -570,7 +585,7 @@ private fun GamepadShellBody(
                 .onFailure {
                     android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)
                     pendingLaunchSound.set(false)
-                    dev.droidtop.runtime.AudioHandOff.setQuiet("launch failed", false)
+                    dev.droidtop.runtime.AudioHandOff.setQuiet("A pressed", false)
                     launching = null
                     missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled
                     launchError = LaunchFailureMessage.userMessage(entry.title, it)
@@ -588,7 +603,7 @@ private fun GamepadShellBody(
             // nothing silenced or held back by the launch-static experiment.
             if (displayChoice == null && !dev.droidtop.runtime.AudioHandOff.handedOff.value) {
                 pendingLaunchSound.set(false)
-                dev.droidtop.runtime.AudioHandOff.setQuiet("launch settled", false)
+                dev.droidtop.runtime.AudioHandOff.setQuiet("A pressed", false)
             }
         }
     }

@@ -6568,15 +6568,27 @@ samples are not the suspect: the launch sample is 48 kHz stereo 16-bit PCM,
 before the 3 s play-out cap, and the other six are 48 kHz 16-bit PCM of
 0.1 to 1.9 s.
 Until the cause is known there is a test row, "Launch sound test" in the
-Shell group of Settings, with four variants that change only the window
-between the A press and the dispatch (`LaunchSoundVariant`, `LaunchSoundPlan`,
-unit-tested): A as it works (default); B holds the launch sample back until
-the launch is really dispatched, which is after the question, and the hand-off
-lets it play out; C plays it at the press but pauses and mutes the preview
-video and mutes the other navigation sounds while the question is up
-(`AudioHandOff.setQuiet`; nothing is released); D plays no droidtop sound
-from the press on (no launch sample, preview silenced). The row is removed
-once the cause is fixed and the variant that cured it becomes the behaviour.
+Shell group of Settings, with three variants that change only the launch
+sample between the A press and the dispatch (`LaunchSoundVariant`,
+`LaunchSoundPlan`, unit-tested): A as it works (default); B holds the launch
+sample back until the launch is really dispatched, which is after the
+question, and the hand-off lets it play out; D plays no droidtop sound from
+the press on (no launch sample, preview silenced), a control. The row is
+removed once the cause is fixed and the variant that cured it becomes the
+behaviour. What was a fourth variant, silencing the preview while the
+question is up, is a rule for every modal layer, below.
+**Nothing plays beneath a modal layer (2026-10-02, tracker#160).** The owner
+has no preview video he knows of and asked why one would play under a prompt:
+no layer leaves media playing beneath it. While any layer on the hint bar's
+open-layer list (`FocusedHints.layerOpen`: the screen question, sheets, menus,
+dialogs) is open, the themed preview video is paused and muted
+(`ShellAudio`) and the navigation sounds are muted (`EsDeNavigationSounds`),
+through `AudioHandOff.setQuiet`; nothing is released. Both come back when the
+last layer closes, answered or cancelled. A launch sample already sounding is
+the one event that opened the layer and plays on; the launch sample itself is
+never muted. A hand-off supersedes the rule. Each launch also logs what was
+open at the A press and as the question opened (`AudioHandOff.openStreams`):
+"no preview player" when the shell has none.
 Every audio open, start, stop and release is logged under `droidtop.audio`
 with `t=` (uptimeMillis) and the variant letter (`AudioHandOff.mark`): the
 A press, the question opening, answering or cancelling, the navigation
@@ -10455,7 +10467,9 @@ B Back) and draws no hint row inside itself; two sets never show at once.
 The Get games sheet is such a layer and paints the ground under itself
 (Droidtop/tracker#278). A failed source search says one plain sentence and
 keeps what the source reported behind a "Technical details" row, never the
-raw exception text.
+raw exception text. A layer is also the shell's rule for sound: while one is
+open, nothing plays beneath it (docs/SPEC.md "Launch audio hand-off": the
+preview video pauses and mutes, the theme sounds mute).
 
 ## 7k. The design system: one spacing scale, one type scale, one colour source
 

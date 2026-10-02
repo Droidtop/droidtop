@@ -101,6 +101,13 @@ class FocusedHints {
 
     private val layers = mutableStateListOf<Layer>()
 
+    /**
+     * Whether any modal layer is open: the one list the hint bar and the
+     * shell's audio rule (nothing plays beneath a layer, [dev.droidtop.runtime.AudioHandOff.setQuiet])
+     * both read.
+     */
+    val layerOpen: Boolean get() = layers.isNotEmpty()
+
     /** The topmost open layer's hints, or null while no layer is open; an empty list means the layer draws its own bar. */
     val layerBindings: List<HintBinding>? get() = layers.lastOrNull()?.bindings
 

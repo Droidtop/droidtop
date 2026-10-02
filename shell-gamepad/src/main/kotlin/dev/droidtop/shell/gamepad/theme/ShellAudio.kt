@@ -95,6 +95,13 @@ object ShellAudio : AudioHandOff.Holder {
         }
     }
 
+    override fun status(): String =
+        if (videos.isEmpty()) {
+            "no preview player"
+        } else {
+            "${videos.size} preview player(s), ${videos.keys.count { it.isPlaying }} playing"
+        }
+
     override suspend fun release(fade: Boolean): String? {
         if (videos.isEmpty()) return null
         val audible = videos.filter { (player, entry) -> player.isPlaying && entry.baseVolume() > 0f }

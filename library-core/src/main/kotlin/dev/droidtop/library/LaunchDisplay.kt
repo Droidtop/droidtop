@@ -8,7 +8,6 @@ import android.util.Log
 import android.view.Display
 import dev.droidtop.runtime.AudioHandOff
 import dev.droidtop.runtime.LaunchSoundExperiment
-import dev.droidtop.runtime.LaunchSoundPlan
 import dev.droidtop.runtime.tasks.LaunchLedger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -173,10 +172,10 @@ object LaunchDisplay {
                 startOn(context, intent, decision.displayId)
             }
             LaunchScreenResolution.Decision.Ask -> {
-                val variant = LaunchSoundExperiment.variant(context)
-                AudioHandOff.mark("screen question opened (${options!!.size} screens)")
-                // Variants C and D: nothing of droidtop's may sound behind the question (tracker#160).
-                if (LaunchSoundPlan.quietWhileChooser(variant)) AudioHandOff.setQuiet("screen question open", true)
+                LaunchSoundExperiment.variant(context)
+                // The question is a modal layer, so the shell silences droidtop's sound behind it by the layer
+                // rule (docs/SPEC.md "Launch audio hand-off"); the line says what was open as it appeared.
+                AudioHandOff.mark("screen question opened (${options!!.size} screens); open: ${AudioHandOff.openStreams()}")
                 ask!!(options, ctx != null) { chosen, remember ->
                     AudioHandOff.mark("screen question answered")
                     if (remember && ctx != null) {
@@ -250,7 +249,6 @@ object LaunchDisplay {
                 dispatch(context, intent, displayId)
             } catch (e: Exception) {
                 Log.e("droidtop.LaunchDisplay", "Launch failed", e)
-                AudioHandOff.setQuiet("launch failed", false)
                 AudioHandOff.reopen("launch failed")
                 onLaunchFailed?.invoke(e)
             }
