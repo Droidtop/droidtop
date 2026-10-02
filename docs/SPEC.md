@@ -5459,6 +5459,13 @@ builtins agree on what they accept (`.htm` and `.html` alike, the same
 Godot pack test, the same depth cap), because a folder that scans as one
 engine and launches as another is the defect v5 exists to prevent.
 
+**An HTML page alone is not game evidence (decided 2026-10-01, Droidtop/tracker#242).**
+Extracted launcher and tool bundles can contain `index.html` just like a
+web game. The generic HTML fallback therefore requires a Twine
+`<tw-storydata>` marker in the first 8 KiB of a root HTML file; the
+registry's more specific web-game signatures still run first. The bounded
+read avoids loading an entire potentially large page during library scan.
+
 ### Coverage: what runs where
 
 Every engine row in the registry routes to at least one runner (§7i).

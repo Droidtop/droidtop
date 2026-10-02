@@ -46,15 +46,10 @@ enum class GameEngine {
  *   loose-`.pck` check alone can't see, verified against a real install.
  *   Only ever reads the last 12 bytes of a candidate file, not the whole
  *   thing, so this stays cheap against multi-gigabyte executables.
- * - HTML: any `.html`/`.htm` file directly in the game root. Twine
- *   stories are the case Pythia closed this gap for, but the database
- *   row is `html`, not `twine`, and its own note says so: the row is
- *   ordered LAST precisely because Godot and Unity web exports also ship
- *   an `index.html` and are classified by their richer signatures first,
- *   so nothing narrower than "there is a page here" is needed. Which
- *   HTML dialect a game is stays a version question, not a detection
- *   one — [EngineVersionDetector] still reads `tw-storydata`'s
- *   `creator-version` and reports a version only for real Twine exports.
+ * - HTML: a Twine story-data marker in an `.html`/`.htm` file directly
+ *   in the root. A page alone is not game evidence: extracted web tools
+ *   and launchers also contain `index.html`. Other web game formats are
+ *   recognized by their more specific registry rules before this fallback.
  * - Unreal Engine: an `Engine/Binaries` directory.
  * - Unity: `UnityPlayer.dll`/`.so`/`.dylib` present up to 3 folders deep —
  *   Pythia's own real fix for a Linux export (`.so` instead of `.dll`) and
@@ -156,9 +151,27 @@ object GameEngineDetector {
 
     private val HTML_EXTENSIONS = setOf("html", "htm")
 
-    /** No file is read: the row's own evidence is that a page exists in the root. */
+    /** A web page alone may be a tool or launcher; Twine's story data identifies a game. */
     private fun isHtml(folder: File): Boolean =
-        folder.listFiles()?.any { it.isFile && it.extension.lowercase() in HTML_EXTENSIONS } == true
+        folder.listFiles()
+            ?.asSequence()
+            ?.filter { it.isFile && it.extension.lowercase() in HTML_EXTENSIONS }
+            ?.any { file ->
+                try {
+                    file.bufferedReader().use { reader ->
+                        val head = CharArray(8 * 1024)
+                        var count = 0
+                        while (count < head.size) {
+                            val read = reader.read(head, count, head.size - count)
+                            if (read <= 0) break
+                            count += read
+                        }
+                        count > 0 && String(head, 0, count).contains("<tw-storydata", ignoreCase = true)
+                    }
+                } catch (_: java.io.IOException) {
+                    false
+                }
+            } == true
 
     private fun ByteArray.indexOfSubsequence(needle: ByteArray): Int {
         if (needle.isEmpty() || needle.size > size) return -1

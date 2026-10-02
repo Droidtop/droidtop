@@ -201,17 +201,24 @@ class GameEngineDetectorTest {
 
     @Test
     fun `an ambiguous mvmz export falls through to the last row, html`() {
-        // rpgmaker-mvmz is enginehost-only -- droidtop has no MV-or-MZ
-        // engine to map that row to, so it is skipped -- and what the
-        // export really is from droidtop's side is a page in the root.
+        // A Twine story-data marker is game evidence for the generic HTML
+        // family after droidtop skips the enginehost-only MVMZ row.
         touch("js", "main.js")
-        touch("index.html")
+        val page = File(tmp.root, "index.html")
+        page.writeText("<tw-storydata creator-version=\"2.3.0\">")
         assertEquals(GameEngine.HTML, GameEngineDetector.detect(tmp.root, defs))
     }
 
     @Test
-    fun `detects an html game from a page in the root, no markers needed`() {
-        touch("A Story.html")
+    fun `an html utility page without game content is not an engine game`() {
+        touch("index.html")
+        touch("glview.js")
+        assertNull(GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `detects an html game from Twine story data`() {
+        File(tmp.root, "A Story.html").writeText("<html><tw-storydata name=\"story\">")
         assertEquals(GameEngine.HTML, GameEngineDetector.detect(tmp.root, defs))
     }
 
