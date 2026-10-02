@@ -12584,8 +12584,9 @@ of what is built. The decisions, briefly:
   Unticked or untouched risky access is Ask; Never is an explicit choice
   that refuses without prompting. A call-level choice overrides its
   category choice, which overrides the manifest's declared default
-  (risky defaults to Ask; harmless defaults to Allow). The same resolver
-  governs approval, stored choices, plugin settings, and runtime checks.
+  (risky defaults to Ask; harmless defaults to Allow). Category and call
+  choices are stored per plugin, and clearing an override reveals the
+  broader choice or declared default.
 - **Honest enforcement.** Today's `:pluginhost` shares droidtop's UID,
   so permissions bound only what the host does on a plugin's behalf.
   The proposed contained tier closes that: one `isolatedProcess` per
