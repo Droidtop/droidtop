@@ -1117,8 +1117,7 @@ private fun CatalogRowView(
     val slider = item as? SliderItem
     val value = if (toggle != null) null else catalogRowValue(item, context)
     val placeholder = status == null && value == null && item is TextInputItem
-    val tip = listOfNotNull(status, item.subtitle).joinToString("
-").ifEmpty { null }
+    val tip = listOfNotNull(status, item.subtitle).joinToString("\n").ifEmpty { null }
     HintTip(text = tip, shown = tipShown) {
         MenuRow(
             title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
