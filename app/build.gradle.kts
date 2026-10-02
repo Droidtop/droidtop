@@ -38,6 +38,14 @@ android {
         // modules need it or the app-level merge re-strips what the
         // library kept.
         ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
+        // Archives that are already compressed are stored, not deflated
+        // again. The vendored Windows runtime ships 27 .tzst assets, 59 MB
+        // that deflate to 100% of their size, and packaging deflated them
+        // in memory once per APK (three ABI splits, two build types): the
+        // frame CI's packaging OutOfMemoryError dies in is that deflate
+        // (zipflinger Compressor.deflate, Droidtop/tracker#283). The APK
+        // is the same size either way.
+        noCompress += listOf("tzst", "txz", "zst", "xz")
     }
 
     defaultConfig {
@@ -290,4 +298,14 @@ dependencies {
     // org.json is a throwing stub in JVM tests, so the real library backs
     // them (the same reasoning and version as shell-gamepad's test classpath).
     testImplementation(libs.json.v20240303)
+}
+
+// CI builds both variants in one invocation, and AGP then packages the
+// release and debug APKs side by side in the one daemon heap: the
+// packaging OutOfMemoryError of Droidtop/tracker#283 hit both splitter
+// runs at once ("both IncrementalSplitterRunnable actions failed
+// together"). Only the two packaging tasks are ordered; everything before
+// them still runs in parallel.
+tasks.matching { it.name == "packageDebug" }.configureEach {
+    mustRunAfter("packageRelease")
 }

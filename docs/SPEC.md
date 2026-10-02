@@ -12085,6 +12085,14 @@ Everything the app executes as itself (crane, proot) ships in
 `nativeLibraryDir`, because Android refuses exec() of a file an app
 extracted to its own storage above targetSdk 28 (§3).
 
+**Packaging memory.** The release and debug APKs are packaged one after
+the other (`packageDebug` runs after `packageRelease`), and asset archives
+that are already compressed (`tzst`, `txz`, `zst`, `xz`) are stored rather
+than deflated again; both in `app/build.gradle.kts`. The packaging
+`OutOfMemoryError` of Droidtop/tracker#283 died in that deflate with both
+packaging runs in one daemon. The daemon heap itself is the owner's budget
+(`gradle.properties`).
+
 **ABIs.** droidtop ships `arm64-v8a` (real hardware) and `x86_64` (x86
 devices and emulators). The release channel publishes one universal APK
 holding both; ABI splits also build an `x86_64`-only APK, uploaded but not
