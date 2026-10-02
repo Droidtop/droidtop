@@ -179,9 +179,9 @@ object PcGameRuntimeRegistry {
  */
 object GameExecutableResolver {
 
-    // Real installer/uninstaller/tooling names that sit beside a game's
-    // own executable and must never be mistaken for it.
-    private val NON_GAME_PREFIXES = listOf("unins", "setup", "install", "vcredist", "dxsetup", "crashpad", "crashreport")
+    // Which programs sit beside a game's own executable and must never be
+    // mistaken for it is [PcFolderClassifier]'s answer (docs/SPEC.md 7n):
+    // one list, shared with the page's alternatives, not a prefix list here.
 
     /**
      * Whether [gameRoot] directly holds anything runnable at all --
@@ -202,10 +202,16 @@ object GameExecutableResolver {
         // expensive part of a scan.
     }.isNotEmpty()
 
-    fun windowsExecutable(gameRoot: File): File? = pickOne(
-        candidates(gameRoot) { it.extension.equals("exe", ignoreCase = true) },
-        gameRoot,
-    )
+    fun windowsExecutable(gameRoot: File): File? {
+        val top = candidates(gameRoot) { it.extension.equals("exe", ignoreCase = true) }
+        if (top.isNotEmpty()) return pickOne(top, gameRoot)
+        // Nothing runnable at the top: the `Game/Binaries/Win64/Game.exe`
+        // and `bin/` payload shapes. The classifier reads a bounded listing
+        // and takes the shallowest program that is the game.
+        val listed = PcFolderClassifier.read(gameRoot).filter { it.extension == "exe" }
+        val main = PcFolderClassifier.classify(listed, gameRoot.name).main ?: return null
+        return File(gameRoot, main)
+    }
 
     /**
      * A native Linux launcher, in the order the real shapes should win:
@@ -242,19 +248,17 @@ object GameExecutableResolver {
     private fun candidates(gameRoot: File, matches: (File) -> Boolean): List<File> =
         (gameRoot.listFiles() ?: emptyArray())
             .filter { it.isFile && matches(it) }
-            .filterNot { file -> NON_GAME_PREFIXES.any { file.name.lowercase().startsWith(it) } }
+            .filterNot { file -> PcFolderClassifier.roleOf(file.name).collapsed }
 
     /**
-     * One candidate wins outright. With several, prefer one named after
-     * the game folder itself -- the near-universal convention for
-     * engine exports (`Eternum-0.9.5-pc/Eternum.exe`) and the one real
-     * disambiguation that isn't a guess. Otherwise give up.
+     * The one of [candidates] that is the game, or null when nothing says
+     * which: [PcFolderClassifier.classify]'s answer (one program wins
+     * outright; several are told apart by the folder's own title, else
+     * none is guessed).
      */
     private fun pickOne(candidates: List<File>, gameRoot: File): File? {
-        if (candidates.size == 1) return candidates.single()
         if (candidates.isEmpty()) return null
-        val folderName = gameRoot.name.substringBefore('-').trim().lowercase()
-        return candidates.firstOrNull { it.nameWithoutExtension.lowercase() == folderName }
-            ?: candidates.firstOrNull { it.nameWithoutExtension.lowercase().startsWith(folderName) && folderName.length >= 3 }
+        val main = PcFolderClassifier.classify(candidates.map { ListedFile(it.name, it.length()) }, gameRoot.name).main
+        return candidates.firstOrNull { it.name == main }
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,9 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.groupingPath
+import dev.droidtop.library.isUnscraped
+import dev.droidtop.library.scraper.PcScraper
 import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.scraper.FieldSources
@@ -68,6 +72,7 @@ import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -117,11 +122,25 @@ internal fun PcGamePage(
     val window = LocalShellWindow.current
     val (play, runner) = rememberPcPlayState(entry)
     val folderSize by produceState<Long?>(null, entry.id) {
-        val path = entry.id.takeIf { it.startsWith("/") } ?: return@produceState
+        val path = entry.groupingPath() ?: return@produceState
         value = withContext(Dispatchers.IO) { folderSizeBytes(path) }
     }
-    val rows = remember(entry, play, runner, siblings, folderSize) {
-        pageRows(context, entry, play, runner, siblings, folderSize)
+    // A game nothing has matched shows a plain row that scrapes it through the
+    // one PC scrape pipeline (docs/SPEC.md 7n); what the scrape said replaces
+    // the row's value until the library publishes the result.
+    val scope = rememberCoroutineScope()
+    var scrapeStatus by remember(entry.id) { mutableStateOf<String?>(null) }
+    val rows = remember(entry, play, runner, siblings, folderSize, scrapeStatus) {
+        pageRows(
+            context, entry, play, runner, siblings, folderSize,
+            scrapeStatus = scrapeStatus,
+            onScrape = {
+                scope.launch {
+                    scrapeStatus = "Looking it up..."
+                    scrapeStatus = PcScraper.scrape(context, listOf(entry))
+                }
+            },
+        )
     }
 
     // ONE cursor: row 0 is the button row, rows 1.. are the facts.
@@ -395,6 +414,8 @@ private fun pageRows(
     runner: dev.droidtop.library.ResolvedRunner?,
     siblings: List<LibraryEntry>,
     folderSizeBytes: Long?,
+    scrapeStatus: String?,
+    onScrape: () -> Unit,
 ): List<PageFact> = buildList {
     val now = System.currentTimeMillis()
     add(PageFact("Play time", playtimeLine(entry.playtimeSeconds, entry.playCount)))
@@ -409,7 +430,7 @@ private fun pageRows(
         )
     }
     entry.pcInfo?.let { pc ->
-        val sizeBytes = if (entry.id.startsWith("/")) folderSizeBytes ?: pc.sizeBytes else pc.sizeBytes
+        val sizeBytes = if (entry.groupingPath() != null) folderSizeBytes ?: pc.sizeBytes else pc.sizeBytes
         if (sizeBytes > 0) {
             add(
                 PageFact(
@@ -424,7 +445,7 @@ private fun pageRows(
     }
     val owned = siblings.mapNotNull { it.ownership() }
     val ownedLine = owned.ownershipLabel().removePrefix("Owned on ").takeIf { it.isNotBlank() }
-    val folderPath = entry.id.takeIf { it.startsWith("/") }
+    val folderPath = entry.groupingPath()
     add(
         PageFact(
             "Owned on",
@@ -432,16 +453,36 @@ private fun pageRows(
             subtitle = if (folderPath != null) "Your folders" else null,
         ),
     )
+    // The name as it is on disk, beside the title drawn from it (docs/SPEC.md
+    // 7n): the raw name is never altered, only parsed.
+    // An unidentified folder is drawn by its path: its own name says nothing.
+    if (folderPath != null && entry.title == GameNaming.UNIDENTIFIED) {
+        add(PageFact("Folder", folderPath))
+    } else {
+        folderPath?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() && it != GameNaming.displayName(entry.title) }
+            ?.let { add(PageFact("Folder name", it)) }
+    }
     // A version comes from a folder's own name (docs/SPEC.md 7m); a store
     // row has none to derive.
-    val versions = siblings.filter { it.id.startsWith("/") }
-        .mapNotNull { GameNaming.derive(it.id).version.takeIf { v -> v.isNotBlank() } }
+    val versions = siblings.mapNotNull { sibling -> sibling.groupingPath() }
+        .mapNotNull { GameNaming.derive(it).version.takeIf { v -> v.isNotBlank() } }
         .distinct()
     val availableVersions = (versions + listOfNotNull(folderPath?.let { GameNaming.derive(it).version.takeIf(String::isNotBlank) })).distinct()
     if (availableVersions.isNotEmpty()) {
         add(PageFact("Version", availableVersions.first(), subtitle = if (availableVersions.size > 1) "Also here: ${availableVersions.drop(1).joinToString(", ")}" else null))
     }
     entry.availableUpdate?.let { add(PageFact("Update", it, subtitle = GameUpdates.line(it))) }
+    if (entry.isUnscraped()) {
+        add(
+            PageFact(
+                "Not scraped yet",
+                value = scrapeStatus ?: "Scrape",
+                subtitle = "No cover or description yet. Press A to look this game up in your PC scrape source; " +
+                    "Options has Choose match when it finds the wrong game.",
+                onActivate = onScrape,
+            ),
+        )
+    }
     add(
         PageFact(
             "Runs with",

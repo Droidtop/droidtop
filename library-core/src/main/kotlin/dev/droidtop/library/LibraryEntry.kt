@@ -1548,6 +1548,19 @@ class Library(
     }
 
     /**
+     * The person's own title for the game whose entries are [ids] (docs/SPEC.md
+     * 7n), or the parsed title again when [name] is blank. Kept by the same
+     * store as "the same game" ([GameLinksStore.setGameName]), keyed by entry
+     * id, so no rescan changes it. Naming one folder of a multi-part game
+     * takes that part out of the game: it is a game of that name from now on.
+     */
+    suspend fun renameGame(ids: Collection<String>, name: String?) = withContext(Dispatchers.IO) {
+        links.setGameName(ids, name?.trim()?.takeIf { it.isNotEmpty() })
+        changedFactIds += ids
+        republish()
+    }
+
+    /**
      * Two games in the library are one game (docs/SPEC.md 7m, "The same
      * game"): every folder of [other] becomes a folder of [game], under
      * [game]'s name, and stays exactly where it is. Both are here, so both
@@ -1571,7 +1584,7 @@ class Library(
         val keep = game.entriesByPath.keys
         val fold = other.entriesByPath.keys
         if (keep.isEmpty() || fold.isEmpty() || keep.any { it in fold }) return@withContext false
-        if (!(keep + fold).all { it.startsWith("/") }) return@withContext false
+        if (!(game.entriesByPath.values + other.entriesByPath.values).all { it.groupingPath() != null }) return@withContext false
         val name = game.game.name
         links.setGameName(fold, name)
         // The card the merged game will draw, worked out the way the list

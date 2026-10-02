@@ -462,8 +462,8 @@ private class FakeGameLinksStore : GameLinksStore {
     val names = mutableMapOf<String, String>()
     override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> =
         ids.mapNotNull { id -> names[id]?.let { id to GameLinks(gameName = it) } }.toMap()
-    override suspend fun setGameName(ids: Collection<String>, name: String) {
-        ids.forEach { names[it] = name }
+    override suspend fun setGameName(ids: Collection<String>, name: String?) {
+        ids.forEach { if (name == null) names.remove(it) else names[it] = name }
     }
     override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) {}
     override suspend fun moveTo(fromId: String, toId: String) {

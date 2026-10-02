@@ -189,6 +189,7 @@ object GameGrouping {
 
     /** One folder a scan found, and what the scan knows about it. */
     data class Found(
+        /** What the folder is keyed by in the result ([GameCopy.path]): its path, or the id of a scanned PC folder game. */
         val path: String,
         val source: String? = null,
         val platforms: List<String> = emptyList(),
@@ -197,6 +198,12 @@ object GameGrouping {
         val latestKnown: String? = null,
         /** The game the user said this folder is (docs/SPEC.md 7m); null is the name the folder derives. */
         val name: String? = null,
+        /**
+         * The folder path the name, version and segment are read from, when
+         * [path] is not one (a scanned PC folder game's id is not a path;
+         * its install folder is, [groupingPath]). Defaults to [path].
+         */
+        val namePath: String = path,
     )
 
     /**
@@ -206,10 +213,16 @@ object GameGrouping {
      */
     fun group(found: List<Found>): List<GroupedGame> {
         val games = LinkedHashMap<String, Builder>()
-        for (folder in found.sortedBy { it.path }) {
-            val derived = GameNaming.derive(folder.path)
+        for (folder in found.sortedWith(compareBy({ it.namePath }, { it.path }))) {
+            val derived = GameNaming.derive(folder.namePath)
             val name = folder.name?.takeIf { it.isNotBlank() } ?: derived.name
-            val key = GameNaming.nameKey(name).ifEmpty { folder.path.lowercase() }
+            // An unidentified folder is nobody's version: two `game` folders
+            // are two unknowns, not one game.
+            val key = if (derived.unidentified && folder.name.isNullOrBlank()) {
+                "path:" + folder.path
+            } else {
+                GameNaming.nameKey(name).ifEmpty { folder.path.lowercase() }
+            }
             games.getOrPut(key) { Builder(name) }.merge(derived, folder)
         }
         return games.values.map { it.build() }.sortedBy { it.name.lowercase() }

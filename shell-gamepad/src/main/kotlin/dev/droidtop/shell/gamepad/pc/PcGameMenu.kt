@@ -50,6 +50,8 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.MissingGames
+import dev.droidtop.library.PartProgress
+import dev.droidtop.library.groupingPath
 import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.PcRunners
 import dev.droidtop.library.ResolvedRunner
@@ -127,6 +129,8 @@ internal fun PcGameMenu(
     // caller that has no list passes.
     siblings: List<LibraryEntry> = emptyList(),
     onOpenOther: (LibraryEntry) -> Unit = {},
+    // A part was marked finished or not: the tab folds again, so Play moves on (docs/SPEC.md 7n).
+    onProgressChanged: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -143,6 +147,8 @@ internal fun PcGameMenu(
     var editingCollections by remember(entry) { mutableStateOf(false) }
     var pickingReplacement by remember(entry) { mutableStateOf(false) }
     var pickingSameGame by remember(entry) { mutableStateOf(false) }
+    var renaming by remember(entry) { mutableStateOf(false) }
+    var progressToken by remember(entry) { mutableStateOf(0) }
     var editingThread by remember(entry) { mutableStateOf(false) }
     var pickingEngine by remember(entry) { mutableStateOf(false) }
     var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
@@ -204,9 +210,9 @@ internal fun PcGameMenu(
     // THIS game only: nothing compares every game with every other. Until
     // they are, the header names the game from this folder alone and no
     // row offers a version, a replacement or a merge.
-    val worked by produceState(DetailNames.NONE, entry, siblings) {
+    val worked by produceState(DetailNames.NONE, entry, siblings, progressToken) {
         value = withContext(Dispatchers.Default) {
-            val groups = LibraryGrouping.group(siblings)
+            val groups = LibraryGrouping.group(siblings, PartProgress.finished(context), dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath })
             val grouping = groups.firstOrNull { it.entriesByPath.containsKey(entry.id) }
             DetailNames(
                 forId = entry.id,
@@ -229,14 +235,14 @@ internal fun PcGameMenu(
     // GAME's, so it is read and written for every folder of it, and read
     // from the library rather than from [entry], which is the list's copy
     // from before anything on this screen changed it.
-    val isFolder = entry.id.startsWith("/")
+    val isFolder = entry.groupingPath() != null
     val gameIds = grouping?.entriesByPath?.keys ?: setOf(entry.id)
     var linksToken by remember(entry) { mutableStateOf(0) }
     val links by produceState<GameLinks?>(null, gameIds, linksToken) {
         value = if (isFolder) library.gameLinks(gameIds) else null
     }
     val versions = grouping?.game?.allVersions?.map { it.version }
-        ?: if (isFolder) listOf(GameNaming.derive(entry.id).version) else emptyList()
+        ?: entry.groupingPath()?.let { listOf(GameNaming.derive(it).version) }.orEmpty()
     val available = GameUpdates.available(links?.latestKnown ?: entry.latestKnown, versions)
 
     // Media is a folder listing (EsDeArtwork), which is disk work: IO
@@ -397,6 +403,23 @@ internal fun PcGameMenu(
             onDismiss = { pickingSameGame = false },
         )
     }
+    if (renaming) {
+        TextEditDialog(
+            title = "Title",
+            subtitle = "The name this game is drawn and scraped under. droidtop reads it from the folder name " +
+                "(${folderNameOf(entry)}); your own title is kept across every rescan. " +
+                "Clear it and save to go back to the folder's.",
+            initial = entry.gameName.orEmpty(),
+            onCommit = { text ->
+                renaming = false
+                scope.launch {
+                    library.renameGame(gameIds, text)
+                    status = if (text.isBlank()) "Back to the title read from the folder name." else "Renamed to ${text.trim()}."
+                }
+            },
+            onDismiss = { renaming = false },
+        )
+    }
     if (editingThread) {
         TextEditDialog(
             title = "F95zone thread",
@@ -431,7 +454,53 @@ internal fun PcGameMenu(
     val hasWindowsRoute = runners.options.any {
         it.strategy == GameLaunchStrategy.WINE_PREFIX && it.state != RunnerState.NOT_FOR_THIS_GAME
     }
+    // Which part of a multi-part game this entry is, and whether it is finished
+    // (docs/SPEC.md 7n). Names only: the segments came from the folder names.
+    val partOf = grouping?.game?.takeIf { it.segments.size > 1 }?.segments
+        ?.firstOrNull { segment -> segment.versions.any { version -> version.copies.any { it.path == entry.id } } }
+    val finishedHere = grouping?.finished?.contains(entry.id) == true
+    val titleRows = listOfNotNull(
+        PcActionRow(
+            "Title",
+            if (entry.gameName.isNullOrBlank()) {
+                "Read from the folder name (${folderNameOf(entry)}). Select to use your own"
+            } else {
+                "Your own title, kept across rescans. Select to change it or clear it"
+            },
+            { renaming = true },
+        ),
+        partOf?.let { part ->
+            PcActionRow(
+                if (finishedHere) "Not finished with ${part.label}" else "Finished with ${part.label}",
+                if (finishedHere) {
+                    "Play goes back to this part"
+                } else {
+                    "Play then continues with the next part of $gameName"
+                },
+                {
+                    scope.launch {
+                        withContext(Dispatchers.IO) { PartProgress.setFinished(context, entry.id, !finishedHere) }
+                        progressToken++
+                        onProgressChanged()
+                    }
+                },
+            )
+        },
+        partOf?.let { part ->
+            PcActionRow(
+                "Make ${part.label} its own game",
+                "Takes it out of $gameName and lists it on its own. Clearing its title puts it back",
+                {
+                    scope.launch {
+                        library.renameGame(listOf(entry.id), "$gameName ${part.label}")
+                        status = "${part.label} is a game of its own now."
+                    }
+                },
+            )
+        },
+    )
     val actions = rememberPcActions(
+        titleRows = titleRows,
         group = group,
         currentId = entry.id,
         onOpenOther = onOpenOther,
@@ -899,6 +968,7 @@ private data class EngineChoice(val folder: String?, val pinned: Boolean, val en
  */
 @Composable
 private fun rememberPcActions(
+    titleRows: List<PcActionRow>,
     group: dev.droidtop.library.LibraryGameGroup?,
     currentId: String,
     onOpenOther: (LibraryEntry) -> Unit,
@@ -963,7 +1033,7 @@ private fun rememberPcActions(
         ),
         // About: this copy -- its update state and its record in the
         // person's library.
-        about = updateRows + listOfNotNull(
+        about = titleRows + updateRows + listOfNotNull(
             PcActionRow("Scrape", "Looks this game up in the PC sources", onScrape),
             PcActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong", onChooseMatch),
             if (media > 1) PcActionRow("View media", "$media images and videos scraped for this game", onViewMedia) else null,
@@ -1199,14 +1269,14 @@ private data class DetailNames(
  * -- "0.73" is not a reason a person can act on, and the path is.
  */
 private fun MissingGames.Candidate.line(): String {
-    val where = entry.id.takeIf { it.startsWith("/") }
+    val where = entry.groupingPath()
     val why = if (certain) "The same name" else "A similar name"
     return listOfNotNull(why, where).joinToString(" - ")
 }
 
 /** The same for a game that might be this one: why, and where its folders are. */
 private fun SimilarGames.Candidate.line(): String {
-    val folders = group.entriesByPath.keys.sorted()
+    val folders = group.entriesByPath.values.mapNotNull { it.groupingPath() }.sorted()
     val where = folders.first() + if (folders.size > 1) " and ${folders.size - 1} more" else ""
     return "A similar name - $where"
 }
@@ -1267,4 +1337,8 @@ private suspend fun lookUpProtonDb(entry: LibraryEntry, name: String): ProtonDbS
 
 /** The name one folder derives for its game, before any grouping is worked out. */
 private fun ownNameOf(entry: LibraryEntry): String =
-    if (entry.id.startsWith("/")) dev.droidtop.library.GameNaming.derive(entry.id).name.ifEmpty { entry.title } else entry.title
+    entry.groupingPath()?.let { dev.droidtop.library.GameNaming.derive(it).name.ifEmpty { entry.title } } ?: entry.title
+
+/** The folder's own name, as it is on disk: what a title is read from (docs/SPEC.md 7n). Names only. */
+private fun folderNameOf(entry: LibraryEntry): String =
+    entry.groupingPath()?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() } ?: entry.title

@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.groupingPath
 import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.ResolvedRunner
 import dev.droidtop.library.RunnerState
@@ -81,8 +82,8 @@ internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, Resolve
  * and the path is the thing the person has to go and look at.
  */
 internal fun missingFolderLine(entry: LibraryEntry): String =
-    if (entry.id.startsWith("/")) {
-        "${entry.id} is not there any more. Its history, favourite and collections are kept."
+    if (entry.groupingPath() != null) {
+        "${entry.groupingPath()} is not there any more. Its history, favourite and collections are kept."
     } else {
         "Nothing droidtop scanned still has this game. Its history, favourite and collections are kept."
     }

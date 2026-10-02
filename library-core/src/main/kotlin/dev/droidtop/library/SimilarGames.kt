@@ -47,5 +47,5 @@ object SimilarGames {
     }
 
     private fun LibraryGameGroup.isFolders(): Boolean =
-        entriesByPath.isNotEmpty() && entriesByPath.keys.all { it.startsWith("/") }
+        entriesByPath.isNotEmpty() && entriesByPath.values.all { it.groupingPath() != null }
 }

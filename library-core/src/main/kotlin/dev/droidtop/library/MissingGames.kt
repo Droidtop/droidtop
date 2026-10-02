@@ -73,5 +73,5 @@ object MissingGames {
      * row, whose name nobody has to derive.
      */
     fun nameOf(entry: LibraryEntry): String =
-        if (entry.id.startsWith("/")) GameNaming.derive(entry.id).name else entry.title
+        entry.groupingPath()?.let { GameNaming.derive(it).name } ?: entry.title
 }

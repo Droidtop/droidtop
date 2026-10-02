@@ -97,8 +97,12 @@ data class GameLinks(
 interface GameLinksStore {
     suspend fun getAll(ids: Collection<String>): Map<String, GameLinks>
 
-    /** [ids] are all the game called [name] from now on (docs/SPEC.md 7m, "The same game"). */
-    suspend fun setGameName(ids: Collection<String>, name: String)
+    /**
+     * [ids] are all the game called [name] from now on (docs/SPEC.md 7m, "The
+     * same game"; 7n, the person's own title), or go back to the name the
+     * folder derives when [name] is null.
+     */
+    suspend fun setGameName(ids: Collection<String>, name: String?)
 
     /** Links [thread] to every one of [ids], or unlinks them when it is null. */
     suspend fun setF95Thread(ids: Collection<String>, thread: Long?)
@@ -122,7 +126,7 @@ interface GameLinksStore {
 
 object NoOpGameLinksStore : GameLinksStore {
     override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> = emptyMap()
-    override suspend fun setGameName(ids: Collection<String>, name: String) {}
+    override suspend fun setGameName(ids: Collection<String>, name: String?) {}
     override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) {}
     override suspend fun moveTo(fromId: String, toId: String) {}
     override suspend fun linkedThreads(): Map<Long, F95ThreadCheck?> = emptyMap()

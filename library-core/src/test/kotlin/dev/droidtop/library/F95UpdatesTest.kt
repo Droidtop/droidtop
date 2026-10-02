@@ -48,7 +48,7 @@ class F95UpdatesTest {
         val checks = mutableMapOf<Long, F95ThreadCheck>()
         override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> =
             ids.mapNotNull { id -> threadOf[id]?.let { id to GameLinks(f95Thread = it, check = checks[it]) } }.toMap()
-        override suspend fun setGameName(ids: Collection<String>, name: String) {}
+        override suspend fun setGameName(ids: Collection<String>, name: String?) {}
         override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) {
             ids.forEach { if (thread == null) threadOf.remove(it) else threadOf[it] = thread }
         }

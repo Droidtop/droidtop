@@ -2,6 +2,7 @@ package dev.droidtop.library.scraper
 
 import android.content.Context
 import dev.droidtop.library.GameEngine
+import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
@@ -171,49 +172,16 @@ interface PcMetadataSource {
 }
 
 /**
- * Turns a game FOLDER name into something a title search can use.
+ * The search string for a PC game: its parsed title, nothing else.
  *
- * Real folder names in a real library are not titles: "Eternum-0.9.5-pc",
- * "BeingADIK-0.8.3-scrappy", "Game_v1.2_win64", "Some Game [1.0]". Every
- * rule here strips a tag that is provably not part of a title -- a
- * version number, a platform/build tag, a bracketed suffix, a separator
- * used as a space. Nothing here guesses at the title itself: whatever
- * survives the strip is passed through unchanged.
+ * It used to be a second cleaner of folder names beside [GameNaming];
+ * [GameTitleParser] is the one parser now (docs/SPEC.md 7n), so what a
+ * scrape searches for is the title the library draws. A leftover word the
+ * parser cannot place (a scene group, a mod name) is not part of the title
+ * and is not searched for.
  */
 object PcScrapeTitle {
-
-    // Platform/build tags real distributions append. Matched as whole
-    // separator-delimited tokens, so a title containing "win" or a game
-    // actually called "Mac" is untouched.
-    private val PLATFORM_TAGS = setOf(
-        "pc", "win", "win32", "win64", "windows", "linux", "lin", "lin64", "mac", "osx",
-        "x86", "x64", "32bit", "64bit", "android",
-    )
-
-    /**
-     * A version token: either something with an internal separator
-     * ("0.9.5", "1_2") or a v/r-prefixed number ("v1.2", "r12").
-     *
-     * A bare number deliberately does NOT match. Sequels are numbered --
-     * "Half-Life 2", "Persona 5" -- and a rule that ate a trailing digit
-     * would quietly search for the wrong game every time.
-     */
-    private val VERSION_TOKEN = Regex("""^([vr]\d+([.\-_]\d+)*|\d+([.\-_]\d+)+)[a-z]?$""", RegexOption.IGNORE_CASE)
-
-    // Bracketed or parenthesised tags anywhere in the name: "[1.0]", "(Final)".
-    private val BRACKETED = Regex("""[\[({][^\[\]{}()]*[\])}]""")
-
-    fun clean(folderName: String): String {
-        val tokens = BRACKETED.replace(folderName, " ").split('-', '_', ' ').filter { it.isNotBlank() }
-        // The FIRST token is never dropped: "V2 Berlin" is a title, and
-        // so is "2064" -- a version-shaped word can only be a version tag
-        // when something came before it.
-        val withoutVersions = tokens.filterIndexed { index, token -> index == 0 || !VERSION_TOKEN.matches(token) }
-        val kept = withoutVersions.toMutableList()
-        // Platform tags only at the end, where releases actually put them.
-        while (kept.size > 1 && kept.last().lowercase() in PLATFORM_TAGS) kept.removeAt(kept.size - 1)
-        return kept.joinToString(" ").trim().ifBlank { folderName }
-    }
+    fun clean(folderName: String): String = GameTitleParser.parseName(folderName).title.ifBlank { folderName }
 }
 
 /**
@@ -383,7 +351,7 @@ object PcScraper {
     suspend fun candidates(context: Context, entry: LibraryEntry): Candidates = withContext(Dispatchers.IO) {
         ScraperReadiness.pcSourceProblem(context)?.let { return@withContext Candidates.Unavailable(it) }
         val source = source(context) ?: return@withContext Candidates.Unavailable("No PC scraper source is configured.")
-        val title = PcScrapeTitle.clean(baseNameFor(entry))
+        val title = searchTitleFor(entry)
         val lookup = runCatching { source.search(title) }.getOrElse { error ->
             return@withContext Candidates.Unavailable("${source.label} search failed: ${error.message}")
         }
@@ -543,7 +511,7 @@ object PcScraper {
                 return PcOutcome.ByStoreId
             }
         }
-        val title = PcScrapeTitle.clean(baseNameFor(entry))
+        val title = searchTitleFor(entry)
         return when (val lookup = source.search(title)) {
             is ScrapeLookup.Refused -> PcOutcome.Refused(lookup)
             ScrapeLookup.NoMatch -> PcOutcome.NoMatch
@@ -662,6 +630,21 @@ object PcScraper {
      * is, and what its artwork lookup already keys on at scan time), the
      * title otherwise -- a store row's id is a store id, not a path.
      */
+    /**
+     * What a scrape searches for: the person's own title when they set one
+     * (docs/SPEC.md 7n), else the parsed title of the game's folder (so a
+     * part folder such as `book3` searches for the game it is a part of),
+     * else the title the entry carries. Disk (one `isDirectory`): IO only.
+     */
+    internal fun searchTitleFor(entry: LibraryEntry): String {
+        entry.gameName?.takeIf { it.isNotBlank() }?.let { return it }
+        return if (File(entry.id).isDirectory) {
+            GameTitleParser.parse(entry.id).title
+        } else {
+            PcScrapeTitle.clean(baseNameFor(entry))
+        }
+    }
+
     internal fun baseNameFor(entry: LibraryEntry): String {
         val path = File(entry.id)
         return when {

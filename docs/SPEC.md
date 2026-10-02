@@ -48,6 +48,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [7k. The design system: one spacing scale, one type scale, one colour source](#7k-the-design-system-one-spacing-scale-one-type-scale-one-colour-source)
 - [7k2. Gaming theming: the active ES-DE theme as droidtop's own design tokens (owner direction 2026-10-01, Droidtop/tracker#185)](#7k2-gaming-theming-the-active-es-de-theme-as-droidtops-own-design-tokens-owner-direction-2026-10-01-droidtoptracker185)
 - [7m. One game, its versions and its segments (directed 2026-09-16)](#7m-one-game-its-versions-and-its-segments-directed-2026-09-16)
+- [7n. PC game titles, executables and multi-part games (Droidtop/tracker#264)](#7n-pc-game-titles-executables-and-multi-part-games-droidtoptracker264)
 - [8. Licensing](#8-licensing)
 - [9. Module map](#9-module-map)
 - [10. Build order](#10-build-order)
@@ -10693,6 +10694,78 @@ picker, and naming the emulator's user-folder document provider for the
 external-content route. An action that claims to install would be
 fabrication; an action that opens the door and says which file to pick
 is real, and is the shape this research supports.
+
+## 7n. PC game titles, executables and multi-part games (Droidtop/tracker#264)
+
+Owner, 2026-10-01: the PC tab needs scraping, game detection and parsing,
+and "we have the book3 game issue again". Root cause: a folder game the
+vendored scanner finds has the id `folder:CUSTOM_GAME_n`, which is not a
+path, so `LibraryGrouping` never folded it and the raw folder name was the
+title (`Some Game/book3` was a game called `book3`).
+
+**One title parser.** `GameTitleParser` (library-core, pure, names only)
+is the one answer to "what is this folder called": title, version, release
+tag, language, platform, part, subtitle, series number and the leftover
+words. It stands on `GameNaming.derive`, which groups folders, so the
+grouping name and the drawn title cannot differ. It strips bracketed tags,
+scene dots (`Name.v1.2-GROUP`), trailing platform tokens and trailing
+release tags (`Final`, `GOG`, `Repack`; after a dash, underscore or dot
+only, so `Project Alpha` keeps its word), versions and repeated
+punctuation. It never guesses: a bare trailing number is part of the title
+(`Name 5`), and its `seriesTitle`/`number` are exposed so separate sequels
+can be shown together but are NEVER merged. The raw name is never altered
+and is shown on the game page ("Folder name"). `PcScrapeTitle.clean` is
+now this parser, so a scrape searches for the title the list draws.
+The person's own title (`Library.renameGame`, the menu's "Title" row) is
+the existing `GameLinksStore` game name, keyed by entry id, so it survives
+every rescan; clearing it returns to the parsed one.
+
+**Multi-part games are ONE entry.** A parent folder with ordered part
+folders (`book1`..., `episode`, `chapter`, `part`, `volume`, `season N`,
+`Vol 2`, `Act II`, spelled-out numbers) is one game titled after the
+parent, with one segment per part. The part words live once in
+`PartMarkers`, read by the naming rule, the scan's depth rule and the
+grouping. `book` is a part word only as a whole folder name under a
+titled parent; a flat `name_book1` beside `name_book2` stays two numbered
+titles (7m). A scanned folder game groups through `groupingPath()` (its
+install folder), so every provider's folders fold the same way. The card
+stays the first part's entry (favourite, art and history do not move);
+Play starts the first part not marked finished (`PartProgress`, a small
+preferences set keyed by entry id; "Finished with <part>" on the menu),
+and starts the first again when all are finished. Splitting a part out
+("Make <part> its own game") and merging are the person's game name,
+stored by entry id, so rescans keep them. Separate sequels stay separate.
+
+**Engine-standard folder names are never titles.** `game`, `data`, `www`,
+`resources`, `lib`, `renpy`, `Contents` and the platform folders
+(`EngineFolderNames`) take their title from the game above them; names at
+or above a games root are never read as a title (`GameNaming.relativeTo`).
+A stand-alone one with nothing above it is titled "Unidentified folder",
+the game page shows its full path, and two of them are never one game.
+
+**One executable classifier.** `PcFolderClassifier` is a pure classifier
+over a bounded folder listing (`read`: depth 3, 600 entries, no hidden
+folders): installers, uninstallers, redistributables and crash handlers
+are collapsed; tools (config, patcher, editor) rank below the game; the
+shallowest layer decides, then the folder's own title. Nothing guessed:
+several equal programs give `ambiguous` and the person picks from the
+`alternatives`. `GameExecutableResolver` answers through it (and now finds
+`Game/Binaries/Win64/Game.exe`). Engine detection is NOT redone: the
+classifier passes through what `GameEngineDetector.detectGame` says.
+
+**Unmatched games are shown plainly.** A game with no art, description or
+scrape source (`isUnscraped`) is drawn with its parsed title and its game
+page has a "Not scraped yet" row whose A press runs the existing
+`PcScraper.scrape` (no new scraper).
+
+Gaps recorded, not built (#264): the first-scan scrape offer for the PC tab
+(#174 wording), store-library identity (#8, #11), `metadata_source` plugin
+wiring for PC, series grouping of sequels in the shelves, a manual merge UI
+for non-path ids beyond the same-game picker, the folder classifier's
+alternatives list on the game page, and the vendored gamenative scanner's
+own weaker executable pick and raw name (on hold with `.gamenative`). Next
+slice: a read-only "library health" view (leftover or duplicate folders,
+archives beside extracted copies); droidtop never deletes or moves files.
 
 ## 8. Licensing
 

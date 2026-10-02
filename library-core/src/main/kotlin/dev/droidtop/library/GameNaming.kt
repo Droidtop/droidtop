@@ -36,20 +36,12 @@ object GameNaming {
 
     /**
      * The words a folder uses when it is a part of a game rather than a
-     * game: `Week 1`, `Part1`, `Chap3+`, `Episode 2`. Pythia's list, from
-     * the real cases that fragmented into bogus separate games
-     * (`Fetish Locator/Week 1|2|3`, `My New Family/Part 1`,
-     * `Thief of Hearts/Part1`, `BeingADik/Chap3+`), plus `day`, `disc` and
-     * `disk`, which droidtop's own episode-title rule already carried
-     * ([qualifiedFolderTitle]) -- one list, because the two rules read the
-     * same folder names and must not disagree about them.
+     * game, and where they end a name, live in [PartMarkers]: one list,
+     * read by this file, the scan's depth rule and the multi-part grouping
+     * ([LibraryGrouping]), so none of them can disagree about what a part is.
      */
-    private val GENERIC_PART_PREFIX =
-        Regex("""^(chap(?:ter)?|part|week|act|episode|ep|season|vol(?:ume)?|day|disc|disk)\.?\s*""", RegexOption.IGNORE_CASE)
-
-    /** The same words where they end a name that has a title in front of it -- see [trailingSegment]. */
-    private val TRAILING_PART =
-        Regex("""[-_ .]?(chap(?:ter)?|part|week|act|episode|ep|season|vol(?:ume)?|day|disc|disk)\.?\s*(\d+)$""", RegexOption.IGNORE_CASE)
+    private val GENERIC_PART_PREFIX get() = PartMarkers.LEAF_PREFIX
+    private val TRAILING_PART get() = PartMarkers.TRAILING
 
     /** A leaf that is a dotted version and nothing else: `10.0-sancho`. */
     private val BARE_VERSION_LEAF = Regex("""^\d+\.\d""")
@@ -80,13 +72,38 @@ object GameNaming {
         val mods: List<String>,
         val language: String?,
         val segment: Segment? = null,
+        /** The platform a trailing token named (`win64` is `windows`); null when none did. See [GameTitleParser.trimTrailing]. */
+        val platform: String? = null,
+        /** Release tags cut off the end of the name (`Final`, `GOG`), in name order. */
+        val tags: List<String> = emptyList(),
+        /**
+         * The folder is an engine-standard one (`game`, `data`, `www`) with no
+         * game above it to take the title from; [name] is [UNIDENTIFIED]. Two
+         * such folders are never one game ([GameGrouping.group]).
+         */
+        val unidentified: Boolean = false,
     )
 
     /** One part of a game: `Week 1` of `Fetish Locator`. [order] sorts them. */
     data class Segment(val label: String, val order: Int?)
 
     /** What a leaf folder name is, when it is not a title of its own. */
-    private enum class LeafKind { TITLE, BARE_VERSION, PART }
+    private enum class LeafKind { TITLE, BARE_VERSION, PART, ENGINE_FOLDER }
+
+    /** What a folder that no game can be identified from is called (docs/SPEC.md 7n). */
+    const val UNIDENTIFIED = "Unidentified folder"
+
+    /**
+     * [path] below [root] when it is under it, else [path] itself. Names
+     * above a games root are the person's own filing, never a game's title:
+     * a `game` folder straight under `/mnt/games` has no parent game, not a
+     * parent called `games`.
+     */
+    fun relativeTo(root: String?, path: String): String {
+        if (root.isNullOrEmpty()) return path
+        val base = root.trimEnd('/') + "/"
+        return if (path.startsWith(base)) path.removePrefix(base) else path
+    }
 
     /**
      * Pythia's `_is_generic_part_leaf`, split into the two answers droidtop
@@ -105,9 +122,11 @@ object GameNaming {
      * (docs/SPEC.md 7m): such a folder costs nothing, because the game it
      * belongs to is the level, not the folder.
      */
-    fun isStructuralFolderName(name: String): Boolean = leafKind(name) != LeafKind.TITLE
+    fun isStructuralFolderName(name: String): Boolean = leafKind(name).let { it == LeafKind.PART || it == LeafKind.BARE_VERSION }
 
-    private fun leafKind(name: String): LeafKind {
+    private fun leafKind(raw: String): LeafKind {
+        val name = PartMarkers.withArabic(GameTitleParser.stripNoise(raw))
+        if (EngineFolderNames.matches(name)) return LeafKind.ENGINE_FOLDER
         if (BARE_VERSION_LEAF.containsMatchIn(name)) return LeafKind.BARE_VERSION
         val stripped = GENERIC_PART_PREFIX.replaceFirst(name, "")
         if (stripped == name) return LeafKind.TITLE
@@ -142,7 +161,7 @@ object GameNaming {
                 when (leafKind(name)) {
                     LeafKind.TITLE -> return Ancestor(name, segment)
                     LeafKind.PART -> if (segment == null) segment = segmentOf(name)
-                    LeafKind.BARE_VERSION -> Unit
+                    LeafKind.BARE_VERSION, LeafKind.ENGINE_FOLDER -> Unit
                 }
             }
             index--
@@ -152,8 +171,10 @@ object GameNaming {
     }
 
     /** A part-marker folder name read as a segment: its own label, and the number in it. */
-    private fun segmentOf(name: String): Segment =
-        Segment(name.trim(), extractVersionOnly(name).first.substringBefore('.').toIntOrNull())
+    private fun segmentOf(raw: String): Segment {
+        val name = GameTitleParser.stripNoise(raw)
+        return Segment(name.trim(), extractVersionOnly(name).first.substringBefore('.').toIntOrNull())
+    }
 
     /**
      * Pythia's `_extract_version_only`: the version/mods/language of a leaf
@@ -161,7 +182,8 @@ object GameNaming {
      * ancestor instead. The part word itself is stripped rather than kept
      * as a mod.
      */
-    private fun extractVersionOnly(leaf: String): Triple<String, List<String>, String?> {
+    private fun extractVersionOnly(raw: String): Triple<String, List<String>, String?> {
+        val leaf = PartMarkers.withArabic(raw)
         val stripped = GENERIC_PART_PREFIX.replaceFirst(leaf, "")
         val match = VERSION_IN_LEAF.find(stripped)
             ?: return classifyVariantTokens(stripped).let { (mods, language) ->
@@ -207,7 +229,17 @@ object GameNaming {
      *    (`ThiefofHeartsPart3-0.0.9-pc`) -- see [trailingSegment].
      */
     fun derive(path: String): Derived {
-        val parts = path.split('/', '\\').filter { it.isNotEmpty() }
+        val derived = deriveUntrimmed(path)
+        val trimmed = GameTitleParser.trimTrailing(derived.name)
+        if (trimmed.tokens.isEmpty()) return derived
+        return derived.copy(name = trimmed.name, platform = trimmed.platform, tags = trimmed.tokens)
+    }
+
+    private fun deriveUntrimmed(path: String): Derived {
+        // Bracketed tags and scene dots come off every component first, so
+        // a `Game [GOG]` parent and a `Game` parent are the same game
+        // (GameTitleParser.stripNoise).
+        val parts = path.split('/', '\\').filter { it.isNotEmpty() }.map { GameTitleParser.stripNoise(it) }
         val leaf = parts.lastOrNull().orEmpty().ifEmpty { return Derived(path, "", emptyList(), null) }
 
         when (leafKind(leaf)) {
@@ -225,6 +257,17 @@ object GameNaming {
                 if (ancestor != null) {
                     val (version, mods, language) = extractVersionOnly(leaf)
                     return Derived(ancestor.name, version, mods, language, ancestor.segment)
+                }
+            }
+            // `game`, `data`, `www`: the engine's own layout, never a title. The
+            // title is the game it sits in; with no game above it the folder
+            // is unidentified, and says so rather than naming itself `game`.
+            LeafKind.ENGINE_FOLDER -> {
+                val ancestor = meaningfulAncestor(parts)
+                return if (ancestor != null) {
+                    Derived(ancestor.name, "", emptyList(), null, ancestor.segment)
+                } else {
+                    Derived(UNIDENTIFIED, "", emptyList(), null, unidentified = true)
                 }
             }
             LeafKind.TITLE -> Unit

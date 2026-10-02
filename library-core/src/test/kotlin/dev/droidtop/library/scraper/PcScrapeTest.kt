@@ -31,13 +31,11 @@ class PcScrapeTest {
     }
 
     @Test
-    fun `an unrecognised release tag is left in rather than guessed at`() {
-        // "scrappy" is a real distribution's own build tag and nothing
-        // here can know that. It stays, the search then finds no exact
-        // title, and the game goes to the picker -- which is the right
-        // outcome: a rule invented to strip it would strip real title
-        // words too.
-        assertEquals("BeingADIK scrappy", PcScrapeTitle.clean("BeingADIK-0.8.3-scrappy"))
+    fun `a word after the version is a build tag, not part of what is searched for`() {
+        // "scrappy" is a real distribution's own build tag. The parser
+        // reads everything after the version as the build's, never the
+        // title's (GameTitleParser), so the search is the name alone.
+        assertEquals("BeingADIK", PcScrapeTitle.clean("BeingADIK-0.8.3-scrappy"))
     }
 
     @Test

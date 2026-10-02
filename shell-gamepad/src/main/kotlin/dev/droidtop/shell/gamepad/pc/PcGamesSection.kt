@@ -38,9 +38,11 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryGrouping
+import dev.droidtop.library.PartProgress
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.CatalogNavigator
@@ -126,7 +128,12 @@ internal class PcGamesState {
 }
 
 /** The folded library and, per drawn game, every folder and store row behind it (docs/SPEC.md 7m). */
-private class FoldedPcLibrary(val games: List<LibraryEntry>, val siblings: Map<String, List<LibraryEntry>>)
+private class FoldedPcLibrary(
+    val games: List<LibraryEntry>,
+    val siblings: Map<String, List<LibraryEntry>>,
+    /** A multi-part game's card id to the entry Play starts (the first part not finished, docs/SPEC.md 7n); only games where that differs from the card. */
+    val continuing: Map<String, LibraryEntry>,
+)
 
 /**
  * The PC Games tab (docs/SPEC.md 7i, 2026-10-01): droidtop's own library
@@ -176,21 +183,29 @@ internal fun PcGamesSection(
     // thread; null until the first fold so an empty library is never shown
     // for the moment a real one takes to fold.
     var folded by remember { mutableStateOf<FoldedPcLibrary?>(null) }
-    LaunchedEffect(entries) {
+    // Bumped when the person marks a part finished, so Play moves on at once.
+    var progressToken by remember { mutableIntStateOf(0) }
+    LaunchedEffect(entries, progressToken) {
         // A Windows setup Activity can briefly publish an empty library
         // while its providers resume. Keep the last usable snapshot until
         // the refreshed entries arrive instead of replacing the grid with
         // an empty state during that gap.
         if (entries.isEmpty() && folded?.games?.isNotEmpty() == true) return@LaunchedEffect
         folded = withContext(Dispatchers.Default) {
-            val groups = LibraryGrouping.group(entries)
+            val groups = LibraryGrouping.group(entries, PartProgress.finished(context), GamesRoots.current(context).map { it.absolutePath })
             FoldedPcLibrary(
                 games = groups.map { it.displayEntry },
                 siblings = groups.associate { group -> group.displayEntry.id to group.entriesByPath.values.toList() },
+                continuing = groups
+                    .mapNotNull { group -> group.continueEntry?.takeIf { it.id != group.displayEntry.id }?.let { group.displayEntry.id to it } }
+                    .toMap(),
             )
         }
     }
     val games = folded?.games
+    // A multi-part game's card launches the part to continue with, not
+    // always the first (docs/SPEC.md 7n); every other card launches itself.
+    val launch: (LibraryEntry) -> Unit = { entry -> onLaunch(folded?.continuing?.get(entry.id) ?: entry) }
 
     val scope = remember {
         LibraryQueryScope(
@@ -406,7 +421,7 @@ internal fun PcGamesSection(
                             }
                         }
                         GamepadAction.A -> {
-                            if (state.stripFocused) activateChip(state.stripIndex) else focusedEntry?.let(onLaunch)
+                            if (state.stripFocused) activateChip(state.stripIndex) else focusedEntry?.let(launch)
                         }
                         GamepadAction.Y -> focusedEntry?.let { state.pageId = it.id }
                         GamepadAction.X -> focusedEntry?.let(onToggleFavorite) ?: return@onPad false
@@ -468,7 +483,7 @@ internal fun PcGamesSection(
                     rowState = ::rowState,
                     onTapCapsule = { shelf, item, entry ->
                         state.stripFocused = false
-                        if (state.shelfIndex == shelf && state.itemIndex == item) onLaunch(entry) else moveTo(shelf, item)
+                        if (state.shelfIndex == shelf && state.itemIndex == item) launch(entry) else moveTo(shelf, item)
                     },
                     onLongPressCapsule = { state.pageId = it.id },
                 )
@@ -500,7 +515,7 @@ internal fun PcGamesSection(
                                     width = width,
                                     onTap = {
                                         state.stripFocused = false
-                                        if (state.itemIndex == index) onLaunch(entry) else moveTo(state.shelfIndex, index)
+                                        if (state.itemIndex == index) launch(entry) else moveTo(state.shelfIndex, index)
                                     },
                                     onLongPress = { state.pageId = entry.id },
                                 )
@@ -618,7 +633,7 @@ internal fun PcGamesSection(
         PcGamePage(
             entry = pageEntry,
             siblings = folded?.siblings?.get(pageEntry.id) ?: listOf(pageEntry),
-            onPlay = { onLaunch(pageEntry) },
+            onPlay = { launch(pageEntry) },
             onToggleFavorite = { onToggleFavorite(pageEntry) },
             onOpenOptions = { state.menuId = pageEntry.id },
             onClose = { state.pageId = null },
@@ -630,8 +645,9 @@ internal fun PcGamesSection(
             library = library,
             onLaunch = {
                 state.pageId = null
-                onLaunch(menuEntry)
+                launch(menuEntry)
             },
+            onProgressChanged = { progressToken++ },
             onClose = { state.menuId = null },
             // Every PC/engine game the shell has, so the menu can offer the
             // other folders of the same game (docs/SPEC.md 7m).

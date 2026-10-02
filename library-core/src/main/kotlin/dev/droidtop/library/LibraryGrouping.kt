@@ -1,7 +1,5 @@
 package dev.droidtop.library
 
-import java.io.File
-
 /**
  * One game as the library shows it: the [GroupedGame] its folders add up
  * to, and the [LibraryEntry] each of those folders actually is.
@@ -16,11 +14,36 @@ import java.io.File
  */
 data class LibraryGameGroup(
     val game: GroupedGame,
-    /** Every entry in this game, by the path that found it. */
+    /** Every entry in this game, by the id that found it (a folder's path, or a scanned PC folder game's id). */
     val entriesByPath: Map<String, LibraryEntry>,
+    /** The ids of the entries the person marked finished ([PartProgress]); only the parts of a multi-part game use them. */
+    val finished: Set<String> = emptySet(),
 ) {
-    /** The version and copy Play starts: newest version of the first segment. */
+    /** The version and copy the card stands on: newest version of the first segment. */
     val defaultCopy: GameCopy? get() = game.defaultVersion?.playable
+
+    /**
+     * The copy Play starts (docs/SPEC.md 7n): for a game of several parts,
+     * the first part not marked finished, in the order the names give
+     * (`book1`, `book2`, `book3`), newest version of it; for every other
+     * game, [defaultCopy]. When every part is finished it is the first
+     * again, so Play never has nothing to start.
+     */
+    val continueCopy: GameCopy?
+        get() {
+            if (game.segments.size < 2) return defaultCopy
+            return game.segments
+                .mapNotNull { segment -> segment.versions.firstOrNull()?.playable }
+                .firstOrNull { it.path !in finished }
+                ?: defaultCopy
+        }
+
+    /**
+     * The entry Play starts. The card itself stays the first part's entry
+     * ([displayEntry]) so its favourite, scraped art and history do not
+     * move when a part is finished; only what A launches does.
+     */
+    val continueEntry: LibraryEntry? get() = continueCopy?.let { entriesByPath[it.path] }
 
     /**
      * The entry the list draws, titled with the game's own name and
@@ -54,10 +77,35 @@ data class LibraryGameGroup(
 }
 
 /**
+ * Where a library entry's name, version and part are read from, or null when
+ * it is not a folder on this device: the entry's own id when that is a path
+ * (an engine game), the install folder of a scanned PC folder game
+ * (`folder:CUSTOM_GAME_123`, docs/SPEC.md 7n), nothing for a store row or an
+ * app. The one answer to "is this a folder game", for the grouping, the
+ * same-game picker and the shell's version rows.
+ */
+fun LibraryEntry.groupingPath(): String? = when {
+    id.startsWith("/") || id.startsWith(java.io.File.separator) -> id
+    id.startsWith("folder:") -> pcInfo?.installPath?.takeIf { it.startsWith("/") }
+    else -> null
+}
+
+/**
+ * A game nothing has matched: no cover, no hero, no description and no
+ * recorded scrape source (docs/SPEC.md 7n). Drawn plainly, with its parsed
+ * title, and offered a Scrape. A game the folder walk no longer finds is not
+ * one: it has nothing to look up.
+ */
+fun LibraryEntry.isUnscraped(): Boolean =
+    !missing && artworkUri == null && heroUri == null && description.isNullOrBlank() && fieldSources.isEmpty()
+
+/**
  * Folding a scan's [LibraryEntry] list into games (docs/SPEC.md 7m).
  *
- * An entry whose id is a path on this device is a folder the scan found,
- * so [GameNaming] can say what its name, version and segment are. An entry
+ * An entry that is a folder on this device ([groupingPath]) is one the scan
+ * found, so [GameNaming] can say what its name, version and segment are:
+ * `Some Game/book1` and `Some Game/book2` are ONE game, `Some Game`, with two
+ * segments, whichever provider found the folders. An entry
  * with a store's id (`steam:440`) is a store row whose name the store
  * already gave, so no version is derived from it; the rows of one game
  * owned on several stores become ONE group with a copy per store
@@ -65,22 +113,42 @@ data class LibraryGameGroup(
  */
 object LibraryGrouping {
 
-    /** Every game in [entries], in the order their names sort. */
-    fun group(entries: List<LibraryEntry>): List<LibraryGameGroup> {
-        val byPath = entries.filter { it.id.isFolderPath() }.associateBy { it.id }
+    /**
+     * Every game in [entries], in the order their names sort. [roots] are the
+     * games roots, [finished] is
+     * the ids of the parts the person marked finished ([PartProgress]); it
+     * decides which part of a multi-part game Play continues with and
+     * nothing else.
+     */
+    fun group(
+        entries: List<LibraryEntry>,
+        finished: Set<String> = emptySet(),
+        // The games roots: nothing at or above one is read as a game's title,
+        // so a `game` folder straight under a root is unidentified, not "games".
+        roots: Collection<String> = emptyList(),
+    ): List<LibraryGameGroup> {
+        val folders = entries.mapNotNull { entry -> entry.groupingPath()?.let { entry to it } }
+        val byPath = folders.associate { (entry, _) -> entry.id to entry }
         val grouped = GameGrouping.group(
-            byPath.values.map { entry ->
+            folders.map { (entry, path) ->
                 GameGrouping.Found(
                     path = entry.id,
                     installed = entry.pcInfo?.installed != false,
                     latestKnown = entry.latestKnown,
                     name = entry.gameName,
+                    namePath = roots.firstNotNullOfOrNull { root -> GameNaming.relativeTo(root, path).takeIf { it != path } } ?: path,
                 )
             },
         )
-            .map { game -> LibraryGameGroup(game, game.allVersions.flatMap { it.copies }.mapNotNull { copy -> byPath[copy.path]?.let { copy.path to it } }.toMap()) }
+            .map { game ->
+                LibraryGameGroup(
+                    game,
+                    game.allVersions.flatMap { it.copies }.mapNotNull { copy -> byPath[copy.path]?.let { copy.path to it } }.toMap(),
+                    finished,
+                )
+            }
             .filter { it.entriesByPath.isNotEmpty() }
-        val (stores, ungroupedRows) = entries.filterNot { it.id.isFolderPath() }.partition { it.ownership() != null }
+        val (stores, ungroupedRows) = entries.filter { it.groupingPath() == null }.partition { it.ownership() != null }
         val storeGames = StoreIdentity.group(stores).map { merged ->
             val copies = merged.entries.map { entry ->
                 GameCopy(path = entry.id, source = entry.pcInfo?.source, installed = entry.pcInfo?.installed != false)
@@ -92,16 +160,11 @@ object LibraryGrouping {
         }
         val ungrouped = ungroupedRows.map { entry ->
             LibraryGameGroup(
-                GroupedGame(entry.title, listOf(GameVersion(version = "", copies = listOf(GameCopy(path = entry.id))))),
+                // The person's own title wins over the one the source gave (docs/SPEC.md 7n).
+                GroupedGame(entry.gameName?.takeIf { it.isNotBlank() } ?: entry.title, listOf(GameVersion(version = "", copies = listOf(GameCopy(path = entry.id))))),
                 mapOf(entry.id to entry),
             )
         }
         return (grouped + storeGames + ungrouped).sortedBy { it.game.name.lowercase() }
     }
-
-    /**
-     * A store row's id is `steam:440`; a scanned game's id is where it is.
-     * Only the second can be read as a folder name.
-     */
-    private fun String.isFolderPath(): Boolean = startsWith(File.separator) || startsWith("/")
 }

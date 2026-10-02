@@ -15,6 +15,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.PcCompatibility
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.StoreInstall
@@ -217,7 +218,7 @@ object PcLibrary {
                 // game already came from the Steam DAO, so taking both
                 // would list it twice.
                 .filter { it.gameSource == GameSource.CUSTOM_GAME }
-                .map { it.toGame() }
+                .map { it.toGame(group.root) }
                 .sortedBy { it.title.lowercase() }
             FolderGroup(
                 root = group.root,
@@ -575,7 +576,7 @@ object PcLibrary {
      * offline installer's output, an itch download, a portable game.
      * These are "installed" by definition: the files are already there.
      */
-    private fun LibraryItem.toGame(): Game {
+    private fun LibraryItem.toGame(root: String? = null): Game {
         // The scanner's appId is "CUSTOM_GAME_<numeric id>"; the numeric
         // half is what resolves back to a folder.
         val numericId = appId.substringAfterLast('_').toIntOrNull()
@@ -586,16 +587,21 @@ object PcLibrary {
             CustomGameScanner.findCapsuleCoverForCustomGame(appId)
                 ?: CustomGameScanner.findIconFileForCustomGame(appId)
         }.getOrNull()
+        // The scanner names a game by its raw folder name; the title is the
+        // parsed one (docs/SPEC.md 7n), read from the whole path so
+        // `Some Game/book3` is `Some Game`. The folder name stays on disk
+        // and on the game page; nothing here reads the disk.
+        val title = folderPath?.let { GameTitleParser.parse(it, root).title }?.takeIf { it.isNotBlank() } ?: name
         return Game(
             id = "folder:$appId",
             source = Source.FOLDER,
             nativeId = appId,
-            title = name,
+            title = title,
             installed = true,
             installPath = folderPath,
             sizeBytes = sizeBytes,
             artUrl = localArt,
-            compatibility = compatibilityFor(name),
+            compatibility = compatibilityFor(title),
         )
     }
 }

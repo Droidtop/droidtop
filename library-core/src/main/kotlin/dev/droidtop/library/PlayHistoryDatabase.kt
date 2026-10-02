@@ -162,7 +162,7 @@ interface GameLinksDao {
     suspend fun pruneThreads()
 
     @Transaction
-    suspend fun setGameName(ids: Collection<String>, name: String) {
+    suspend fun setGameName(ids: Collection<String>, name: String?) {
         val existing = getLinks(ids).associateBy { it.id }
         for (id in ids) putOrDrop((existing[id] ?: GameLinkEntity(id)).copy(gameName = name))
     }
@@ -254,7 +254,7 @@ class RoomGameLinksStore(context: Context) : GameLinksStore {
         }
     }
 
-    override suspend fun setGameName(ids: Collection<String>, name: String) = dao.setGameName(ids, name)
+    override suspend fun setGameName(ids: Collection<String>, name: String?) = dao.setGameName(ids, name)
 
     override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) = dao.setF95Thread(ids, thread)
 
