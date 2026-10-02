@@ -170,8 +170,14 @@ internal fun PcGamesSection(
     // ONE card per game, not per folder (docs/SPEC.md 7m), off the main
     // thread; null until the first fold so an empty library is never shown
     // for the moment a real one takes to fold.
-    val folded by produceState<FoldedPcLibrary?>(initialValue = null, entries) {
-        value = withContext(Dispatchers.Default) {
+    var folded by remember { mutableStateOf<FoldedPcLibrary?>(null) }
+    LaunchedEffect(entries) {
+        // A Windows setup Activity can briefly publish an empty library
+        // while its providers resume. Keep the last usable snapshot until
+        // the refreshed entries arrive instead of replacing the grid with
+        // an empty state during that gap.
+        if (entries.isEmpty() && folded?.games?.isNotEmpty() == true) return@LaunchedEffect
+        folded = withContext(Dispatchers.Default) {
             val groups = LibraryGrouping.group(entries)
             FoldedPcLibrary(
                 games = groups.map { it.displayEntry },
@@ -210,14 +216,16 @@ internal fun PcGamesSection(
     LaunchedEffect(Unit) { savedViews = withContext(Dispatchers.IO) { LibraryViewPrefs.savedViews(context, scope.id) } }
     val views = pcBuiltInViews + savedViews
 
-    val shelves by produceState(emptyList<PcShelf>(), games) {
-        val all = games ?: return@produceState
-        value = withContext(Dispatchers.Default) { pcShelves(all) }
+    var shelves by remember { mutableStateOf(emptyList<PcShelf>()) }
+    LaunchedEffect(games) {
+        val all = games ?: return@LaunchedEffect
+        shelves = withContext(Dispatchers.Default) { pcShelves(all) }
     }
-    val grid by produceState(emptyList<LibraryEntry>(), games, state.query) {
-        val all = games ?: return@produceState
+    var grid by remember { mutableStateOf(emptyList<LibraryEntry>()) }
+    LaunchedEffect(games, state.query) {
+        val all = games ?: return@LaunchedEffect
         val query = state.query
-        value = withContext(Dispatchers.Default) { query.applyTo(all, scope) }
+        grid = withContext(Dispatchers.Default) { query.applyTo(all, scope) }
     }
 
     // The library, as this tab shows it right now, and the game under the cursor.
@@ -368,7 +376,7 @@ internal fun PcGamesSection(
                         GamepadAction.A -> {
                             if (state.stripFocused) activateChip(state.stripIndex) else focusedEntry?.let(onLaunch)
                         }
-                        GamepadAction.Y -> focusedEntry?.let { state.pageId = it.id } ?: return@onPad false
+                        GamepadAction.Y -> focusedEntry?.let { state.pageId = it.id }
                         GamepadAction.X -> focusedEntry?.let(onToggleFavorite) ?: return@onPad false
                         GamepadAction.L2 -> focusedEntry?.let { state.menuId = it.id } ?: return@onPad false
                         GamepadAction.SELECT -> state.optionsOpen = true

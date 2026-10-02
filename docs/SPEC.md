@@ -9125,6 +9125,15 @@ guessed.
 
 ### Relationship to the Quick Menu
 
+**A library refresh keeps the current PC Games view on screen (directed
+2026-10-01, Droidtop/tracker#242).** Provider resume can briefly publish
+an empty entry list while the Windows setup Activity closes. `PcGamesSection`
+keeps its last non-empty folded snapshot through that gap, then replaces it
+when the refreshed entries arrive. Its shelves and filtered grid also retain
+their previous computed values while background recomputation runs, so the
+empty-state message is reserved for a completed empty result. Y is consumed
+while the first snapshot is loading and cannot open a page without a game.
+
 The tab is a shell screen, so the Gaming Quick Menu (§7f) opens over it
 unchanged. In-game is a separate surface and gets no new mechanism: an
 enginehost game's in-game menu is enginehost's own, a Wine game's is
