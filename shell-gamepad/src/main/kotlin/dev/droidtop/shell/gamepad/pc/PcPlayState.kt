@@ -107,7 +107,12 @@ internal fun downloadSizeLabel(bytes: Long): String =
 /** The state before the runner has been worked out: nothing to press yet. */
 internal val PcPlayStateLoading = PcPlayState("…", "", pressable = false, ready = false)
 
-internal fun playStateOf(runner: ResolvedRunner?, entry: LibraryEntry, download: StoreDownloads.Progress? = null): PcPlayState {
+internal fun playStateOf(
+    runner: ResolvedRunner?,
+    entry: LibraryEntry,
+    download: StoreDownloads.Progress? = null,
+    noRunnerLine: String = "No runner on this device offers this game",
+): PcPlayState {
     if (entry.missing) {
         return PcPlayState("Folder is missing", missingFolderLine(entry), pressable = false, ready = false)
     }
@@ -120,7 +125,7 @@ internal fun playStateOf(runner: ResolvedRunner?, entry: LibraryEntry, download:
         option?.action != null ->
             PcPlayState(primaryActionLabel(option.action), option.reason ?: "One step, then this becomes Play", pressable = true, ready = false)
         else ->
-            PcPlayState("Choose a runner", option?.reason ?: "No runner on this device offers this game", pressable = false, ready = false)
+            PcPlayState("Choose a runner", option?.reason ?: noRunnerLine, pressable = false, ready = false)
     }
 }
 
@@ -145,17 +150,21 @@ internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, Resolve
     val context = LocalContext.current
     val downloads by StoreDownloads.active.collectAsState()
     val download = entry.downloadKey()?.let { downloads[it] }
-    val resolved by produceState<Pair<Boolean, ResolvedRunner?>>(false to null, entry.id) {
-        value = false to null
-        val runner = withContext(Dispatchers.IO) {
+    val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id) {
+        value = Triple(false, null, null)
+        val (runner, line) = withContext(Dispatchers.IO) {
             val runners = PcRunnerOptions.forEntry(context, entry)
-            PcRunnerOptions.resolvedFor(context, entry, runners)
+            PcRunnerOptions.resolvedFor(context, entry, runners) to runners.noRunnerLine
         }
-        value = true to runner
+        value = Triple(true, runner, line)
     }
-    val (loaded, runner) = resolved
+    val (loaded, runner, noRunnerLine) = resolved
     // A store stage needs no runner, so it is never held back by the lookup.
-    val state = if (loaded || storeStageOf(entry, download) != null) playStateOf(runner, entry, download) else PcPlayStateLoading
+    val state = if (loaded || storeStageOf(entry, download) != null) {
+        if (noRunnerLine != null) playStateOf(runner, entry, download, noRunnerLine) else playStateOf(runner, entry, download)
+    } else {
+        PcPlayStateLoading
+    }
     return state to runner
 }
 

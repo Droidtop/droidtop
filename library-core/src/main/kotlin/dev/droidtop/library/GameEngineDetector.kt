@@ -170,27 +170,12 @@ object GameEngineDetector {
             .asSequence()
             .filter { it.substringAfterLast('.', "").lowercase() in HTML_EXTENSIONS }
             // The page a game opens with is read first, and only a few are
-            // opened: each is a read on a slow card.
+            // opened: each is a read (up to TWINE_SCAN_BYTES) on a slow card.
             .sortedBy { !it.equals("index.html", ignoreCase = true) }
             .filter { facts.isFile(it) }
             .take(HTML_MAX_HEAD_READS)
             .map { File(facts.folder, it) }
-            .any { file ->
-                try {
-                    file.bufferedReader().use { reader ->
-                        val head = CharArray(8 * 1024)
-                        var count = 0
-                        while (count < head.size) {
-                            val read = reader.read(head, count, head.size - count)
-                            if (read <= 0) break
-                            count += read
-                        }
-                        count > 0 && String(head, 0, count).contains("<tw-storydata", ignoreCase = true)
-                    }
-                } catch (_: java.io.IOException) {
-                    false
-                }
-            }
+            .any { file -> file.readTwineHead()?.let(::looksLikeTwine) == true }
 
     private fun ByteArray.indexOfSubsequence(needle: ByteArray): Int {
         if (needle.isEmpty() || needle.size > size) return -1

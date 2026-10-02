@@ -217,6 +217,21 @@ class GameEngineDetectorTest {
     }
 
     @Test
+    fun `twine story data far past the first 8 KiB still counts - SugarCube puts its script first`() {
+        val head = "<html><head><style>" + "x".repeat(230 * 1024) + "</style></head><body><tw-storydata name=\"s\">"
+        File(tmp.root, "story.html").writeText(head)
+        assertEquals(GameEngine.HTML, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `a compiled SugarCube page with no story data element is recognised by its banner`() {
+        File(tmp.root, "game.html").writeText(
+            "<!DOCTYPE html>\n<html data-init=\"no-js\">\n<head><!--\nSugarCube (v2.36.1): A free (gratis and libre) story format.\n-->",
+        )
+        assertEquals(GameEngine.HTML, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
     fun `detects an html game from Twine story data`() {
         File(tmp.root, "A Story.html").writeText("<html><tw-storydata name=\"story\">")
         assertEquals(GameEngine.HTML, GameEngineDetector.detect(tmp.root, defs))

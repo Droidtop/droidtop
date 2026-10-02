@@ -245,4 +245,22 @@ class RunnerAvailabilityTest {
         )
         assertNull(resolved)
     }
+
+    @Test
+    fun `a game nothing can run says what is missing instead of no runner`() {
+        val rows = RunnerAvailability.evaluate(facts(engine = null, enginehostSupported = false))
+        assertEquals("No game engine, Windows or Linux build found in this folder", PcRunners(null, rows).noRunnerLine)
+        assertEquals(
+            "No Enginehost plugin covers HTML yet",
+            PcRunners(GameEngine.HTML, rows).noRunnerLine,
+        )
+        assertEquals("This game's folder isn't on this device", PcRunners(null, emptyList()).noRunnerLine)
+    }
+
+    @Test
+    fun `an html game whose plugin is not installed has an install action, not a dead end`() {
+        val rows = RunnerAvailability.evaluate(facts(engine = GameEngine.HTML, enginehostBundleCovers = false))
+        val resolved = RunnerAvailability.resolve(rows, null, GameEngine.HTML)
+        assertEquals(RunnerAction.INSTALL_ENGINEHOST_PLUGIN, resolved?.option?.action)
+    }
 }

@@ -5683,9 +5683,16 @@ engine and launches as another is the defect v5 exists to prevent.
 **An HTML page alone is not game evidence (decided 2026-10-01, Droidtop/tracker#242).**
 Extracted launcher and tool bundles can contain `index.html` just like a
 web game. The generic HTML fallback therefore requires a Twine
-`<tw-storydata>` marker in the first 8 KiB of a root HTML file; the
-registry's more specific web-game signatures still run first. The bounded
-read avoids loading an entire potentially large page during library scan.
+`<tw-storydata>` marker in a root HTML file; the registry's more specific
+web-game signatures still run first. **The marker is read from the first
+1 MiB, not 8 KiB (2026-10-02, Droidtop/tracker#287):** a published story
+puts the story format's own script and styles (SugarCube's are about
+230 KB) ahead of the story data, so an 8 KiB read never reached it and
+every SugarCube game was "not an engine game" with no runner at all. A
+compiled SugarCube page that has no `<tw-storydata>` element still carries
+the format's banner comment ("... story format") in its first 8 KiB, which
+counts too (`looksLikeTwine`). The read is bounded so a very large page is
+never loaded whole during a library scan.
 
 ### Coverage: what runs where
 
@@ -9847,7 +9854,13 @@ need them again.
 "Play" when the resolved runner is ready, the one setup step's own name
 when it is not (Install, Set up), "Choose a runner" when nothing on this
 device offers the game, "Folder is missing" for a game the walk no longer
-finds. The capsule's hint pill, the page's big button and `PcGameMenu`'s
+finds. A game no runner can take is never a dead end that only says
+"no runner": the line names what is missing (`PcRunners.noRunnerLine`:
+no engine, Windows or Linux build found in the folder; or that no
+Enginehost plugin covers the engine yet). A game whose engine has an
+Enginehost plugin always has a setup row instead ("Install the HTML
+plugin") whose action asks Enginehost for it, as an emulator-less console
+game does with "Get an emulator". The capsule's hint pill, the page's big button and `PcGameMenu`'s
 first row all read it, and A runs `PcRunnerOptions.resolveAndPlay`, so
 the four can never disagree. **One exception (2026-09-29,
 Droidtop/tracker#140):** the Windows system-files setup downloads several
@@ -9920,6 +9933,16 @@ unchanged. In-game is a separate surface and gets no new mechanism: an
 enginehost game's in-game menu is enginehost's own, a Wine game's is
 gamenative's own menu over its renderer, adopted rather than rewritten and
 taught the same contract. PC Games never invents a third in-game overlay.
+**Back during an Enginehost game opens that menu (2026-10-02,
+Droidtop/tracker#289):** engines such as SDL swallowed Back, so only Home
+left the game. Enginehost's window callback now takes Back first in every
+engine and opens its menu (Resume, Controller settings, Quit), and a
+runtime window shows a small "Loading <game>" bar until the engine draws a
+non-black frame instead of a bare black window. An engine plugin never has
+to implement either. A close that droidtop cannot confirm (no Shizuku
+plugin) still says so; ending Enginehost's runtime on request would need
+an Enginehost-side call that only a trusted caller may make, which is an
+open decision, not built.
 
 ### Relationship to enginehost
 
