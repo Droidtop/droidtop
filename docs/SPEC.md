@@ -4832,7 +4832,7 @@ key code or an edge.
   a held direction can never spin round a menu (`menuStep`). A themed
   gamelist keeps its own rule (§7f). A full-screen list leaves Up at its
   first row unconsumed, so it reaches the safe-mode banner when there is
-  one and nothing otherwise; the top bar is never a focus target (§7j).
+  one and nothing otherwise; the status cluster over the page is never a focus target (§7k).
 - **The selection is always fully on screen,** by one mechanism per kind
   of container: a lazy list or grid scrolls only as far as it takes to
   show the selected row whole (`keepInView`), a scrolling column brings
@@ -7709,9 +7709,8 @@ Gaming, where the owner's ask was sharpest:
   > Library itself keeps opening the unparameterized full list.
 
 Touch was already covered per surface and stays that way, deliberately
-not consolidated into a single new widget: Gaming's own "Settings" tab in
-the section tab bar (touch-reachable per §7j, `SectionTabBar`'s
-`onQuickMenu` pill besides it), Desktop's taskbar "Settings" button, and
+not consolidated into a single new widget: Gaming's own "Settings" row in
+the left menu (touch-reachable through the hint row's Start / Menu pill, §7j), Desktop's taskbar "Settings" button, and
 Standard's own long-press-wallpaper settings entry (stock launcher3
 behaviour, left alone per this repo's "vendored trees ... hook or extend,
 never rewrite" rule) are three different, already-obvious touch
@@ -10763,11 +10762,11 @@ The left menu is where things live. Beside the three tabs it lists four
 **places**, each one a registered settings screen drawn in the shell's
 content area by the same navigator Settings uses (`PlaceCatalogView`, so
 the same B, Info sheet and touch behaviour). A place is a `GamingSection`
-with `inTopBar = false`: it is not a top-bar tab and L1/R1 do not step
-through it (from a place they step into the bar from its edge), and a mode
+with `inTopBar = false` (the flag now only orders the left menu: the
+main destinations first, then the places, then Settings), and a mode
 that hides Settings (Kiosk, Kid) hides the places too, because they are
 device management (`GamingSection.managesDevice`). The list is one pure
-function (`menuSectionsFor`), the top bar's is another (`sectionsFor`).
+function (`menuSectionsFor`, built on `sectionsFor`).
 
 - **Stores** (`stores`, `StoresCatalog`): one page per store (Steam, GOG,
   Epic, Amazon Games, itch.io) with its account (signed in, as whom where
