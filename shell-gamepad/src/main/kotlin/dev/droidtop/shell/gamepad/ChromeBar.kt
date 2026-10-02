@@ -102,7 +102,7 @@ internal fun SectionTabBar(
     onLeftMenu: () -> Unit,
     contextMenuEnabled: Boolean,
     onContextMenu: () -> Unit,
-    sections: List<GamingSection> = GamingSection.entries,
+    sections: List<GamingSection> = GamingSection.entries.filter { it.inTopBar },
     // False while the page in front has claimed L1/R1 for a tab strip of
     // its own (ShoulderStrip.kt): the bar then does not name them.
     shouldersOnBar: Boolean = true,

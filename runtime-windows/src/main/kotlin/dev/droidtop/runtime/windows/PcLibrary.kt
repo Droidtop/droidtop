@@ -18,6 +18,7 @@ import dagger.hilt.components.SingletonComponent
 import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.PcCompatibility
 import dev.droidtop.library.PcInfo
+import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreInstall
 import dev.droidtop.library.StoreUpdate
 import java.io.File
@@ -660,10 +661,10 @@ fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
 )
 
 fun PcLibrary.Source.displayName(): String = when (this) {
-    PcLibrary.Source.STEAM -> "Steam"
-    PcLibrary.Source.GOG -> "GOG"
-    PcLibrary.Source.EPIC -> "Epic"
-    PcLibrary.Source.AMAZON -> "Amazon"
-    PcLibrary.Source.ITCH -> "itch.io"
+    PcLibrary.Source.STEAM -> PcStoreNames.STEAM
+    PcLibrary.Source.GOG -> PcStoreNames.GOG
+    PcLibrary.Source.EPIC -> PcStoreNames.EPIC
+    PcLibrary.Source.AMAZON -> PcStoreNames.AMAZON
+    PcLibrary.Source.ITCH -> PcStoreNames.ITCH
     PcLibrary.Source.FOLDER -> "Folder"
 }

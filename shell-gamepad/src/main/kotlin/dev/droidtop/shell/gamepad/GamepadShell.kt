@@ -73,6 +73,7 @@ import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.toQuitResult
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryKinds
+import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.CapsuleStatusBadge
@@ -383,7 +384,7 @@ private fun GamepadShellBody(
     val screensaverMode by remember { dev.droidtop.library.settings.ScreensaverPrefs.changes(context) }
         .collectAsState(initial = dev.droidtop.library.settings.ScreensaverPrefs.mode(context))
     LaunchedEffect(uiMode) {
-        if (uiMode.hidesSettings && section == GamingSection.SETTINGS) {
+        if (uiMode.hidesSettings && section.managesDevice) {
             nav.openSection(GamingSection.GAMES)
         }
     }
@@ -668,7 +669,7 @@ private fun GamepadShellBody(
     }
     if (leftMenuOpen) {
         LeftMenu(
-            entries = leftMenuEntries(sectionsFor(uiMode)),
+            entries = leftMenuEntries(menuSectionsFor(uiMode)),
             current = section,
             onSelect = { target ->
                 leftMenuOpen = false
@@ -876,7 +877,14 @@ private fun GamepadShellBody(
                             ShoulderRoute.TOP_BAR -> {
                                 val sections = sectionsFor(uiMode)
                                 val currentIndex = sections.indexOf(section)
-                                selectSection(sections[(currentIndex + step + sections.size) % sections.size])
+                                // A place is not a tab: the shoulders step from its edge into the bar.
+                                selectSection(
+                                    if (currentIndex < 0) {
+                                        if (step < 0) sections.last() else sections.first()
+                                    } else {
+                                        sections[(currentIndex + step + sections.size) % sections.size]
+                                    },
+                                )
                                 true
                             }
                             ShoulderRoute.NONE -> false
@@ -1029,7 +1037,12 @@ private fun GamepadShellBody(
             // the shell's bar shows there only over its setup screen.
             GamingSection.PC_GAMES -> false
             GamingSection.APPS -> !appEntries.isNullOrEmpty()
-            GamingSection.SETTINGS -> true
+            GamingSection.SETTINGS,
+            GamingSection.STORES,
+            GamingSection.DOWNLOADS,
+            GamingSection.UPDATES,
+            GamingSection.PLUGINS,
+            -> true
         }
         val shellHelpRow: @Composable (Color) -> Unit = shellHelpRow@{ background ->
             if (screensaverOn) return@shellHelpRow
@@ -1116,6 +1129,25 @@ private fun GamepadShellBody(
                             onClose = { nav.back() },
                             onPrimaryFocus = { detailPrimaryLabel = it },
                         )
+                        // The left menu's places: a registered settings screen each,
+                        // in place (docs/SPEC.md 7j "Places"). Back is always
+                        // something here too, for the reason Settings' is.
+                        shownSection.placeScreenId != null -> {
+                            canGoBack = true
+                            val storeLibraries = remember {
+                                PcStoreNames.ALL.associate { label ->
+                                    "${PcStoreNames.LIBRARY_ITEM_PREFIX}$label" to {
+                                        pcGames.showStore(label)
+                                        nav.openSection(GamingSection.PC_GAMES)
+                                    }
+                                }
+                            }
+                            PlaceCatalogView(
+                                screenId = shownSection.placeScreenId.orEmpty(),
+                                onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
+                                nativeActions = storeLibraries,
+                            )
+                        }
                         shownSection == GamingSection.SETTINGS -> {
                             // Back always does something in Settings: it pops a
                             // nested screen, or leaves Settings for the default
@@ -1206,7 +1238,12 @@ private fun GamepadShellBody(
                             }
                             // SETTINGS is handled above, before the loading gate --
                             // unreachable here, kept only so `when` stays exhaustive.
-                            GamingSection.SETTINGS -> Unit
+                            GamingSection.SETTINGS,
+                            GamingSection.STORES,
+                            GamingSection.DOWNLOADS,
+                            GamingSection.UPDATES,
+                            GamingSection.PLUGINS,
+                            -> Unit
                         }
                     }
                 }
@@ -1681,7 +1718,41 @@ private fun ButtonHintFooter(
  * theme draws. The enum name GAMES is kept so a saved place and the
  * Settings deep link that name it keep working.
  */
-internal enum class GamingSection { GAMES, PC_GAMES, APPS, SETTINGS }
+internal enum class GamingSection(val inTopBar: Boolean = true) {
+    GAMES, PC_GAMES, APPS, SETTINGS,
+
+    /**
+     * The places things live (docs/SPEC.md 7j, "Places", Droidtop/tracker#258):
+     * reached from the left menu only, never as top-bar tabs, each one a
+     * registered settings catalog screen drawn in place ([PlaceCatalogView]).
+     */
+    STORES(inTopBar = false),
+    DOWNLOADS(inTopBar = false),
+    UPDATES(inTopBar = false),
+    PLUGINS(inTopBar = false),
+    ;
+
+    /** A place or Settings: device management, which Kiosk and Kid hide. */
+    val managesDevice: Boolean get() = this == SETTINGS || !inTopBar
+
+    /** The settings-registry screen a place draws, null for a tab with a view of its own. */
+    val placeScreenId: String?
+        get() = when (this) {
+            STORES -> PLACE_STORES_SCREEN_ID
+            DOWNLOADS -> PLACE_DOWNLOADS_SCREEN_ID
+            UPDATES -> PLACE_UPDATES_SCREEN_ID
+            PLUGINS -> PLACE_PLUGINS_SCREEN_ID
+            else -> null
+        }
+}
+
+// Registry ids of the screens the places draw. :app registers them (this
+// module cannot depend on it), the same way PC_STORES_SCREEN_ID names the
+// PC setup screen.
+internal const val PLACE_STORES_SCREEN_ID = "stores"
+internal const val PLACE_DOWNLOADS_SCREEN_ID = "plugin_jobs"
+internal const val PLACE_UPDATES_SCREEN_ID = "updates"
+internal const val PLACE_PLUGINS_SCREEN_ID = "plugins"
 
 /**
  * How long one shell-drawn screen takes to become another. ES-DE's own
@@ -1699,11 +1770,19 @@ private const val SHELL_SCREEN_TRANSITION_MS = Motion.ScreenMs
  * over the device's configuration.
  */
 internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> =
-    if (mode.hidesSettings) {
-        GamingSection.entries.filterNot { it == GamingSection.SETTINGS }
-    } else {
-        GamingSection.entries
-    }
+    GamingSection.entries.filter { it.inTopBar && !(mode.hidesSettings && it.managesDevice) }
+
+/**
+ * The destinations the left menu lists: the top bar's tabs, then the
+ * places things live, with Settings last. A mode that hides Settings
+ * hides the places too -- stores, downloads, updates and plugins are the
+ * device's configuration as much as Settings is.
+ */
+internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
+    val tabs = sectionsFor(mode)
+    val places = GamingSection.entries.filter { !it.inTopBar && !(mode.hidesSettings && it.managesDevice) }
+    return tabs.filterNot { it == GamingSection.SETTINGS } + places + tabs.filter { it == GamingSection.SETTINGS }
+}
 
 // Which kinds are Apps and which are Games is the library's split, not
 // this shell's: the Launcher's Games screen reads the same two sets
@@ -1716,6 +1795,10 @@ internal fun GamingSection.displayName(): String = when (this) {
     GamingSection.PC_GAMES -> "PC Games"
     GamingSection.APPS -> "Apps"
     GamingSection.SETTINGS -> "Settings"
+    GamingSection.STORES -> "Stores"
+    GamingSection.DOWNLOADS -> "Downloads and installs"
+    GamingSection.UPDATES -> "Updates"
+    GamingSection.PLUGINS -> "Plugins"
 }
 
 /**

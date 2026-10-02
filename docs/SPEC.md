@@ -7461,8 +7461,7 @@ column (signed in / not, configured / not, how many active) with its own
 actions and fields inside the row it opens. The screens that used to
 carry these rows keep only what is genuinely theirs: `pc_stores`
 (retitled "PC setup") keeps game folders, the Windows/Wine setup and
-Downloads, linking into Accounts and sources for the store sign-ins
-themselves; the Scraper screen keeps scrape BEHAVIOR (which source is
+Downloads, linking into Stores for the store sign-ins themselves; the Scraper screen keeps scrape BEHAVIOR (which source is
 active, what content to fetch) and links into Accounts and sources for
 credentials; Console systems keeps platform management and Enginehost,
 with Plugins/App integrations/Jobs moved out entirely. Per-game
@@ -7470,6 +7469,11 @@ management (runner, versions, links, updates) and per-system settings
 were already on the game's own detail and the system's own screen
 respectively (§7i, §7f) and stay there — this decision is about
 consolidating the PROVIDER/ACCOUNT layer, not those.
+
+**Update (2026-10-02):** a store's sign-in, sign-out, library and sync are
+one page per store in **Stores** (`stores`, reached from the Gaming left
+menu, "Places" under 7j), and Accounts and sources links to it with one row
+instead of five sign-in rows.
 
 ### One consistent way into Settings (directed 2026-09-28)
 
@@ -9946,11 +9950,9 @@ language applies.
   Menu; Start inside the Quick Menu swaps to the left menu. A tap on a row
   is A, a tap on the dimmed page is B, and the header's Start pill and the
   hint row's Start chip are its touch routes. It lists the destinations
-  the UI mode allows (`sectionsFor`: Retro Games, PC Games, Apps,
-  Settings); it grows with stores (a page per store with its login and its
-  own library), individual libraries, downloads and jobs, running apps and
-  a Plugins entry as those screens exist -- a row appears only when what it
-  opens exists.
+  the UI mode allows (`menuSectionsFor`: the top bar's tabs, then the
+  places below, then Settings); running apps and individual libraries join
+  as those screens exist -- a row appears only when what it opens exists.
 - **Start is the shell's, not a running game's.** The shell receives input
   only while it is the foreground window; once a launched game or any other
   app is in front, Start belongs to it and droidtop does nothing.
@@ -10408,6 +10410,61 @@ both palettes. And **onboarding takes the dark palette deliberately** rather tha
 setting (section 7b), which is what lets it use the shell's own menu row anatomy — those
 tokens are absolute against the menu overlay surface and legible over a dark ground and
 nothing else.
+
+### Places: stores, downloads, updates and plugins (directed 2026-10-01, Droidtop/tracker#258)
+
+The left menu is where things live. Beside the three tabs it lists four
+**places**, each one a registered settings screen drawn in the shell's
+content area by the same navigator Settings uses (`PlaceCatalogView`, so
+the same B, Info sheet and touch behaviour). A place is a `GamingSection`
+with `inTopBar = false`: it is not a top-bar tab and L1/R1 do not step
+through it (from a place they step into the bar from its edge), and a mode
+that hides Settings (Kiosk, Kid) hides the places too, because they are
+device management (`GamingSection.managesDevice`). The list is one pure
+function (`menuSectionsFor`), the top bar's is another (`sectionsFor`).
+
+- **Stores** (`stores`, `StoresCatalog`): one page per store (Steam, GOG,
+  Epic, Amazon Games, itch.io) with its account (signed in, as whom where
+  the store keeps that in the open, sign in or out), its library (how many
+  games the library has read from it and how many are installed, a way into
+  it, a sync and when droidtop last asked for one) and a way to the
+  downloads. `PcStore` is the one place that knows how each store signs in,
+  signs out, syncs and says whether it is signed in; the checks that were
+  written out three times in the accounts screen are gone, and **Accounts
+  and sources** and **PC setup** now link to Stores instead of carrying
+  their own sign-in rows. Credentials are never entered by droidtop: Sign
+  in starts the store's own screen. **Open library** sets the PC Games
+  tab's Store filter to that store and opens the tab (`PcGamesState.showStore`),
+  so a store is a filter on the one library and not a second place to
+  browse. **Sync library** is `triggerLibrarySync` for GOG, Epic and
+  Amazon (their service pass, bypassing its throttle) and `syncLibrary` for
+  itch.io (Droidtop/tracker#225); Steam has no row because its library
+  follows its live session. The "last synced" time is droidtop's own note
+  of when it asked: the services keep their times in memory only, so it is
+  absent until the first sync from here. The store names are written once
+  (`PcStoreNames`), for the code that makes them and the code that filters
+  by them. Per-store settings do not exist yet: nothing in the backend is
+  configurable per store, and no row is shown for it.
+- **Downloads and installs** (`plugin_jobs`, `PluginJobsScreen`): the one
+  jobs list (plugin work, library scrapes, store depots, DownloadManager
+  downloads, plugin updates) with progress, Pause, Resume and Cancel where
+  the job supports them (12a "Jobs"), and under it a row to the store
+  installs queue (gamenative's own downloads screen, `PcStoreActivity`).
+  The name stays the one the rest of the app already uses. Theme downloads
+  and update installs are not yet jobs in that list, and gamenative's queue
+  is a separate surface; folding them in is open.
+- **Updates** (`updates`): the "Available" group lists what has a newer
+  version from data that exists today: droidtop's own newer build as the
+  last check saw it, installed plugins against the cached catalog (with
+  Update all), and games whose source names a version the library lacks
+  (the F95 index, 7g "Where an update comes from"). It reads only what is
+  cached or published and never starts a network call or a walk. The
+  group below it is droidtop's own update settings and Check now, as
+  before. Android apps are not listed: nothing yet knows an installed app's
+  latest version, and the install and update manager (Droidtop/tracker#261)
+  is what will feed this group.
+- **Plugins** (`plugins`): the existing Plugins screen (installed,
+  approvals, repositories, updates, catalog), opened in place.
 
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 
@@ -13806,8 +13863,9 @@ without its runtime said "Running". Decisions:
   `PluginRecord.disabledDetail`, shown under "Technical details" on the
   plugin page and on a failed source row in search.
 - **One entry for downloads and jobs.** "Downloads and installs" in
-  Settings is the single entry for the jobs screen (it carries that title
-  now); the second "Jobs" row under Accounts and sources is gone.
+  Settings is the single entry for the jobs screen in Standard (it carries
+  that title now); the Gaming left menu has the same screen as its place of
+  that name; the second "Jobs" row under Accounts and sources is gone.
 - **Permissions never contradict their own summary.** Once a plugin is
   approved its page no longer repeats the approval-time "Asks for" list (its
   "Asks first" tags read as the current state next to "7 allowed, 0 ask");

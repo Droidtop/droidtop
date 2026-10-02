@@ -637,6 +637,29 @@ internal fun SettingsCatalogView(
 }
 
 /**
+ * A place from the left menu (Stores, Downloads and jobs, Updates,
+ * Plugins; docs/SPEC.md 7j "Places"): one registered settings screen
+ * drawn in place of the section's content, by the same navigator Settings
+ * uses, so it has the same B, Info sheet and touch behaviour. The screens
+ * live in :app and :library-core and are found by registry id, because
+ * this module cannot depend on them.
+ */
+@Composable
+internal fun PlaceCatalogView(
+    screenId: String,
+    onBack: () -> Unit,
+    nativeActions: Map<String, () -> Unit> = emptyMap(),
+) {
+    val screen = remember(screenId) { SettingsScreenRegistry.get(screenId) }
+    if (screen == null) {
+        BackHandler(onBack = onBack)
+        Text("This page is not available in this build.", color = MenuTokens.OnSurfaceMuted)
+        return
+    }
+    CatalogNavigator(root = screen, onExit = onBack, nativeActions = nativeActions)
+}
+
+/**
  * Apply a value change to a catalog item -- the ONE definition of what a
  * Left/Right (or a tile press that cycles) means: choices wrap through
  * their options, sliders step within their range and clamp, toggles

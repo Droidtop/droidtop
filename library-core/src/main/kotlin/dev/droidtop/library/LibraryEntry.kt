@@ -297,6 +297,23 @@ data class GameLink(val label: String, val url: String) {
 }
 
 /**
+ * The store names [PcInfo.source] carries, written once for the code that
+ * makes them (`:runtime-windows`) and the code that filters by them (the
+ * PC Games tab's Store facet, a store page's "Open library").
+ */
+object PcStoreNames {
+    const val STEAM = "Steam"
+    const val GOG = "GOG"
+    const val EPIC = "Epic"
+    const val AMAZON = "Amazon"
+    const val ITCH = "itch.io"
+    val ALL = listOf(STEAM, GOG, EPIC, AMAZON, ITCH)
+
+    /** The catalog item id prefix of a store page's "Open library" row; the label follows. */
+    const val LIBRARY_ITEM_PREFIX = "store_library:"
+}
+
+/**
  * Facts that only a PC game from a store or a scanned folder has, kept
  * as one nested value rather than four loose fields, so [LibraryEntry]'s
  * own vocabulary stays ES-DE's metadata schema (docs/SPEC.md §7g).

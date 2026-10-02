@@ -3,6 +3,7 @@ package dev.droidtop.app.settings
 import android.content.Context
 import android.net.Uri
 import dev.droidtop.app.GamesRootPrefs
+import dev.droidtop.app.LibraryCore
 import dev.droidtop.app.PluginStatusWidgetProvider
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.LibraryScrapeJob
@@ -30,6 +31,9 @@ import dev.droidtop.library.integrations.PluginCatalog
 import dev.droidtop.library.integrations.PluginCatalogScreen
 import dev.droidtop.library.integrations.PluginSettingsRows
 import dev.droidtop.library.integrations.PluginJobsScreen
+import dev.droidtop.library.GameUpdates
+import dev.droidtop.library.LibraryGrouping
+import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.PcFolderScan
 import dev.droidtop.library.GameEngineDetector
 import dev.droidtop.library.EnginesDatabase
@@ -172,9 +176,10 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(AcquireContentSources.chooseSystemScreen())
         SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(pluginKeysScreen())
-        SettingsScreenRegistry.register(PluginJobsScreen.screen())
+        SettingsScreenRegistry.register(PluginJobsScreen.screen { _ -> pcInstallsGroups() })
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(pcStoresScreen())
+        SettingsScreenRegistry.register(StoresCatalog.screen())
         SettingsScreenRegistry.register(accountsAndSourcesScreen())
         SettingsScreenRegistry.register(androidSettingsScreen())
         SettingsScreenRegistry.register(enginehostScreen())
@@ -949,14 +954,14 @@ object AppSettingsCatalogs {
 
     private fun updatesScreen() = CatalogScreen(
         id = SCREEN_UPDATES,
-        title = "Software updates",
-        subtitle = "Check for and install newer droidtop builds from the project's own releases",
+        title = "Updates",
+        subtitle = "What has a newer version, and how droidtop checks for its own",
         groups = { context ->
             val update = dev.droidtop.app.update.AppSelfUpdate
-            listOf(
+            availableUpdatesGroups(context) + listOf(
                 CatalogGroup(
                     id = "updates_droidtop",
-                    title = null,
+                    title = "droidtop's own updates",
                     items = listOf(
                         ChoiceItem(
                             id = "updates_frequency",
@@ -1049,6 +1054,98 @@ object AppSettingsCatalogs {
             )
         },
     )
+
+    /**
+     * What has a newer version, from the data that exists today (docs/SPEC.md 7j "Places",
+     * Droidtop/tracker#222): droidtop's own newer build as the last check saw it, installed
+     * plugins against the cached catalog, and games whose source names a version the library does
+     * not have. Android apps are not here: nothing yet knows an installed app's latest version
+     * (the install and update manager, Droidtop/tracker#261, is what will). Reads only what is
+     * already cached or published; it never starts a network call or a walk.
+     */
+    private suspend fun availableUpdatesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val selfUpdate = dev.droidtop.app.update.AppSelfUpdate
+        val newerBuild = selfUpdate.newerSeenVersionName(context)
+        val installed = PluginStore.installed(context)
+        val index = PluginCatalog.lastGoodIndex(context)
+        val pluginUpdates = index?.let { PluginCatalog.updatesFor(installed, it) }.orEmpty()
+        val published = LibraryCore.library(context).backgroundScanState(LibraryKinds.GAMES).value
+        val gameUpdates = published?.let { entries ->
+            LibraryGrouping.group(entries).mapNotNull { group -> group.game.availableUpdate?.let { group.game.name to it } }
+        }.orEmpty().sortedBy { it.first.lowercase() }
+
+        val shown = buildList<dev.droidtop.library.settings.CatalogItem> {
+            add(
+                ActionItem(
+                    id = "updates_droidtop_status",
+                    title = "droidtop",
+                    subtitle = if (newerBuild != null) {
+                        "Installed ${selfUpdate.installedVersionName(context)}. Check now, below, installs it"
+                    } else {
+                        "Installed ${selfUpdate.installedVersionName(context)}. No newer build seen by the last check"
+                    },
+                    value = newerBuild?.let { "Update to $it" } ?: "Up to date",
+                    run = {},
+                ),
+            )
+            pluginUpdates.forEach { (record, release) ->
+                add(
+                    ActionItem(
+                        id = "updates_plugin_${record.manifest.id}",
+                        title = record.manifest.label,
+                        subtitle = "Plugin, installed ${record.manifest.version}",
+                        value = "Update to ${release.version}",
+                        run = {},
+                    ),
+                )
+            }
+            if (index == null && installed.isNotEmpty()) {
+                add(
+                    ActionItem(
+                        id = "updates_plugins_unknown",
+                        title = "Plugins",
+                        subtitle = "The plugin catalog has not been fetched yet. Plugins, Add, Browse catalog checks it",
+                        value = "Not checked",
+                        run = {},
+                    ),
+                )
+            }
+            if (pluginUpdates.isNotEmpty()) {
+                add(
+                    AsyncActionItem(
+                        id = "updates_plugins_update_all",
+                        title = "Update all plugins",
+                        subtitle = "Downloads and verifies each update, then installs it the way a single update installs",
+                        run = { ctx, onStatus -> PluginCatalog.updateAll(ctx, onStatus) },
+                    ),
+                )
+            }
+            gameUpdates.take(MAX_GAME_UPDATE_ROWS).forEach { (name, version) ->
+                add(
+                    ActionItem(
+                        id = "updates_game_${name.lowercase()}",
+                        title = name,
+                        subtitle = "Game",
+                        value = GameUpdates.line(version),
+                        run = {},
+                    ),
+                )
+            }
+            if (gameUpdates.size > MAX_GAME_UPDATE_ROWS) {
+                add(
+                    ActionItem(
+                        id = "updates_games_more",
+                        title = "${gameUpdates.size - MAX_GAME_UPDATE_ROWS} more games have updates",
+                        subtitle = "PC Games, Filters, Update available lists them all",
+                        run = {},
+                    ),
+                )
+            }
+        }
+        listOf(CatalogGroup(id = "updates_available", title = "Available", items = shown))
+    }
+
+    private const val MAX_GAME_UPDATE_ROWS = 30
 
     private fun androidSettingsScreen() = CatalogScreen(
         id = SCREEN_ANDROID_SETTINGS,
@@ -1235,7 +1332,7 @@ object AppSettingsCatalogs {
 
     private suspend fun pcStoresGroups(context: Context): List<CatalogGroup> {
         val folders = withContext(Dispatchers.IO) { GamesRootPrefs.gamesRootPaths(context) }
-        val signedInCount = withContext(Dispatchers.IO) { signedInStoreCount(context) }
+        val signedInCount = withContext(Dispatchers.IO) { PcStore.entries.count { it.signedIn(context) } }
 
         return listOf(
             CatalogGroup(
@@ -1244,10 +1341,10 @@ object AppSettingsCatalogs {
                 items = listOf(
                     NestedScreenItem(
                         id = "pc_stores_accounts_link",
-                        title = "Accounts and sources",
+                        title = "Stores",
                         subtitle = "Sign in to Steam, GOG, Epic, Amazon Games or itch.io to download your library",
-                        registryId = SCREEN_ACCOUNTS_AND_SOURCES,
-                        valueLabel = { "$signedInCount of 5 stores signed in" },
+                        registryId = StoresCatalog.SCREEN_ID,
+                        valueLabel = { "$signedInCount of ${PcStore.entries.size} stores signed in" },
                         icon = CatalogIcon.GLOBAL,
                     ),
                 ),
@@ -1282,14 +1379,25 @@ object AppSettingsCatalogs {
         )
     }
 
-    private suspend fun signedInStoreCount(context: Context): Int {
-        val steam = runCatching { app.gamenative.utils.SteamUtils.hasStoredCredentials() }.getOrDefault(false)
-        val gog = runCatching { app.gamenative.service.gog.GOGService.hasStoredCredentials(context) }.getOrDefault(false)
-        val epic = runCatching { app.gamenative.service.epic.EpicService.hasStoredCredentials(context) }.getOrDefault(false)
-        val amazon = runCatching { app.gamenative.service.amazon.AmazonService.hasStoredCredentials(context) }.getOrDefault(false)
-        val itch = runCatching { app.gamenative.service.itch.ItchService.hasStoredCredentials(context) }.getOrDefault(false)
-        return listOf(steam, gog, epic, amazon, itch).count { it }
-    }
+    /**
+     * The store installs queue, under the jobs list in "Downloads and installs": a store install is
+     * gamenative's own download service, so its progress, pause and cancel are on its own screen
+     * (PcStoreActivity); this is the way there from the one place downloads are looked for.
+     */
+    private fun pcInstallsGroups(): List<CatalogGroup> = listOf(
+        CatalogGroup(
+            id = "jobs_pc_installs",
+            title = "Store installs",
+            items = listOf(
+                ActionItem(
+                    id = "jobs_pc_installs_queue",
+                    title = "PC game downloads",
+                    subtitle = "Installs and updates from Steam, GOG, Epic, Amazon and itch.io: progress, pause and cancel",
+                    run = { ctx -> ctx.startActivity(dev.droidtop.app.PcStoreActivity.intent(ctx, entryId = null)) },
+                ),
+            ),
+        ),
+    )
 
     /**
      * The ONE settings area for every account and source droidtop has --
@@ -1313,12 +1421,7 @@ object AppSettingsCatalogs {
     )
 
     private suspend fun accountsAndSourcesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
-        fun signedIn(yes: Boolean): String = if (yes) "Signed in" else "Not signed in yet"
-        val steamSignedIn = runCatching { app.gamenative.utils.SteamUtils.hasStoredCredentials() }.getOrDefault(false)
-        val gogSignedIn = runCatching { app.gamenative.service.gog.GOGService.hasStoredCredentials(context) }.getOrDefault(false)
-        val epicSignedIn = runCatching { app.gamenative.service.epic.EpicService.hasStoredCredentials(context) }.getOrDefault(false)
-        val amazonSignedIn = runCatching { app.gamenative.service.amazon.AmazonService.hasStoredCredentials(context) }.getOrDefault(false)
-        val itchSignedIn = runCatching { app.gamenative.service.itch.ItchService.hasStoredCredentials(context) }.getOrDefault(false)
+        val signedInStores = PcStore.entries.count { it.signedIn(context) }
 
         val activeIntegrations = IntegrationStore.available(context).size
         val installedPlugins = PluginStore.installed(context)
@@ -1344,65 +1447,14 @@ object AppSettingsCatalogs {
                 id = "accounts_stores",
                 title = "Store accounts",
                 items = listOf(
-                    ActionItem(
-                        id = "pc_store_steam",
-                        title = "Steam",
-                        subtitle = "${signedIn(steamSignedIn)} - sign in with a QR code or a password, and download your games",
-                        run = { ctx ->
-                            ctx.startActivity(
-                                android.content.Intent(ctx, dev.droidtop.app.SteamLoginActivity::class.java)
-                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        },
-                    ),
-                    ActionItem(
-                        id = "pc_store_gog",
-                        title = "GOG",
-                        subtitle = "${signedIn(gogSignedIn)} - signs in on GOG's own page",
-                        run = { ctx ->
-                            ctx.startActivity(
-                                dev.droidtop.app.PcStoreSignInActivity.intent(
-                                    ctx,
-                                    dev.droidtop.app.PcStoreSignInActivity.Store.GOG,
-                                ),
-                            )
-                        },
-                    ),
-                    ActionItem(
-                        id = "pc_store_epic",
-                        title = "Epic Games",
-                        subtitle = "${signedIn(epicSignedIn)} - signs in on Epic's own page",
-                        run = { ctx ->
-                            ctx.startActivity(
-                                dev.droidtop.app.PcStoreSignInActivity.intent(
-                                    ctx,
-                                    dev.droidtop.app.PcStoreSignInActivity.Store.EPIC,
-                                ),
-                            )
-                        },
-                    ),
-                    ActionItem(
-                        id = "pc_store_amazon",
-                        title = "Amazon Games",
-                        subtitle = "${signedIn(amazonSignedIn)} - signs in on Amazon's own page",
-                        run = { ctx ->
-                            ctx.startActivity(
-                                dev.droidtop.app.PcStoreSignInActivity.intent(
-                                    ctx,
-                                    dev.droidtop.app.PcStoreSignInActivity.Store.AMAZON,
-                                ),
-                            )
-                        },
-                    ),
-                    ActionItem(
-                        id = "pc_store_itch",
-                        title = "itch.io",
-                        subtitle = "${signedIn(itchSignedIn)} - paste your personal API key from itch.io settings",
-                        run = { ctx ->
-                            ctx.startActivity(
-                                dev.droidtop.app.ItchSignInActivity.intent(ctx),
-                            )
-                        },
+                    // Each store's sign-in, library and sync live on its own page in Stores (docs/SPEC.md 7j "Places").
+                    NestedScreenItem(
+                        id = "accounts_stores_link",
+                        title = "Stores",
+                        subtitle = "Steam, GOG, Epic Games, Amazon Games and itch.io: sign in or out, library, sync",
+                        registryId = StoresCatalog.SCREEN_ID,
+                        valueLabel = { "$signedInStores of ${PcStore.entries.size} signed in" },
+                        icon = CatalogIcon.GLOBAL,
                     ),
                 ),
             ),

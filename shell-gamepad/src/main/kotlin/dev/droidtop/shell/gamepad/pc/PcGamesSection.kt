@@ -113,6 +113,20 @@ internal class PcGamesState {
     var filterOpen by mutableStateOf(false)
     var searchOpen by mutableStateOf(false)
 
+    /**
+     * The grid filtered to one store (a store page's "Open library",
+     * docs/SPEC.md 7j "Places"): the Store facet selected, nothing else.
+     * Marks the query loaded so the saved query is not read over it.
+     */
+    fun showStore(label: String) {
+        query = LibraryQuery().withToggled(LibraryFacet.STORE, label, true)
+        queryLoaded = true
+        home = false
+        stripFocused = false
+        itemIndex = 0
+        pageId = null
+    }
+
     companion object {
         val Saver: Saver<PcGamesState, Any> = listSaver(
             save = { s -> listOf(s.home, s.stripFocused, s.stripIndex, s.shelfIndex, s.itemIndex, s.pageId.orEmpty()) },

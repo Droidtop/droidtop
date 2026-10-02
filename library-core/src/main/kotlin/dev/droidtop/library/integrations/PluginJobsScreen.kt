@@ -1,5 +1,6 @@
 package dev.droidtop.library.integrations
 
+import android.content.Context
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -22,20 +23,26 @@ import kotlinx.coroutines.launch
  * itself.
  *
  * Registered once (in `:app`'s `AppSettingsCatalogs`) and reached from
- * the one "Downloads and installs" entry of Settings -- same
- * shared-catalog registry every other cross-module management screen
- * uses, so both the Gaming and Standard settings renderers get it for
- * free. There is no second entry for it: it used to also appear as
- * "Jobs" under Accounts and sources (docs/SPEC.md 12a "Jobs").
+ * the "Downloads and installs" entry of Settings and, in the Gaming
+ * shell, from the left menu's place of the same name (docs/SPEC.md 7j
+ * "Places") -- same shared-catalog registry every other cross-module
+ * management screen uses, so every renderer gets it for free. It used to
+ * also appear as "Jobs" under Accounts and sources (docs/SPEC.md 12a
+ * "Jobs").
  */
 object PluginJobsScreen {
     const val ID = "plugin_jobs"
 
-    fun screen(): CatalogScreen = CatalogScreen(
+    /**
+     * [extraGroups] are rows the owner of some other queue adds below the jobs (`:app` adds the
+     * store installs queue, which lives in gamenative's own screen), so this stays the one place
+     * the list of "what is running" is reached.
+     */
+    fun screen(extraGroups: suspend (Context) -> List<CatalogGroup> = { emptyList() }): CatalogScreen = CatalogScreen(
         id = ID,
         title = "Downloads and installs",
         subtitle = "Plugin downloads, library scrapes and other long-running actions, wherever they were started from",
-        groups = { _ ->
+        groups = { context ->
             val snapshot = PluginJobsCenter.entries().value
             listOf(
                 CatalogGroup(
@@ -47,7 +54,7 @@ object PluginJobsScreen {
                         snapshot.flatMap { entry -> jobItems(entry) }
                     },
                 ),
-            )
+            ) + extraGroups(context)
         },
     )
 
