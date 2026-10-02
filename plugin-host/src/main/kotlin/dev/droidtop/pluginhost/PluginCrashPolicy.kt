@@ -32,12 +32,12 @@ class PluginCrashPolicy(
             // an idle death is a system kill and must reconnect without disabling.
             disableInFlight(PluginBrokers.inFlightPluginIds()) { affectedId ->
                 Log.w("droidtop.plugin", "$affectedId disabled: $reason")
-                PluginStore.disableWithReason(context, affectedId, PluginLoadErrorMessage.userMessage(reason))
+                PluginStore.disableWithReason(context, affectedId, PluginLoadErrorMessage.userMessage(reason), detail = reason)
             }
             return
         }
         Log.w("droidtop.plugin", "$pluginId disabled: $reason")
-        PluginStore.disableWithReason(context, pluginId, PluginLoadErrorMessage.userMessage(reason))
+        PluginStore.disableWithReason(context, pluginId, PluginLoadErrorMessage.userMessage(reason), detail = reason)
     }
 
     /**

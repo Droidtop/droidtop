@@ -32,6 +32,8 @@ data class PluginRecord(
     val rootApproved: Boolean,
     /** Set by [PluginCrashPolicy] when a plugin crashes; cleared by re-enabling from the approval screen, which is the one deliberate manual step (12a point 6: a crash disables, it doesn't silently retry forever). */
     val disabledReason: String?,
+    /** The technical reason behind [disabledReason] (the raw load failure), for a "Technical details" line and a bug report; never the headline, which is the plain sentence. */
+    val disabledDetail: String? = null,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", manifest.id)
@@ -74,6 +76,7 @@ data class PluginRecord(
         put("enabled", enabled)
         put("rootApproved", rootApproved)
         put("disabledReason", disabledReason ?: JSONObject.NULL)
+        put("disabledDetail", disabledDetail ?: JSONObject.NULL)
     }
 
     companion object {
@@ -142,6 +145,7 @@ data class PluginRecord(
                 enabled = json.optBoolean("enabled", trust == PluginTrustState.APPROVED),
                 rootApproved = json.optBoolean("rootApproved", false),
                 disabledReason = optNullableString(json, "disabledReason"),
+                disabledDetail = optNullableString(json, "disabledDetail"),
             )
         }
     }

@@ -89,15 +89,19 @@ object PluginStore {
     fun setEnabled(context: Context, pluginId: String, enabled: Boolean) {
         val dir = root(context)
         val record = PluginBundleInstaller.readRecord(dir, pluginId) ?: return
-        PluginBundleInstaller.writeRecord(dir, record.copy(enabled = enabled, disabledReason = if (enabled) null else record.disabledReason))
+        PluginBundleInstaller.writeRecord(dir, record.copy(enabled = enabled, disabledReason = if (enabled) null else record.disabledReason, disabledDetail = if (enabled) null else record.disabledDetail))
     }
 
     /** [PluginCrashPolicy]'s write path -- the only other place [PluginRecord.disabledReason] gets set. */
-    fun disableWithReason(context: Context, pluginId: String, reason: String) {
+    fun disableWithReason(context: Context, pluginId: String, reason: String, detail: String? = null) {
         val dir = root(context)
         val record = PluginBundleInstaller.readRecord(dir, pluginId) ?: return
-        PluginBundleInstaller.writeRecord(dir, record.copy(enabled = false, disabledReason = reason))
+        PluginBundleInstaller.writeRecord(dir, record.copy(enabled = false, disabledReason = reason, disabledDetail = detail))
     }
+
+    /** The technical reason a plugin was last disabled for, or null. Reads the record: off the main thread. */
+    fun disabledDetail(context: Context, pluginId: String): String? =
+        PluginBundleInstaller.readRecord(root(context), pluginId)?.disabledDetail
 
     /** Removes the plugin, its data and its grants; its activity ring is kept 7 days and marked removed (docs/plugin-api.md 1.5, 4.6). */
     fun uninstall(context: Context, pluginId: String) {

@@ -65,6 +65,14 @@ class PluginRecordTest {
     }
 
     @Test
+    fun `the technical detail behind a plain disabledReason round-trips, and a record without one reads as null`() {
+        val withDetail = record(disabledReason = "The plugin crashed while loading.").copy(disabledDetail = "load failed: boom")
+        assertEquals("load failed: boom", PluginRecord.fromJson(withDetail.toJson())!!.disabledDetail)
+        assertNull(PluginRecord.fromJson(record().toJson())!!.disabledDetail)
+        assertNull(PluginRecord.fromJson(record().toJson().apply { remove("disabledDetail") })!!.disabledDetail)
+    }
+
+    @Test
     fun `manifest subscribedEvents round-trips, not silently dropped to empty`() {
         // Found and fixed 2026-09-27 (dq-pluginui-01): toJson()/fromJson()
         // never carried this field at all, so PluginStore.installed()'s
