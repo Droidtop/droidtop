@@ -15,7 +15,8 @@ import org.junit.Test
  * contain spaces.
  *
  * The paths and templates below are the real ones from the device and
- * from `DefaultPlayers.retroArch`, not simplified stand-ins.
+ * from an earlier `DefaultPlayers.retroArch` (the tokenizer case, not
+ * today's launch command), not simplified stand-ins.
  */
 class AmStartTokenizeTest {
 

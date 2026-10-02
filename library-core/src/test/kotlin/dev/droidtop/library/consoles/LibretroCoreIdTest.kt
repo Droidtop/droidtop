@@ -36,9 +36,7 @@ class LibretroCoreIdTest {
     private val defaultRetroArch = Player.AmStart(
         id = "retroarch-psx",
         name = "RetroArch",
-        argumentsTemplate = "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture " +
-            "--es ROM {file.path} " +
-            "--es LIBRETRO /data/user/0/com.retroarch/cores/mednafen_psx_android.so",
+        argumentsTemplate = DefaultPlayers.retroArchArguments("com.retroarch", "mednafen_psx"),
         packageName = "com.retroarch",
     )
 
@@ -143,8 +141,9 @@ class LibretroCoreIdTest {
 
     @Test
     fun `either real core so suffix shape reduces to the same id`() {
-        // buildbot / players-database write <core>_libretro_android.so;
-        // DefaultPlayers writes <core>_android.so. The more specific
+        // buildbot, the players database and DefaultPlayers write
+        // <core>_libretro_android.so; the old Daijisho-wiki shape and
+        // hand-typed custom players write <core>_android.so. The more specific
         // suffix must match first, or the id would keep a stray
         // _libretro tail.
         val both = Player.AmStart(
@@ -154,5 +153,20 @@ class LibretroCoreIdTest {
             packageName = "com.retroarch",
         )
         assertEquals("mednafen_psx_hw", libretroCoreId(both, systemConfiguredCore = null))
+    }
+
+    @Test
+    fun `the generated RetroArch launch is ES-DE Android's command`() {
+        // ES-DE resources/systems/android/es_systems.xml, Nintendo 64:
+        // CONFIGFILE, then LIBRETRO with the downloader's file name, then
+        // ROM. Droidtop/tracker#271: the old <core>_android.so named a
+        // file RetroArch does not have, and there was no CONFIGFILE.
+        assertEquals(
+            "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture " +
+                "--es CONFIGFILE /storage/emulated/0/Android/data/com.retroarch.aarch64/files/retroarch.cfg " +
+                "--es LIBRETRO /data/user/0/com.retroarch.aarch64/cores/mupen64plus_next_gles3_libretro_android.so " +
+                "--es ROM {file.path}",
+            DefaultPlayers.retroArchArguments("com.retroarch.aarch64", "mupen64plus_next_gles3"),
+        )
     }
 }

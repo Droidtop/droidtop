@@ -35,6 +35,24 @@ import android.content.Context
  * reads it -- only the string is handed over, and RetroArch resolves it
  * inside its own process where it is readable.
  *
+ * The command is ES-DE Android's own, extra for extra
+ * (resources/systems/android/es_systems.xml, e.g. its Nintendo 64 entry):
+ *
+ *     CONFIGFILE=/storage/emulated/0/Android/data/<package>/files/retroarch.cfg
+ *     LIBRETRO=/data/user/0/<package>/cores/<core>_libretro_android.so
+ *     ROM=<path>
+ *
+ * Two differences from that left every game black on the console
+ * (Droidtop/tracker#271). The file name: RetroArch's own core downloader
+ * saves `<core>_libretro_android.so` (the buildbot's zip names), and this
+ * wrote `<core>_android.so`, a file that does not exist. And no
+ * CONFIGFILE: RetroArch's native side (frontend/drivers/platform_unix.c,
+ * frontend_unix_get_env) takes its config path only from the extras its
+ * own launcher passes, so a bare ROM+LIBRETRO launch started without the
+ * person's settings. [ConsoleSystemDef.retroArchCore] is ES-DE's Android
+ * core name for the same reason (Nintendo 64 is `mupen64plus_next_gles3`
+ * there, not the Linux `mupen64plus_next`).
+ *
  * Still a starting default meant to be edited, the same way Daijishō's
  * own Player entities are user-editable: someone who has moved
  * `libretro_directory` elsewhere, or runs a fork with its own package
@@ -70,15 +88,18 @@ object DefaultPlayers {
         val core = system.retroArchCore ?: return null
         val installedPackage = RETROARCH_PACKAGE_VARIANTS.firstOrNull { isPackageInstalled(context, it) }
             ?: return null
-        val activity = "$installedPackage/$RETROARCH_ACTIVITY"
-        val coresDir = "/data/user/0/$installedPackage/cores"
         return Player.AmStart(
             id = "retroarch-${system.id}",
             name = "RetroArch",
-            argumentsTemplate = "-n $activity " +
-                "--es ROM {file.path} " +
-                "--es LIBRETRO $coresDir/${core}_android.so",
+            argumentsTemplate = retroArchArguments(installedPackage, core),
             packageName = installedPackage,
         )
     }
+
+    /** The launch arguments for [core] under [installedPackage]; pure, see the class comment. */
+    internal fun retroArchArguments(installedPackage: String, core: String): String =
+        "-n $installedPackage/$RETROARCH_ACTIVITY " +
+            "--es CONFIGFILE /storage/emulated/0/Android/data/$installedPackage/files/retroarch.cfg " +
+            "--es LIBRETRO /data/user/0/$installedPackage/cores/${core}_libretro_android.so " +
+            "--es ROM {file.path}"
 }

@@ -6047,9 +6047,15 @@ dialog on the shell, which has the pad. A pad-only escape from a hung full-scree
 key listener (an accessibility service with key filtering), which droidtop does not request; it is left as
 an owner decision rather than built.
 
-`Droidtop/tracker#271`: RetroArch hanging when a ROM is read from `/storage/<card>` is not droidtop's to
-fix from here (the evidence points at RetroArch's read stalling in the platform's storage layer, not at the launch); only the watchdog
-applies to it.
+`Droidtop/tracker#271`: RetroArch staying black on every system droidtop launched it for points at
+droidtop's own launch, not the storage layer (console verification pending). The generated RetroArch preset (`DefaultPlayers.retroArch`, used for
+every system without a players-database RetroArch row) named the core `<core>_android.so`, a file RetroArch's
+core downloader never writes (it saves `<core>_libretro_android.so`), passed no `CONFIGFILE`, and took
+the core names from ES-DE's Linux data (N64 `mupen64plus_next`; Android's core is `mupen64plus_next_gles3`).
+The preset is now ES-DE Android's command extra for extra (`CONFIGFILE`
+`/storage/emulated/0/Android/data/<pkg>/files/retroarch.cfg`, `LIBRETRO`
+`/data/user/0/<pkg>/cores/<core>_libretro_android.so`, `ROM`), and the platform cores come from ES-DE's
+Android es_systems.xml (§7e2b). The watchdog still applies to any emulator that hangs.
 
 ## 7e2b. Launch resolution FROM the platforms database (directed 2026-08-31)
 
@@ -6062,8 +6068,12 @@ validate-before-replace:
   (`KnownPlayers`), as before.
 - `platforms-database.json` — platform definitions (id, name,
   extensions, RetroArch core), GENERATED from ES-DE's real
-  es_systems.xml (`generator/from_esde_systems.py`; 195 platforms, 153
-  with cores). Replaces the formerly compiled-in
+  es_systems.xml (195 platforms). The RetroArch core comes from ES-DE's
+  ANDROID es_systems.xml (`generator/from_esde_systems.py`: the core in
+  each system's first RetroArch command), because RetroArch's Android
+  cores are not always named like the Linux ones and droidtop launches
+  the Android build; a system ES-DE Android runs only standalone has no
+  core. Replaces the formerly compiled-in
   `ES_DE_CONSOLE_SYSTEMS` Kotlin list (deleted) as the seed for
   `ConsoleSystemsRepository`'s Room store — Room stays the runtime
   source of truth because the user can edit platforms. A platform a
@@ -6071,7 +6081,11 @@ validate-before-replace:
   remembered, so a new platform appears while a built-in the user
   deleted stays deleted and an edited row is never overwritten (a
   refresh's changes to an existing platform reach Room only through
-  "restore defaults").
+  "restore defaults"). One exception, a Room migration
+  (`CONSOLE_SYSTEMS_MIGRATION_1_2`): the 31 cores the Linux-derived data
+  got wrong for Android are corrected in built-in rows that still hold
+  exactly the old shipped value, since those launched a core file that
+  does not exist (`Droidtop/tracker#271`).
   `PlatformsDatabase.builtInsOrEmpty()` serves the synchronous label
   lookups (shell group labels, companion), warmed at process start.
 - `engines-database.json` — the full engine REGISTRY as of v4
@@ -13592,8 +13606,8 @@ describes.
     `LIBRETRO` extra names one -- `libretroCoreId` (`library-core`
     `consoles`) reads it out of the template with the same tokenizer
     that builds the launch Intent, so both real `.so` shapes
-    (`<core>_libretro_android.so`, droidtop's own
-    `<core>_android.so`) reduce to the same buildbot core id. The real
+    (`<core>_libretro_android.so`, and the old Daijishō-wiki or
+    hand-typed `<core>_android.so`) reduce to the same buildbot core id. The real
     case that demands it: psx's configured core is `mednafen_psx`
     (platforms-database.json) while the players database's six
     RetroArch entries each name theirs in the template, so choosing

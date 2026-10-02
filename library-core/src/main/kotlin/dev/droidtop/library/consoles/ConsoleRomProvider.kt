@@ -119,10 +119,11 @@ fun buildLaunchIntent(context: Context, system: ConsoleSystemDef, player: Player
 // extra, never a same-named value of some other extra.
 private val STRING_EXTRA_FLAGS = setOf("-e", "--es")
 
-// RetroArch core `.so` naming, most specific first: buildbot (and the
-// players database's real entries) ship `<core>_libretro_android.so`,
-// while [DefaultPlayers.retroArch] writes `<core>_android.so` -- both
-// reduce to the same core id.
+// RetroArch core `.so` naming, most specific first: buildbot, the
+// players database's real entries and [DefaultPlayers.retroArch] use
+// `<core>_libretro_android.so`, while the old Daijishō-wiki shape and
+// hand-typed custom players may use `<core>_android.so` -- both reduce
+// to the same core id.
 private val LIBRETRO_CORE_SO_SUFFIXES = listOf("_libretro_android.so", "_android.so")
 
 /**
