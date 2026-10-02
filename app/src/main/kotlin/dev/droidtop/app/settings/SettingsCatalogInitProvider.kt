@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.net.Uri
 import dev.droidtop.library.settings.Modes
+import kotlinx.coroutines.launch
 
 /**
  * droidtop's process-start hook, and the shared core only.
@@ -44,7 +45,23 @@ class SettingsCatalogInitProvider : ContentProvider() {
             onStatus("Looking for new or changed games and apps\u2026")
             val started = android.os.SystemClock.elapsedRealtime()
             val library = dev.droidtop.app.LibraryCore.library(ctx)
-            val games = library.rescanNow(dev.droidtop.library.LibraryKinds.GAMES)
+            // What the walks say they are doing ("Looking at PC game
+            // folders: 12 of 21"), live, while they run. A walk over a slow
+            // card is minutes, and a row that says nothing for minutes
+            // reads as a hang (Droidtop/tracker#275).
+            val games = kotlinx.coroutines.coroutineScope {
+                val progress = launch {
+                    dev.droidtop.library.ScanActivity.state.collect { running ->
+                        dev.droidtop.library.ScanActivity.describe(running)
+                            ?.let { onStatus("$it. Select again to cancel.") }
+                    }
+                }
+                try {
+                    library.rescanNow(dev.droidtop.library.LibraryKinds.GAMES)
+                } finally {
+                    progress.cancel()
+                }
+            }
             onStatus("Games done, looking at apps\u2026")
             val apps = library.rescanNow(dev.droidtop.library.LibraryKinds.APPS)
             val seconds = (android.os.SystemClock.elapsedRealtime() - started + 500) / 1000

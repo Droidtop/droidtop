@@ -42,6 +42,12 @@ class GameTitleParserTest {
         Row("Game_Name-win64-Final", "Game Name", releaseTag = "Final", platform = "windows"),
         Row("Game_Name-Win64", "Game Name", platform = "windows"),
         Row("Game Name x64", "Game Name"),
+        // A `ver` or `version` marker is a version, and what follows it is a language or a mod.
+        Row("Some Game_ver1.1-eng", "Some Game", version = "1.1", language = "en"),
+        Row("Some_Game_version2.0", "Some Game", version = "2.0"),
+        // A build stage a release filed the name under is a tag, never the title.
+        Row("Some_Game_REC", "Some Game", releaseTag = "REC"),
+        Row("Some Game-RTS", "Some Game", releaseTag = "RTS"),
         // Bracketed tags anywhere in the name.
         Row("Night Road [1.0] (Final)", "Night Road", version = "1.0", releaseTag = "Final"),
         Row("Some Game [GOG] (Final)", "Some Game", releaseTag = "GOG Final"),
@@ -216,6 +222,49 @@ class GameTitleParserTest {
         assertFalse(parse("Data Wing").unidentified)
         assertTrue(EngineFolderNames.matches("Game"))
         assertFalse(EngineFolderNames.matches("Game of Something"))
+    }
+
+    // --- folder noise (Droidtop/tracker#282) -----------------------------
+
+    @Test
+    fun `a build folder is never the title and the game above it names it`() {
+        for (build in listOf("win64 build", "Win32_Build", "windows", "Release", "x64 release", "linux build")) {
+            val parsed = GameTitleParser.parse("/games/Some Game/$build", root = "/games")
+            assertEquals(build, "Some Game", parsed.title)
+            assertFalse(build, parsed.unidentified)
+        }
+        // With no game above it, a build folder is unidentified rather than called `win64 build`.
+        val alone = GameTitleParser.parse("/games/win64 build", root = "/games")
+        assertTrue(alone.unidentified)
+        assertEquals(GameNaming.UNIDENTIFIED, alone.title)
+    }
+
+    @Test
+    fun `a build stage folder takes the game above it as its title, and keeps its own name alone`() {
+        assertEquals("Some Game", GameTitleParser.parse("/games/Some Game/REC", root = "/games").title)
+        assertEquals("Some Game", GameTitleParser.parse("/games/Some Game/RTS", root = "/games").title)
+        // Alone it is all the name there is.
+        assertEquals("REC", GameTitleParser.parse("/games/REC", root = "/games").title)
+        // Only the capitals are a stage: these are words and names.
+        assertEquals("rec", GameTitleParser.parse("/games/Some Game/rec", root = "/games").title)
+        assertEquals("GTA", GameTitleParser.parse("/games/Series/GTA", root = "/games").title)
+        assertFalse(GameTitleParser.isReleaseTagFolder("GTA"))
+        assertTrue(GameTitleParser.isReleaseTagFolder("RTS"))
+    }
+
+    @Test
+    fun `a chp suffix is a chapter of the title in front of it`() {
+        val parsed = parse("Some GameCHP2")
+        assertEquals("Some Game", parsed.title)
+        assertEquals(2, parsed.part?.order)
+    }
+
+    @Test
+    fun `build words only count when nothing but build words is in the name`() {
+        assertTrue(EngineFolderNames.matches("win64 build"))
+        assertTrue(EngineFolderNames.matches("Windows_Release"))
+        assertFalse(EngineFolderNames.matches("Release Notes Game"))
+        assertFalse(EngineFolderNames.matches("Build a Bear"))
     }
 
     // --- the person's own title ------------------------------------------

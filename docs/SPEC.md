@@ -9151,6 +9151,61 @@ the first scan after an install read the EMPTY set. That is why build 537
 (upgraded, with a previous run's value in the preference) listed 171 games
 and a freshly installed 539 listed 151 with every folder game missing.
 
+### PC folder scan cost, progress and cancel (Droidtop/tracker#275)
+
+A rescan of 79 PC games on an SD card took 300 s (`pc folders ... 79 games,
+300720 ms`) plus 38 s to rebuild the library, with no progress shown, while
+the ROM and engine walks over the same roots took 7 to 9 s. On a removable
+card behind Android's FUSE layer every `stat` is a round trip to a user-space
+daemon, so the cost of a walk is its count of calls, not its bytes. The rules
+that follow are decisions, and each is in the code it names:
+
+- **One listing per folder, one `stat` per entry** (`PcFolderScan.Walk`). The
+  walk listed each folder three times and `stat`ed every entry three times.
+  Whether a folder holds a program or a file of its own is read off the one
+  listing (`GameExecutableResolver.isProgram`).
+- **Rule 4 is an existence question, answered breadth first and stopped at the
+  first game** (`hasGameBelow`), not an enumeration of every game below; the
+  `Game/Binaries/Win64/Game.exe` shape no longer walks the asset tree to depth
+  four.
+- **ROM system folders are not walked** by the PC scan (the engine walk already
+  skipped them): `psx`, `gba` and the rest hold ROM files the ROM walk owns.
+  ES-DE's `pc` and `windows` systems are the exception, since PC games are what
+  is kept there.
+- **A store-root verdict is remembered for a minute** (`ScanPrune.storeRootAt`).
+  Every folder asked it of itself and of six ancestors, three marker `stat`s
+  each, so the same ancestors were asked about tens of thousands of times.
+- **Listings are remembered by folder path and modification time**
+  (`PcFolderScan.ListingCache`, held by `PcLibrary` for the process): a
+  directory's time moves when an entry is added, removed or renamed in it, so an
+  unchanged folder costs one `stat` on the next rescan. The cache is in memory;
+  the first rescan after a restart is cold. Rule 6's engine probe, the costliest
+  thing done per folder (it opens files), is remembered with the listing.
+- **Top-level folders are walked three at a time** (`PcLibrary.scanGameFolders`);
+  the cost is latency and latency overlaps.
+- **A folder game's cover or icon is remembered by the game folder's
+  modification time** (`PcLibrary.cachedArt`), found images only. The vendored
+  lookup lists the folder and its subfolders more than once and may read the
+  executable, and it ran twice per game: once for the folder's own part and once
+  again in the store part only to be discarded as under a games root. The store
+  part now filters before it looks.
+- **Nothing on this path sums a folder's size.** A folder game carries no size
+  until something that wants one computes it off the scan path.
+
+`droidtop.ScanLog` carries one line per walked PC folder with its cost
+(`PcFolderScan.Work`: listings read, entries `stat`ed, listings answered from
+cache, engine checks and their time), beside the existing root line, so a slow
+root can be told from a big one.
+
+**Progress and cancel.** `ScanActivity` carries each running walk's line
+("Looking at PC game folders: 12 of 21", then "Reading PC game details: ...");
+the Rescan row shows it live. A PC folder's games reach the library as soon as
+they are known, not all at the end. Selecting the Rescan row (or the Games
+options menu entry) again while it runs cancels it (`LibraryRescan.cancel`);
+the walk stops at its next directory, and what finished is kept. A pass that did
+not finish never reports which folders a root has, so nothing it did not reach
+is marked missing.
+
 ### The library scrape is a job, and the first walk offers it (Droidtop/tracker#174)
 
 A scrape that takes an hour on the anonymous tier must not be a button that
@@ -11312,6 +11367,15 @@ stored by entry id, so rescans keep them. Separate sequels stay separate.
 or above a games root are never read as a title (`GameNaming.relativeTo`).
 A stand-alone one with nothing above it is titled "Unidentified folder",
 the game page shows its full path, and two of them are never one game.
+A name made of nothing but such words (`win64 build`, `Windows_Release`)
+counts too, and `build`, `release` and `dist` are in the list (#282). A build
+stage a release files its folder under (`REC`, `RTS`, written in capitals)
+takes the game above it as its title, and keeps its own name when nothing is
+above it; as a trailing tag after a dash, underscore or dot (`Name_REC`) it is
+a release tag. The stages are a short list, not "any short capitals", because
+three capitals are as likely a game's whole title. `ver1.1` and `version2`
+after a separator are versions (`Name_ver1.1-eng` is `Name`, 1.1, English), and
+`chp` is a chapter word.
 
 **One executable classifier.** `PcFolderClassifier` is a pure classifier
 over a bounded folder listing (`read`: depth 3, 600 entries, no hidden

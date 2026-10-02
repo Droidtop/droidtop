@@ -18,6 +18,7 @@ import dev.droidtop.library.LibraryProvider
 import dev.droidtop.library.RunnerState
 import dev.droidtop.library.withScrapedMetadata
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -172,22 +173,38 @@ class PcGameProvider(
                 mtime != 0L && known[dev.droidtop.library.PartRef(folder.absolutePath, folder.parentFile?.absolutePath)] == mtime
             }
         }
-        val folderGroups = runCatching { PcLibrary.folderGames(context, skip) }
-            .onFailure { android.util.Log.w("droidtop.PcGameProvider", "Reading the PC folders failed", it) }
-            .getOrDefault(emptyList())
         val engineDefs = runCatching { EnginesDatabase.defs(context) }.getOrDefault(emptyList())
-        if (!storeUnchanged) emitStorePart(storeStamp, folderGroups, engineDefs, emit)
-        for (group in folderGroups) {
-            if (group.skipped) continue
-            emit(
-                dev.droidtop.library.ScanStep.Segment(
-                    key = group.topFolder,
-                    root = group.root,
-                    entries = group.games.notOwnedByAnEngine(engineDefs).map { it.toLibraryEntry() }.withEntryMetadata(),
-                    folderMtime = group.mtime.takeIf { it != 0L },
-                ),
-            )
+        // Each folder's games are published the moment they are known, so a
+        // rescan fills the PC library in as it goes instead of all at the
+        // end, and a cancelled one leaves behind exactly the folders it
+        // finished.
+        val folderGroups = mutableListOf<PcLibrary.FolderGroup>()
+        // Only a pass that finished may say which folders a root has: a
+        // partial list would mark every folder it never reached as gone.
+        var folderPassFinished = false
+        try {
+            PcLibrary.folderGames(context, skip) { group ->
+                folderGroups += group
+                if (group.skipped) return@folderGames
+                emit(
+                    dev.droidtop.library.ScanStep.Segment(
+                        key = group.topFolder,
+                        root = group.root,
+                        entries = group.games.notOwnedByAnEngine(engineDefs).map { it.toLibraryEntry() }.withEntryMetadata(),
+                        folderMtime = group.mtime.takeIf { it != 0L },
+                    ),
+                )
+            }
+            folderPassFinished = true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            android.util.Log.w("droidtop.PcGameProvider", "Reading the PC folders failed", t)
         }
+        // The store part suppresses Wine shortcuts against every folder
+        // game's install directory, so it needs them all and follows them.
+        if (!storeUnchanged) emitStorePart(storeStamp, folderGroups, engineDefs, emit)
+        if (!folderPassFinished) return
         for ((root, groups) in folderGroups.groupBy { it.root }) {
             emit(dev.droidtop.library.ScanStep.RootDone(root, groups.map { it.topFolder }))
         }

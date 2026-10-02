@@ -478,7 +478,7 @@ object GameEngineDetector {
     }
 
     /** Why a console-system folder is not walked for engine games. */
-    private const val CONSOLE_SYSTEM_FOLDER_REASON =
+    internal const val CONSOLE_SYSTEM_FOLDER_REASON =
         "it is a console system folder, scanned for ROMs instead"
 
     /**
@@ -526,7 +526,7 @@ object GameEngineDetector {
      * build-540 log line `2 x it is a console system folder` was actually
      * counting.
      */
-    private fun isConsoleSystemFolder(
+    internal fun isConsoleSystemFolder(
         dir: File,
         systemsById: Map<String, ConsoleSystemDef>,
         childDepth: Int,

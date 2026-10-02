@@ -214,7 +214,11 @@ internal fun GamelistOptionsMenu(
             "Rescan library" -> {
                 // Says it started and what it found, like the settings row
                 // it is the same action as (LibraryRescan).
-                if (busy) return
+                // Selected again while it runs, it stops the rescan.
+                if (busy) {
+                    dev.droidtop.library.settings.LibraryRescan.cancel()
+                    return
+                }
                 busy = true
                 scope.launch {
                     status = withContext(Dispatchers.IO) {

@@ -1,6 +1,12 @@
 package dev.droidtop.library.settings
 
 import android.content.Context
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
 
 /**
  * "Rescan library", as one action every screen that offers it runs: Gaming's
@@ -13,11 +19,42 @@ import android.content.Context
  * reads. The row used to relaunch the Gaming shell with a rescan flag and
  * say nothing at all, so a rescan could not be told from a tap that missed
  * (rig, dq-shell2-02).
+ *
+ * A rescan can be stopped: [cancel] ends the one in flight, and the row
+ * calls it when it is selected again while the rescan runs, so a walk over
+ * a slow card is never something a person has to sit out
+ * (Droidtop/tracker#275).
  */
 object LibraryRescan {
     @Volatile
     var handler: (suspend (Context, (String) -> Unit) -> String)? = null
 
-    suspend fun run(context: Context, onStatus: (String) -> Unit): String =
-        handler?.invoke(context, onStatus) ?: "The library cannot be rescanned from here."
+    private val active = AtomicReference<Deferred<String>?>(null)
+
+    /** Whether a rescan started by [run] is in flight. */
+    val isRunning: Boolean get() = active.get()?.isActive == true
+
+    /** Stops the rescan in flight; false when there was none. [run] then returns "Rescan cancelled.". */
+    fun cancel(): Boolean {
+        val running = active.get()?.takeIf { it.isActive } ?: return false
+        running.cancel()
+        return true
+    }
+
+    suspend fun run(context: Context, onStatus: (String) -> Unit): String {
+        val rescan = handler ?: return "The library cannot be rescanned from here."
+        return coroutineScope {
+            val answer = async { rescan(context, onStatus) }
+            active.set(answer)
+            try {
+                answer.await()
+            } catch (cancelled: CancellationException) {
+                // Our own caller going away is a cancellation to pass on;
+                // only the rescan having been cancelled is an answer.
+                if (isActive) "Rescan cancelled." else throw cancelled
+            } finally {
+                active.compareAndSet(answer, null)
+            }
+        }
+    }
 }

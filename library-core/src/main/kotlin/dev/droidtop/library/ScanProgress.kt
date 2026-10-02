@@ -2,6 +2,10 @@ package dev.droidtop.library
 
 import android.content.Context
 import java.io.File
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * A time budget for ONE folder of a library scan.
@@ -333,4 +337,35 @@ object ScanLog {
         }
     }
 
+}
+
+/**
+ * What the walks running now say they are doing, one line per source:
+ * "Looking at PC game folders: 12 of 21". A walk is silent to the person
+ * otherwise, and the rig's five-minute PC rescan sat on "Looking for new
+ * or changed games and apps..." the whole time with nothing to say whether
+ * it was working (Droidtop/tracker#275).
+ *
+ * A source [set]s its line as it goes and [finish]es it when it is done
+ * (always, including when it was cancelled); [state] is what a screen
+ * collects. The line is free text because the sources count different
+ * things: folders, systems, apps.
+ */
+object ScanActivity {
+    private val lines = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    /** Every running source's line, keyed by source, in the order they began. */
+    val state: StateFlow<Map<String, String>> = lines.asStateFlow()
+
+    fun set(source: String, line: String) {
+        lines.update { it + (source to line) }
+    }
+
+    fun finish(source: String) {
+        lines.update { it - source }
+    }
+
+    /** The lines of [running] as one sentence a row can show, or null when nothing is running. */
+    fun describe(running: Map<String, String>): String? =
+        running.values.joinToString("; ").takeIf { it.isNotEmpty() }
 }

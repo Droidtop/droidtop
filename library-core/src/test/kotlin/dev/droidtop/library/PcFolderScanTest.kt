@@ -195,4 +195,40 @@ class PcFolderScanTest {
         file("Adult/unity/Story/Chapter 2/readme.txt")
         assertEquals(listOf("Adult/unity/Story/Chapter 2/1.0"), found())
     }
+
+    @Test
+    fun `a game whose executable sits below its own files is found without reading its whole tree`() {
+        file("Shape/Some Game/readme.txt")
+        game("Shape/Some Game/Binaries/Win64")
+        for (i in 1..5) file("Shape/Some Game/Content/Pack$i/data.pak")
+        val top = PcFolderScan.gamesByTopLevelFolder(File(temp.root, "Shape"), defs).single()
+        assertEquals(listOf("Some Game"), top.games.map { it.name })
+        // The root and the game folder, then the level the executable is in: never the Content packs' folders.
+        assertTrue(top.work.listings <= 4)
+    }
+
+    @Test
+    fun `a remembered listing answers an unchanged folder and a changed one is read again`() {
+        game("Cache/Some Game")
+        val cache = PcFolderScan.ListingCache()
+        val options = PcFolderScan.Options(cache = cache)
+        val folder = File(temp.root, "Cache")
+        val first = PcFolderScan.scanTopLevel(folder, defs, options)
+        assertTrue(first.work.listings > 0)
+        val second = PcFolderScan.scanTopLevel(folder, defs, options)
+        assertEquals(first.games, second.games)
+        assertEquals(0, second.work.listings)
+        assertTrue(second.work.cachedListings > 0)
+        // A new game beside it moves the folder's time, so the folder is read again.
+        game("Cache/Other Game")
+        File(temp.root, "Cache").setLastModified(File(temp.root, "Cache").lastModified() + 5_000)
+        val third = PcFolderScan.scanTopLevel(folder, defs, options)
+        assertEquals(listOf("Other Game", "Some Game"), third.games.map { it.name })
+    }
+
+    @Test(expected = java.util.concurrent.CancellationException::class)
+    fun `a cancelled walk stops at its next listing`() {
+        game("Stop/Some Game")
+        PcFolderScan.scanTopLevel(File(temp.root, "Stop"), defs, PcFolderScan.Options(cancelled = { true }))
+    }
 }

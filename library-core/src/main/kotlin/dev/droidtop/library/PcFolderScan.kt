@@ -1,6 +1,10 @@
 package dev.droidtop.library
 
+import dev.droidtop.library.consoles.ConsoleSystemDef
+import dev.droidtop.library.consoles.resolveSystem
 import java.io.File
+import java.util.concurrent.CancellationException
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Which folders under a games root are Windows/Linux PC games, decided by
@@ -21,6 +25,11 @@ import java.io.File
  *
  *  1. A folder a library scan must not descend into is not a game
  *     ([ScanPrune]): hidden and marker folders, a store's non-game tree.
+ *     A ROM system folder (`psx`, `gba`: [GameEngineDetector.isConsoleSystemFolder])
+ *     is not one either: the ROM walk owns it, and the PC walk used to
+ *     list every file in it to find no executable (Droidtop/tracker#275).
+ *     ES-DE's own `pc` and `windows` systems are the exception, since a
+ *     PC game is exactly what a person keeps there.
  *  2. **A folder that directly holds an executable is the game.** Its own
  *     subfolders are not further games -- that is what listed
  *     `Ghost Recon Breakpoint/benchmark` as a game of its own. The
@@ -60,11 +69,91 @@ import java.io.File
  * Engine games are NOT this scan's business: [GameEngineDetector] finds
  * them, and `PcGameProvider` already drops a PC entry for any folder
  * engine detection owns (docs/SPEC.md 7g).
+ *
+ * **What a scan costs** (docs/SPEC.md 7g, "PC folder scan cost"). The disk
+ * work is what takes the time, and on a removable card behind Android's
+ * FUSE layer every `stat` is a round trip to a user-space daemon, so the
+ * walk is written to touch as little as it can and no more than once:
+ *
+ *  - ONE directory listing per folder, whose entries are told apart with
+ *    ONE `stat` each ([listingOf]); what rules 2 and 4 need (a program, a
+ *    file of its own) is read off that listing, never asked of the folder
+ *    again. The walk used to list a folder three times and `stat` every
+ *    entry three times.
+ *  - "Is there a game below this folder" (rule 4) is a question of
+ *    EXISTENCE, answered breadth first and stopped at the first game
+ *    ([hasGameBelow]); it used to enumerate every game below, which for a
+ *    `Game/Binaries/Win64/Game.exe` shape meant walking the game's whole
+ *    asset tree to depth four to confirm what the third level already
+ *    showed.
+ *  - A listing is remembered per folder by the folder's modification time
+ *    ([ListingCache]): a directory's time moves when an entry is added,
+ *    removed or renamed in it, so an unchanged folder costs one `stat`
+ *    instead of a listing and a `stat` per entry.
+ *  - Top-level folders are independent of one another, so a caller may
+ *    walk several at once ([scanTopLevel]); the cost is latency, not
+ *    bandwidth, and latency overlaps.
+ *
+ * Every walk reports what it did ([Work]) so a slow root can be told from
+ * a big one in `droidtop.ScanLog`.
  */
 object PcFolderScan {
 
     /** Same bound as [GameEngineDetector.MAX_SCAN_DEPTH], for the same reason. */
     const val MAX_SCAN_DEPTH = 4
+
+    /** ES-DE's own PC systems: a console-style name whose folders ARE where PC games live. */
+    private val PC_SYSTEM_IDS = setOf("pc", "windows")
+
+    /**
+     * What a walk may be given beyond the roots and the engine rules.
+     *
+     * [systemsById] is the console systems, used for rule 1's ROM folders
+     * only; empty means "no folder is known to be a ROM system folder".
+     * [cache] is the caller's own [ListingCache], kept for as long as the
+     * caller wants listings remembered; null remembers nothing, which is
+     * what a test wants. [cancelled] is asked before every listing and
+     * answers "stop now": the walk then throws [CancellationException], so
+     * a blocking walk can be abandoned from a coroutine without waiting
+     * for its folder to finish.
+     */
+    class Options(
+        val systemsById: Map<String, ConsoleSystemDef> = emptyMap(),
+        val cache: ListingCache? = null,
+        val cancelled: () -> Boolean = { false },
+    )
+
+    /**
+     * What one top-level folder's walk did, for the scan log: how many
+     * directory listings it read from disk, how many entries it `stat`ed,
+     * how many listings the cache answered instead, how often and for how
+     * long rule 6's engine probe ran, and the wall time of the whole walk.
+     */
+    data class Work(
+        val listings: Int = 0,
+        val entriesStatted: Int = 0,
+        val cachedListings: Int = 0,
+        val engineChecks: Int = 0,
+        val engineMs: Long = 0L,
+        val millis: Long = 0L,
+    ) {
+        fun describe(): String =
+            "$listings listings, $entriesStatted entries statted, $cachedListings listings from cache, " +
+                "$engineChecks engine checks ($engineMs ms)"
+    }
+
+    /**
+     * The folders a root's walk is split into: its immediate subfolders,
+     * in name order. Rule 3 makes the root itself a container, so each of
+     * these is the unit of work (and of the index's replace-one-folder
+     * merge, docs/SPEC.md 7g).
+     */
+    fun topLevelFolders(root: File): List<File> =
+        if (!root.isDirectory) {
+            emptyList()
+        } else {
+            (root.listFiles() ?: emptyArray()).filter { it.isDirectory }.sortedBy { it.name.lowercase() }
+        }
 
     /**
      * Every PC game folder under [root], deepest-evidence-first. [root]
@@ -83,13 +172,17 @@ object PcFolderScan {
      * (a change during the walk then moves it past the stamp the index
      * keeps, and the next slow round walks the folder again). [skipped]
      * is a folder the caller's `skip` left unwalked: [games] is empty
-     * because nobody looked, not because it holds none.
+     * because nobody looked, not because it holds none. [work] is what
+     * the walk cost and [skips] the folders it did not enter and why
+     * (ROM system folders), both for the scan log.
      */
     data class TopLevelFolder(
         val folder: File,
         val games: List<File>,
         val mtime: Long = 0L,
         val skipped: Boolean = false,
+        val work: Work = Work(),
+        val skips: ScanSkips = ScanSkips(),
     )
 
     /**
@@ -106,54 +199,213 @@ object PcFolderScan {
     fun gamesByTopLevelFolder(
         root: File,
         defs: List<EngineDef> = emptyList(),
+        options: Options = Options(),
         skip: (folder: File, mtime: Long) -> Boolean = { _, _ -> false },
-    ): List<TopLevelFolder> =
-        if (!root.isDirectory) {
-            emptyList()
-        } else {
-            childrenOf(root).map { child ->
-                val mtime = child.lastModified()
-                if (skip(child, mtime)) {
-                    TopLevelFolder(child, emptyList(), mtime, skipped = true)
-                } else {
-                    TopLevelFolder(child, walk(child, defs, depth = 1), mtime)
-                }
-            }
-        }
+    ): List<TopLevelFolder> = topLevelFolders(root).map { scanTopLevel(it, defs, options, skip) }
 
-    private fun walk(folder: File, defs: List<EngineDef>, depth: Int): List<File> {
-        if (!folder.isDirectory || !ScanPrune.isScannableFolder(folder)) return emptyList()
-        // A store's own install root is the store's business, never a
-        // game, however many executables its client drops in it.
-        val isStoreRoot = ScanPrune.storeRootOwner(folder) != null
-        // Rule 6. Lazy: it costs one directory listing per child, and
-        // only a folder that would otherwise BE an entry needs the
-        // answer. A folder holding engine games is a category folder,
-        // and anything it holds of its own is a stray.
-        val holdsEngineGames by lazy { defs.isNotEmpty() && GameEngineDetector.holdsSeveralGames(folder, defs) }
-        if (!isStoreRoot && GameExecutableResolver.hasExecutable(folder) && !holdsEngineGames) return listOf(folder)
-
-        // The engine walk's depth rule, asked of the same names: a part or
-        // version folder is one game's structure and costs no depth
-        // (GameNaming.isStructuralFolderName, docs/SPEC.md 7m).
-        val below = childrenOf(folder).flatMap { child ->
-            when {
-                GameNaming.isStructuralFolderName(child.name) -> walk(child, defs, depth)
-                depth < MAX_SCAN_DEPTH -> walk(child, defs, depth + 1)
-                else -> emptyList()
-            }
-        }
-        if (below.isEmpty()) return emptyList()
-        val holdsOwnFiles = (folder.listFiles() ?: emptyArray()).any { it.isFile && !it.name.startsWith(".") }
-        val insideStoreTree = isStoreRoot || ScanPrune.storeTreeRoot(folder) != null
-        // A part or version folder with a stray file of its own is still
-        // not the game; the game is the folder below it that has one.
-        val structural = GameNaming.isStructuralFolderName(folder.name)
-        return if (holdsOwnFiles && !insideStoreTree && !holdsEngineGames && !structural) listOf(folder) else below
+    /**
+     * One top-level folder's walk, on the calling thread. Independent of
+     * every other folder's, so a caller that wants the walk to overlap its
+     * disk waits runs several of these at once ([ListingCache] is safe to
+     * share between them).
+     */
+    fun scanTopLevel(
+        folder: File,
+        defs: List<EngineDef> = emptyList(),
+        options: Options = Options(),
+        skip: (folder: File, mtime: Long) -> Boolean = { _, _ -> false },
+    ): TopLevelFolder {
+        val mtime = folder.lastModified()
+        if (skip(folder, mtime)) return TopLevelFolder(folder, emptyList(), mtime, skipped = true)
+        val walk = Walk(defs, options)
+        val startedAt = System.currentTimeMillis()
+        val games = walk.walk(folder, depth = 1)
+        return TopLevelFolder(
+            folder = folder,
+            games = games,
+            mtime = mtime,
+            work = walk.work(System.currentTimeMillis() - startedAt),
+            skips = walk.skips,
+        )
     }
 
-    private fun childrenOf(folder: File): List<File> =
-        (folder.listFiles() ?: emptyArray())
-            .filter { it.isDirectory }
-            .sortedBy { it.name.lowercase() }
+    /**
+     * What a read of one folder said: its subfolders in name order, and the
+     * two facts about its own files that rules 2 and 4 are made of. Kept
+     * whole so a repeat walk of an unchanged folder asks the disk nothing
+     * but its modification time.
+     */
+    class Listing internal constructor(
+        internal val mtime: Long,
+        internal val folders: List<File>,
+        internal val hasProgram: Boolean,
+        internal val hasOwnFile: Boolean,
+    ) {
+        /** Rule 6's answer for this folder, with the engine rules it was asked under; filled in when first needed. */
+        @Volatile
+        internal var engineDefs: List<EngineDef>? = null
+
+        @Volatile
+        internal var holdsEngineGames: Boolean = false
+    }
+
+    /**
+     * Listings remembered by folder path and modification time, for as long
+     * as the holder keeps it. A directory's modification time moves when an
+     * entry is added, removed or renamed in it, which is every change a
+     * listing records, so an entry that matches is the listing a fresh read
+     * would give; what a listing does NOT record (a file's own contents,
+     * the execute bit of an extensionless file) is not something a rescan
+     * of a games folder is asked to notice. Bounded: past [MAX_ENTRIES] it
+     * starts over rather than growing with the library.
+     */
+    class ListingCache {
+        private val entries = ConcurrentHashMap<String, Listing>()
+
+        internal fun get(folder: File, mtime: Long): Listing? =
+            entries[folder.path]?.takeIf { it.mtime == mtime }
+
+        internal fun put(folder: File, listing: Listing) {
+            if (entries.size >= MAX_ENTRIES) entries.clear()
+            entries[folder.path] = listing
+        }
+
+        companion object {
+            const val MAX_ENTRIES = 20_000
+        }
+    }
+
+    /** One top-level folder's walk: the rules, and the counts [Work] reports. */
+    private class Walk(private val defs: List<EngineDef>, private val options: Options) {
+        val skips = ScanSkips()
+        private val skipped = HashSet<String>()
+        private var listings = 0
+        private var entriesStatted = 0
+        private var cachedListings = 0
+        private var engineChecks = 0
+        private var engineNanos = 0L
+
+        fun work(millis: Long) = Work(listings, entriesStatted, cachedListings, engineChecks, engineNanos / 1_000_000L, millis)
+
+        fun walk(folder: File, depth: Int): List<File> {
+            if (!walkable(folder, depth)) return emptyList()
+            val listing = listingOf(folder)
+            // A store's own install root is the store's business, never a
+            // game, however many executables its client drops in it.
+            val isStoreRoot = ScanPrune.storeRootOwner(folder) != null
+            if (!isStoreRoot && listing.hasProgram && !holdsEngineGames(folder, listing)) return listOf(folder)
+
+            val insideStoreTree = isStoreRoot || ScanPrune.storeTreeRoot(folder) != null
+            // A part or version folder with a stray file of its own is still
+            // not the game; the game is the folder below it that has one.
+            val structural = GameNaming.isStructuralFolderName(folder.name)
+            if (listing.hasOwnFile && !insideStoreTree && !structural) {
+                // Rule 4 only needs to know THAT a game is below.
+                if (!hasGameBelow(listing, depth)) return emptyList()
+                if (!holdsEngineGames(folder, listing)) return listOf(folder)
+            }
+            return childrenOf(listing, depth).flatMap { (child, childDepth) -> walk(child, childDepth) }
+        }
+
+        /**
+         * Whether some game is below [listing]'s folder: rule 2 asked of each
+         * folder under it, one level at a time, shallowest first, stopping
+         * at the first that answers yes. Same answer as walking every child
+         * and asking whether anything came back, at the cost of the levels
+         * above the first game.
+         */
+        private fun hasGameBelow(listing: Listing, depth: Int): Boolean {
+            var level = childrenOf(listing, depth)
+            while (level.isNotEmpty()) {
+                val next = ArrayList<Pair<File, Int>>()
+                for ((child, childDepth) in level) {
+                    if (!walkable(child, childDepth)) continue
+                    val below = listingOf(child)
+                    if (ScanPrune.storeRootOwner(child) == null && below.hasProgram && !holdsEngineGames(child, below)) return true
+                    next += childrenOf(below, childDepth)
+                }
+                level = next
+            }
+            return false
+        }
+
+        /**
+         * The engine walk's depth rule, asked of the same names: a part or
+         * version folder is one game's structure and costs no depth
+         * (GameNaming.isStructuralFolderName, docs/SPEC.md 7m).
+         */
+        private fun childrenOf(listing: Listing, depth: Int): List<Pair<File, Int>> =
+            listing.folders.mapNotNull { child ->
+                when {
+                    GameNaming.isStructuralFolderName(child.name) -> child to depth
+                    depth < MAX_SCAN_DEPTH -> child to depth + 1
+                    else -> null
+                }
+            }
+
+        private fun walkable(folder: File, depth: Int): Boolean {
+            if (!ScanPrune.isScannableFolder(folder)) return false
+            if (isRomSystemFolder(folder, depth)) {
+                if (skipped.add(folder.path)) skips.add(folder, GameEngineDetector.CONSOLE_SYSTEM_FOLDER_REASON)
+                return false
+            }
+            return true
+        }
+
+        private fun isRomSystemFolder(folder: File, depth: Int): Boolean {
+            val systems = options.systemsById
+            if (systems.isEmpty()) return false
+            if (resolveSystem(folder.name, systems)?.id in PC_SYSTEM_IDS) return false
+            return GameEngineDetector.isConsoleSystemFolder(folder, systems, depth)
+        }
+
+        /**
+         * Rule 6, asked at most once per folder and only when the folder has
+         * two subfolders at all (it needs two games below). Probing a
+         * subfolder for engine evidence opens files, so it is the costliest
+         * thing a walk does per folder; [Work] counts it for that reason.
+         */
+        private fun holdsEngineGames(folder: File, listing: Listing): Boolean {
+            if (defs.isEmpty() || listing.folders.size < 2) return false
+            if (listing.engineDefs === defs) return listing.holdsEngineGames
+            val startedAt = System.nanoTime()
+            val holds = GameEngineDetector.holdsSeveralGames(folder, defs)
+            engineNanos += System.nanoTime() - startedAt
+            engineChecks++
+            listing.holdsEngineGames = holds
+            listing.engineDefs = defs
+            return holds
+        }
+
+        private fun listingOf(folder: File): Listing {
+            if (options.cancelled()) throw CancellationException("PC folder scan cancelled")
+            val cache = options.cache
+            // Read BEFORE the listing: a change during it then moves the
+            // time past the one stored, and the next walk reads again.
+            val mtime = if (cache != null) folder.lastModified() else 0L
+            if (cache != null && mtime != 0L) {
+                cache.get(folder, mtime)?.let {
+                    cachedListings++
+                    return it
+                }
+            }
+            listings++
+            val folders = ArrayList<File>()
+            var hasProgram = false
+            var hasOwnFile = false
+            for (entry in folder.listFiles() ?: emptyArray()) {
+                entriesStatted++
+                if (entry.isDirectory) {
+                    folders += entry
+                    continue
+                }
+                if (!entry.name.startsWith(".")) hasOwnFile = true
+                if (!hasProgram && GameExecutableResolver.isProgram(entry)) hasProgram = true
+            }
+            folders.sortBy { it.name.lowercase() }
+            val listing = Listing(mtime, folders, hasProgram, hasOwnFile)
+            if (cache != null && mtime != 0L) cache.put(folder, listing)
+            return listing
+        }
+    }
 }

@@ -17,7 +17,7 @@ object PartMarkers {
      * parent gives (Droidtop/tracker#264). The words a games library
      * actually uses, not every word that could count a part.
      */
-    private const val LEAF_WORDS = "chap(?:ter)?|part|week|act|episode|ep|season|vol(?:ume)?|day|disc|disk|book|bk|pt"
+    private const val LEAF_WORDS = "chap(?:ter)?|chp|part|week|act|episode|ep|season|vol(?:ume)?|day|disc|disk|book|bk|pt"
 
     /** A leaf's part word, with the dot and spaces after it. */
     val LEAF_PREFIX = Regex("""^($LEAF_WORDS)\.?\s*""", RegexOption.IGNORE_CASE)
@@ -30,7 +30,7 @@ object PartMarkers {
      * unambiguous.
      */
     val TRAILING = Regex(
-        """[-_ .]?(chap(?:ter)?|part|week|act|episode|ep|season|vol(?:ume)?|day|disc|disk)\.?\s*(\d+)$""",
+        """[-_ .]?(chap(?:ter)?|chp|part|week|act|episode|ep|season|vol(?:ume)?|day|disc|disk)\.?\s*(\d+)$""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -91,10 +91,23 @@ object EngineFolderNames {
         "game", "data", "www", "resources", "resource", "res", "lib", "lib64", "libs", "renpy", "contents",
         "assets", "bin", "binaries", "content", "engine", "runtime", "app", "src", "js",
         "win", "win32", "win64", "x86", "x64", "windows", "linux", "mac", "macos", "pc",
+        "build", "builds", "release", "releases", "dist",
     )
 
-    /** Whether [name], a whole folder name, is one of them. */
-    fun matches(name: String): Boolean = name.trim().lowercase() in NAMES
+    private val WORDS = Regex("""[^a-z0-9]+""")
+
+    /**
+     * Whether [name], a whole folder name, is one of them, alone or as
+     * nothing but such words (`win64 build`, `Windows_Release`): a build
+     * folder is filed under a platform and a build word and never has a
+     * title of its own.
+     */
+    fun matches(name: String): Boolean {
+        val lower = name.trim().lowercase()
+        if (lower in NAMES) return true
+        val words = lower.split(WORDS).filter { it.isNotEmpty() }
+        return words.size > 1 && words.all { it in NAMES }
+    }
 }
 
 /**
@@ -179,7 +192,23 @@ object GameTitleParser {
 
     private val RELEASE_TAGS = setOf(
         "final", "alpha", "beta", "demo", "repack", "gog", "steam", "epic", "itch", "prototype", "preview", "patched", "pre",
+        // Build-stage abbreviations a release is filed under (release candidate, to store, to manufacturing).
+        "rec", "rts", "rtm",
     )
+
+    /**
+     * Whether [name], a whole folder name, is only a build stage a release
+     * filed its folder under (`REC`, `RTS`). Written in capitals and nothing
+     * else, so a title that is a word or a name in lower case is never read
+     * as one; and only a stage, not any short all-caps name, because
+     * three capital letters are as likely a game's whole title.
+     */
+    fun isReleaseTagFolder(name: String): Boolean {
+        val trimmed = name.trim()
+        return trimmed == trimmed.uppercase() && trimmed.lowercase() in RELEASE_STAGE_FOLDERS
+    }
+
+    private val RELEASE_STAGE_FOLDERS = setOf("rec", "rts", "rtm")
 
     private fun isReleaseTag(lower: String): Boolean = lower in RELEASE_TAGS || MULTI.matches(lower)
 

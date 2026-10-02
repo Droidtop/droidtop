@@ -1003,7 +1003,16 @@ class Library(
     suspend fun rescanNow(kinds: Set<LibraryEntryKind>): Int {
         val key = kinds.toSet()
         scanInBackground(key, rescan = true, restart = true)
-        synchronized(backgroundScanJobs) { backgroundScanJobs[key] }?.join()
+        val walk = synchronized(backgroundScanJobs) { backgroundScanJobs[key] }
+        try {
+            walk?.join()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            // The caller gave up (a rescan cancelled from its row): the walk
+            // belongs to the library and would otherwise run on to the end
+            // with nobody waiting for it. What it had finished is kept.
+            walk?.cancel()
+            throw cancelled
+        }
         return stateFor(key).value?.size ?: 0
     }
 

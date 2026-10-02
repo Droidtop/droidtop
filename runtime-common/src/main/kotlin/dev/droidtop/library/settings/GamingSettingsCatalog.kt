@@ -889,9 +889,13 @@ object GamingSettingsCatalog {
         id = ID_RESCAN_LIBRARY,
         title = "Rescan library",
         subtitle = "Look for new or changed games and apps again",
-        // One action wherever the row is: it says it started, and what it
-        // found when it finished (LibraryRescan).
-        run = { ctx, onStatus -> LibraryRescan.run(ctx, onStatus) },
+        // One action wherever the row is: it says it started, how far it
+        // is, and what it found when it finished (LibraryRescan). Selected
+        // again while it runs, it stops the rescan instead of starting a
+        // second one: a walk of a slow card can take minutes.
+        run = { ctx, onStatus ->
+            if (LibraryRescan.cancel()) "Cancelling the rescan\u2026" else LibraryRescan.run(ctx, onStatus)
+        },
     )
 
     private fun launchComponent(className: String, vararg extras: Pair<String, Any>): (Context) -> Unit = { ctx ->

@@ -22,7 +22,7 @@ object GameNaming {
 
     /**
      * A bare trailing number only counts as a version when it is marked as
-     * one (a `v` prefix) or dotted (`0.8.3`, `1_3_3`).
+     * one (a `v`, `ver` or `version` prefix) or dotted (`0.8.3`, `1_3_3`).
      *
      * Pythia's own finding, from a real library on 2026-08-02: the `5` in
      * `Far Cry 5` and the `2077` in `Cyberpunk 2077` are title numbers, and
@@ -32,7 +32,7 @@ object GameNaming {
      * round, since a missed version costs one extra entry and a wrong one
      * merges two games.
      */
-    private val NAME_VERSION = Regex("""^(.*?)[-_ ](?:v(\d+(?:[._]\d+)*[a-zA-Z]*)|(\d+[._]\d+(?:[._]\d+)*[a-zA-Z]*))(.*)$""")
+    private val NAME_VERSION = Regex("""^(.*?)[-_ ](?:(?:v|(?i:ver(?:sion)?)\.?)(\d+(?:[._]\d+)*[a-zA-Z]*)|(\d+[._]\d+(?:[._]\d+)*[a-zA-Z]*))(.*)$""")
 
     /**
      * The words a folder uses when it is a part of a game rather than a
@@ -88,7 +88,7 @@ object GameNaming {
     data class Segment(val label: String, val order: Int?)
 
     /** What a leaf folder name is, when it is not a title of its own. */
-    private enum class LeafKind { TITLE, BARE_VERSION, PART, ENGINE_FOLDER }
+    private enum class LeafKind { TITLE, BARE_VERSION, PART, ENGINE_FOLDER, RELEASE_TAG }
 
     /** What a folder that no game can be identified from is called (docs/SPEC.md 7n). */
     const val UNIDENTIFIED = "Unidentified folder"
@@ -127,6 +127,7 @@ object GameNaming {
     private fun leafKind(raw: String): LeafKind {
         val name = PartMarkers.withArabic(GameTitleParser.stripNoise(raw))
         if (EngineFolderNames.matches(name)) return LeafKind.ENGINE_FOLDER
+        if (GameTitleParser.isReleaseTagFolder(name)) return LeafKind.RELEASE_TAG
         if (BARE_VERSION_LEAF.containsMatchIn(name)) return LeafKind.BARE_VERSION
         val stripped = GENERIC_PART_PREFIX.replaceFirst(name, "")
         if (stripped == name) return LeafKind.TITLE
@@ -161,7 +162,7 @@ object GameNaming {
                 when (leafKind(name)) {
                     LeafKind.TITLE -> return Ancestor(name, segment)
                     LeafKind.PART -> if (segment == null) segment = segmentOf(name)
-                    LeafKind.BARE_VERSION, LeafKind.ENGINE_FOLDER -> Unit
+                    LeafKind.BARE_VERSION, LeafKind.ENGINE_FOLDER, LeafKind.RELEASE_TAG -> Unit
                 }
             }
             index--
@@ -269,6 +270,13 @@ object GameNaming {
                 } else {
                     Derived(UNIDENTIFIED, "", emptyList(), null, unidentified = true)
                 }
+            }
+            // `REC`, `RTS`: a build stage a release filed its folder under. Under a
+            // titled folder it is that game's; alone it is all the name there is,
+            // and stays the title rather than becoming unidentified.
+            LeafKind.RELEASE_TAG -> {
+                val ancestor = meaningfulAncestor(parts)
+                if (ancestor != null) return Derived(ancestor.name, "", emptyList(), null, ancestor.segment)
             }
             LeafKind.TITLE -> Unit
         }

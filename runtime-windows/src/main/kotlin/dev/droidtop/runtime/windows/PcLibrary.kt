@@ -17,11 +17,27 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.PcCompatibility
+import dev.droidtop.library.PcFolderScan
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.PcStoreNames
+import dev.droidtop.library.ScanActivity
+import dev.droidtop.library.ScanLog
+import dev.droidtop.library.ScanSkips
 import dev.droidtop.library.StoreInstall
 import dev.droidtop.library.StoreUpdate
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 
 /**
  * droidtop's OWN source-agnostic view of every PC game the vendored
@@ -163,11 +179,15 @@ object PcLibrary {
                     // hand, OUTSIDE droidtop's roots, still count. Inside
                     // them is [folderGames]' answer and only its answer:
                     // droidtop writes its own findings into the scanner's
-                    // manual-folder list (see adoptScannedGameFolders), so
+                    // manual-folder list (see adoptFoundFolders), so
                     // without this filter the same game would arrive twice
                     // -- once as a store part with no root, once as its
                     // folder's part -- and removing the root would leave
-                    // the rootless copy behind.
+                    // the rootless copy behind. The filter runs BEFORE the
+                    // item is made into a game: that step reads the folder
+                    // for its art, and doing it for every game under the
+                    // roots only to throw the result away was a second
+                    // pass over every game folder in the library.
                     val ourRoots = dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath }
                     CustomGameScanner.scanAsLibraryItems()
                         .distinctBy { it.appId }
@@ -176,11 +196,11 @@ object PcLibrary {
                         // game already came from the Steam DAO above, so taking
                         // both would list it twice.
                         .filter { it.gameSource == GameSource.CUSTOM_GAME }
-                        .map { it.toGame() }
-                        .filterNot { game ->
-                            val path = game.installPath.orEmpty()
-                            ourRoots.any { root -> path == root || path.startsWith(root + "/") }
+                        .map { it to it.scannerFolder() }
+                        .filterNot { (_, path) ->
+                            path != null && ourRoots.any { root -> path == root || path.startsWith(root + "/") }
                         }
+                        .map { (item, path) -> item.toGame(context, folderPath = path) }
                 }.getOrDefault(emptyList()),
             )
         }.sortedBy { it.title.lowercase() }
@@ -197,10 +217,19 @@ object PcLibrary {
      * docs/SPEC.md 7g) comes back listed but unwalked, and what the last
      * walk recorded for it (its installs, its games in the scanner's
      * folder list) is kept.
+     *
+     * Two phases, both reported through [dev.droidtop.library.ScanActivity]
+     * as "n of m folders": the walk of the folders ([scanGameFolders]),
+     * which is the slow one on a card, and the turning of what it found
+     * into games, whose finished folders are handed to [onGroup] one at a
+     * time so the caller can publish them as they arrive rather than all
+     * at the end. A cancelled caller stops the walk at its next directory
+     * and nothing of the unfinished work is returned or published.
      */
     suspend fun folderGames(
         context: Context,
         skip: (folder: File, mtime: Long) -> Boolean = { _, _ -> false },
+        onGroup: suspend (FolderGroup) -> Unit = {},
     ): List<FolderGroup> {
         DroidtopGameIdStore.install(context)
         // The scanner looks in its own managed folders plus whatever
@@ -209,50 +238,73 @@ object PcLibrary {
         // this the folder source could only ever see gamenative's own
         // CustomGames directory, which nothing in droidtop tells anybody
         // about.
-        val found = runCatching { adoptScannedGameFolders(context, skip) }
-            .onFailure { android.util.Log.w(TAG, "Scanning droidtop's roots for PC games failed", it) }
-            .getOrDefault(emptyList())
-        val groups = found.map { group ->
-            // droidtop's own folders are turned into items HERE, from the
-            // list this scan just produced, and not read back out of the
-            // preference it was also written to. The rig proved why:
-            // `PrefManager.setPref` hands the write to a DataStore
-            // coroutine and returns, while `candidateFolders()` reads the
-            // value back synchronously, so the very first scan after an
-            // install read the EMPTY set and the PC library was 151
-            // engine games and not one folder game. On a device that had
-            // scanned before, the previous run's value hid the race
-            // completely -- which is exactly why build 537 showed 171
-            // games and a freshly installed 539 showed 151.
-            val games = group.gameFolders
-                .mapNotNull { folder -> runCatching { CustomGameScanner.createLibraryItemFromFolder(folder) }.getOrNull() }
-                .distinctBy { it.appId }
-                // The scanner recognizes a Steam install sitting in a
-                // scanned folder and returns it as a STEAM item; that
-                // game already came from the Steam DAO, so taking both
-                // would list it twice.
-                .filter { it.gameSource == GameSource.CUSTOM_GAME }
-                .map { it.toGame(group.root) }
-                .sortedBy { it.title.lowercase() }
-            FolderGroup(
-                root = group.root,
-                topFolder = group.topFolder,
-                games = games,
-                mtime = group.mtime,
-                skipped = group.skipped,
-            )
+        val roots = dev.droidtop.library.GamesRoots.current(context)
+        val rootPaths = roots.map { it.absolutePath }
+        try {
+            var found: List<ScannedFolder> = emptyList()
+            if (roots.isNotEmpty()) {
+                try {
+                    found = scanGameFolders(context, roots, skip)
+                    adoptFoundFolders(rootPaths, found)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (t: Throwable) {
+                    android.util.Log.w(TAG, "Scanning droidtop's roots for PC games failed", t)
+                }
+            }
+            val withGames = found.count { it.gameFolders.isNotEmpty() }
+            var built = 0
+            val groups = ArrayList<FolderGroup>(found.size)
+            for (group in found) {
+                currentCoroutineContext().ensureActive()
+                if (group.gameFolders.isNotEmpty()) {
+                    ScanActivity.set(SCAN_SOURCE, "Reading PC game details: ${++built} of $withGames folders")
+                }
+                // droidtop's own folders are turned into items HERE, from the
+                // list this scan just produced, and not read back out of the
+                // preference it was also written to. The rig proved why:
+                // `PrefManager.setPref` hands the write to a DataStore
+                // coroutine and returns, while `candidateFolders()` reads the
+                // value back synchronously, so the very first scan after an
+                // install read the EMPTY set and the PC library was 151
+                // engine games and not one folder game. On a device that had
+                // scanned before, the previous run's value hid the race
+                // completely -- which is exactly why build 537 showed 171
+                // games and a freshly installed 539 showed 151.
+                val games = group.gameFolders
+                    .mapNotNull { folder -> runCatching { CustomGameScanner.createLibraryItemFromFolder(folder) }.getOrNull() }
+                    .distinctBy { it.appId }
+                    // The scanner recognizes a Steam install sitting in a
+                    // scanned folder and returns it as a STEAM item; that
+                    // game already came from the Steam DAO, so taking both
+                    // would list it twice.
+                    .filter { it.gameSource == GameSource.CUSTOM_GAME }
+                    .map { it.toGame(context, group.root) }
+                    .sortedBy { it.title.lowercase() }
+                val folderGroup = FolderGroup(
+                    root = group.root,
+                    topFolder = group.topFolder,
+                    games = games,
+                    mtime = group.mtime,
+                    skipped = group.skipped,
+                )
+                groups += folderGroup
+                onGroup(folderGroup)
+            }
+            // Recording the installs here, in the one place every source's
+            // install directories are already known, is what keeps
+            // [knownInstalls]/[knownInstallRoots] answerable synchronously.
+            // It used to be a separate `installRoots(context)` entry point
+            // that nothing ever called, so the store half of that list stayed
+            // empty forever and only Steam's own paths reached engine
+            // detection.
+            val unwalked = groups.filter { it.skipped }.map { it.topFolder }
+            folderSourceInstalls = folderSourceInstalls.filter { install -> install.installDir.absolutePath.isUnder(unwalked) } +
+                groups.flatMap { it.games }.mapNotNull { it.toStoreInstall() }
+            return groups
+        } finally {
+            ScanActivity.finish(SCAN_SOURCE)
         }
-        // Recording the installs here, in the one place every source's
-        // install directories are already known, is what keeps
-        // [knownInstalls]/[knownInstallRoots] answerable synchronously.
-        // It used to be a separate `installRoots(context)` entry point
-        // that nothing ever called, so the store half of that list stayed
-        // empty forever and only Steam's own paths reached engine
-        // detection.
-        val unwalked = groups.filter { it.skipped }.map { it.topFolder }
-        folderSourceInstalls = folderSourceInstalls.filter { install -> install.installDir.absolutePath.isUnder(unwalked) } +
-            groups.flatMap { it.games }.mapNotNull { it.toStoreInstall() }
-        return groups
     }
 
 
@@ -400,6 +452,48 @@ object PcLibrary {
         compatibility = compatibilityFor(title),
     )
 
+    /** One top-level folder of one root, and the game folders droidtop's rule found under it. */
+    private data class ScannedFolder(
+        val root: String,
+        val topFolder: String,
+        val gameFolders: List<String>,
+        val mtime: Long,
+        val skipped: Boolean,
+        val skips: ScanSkips,
+    )
+
+    private fun String.isUnder(folders: Collection<String>): Boolean =
+        folders.any { folder -> this == folder || startsWith("$folder/") }
+
+    /** The key this walk's progress is shown under ([ScanActivity]). */
+    private const val SCAN_SOURCE = "pc"
+
+    /**
+     * How many top-level folders are walked at once. What a walk of a
+     * removable card costs is the latency of each call, not its
+     * bandwidth, so a few at once finish in a fraction of the time; more
+     * than a few only queue up behind the card's own FUSE daemon.
+     */
+    private const val SCAN_PARALLELISM = 3
+
+    /**
+     * Every directory listing the folder walk has read, for as long as the
+     * process lives, so a rescan of folders nobody touched asks the card
+     * for a modification time per folder instead of a listing
+     * ([PcFolderScan.ListingCache]).
+     */
+    private val listingCache = PcFolderScan.ListingCache()
+
+    /** [block]'s answer, or [default] when it throws. A cancellation is never swallowed. */
+    private suspend fun <T> orDefault(default: T, block: suspend () -> T): T =
+        try {
+            block()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            default
+        }
+
     /**
      * The PC game folders under droidtop's own games roots, handed to
      * gamenative's folder scanner as the exact folders to make items for.
@@ -422,25 +516,19 @@ object PcLibrary {
      * entries rather than keeping them until the user finds the vendored
      * setting. Manual folders the user added by hand outside droidtop's
      * roots are left alone.
+     *
+     * The folders of every root are walked [SCAN_PARALLELISM] at a time,
+     * and each walked folder gets its own `droidtop.ScanLog` line with
+     * what it cost ([PcFolderScan.Work]), as the ROM and engine walks
+     * already do: the five-minute rescan of 79 games on a card
+     * (Droidtop/tracker#275) could not be explained from one line for the
+     * whole root.
      */
-    /** One top-level folder of one root, and the game folders droidtop's rule found under it. */
-    private data class ScannedFolder(
-        val root: String,
-        val topFolder: String,
-        val gameFolders: List<String>,
-        val mtime: Long,
-        val skipped: Boolean,
-    )
-
-    private fun String.isUnder(folders: Collection<String>): Boolean =
-        folders.any { folder -> this == folder || startsWith("$folder/") }
-
-    private fun adoptScannedGameFolders(
+    private suspend fun scanGameFolders(
         context: Context,
+        roots: List<File>,
         skip: (folder: File, mtime: Long) -> Boolean,
-    ): List<ScannedFolder> {
-        val roots = dev.droidtop.library.GamesRoots.current(context)
-        if (roots.isEmpty()) return emptyList()
+    ): List<ScannedFolder> = coroutineScope {
         val rootPaths = roots.map { it.absolutePath }
         runCatching {
             val currentRoots = app.gamenative.PrefManager.customGameScanRoots
@@ -453,27 +541,75 @@ object PcLibrary {
         // The engine rules go in because which folders are PC games and
         // which are engine games is one question: a category folder
         // holding engine games is nobody's game (PcFolderScan rule 6).
-        val defs = runCatching { dev.droidtop.library.EnginesDatabase.defs(context) }.getOrDefault(emptyList())
-        val scanned = roots.flatMap { root ->
-            dev.droidtop.library.PcFolderScan.gamesByTopLevelFolder(root, defs, skip).map { top ->
-                ScannedFolder(
-                    root = root.absolutePath,
-                    topFolder = top.folder.absolutePath,
-                    gameFolders = top.games.map { it.absolutePath },
-                    mtime = top.mtime,
-                    skipped = top.skipped,
-                )
-            }
+        val defs = orDefault<List<dev.droidtop.library.EngineDef>>(emptyList()) {
+            dev.droidtop.library.EnginesDatabase.defs(context)
         }
-        val found = scanned.flatMap { it.gameFolders }.toSet()
+        // The ROM system folders, which the ROM walk owns (PcFolderScan rule 1).
+        val systems = orDefault<Map<String, dev.droidtop.library.consoles.ConsoleSystemDef>>(emptyMap()) {
+            dev.droidtop.library.consoles.ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        }
+        val job = currentCoroutineContext()[Job]
+        val options = PcFolderScan.Options(
+            systemsById = systems,
+            cache = listingCache,
+            cancelled = { job?.isActive == false },
+        )
+        val tops = withContext(Dispatchers.IO) {
+            roots.flatMap { root -> PcFolderScan.topLevelFolders(root).map { root to it } }
+        }
+        val gate = Semaphore(SCAN_PARALLELISM)
+        val done = AtomicInteger()
+        ScanActivity.set(SCAN_SOURCE, "Looking at PC game folders: 0 of ${tops.size}")
+        val scanned = tops.map { (root, folder) ->
+            async(Dispatchers.IO) {
+                gate.withPermit {
+                    val top = try {
+                        PcFolderScan.scanTopLevel(folder, defs, options, skip)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (t: Throwable) {
+                        android.util.Log.w(TAG, "Walking ${folder.absolutePath} for PC games failed", t)
+                        // Unwalked, not empty: what the last walk found there is kept.
+                        PcFolderScan.TopLevelFolder(folder, emptyList(), folder.lastModified(), skipped = true)
+                    }
+                    if (!top.skipped) {
+                        ScanLog.write(
+                            label = "pc folder ${folder.absolutePath}",
+                            games = top.games.size,
+                            skipped = top.skips,
+                            durationMs = top.work.millis,
+                            note = top.work.describe(),
+                            base = folder,
+                        )
+                    }
+                    ScanActivity.set(SCAN_SOURCE, "Looking at PC game folders: ${done.incrementAndGet()} of ${tops.size}")
+                    ScannedFolder(
+                        root = root.absolutePath,
+                        topFolder = folder.absolutePath,
+                        gameFolders = top.games.map { it.absolutePath },
+                        mtime = top.mtime,
+                        skipped = top.skipped,
+                        skips = top.skips,
+                    )
+                }
+            }
+        }.awaitAll()
+        val skips = ScanSkips()
+        for (folder in scanned) skips.addAll(folder.skips)
         // A scan that finds nothing and a scan that never ran look the
         // same from the library; this line is how they are told apart.
-        dev.droidtop.library.ScanLog.write(
+        ScanLog.write(
             label = "pc folders under " + rootPaths.joinToString(", "),
-            games = found.size,
-            skipped = dev.droidtop.library.ScanSkips(),
+            games = scanned.sumOf { it.gameFolders.size },
+            skipped = skips,
             durationMs = android.os.SystemClock.elapsedRealtime() - startedAt,
         )
+        scanned
+    }
+
+    /** Tells the vendored folder scanner which folders are games: what [scanGameFolders] found, beside what it already had. */
+    private fun adoptFoundFolders(rootPaths: List<String>, scanned: List<ScannedFolder>) {
+        val found = scanned.flatMap { it.gameFolders }.toSet()
         runCatching {
             val current = app.gamenative.PrefManager.customGameManualFolders
             // A folder this walk skipped keeps the games the last walk
@@ -486,7 +622,6 @@ object PcLibrary {
             val wanted = (theirs + found).toSet()
             if (wanted != current) app.gamenative.PrefManager.customGameManualFolders = wanted
         }.onFailure { android.util.Log.w(TAG, "Could not tell the folder scanner which folders are games", it) }
-        return scanned
     }
 
     private const val TAG = "droidtop.PcLibrary"
@@ -588,21 +723,58 @@ object PcLibrary {
     )
 
     /**
+     * The folder a scanner item names, or null. The scanner's appId is
+     * "CUSTOM_GAME_<numeric id>"; the numeric half is what resolves back to
+     * a folder.
+     */
+    private fun LibraryItem.scannerFolder(): String? =
+        appId.substringAfterLast('_').toIntOrNull()
+            ?.let { id -> runCatching { CustomGameScanner.findCustomGameById(id) }.getOrNull() }
+
+    /**
+     * A scanned folder's cover or icon, remembered by the folder's
+     * modification time ([ART_PREFS]). Finding it is the vendored scanner's
+     * business and not a cheap one: it lists the folder and every folder
+     * directly under it, more than once, and may read the executable to
+     * extract an icon -- per game, on every scan, for an answer that only
+     * changes when the folder does. A folder whose time has not moved gets
+     * its remembered answer.
+     *
+     * Only a FOUND image is remembered. The scanner extracts an icon in the
+     * background after it first sees a game, possibly into a subfolder
+     * whose change does not move this folder's time, so "nothing yet" has
+     * to be asked again next time.
+     */
+    private fun cachedArt(context: Context, folderPath: String, find: () -> String?): String? {
+        val prefs = context.applicationContext.getSharedPreferences(ART_PREFS, Context.MODE_PRIVATE)
+        val mtime = File(folderPath).lastModified()
+        val remembered = prefs.getString(folderPath, null)
+        if (mtime != 0L && remembered != null && remembered.substringBefore('\t') == mtime.toString()) {
+            return remembered.substringAfter('\t')
+        }
+        val art = find()
+        if (mtime != 0L && art != null) prefs.edit().putString(folderPath, "$mtime\t$art").apply()
+        return art
+    }
+
+    private const val ART_PREFS = "droidtop_pc_folder_art"
+
+    /**
      * A loose folder of files the user pointed droidtop at — a GOG
      * offline installer's output, an itch download, a portable game.
      * These are "installed" by definition: the files are already there.
      */
-    private fun LibraryItem.toGame(root: String? = null): Game {
-        // The scanner's appId is "CUSTOM_GAME_<numeric id>"; the numeric
-        // half is what resolves back to a folder.
-        val numericId = appId.substringAfterLast('_').toIntOrNull()
-        val folderPath = numericId?.let { id -> runCatching { CustomGameScanner.findCustomGameById(id) }.getOrNull() }
+    private fun LibraryItem.toGame(context: Context, root: String? = null, folderPath: String? = scannerFolder()): Game {
         // A custom game has no store CDN behind it, so its art is whatever
         // image sits in the folder rather than a remote URL.
-        val localArt = runCatching {
-            CustomGameScanner.findCapsuleCoverForCustomGame(appId)
-                ?: CustomGameScanner.findIconFileForCustomGame(appId)
-        }.getOrNull()
+        val localArt = folderPath?.let { path ->
+            cachedArt(context, path) {
+                runCatching {
+                    CustomGameScanner.findCapsuleCoverForCustomGame(appId)
+                        ?: CustomGameScanner.findIconFileForCustomGame(appId)
+                }.getOrNull()
+            }
+        }
         // The scanner names a game by its raw folder name; the title is the
         // parsed one (docs/SPEC.md 7n), read from the whole path so
         // `Some Game/book3` is `Some Game`. The folder name stays on disk

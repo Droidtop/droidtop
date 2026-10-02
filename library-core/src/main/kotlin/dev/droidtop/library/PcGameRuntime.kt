@@ -191,16 +191,29 @@ object GameExecutableResolver {
      * plausible `.exe` files IS a game, it just cannot be launched
      * without the user naming one.
      */
-    fun hasExecutable(gameRoot: File): Boolean = candidates(gameRoot) { file ->
-        val extension = file.extension.lowercase()
-        extension == "exe" ||
-            extension == "sh" ||
-            extension in LINUX_ELF_EXTENSIONS ||
-            (extension.isEmpty() && file.canExecute())
+    fun hasExecutable(gameRoot: File): Boolean =
         // One listing, not four: both walks ask this of every folder
         // they touch, and a directory listing over a slow share is the
         // expensive part of a scan.
-    }.isNotEmpty()
+        (gameRoot.listFiles() ?: emptyArray()).any { it.isFile && isProgram(it) }
+
+    /**
+     * Whether [file], a plain file, is a program a game folder can hold:
+     * the one test [hasExecutable] and [PcFolderScan]'s own listing share,
+     * so a scan that already has a folder's entries in hand does not list
+     * the folder a second time to ask it. Installers, uninstallers,
+     * redistributables and crash handlers are not ([PcFolderClassifier]).
+     * The name is read first and the execute bit only for a name with no
+     * extension: that is a `stat` more, which is the expensive part.
+     */
+    fun isProgram(file: File): Boolean {
+        val extension = file.extension.lowercase()
+        val program = extension == "exe" ||
+            extension == "sh" ||
+            extension in LINUX_ELF_EXTENSIONS ||
+            (extension.isEmpty() && file.canExecute())
+        return program && !PcFolderClassifier.roleOf(file.name).collapsed
+    }
 
     fun windowsExecutable(gameRoot: File): File? {
         val top = candidates(gameRoot) { it.extension.equals("exe", ignoreCase = true) }

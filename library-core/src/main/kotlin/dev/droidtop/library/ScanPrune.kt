@@ -237,9 +237,39 @@ object ScanPrune {
         return null
     }
 
-    /** The store whose install root [dir] is, or null. */
-    private fun storeRootAt(dir: File): StoreTree? = STORE_TREES.firstOrNull { store ->
-        (store.rootName == null || dir.name.lowercase() == store.rootName) &&
-            store.rootMarkers.any { File(dir, it).exists() }
+    /**
+     * The store whose install root [dir] is, or null.
+     *
+     * Remembered for [STORE_ROOT_TTL_MS]. Every verdict about a folder asks
+     * this of the folder and of up to six ancestors, and the ancestors
+     * are the same for every folder below them, so a walk over a games
+     * root asked `exists()` of the same marker names (`steamapps` and its
+     * two siblings) tens of thousands of times. Each one is a `stat` that
+     * Android's FUSE layer answers from user space, and on an SD card that
+     * was a large part of a PC rescan taking five minutes for 79 games
+     * (Droidtop/tracker#275). A minute is far longer than a walk and far
+     * shorter than anybody installing a Steam library, so a stale answer
+     * is not something a person can meet.
+     */
+    private fun storeRootAt(dir: File): StoreTree? {
+        val key = dir.path
+        val now = System.nanoTime() / 1_000_000L
+        storeRootMemo[key]?.let { remembered ->
+            if (now - remembered.at < STORE_ROOT_TTL_MS) return remembered.tree
+        }
+        val tree = STORE_TREES.firstOrNull { store ->
+            (store.rootName == null || dir.name.lowercase() == store.rootName) &&
+                store.rootMarkers.any { File(dir, it).exists() }
+        }
+        if (storeRootMemo.size >= STORE_ROOT_MEMO_MAX) storeRootMemo.clear()
+        storeRootMemo[key] = Remembered(tree, now)
+        return tree
     }
+
+    /** One remembered verdict: the store tree found (or none) and when it was read. */
+    private class Remembered(val tree: StoreTree?, val at: Long)
+
+    private val storeRootMemo = java.util.concurrent.ConcurrentHashMap<String, Remembered>()
+    private const val STORE_ROOT_TTL_MS = 60_000L
+    private const val STORE_ROOT_MEMO_MAX = 20_000
 }
