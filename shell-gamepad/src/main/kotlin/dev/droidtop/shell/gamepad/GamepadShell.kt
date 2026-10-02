@@ -1976,7 +1976,7 @@ private fun GamesSection(
     // display name) -- hoisted so both the system-list view and the
     // per-system grid view share one ordering (needed for ES-DE-style
     // Left/Right sibling-system switching below).
-    val byGroup = entries.groupBy { it.gameGroup() }
+    val byGroup = entries.filter { it.systemId != null }.groupBy { it.gameGroup() }
     // Keyed on the platform database's load version as well as the
     // groups: labels resolve through its cache, which warms on a
     // background thread -- sorting before the warm lands used raw
@@ -1984,7 +1984,7 @@ private fun GamesSection(
     // (observed live) instead of "Nintendo Switch" among the Nintendos.
     val platformsLoadVersion by dev.droidtop.library.consoles.PlatformsDatabase.loadVersion.collectAsState()
     val orderedSystemGroups = remember(entries, platformsLoadVersion) {
-        retroGamesSystemIds(entries).map(::GameGroup.System).sortedBy { it.label.lowercase() }
+        retroGamesSystemIds(entries).map { GameGroup.System(it) }.sortedBy { it.label.lowercase() }
     }
     // Carousel order, per direction (2026-08-31): "All games" leads
     // straight into the real systems -- Favorites/Last played/custom
