@@ -65,8 +65,8 @@ object PluginOriginKeys {
      * exact pinned key, so two bundles that both pass it are, by
      * construction, signed by the same key.
      */
-    fun keyFingerprintFor(origin: String): String? {
-        val key = resolve(origin) ?: return null
+    fun keyFingerprintFor(origin: String, userKeys: Map<String, String> = emptyMap()): String? {
+        val key = resolve(origin, userKeys) ?: return null
         return Sha256.hex(key.encoded)
     }
 

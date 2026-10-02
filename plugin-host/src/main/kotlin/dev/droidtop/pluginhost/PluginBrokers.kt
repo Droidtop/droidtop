@@ -113,8 +113,9 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun trustBadge(origin: String): String = when {
         PluginOriginKeys.isOfficial(origin) -> "Official"
-        UserOriginKeys.loadBase64(UserOriginKeys.storeFile(appContext)).containsKey(origin) -> "Added by you"
-        else -> "Not verified"
+        else -> UserOriginKeys.load(UserOriginKeys.storeFile(appContext))[origin]
+            ?.let { entry -> entry.repo?.let { "Verified by: $it" } ?: "Added by you" }
+            ?: "Not verified"
     }
 
     override fun installId(pluginId: String): String = grantStore.installIdFor(pluginId)

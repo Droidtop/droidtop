@@ -17,7 +17,17 @@ import org.json.JSONObject
  * refuses that id outright, and nothing here ever feeds
  * [PluginOriginKeys]'s pinned set.
  */
-data class UserOriginKey(val origin: String, val keyBase64: String, val source: String?)
+data class UserOriginKey(
+    val origin: String,
+    val keyBase64: String,
+    val source: String?,
+    /**
+     * The GitHub repository ("owner/name") the person added to get this key, or null for a key added by
+     * source address, file or paste. It is what the plugin badge reads: "Verified by: <repo>"
+     * (docs/SPEC.md 12a "Plugin repositories").
+     */
+    val repo: String? = null,
+)
 
 /** What [UserOriginKeys.add] (or [UserOriginKeys.replace]) decided, verbatim on the settings screen. */
 sealed interface AddKeyOutcome {
@@ -59,7 +69,8 @@ object UserOriginKeys {
                 val entry = runCatching { json.optJSONObject(key) }.getOrNull() ?: continue
                 val keyBase64 = entry.optString("key").takeIf { it.isNotBlank() } ?: continue
                 val source = if (entry.isNull("source")) null else entry.optString("source").takeIf { it.isNotBlank() }
-                put(key, UserOriginKey(origin = key, keyBase64 = keyBase64, source = source))
+                val repo = if (entry.isNull("repo")) null else entry.optString("repo").takeIf { it.isNotBlank() }
+                put(key, UserOriginKey(origin = key, keyBase64 = keyBase64, source = source, repo = repo))
             }
         }
     }
@@ -70,7 +81,13 @@ object UserOriginKeys {
     private fun save(file: File, keys: Map<String, UserOriginKey>) {
         val json = JSONObject()
         for ((origin, entry) in keys) {
-            json.put(origin, JSONObject().put("key", entry.keyBase64).apply { entry.source?.let { put("source", it) } })
+            json.put(
+                origin,
+                JSONObject().put("key", entry.keyBase64).apply {
+                    entry.source?.let { put("source", it) }
+                    entry.repo?.let { put("repo", it) }
+                },
+            )
         }
         val tmp = File(file.parentFile, "${file.name}.tmp")
         tmp.writeText(json.toString())
@@ -123,7 +140,7 @@ object UserOriginKeys {
      * is the same key); a DIFFERENT key for a trusted origin ->
      * [AddKeyOutcome.KeyChanged] with nothing written.
      */
-    fun add(file: File, origin: String, keyBase64: String, source: String?): AddKeyOutcome {
+    fun add(file: File, origin: String, keyBase64: String, source: String?, repo: String? = null): AddKeyOutcome {
         val id = origin.trim()
         originProblem(id)?.let { return AddKeyOutcome.Refused(it) }
         val key = canonicalKey(keyBase64)
@@ -134,10 +151,10 @@ object UserOriginKeys {
             return if (fingerprint(key) == fingerprint(existing.keyBase64)) {
                 AddKeyOutcome.AlreadyTrustedSameKey
             } else {
-                AddKeyOutcome.KeyChanged(existing, UserOriginKey(id, key, source))
+                AddKeyOutcome.KeyChanged(existing, UserOriginKey(id, key, source, repo))
             }
         }
-        val entry = UserOriginKey(origin = id, keyBase64 = key, source = source?.trim()?.takeIf { it.isNotBlank() })
+        val entry = UserOriginKey(origin = id, keyBase64 = key, source = source?.trim()?.takeIf { it.isNotBlank() }, repo = repo)
         runCatching { save(file, stored + (id to entry)) }
             .onFailure { return AddKeyOutcome.Refused("couldn't save the key: ${it.message}") }
         return AddKeyOutcome.Added(entry)
@@ -149,7 +166,7 @@ object UserOriginKeys {
      * (docs/SPEC.md 12a), which showed both fingerprints first. Same
      * validation and same-key shortcut as [add].
      */
-    fun replace(file: File, origin: String, keyBase64: String, source: String?): AddKeyOutcome {
+    fun replace(file: File, origin: String, keyBase64: String, source: String?, repo: String? = null): AddKeyOutcome {
         val id = origin.trim()
         originProblem(id)?.let { return AddKeyOutcome.Refused(it) }
         val key = canonicalKey(keyBase64)
@@ -157,10 +174,20 @@ object UserOriginKeys {
         val stored = load(file)
         val existing = stored[id] ?: return AddKeyOutcome.Refused("no trusted key for origin \"$id\" to replace")
         if (fingerprint(key) == fingerprint(existing.keyBase64)) return AddKeyOutcome.AlreadyTrustedSameKey
-        val entry = UserOriginKey(origin = id, keyBase64 = key, source = source?.trim()?.takeIf { it.isNotBlank() })
+        val entry = UserOriginKey(origin = id, keyBase64 = key, source = source?.trim()?.takeIf { it.isNotBlank() }, repo = repo)
         runCatching { save(file, stored + (id to entry)) }
             .onFailure { return AddKeyOutcome.Refused("couldn't save the key: ${it.message}") }
         return AddKeyOutcome.Added(entry)
+    }
+
+    /** The repository ("owner/name") whose key [origin] is trusted under, for the "Verified by" badge; null for a key not added through a repository. */
+    fun verifiedBy(file: File, origin: String): String? = load(file)[origin]?.repo
+
+    /** Records that an already-trusted [origin] was confirmed again through [repo], leaving its key as it is. False when it is not trusted or the store could not be written. */
+    fun attachRepo(file: File, origin: String, repo: String): Boolean {
+        val stored = load(file)
+        val existing = stored[origin] ?: return false
+        return runCatching { save(file, stored + (origin to existing.copy(repo = repo))) }.isSuccess
     }
 
     /** Stops trusting `origin`; false when it wasn't trusted to begin with. Plugins it signed stop verifying the moment this returns true. */
