@@ -1,17 +1,27 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
@@ -33,6 +43,40 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import java.util.Date
+
+/**
+ * How much of the window's top-right corner the floating status cluster
+ * covers, margins included, measured as it is drawn; zero while it is not
+ * drawn. A row along the top edge (the view strip, [ViewStrip]) ends short
+ * of it and shelves with no strip start under it, so nothing of the page
+ * sits beneath the clock and battery (Droidtop/tracker#292). One cluster
+ * per shell, so one value.
+ */
+internal object StatusClusterRoom {
+    var size by mutableStateOf(DpSize.Zero)
+}
+
+/**
+ * The status cluster as Gaming draws it: floating at the top-right over the
+ * page on a soft plate rather than in a header band (docs/SPEC.md 7j); a
+ * readout and the tap route to the Quick Menu. Reports its footprint to
+ * [StatusClusterRoom].
+ */
+@Composable
+internal fun FloatingStatusCluster(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val window = LocalShellWindow.current
+    val density = LocalDensity.current
+    DisposableEffect(Unit) { onDispose { StatusClusterRoom.size = DpSize.Zero } }
+    Box(
+        modifier = modifier
+            .onSizeChanged { px -> StatusClusterRoom.size = with(density) { DpSize(px.width.toDp(), px.height.toDp()) } }
+            .padding(horizontal = window.edgePadding, vertical = 8.dp)
+            .background(MenuTokens.Surface.copy(alpha = 0.58f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        StatusCluster(showBatteryPercent = true, onClick = onClick)
+    }
+}
 
 /**
  * The Gaming header's status readout: clock, connectivity and battery

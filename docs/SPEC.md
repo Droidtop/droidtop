@@ -9523,9 +9523,9 @@ it:
 
 | Steam Deck / Big Picture | Others | PC Games |
 | --- | --- | --- |
-| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves** on Home: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (nonzero indexed first-seen time, newest first), Update available, Favourites, Installed (only when something is not), one per store (Steam, GOG, ...), one per engine family (Visual Novels, RPG Maker, Windows, ...). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. `pcShelves`, `pc/PcShelves.kt`. |
-| Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip** (decided 2026-10-02, Droidtop/tracker#273 slice 2): the one row above the grid, L1 and R1 glyphs at its ends: All games, Installed, Updates, Favourites, one view per store (largest first), the person's saved views; each carries its count ("Installed · 12"), and Updates and Favourites appear only when something is in them. No Home chip (Home is a destination of its own, B from a view returns to the shelves), no Filters chip (X opens the filter dialog), no Continue playing view (it is Home's first shelf). The filters set that no strip view stands for show as ONE pill at the strip's end ("Recently played, 4 of 6679 ✕"), cleared by one press; there is no count line and no chip row on this page (the Filter sheet keeps its chips). The filter, sort, search and saved views are reached from X, Y and the sheets (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
-| 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule. No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is the window's usable width shared so about 5.5 show across (`capsuleWidth`, 104-220dp), so a shelf's last capsule is cut and says there is more; a phone held upright stays at the 104dp floor. |
+| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (nonzero indexed first-seen time, newest first), Update available, Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), one per store (Steam, GOG, ...), one per engine family (Visual Novels, RPG Maker, Windows, ...). **Home** keeps only recent activity across every library: Continue playing, Recently added and Update available (`homeShelves`, `HOME_SHELF_IDS`). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
+| Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip** (decided 2026-10-02, Droidtop/tracker#273 slice 2): the one row above PC Games' content, L1 and R1 glyphs at its ends: **Overview** (the shelves, `VIEW_OVERVIEW`, first and where PC Games opens), then the grid views All games, Installed, Updates, Favourites, one view per store (largest first), the person's saved views; each grid view carries its count ("Installed · 12"), and Updates and Favourites appear only when something is in them. The full grid is one press away (R1 from Overview is All games). No Home chip (Home is a destination of its own and has no strip), no Filters chip (X opens the filter dialog), no Continue playing view (it is the first shelf). B from a grid view returns to Overview. The strip ends short of the floating status cluster (`StatusClusterRoom`, Droidtop/tracker#292), so its R1 glyph is never under the clock. The filters set that no strip view stands for show as ONE pill at the strip's end ("Recently played, 4 of 6679 ✕"), cleared by one press; there is no count line and no chip row on this page (the Filter sheet keeps its chips). The filter, sort, search and saved views are reached from X, Y and the sheets (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
+| 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule; that line carries the version management fact too: the installed build and, when a source knows a newer one, "v0.9.6 is available" (`focusLine`, `GameUpdates.line`). No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is the window's usable width shared so about 5.5 show across (`capsuleWidth`, 104-220dp), so a shelf's last capsule is cut and says there is more; a phone held upright stays at the 104dp floor. |
 | Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons, a quiet facts strip, a tab strip (Overview, Versions and updates, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are not a row because droidtop has no achievement data (#143); when it does, this is where the row goes. |
 | The page's rows are the same rows as Steam's settings | | **Settings' rows.** The page's facts are `MenuRow(uniformHeight = true)` at `uniformRowHeight()`, with one content-sized value column (`LocalValueColumnWidth`) and the selected row's full text in the detail strip under the list (`CatalogDetailStrip`, §7k "Text in rows and tiles"); a long description is read there, never by growing a row. |
 | A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A is the primary action** (owner, 2026-10-01: "A is Primary Action. We can make it contextual using the pills."): on a capsule A does what the hint pill says -- Play when the runner is ready, else the one setup step (`PcRunnerOptions.resolveAndPlay`, the one launch handler); the page is the first row of the game's menu (Select) and a long press. The page exists for looking and for the game's own actions, never as a step in front of Play. |
@@ -9630,15 +9630,23 @@ Droidtop/tracker#253, 2026-10-02. The PC Games home is led by the player's
 own games, in droidtop's own treatment:
 
 - **Home is a destination** (owner, 2026-10-02, Droidtop/tracker#273): the
-  left menu's first row, "Home", opens these shelves, and "PC Games" opens the
-  library grid with its strip. Both are the one `PC_GAMES` section
-  (`LeftMenuEntry.home`, `PcGamesState.open`), not a new section. Gaming opens
+  left menu's first row, "Home", opens the cross-library shelves, and "PC
+  Games" opens the PC library's Overview shelves under its strip, the grid
+  views one strip chip away. All three are the one `PC_GAMES` section
+  (`PcView` HOME, OVERVIEW and GRID; `LeftMenuEntry.home`,
+  `PcGamesState.open`), not new sections. Choosing "PC Games" while one of
+  its grid views shows keeps that view. The Default section setting's `pc`
+  opens on Overview. Gaming opens
   on Home: the Default section setting's `home` is its default, and a cold
   start never restores the last place (`sessionOnly` drops saved shell state
   from an earlier process; a recreate in the same process keeps it). Home has
   no strip and the shoulders do nothing there; B does nothing on Home (it is
-  the root). Home carries no chrome of its own: the shelves and the shell footer.
-- **Home shows all recent activity** (Droidtop/tracker#273): Continue playing
+  the root). Home carries no chrome of its own: the shelves and the shell footer,
+  its first row starting under the floating status cluster (the band Steam's top
+  bar takes).
+- **Home shows all recent activity, and only that** (Droidtop/tracker#273):
+  its shelves are Continue playing, Recently added and Update available; the
+  library's other shelves are PC Games' Overview. Continue playing
   and Recently added also take the Retro library and the launcher apps that
   are games (`AppCategoryRules`: Android's flag and the person's marks),
   merged with the PC games by last-played and by added time (`pcShelves(...,
@@ -9654,11 +9662,14 @@ own games, in droidtop's own treatment:
   (`artworkUri`, the same media the Retro list shows); the hero card of a
   Retro game takes its fanart, else its screenshot, and without either is
   drawn as portrait art beside the title, the PC rule (`withRetroHero`).
-- **Continue playing is the first shelf** and its first card is the **hero
-  card** (`PcCapsule(hero = true)`): the game's landscape hero art at the
+- **Continue playing is the first shelf** and the first card of the first
+  shelf is always the **hero card** (`isHeroCard`; on a library nothing has
+  been played from, whichever shelf leads), so Home and Overview both open on
+  one large piece of art (`PcCapsule(hero = true)`): the game's landscape hero art at the
   capsules' own height (`heroWidth`, `HERO_ASPECT` 16:9) so the row keeps
   one baseline, the name under it and one quiet line,
-  "Played yesterday · 2 h 5 min" (`heroCaption`). Only portrait art: that art
+  "Played yesterday · 2 h 5 min" (`heroCaption`). That row has no heading,
+  as the Deck's recent row has none: the caption says what it is. Only portrait art: that art
   at its own shape beside the title on the plate, never stretched. Recently
   added follows as its own shelf, unchanged.
 - **The backdrop** (`PcBackdrop`) is the art of the game under the cursor
@@ -9690,11 +9701,11 @@ the pipeline applies it.
 
 - **Up/Down** move between the strip, the shelves (each shelf remembers
   where its cursor was, as the Deck's rows do) and the grid's rows; at the
-  top of a view the cursor lands on the strip (Home has none: Up on its first
-  shelf stays), and Up on the strip is consumed: the
+  top of Overview or a grid view the cursor lands on the strip (Home has none:
+  Up on its first shelf stays), and Up on the strip is consumed: the
   D-pad never reaches the tab bar (§7j; owner, 2026-09-27).
-- **L1/R1** step the strip's views (from the shelves R1 enters the first
-  view, L1 stays), because this tab's strip owns the shoulders
+- **L1/R1** step the strip's chips (from Overview R1 enters All games, L1
+  stays), because this tab's strip owns the shoulders
   (`OwnShoulders`, §7j "Gaming controls"); the glyphs sit at the strip's
   ends and are not hint items; Home has no strip, so they do nothing there.
   **Start** opens the left menu.
@@ -9719,8 +9730,8 @@ the pipeline applies it.
   system and Import gamelist.xml are not offered for it,
   Droidtop/tracker#175), which is also the Filter sheet's last row, "List
   options", so it stays reachable from an empty library.
-  **B** goes back one level: from a view to Home, from PC setup to the
-  library; on Home it is the shell's top level and does nothing.
+  **B** goes back one level: from a grid view to Overview, from PC setup to
+  the library; on Home and Overview it is the shell's top level and does nothing.
 - **Touch is the same cursor.** A tap on a capsule that is not selected
   selects it (pointer and focus are one selection, and the hint row then
   names what A would do); a tap on the selected capsule is A (design

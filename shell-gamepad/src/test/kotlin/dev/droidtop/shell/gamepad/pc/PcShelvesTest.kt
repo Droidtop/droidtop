@@ -186,6 +186,59 @@ class PcShelvesTest {
     }
 
     @Test
+    fun `home keeps the recent shelves across libraries and leaves the rest to PC Games`() {
+        val pc = game("/pc", lastPlayed = now - 30, firstSeen = now - 300, favorite = true, update = "2.0")
+        val rom = game("/rom", kind = LibraryEntryKind.CONSOLE_ROM, lastPlayed = now - 10).copy(systemId = "snes")
+
+        val home = homeShelves(listOf(pc, game("/other")), listOf(rom), now)
+        assertEquals(listOf(SHELF_CONTINUE, SHELF_RECENTLY_ADDED, SHELF_UPDATES), home.map { it.id })
+        assertEquals(listOf("/rom", "/pc"), home.first().entries.map { it.id })
+
+        // PC Games' Overview is the PC fold's own, Retro games never on it.
+        val overview = pcShelves(listOf(pc, game("/other")), now)
+        assertTrue(overview.any { it.id == SHELF_FAVOURITES })
+        assertTrue(overview.flatMap { it.entries }.none { it.id == "/rom" })
+    }
+
+    @Test
+    fun `not played yet appears once something was played, newest added first`() {
+        assertNull(pcShelves(listOf(game("/a"), game("/b")), now).firstOrNull { it.id == SHELF_NOT_PLAYED })
+
+        val shelf = pcShelves(
+            listOf(
+                game("/played", lastPlayed = now - 5),
+                game("/old", firstSeen = now - 50),
+                game("/new", firstSeen = now - 5),
+                game("/gone", missing = true),
+            ),
+            now,
+        ).first { it.id == SHELF_NOT_PLAYED }
+        assertEquals("Not played yet", shelf.title)
+        assertEquals(listOf("/new", "/old"), shelf.entries.map { it.id })
+    }
+
+    @Test
+    fun `the hero card is the first card of the first shelf, whichever shelf leads`() {
+        assertTrue(isHeroCard(0, 0))
+        assertEquals(false, isHeroCard(0, 1))
+        assertEquals(false, isHeroCard(1, 0))
+    }
+
+    @Test
+    fun `the cursor stays on its game when the shelves move under it`() {
+        fun shelf(id: String, vararg games: String) = PcShelf(id, id, games.map { game(it) }, games.size)
+        val before = listOf(shelf("kind:A", "/a1", "/a2"), shelf("kind:B", "/b1", "/b2", "/b3"))
+        // A scan grew shelf A past B, and added a game ahead of /b3.
+        val after = listOf(shelf("kind:B", "/b0", "/b1", "/b2", "/b3"), shelf("kind:A", "/a1", "/a2"))
+
+        assertEquals(0 to 3, cursorAfter(before, after, shelf = 1, item = 2))
+        assertEquals(1 to 1, cursorAfter(before, after, shelf = 0, item = 1))
+        // The shelf went away: the same places, clamped.
+        assertEquals(0 to 1, cursorAfter(before, listOf(shelf("kind:C", "/c1", "/c2")), shelf = 1, item = 2))
+        assertEquals(0 to 0, cursorAfter(emptyList(), after, shelf = 0, item = 0))
+    }
+
+    @Test
     fun `play time reads as a person says it`() {
         assertEquals("Never played", playtimeLine(0, 0))
         assertEquals("Under a minute, played once", playtimeLine(30, 1))

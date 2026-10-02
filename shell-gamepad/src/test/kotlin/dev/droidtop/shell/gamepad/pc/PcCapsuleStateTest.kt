@@ -125,6 +125,8 @@ class PcCapsuleStateTest {
         assertEquals("Game steam:1 · Steam · Install · 2.5 GB", line)
         assertEquals("Folder game", focusLine(folder(), null, parts = 1))
         assertTrue(focusLine(folder(), null, parts = 3).endsWith("3 copies"))
+        // Version management on the line: the version a source knows of.
+        assertEquals("Folder game · v0.9.6 is available", focusLine(folder(update = "0.9.6"), null, parts = 1))
     }
 
     @Test

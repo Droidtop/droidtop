@@ -38,9 +38,14 @@ internal fun ViewStrip(
 ) {
     val window = LocalShellWindow.current
     val shoulderGlyphs = window.showsShoulderGlyphs()
+    // The strip runs along the top edge, where the status cluster floats:
+    // it ends short of the cluster so R1 is never under the clock
+    // (Droidtop/tracker#292). The cluster's width already holds its margins.
+    val clusterWidth = StatusClusterRoom.size.width
+    val end = if (clusterWidth > 0.dp) clusterWidth else window.edgePadding
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.fillMaxWidth().padding(horizontal = window.edgePadding),
+        modifier = modifier.fillMaxWidth().padding(start = window.edgePadding, end = end),
     ) {
         if (shoulderGlyphs) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = Space.Sm))
         LazyRow(

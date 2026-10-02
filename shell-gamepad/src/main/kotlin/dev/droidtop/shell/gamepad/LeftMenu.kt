@@ -49,13 +49,14 @@ import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 
 /**
  * One place the left menu can take the user. Home is the PC Games section
- * showing its shelves ([home]); the "PC Games" row is the same section
- * showing the library grid (docs/SPEC.md 7i, "Home art").
+ * showing recent activity across every library ([home]); the "PC Games" row
+ * is the same section showing the PC library's own Overview shelves and its
+ * grid views (docs/SPEC.md 7i, "Home art").
  */
 internal data class LeftMenuEntry(val section: GamingSection, val label: String, val home: Boolean = false) {
     val key: String get() = if (home) "home" else section.name
 
-    /** Whether this row is where the user is: [atHome] tells Home from the PC Games grid. */
+    /** Whether this row is where the user is: [atHome] tells Home from PC Games. */
     fun isAt(current: GamingSection, atHome: Boolean): Boolean =
         section == current && (section != GamingSection.PC_GAMES || home == atHome)
 }

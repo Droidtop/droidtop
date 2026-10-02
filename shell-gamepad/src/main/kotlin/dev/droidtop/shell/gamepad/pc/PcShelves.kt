@@ -33,9 +33,30 @@ internal const val SHELF_RECENTLY_ADDED = "recently-added"
 internal const val SHELF_UPDATES = "updates"
 internal const val SHELF_FAVOURITES = "favourites"
 internal const val SHELF_INSTALLED = "installed"
+internal const val SHELF_NOT_PLAYED = "not-played"
 
 /**
- * The home's shelves, from the folded one-card-per-game list, as a pure
+ * The shelves Home keeps (docs/SPEC.md 7i, "Home art"): recent activity
+ * across every library and what needs attention. The rest of [pcShelves]
+ * (favourites, what was never played, stores, engine families) is the PC
+ * library's own and lives on PC Games' Overview.
+ */
+internal val HOME_SHELF_IDS = setOf(SHELF_CONTINUE, SHELF_RECENTLY_ADDED, SHELF_UPDATES)
+
+/**
+ * Home's shelves: [pcShelves] over the PC fold with [others] (Retro games
+ * and game apps) merged in, kept to [HOME_SHELF_IDS]. One shelf builder for
+ * both surfaces, so Home and PC Games never disagree about what "Recently
+ * added" means.
+ */
+internal fun homeShelves(
+    games: List<LibraryEntry>,
+    others: List<LibraryEntry>,
+    now: Long = System.currentTimeMillis(),
+): List<PcShelf> = pcShelves(games, now, others).filter { it.id in HOME_SHELF_IDS }
+
+/**
+ * The PC library's shelves, from the folded one-card-per-game list, as a pure
  * function so a JVM test can hold it to its rules and so the tab can run
  * it off the main thread (one sort per shelf over the whole library: never
  * while drawing). [now] is the clock, for "recently".
@@ -50,6 +71,10 @@ internal const val SHELF_INSTALLED = "installed"
  * - **Update available**: a source knows a newer version than any folder
  *   here (docs/SPEC.md 7g), only when there is one.
  * - **Favourites**, only when there is one.
+ * - **Not played yet**: installed games with no last-played time, newest
+ *   added first -- the discovery row, from data the library already has.
+ *   Only once something has been played: before that it is the whole
+ *   library again.
  * - **Installed**, only when something is NOT installed: on a library of
  *   folder games alone every game is installed, and a shelf that repeats
  *   the whole library says nothing.
@@ -94,6 +119,11 @@ internal fun pcShelves(
         }
         shelf(SHELF_UPDATES, "Update available", games.filter { it.availableUpdate != null })?.let(::add)
         shelf(SHELF_FAVOURITES, "Favourites", games.filter { it.favorite })?.let(::add)
+        if (games.any { it.lastPlayedEpochMs != null }) {
+            val unplayed = games.filter { it.lastPlayedEpochMs == null && it.isInstalled }
+                .sortedWith(compareByDescending<LibraryEntry> { it.addedEpochMs() }.thenBy { it.title.lowercase() })
+            if (unplayed.isNotEmpty()) add(PcShelf(SHELF_NOT_PLAYED, "Not played yet", unplayed.take(SHELF_LIMIT), unplayed.size))
+        }
         val installed = games.filter { it.isInstalled }
         if (installed.size < games.size) shelf(SHELF_INSTALLED, "Installed", installed)?.let(::add)
         fun storeOf(entry: LibraryEntry): String? = entry.pcInfo?.source?.takeIf { it != "Folder" }
@@ -139,20 +169,54 @@ internal val LibraryEntry.inPcFold: Boolean
     get() = appFacts == null && onPcGamesTab
 
 /**
- * Gives the first Continue playing card of a Retro game the landscape art the
- * PC hero rule asks for (docs/SPEC.md 7i, "Home art"): its scraped fanart, else
- * its screenshot, from the media layout it already carries. One file lookup for
- * one card, so the caller runs this off the main thread with the shelves.
+ * Gives the hero card (the first shelf's first card, [isHeroCard]) of a Retro
+ * game the landscape art the PC hero rule asks for (docs/SPEC.md 7i, "Home
+ * art"): its scraped fanart, else its screenshot, from the media layout it
+ * already carries. One file lookup for one card, so the caller runs this off
+ * the main thread with the shelves.
  */
-internal fun withRetroHero(shelves: List<PcShelf>): List<PcShelf> = shelves.map { shelf ->
+internal fun withRetroHero(shelves: List<PcShelf>): List<PcShelf> = shelves.mapIndexed { index, shelf ->
     val first = shelf.entries.firstOrNull()
-    if (shelf.id != SHELF_CONTINUE || first == null || first.inPcFold || first.heroUri != null || first.mediaLocator == null) {
+    if (index != 0 || first == null || first.inPcFold || first.heroUri != null || first.mediaLocator == null) {
         shelf
     } else {
         val art = first.mediaForImageTypes(listOf("fanart", "screenshot"))
         if (art == null) shelf else shelf.copy(entries = listOf(first.copy(heroUri = art)) + shelf.entries.drop(1))
     }
 }
+
+/**
+ * Whether a card is the hero card: the first card of the first shelf, drawn
+ * landscape (docs/SPEC.md 7i, "Home art"). Usually Continue playing's; on a
+ * library nothing has been played from yet, whatever shelf leads, so the
+ * page always opens on one large piece of art. Pure.
+ */
+internal fun isHeroCard(shelfIndex: Int, itemIndex: Int): Boolean = shelfIndex == 0 && itemIndex == 0
+
+/**
+ * Where the cursor goes when the shelves are worked out again (a scan still
+ * running adds games, and a shelf ordered by size can move up or down): the
+ * same game on the same shelf, found by id, so the rows do not slide the
+ * cursor onto another game under the user; else the same places, clamped.
+ * Returns (shelf, item). Pure.
+ */
+internal fun cursorAfter(old: List<PcShelf>, new: List<PcShelf>, shelf: Int, item: Int): Pair<Int, Int> {
+    fun clamp(index: Int, size: Int) = index.coerceIn(0, (size - 1).coerceAtLeast(0))
+    val oldShelf = old.getOrNull(shelf)
+    val newShelf = oldShelf?.let { wanted -> new.indexOfFirst { it.id == wanted.id } }?.takeIf { it >= 0 }
+        ?: return clamp(shelf, new.size) to clamp(item, new.getOrNull(clamp(shelf, new.size))?.entries?.size ?: 0)
+    val entries = new[newShelf].entries
+    val oldId = oldShelf?.entries?.getOrNull(item)?.id
+    val newItem = oldId?.let { id -> entries.indexOfFirst { it.id == id } }?.takeIf { it >= 0 } ?: clamp(item, entries.size)
+    return newShelf to newItem
+}
+
+/**
+ * The first chip on PC Games' strip: the PC library's own shelves, which the
+ * page opens on (docs/SPEC.md 7i). Not a [NamedLibraryView]: it is no filter
+ * over the grid, so it never appears in the filter dialog's saved views.
+ */
+internal const val VIEW_OVERVIEW = "Overview"
 
 /** The strip's built-in view names, which the counts below are keyed by. */
 internal const val VIEW_ALL = "All games"

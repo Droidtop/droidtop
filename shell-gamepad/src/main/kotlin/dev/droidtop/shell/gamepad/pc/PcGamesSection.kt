@@ -58,6 +58,7 @@ import dev.droidtop.shell.gamepad.HelpRowClaim
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.OwnShoulders
+import dev.droidtop.shell.gamepad.StatusClusterRoom
 import dev.droidtop.shell.gamepad.ViewStrip
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
@@ -93,8 +94,14 @@ import kotlinx.coroutines.withContext
  * Activity recreate the Text size setting triggers keeps the place too.
  */
 internal class PcGamesState {
-    /** The shelves (true), or the grid over [query]. */
-    var home by mutableStateOf(true)
+    /** Which of the section's three surfaces is showing ([PcView]). */
+    var view by mutableStateOf(PcView.HOME)
+
+    /** Home, the cross-library shelves the left menu's first row opens. */
+    val home: Boolean get() = view == PcView.HOME
+
+    /** Shelves of capsules (Home or PC Games' Overview), not the grid. */
+    val onShelves: Boolean get() = view != PcView.GRID
 
     /** The grid's filter, sort and search; loaded from the list's prefs once, written back on change. */
     var query by mutableStateOf(LibraryQuery())
@@ -120,13 +127,35 @@ internal class PcGamesState {
     var searchOpen by mutableStateOf(false)
 
     /**
-     * Opens the shelves (Home) or the grid, from the left menu's two rows.
-     * Switching resets the cursor, because the two draw different lists.
+     * Opens Home or PC Games, from the left menu's two rows. PC Games opens
+     * on its Overview shelves; choosing it while one of its grid views shows
+     * keeps that view (the row is already where the user is). Switching
+     * resets the cursor, because the surfaces draw different lists.
      */
     fun open(home: Boolean) {
-        if (this.home == home) return
-        this.home = home
+        if (home == this.home) return
+        if (!home && view == PcView.GRID) return
+        view = if (home) PcView.HOME else PcView.OVERVIEW
         stripFocused = false
+        stripIndex = 0
+        shelfIndex = 0
+        itemIndex = 0
+        shelfItems.clear()
+    }
+
+    /** PC Games' Overview shelves: its strip's first chip, and B from a grid view. */
+    fun showOverview() {
+        if (view == PcView.OVERVIEW) return
+        view = PcView.OVERVIEW
+        shelfIndex = 0
+        itemIndex = 0
+        shelfItems.clear()
+    }
+
+    /** One of the strip's grid views, over [query]. */
+    fun showGrid(query: LibraryQuery) {
+        this.query = query
+        view = PcView.GRID
         itemIndex = 0
     }
 
@@ -138,7 +167,7 @@ internal class PcGamesState {
     fun showStore(label: String) {
         query = LibraryQuery().withToggled(LibraryFacet.STORE, label, true)
         queryLoaded = true
-        home = false
+        view = PcView.GRID
         stripFocused = false
         itemIndex = 0
         pageId = null
@@ -146,10 +175,10 @@ internal class PcGamesState {
 
     companion object {
         val Saver: Saver<PcGamesState, Any> = listSaver(
-            save = { s -> listOf(s.home, s.stripFocused, s.stripIndex, s.shelfIndex, s.itemIndex, s.pageId.orEmpty()) },
+            save = { s -> listOf(s.view.ordinal, s.stripFocused, s.stripIndex, s.shelfIndex, s.itemIndex, s.pageId.orEmpty()) },
             restore = { v ->
                 PcGamesState().apply {
-                    home = v.getOrNull(0) as? Boolean ?: true
+                    view = PcView.entries.getOrNull(v.getOrNull(0) as? Int ?: 0) ?: PcView.HOME
                     stripFocused = v.getOrNull(1) as? Boolean ?: false
                     stripIndex = v.getOrNull(2) as? Int ?: 0
                     shelfIndex = v.getOrNull(3) as? Int ?: 0
@@ -160,6 +189,17 @@ internal class PcGamesState {
         )
     }
 }
+
+/**
+ * The PC_GAMES section's three surfaces (docs/SPEC.md 7i):
+ *
+ * - [HOME]: the left menu's "Home", recent activity across every library
+ *   ([homeShelves]); no strip.
+ * - [OVERVIEW]: what "PC Games" opens on, the PC library's own shelves
+ *   ([pcShelves]) led by a hero card, under the view strip's first chip.
+ * - [GRID]: one of the strip's grid views over the shared [LibraryQuery].
+ */
+internal enum class PcView { HOME, OVERVIEW, GRID }
 
 /** The folded library and, per drawn game, every folder and store row behind it (docs/SPEC.md 7m). */
 private class FoldedPcLibrary(
@@ -175,16 +215,18 @@ private class FoldedPcLibrary(
  * Big Picture rather than after an ES-DE theme. Three parts, top to
  * bottom:
  *
- * - **The view strip**: the built-in views (All games, Installed, Updates,
- *   Favourites), one per store and the person's saved views, with the
- *   active filter as one pill at its end -- the Deck's library tabs.
- * - **Home**: shelves, each a horizontal row of large capsules
- *   ([pcShelves]). **A view**: the same capsules as a grid over the one
- *   shared [LibraryQuery].
- * - **The hint row**, the tab's own: A names the focused game's primary
- *   action from [PcPlayState] (owner, 2026-10-01: "A is Primary Action.
- *   We can make it contextual using the pills"), Y its page, X favourite,
- *   L2 its menu, Select the list's options, B back to Home.
+ * - **The view strip** (PC Games only, not Home): Overview first, then the
+ *   built-in views (All games, Installed, Updates, Favourites), one per
+ *   store and the person's saved views, with the active filter as one pill
+ *   at its end -- the Deck's library tabs.
+ * - **Shelves**, each a horizontal row of large capsules led by a landscape
+ *   hero card: Home's cross-library ones ([homeShelves]) or the PC
+ *   library's own on Overview ([pcShelves]). **A grid view**: the same
+ *   capsules as a grid over the one shared [LibraryQuery].
+ * - **The hints**, declared into the shell footer: A names the focused
+ *   game's primary action from [PcPlayState] (owner, 2026-10-01: "A is
+ *   Primary Action. We can make it contextual using the pills"), X Filter,
+ *   Y Sort By, Select the game's menu, B back to Overview from a grid view.
  *
  * ONE pad handler moves ONE cursor (docs/SPEC.md 6e): Up/Down between the
  * strip, the shelves and the grid's rows, Left/Right along a shelf, the
@@ -291,11 +333,30 @@ internal fun PcGamesSection(
         systemNames = loaded.first
         others = loaded.second
     }
-    var shelves by remember { mutableStateOf(emptyList<PcShelf>()) }
+    // Home's shelves (recent activity across every library) and PC Games'
+    // Overview (the PC library's own), from the one shelf builder.
+    var homeShelfList by remember { mutableStateOf(emptyList<PcShelf>()) }
+    var pcShelfList by remember { mutableStateOf(emptyList<PcShelf>()) }
+    // A scan still running republishes the library and the shelves move: the
+    // cursor stays on its game ([cursorAfter]) instead of on a position.
+    fun keepCursor(old: List<PcShelf>, new: List<PcShelf>) {
+        val (shelf, item) = cursorAfter(old, new, state.shelfIndex, state.itemIndex)
+        state.shelfIndex = shelf
+        state.itemIndex = item
+    }
     LaunchedEffect(games, others) {
         val all = games ?: return@LaunchedEffect
-        shelves = withContext(Dispatchers.Default) { withRetroHero(pcShelves(all, others = others)) }
+        val next = withContext(Dispatchers.Default) { withRetroHero(homeShelves(all, others)) }
+        if (state.home && !state.stripFocused) keepCursor(homeShelfList, next)
+        homeShelfList = next
     }
+    LaunchedEffect(games) {
+        val all = games ?: return@LaunchedEffect
+        val next = withContext(Dispatchers.Default) { pcShelves(all) }
+        if (state.view == PcView.OVERVIEW && !state.stripFocused) keepCursor(pcShelfList, next)
+        pcShelfList = next
+    }
+    val shelves = if (state.home) homeShelfList else pcShelfList
     LaunchedEffect(games) {
         val all = games ?: return@LaunchedEffect
         counts = withContext(Dispatchers.Default) { pcViewCounts(all, scope) }
@@ -309,7 +370,7 @@ internal fun PcGamesSection(
 
     // The library, as this tab shows it right now, and the game under the cursor.
     val currentShelf = shelves.getOrNull(state.shelfIndex)
-    val currentList: List<LibraryEntry> = if (state.home) currentShelf?.entries.orEmpty() else grid
+    val currentList: List<LibraryEntry> = if (state.onShelves) currentShelf?.entries.orEmpty() else grid
     LaunchedEffect(shelves.size, currentList.size) {
         state.shelfIndex = state.shelfIndex.coerceIn(0, (shelves.size - 1).coerceAtLeast(0))
         state.itemIndex = state.itemIndex.coerceIn(0, (currentList.size - 1).coerceAtLeast(0))
@@ -359,30 +420,42 @@ internal fun PcGamesSection(
     LaunchedEffect(focusedEntry?.id) { focusedEntry?.let { backdropArt = it.backdropArt() } }
     PreloadBackdrops(remember(currentList, state.itemIndex) { neighbourBackdrops(currentList, state.itemIndex) })
 
-    // The strip: one chip per view (built-in, store, saved). Home is not on
-    // it; B from a view returns to the shelves.
-    val stripCount = views.size
+    // The strip: Overview (the shelves) first, then one chip per grid view
+    // (built-in, store, saved). Chip 0 is Overview and chip i is views[i - 1].
+    // Home has no strip; B from a grid view returns to Overview.
+    val stripCount = views.size + 1
     fun activateChip(index: Int) {
-        val view = views.getOrNull(index) ?: return
+        if (index !in 0 until stripCount) return
         state.stripIndex = index
-        if (!state.home && state.query == view.query) return
-        state.query = view.query
-        state.home = false
-        state.itemIndex = 0
+        if (index == 0) {
+            state.showOverview()
+            return
+        }
+        val view = views[index - 1]
+        if (state.view == PcView.GRID && state.query == view.query) return
+        state.showGrid(view.query)
     }
     val currentView = views.firstOrNull { it.query == state.query }
+    // The chip that is lit: Overview on the shelves, the grid's view when one
+    // stands for its query, none when only the pill describes it.
+    val activeChip = when {
+        state.onShelves -> 0
+        currentView != null -> views.indexOf(currentView) + 1
+        else -> -1
+    }
     // The filters the person set that no strip view stands for, as the one
     // pill at the strip's end: its text and a count, cleared by one press.
-    val filterPill = remember(grid, games, state.query, state.home, currentView != null) {
-        if (state.home || currentView != null) return@remember null
+    val filterPill = remember(grid, games, state.query, state.view, currentView != null) {
+        if (state.onShelves || currentView != null) return@remember null
         state.query.pillText(scope, grid.size, state.query.totalIn(games.orEmpty(), scope))
     }
 
     // Which level B leaves (docs/SPEC.md 6e: B always goes back one level).
+    // Home and Overview are roots: B does nothing there.
     val storesScreen = remember { SettingsScreenRegistry.get(PC_STORES_SCREEN_ID) }
     val knownEmpty = games?.isEmpty() == true
     val showingSetup = (state.setupOpen || knownEmpty) && storesScreen != null
-    val canGoBack = state.setupOpen || !state.home
+    val canGoBack = state.setupOpen || state.view == PcView.GRID
     LaunchedEffect(canGoBack) {
         // The shell's one footer draws this tab's hints too: the focused
         // element declares them ([declaresHints] below), so the tab claims
@@ -392,7 +465,8 @@ internal fun PcGamesSection(
     }
     BackHandler(enabled = canGoBack && !showingSetup) {
         EsDeNavigationSounds.play("back")
-        state.home = true
+        state.stripIndex = 0
+        state.showOverview()
     }
 
     if (showingSetup) {
@@ -411,10 +485,7 @@ internal fun PcGamesSection(
     // grid does not pull the cursor up onto the strip.
     OwnShoulders { step ->
         if (state.home) return@OwnShoulders
-        val active = when {
-            currentView != null -> views.indexOf(currentView)
-            else -> state.stripIndex.coerceIn(0, (stripCount - 1).coerceAtLeast(0))
-        }
+        val active = activeChip.takeIf { it >= 0 } ?: state.stripIndex.coerceIn(0, stripCount - 1)
         val next = menuStep(active, stripCount, step)
         if (next != active) {
             EsDeNavigationSounds.play("scroll")
@@ -426,7 +497,7 @@ internal fun PcGamesSection(
     // Sort By (docs/SPEC.md 7j), Select the focused game's menu: only what
     // dispatches, re-read as the cursor moves.
     val verb = focusedPlay?.first?.verb
-    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.home) {
+    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view) {
         // Steam's order: the list's own actions, then A and B. Start (Menu)
         // is the shell's, drawn at the row's left; L1/R1 are the glyphs at
         // the strip's ends, not hints.
@@ -435,7 +506,7 @@ internal fun PcGamesSection(
             HintBinding(GamepadAction.Y, "Sort By"),
             HintBinding(GamepadAction.SELECT, "Options"),
             HintBinding(GamepadAction.A, if (state.stripFocused) "Select" else verb ?: "Play") { state.stripFocused || focusedEntry != null },
-            HintBinding(GamepadAction.B, "Back") { !state.home },
+            HintBinding(GamepadAction.B, "Back") { state.view == PcView.GRID },
         )
     }
 
@@ -453,10 +524,10 @@ internal fun PcGamesSection(
     // it, eased on the first press and linear while a direction is held; the
     // page of shelves moves by as little as it takes (docs/SPEC.md 6e and
     // "Gaming motion and focus").
-    LaunchedEffect(state.home, state.stripFocused, state.stripIndex, state.shelfIndex, state.itemIndex, shelves, grid) {
+    LaunchedEffect(state.view, state.stripFocused, state.stripIndex, state.shelfIndex, state.itemIndex, shelves, grid) {
         when {
             state.stripFocused -> stripState.keepCentred(state.stripIndex, chained = heldStep)
-            state.home -> {
+            state.onShelves -> {
                 val shelf = shelves.getOrNull(state.shelfIndex) ?: return@LaunchedEffect
                 columnState.keepInView(state.shelfIndex, animate = !heldStep)
                 rowState(shelf.id).keepCentred(state.itemIndex, chained = heldStep)
@@ -495,10 +566,13 @@ internal fun PcGamesSection(
                             // Never the tab bar (owner, 2026-09-27): the top
                             // of this tab is its strip, and Up there stays.
                             state.stripFocused -> Unit
+                            // Overview's first shelf goes up to the strip;
                             // Home has no strip above its first shelf.
-                            state.home -> if (state.shelfIndex > 0) {
+                            state.onShelves -> if (state.shelfIndex > 0) {
                                 val next = state.shelfIndex - 1
                                 moveTo(next, state.shelfItems[shelves[next].id] ?: 0)
+                            } else if (!state.home) {
+                                state.stripFocused = true
                             }
                             else -> {
                                 val target = gridPadTarget(state.itemIndex, grid.size, gridColumns(), FocusDirection.Up)
@@ -507,7 +581,7 @@ internal fun PcGamesSection(
                         }
                         GamepadAction.DOWN -> when {
                             state.stripFocused -> if (currentList.isNotEmpty()) state.stripFocused = false
-                            state.home -> if (state.shelfIndex < shelves.lastIndex) {
+                            state.onShelves -> if (state.shelfIndex < shelves.lastIndex) {
                                 val next = state.shelfIndex + 1
                                 moveTo(next, state.shelfItems[shelves[next].id] ?: 0)
                             }
@@ -522,7 +596,7 @@ internal fun PcGamesSection(
                                     if (next != state.stripIndex) EsDeNavigationSounds.play("scroll")
                                     state.stripIndex = next
                                 }
-                                state.home -> moveTo(state.shelfIndex, menuStep(state.itemIndex, currentList.size, step))
+                                state.onShelves -> moveTo(state.shelfIndex, menuStep(state.itemIndex, currentList.size, step))
                                 else -> gridPadTarget(
                                     state.itemIndex, grid.size, gridColumns(),
                                     if (step < 0) FocusDirection.Left else FocusDirection.Right,
@@ -544,12 +618,12 @@ internal fun PcGamesSection(
                     true
                 },
         ) {
-            // The one strip above the grid, with L1 and R1 at its ends: it
-            // owns the shoulders while this tab is up (OwnShoulders above),
-            // and the active filter is its last pill.
+            // The one strip above the shelves or the grid, with L1 and R1 at
+            // its ends: it owns the shoulders while this tab is up
+            // (OwnShoulders above), and the active filter is its last pill.
             if (!state.home) ViewStrip(
-                labels = views.map { pcStripLabel(it, counts) },
-                active = views.indexOfFirst { it === currentView },
+                labels = listOf(VIEW_OVERVIEW) + views.map { pcStripLabel(it, counts) },
+                active = activeChip,
                 focused = if (state.stripFocused) state.stripIndex else null,
                 pill = filterPill,
                 onSelect = { index ->
@@ -566,7 +640,7 @@ internal fun PcGamesSection(
                 games == null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MenuTokens.OnSurface)
                 }
-                state.home -> PcShelvesHome(
+                state.onShelves -> PcShelvesHome(
                     shelves = shelves,
                     state = state,
                     columnState = columnState,
@@ -579,6 +653,7 @@ internal fun PcGamesSection(
                     downloads = downloads,
                     partsOf = ::partsOf,
                     systemNames = systemNames,
+                    mixed = state.home,
                 )
                 else -> {
                     if (grid.isEmpty()) {
@@ -637,11 +712,7 @@ internal fun PcGamesSection(
             base = games.orEmpty(),
             query = state.query,
             savedViews = views,
-            onQueryChange = { query ->
-                state.query = query
-                state.home = false
-                state.itemIndex = 0
-            },
+            onQueryChange = { query -> state.showGrid(query) },
             onSearch = {
                 state.filterOpen = false
                 state.searchOpen = true
@@ -664,11 +735,7 @@ internal fun PcGamesSection(
         LibrarySortSheet(
             scope = scope,
             query = state.query,
-            onQueryChange = { query ->
-                state.query = query
-                state.home = false
-                state.itemIndex = 0
-            },
+            onQueryChange = { query -> state.showGrid(query) },
             onDismiss = { state.sortOpen = false },
         )
     }
@@ -684,11 +751,7 @@ internal fun PcGamesSection(
             query = state.query,
             matchCount = grid.size,
             totalCount = all.size,
-            onTextChange = {
-                state.query = state.query.copy(text = it)
-                state.home = false
-                state.itemIndex = 0
-            },
+            onTextChange = { state.showGrid(state.query.copy(text = it)) },
             onDismiss = { state.searchOpen = false },
             suggestions = suggestions,
         )
@@ -697,7 +760,7 @@ internal fun PcGamesSection(
         // The list's own options (jump to letter, random, get games, the
         // PC scrape, PC setup): the same menu every gamelist's Select
         // opens, over the list as it is shown right now.
-        val listed = if (state.home) games.orEmpty() else grid
+        val listed = if (state.onShelves) games.orEmpty() else grid
         GamelistOptionsMenu(
             groupKey = "PC",
             groupLabel = "PC Games",
@@ -706,11 +769,10 @@ internal fun PcGamesSection(
             onDismiss = { state.optionsOpen = false },
             games = listed,
             onJumpTo = { index ->
-                if (state.home) {
+                if (state.onShelves) {
                     // The letters were counted over the whole library in
                     // name order, which is the All games view.
-                    state.query = LibraryQuery()
-                    state.home = false
+                    state.showGrid(LibraryQuery())
                 }
                 state.stripFocused = false
                 state.itemIndex = index.coerceIn(0, (listed.size - 1).coerceAtLeast(0))
@@ -787,7 +849,11 @@ internal fun PcGamesSection(
     )
 }
 
-/** The shelves, one horizontal row of capsules each, with the cursor's shelf heading drawn brighter. */
+/**
+ * The shelves, one horizontal row of capsules each, with the cursor's shelf
+ * heading drawn brighter: Home's and PC Games' Overview alike. [mixed] is
+ * Home, whose recent shelves carry a source badge per card.
+ */
 @Composable
 private fun PcShelvesHome(
     shelves: List<PcShelf>,
@@ -799,6 +865,7 @@ private fun PcShelvesHome(
     downloads: Map<String, StoreDownloads.Progress>,
     partsOf: (LibraryEntry) -> Int,
     systemNames: Map<String, String>,
+    mixed: Boolean,
 ) {
     val window = LocalShellWindow.current
     if (shelves.isEmpty()) {
@@ -815,13 +882,21 @@ private fun PcShelvesHome(
     LazyColumn(
         state = columnState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = Space.Sm, bottom = Space.Lg),
+        // Home has no strip: its first row starts under the floating status
+        // cluster, the band Steam's top bar takes, never beneath it.
+        contentPadding = PaddingValues(
+            top = if (mixed) maxOf(Space.Sm, StatusClusterRoom.size.height) else Space.Sm,
+            bottom = Space.Lg,
+        ),
         verticalArrangement = Arrangement.spacedBy(Space.Lg),
     ) {
         itemsIndexed(shelves, key = { _, shelf -> shelf.id }) { shelfIndex, shelf ->
             val onThisShelf = !state.stripFocused && state.shelfIndex == shelfIndex
             Column {
-                Text(
+                // The hero row of what was being played carries no heading,
+                // as the Deck's recent row has none: the hero card's own
+                // caption ("Played today · 2 h") says what the row is.
+                if (!(shelfIndex == 0 && shelf.id == SHELF_CONTINUE)) Text(
                     shelf.heading,
                     color = if (onThisShelf) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                     style = TypeRole.rowTitle,
@@ -840,7 +915,7 @@ private fun PcShelvesHome(
                     itemsIndexed(shelf.entries, key = { _, entry -> entry.id }) { itemIndex, entry ->
                         // The game most likely wanted leads the first shelf as a
                         // landscape hero card (docs/SPEC.md 7i, "Home art").
-                        val hero = shelf.id == SHELF_CONTINUE && itemIndex == 0
+                        val hero = isHeroCard(shelfIndex, itemIndex)
                         PcCapsule(
                             entry = entry,
                             selected = onThisShelf && state.itemIndex == itemIndex,
@@ -850,8 +925,8 @@ private fun PcShelvesHome(
                             download = entry.downloadKey()?.let { downloads[it] },
                             parts = partsOf(entry),
                             hero = hero,
-                            // The two shelves that mix sources say where each is from.
-                            badge = if (shelf.id == SHELF_CONTINUE || shelf.id == SHELF_RECENTLY_ADDED) homeSourceLabel(entry, systemNames) else null,
+                            // Home's two shelves that mix sources say where each is from.
+                            badge = if (mixed && (shelf.id == SHELF_CONTINUE || shelf.id == SHELF_RECENTLY_ADDED)) homeSourceLabel(entry, systemNames) else null,
                         )
                     }
                 }

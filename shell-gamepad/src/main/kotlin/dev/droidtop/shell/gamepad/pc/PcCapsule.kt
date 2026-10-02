@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.GameNaming
+import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.kindLine
@@ -316,6 +317,9 @@ internal fun focusLine(entry: LibraryEntry, play: PcPlayState?, parts: Int): Str
     entry.pcInfo?.takeIf { entry.isStoreRow() }?.let { add(it.source) }
     play?.takeIf { it.store != null }?.let { add(if (it.progress != null) "${it.verb} ${(it.progress * 100).toInt()}%" else it.verb) }
     entry.pcInfo?.installedVersion?.let { add(it) }
+    // The version-management fact a shelf or the grid owes the focused game:
+    // a version a source knows of that this device does not have (docs/SPEC.md 7g).
+    entry.availableUpdate?.let { add(GameUpdates.line(it)) }
     entry.pcInfo?.sizeBytes?.takeIf { it > 0 }?.let { add(downloadSizeLabel(it)) }
     if (parts > 1) add("$parts copies")
 }.joinToString(" · ")

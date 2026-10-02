@@ -310,7 +310,9 @@ private fun GamepadShellBody(
     // here for the same reason the back stack is: the tab is rebuilt
     // whenever another tab is shown (docs/SPEC.md 7i).
     val pcGames = rememberSaveable(saver = sessionOnly(dev.droidtop.shell.gamepad.pc.PcGamesState.Saver)) {
-        dev.droidtop.shell.gamepad.pc.PcGamesState().apply { home = !GamingPrefs.opensOnPcGrid(context) }
+        dev.droidtop.shell.gamepad.pc.PcGamesState().apply {
+            if (GamingPrefs.opensOnPcGames(context)) view = dev.droidtop.shell.gamepad.pc.PcView.OVERVIEW
+        }
     }
     // Bumps whenever a real "Browse themes" deep-link arrives (see
     // deepLinkToken's own doc comment) -- SettingsCatalogView opens its
@@ -1331,15 +1333,7 @@ private fun GamepadShellBody(
             // On Retro Games it yields to a theme that draws its own clock
             // or system status (docs/SPEC.md 7k2), so the two never overlap.
             if (!screensaverOn && !(section == GamingSection.GAMES && GamingTheme.palette.drawsOwnStatus)) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(horizontal = shellWindow.edgePadding, vertical = 8.dp)
-                        .background(MenuTokens.Surface.copy(alpha = 0.58f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                ) {
-                    StatusCluster(showBatteryPercent = true, onClick = { quickMenuOpen = true })
-                }
+                FloatingStatusCluster(onClick = { quickMenuOpen = true }, modifier = Modifier.align(Alignment.TopEnd))
             }
             // A theme that draws its own help legend (a pad is attached, so
             // the legend is the theme's) names nothing of the two menus and
@@ -1421,7 +1415,7 @@ private fun <T : Any> sessionOnly(inner: Saver<T, Any>): Saver<T, Any> = Saver(
 private object GamingPrefs {
     private fun prefs(context: Context) = CatalogPrefs.prefs(context)
 
-    /** Home (the default) and "pc" both start in PC Games; [opensOnPcGrid] tells them apart. */
+    /** Home (the default) and "pc" both start in PC Games; [opensOnPcGames] tells them apart. */
     fun defaultSection(context: Context): GamingSection =
         when (prefs(context).getString(GamingSettingsCatalog.ID_DEFAULT_SECTION, "home")) {
             "apps" -> GamingSection.APPS
@@ -1429,7 +1423,8 @@ private object GamingPrefs {
             else -> GamingSection.PC_GAMES
         }
 
-    fun opensOnPcGrid(context: Context): Boolean =
+    /** "pc": open on PC Games' Overview rather than Home (docs/SPEC.md 7i). */
+    fun opensOnPcGames(context: Context): Boolean =
         prefs(context).getString(GamingSettingsCatalog.ID_DEFAULT_SECTION, "home") == "pc"
 
     fun showHints(context: Context): Boolean =
