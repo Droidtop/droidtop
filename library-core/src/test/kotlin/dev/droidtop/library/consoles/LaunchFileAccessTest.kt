@@ -1,6 +1,7 @@
 package dev.droidtop.library.consoles
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,5 +96,12 @@ class LaunchFileAccessTest {
     @Test
     fun aGameWithoutAFolderHasNoSiblings() {
         assertEquals(emptyList<java.io.File>(), CompanionFiles.candidates(java.io.File("lone.iso")))
+    }
+
+    @Test
+    fun theSetupScreenPointsAtFileAccessOnlyWhenThePathVariantExistsAndCannotBeUsed() {
+        assertTrue(emulatorNeedsAllFilesAccess(hasPathTemplate = true, emulatorReadsPaths = false))
+        assertFalse(emulatorNeedsAllFilesAccess(hasPathTemplate = true, emulatorReadsPaths = true))
+        assertFalse(emulatorNeedsAllFilesAccess(hasPathTemplate = false, emulatorReadsPaths = false))
     }
 }

@@ -51,6 +51,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -215,6 +217,14 @@ fun CatalogNavigator(
 
     fun refresh() {
         version++
+    }
+
+    // Coming back from another app's screen (Android's All files access page, a store page) re-reads the
+    // rows, so a row that described what that screen changes shows the new state. The first resume is the
+    // screen opening, which has just loaded the rows.
+    var resumedOnce by remember { mutableStateOf(false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (resumedOnce) refresh() else resumedOnce = true
     }
 
     // Moving to a DIFFERENT row disarms a pending confirm. Re-selecting the

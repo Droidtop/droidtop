@@ -5975,12 +5975,21 @@ not covered; those take a `storagePathTemplate` (plain path) row where the emula
 The PS2 emulator rows (NetherSX2 and the AetherSX2 families, and other PS2 rows that document a plain path
 launch) carry `storagePathTemplate` in droidtop-platforms, so with all-files access they never need the URI.
 
-**droidtop does not ask about another app's file access** (owner, 2026-10-02, Droidtop/tracker#270). An
-emulator's file permissions are the emulator's and the person's business, not droidtop's: a launch never stops
-to ask for, offer, or check All files access on the emulator's behalf, and there is no "Give access" or "Launch
-anyway" step. A launch builds its intent from the preset and dispatches; if the emulator cannot open the file,
-it reports that itself. Which template a launch uses (`launchTemplateFor`) and how the file reaches the emulator
-(the provider and the sibling grants above) are unchanged here and wait on a separate owner decision.
+**File access is help in emulator setup, never a launch step** (owner, 2026-10-02, Droidtop/tracker#270).
+An emulator's file permissions are the emulator's and the person's business: a launch never stops to ask for,
+offer or check All files access, and there is no "Give access" or "Launch anyway" step. It builds its intent
+from the preset and dispatches; an emulator that cannot open the file reports that itself. The help sits where
+the emulator is configured, Settings > Library > Emulators: for an emulator whose preset carries a
+`storagePathTemplate` and that does not hold All files access (the read-only `emulatorReadsStoragePaths`
+check, rule `emulatorNeedsAllFilesAccess`), the per-system page and the "Found on this device" list show one
+short row "<Emulator> needs All files access" whose "Open settings" action opens Android's own All files
+access screen for that package (`ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION` with a `package:` URI; the
+general screen, then the app's details page, if that cannot open). The Launch test result ends with a line
+pointing at that row. Settings re-reads its rows when it is resumed, so the row goes away once the access is
+given. droidtop never grants anything. When a launch has issues, the failure dialog carries one muted line,
+"Emulator setup: Settings, Library, Emulators.", and no extra button. `launchTemplateFor` is unchanged: the
+plain path is used when the emulator holds access, the row's own template otherwise. The file provider and
+the sibling grants above are unchanged too.
 
 **The launch watchdog** (`LaunchWatchdog`, `LaunchWatchPolicy`). `LaunchDisplay.dispatch`, the one point
 every launch passes, starts it for a game launch. It runs off the main thread, every 3 s for at most 90 s,

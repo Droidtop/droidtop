@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.app.AppOpsManager
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import java.io.File
 
 /**
@@ -58,6 +60,39 @@ fun emulatorReadsStoragePaths(context: Context, packageName: String): Boolean = 
         pm.checkPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE, packageName) == PackageManager.PERMISSION_GRANTED
     }
 }.getOrDefault(false)
+
+/**
+ * Whether the emulator setup screens should point at All files access for an emulator
+ * (Droidtop/tracker#270): its preset has a plain-path launch ([hasPathTemplate]) and the emulator
+ * cannot read plain paths ([emulatorReadsPaths] false). A hint only; a launch never waits on it.
+ * Pure so the rule is testable without a device.
+ */
+fun emulatorNeedsAllFilesAccess(hasPathTemplate: Boolean, emulatorReadsPaths: Boolean): Boolean =
+    hasPathTemplate && !emulatorReadsPaths
+
+/** [emulatorNeedsAllFilesAccess] for [player]. Reads AppOps and PackageManager, so not for the main thread. */
+fun playerNeedsAllFilesAccess(context: Context, player: Player.AmStart): Boolean =
+    player.storagePathTemplate != null &&
+        emulatorNeedsAllFilesAccess(hasPathTemplate = true, emulatorReadsPaths = emulatorReadsStoragePaths(context, player.packageName))
+
+/**
+ * Opens Android's own All files access screen for [packageName] (API 30+); when that cannot open, the
+ * general All files access list, then the app's details page. droidtop only opens the screen and never
+ * grants anything. True when one of them opened.
+ */
+fun openAllFilesAccessSettings(context: Context, packageName: String): Boolean {
+    val uri = Uri.parse("package:$packageName")
+    val intents = buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            add(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, uri))
+            add(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+        }
+        add(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, uri))
+    }
+    return intents.any { intent ->
+        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
+    }
+}
 
 /** The outcome of getting a launch ready: an Intent to send, or why none can be built. */
 sealed interface PreparedLaunch {

@@ -14,8 +14,11 @@ import dev.droidtop.library.consoles.RomDatabase
 import dev.droidtop.library.consoles.SystemFolders
 import dev.droidtop.library.consoles.availablePlayers
 import dev.droidtop.library.consoles.detectEmulatorApps
+import dev.droidtop.library.consoles.emulatorReadsStoragePaths
 import dev.droidtop.library.consoles.explainLaunchFailure
 import dev.droidtop.library.consoles.libretroCoreId
+import dev.droidtop.library.consoles.openAllFilesAccessSettings
+import dev.droidtop.library.consoles.playerNeedsAllFilesAccess
 import dev.droidtop.library.consoles.prepareLaunch
 import dev.droidtop.library.consoles.resolveEmulator
 import dev.droidtop.library.integrations.PluginEventBus
@@ -60,6 +63,16 @@ object EmulatorsCatalog {
         indexGroups = { context -> groups(context, forIndex = true) },
     )
 
+    // The one hint row for an emulator that can launch from a plain path but lacks All files access
+    // (Droidtop/tracker#270): it only opens Android's own screen for the package; droidtop grants nothing.
+    private fun fileAccessRow(id: String, name: String, packageName: String): ActionItem = ActionItem(
+        id = id,
+        title = "$name needs All files access",
+        subtitle = "Opens Android's All files access screen for it. droidtop never grants it for you.",
+        value = "Open settings",
+        run = { ctx -> openAllFilesAccessSettings(ctx, packageName) },
+    )
+
     private fun appLabel(context: Context, packageName: String): String = runCatching {
         val pm = context.packageManager
         pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
@@ -73,6 +86,7 @@ object EmulatorsCatalog {
             .map { it to appLabel(context, it.packageName) }
             .sortedBy { it.second.lowercase() }
         val globalPackage = EmulatorDefaults.globalPackage(context)
+        val pathPackages = KnownPlayers.all(context).filter { it.player.storagePathTemplate != null }.map { it.pkg }.toSet()
         buildList {
             add(
                 CatalogGroup(
@@ -107,10 +121,10 @@ object EmulatorsCatalog {
                             ),
                         )
                     } else {
-                        installed.map { (app, label) ->
+                        installed.flatMap { (app, label) ->
                             val names = app.systemIds.mapNotNull { systemNames[it] }.sorted()
                             val shown = names.take(4).joinToString(", ") + if (names.size > 4) " and more" else ""
-                            ActionItem(
+                            val row = ActionItem(
                                 id = "emulator_app_${app.packageName}",
                                 title = label,
                                 subtitle = "Can run ${names.size} " + (if (names.size == 1) "system" else "systems") +
@@ -118,6 +132,13 @@ object EmulatorsCatalog {
                                 value = "Installed",
                                 run = {},
                             )
+                            val needsAccess = app.packageName in pathPackages &&
+                                !emulatorReadsStoragePaths(context, app.packageName)
+                            if (needsAccess) {
+                                listOf(row, fileAccessRow("emulator_access_${app.packageName}", label, app.packageName))
+                            } else {
+                                listOf(row)
+                            }
                         }
                     },
                 ),
@@ -199,6 +220,11 @@ object EmulatorsCatalog {
                                 value = resolved?.player?.name ?: "None",
                                 run = {},
                             ),
+                            *listOfNotNull(
+                                resolved?.player?.takeIf { playerNeedsAllFilesAccess(context, it) }?.let {
+                                    fileAccessRow("emulator_access_${system.id}", it.name, it.packageName)
+                                },
+                            ).toTypedArray(),
                             NestedScreenItem(
                                 id = "emulator_test_open_${system.id}",
                                 title = "Launch test",
@@ -380,23 +406,33 @@ object EmulatorsCatalog {
         onStatus: (String) -> Unit,
     ): String {
         onStatus("Checking the emulator...")
-        val (resolved, prepared) = withContext(Dispatchers.IO) {
+        val (resolved, prepared, needsAccess) = withContext(Dispatchers.IO) {
             val alt = runCatching { RomDatabase.get(context).romDao().getGameMetadataSingle(file.absolutePath)?.altEmulator }.getOrNull()
             val resolved = resolveEmulator(context, system, alt)
-            resolved to resolved?.let { prepareLaunch(context, system, it.player, file, checkGameFile = true) }
+            Triple(
+                resolved,
+                resolved?.let { prepareLaunch(context, system, it.player, file, checkGameFile = true) },
+                resolved?.let { playerNeedsAllFilesAccess(context, it.player) } == true,
+            )
         }
         if (resolved == null || prepared == null) {
             return "Test failed: no emulator for ${system.displayName} is installed. Install one from this screen's list."
         }
         val name = resolved.player.name
+        // A hint, never a blocker: the launch was or was not sent exactly as it would be from the shell.
+        val accessHint = if (needsAccess) {
+            " $name needs All files access: the row on this system's emulator screen opens Android's settings for it."
+        } else {
+            ""
+        }
         return when (prepared) {
-            is PreparedLaunch.Blocked -> "Test failed: ${prepared.reason}"
+            is PreparedLaunch.Blocked -> "Test failed: ${prepared.reason}$accessHint"
             is PreparedLaunch.Ready -> try {
                 withContext(Dispatchers.Main) { LaunchDisplay.start(context, prepared.intent) }
                 "Sent to $name (${resolved.source.label}). If it opened and showed the game, this system is set up. " +
-                    "If $name opened without the game, its own settings need a look."
+                    "If $name opened without the game, its own settings need a look.$accessHint"
             } catch (e: Exception) {
-                "Test failed: ${explainLaunchFailure(e, name)}"
+                "Test failed: ${explainLaunchFailure(e, name)}$accessHint"
             }
         }
     }
