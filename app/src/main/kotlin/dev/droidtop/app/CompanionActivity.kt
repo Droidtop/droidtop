@@ -279,7 +279,7 @@ internal fun CompanionNotifications() {
             }
         }
         if (items.size > 4) {
-            Text("+" + (items.size - 4) + " more in the Quick Menu", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+            Text("+" + (items.size - 4) + " more", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

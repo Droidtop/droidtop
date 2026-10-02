@@ -83,14 +83,13 @@ class TaskPolicyTest {
 
     @Test
     fun `clear all summarises what was confirmed and what was only asked`() {
-        assertEquals("Nothing to close.", ClearAllSummary.of(emptyList()).message)
-        assertEquals("Closed 2 apps.", ClearAllSummary.of(listOf(CloseOutcome.Closed, CloseOutcome.Closed)).message)
-        assertEquals("Closed 1 app.", ClearAllSummary.of(listOf(CloseOutcome.Closed)).message)
+        assertEquals("Nothing to close", ClearAllSummary.of(emptyList()).message)
+        assertEquals("Closed 2 apps", ClearAllSummary.of(listOf(CloseOutcome.Closed, CloseOutcome.Closed)).message)
+        assertEquals("Closed 1 app", ClearAllSummary.of(listOf(CloseOutcome.Closed)).message)
         val asked = ClearAllSummary.of(listOf(CloseOutcome.Requested("x")))
-        assertTrue(asked.message.startsWith("Asked Android to close 1 app."))
-        assertTrue(asked.message.contains(TaskPolicy.ENABLE_HINT))
+        assertEquals("Not confirmed: 1 app", asked.message)
         val mixed = ClearAllSummary.of(listOf(CloseOutcome.Closed, CloseOutcome.Requested("x"), CloseOutcome.Failed("y")))
         assertEquals(ClearAllSummary(1, 1, 1), mixed)
-        assertTrue(mixed.message.startsWith("Closed 1, asked Android to close 1, could not close 1."))
+        assertTrue(mixed.message.startsWith("Closed 1, not confirmed 1, failed 1"))
     }
 }

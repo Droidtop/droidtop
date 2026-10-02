@@ -104,7 +104,8 @@ object TaskPolicy {
     fun otherDisplay(current: Int, all: List<Int>): Int? =
         if (current != 0 && 0 in all) 0 else all.firstOrNull { it != current }
 
-    /** The one sentence a Close or Clear all that could not confirm anything shows, saying what to enable. */
-    const val ENABLE_HINT =
-        "Android does not let droidtop end another app on its own. Enable the Shizuku plugin in Settings > Plugins to close apps for real."
+    /** What a row says after a close Android never confirmed; [NOT_CONFIRMED_TIP] explains it on hover, long-press or focus. */
+    const val NOT_CONFIRMED = "Not confirmed"
+
+    const val NOT_CONFIRMED_TIP = "Android does not report whether the app closed. The Shizuku plugin closes apps for real."
 }

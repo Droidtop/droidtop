@@ -31,9 +31,9 @@ class AppCloser(
         }
         return when {
             providerFailure != null ->
-                CloseOutcome.Failed("The privileged helper could not close $packageName: $providerFailure. ${TaskPolicy.ENABLE_HINT}")
-            asked -> CloseOutcome.Requested("Asked Android to close it; it does not say whether it did. ${TaskPolicy.ENABLE_HINT}")
-            else -> CloseOutcome.Failed("Android refused to let droidtop ask. ${TaskPolicy.ENABLE_HINT}")
+                CloseOutcome.Failed("Helper failed: $providerFailure")
+            asked -> CloseOutcome.Requested(TaskPolicy.NOT_CONFIRMED)
+            else -> CloseOutcome.Failed("Android refused")
         }
     }
 

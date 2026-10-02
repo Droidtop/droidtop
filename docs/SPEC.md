@@ -2951,17 +2951,25 @@ picks the tab it opens on. Standard's own second screen keeps its launcher-style
   Android's thermal status are given), GPU load and other apps' frame rate (root or Shizuku). Per-app CPU is
   shown only with a running `priv.shell` provider, from `dumpsys cpuinfo` every six seconds while the tab shows.
 - **System** (`CompanionSystemTab`) is `SystemControls` and the existing job and storage sources, no second
-  mechanism: volume; brightness and screen timeout behind the one Modify system settings grant (the tab says
-  so and offers the grant, re-checked on return); Do Not Disturb behind its own grant; Wi-Fi, Bluetooth and
-  airplane mode, which a normal app cannot switch, so with a `priv.shell` provider the row runs the shell's own
-  command (`SystemControls.radioCommand`) and without one it opens Android's own switch and says the Shizuku
-  plugin would let droidtop do it; internal storage free and total; and the running downloads and jobs from
+  mechanism: volume; brightness and screen timeout behind the one Modify system settings grant (a greyed
+  slider with an "Allow" chip offers the grant, re-checked on return); Do Not Disturb behind its own grant;
+  Wi-Fi, Bluetooth and airplane mode, which a normal app cannot switch, so with a `priv.shell` provider the
+  row runs the shell's own command (`SystemControls.radioCommand`) and without one the rows are not drawn;
+  internal storage free and total; and the running downloads and jobs from
   `PluginJobsCenter`. `SystemControls.SCREEN_TIMEOUTS` is the one timeout list (the Gaming catalog uses it
   too). Standard's inline controls use the same `SystemSliders` and `DndPill`.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 
-Across companion and new UI surfaces, a screen may carry at most one short helper line; sentences are for errors and confirmations. Permission and capability explanations stay behind an info affordance or appear only when the user asks for detail.
+**Copy: labels and values, never prose (owner, 2026-10-02, Droidtop/tracker#285, strictest form).** No
+explanatory sentence is ever visible on a companion screen or the shared running-apps list. State is shown by
+the control itself: a row reading "Closing…" and then disappearing, a greyed slider with an "Allow" chip,
+"Nothing running" for an empty list (an empty state is two or three words). A control that needs the Shizuku
+plugin (the radio switches, per-app load) is not drawn at all without a shell provider, and simply works when
+one is present; there is no greyed control, no "opens Android's switch" fallback and no text about it. Any
+explanation that still has to exist lives in `HintTip` (`:shell-gamepad`), the app's one tooltip: long-press
+on touch, rest the pointer for a mouse, a short focus dwell for the pad. Sentences are for real errors only;
+there are no "Info" links. The rest of the app follows the same rule.
 
 ### iiSU uses Android's own secondary-display home
 

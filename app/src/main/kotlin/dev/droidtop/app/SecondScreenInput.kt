@@ -173,7 +173,7 @@ class SecondScreenInputView(
         status.gravity = Gravity.CENTER
         addView(status, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
-        imePicker.text = "Use droidtop's keyboard for the second screen"
+        imePicker.text = "Use droidtop keyboard"
         imePicker.gravity = Gravity.CENTER
         imePicker.setOnClickListener {
             (context.getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)
@@ -312,18 +312,18 @@ class SecondScreenInputView(
     private fun statusText(): String = when {
         mode == SecondaryDisplayContent.Mode.DESKTOP ->
             if (DesktopSessionService.state.value is DesktopSessionState.Connected) {
-                "Trackpad and keyboard — primary container"
+                "Trackpad and keyboard"
             } else {
-                "No desktop session — start one to use this surface"
+                "No desktop session"
             }
 
         !SecondScreenKeyboard.imeRunning ->
-            "Swipe to navigate. Choose droidtop's keyboard below to type on the second screen."
+            "Keyboard off"
 
         !SecondScreenKeyboard.androidTargetAvailable() ->
-            "Swipe to navigate. Typing goes to a text field once one is focused on the other screen."
+            "No text field"
 
-        else -> "Swipe to navigate, tap to select, two fingers to go back."
+        else -> "Touchpad"
     }
 
     private companion object {

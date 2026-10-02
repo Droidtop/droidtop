@@ -1,0 +1,85 @@
+package dev.droidtop.shell.gamepad
+
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import kotlinx.coroutines.delay
+
+/**
+ * The app's one tooltip (docs/SPEC.md "Copy: labels and values, never prose"). Wraps [content] and shows
+ * [text] in a small bubble below it: on a long-press (touch, gone after a few seconds), after the pointer
+ * rests on it (mouse), or after focus has stayed on it or a child for a moment (pad). A null [text] draws
+ * [content] alone, so a caller can pass the explanation only when there is one. Explanations never appear
+ * as visible text on a screen; they live here.
+ */
+@Composable
+fun HintTip(text: String?, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    if (text == null) {
+        Box(modifier = modifier) { content() }
+        return
+    }
+    val source = remember { MutableInteractionSource() }
+    val hovered by source.collectIsHoveredAsState()
+    var focused by remember { mutableStateOf(false) }
+    var touched by remember { mutableStateOf(false) }
+    var settled by remember { mutableStateOf(false) }
+    LaunchedEffect(hovered, focused) {
+        settled = false
+        if (hovered || focused) {
+            delay(TIP_DELAY_MS)
+            settled = true
+        }
+    }
+    LaunchedEffect(touched) {
+        if (touched) {
+            delay(TIP_TOUCH_MS)
+            touched = false
+        }
+    }
+    Box(
+        modifier = modifier
+            .hoverable(source)
+            .onFocusChanged { focused = it.hasFocus }
+            .pointerInput(Unit) { detectTapGestures(onLongPress = { touched = true }) },
+    ) {
+        content()
+        if (touched || (settled && (hovered || focused))) {
+            Popup(alignment = Alignment.BottomStart) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.inverseSurface,
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Text(
+                        text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private const val TIP_DELAY_MS = 600L
+private const val TIP_TOUCH_MS = 3_000L

@@ -67,7 +67,6 @@ internal fun AppsTab(onDismiss: () -> Unit) {
     var message by remember { mutableStateOf<String?>(null) }
     // Clear all, waiting for its second press: set when it found more than a few apps to close.
     var clearAllArmed by remember { mutableStateOf(false) }
-    var showDetails by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     // The other screen, when there is one: a display manager call, read once rather than per recomposition.
     val displays = remember { TaskManager.displayIds(context) }
@@ -97,10 +96,10 @@ internal fun AppsTab(onDismiss: () -> Unit) {
                             val targets = TaskManager.clearAllTargets(context)
                             if (TaskPolicy.needsClearAllConfirm(targets.size) && !clearAllArmed) {
                                 clearAllArmed = true
-                                message = "Press A again to close ${targets.size} apps"
+                                message = "Press A again: close ${targets.size}"
                             } else {
                                 clearAllArmed = false
-                                message = "Closing ${targets.size} apps..."
+                                message = "Closing…"
                                 message = TaskManager.clearAll(context, targets).message
                             }
                         }
@@ -109,19 +108,18 @@ internal fun AppsTab(onDismiss: () -> Unit) {
                         if (failure == null) onDismiss() else message = failure
                     }
                     GamepadAction.X -> if (app != null) {
-                        message = "Closing ${app.label}..."
+                        message = "Closing…"
                         scope.launch {
                             val outcome = TaskManager.close(context, app.packageName)
-                            message = "${app.label}: ${outcome.text}"
+                            message = if (outcome is dev.droidtop.runtime.tasks.CloseOutcome.Closed) null else outcome.text
                             TaskManager.refresh(context)
                         }
                     }
                     GamepadAction.Y -> if (app != null) {
                         val target = TaskPolicy.otherDisplay(app.displayId, TaskManager.displayIds(context))
                         message = when {
-                            target == null -> "There is only one screen."
+                            target == null -> "One screen only"
                             else -> TaskActions.bringTo(context, app.packageName, target)
-                                ?: "Asked Android to move ${app.label} to the ${TaskPolicy.displayLabel(target).lowercase()}."
                         }
                     }
                     else -> Unit
@@ -129,13 +127,8 @@ internal fun AppsTab(onDismiss: () -> Unit) {
                 true
             },
     ) {
-        snapshot?.note?.let { note ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Limited app list", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
-                Text("  Info", color = MenuTokens.Value, style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.clickable { showDetails = !showDetails }.padding(8.dp))
-            }
-            if (showDetails) Text(note, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
+        if (snapshot?.note != null) {
+            Text("Limited list", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
         }
         // Scrolls, and MenuRow brings the selected row into view itself.
         Column(
@@ -145,9 +138,9 @@ internal fun AppsTab(onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (snapshot == null) {
-                Text("Reading the running apps...", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
+                Text("Reading…", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             } else if (apps.isEmpty()) {
-                Text("No apps running", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
+                Text("Nothing running", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             }
             SharedRunningAppsList(
                 apps = apps,
@@ -206,7 +199,10 @@ fun SharedRunningAppsList(
                 AppIcon(app.packageName, modifier = Modifier.padding(start = 12.dp))
                 Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text(app.label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                    Text(rowMessage(i) ?: TaskPolicy.displayLabel(app.displayId), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    val rowText = rowMessage(i)
+                    HintTip(if (rowText == TaskPolicy.NOT_CONFIRMED) TaskPolicy.NOT_CONFIRMED_TIP else null) {
+                        Text(rowText ?: TaskPolicy.displayLabel(app.displayId), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    }
                 }
                 // A tap on the row switches to the app; this asks for it on the other screen.
                 if (displays.any { it != app.displayId }) SharedTaskAction("Move", false) { onMove(i, app) }

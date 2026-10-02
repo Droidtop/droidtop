@@ -337,13 +337,6 @@ object SystemControls {
         }
     }
 
-    /** The system screen that holds [radio]'s own switch, for when nothing privileged can flip it. */
-    fun radioPanelIntent(radio: Radio): Intent = when (radio) {
-        Radio.WIFI -> internetPanelIntent()
-        Radio.BLUETOOTH -> bluetoothSettingsIntent()
-        Radio.AIRPLANE -> Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-
     /** Whether [radio] is on; null when the platform does not say. No permission beyond what droidtop holds. */
     fun radioOn(context: Context, radio: Radio): Boolean? = runCatching {
         when (radio) {

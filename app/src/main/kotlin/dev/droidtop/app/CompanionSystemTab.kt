@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.runtime.systemstatus.SystemControls
 import dev.droidtop.runtime.tasks.TaskManager
+import dev.droidtop.shell.gamepad.HintTip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -46,9 +47,9 @@ import kotlinx.coroutines.withContext
  * The companion's System tab (docs/SPEC.md "The companion's tabs"): the controls Android lets an app own
  * (volume, brightness and screen timeout behind the one Modify system settings grant, Do Not Disturb
  * behind its own), the radios (Wi-Fi, Bluetooth, airplane) which only a privileged provider can flip and
- * which otherwise open Android's own switch, and storage and background-job status. All of it is
- * [SystemControls] and the existing job and storage sources: this file is only the touch surface. Where
- * Android would refuse, the line says what is needed.
+ * which are not drawn without one, and storage and background-job status. All of it is
+ * [SystemControls] and the existing job and storage sources: this file is only the touch surface. State
+ * is shown by the controls themselves; the one explanation lives in a [HintTip].
  */
 @Composable
 internal fun CompanionSystemTab() {
@@ -101,16 +102,21 @@ internal fun SystemSliders() {
                 )
             }
         } else {
-            GrantLine("Brightness and screen timeout need the Modify system settings permission.")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HintTip("Needs the Modify system settings permission") {
+                    Text("Brightness", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Slider(
+                    value = brightness,
+                    onValueChange = {},
+                    enabled = false,
+                    valueRange = 0f..255f,
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                )
+                CompanionPill("Allow") { context.startActivity(SystemControls.brightnessGrantIntent(context)) }
+            }
         }
     }
-}
-
-@Composable
-private fun GrantLine(text: String) {
-    val context = LocalContext.current
-    CompanionNote(text)
-    CompanionPill("Allow") { context.startActivity(SystemControls.brightnessGrantIntent(context)) }
 }
 
 @Composable
@@ -149,8 +155,8 @@ internal fun DndPill() {
 }
 
 /**
- * One row per radio with its state and a switch. With a `priv.shell` provider the switch flips the radio
- * for real; without one it opens Android's own screen for it, and the card says why.
+ * One row per radio with its state and a switch, shown only while a `priv.shell` provider (Shizuku) can
+ * flip it for real; without one the rows are not drawn at all (docs/SPEC.md "Copy: labels and values").
  */
 @Composable
 private fun RadioRows() {
@@ -158,8 +164,9 @@ private fun RadioRows() {
     val scope = rememberCoroutineScope()
     var tick by remember { mutableIntStateOf(0) }
     var shell by remember { mutableStateOf(false) }
-    var note by remember { mutableStateOf<String?>(null) }
+    var failed by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { shell = withContext(Dispatchers.IO) { TaskManager.shell.capabilities().shellCommand } }
+    if (!shell) return
     SystemControls.Radio.entries.forEach { radio ->
         val on = remember(tick) { SystemControls.radioOn(context, radio) }
         Row(
@@ -172,21 +179,19 @@ private fun RadioRows() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            CompanionPill(if (shell && on != null) (if (on) "Turn off" else "Turn on") else "Open") {
-                if (shell && on != null) {
+            if (on != null) {
+                CompanionPill(if (on) "Turn off" else "Turn on") {
                     scope.launch {
                         val out = withContext(Dispatchers.IO) { TaskManager.shell.exec(SystemControls.radioCommand(radio, !on)) }
-                        note = if (out != null && out.exit == 0) null else "${radio.label} could not be switched by the provider."
+                        failed = if (out != null && out.exit == 0) null else "${radio.label}: failed"
                         delay(RADIO_SETTLE_MS)
                         tick++
                     }
-                } else {
-                    context.startActivity(SystemControls.radioPanelIntent(radio))
                 }
             }
         }
     }
-    CompanionNote(note ?: if (shell) "Switching goes through the Shizuku plugin." else "Switching these on and off needs the Shizuku plugin; without it each opens Android's own switch.")
+    failed?.let { CompanionNote(it) }
 }
 
 private const val RADIO_SETTLE_MS = 1_200L
@@ -201,7 +206,7 @@ private fun StorageLine() {
             }.getOrNull()
         }
     }
-    val (free, total) = storage ?: run { CompanionNote("Reading storage..."); return }
+    val (free, total) = storage ?: run { CompanionNote("Reading…"); return }
     Text(storageText(free, total), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
     val used = if (total > 0) ((total - free).toFloat() / total).coerceIn(0f, 1f) else 0f
     Box(
@@ -232,7 +237,7 @@ private fun JobsLines() {
     val jobs by PluginJobsCenter.entries().collectAsState()
     val active = jobs.filter { !it.done }
     if (active.isEmpty()) {
-        CompanionNote("No downloads or jobs are running.")
+        CompanionNote("Nothing running")
         return
     }
     Text(

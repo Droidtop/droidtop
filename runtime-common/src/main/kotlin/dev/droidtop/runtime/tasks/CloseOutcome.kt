@@ -5,7 +5,7 @@ sealed interface CloseOutcome {
     /** A privileged provider ended the package, and said so. */
     data object Closed : CloseOutcome
 
-    /** droidtop asked Android to end it; nothing confirms that it did. [message] says so and what to enable. */
+    /** droidtop asked Android to end it; nothing confirms that it did. [message] is the short [TaskPolicy.NOT_CONFIRMED]. */
     data class Requested(val message: String) : CloseOutcome
 
     /** A provider tried and could not. [message] is its own words. */
@@ -24,10 +24,10 @@ val CloseOutcome.text: String
 data class ClearAllSummary(val closed: Int, val requested: Int, val failed: Int) {
     val message: String
         get() = when {
-            closed + requested + failed == 0 -> "Nothing to close."
-            requested == 0 && failed == 0 -> "Closed $closed ${noun(closed)}."
-            closed == 0 && failed == 0 -> "Asked Android to close $requested ${noun(requested)}. ${TaskPolicy.ENABLE_HINT}"
-            else -> "Closed $closed, asked Android to close $requested, could not close $failed. ${TaskPolicy.ENABLE_HINT}"
+            closed + requested + failed == 0 -> "Nothing to close"
+            requested == 0 && failed == 0 -> "Closed $closed ${noun(closed)}"
+            closed == 0 && failed == 0 -> "${TaskPolicy.NOT_CONFIRMED}: $requested ${noun(requested)}"
+            else -> "Closed $closed, not confirmed $requested, failed $failed"
         }
 
     private fun noun(count: Int) = if (count == 1) "app" else "apps"

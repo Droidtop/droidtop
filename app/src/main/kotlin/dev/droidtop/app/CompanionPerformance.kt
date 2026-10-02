@@ -31,6 +31,7 @@ import dev.droidtop.runtime.systemstatus.AppCpu
 import dev.droidtop.runtime.systemstatus.PerfSample
 import dev.droidtop.runtime.systemstatus.PerformanceMonitor
 import dev.droidtop.runtime.tasks.TaskManager
+import dev.droidtop.shell.gamepad.HintTip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -41,8 +42,8 @@ import kotlinx.coroutines.withContext
  * heat now, each with a graph of the last three minutes from [PerformanceMonitor]'s ring buffer (the one
  * shared sampler; the Quick Menu reads the same history). The sampling loop and the per-app loop run only
  * while this tab is composed AND its window is started (`repeatOnLifecycle`), so a hidden tab or a
- * stopped companion polls nothing. A figure Android does not give a normal app is said to be missing and
- * what would supply it, never drawn from a guess.
+ * stopped companion polls nothing. A figure Android does not give a normal app is never drawn from a guess;
+ * the card that needs a shell provider (per-app load) is not drawn without one.
  */
 @Composable
 internal fun CompanionPerformanceTab() {
@@ -96,48 +97,47 @@ internal fun CompanionPerformanceTab() {
                         history.map { (if (device) it.deviceCpuPercent else it.ownCpuPercent)?.toFloat() },
                         0f, 100f, colors.primary,
                     )
-                    if (latest.deviceCpuPercent == null) {
-                        CompanionNote("Whole-device load is hidden from apps on this Android version.")
-                    } else {
-                        CompanionNote("droidtop itself: ${latest.ownCpuPercent ?: 0}% of all cores")
+                    if (latest.deviceCpuPercent != null) {
+                        CompanionNote("droidtop: ${latest.ownCpuPercent ?: 0}%")
                     }
                     if (latest.deviceCpuPercent != null || latest.ownCpuPercent != null) {
                         latest.cpuMhz?.let { CompanionNote("Fastest core: $it MHz") }
                     }
-                    CompanionNote("GPU load and the frame rate of other apps are not readable without root or the Shizuku plugin.")
                 }
             },
             {
                 CompanionCard("Memory") {
                     Text("${latest.memUsedPercent}% used", style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
                     Sparkline(history.map { it.memUsedPercent.toFloat() }, 0f, 100f, colors.secondary)
-                    CompanionNote("${latest.memAvailMb} MB free of ${latest.memTotalMb} MB" + if (latest.lowMemory) ", Android reports low memory" else "")
+                    CompanionNote("${latest.memAvailMb} MB free of ${latest.memTotalMb} MB" + if (latest.lowMemory) ", low memory" else "")
                 }
             },
             {
                 CompanionCard("Battery") {
                     Text(batteryLine(latest), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
                     Sparkline(history.map { it.batteryPercent?.toFloat() }, 0f, 100f, colors.tertiary)
-                    latest.batteryMilliamps?.let { CompanionNote("Drawing or taking about $it mA") }
+                    latest.batteryMilliamps?.let { CompanionNote("$it mA") }
                 }
             },
             {
                 CompanionCard("Heat") {
-                    Text(PerformanceMonitor.tempText(latest.batteryTempTenthC), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                    HintTip("Battery sensor. Android gives apps no processor or GPU temperature.") {
+                        Text(PerformanceMonitor.tempText(latest.batteryTempTenthC), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                    }
                     Sparkline(history.map { it.batteryTempTenthC?.let { t -> t / 10f } }, 20f, 60f, colors.error)
                     CompanionNote("Thermal state: ${PerformanceMonitor.thermalLabel(latest.thermalStatus)}")
-                    CompanionNote("This is the battery sensor. Android gives apps no processor or GPU temperature.")
                 }
             },
             {
-                CompanionCard("Apps") {
-                    val apps = topApps
-                    if (apps == null) {
-                        CompanionNote("Per-app figures need the Shizuku plugin (Settings, Plugins). Without it only droidtop's own share, above, is known.")
-                    } else if (apps.isEmpty()) {
-                        CompanionNote("The provider gave no per-app figures.")
-                    } else {
-                        apps.forEach { CompanionNote("%.1f%%  %s".format(it.percent, it.packageName)) }
+                // Per-app figures exist only with a shell provider (Shizuku): without one the card is not drawn.
+                val apps = topApps
+                if (apps != null) {
+                    CompanionCard("Apps") {
+                        if (apps.isEmpty()) {
+                            CompanionNote("None")
+                        } else {
+                            apps.forEach { CompanionNote("%.1f%%  %s".format(it.percent, it.packageName)) }
+                        }
                     }
                 }
             },

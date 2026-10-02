@@ -46,7 +46,7 @@ class AppCloserTest {
         val outcome = closer(ops).close("com.android.calendar")
 
         assertTrue(outcome is CloseOutcome.Requested)
-        assertTrue(outcome.text.contains(TaskPolicy.ENABLE_HINT))
+        assertEquals(TaskPolicy.NOT_CONFIRMED, outcome.text)
         assertTrue(ops.forceStops.isEmpty())
         assertEquals(listOf("com.android.calendar"), killed)
         assertTrue(closed.isEmpty())
@@ -69,7 +69,7 @@ class AppCloserTest {
         val outcome = closer(FakeOps(TaskPrivileges.NONE), killWorks = false).close("com.android.calendar")
 
         assertTrue(outcome is CloseOutcome.Failed)
-        assertTrue(outcome.text.contains(TaskPolicy.ENABLE_HINT))
+        assertEquals("Android refused", outcome.text)
     }
 
     @Test
