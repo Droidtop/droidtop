@@ -3,6 +3,7 @@ package dev.droidtop.app.settings
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import dev.droidtop.library.integrations.PluginRepoDetection
 import dev.droidtop.library.integrations.PluginRepoUpdates
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -20,6 +21,7 @@ import dev.droidtop.net.GitHubTokenOrigin
 import dev.droidtop.net.GitHubTokenStore
 import dev.droidtop.net.SaveTokenResult
 import dev.droidtop.net.SignInResult
+import dev.droidtop.pluginhost.PluginRepoKeys
 import dev.droidtop.pluginhost.PluginRepos
 import dev.droidtop.pluginhost.PluginSourceKeys
 import dev.droidtop.pluginhost.UserOriginKey
@@ -94,6 +96,7 @@ object GitHubAccountCatalog {
                 },
                 onWaiting = { left -> Session.code?.let { onStatus(prompt(it, left)) } },
             )
+            if (result is SignInResult.SignedIn) runCatching { PluginRepoDetection.refresh(context, force = true) }
             describe(result)
         } finally {
             Session.active = false
@@ -272,7 +275,7 @@ object GitHubAccountCatalog {
     // ----- plugin repositories -----
 
     /** What the person asked to trust, held between "look up its key" and the confirmation. */
-    private class Proposal(val repo: String, val decision: PluginRepos.TrustDecision)
+    private class Proposal(val repo: String, val decision: PluginRepos.TrustDecision, val sources: String)
 
     private var pendingRepoName = ""
     private var pendingProposal: Proposal? = null
@@ -284,6 +287,8 @@ object GitHubAccountCatalog {
         val checked: Map<String, Boolean>,
         val auto: Boolean,
         val prereleases: Boolean,
+        val found: List<dev.droidtop.library.integrations.DetectedRepo>,
+        val hasPrivateScope: Boolean,
     )
 
     private fun fingerprintOf(keyBase64: String) = UserOriginKeys.fingerprint(keyBase64) ?: "unreadable"
@@ -311,6 +316,8 @@ object GitHubAccountCatalog {
                     checked = repos.associate { it.repo.orEmpty() to (PluginRepoUpdates.lastResult(context, it.repo.orEmpty()) != null) },
                     auto = PluginRepoUpdates.autoUpdate(context),
                     prereleases = PluginRepoUpdates.includePrereleases(context),
+                    found = PluginRepoDetection.cached(context),
+                    hasPrivateScope = GitHubTokenStore.credential(context)?.scope == GitHubOAuth.SCOPE_PRIVATE_REPOS,
                 )
             }
             val repos = read.repos
@@ -366,6 +373,7 @@ object GitHubAccountCatalog {
                     ),
                 ),
                 pendingProposal?.let(::proposalGroup),
+                foundGroup(read),
                 CatalogGroup(
                     id = "repos_updates",
                     title = "Updates",
@@ -391,17 +399,81 @@ object GitHubAccountCatalog {
         },
     )
 
+    /** "Found for you": repositories the signed-in person can reach that look like plugin repositories, from the cached detection; trusting one goes through the same confirmation. */
+    private fun foundGroup(read: RepoScreenData): CatalogGroup? {
+        if (!read.signedIn) return null
+        val items = buildList<CatalogItem> {
+            read.found.filter { f -> read.repos.none { PluginRepos.sameRepo(it.repo, f.repo) } }.forEach { f ->
+                add(
+                    AsyncActionItem(
+                        id = "repos_found_${f.repo}",
+                        title = f.repo,
+                        subtitle = (if (f.isPrivate) "Private. " else "") + "Look up its committed key and review it before trusting",
+                        run = { ctx, onStatus ->
+                            pendingRepoName = f.repo
+                            lookUp(ctx, f.repo, onStatus)
+                        },
+                    ),
+                )
+            }
+            if (isEmpty()) {
+                add(ActionItem(id = "repos_found_none", title = "Nothing found yet", subtitle = "Repositories you can access with the topic ${PluginRepoDetection.TOPIC}, or a plugin name and a published key, show up here", run = {}))
+            }
+            add(
+                AsyncActionItem(
+                    id = "repos_found_refresh",
+                    title = "Look again",
+                    subtitle = "Reads the repositories you can access (cached for hours; it never installs anything on them)",
+                    run = { ctx, onStatus ->
+                        onStatus("Reading your repositories...")
+                        describeDetection(PluginRepoDetection.refresh(ctx, force = true))
+                    },
+                ),
+            )
+            if (!read.hasPrivateScope) {
+                add(
+                    AsyncActionItem(
+                        id = "repos_found_private",
+                        title = "Include private repositories",
+                        subtitle = "Only needed for a private repository. GitHub offers private repositories only as a broad read and write permission, " +
+                            "which droidtop uses only to read. A pasted fine-grained token with read-only access is the narrower option",
+                        run = { ctx, onStatus ->
+                            val message = signIn(ctx, GitHubOAuth.SCOPE_PRIVATE_REPOS, onStatus)
+                            message + " " + describeDetection(PluginRepoDetection.refresh(ctx, force = true))
+                        },
+                    ),
+                )
+            }
+        }
+        return CatalogGroup(id = "repos_found", title = "Found for you", items = items)
+    }
+
+    private fun describeDetection(outcome: PluginRepoDetection.Outcome): String = when (outcome) {
+        is PluginRepoDetection.Outcome.Done -> "Found ${outcome.found.size} plugin repositor${if (outcome.found.size == 1) "y" else "ies"} you can access."
+        PluginRepoDetection.Outcome.NotSignedIn -> "Sign in to GitHub first."
+        is PluginRepoDetection.Outcome.RateLimited -> "GitHub's request limit is used up for now; the earlier list is kept."
+        is PluginRepoDetection.Outcome.Failed -> "Couldn't read your repositories (${outcome.reason})."
+    }
+
     private fun lookUp(context: Context, input: String, onStatus: (String) -> Unit): String {
         val repo = PluginRepos.parse(input) ?: return "Type the repository as owner/name, like octocat/hello-world."
-        onStatus("Fetching the key from $repo...")
+        onStatus("Reading the key committed to $repo...")
         pendingProposal = null
-        val token = GitHubTokenStore.get(context)
-        return when (val fetched = PluginSourceKeys.fetchKey(PluginRepos.sourceUrl(repo), token)) {
-            is PluginSourceKeys.FetchResult.Failed ->
-                fetched.reason + if (token == null) " If $repo is private, sign in to GitHub first." else ""
-            is PluginSourceKeys.FetchResult.Fetched -> {
-                val decision = PluginRepos.decide(repo, fetched.key, UserOriginKeys.load(UserOriginKeys.storeFile(context)))
-                pendingProposal = Proposal(repo, decision)
+        val credential = GitHubTokenStore.credential(context)
+        return when (val fetched = PluginRepoKeys.fetch(repo, credential?.token)) {
+            is PluginRepoKeys.Result.Failed -> {
+                val privateHint = when {
+                    credential == null -> " If $repo is private, sign in to GitHub first."
+                    credential.origin == GitHubTokenOrigin.DEVICE_FLOW && credential.scope != GitHubOAuth.SCOPE_PRIVATE_REPOS ->
+                        " If $repo is private, use \"Include private repositories\" below."
+                    else -> ""
+                }
+                "Refused: " + fetched.reason + privateHint
+            }
+            is PluginRepoKeys.Result.Fetched -> {
+                val published = fetched.found.key
+                val decision = PluginRepos.decide(repo, published, UserOriginKeys.load(UserOriginKeys.storeFile(context)))
+                pendingProposal = Proposal(repo, decision, fetched.found.describeSources(repo))
                 when (decision) {
                     is PluginRepos.TrustDecision.Propose, is PluginRepos.TrustDecision.Adopt -> "Review its key below. Nothing is trusted until you confirm."
                     is PluginRepos.TrustDecision.AlreadyTrusted -> "$repo is already trusted with this same key."
@@ -416,8 +488,8 @@ object GitHubAccountCatalog {
     private fun proposalGroup(proposal: Proposal): CatalogGroup {
         val repo = proposal.repo
         val items = when (val decision = proposal.decision) {
-            is PluginRepos.TrustDecision.Propose -> confirmItems(repo, decision.published, adopt = false)
-            is PluginRepos.TrustDecision.Adopt -> confirmItems(repo, decision.published, adopt = true)
+            is PluginRepos.TrustDecision.Propose -> confirmItems(repo, decision.published, adopt = false, sources = proposal.sources)
+            is PluginRepos.TrustDecision.Adopt -> confirmItems(repo, decision.published, adopt = true, sources = proposal.sources)
             is PluginRepos.TrustDecision.AlreadyTrusted -> listOf(
                 ActionItem(id = "repos_proposal_info", title = "$repo is already trusted", subtitle = "Same key, fingerprint ${fingerprintOf(decision.published.keyBase64)}", run = {}),
             )
@@ -455,11 +527,11 @@ object GitHubAccountCatalog {
         )
     }
 
-    private fun confirmItems(repo: String, published: PluginSourceKeys.PublishedKey, adopt: Boolean): List<CatalogItem> = listOf(
+    private fun confirmItems(repo: String, published: PluginSourceKeys.PublishedKey, adopt: Boolean, sources: String): List<CatalogItem> = listOf(
         ActionItem(
             id = "repos_proposal_info",
             title = "Trust the plugin repository $repo?",
-            subtitle = "Origin \"${published.origin}\", key fingerprint ${fingerprintOf(published.keyBase64)}. Trusting means: plugins signed with this key can be " +
+            subtitle = "Origin \"${published.origin}\", key fingerprint ${fingerprintOf(published.keyBase64)}. Where the key comes from: $sources. Trusting means: plugins signed with this key can be " +
                 "installed and are updated automatically from $repo, and they show \"Verified by: $repo\". Each plugin still runs only after you " +
                 "approve it, and anything an update newly asks for asks you first. droidtop has not vetted this repository and cannot tell whose key it " +
                 "is; compare the fingerprint with one the author published if you can.",

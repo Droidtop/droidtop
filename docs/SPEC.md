@@ -12177,11 +12177,21 @@ the secondary path for sources that publish no key.
 - **Plugin repositories (owner, 2026-10-01, Droidtop/tracker#259: add the
   repository, trust its key automatically, and auto-update).** Plugins screen,
   "Plugin repositories": the person types `owner/name` (or pastes the address
-  from a browser). The key is read from the repository the way every source's key
-  is (the existing `droidtop-plugin-key.json` at the root of its default
-  branch, fetched with the person's token so a private repository works; there is
-  no second key mechanism). droidtop then shows a plain confirmation: the
-  repository name, the origin id, the key fingerprint and what trusting means
+  from a browser). The trusted reference is the `droidtop-plugin-key.json`
+  COMMITTED at the root of the repository's default branch (owner, 2026-10-01: a
+  human-reviewed commit, independent of CI, so a hijacked build cannot choose the
+  key; the same file and reader as every source's key, `PluginSourceKeys`,
+  fetched with the person's token so a private repository works). The copy the
+  repository's CI attaches to its releases (including `build-<branch>` ones) is
+  only a cross-check (`PluginRepoKeys`): when the newest release carrying one
+  has a different origin or key, or its copy cannot be read, droidtop REFUSES to
+  trust the repository and says "the key published by the build does not match
+  the key committed to the repository: this can mean the build was tampered with".
+  A missing root file is refused too; a release copy never stands in for it, and
+  later bundles must verify against the root-file key the person confirmed. No
+  release copy at all is accepted (nothing to compare). droidtop then shows a
+  plain confirmation: the repository name, the origin id, where the key comes
+  from and whether the build's copy matches, the key fingerprint and what trusting means
   (plugins signed with this key can be installed and are updated automatically,
   each still runs only after the person approves it, anything an update newly
   asks for asks first, droidtop has not vetted the repository and cannot tell
@@ -12200,6 +12210,23 @@ the secondary path for sources that publish no key.
   the repository and adds it again. droidtop never creates, searches for or
   handles a signing key anywhere in this: it only verifies what a repository
   publishes against what the person confirmed.
+- **Found for you (owner, 2026-10-01, Droidtop/tracker#259).** Sign-in keeps the
+  OAuth App (no GitHub App is installed on any repository): the signed-in token
+  reads the repositories the person can access, so a plugin repository they are
+  given access to is DETECTED. `PluginRepoDetection` lists `/user/repos` (owner,
+  collaborator and organisation-member repositories, at most five pages), keeps
+  those with the topic `droidtop-plugin`, and for repositories without it whose
+  name contains "plugin" makes one release request each (at most 25 per pass)
+  looking for a published `droidtop-plugin-key.json`. It runs off the main thread
+  after sign-in and on "Look again", the result is cached for twelve hours, and a
+  rate limit keeps the earlier list. Plugin repositories shows the not-yet-trusted
+  ones as "Found for you"; choosing one runs the same committed-key lookup and the
+  same confirmation as a typed name, so detection never trusts anything. The private
+  scope is incremental: sign-in asks for none, and "Include private repositories"
+  (shown when the token lacks it, and hinted when a lookup of a private repository
+  fails) repeats the sign-in with `repo`, saying on screen that GitHub only offers a
+  broad read and write scope for private repositories, that droidtop only reads,
+  and that a pasted fine-grained read-only token is the narrower option.
 - **Auto-update from a trusted repository (Droidtop/tracker#259).**
   `PluginRepoUpdates.runDue` rides on the Software updates pass
   (`AppSelfUpdate.maybeCheck`: its frequency, its off switch, its process-start
@@ -12254,8 +12281,9 @@ the secondary path for sources that publish no key.
 Unit-tested in `net-core` (`GitHubDeviceFlowTest`: interval, `slow_down`, denial,
 expiry, cancel, offline; `GitHubAccountTest`: the credential store seam), in
 `plugin-host` (`PluginReposTest`: repository names, the trust decisions, update
-eligibility) and in `library-core` (`PluginRepoUpdatesTest`: release reading and
-wording), and earlier in `plugin-host` (`UserOriginKeysTest`, `PluginSourceKeysTest`,
+eligibility; `PluginRepoKeysTest`: committed key, release cross-check match,
+mismatch, missing root file, changed key) and in `library-core`
+(`PluginRepoUpdatesTest`: release reading and wording; `PluginRepoDetectionTest`), and earlier in `plugin-host` (`UserOriginKeysTest`, `PluginSourceKeysTest`,
 `BundleSignatureTest`, `PluginBundleInstallerTest`): official verify,
 user-key verify, unknown origin refused, user key removed then refused,
 user origin claiming "droidtop" refused, official-first resolution, and
