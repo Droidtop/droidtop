@@ -225,6 +225,8 @@ class PluginGrants(private val dir: File) {
         for (export in old.manifest.v2.exports) states[EXPORT_PREFIX + export.api] = exportState(snap, export.api)
         // Explicit entries the user set win over what was just derived.
         states.putAll(snap.states.filterKeys { it in states })
+        // Category and call overrides (Droidtop/tracker#263) are the user's own and outlive an update.
+        states.putAll(snap.states.filterKeys { it.startsWith(PluginPermissionPolicy.CATEGORY_PREFIX) || it.startsWith(PluginPermissionPolicy.CALL_PREFIX) })
         for (declared in new.manifest.v2.permissions) {
             if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX) || declared.id in states) continue
             states[declared.id] = if (declared.id in diff.permissions) GrantState.ASK else defaultFor(new, declared)

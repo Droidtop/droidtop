@@ -35,9 +35,6 @@ interface PrivilegedShell {
     fun grantPermission(packageName: String, permission: String): Boolean = false
 }
 
-/** Existing name retained for callers while all task management moves to [PrivilegedShell]. */
-typealias PrivilegedOps = PrivilegedShell
-
 /** No helper installed: every call is "nothing to ask". */
 object NoPrivilegedOps : PrivilegedShell {
     override fun available(): TaskPrivileges = TaskPrivileges.NONE

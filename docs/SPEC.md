@@ -2582,7 +2582,7 @@ a close path of its own. Every call works off the main thread.
 
 - **Ending an app: one path, strongest first** (`TaskPolicy.closeSteps`, `AppCloser`):
   1. A `priv.packages` provider force-stops the package (the official Shizuku plugin, or a root
-     provider: root and Shizuku are provider plugins reached through `PrivilegedOps`, never code in
+     provider: root and Shizuku are provider plugins reached through `PrivilegedShell`, never code in
      the task manager, and root is only ever an enhancement behind the same interface).
   2. `ActivityManager.killBackgroundProcesses` (the `KILL_BACKGROUND_PROCESSES` normal permission),
      always tried last. It ends a process only while it is cached, and nothing confirms the result, so
