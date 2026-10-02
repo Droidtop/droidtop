@@ -31,6 +31,8 @@ import dev.droidtop.library.scraper.TheGamesDbPrefs
 import dev.droidtop.library.scraper.TheGamesDbSystemIds
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import android.util.Log
+import dev.droidtop.library.userFacingErrorMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -107,7 +109,11 @@ internal fun ManualMatchPicker(
             ScrapeLookup.NoMatch -> "TheGamesDB has nothing under this name."
             is ScrapeLookup.Refused -> "TheGamesDB refused the search (HTTP ${result.httpStatus})" +
                 (result.reason?.let { ": $it" } ?: ".")
-            null -> "The search failed: ${lookup.exceptionOrNull()?.message}"
+            null -> {
+                val exc = lookup.exceptionOrNull()
+                Log.w("droidtop.gamepad", "Manual match search failed", exc)
+                userFacingErrorMessage(exc)
+            }
         }
     }
 

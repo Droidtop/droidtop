@@ -17,6 +17,8 @@ import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.runtime.windows.PcLibrary
 import dev.droidtop.runtime.windows.SteamAccess
 import dev.droidtop.runtime.windows.displayName
+import android.util.Log
+import dev.droidtop.library.userFacingErrorMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -97,7 +99,11 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
                 AMAZON -> app.gamenative.service.amazon.AmazonService.triggerLibrarySync(context)
                 ITCH -> {
                     val synced = app.gamenative.service.itch.ItchService.syncLibrary(context)
-                    if (synced.isFailure) return@withContext "Sync failed: ${synced.exceptionOrNull()?.message ?: "unknown error"}"
+                    if (synced.isFailure) {
+                        val exc = synced.exceptionOrNull()
+                        Log.w("droidtop.stores", "Sync failed for itch.io", exc)
+                        return@withContext userFacingErrorMessage(exc)
+                    }
                 }
                 STEAM -> Unit
             }

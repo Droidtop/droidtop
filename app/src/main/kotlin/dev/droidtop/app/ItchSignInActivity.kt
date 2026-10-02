@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.sp
 import dev.droidtop.app.ui.DroidtopTheme
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
+import android.util.Log
+import dev.droidtop.library.userFacingErrorMessage
 import kotlinx.coroutines.launch
 import app.gamenative.service.itch.ItchAuthManager
 
@@ -85,7 +87,9 @@ class ItchSignInActivity : AppCompatActivity() {
                 delay(1500)
                 finish()
             } else {
-                status = result.exceptionOrNull()?.message ?: "Sign-in failed."
+                val exc = result.exceptionOrNull()
+                Log.w("droidtop.itch", "Sign-in failed", exc)
+                status = userFacingErrorMessage(exc)
             }
         }
     }

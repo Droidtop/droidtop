@@ -8855,7 +8855,12 @@ keyless thumbnails gave a cover is found AND refused, and a source that
 refused every request leads the summary with that refusal and its fix
 whatever the thumbnails found (rig, dq-shell2-01: a wrong key read "found
 1"). A JSON error body is reduced to its own sentence (`status`, `message`,
-`error`), never shown raw. **A list follows its selection only as far as it takes to show it**
+`error`), never shown raw. User-facing errors from any failure (store sync,
+search, mount, VPN, sign-in, integration) use `userFacingErrorMessage` (`library-core`):
+"Could not connect. Check your connection and try again." for
+`IOException`/`UnknownHostException`/timeouts, else "Something went wrong. Try again
+in a moment."; the exception detail is logged with `Log.w`, not shown.
+**A list follows its selection only as far as it takes to show it**
 (settings, choice pickers, the Quick Menu): a row already wholly on screen
 does not move, so a tap never scrolls the next row under the finger (rig,
 dq-shell2-01), and the settings navigator keeps each depth's scroll and

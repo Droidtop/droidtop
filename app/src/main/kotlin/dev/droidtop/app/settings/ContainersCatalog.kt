@@ -49,6 +49,8 @@ import dev.droidtop.shell.standard.BackButtonMenu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import android.util.Log
+import dev.droidtop.library.userFacingErrorMessage
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -470,7 +472,9 @@ object ContainersCatalog {
                         val outcome = withContext(Dispatchers.IO) {
                             runCatching { runtime.setExtraMounts(container, mounts + ExtraMount(resolved.absolutePath, name)) }
                         }
-                        outcome.exceptionOrNull()?.message
+                        val exc = outcome.exceptionOrNull()
+                        Log.w("droidtop.containers", "Extra mount failed", exc)
+                        exc?.let { userFacingErrorMessage(it) }
                     },
                 ),
             )

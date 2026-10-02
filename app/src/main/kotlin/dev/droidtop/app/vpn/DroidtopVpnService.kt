@@ -6,6 +6,7 @@ import android.net.ConnectivityManager
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import dev.droidtop.library.userFacingErrorMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -97,7 +98,9 @@ class DroidtopVpnService : VpnService() {
             }
             val started = runCatching { establish(config, socket) }
             if (started.isFailure) {
-                fail(started.exceptionOrNull()?.message ?: "the VPN could not start")
+                val exc = started.exceptionOrNull()
+                Log.w(TAG, "VPN start failed", exc)
+                fail(userFacingErrorMessage(exc))
                 return@launch
             }
             // The state follows the endpoint for as long as the VPN is up.

@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad
 
+import android.util.Log
+import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.shell.gamepad.input.PadCadence
 import android.content.Context
 import androidx.compose.foundation.background
@@ -1571,7 +1573,8 @@ private fun EntryDetailScreen(
                                     file = target.file,
                                 )
                             }.exceptionOrNull()?.let { failure ->
-                                "${integration.label} failed: ${failure.message ?: failure::class.java.simpleName}"
+                                Log.w("droidtop.gamepad", "Integration failed: ${integration.label}", failure)
+                                "${integration.label} failed: ${userFacingErrorMessage(failure)}"
                             }
                         },
                     )
