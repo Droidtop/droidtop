@@ -34,6 +34,9 @@ class DroidtopFileProvider : FileProvider() {
         // The super call is the validation: it resolves the URI against
         // file_paths.xml and throws for one that is not droidtop's to serve.
         val columns = projection?.toList()?.toTypedArray() ?: FileDocumentColumns.ALL_COLUMNS
+        // A companion file an emulator probes for may not exist: answer no rows, not a made-up size.
+        val requested = FileDocumentColumns.filePathOf(uri.path)
+        if (requested != null && !File(requested).exists()) return MatrixCursor(columns, 0)
         val base = super.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)
         val identity = base.use { if (it.moveToFirst()) it.getString(0) to it.getLong(1) else null }
             ?: return MatrixCursor(columns, 0)
@@ -94,4 +97,29 @@ internal object FileDocumentColumns {
      */
     internal fun filePathOf(uriPath: String?): String? =
         uriPath?.takeIf { it.startsWith("/root/") }?.let { "/" + it.removePrefix("/root/") }
+}
+
+/**
+ * The files beside a game that an emulator may open next to it. The provider
+ * serves only URIs droidtop granted, so a launch grants these too: each one a
+ * read-only grant for the launched app, made per launch and dropped by Android
+ * with it. A candidate that does not exist is still granted, so the probe
+ * reaches the provider and gets "not found" (an optional file is allowed to be
+ * missing) instead of SecurityException. Only the game's own base name or full
+ * name with a known companion extension qualifies; nothing else in the folder.
+ */
+internal object CompanionFiles {
+    val EXTENSIONS: List<String> = listOf(
+        "sym", "cue", "bin", "m3u", "sbi", "ppf", "pnach", "srm", "sav", "state", "ips", "bps", "cht",
+    )
+
+    /** The sibling paths of [game] to grant, never [game] itself. */
+    fun candidates(game: File): List<File> {
+        val dir = game.parentFile ?: return emptyList()
+        return linkedSetOf(game.nameWithoutExtension, game.name)
+            .filter { it.isNotEmpty() }
+            .flatMap { stem -> EXTENSIONS.map { File(dir, "$stem.$it") } }
+            .filter { it != game }
+            .distinct()
+    }
 }

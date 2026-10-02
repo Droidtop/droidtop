@@ -386,6 +386,18 @@ object AmStartCommandToIntentConverter {
                 } catch (e: SecurityException) {
                     android.util.Log.w("droidtop.AmStart", "Could not pre-grant $fileUri to $targetPackage", e)
                 }
+                // Emulators probe files beside the game (a symbol file, a cue sheet, a patch);
+                // each needs its own grant or the probe raises SecurityException, and a
+                // sibling that does not exist then answers "not found" instead.
+                val game = File(filePath!!)
+                for (sibling in CompanionFiles.candidates(game)) {
+                    val siblingUri = FileProvider.getUriForFile(context, fileProviderAuthority(context), sibling)
+                    try {
+                        context.grantUriPermission(targetPackage, siblingUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (e: SecurityException) {
+                        android.util.Log.w("droidtop.AmStart", "Could not pre-grant $siblingUri to $targetPackage", e)
+                    }
+                }
             }
         }
         return intent

@@ -16,7 +16,7 @@ class LaunchWatchdogTest {
     @Test
     fun aQuietLaunchIsJustKeptUnderWatch() {
         assertEquals(WatchVerdict.Keep, look(3_000))
-        assertEquals(WatchVerdict.Keep, look(60_000))
+        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.SLOW_MS - 1))
     }
 
     @Test
@@ -51,14 +51,32 @@ class LaunchWatchdogTest {
     }
 
     @Test
-    fun anAppThatIsListedAndHasSettledIsLeftAlone() {
-        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.SETTLED_MS - 1, taskListed = true))
-        assertEquals(WatchVerdict.Stop, look(LaunchWatchPolicy.SETTLED_MS, taskListed = true))
+    fun aLiveResponsiveAppStillInFrontGetsOnlyTheGentleNoticeAfterTheSlowLimit() {
+        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.SLOW_MS - 1, taskListed = true))
+        assertEquals(WatchVerdict.Trouble(LaunchTrouble.TAKING_LONG), look(LaunchWatchPolicy.SLOW_MS, taskListed = true))
+        assertEquals(WatchVerdict.Trouble(LaunchTrouble.TAKING_LONG), look(LaunchWatchPolicy.SLOW_MS, taskListed = null))
     }
 
     @Test
-    fun withoutAHelperTheWatchEndsAtTheLimitAndClaimsNothingAboutABlackScreen() {
-        assertEquals(WatchVerdict.Stop, look(LaunchWatchPolicy.WATCH_MS, taskListed = null))
+    fun aPersonWhoReturnedToTheShellIsNeverToldTheLaunchIsSlow() {
+        assertEquals(WatchVerdict.Stop, look(LaunchWatchPolicy.SLOW_MS + 5_000, shellCameBack = true, taskListed = true))
+    }
+
+    @Test
+    fun theSlowNoticeIsGentleAndAnErrorIsNot() {
+        fun alert(t: LaunchTrouble) = LaunchAlert("a.b", "Example Emu", t, "m", "p")
+        assertTrue(alert(LaunchTrouble.TAKING_LONG).gentle)
+        assertTrue(LaunchTrouble.entries.filter { it != LaunchTrouble.TAKING_LONG }.none { alert(it).gentle })
+    }
+
+    @Test
+    fun afterTheNoticeTheShellComingBackKeepsItButAClosedAppOrTheLimitEndsIt() {
+        fun after(elapsed: Long, shellCameBack: Boolean = false, notResponding: Boolean = false, taskListed: Boolean? = true) =
+            LaunchWatchPolicy.afterNotice(WatchObservation(elapsed, shellCameBack, notResponding, taskListed))
+        assertEquals(WatchVerdict.Keep, after(60_000, shellCameBack = true))
+        assertEquals(WatchVerdict.Stop, after(60_000, taskListed = false))
+        assertEquals(WatchVerdict.Stop, after(LaunchWatchPolicy.WATCH_MS))
+        assertEquals(WatchVerdict.Trouble(LaunchTrouble.NOT_RESPONDING), after(60_000, notResponding = true))
     }
 
     @Test

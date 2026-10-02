@@ -69,4 +69,30 @@ class LaunchFileAccessTest {
         assertNull(FileDocumentColumns.filePathOf("/other/storage/g.iso"))
         assertNull(FileDocumentColumns.filePathOf(null))
     }
+
+    @Test
+    fun siblingsAreTheGamesOwnNameWithACompanionExtension() {
+        val game = java.io.File("/storage/x/Roms/ps2/Example Game.iso")
+        val found = CompanionFiles.candidates(game)
+        val dir = java.io.File("/storage/x/Roms/ps2")
+        assert(java.io.File(dir, "Example Game.sym") in found)
+        assert(java.io.File(dir, "Example Game.iso.sym") in found)
+        assert(java.io.File(dir, "Example Game.cue") in found)
+        assert(java.io.File(dir, "Example Game.pnach") in found)
+    }
+
+    @Test
+    fun siblingsNeverIncludeTheGameOtherFilesOrAnotherFolder() {
+        val game = java.io.File("/storage/x/Roms/ps2/Example Game.bin")
+        val found = CompanionFiles.candidates(game)
+        assert(game !in found)
+        assert(found.all { it.parentFile == game.parentFile })
+        assert(found.all { it.name.startsWith("Example Game.") })
+        assertEquals(found.size, found.toSet().size)
+    }
+
+    @Test
+    fun aGameWithoutAFolderHasNoSiblings() {
+        assertEquals(emptyList<java.io.File>(), CompanionFiles.candidates(java.io.File("lone.iso")))
+    }
 }

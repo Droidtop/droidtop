@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
  */
 object LaunchWatchNotification {
     private const val CHANNEL_ID = "launch_watchdog"
+    private const val SLOW_CHANNEL_ID = "launch_slow"
     private const val NOTIFICATION_ID = 0x4A0C
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -46,7 +47,15 @@ object LaunchWatchNotification {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
-        manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Launch problems", NotificationManager.IMPORTANCE_HIGH))
+        // The slow-launch notice is gentle: its own default-importance channel, silent, no heads-up over a game.
+        val channelId = if (alert.gentle) SLOW_CHANNEL_ID else CHANNEL_ID
+        manager.createNotificationChannel(
+            if (alert.gentle) {
+                NotificationChannel(SLOW_CHANNEL_ID, "Slow launches", NotificationManager.IMPORTANCE_DEFAULT).apply { setSound(null, null) }
+            } else {
+                NotificationChannel(CHANNEL_ID, "Launch problems", NotificationManager.IMPORTANCE_HIGH)
+            },
+        )
         val back = PendingIntent.getActivity(
             context,
             0,
@@ -55,7 +64,7 @@ object LaunchWatchNotification {
         )
         manager.notify(
             NOTIFICATION_ID,
-            Notification.Builder(context, CHANNEL_ID)
+            Notification.Builder(context, channelId)
                 .setContentTitle(alert.message)
                 .setContentText("Tap to return to droidtop, where you can close ${alert.appName}")
                 .setSubText(alert.logPath)
