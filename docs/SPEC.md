@@ -2416,11 +2416,15 @@ the `ContainerRuntime` interface that already exists (§3):
   through the shell's one real launch path (`GamepadShell.onLaunch` —
   console ROM, PC and engine games alike, the same mechanism already
   decided for the planned Recents tab's own "launch it again" row, not
-  a second resume mechanism), and **Quit to Library** calls
+  a second resume mechanism), and **Kill** calls
   `Library.quit`, which dispatches to `LibraryProvider.quit` for the
   entry's kind. `quit` returns a `QuitResult`, not a boolean: the row's
   subtitle is `quitOutcome.message`, which starts as the pre-quit
-  promise "Ends <game>" and is replaced by the outcome when a quit runs
+  promise "End <game>" and is replaced by the outcome when a kill runs.
+  The destructive action needs two A presses: the first names the game
+  and warns that unsaved progress may be lost, and the second confirms
+  it. Changing focus clears the confirmation so an old press cannot
+  authorize a later action
   (see the next bullet). Row list, not a bespoke layout: the same shape
   a plugin's `ui.quick_tile@1` (docs/plugin-api.md C2, tracker#73) will
   append to once that extension point's host exists, so it extends this

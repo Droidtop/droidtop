@@ -6,6 +6,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class GamepadShellTest {
+    @Test
+    fun `kill requires a second activation after warning about unsaved progress`() {
+        assertEquals(true, quitNeedsConfirmation(armed = false))
+        assertEquals(false, quitNeedsConfirmation(armed = true))
+    }
+
     private fun entry(
         id: String,
         kind: LibraryEntryKind,

@@ -452,6 +452,9 @@ private data class GameQuickTile(
     val action: () -> Unit,
 )
 
+/** Returns whether a destructive quit needs a second activation. */
+internal fun quitNeedsConfirmation(armed: Boolean): Boolean = !armed
+
 /**
  * The Quick Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82): who is
  * running, and the two actions a console's in-game overlay always
@@ -587,8 +590,9 @@ private fun GameTab(
     var focusIndex by remember(entry.id) { mutableStateOf(0) }
     val focusRequester = remember { FocusRequester() }
     val press = rememberGamepadTouch()
+    var quitConfirmArmed by remember(entry.id) { mutableStateOf(false) }
 
-    val tiles = remember(entry.id, quitOutcome) {
+    val tiles = remember(entry.id, quitOutcome, quitConfirmArmed) {
         listOf(
             GameQuickTile(
                 title = "Resume",
@@ -596,10 +600,21 @@ private fun GameTab(
                 action = { onResume(entry) },
             ),
             GameQuickTile(
-                title = "Quit to Library",
-                subtitle = quitOutcome?.message ?: "Ends ${entry.title}",
+                title = "Kill",
+                subtitle = quitOutcome?.message ?: if (quitConfirmArmed) {
+                    "Press A again to end ${entry.title}; unsaved progress may be lost"
+                } else {
+                    "End ${entry.title}"
+                },
                 dangerAction = true,
-                action = { onQuit(entry) },
+                action = {
+                    if (quitNeedsConfirmation(quitConfirmArmed)) {
+                        quitConfirmArmed = true
+                    } else {
+                        quitConfirmArmed = false
+                        onQuit(entry)
+                    }
+                },
             ),
         )
     }
@@ -614,7 +629,10 @@ private fun GameTab(
             .onPad { press ->
                 when (press.action) {
                     GamepadAction.UP, GamepadAction.DOWN ->
-                        focusIndex = menuStep(focusIndex, tiles.size, if (press.action == GamepadAction.UP) -1 else 1)
+                        {
+                            quitConfirmArmed = false
+                            focusIndex = menuStep(focusIndex, tiles.size, if (press.action == GamepadAction.UP) -1 else 1)
+                        }
                     GamepadAction.B -> onDismiss()
                     GamepadAction.A -> tiles.getOrNull(focusIndex)?.action?.invoke()
                     else -> Unit
