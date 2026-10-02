@@ -15,7 +15,7 @@ import org.junit.Test
  */
 class StoreInstallVolumesTest {
 
-    private val format: (Long) -> String = { (it / 1_000_000_000).toString() + " GB" }
+    private val format: (Long) -> String = { "$it GB" }
 
     private val card = InstallVolume("SD card", "/storage/ABCD-1234/Android/data/x/files", 95L, 128L)
     private val phone = InstallVolume("Internal storage", "/storage/emulated/0/Android/data/x/files", 12L, 32L)
