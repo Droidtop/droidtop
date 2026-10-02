@@ -242,7 +242,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                     .onFailure {
                         android.util.Log.e("droidtop.MainActivity", "Companion launch of ${entry.title} failed", it)
                         // The shell's own wording for the same failure.
-                        CompanionState.launchError.value = "Couldn't launch ${entry.title}: ${it.message}"
+                        CompanionState.launchError.value = dev.droidtop.shell.gamepad.LaunchFailureMessage.userMessage(entry.title, it)
                     }
             }
         }

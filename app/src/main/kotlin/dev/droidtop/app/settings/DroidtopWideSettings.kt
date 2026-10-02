@@ -405,7 +405,10 @@ object DroidtopWideSettings {
         context.contentResolver.openOutputStream(uri)?.use { it.write(json.toString(2).toByteArray()) }
             ?: error("the file could not be opened")
         "Backup saved"
-    }.getOrElse { "Backup failed: ${it.message}" }
+    }.getOrElse {
+        android.util.Log.w("droidtop.settings", "Backup failed", it)
+        "Backup failed. Check there is space left on the storage you chose and try again."
+    }
 
     /**
      * Builds the diagnostics archive (10c) and only then opens the system
@@ -421,7 +424,10 @@ object DroidtopWideSettings {
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(Intent.createChooser(send, "Share diagnostics").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         "Diagnostics packed (${file.length() / 1024} KB); choose where to send it"
-    }.getOrElse { "Couldn't pack diagnostics: ${it.message}" }
+    }.getOrElse {
+        android.util.Log.w("droidtop.settings", "Diagnostics archive failed", it)
+        "Couldn't pack diagnostics. Check there is space left on this device and try again."
+    }
 
     private fun readBackup(context: Context, uri: Uri): String = runCatching {
         val text = context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }
@@ -447,5 +453,8 @@ object DroidtopWideSettings {
         }
         editor.apply()
         "Restored. Restart droidtop for every setting to apply."
-    }.getOrElse { "Restore failed: ${it.message}" }
+    }.getOrElse {
+        android.util.Log.w("droidtop.settings", "Restore failed", it)
+        "Restore failed. Check that the file is a droidtop backup and try again."
+    }
 }

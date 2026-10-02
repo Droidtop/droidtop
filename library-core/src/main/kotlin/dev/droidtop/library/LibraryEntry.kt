@@ -1753,7 +1753,7 @@ class Library(
                 throw t
             } catch (t: Throwable) {
                 Log.e("droidtop.Library", "Launch of ${entry.title} failed", t)
-                LaunchResult.Refused("${entry.title} could not be launched (${t.message ?: t.javaClass.simpleName})")
+                LaunchResult.Refused("${entry.title} could not be started. Check that its emulator or app is installed, then try again.")
             }
         }
     }
