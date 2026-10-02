@@ -716,6 +716,7 @@ internal fun PcGamesSection(
         PcGamePage(
             entry = pageEntry,
             siblings = folded?.siblings?.get(pageEntry.id) ?: listOf(pageEntry),
+            library = library,
             onPlay = { launch(pageEntry) },
             onToggleFavorite = { onToggleFavorite(pageEntry) },
             onOpenOptions = { state.menuId = pageEntry.id },
