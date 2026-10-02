@@ -660,13 +660,14 @@ internal fun PcGameMenu(
                         detail = playState.detail,
                         onSelect = if (loaded && playState.pressable) {
                             {
-                                when (val store = playState.store) {
+                                val store = playState.store
+                                when (store) {
                                     // Install and Update stop on the free-space
                                     // offer first: the size and the room the
                                     // chosen volume has are named before the
                                     // store's screen opens (Droidtop/tracker#227).
                                     StoreStage.INSTALL, StoreStage.UPDATE ->
-                                        storeOffer = StoreInstallOffer(entry, store)
+                                        storeOffer = StoreInstallOffer(entry, checkNotNull(store))
                                     // Downloading, Paused: the download is already
                                     // in flight; the store's queue is the place for it.
                                     null -> Unit

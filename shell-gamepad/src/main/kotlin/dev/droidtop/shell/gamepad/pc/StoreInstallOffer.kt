@@ -58,7 +58,7 @@ import kotlinx.coroutines.withContext
  * [dev.droidtop.shell.gamepad.WindowsSetupOfferDialog] uses for the
  * Windows system-files download.
  */
-data class StoreInstallOffer(val entry: LibraryEntry, val stage: StoreStage)
+internal data class StoreInstallOffer(val entry: LibraryEntry, val stage: StoreStage)
 
 @Composable
 internal fun StoreInstallOfferSheet(
