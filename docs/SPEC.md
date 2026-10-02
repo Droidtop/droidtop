@@ -9583,6 +9583,16 @@ version rollback (#231).
 Droidtop/tracker#253, 2026-10-02. The PC Games home is led by the player's
 own games, in droidtop's own treatment:
 
+- **Home is a destination** (owner, 2026-10-02, Droidtop/tracker#273): the
+  left menu's first row, "Home", opens these shelves, and "PC Games" opens the
+  library grid with its strip. Both are the one `PC_GAMES` section
+  (`LeftMenuEntry.home`, `PcGamesState.open`), not a new section. Gaming opens
+  on Home: the Default section setting's `home` is its default, and a cold
+  start never restores the last place (`sessionOnly` drops saved shell state
+  from an earlier process; a recreate in the same process keeps it). Home has
+  no strip and the shoulders do nothing there; B does nothing on Home (it is
+  the root). Continue playing lists PC games only: the Retro library is not in
+  this fold, so Retro games join it when Home takes them.
 - **Continue playing is the first shelf** and its first card is the **hero
   card** (`PcCapsule(hero = true)`): the game's landscape hero art at the
   capsules' own height (`heroWidth`, `HERO_ASPECT` 16:9) so the row keeps
@@ -9592,8 +9602,9 @@ own games, in droidtop's own treatment:
   added follows as its own shelf, unchanged.
 - **The backdrop** (`PcBackdrop`) is the art of the game under the cursor
   (`backdropArt`: its hero, else its box art), crossfading as the cursor
-  moves, darkened toward the ground by a scrim that is heaviest where the
-  shelves' text sits. It keeps the last game's art while the cursor is on
+  moves, shown at 70% opacity and darkened toward the ground by a scrim (35% at
+  the top to 85% at the bottom; the Steam original measures about half
+  brightness) that is heaviest where the shelves' text sits. It keeps the last game's art while the cursor is on
   the strip, and draws nothing (the plain ground) for a game with no art.
   Cheap on purpose: **no live blur**: the art is decoded small (640 by 360)
   and scaled up under the scrim, so it is soft by construction and costs one
@@ -9618,12 +9629,14 @@ the pipeline applies it.
 
 - **Up/Down** move between the strip, the shelves (each shelf remembers
   where its cursor was, as the Deck's rows do) and the grid's rows; at the
-  top the cursor lands on the strip, and Up on the strip is consumed: the
+  top of a view the cursor lands on the strip (Home has none: Up on its first
+  shelf stays), and Up on the strip is consumed: the
   D-pad never reaches the tab bar (§7j; owner, 2026-09-27).
 - **L1/R1** step the strip's views (from the shelves R1 enters the first
   view, L1 stays), because this tab's strip owns the shoulders
   (`OwnShoulders`, §7j "Gaming controls"); the glyphs sit at the strip's
-  ends and are not hint items. **Start** opens the left menu.
+  ends and are not hint items; Home has no strip, so they do nothing there.
+  **Start** opens the left menu.
 - **Left/Right** move along the strip, along a shelf, or along a grid row
   (`gridPadTarget`, the one card-grid edge rule), never wrapping
   (`menuStep`: ES-DE's menus do not loop). A held direction repeats at
@@ -10348,6 +10361,10 @@ L1/R1 step the nearest tab strip on the current page. A page with no strip
 leaves those presses unhandled; Retro Games gamelists keep ES-DE's own
 behaviour inside the theme. The D-pad never reaches a header or status cluster.
 The hint row and the left menu are touch routes to their corresponding actions.
+
+The left menu's order is Home, PC Games, Retro Games, Apps, the places, then
+Settings. Home (the PC section's shelves, §7i "Home art") is the first row;
+the "Here" mark follows which of Home and PC Games is showing.
 
 The status cluster (clock, connectivity and battery) floats at the top right
 over Gaming content on a soft token-based scrim. It is not focusable and a tap

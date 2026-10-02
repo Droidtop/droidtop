@@ -721,9 +721,12 @@ object GamingSettingsCatalog {
     private fun defaultSectionItem(context: Context) = ChoiceItem(
         id = ID_DEFAULT_SECTION,
         title = "Default section",
-        // Gaming's two game tabs (docs/SPEC.md 7i, 2026-10-01) and Apps.
-        options = listOf(ChoiceOption("games", "Retro Games"), ChoiceOption("pc", "PC Games"), ChoiceOption("apps", "Apps")),
-        current = CatalogPrefs.prefs(context).getString(ID_DEFAULT_SECTION, "games"),
+        // Home, Gaming's two game tabs (docs/SPEC.md 7i, 2026-10-01) and Apps.
+        options = listOf(
+            ChoiceOption("home", "Home"), ChoiceOption("pc", "PC Games"),
+            ChoiceOption("games", "Retro Games"), ChoiceOption("apps", "Apps"),
+        ),
+        current = CatalogPrefs.prefs(context).getString(ID_DEFAULT_SECTION, "home"),
         onSelect = { ctx, value ->
             CatalogPrefs.prefs(ctx).edit().putString(ID_DEFAULT_SECTION, value).apply()
         },

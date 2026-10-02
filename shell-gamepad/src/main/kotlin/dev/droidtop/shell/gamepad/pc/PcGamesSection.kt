@@ -119,6 +119,17 @@ internal class PcGamesState {
     var searchOpen by mutableStateOf(false)
 
     /**
+     * Opens the shelves (Home) or the grid, from the left menu's two rows.
+     * Switching resets the cursor, because the two draw different lists.
+     */
+    fun open(home: Boolean) {
+        if (this.home == home) return
+        this.home = home
+        stripFocused = false
+        itemIndex = 0
+    }
+
+    /**
      * The grid filtered to one store (a store page's "Open library",
      * docs/SPEC.md 7j "Places"): the Store facet selected, nothing else.
      * Marks the query loaded so the saved query is not read over it.
@@ -358,20 +369,19 @@ internal fun PcGamesSection(
         return
     }
 
-    // L1/R1 step the strip's views in order, never wrapping (menuStep). From
-    // the shelves (no view is showing) R1 enters the first view and L1 stays.
-    // The strip owns the press even at its end, so the shoulders never move
+    // L1/R1 step the strip's views in order, never wrapping (menuStep). Home
+    // has no strip, so they do nothing there. The strip owns the press even at its end, so the shoulders never move
     // the whole page to another tab from here (docs/SPEC.md 7j, "Gaming
     // controls"). The cursor stays where it is: stepping a view from the
     // grid does not pull the cursor up onto the strip.
     OwnShoulders { step ->
+        if (state.home) return@OwnShoulders
         val active = when {
-            state.home -> -1
             currentView != null -> views.indexOf(currentView)
             else -> state.stripIndex.coerceIn(0, (stripCount - 1).coerceAtLeast(0))
         }
-        val next = if (active < 0) (if (step > 0) 0 else -1) else menuStep(active, stripCount, step)
-        if (next >= 0 && next != active) {
+        val next = menuStep(active, stripCount, step)
+        if (next != active) {
             EsDeNavigationSounds.play("scroll")
             activateChip(next)
         }
@@ -450,9 +460,8 @@ internal fun PcGamesSection(
                             // Never the tab bar (owner, 2026-09-27): the top
                             // of this tab is its strip, and Up there stays.
                             state.stripFocused -> Unit
-                            state.home -> if (state.shelfIndex == 0) {
-                                state.stripFocused = true
-                            } else {
+                            // Home has no strip above its first shelf.
+                            state.home -> if (state.shelfIndex > 0) {
                                 val next = state.shelfIndex - 1
                                 moveTo(next, state.shelfItems[shelves[next].id] ?: 0)
                             }
@@ -504,7 +513,7 @@ internal fun PcGamesSection(
             // owns the shoulders while this tab is up (OwnShoulders above),
             // and the active filter is its last pill.
             val shoulderGlyphs = window.showsShoulderGlyphs()
-            Row(
+            if (!state.home) Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = window.edgePadding),
             ) {

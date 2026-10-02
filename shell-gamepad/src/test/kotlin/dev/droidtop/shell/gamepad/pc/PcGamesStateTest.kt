@@ -21,6 +21,29 @@ class PcGamesStateTest {
     }
 
     @Test
+    fun `opening the grid from Home resets the cursor and opening Home leaves the strip`() {
+        val state = PcGamesState()
+        state.itemIndex = 5
+        state.open(home = false)
+        assertFalse(state.home)
+        assertEquals(0, state.itemIndex)
+        state.stripFocused = true
+        state.itemIndex = 3
+        state.open(home = true)
+        assertTrue(state.home)
+        assertFalse(state.stripFocused)
+        assertEquals(0, state.itemIndex)
+    }
+
+    @Test
+    fun `opening the view it already shows changes nothing`() {
+        val state = PcGamesState()
+        state.itemIndex = 4
+        state.open(home = true)
+        assertEquals(4, state.itemIndex)
+    }
+
+    @Test
     fun `showing another store replaces the first rather than adding to it`() {
         val state = PcGamesState()
         state.showStore("GOG")

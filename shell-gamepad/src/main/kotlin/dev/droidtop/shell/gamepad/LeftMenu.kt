@@ -45,19 +45,31 @@ import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 
-/** One place the left menu can take the user. */
-internal data class LeftMenuEntry(val section: GamingSection, val label: String)
+/**
+ * One place the left menu can take the user. Home is the PC Games section
+ * showing its shelves ([home]); the "PC Games" row is the same section
+ * showing the library grid (docs/SPEC.md 7i, "Home art").
+ */
+internal data class LeftMenuEntry(val section: GamingSection, val label: String, val home: Boolean = false) {
+    val key: String get() = if (home) "home" else section.name
 
-/** The left menu's rows for the sections this UI mode allows (Kiosk and Kid hide Settings). */
-internal fun leftMenuEntries(sections: List<GamingSection>): List<LeftMenuEntry> =
-    sections.map { LeftMenuEntry(it, it.displayName()) }
+    /** Whether this row is where the user is: [atHome] tells Home from the PC Games grid. */
+    fun isAt(current: GamingSection, atHome: Boolean): Boolean =
+        section == current && (section != GamingSection.PC_GAMES || home == atHome)
+}
+
+/** The left menu's rows for the sections this UI mode allows (Kiosk and Kid hide Settings), Home first. */
+internal fun leftMenuEntries(sections: List<GamingSection>): List<LeftMenuEntry> = buildList {
+    if (GamingSection.PC_GAMES in sections) add(LeftMenuEntry(GamingSection.PC_GAMES, "Home", home = true))
+    sections.forEach { add(LeftMenuEntry(it, it.displayName())) }
+}
 
 /**
  * The row the cursor starts on: where the user is now (focus memory). A
  * destination the mode hides falls to the top rather than to nothing.
  */
-internal fun leftMenuStartIndex(entries: List<LeftMenuEntry>, current: GamingSection): Int =
-    entries.indexOfFirst { it.section == current }.coerceAtLeast(0)
+internal fun leftMenuStartIndex(entries: List<LeftMenuEntry>, current: GamingSection, atHome: Boolean = false): Int =
+    entries.indexOfFirst { it.isAt(current, atHome) }.coerceAtLeast(0)
 
 // How long the panel takes to slide in and the page behind it to dim.
 // Local until the shared motion tokens land (Droidtop/tracker#256).
@@ -88,7 +100,8 @@ private const val LEFT_MENU_SCRIM_ALPHA = 0.55f
 internal fun LeftMenu(
     entries: List<LeftMenuEntry>,
     current: GamingSection,
-    onSelect: (GamingSection) -> Unit,
+    atHome: Boolean,
+    onSelect: (LeftMenuEntry) -> Unit,
     onOpenQuickMenu: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -102,7 +115,7 @@ internal fun LeftMenu(
         // A tap moves the cursor and sends the real press, so the one key
         // handler below is the only place that says what a row does.
         val press = rememberGamepadTouch()
-        var focusIndex by remember { mutableIntStateOf(leftMenuStartIndex(entries, current)) }
+        var focusIndex by remember { mutableIntStateOf(leftMenuStartIndex(entries, current, atHome)) }
         var heldStep by remember { mutableStateOf(false) }
         val listState = rememberLazyListState()
         val focusRequester = remember { FocusRequester() }
@@ -141,7 +154,7 @@ internal fun LeftMenu(
                                 if (next != focusIndex) EsDeNavigationSounds.play("scroll")
                                 focusIndex = next
                             }
-                            GamepadAction.A -> entries.getOrNull(focusIndex)?.let { onSelect(it.section) }
+                            GamepadAction.A -> entries.getOrNull(focusIndex)?.let(onSelect)
                             GamepadAction.B, GamepadAction.START -> onDismiss()
                             GamepadAction.R2 -> onOpenQuickMenu()
                             else -> return@onPad false
@@ -163,10 +176,10 @@ internal fun LeftMenu(
                         verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
                         contentPadding = PaddingValues(top = Space.Md, bottom = Space.Md),
                     ) {
-                        itemsIndexed(entries, key = { _, entry -> entry.section.name }) { index, entry ->
+                        itemsIndexed(entries, key = { _, entry -> entry.key }) { index, entry ->
                             MenuRow(
                                 title = entry.label,
-                                value = if (entry.section == current) "Here" else null,
+                                value = if (entry.isAt(current, atHome)) "Here" else null,
                                 selected = index == focusIndex,
                                 onClick = {
                                     focusIndex = index

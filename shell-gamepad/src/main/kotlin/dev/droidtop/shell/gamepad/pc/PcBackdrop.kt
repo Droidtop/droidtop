@@ -103,7 +103,11 @@ private const val BACKDROP_HEIGHT_PX = 360
 /** How many games either side of the cursor are preloaded. */
 internal const val BACKDROP_PRELOAD_REACH = 2
 
-/** How much of the art shows through, and the ground laid over it, top and bottom. */
-private const val BACKDROP_ART_ALPHA = 0.55f
-private const val BACKDROP_SCRIM_TOP = 0.55f
-private const val BACKDROP_SCRIM_BOTTOM = 0.92f
+/**
+ * How much of the art shows through, and the ground laid over it, top and
+ * bottom: lighter than before (the Steam original measures about half
+ * brightness at 70% opacity), still heaviest where the shelves' text sits.
+ */
+private const val BACKDROP_ART_ALPHA = 0.7f
+private const val BACKDROP_SCRIM_TOP = 0.35f
+private const val BACKDROP_SCRIM_BOTTOM = 0.85f

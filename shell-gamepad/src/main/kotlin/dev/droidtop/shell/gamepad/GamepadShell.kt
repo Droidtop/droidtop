@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import dev.droidtop.runtime.tasks.text
@@ -292,12 +293,14 @@ private fun GamepadShellBody(
     // Activity recreate the Text size setting triggers
     // (AccessibilityPrefs, Droidtop/tracker#87) restores this whole
     // place instead of dropping the user on the default section.
-    val nav = rememberSaveable(saver = ShellBackStack.Saver) { ShellBackStack(GamingPrefs.defaultSection(context)) }
+    val nav = rememberSaveable(saver = sessionOnly(ShellBackStack.Saver)) { ShellBackStack(GamingPrefs.defaultSection(context)) }
     val section = nav.section
     // Where the PC Games tab is (its view, its cursor, an open page), held
     // here for the same reason the back stack is: the tab is rebuilt
     // whenever another tab is shown (docs/SPEC.md 7i).
-    val pcGames = rememberSaveable(saver = dev.droidtop.shell.gamepad.pc.PcGamesState.Saver) { dev.droidtop.shell.gamepad.pc.PcGamesState() }
+    val pcGames = rememberSaveable(saver = sessionOnly(dev.droidtop.shell.gamepad.pc.PcGamesState.Saver)) {
+        dev.droidtop.shell.gamepad.pc.PcGamesState().apply { home = !GamingPrefs.opensOnPcGrid(context) }
+    }
     // Bumps whenever a real "Browse themes" deep-link arrives (see
     // deepLinkToken's own doc comment) -- SettingsCatalogView opens its
     // inline ThemeBrowserScreen off this token.
@@ -741,9 +744,12 @@ private fun GamepadShellBody(
         LeftMenu(
             entries = leftMenuEntries(menuSectionsFor(uiMode)),
             current = section,
-            onSelect = { target ->
+            atHome = pcGames.home,
+            onSelect = { entry ->
                 leftMenuOpen = false
-                selectSection(target)
+                // Home and PC Games are one section: the row says which view.
+                if (entry.section == GamingSection.PC_GAMES) pcGames.open(entry.home)
+                selectSection(entry.section)
             },
             onOpenQuickMenu = {
                 leftMenuOpen = false
@@ -1355,6 +1361,21 @@ private fun GamepadShellBody(
 }
 
 /**
+ * Marks this process. Saved shell state from an earlier process (a cold
+ * start) is dropped so Gaming opens on its default, Home; a recreate in
+ * this process (the Text size setting) keeps the user's place.
+ */
+private val PROCESS_MARK: Long = System.currentTimeMillis()
+
+private fun <T : Any> sessionOnly(inner: Saver<T, Any>): Saver<T, Any> = Saver(
+    save = { value -> with(inner) { save(value) }?.let { listOf(PROCESS_MARK, it) } },
+    restore = { saved ->
+        val parts = saved as? List<*>
+        if (parts != null && parts.getOrNull(0) == PROCESS_MARK) parts.getOrNull(1)?.let { inner.restore(it) } else null
+    },
+)
+
+/**
  * The Gaming shell's reads of its own settings. [GamingSettingsCatalog]
  * owns the keys, defaults and every write (both the in-shell settings and
  * Standard's SettingsGamingFragment render that catalog); this only reads
@@ -1363,12 +1384,16 @@ private fun GamepadShellBody(
 private object GamingPrefs {
     private fun prefs(context: Context) = CatalogPrefs.prefs(context)
 
+    /** Home (the default) and "pc" both start in PC Games; [opensOnPcGrid] tells them apart. */
     fun defaultSection(context: Context): GamingSection =
-        when (prefs(context).getString(GamingSettingsCatalog.ID_DEFAULT_SECTION, "games")) {
+        when (prefs(context).getString(GamingSettingsCatalog.ID_DEFAULT_SECTION, "home")) {
             "apps" -> GamingSection.APPS
-            "pc" -> GamingSection.PC_GAMES
-            else -> GamingSection.GAMES
+            "games" -> GamingSection.GAMES
+            else -> GamingSection.PC_GAMES
         }
+
+    fun opensOnPcGrid(context: Context): Boolean =
+        prefs(context).getString(GamingSettingsCatalog.ID_DEFAULT_SECTION, "home") == "pc"
 
     fun showHints(context: Context): Boolean =
         prefs(context).getBoolean(GamingSettingsCatalog.ID_SHOW_HINTS, true)
@@ -1839,7 +1864,9 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
     val places = GamingSection.entries.filter { !it.inTopBar && !(mode.hidesSettings && it.managesDevice) }
-    return tabs.filterNot { it == GamingSection.SETTINGS } + places + tabs.filter { it == GamingSection.SETTINGS }
+    // PC Games leads (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
+    val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy { if (it == GamingSection.PC_GAMES) 0 else 1 }
+    return main + places + tabs.filter { it == GamingSection.SETTINGS }
 }
 
 // Which kinds are Apps and which are Games is the library's split, not
