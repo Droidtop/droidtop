@@ -10364,7 +10364,20 @@ The hint row and the left menu are touch routes to their corresponding actions.
 
 The left menu's order is Home, PC Games, Retro Games, Apps, the places, then
 Settings. Home (the PC section's shelves, §7i "Home art") is the first row;
-the "Here" mark follows which of Home and PC Games is showing.
+the current-destination mark follows which of Home and PC Games is showing.
+
+The left menu is a real side menu (Droidtop/tracker#273, slice 4, compared with
+the Steam side menu): a full-height panel from the left edge, about 28% of a
+landscape window (224 to 360 dp; 72% in portrait), over the dimmed page. Each
+row is an icon and a label, 48 dp tall (one touch target in a touch window),
+with 24 dp of left padding and no prose: no "Go to" heading and no "Here" value.
+The destination the user is on is marked by a 4 dp accent bar and a filled row;
+the cursor is the shell's one selection frame and starts on that row. Icons come
+from the one Material set (`LeftMenuEntry.glyph`, CatalogIconGlyphs.kt). There is
+no Power row: Android gives an app no call that opens the power menu (the Quick
+Menu marks its Power menu tile as needing privilege), so a row would be a button that cannot work.
+Up/Down move, A goes, B or Start closes, R2 swaps to the Quick Menu, a tap on a
+row goes and a tap on the dimmed page closes.
 
 The status cluster (clock, connectivity and battery) floats at the top right
 over Gaming content on a soft token-based scrim. It is not focusable and a tap

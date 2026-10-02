@@ -11,13 +11,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,7 +41,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -80,12 +93,16 @@ private const val LEFT_MENU_SLIDE_MS = 160
 // the handheld should not pay for a menu that is open for seconds.
 private const val LEFT_MENU_SCRIM_ALPHA = 0.55f
 
+// A side-menu row is this tall (a touch window raises it to one touch target).
+private val LEFT_MENU_ROW_HEIGHT = 48.dp
+
 /**
  * The left menu: press Start anywhere in the Gaming shell (docs/SPEC.md
  * 7j, "Gaming controls", Droidtop/tracker#258). It is where things LIVE
  * and how you get to them -- the destinations -- while the Quick Menu on
- * the right (R2) is quick management only. A left-edge panel over a
- * dimmed page, opening on the destination the user is on.
+ * the right (R2) is quick management only. A full-height left-edge side
+ * menu (icon and label rows) over a dimmed page, opening on the destination
+ * the user is on.
  *
  * Its own layout, not the ES-DE theme's (no theme draws a menu), but
  * every colour and type style comes from the same tokens the theme feeds
@@ -135,7 +152,7 @@ internal fun LeftMenu(
                     .background(MenuTokens.Scrim.copy(alpha = LEFT_MENU_SCRIM_ALPHA))
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
             )
-            val panelWidth = if (window.portrait) maxWidth * 0.82f else (maxWidth * 0.34f).coerceIn(280.dp, 420.dp)
+            val panelWidth = if (window.portrait) maxWidth * 0.72f else (maxWidth * 0.28f).coerceIn(224.dp, 360.dp)
             Surface(
                 color = MenuTokens.OverlaySurface,
                 tonalElevation = 0.dp,
@@ -166,20 +183,18 @@ internal fun LeftMenu(
                     modifier = Modifier
                         .fillMaxSize()
                         .focusRequester(focusRequester)
-                        .focusable()
-                        .padding(Space.Lg),
+                        .focusable(),
                 ) {
-                    Text("Go to", color = MenuTokens.SectionLabel, style = TypeRole.sectionLabel)
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
-                        contentPadding = PaddingValues(top = Space.Md, bottom = Space.Md),
+                        verticalArrangement = Arrangement.spacedBy(Space.Hair),
+                        contentPadding = PaddingValues(vertical = Space.Lg),
                     ) {
                         itemsIndexed(entries, key = { _, entry -> entry.key }) { index, entry ->
-                            MenuRow(
-                                title = entry.label,
-                                value = if (entry.isAt(current, atHome)) "Here" else null,
+                            SideMenuRow(
+                                entry = entry,
+                                isCurrent = entry.isAt(current, atHome),
                                 selected = index == focusIndex,
                                 onClick = {
                                     focusIndex = index
@@ -198,6 +213,56 @@ internal fun LeftMenu(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * One side-menu row: an icon and a label, flat to the panel's edges. The
+ * destination the user is on carries an accent bar and a filled row; the
+ * cursor is the shell's one selection frame, so both read together when the
+ * menu opens on the current destination (docs/SPEC.md 7j, "Gaming controls").
+ */
+@Composable
+private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, selected: Boolean, onClick: () -> Unit) {
+    val window = currentShellWindow()
+    val height: Dp = maxOf(LEFT_MENU_ROW_HEIGHT, if (window.touchFirst) window.minTouchTarget else 0.dp)
+    Box(
+        contentAlignment = Alignment.CenterStart,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = height)
+            .selectionFrame(selected, RectangleShape, rest = if (isCurrent) MenuTokens.Surface else Color.Transparent)
+            .clickable(onClick = onClick),
+    ) {
+        if (isCurrent) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .width(4.dp)
+                    .height(28.dp)
+                    .background(MenuTokens.Accent, RoundedCornerShape(topEnd = 2.dp, bottomEnd = 2.dp)),
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 24.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+        ) {
+            Icon(
+                entry.glyph(),
+                contentDescription = null,
+                tint = if (selected || isCurrent) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(16.dp))
+            Text(
+                entry.label,
+                color = MenuTokens.OnSurface,
+                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

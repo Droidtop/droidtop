@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.DesktopWindows
 import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Gamepad
@@ -20,7 +21,9 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SportsEsports
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.Tv
@@ -65,4 +68,19 @@ internal fun CatalogIcon.glyph(): ImageVector = when (this) {
     CatalogIcon.ANDROID_SETTINGS -> Icons.Outlined.Android
     CatalogIcon.INTEGRATIONS -> Icons.Outlined.Extension
     CatalogIcon.SEARCH -> Icons.Outlined.Search
+}
+
+/** The glyph a left-menu row draws, from the same Material set (docs/SPEC.md 7j, "Gaming controls"). */
+internal fun LeftMenuEntry.glyph(): ImageVector = when {
+    home -> Icons.Outlined.Home
+    else -> when (section) {
+        GamingSection.PC_GAMES -> Icons.Outlined.Laptop
+        GamingSection.GAMES -> Icons.Outlined.SportsEsports
+        GamingSection.APPS -> Icons.Outlined.Apps
+        GamingSection.STORES -> Icons.Outlined.Storefront
+        GamingSection.DOWNLOADS -> Icons.Outlined.Download
+        GamingSection.UPDATES -> Icons.Outlined.SystemUpdate
+        GamingSection.PLUGINS -> Icons.Outlined.Extension
+        GamingSection.SETTINGS -> Icons.Outlined.Settings
+    }
 }

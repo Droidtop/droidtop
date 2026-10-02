@@ -83,6 +83,11 @@ class LeftMenuTest {
     }
 
     @Test
+    fun `every row has its own icon`() {
+        assertEquals(all.size, all.map { it.glyph().name }.toSet().size)
+    }
+
+    @Test
     fun `Settings and the places manage the device`() {
         assertTrue(GamingSection.SETTINGS.managesDevice)
         assertTrue(GamingSection.STORES.managesDevice)
