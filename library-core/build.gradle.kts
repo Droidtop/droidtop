@@ -69,6 +69,15 @@ val platformDatabaseSeedFiles = listOf(
     "bios-database.json",
 )
 
+/**
+ * Seeds that ride along when the pinned snapshot has them and are simply
+ * absent otherwise: the console table (`hardware-database.json`, composed
+ * into `legacy/` by the repo's generator) arrived after the pin. Without a
+ * bundled copy the console table is empty until the first refresh, which
+ * `HardwareDatabase` treats as "no row for this device".
+ */
+val platformDatabaseOptionalSeeds = listOf("legacy/hardware-database.json")
+
 /** The pinned submodule commit, or "unknown" when git cannot say (a source-zip build). */
 val platformDatabaseSnapshotCommit: String = runCatching {
     providers.exec {
@@ -82,6 +91,12 @@ val platformDatabaseSeedDir: Provider<Directory> =
 val platformDatabaseSeed = tasks.register<Copy>("platformDatabaseSeed") {
     description = "Copies the pinned droidtop-platforms snapshot into the bundled assets."
     from(platformsRepoDir) { include(platformDatabaseSeedFiles) }
+    from(platformsRepoDir) {
+        include(platformDatabaseOptionalSeeds)
+        // legacy/hardware-database.json is bundled as hardware-database.json, next to the others.
+        eachFile { path = name }
+        includeEmptyDirs = false
+    }
     into(platformDatabaseSeedDir)
     inputs.property("snapshotCommit", platformDatabaseSnapshotCommit)
     doFirst {

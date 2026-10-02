@@ -2,6 +2,7 @@ package dev.droidtop.library.consoles
 
 import android.content.Context
 import dev.droidtop.library.EnginesDatabase
+import dev.droidtop.library.controller.HardwareDatabase
 import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
@@ -25,7 +26,7 @@ import org.json.JSONObject
  * previous database stays exactly as it was.
  *
  * The index is also how this survives an older app meeting a newer repo:
- * a collection this app has no consumer for (hardware, controllers) is
+ * a collection this app has no consumer for (controllers) is
  * cached and ignored rather than treated as an error, and a repo with no
  * index at all falls back to the legacy whole-file URLs
  * ([PlatformDatabases.refresh]).
@@ -188,6 +189,7 @@ object PlatformDatabaseIndex {
             "platforms-database.json" to Consumer(PlatformsDatabase::validate, PlatformsDatabase::install),
             "players-database.json" to Consumer(PlayersDatabaseUpdater::validate, PlayersDatabaseUpdater::install),
             "bios-database.json" to Consumer(BiosDatabase::validate, BiosDatabase::install),
+            "hardware-database.json" to Consumer(HardwareDatabase::validate, HardwareDatabase::install),
         )
     }
 }
