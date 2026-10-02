@@ -92,10 +92,10 @@ fun CompanionSurface(
                 )
                 .padding(if (portrait) 16.dp else 24.dp),
         ) {
-            // Status + controls bar, always the first row -- the companion
+            // Status bar, always the first row (the controls live on the System tab) -- the companion
             // is the glanceable screen, and "is my Wi-Fi ok / how much
             // battery" is the glance.
-            CompanionSystemBar()
+            CompanionSystemBar(showControls = false)
             // The Quick Menu's device-management surface, mirrored to the
             // always-on screen: live notifications with tap-to-open and
             // per-item dismiss, no controller needed.
@@ -103,8 +103,6 @@ fun CompanionSurface(
             // Continue-playing rail: tap a recent game to launch it,
             // through the one real launch path -- see CompanionRecents.
             CompanionRecents()
-            // What is running, with close and Clear all apps, touch only: the shared task manager.
-            CompanionTasks()
         }
         // Starts exactly where the measured block above ends (that
         // block already carries its own 24dp top padding) -- not a

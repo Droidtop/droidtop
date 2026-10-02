@@ -292,6 +292,54 @@ object SystemControls {
         }.isSuccess
     }
 
+    /** The screen-timeout choices Android's own Settings offers, labelled the same way; one list for every surface. */
+    val SCREEN_TIMEOUTS = listOf(
+        15_000 to "15 seconds",
+        30_000 to "30 seconds",
+        60_000 to "1 minute",
+        120_000 to "2 minutes",
+        300_000 to "5 minutes",
+        600_000 to "10 minutes",
+        1_800_000 to "30 minutes",
+    )
+
+    // ------------------------------------------------------------------
+    // Radios. A normal app cannot switch Wi-Fi, Bluetooth or airplane mode
+    // (removed from app reach in API 29 and later), so the only honest
+    // routes are the system's own panel, or a privileged provider running
+    // the same command Android's shell does. Which one is the caller's
+    // call; this only names both.
+    // ------------------------------------------------------------------
+
+    enum class Radio(val label: String) { WIFI("Wi-Fi"), BLUETOOTH("Bluetooth"), AIRPLANE("Airplane mode") }
+
+    /** The shell command that switches [radio], for a `priv.shell` provider. */
+    fun radioCommand(radio: Radio, on: Boolean): List<String> {
+        val verb = if (on) "enable" else "disable"
+        return when (radio) {
+            Radio.WIFI -> listOf("svc", "wifi", verb)
+            Radio.BLUETOOTH -> listOf("svc", "bluetooth", verb)
+            Radio.AIRPLANE -> listOf("cmd", "connectivity", "airplane-mode", verb)
+        }
+    }
+
+    /** The system screen that holds [radio]'s own switch, for when nothing privileged can flip it. */
+    fun radioPanelIntent(radio: Radio): Intent = when (radio) {
+        Radio.WIFI -> internetPanelIntent()
+        Radio.BLUETOOTH -> bluetoothSettingsIntent()
+        Radio.AIRPLANE -> Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    /** Whether [radio] is on; null when the platform does not say. No permission beyond what droidtop holds. */
+    fun radioOn(context: Context, radio: Radio): Boolean? = runCatching {
+        when (radio) {
+            Radio.WIFI -> (context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).isWifiEnabled
+            Radio.BLUETOOTH ->
+                (context.getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager).adapter?.isEnabled
+            Radio.AIRPLANE -> Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 1
+        }
+    }.getOrNull()
+
     // ------------------------------------------------------------------
     // Direct links into the system screens the platform refuses to let
     // an app own. Filtered to what actually RESOLVES on this device --

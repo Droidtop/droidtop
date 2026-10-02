@@ -2844,6 +2844,45 @@ Read directly off the installed `com.iisulauncher` 0.1.6.1 APK
 manifest and resources are not, and they were enough — class names,
 intent filters and user-facing strings all survive.
 
+
+### The companion's tabs (decided 2026-10-02, Droidtop/tracker#247, #273)
+
+The companion is a tabbed, touch-only second screen. One entry, `CompanionTabs` (`:app`), is drawn by
+every host that draws the companion (the registry's `Surface`, used by `SecondScreenPresentation` and
+`SecondaryDisplayActivity`, and `CompanionActivity`); the per-mode role choice (section 6c) now only
+picks the tab it opens on. Standard's own second screen keeps its launcher-style surface.
+
+- **Tabs, in strip order:** Home (today's widgets and info surface, `CompanionSurface`, the host's own
+  add/remove controls where it has them), Tasks, Performance, System and Input. Input (the keyboard and
+  trackpad surface) is offered in Desktop mode and wherever a mode's role is set to Input. Desktop opens on
+  Input (section 6c, unchanged); every other mode opens on Home. Only the selected tab is composed.
+- **Touch only, screens independent.** No tab takes focus: each host already denies focus to the whole tree
+  (tracker#186, #265), and the tab strip is plain touch targets. Nothing here moves an app the user opened
+  (#243); Tasks' switch tap launches on the app's own screen and its arrow pair is an explicit request.
+  The strip scrolls sideways and the Performance and System pages lay out in one column in portrait and two on
+  a wide window, from the window's own bounds (#213).
+- **Tasks** is `CompanionTasks`, the task manager's row (switch, ask for the other screen, close, Clear
+  all apps with an inline confirm); see "The task manager". Nothing is rebuilt for the tab.
+- **Performance** (`CompanionPerformanceTab`) reads `PerformanceMonitor` in `:runtime-common`, the one shared
+  sampler and history (a 90-entry ring buffer, two seconds apart, three minutes) that the Quick Menu's
+  performance section also reads. Sampling runs only while the tab is composed and its window is started
+  (`repeatOnLifecycle(STARTED)`), on `Dispatchers.IO`; two surfaces watching share the samples. It shows
+  processor, memory, battery and heat with a graph each. What a normal app cannot read is said, not drawn:
+  whole-device CPU load (`/proc/stat` is hidden from apps on current Android; droidtop's own share is graphed
+  instead), per-core frequency (only where sysfs allows), CPU and GPU temperature (only the battery sensor and
+  Android's thermal status are given), GPU load and other apps' frame rate (root or Shizuku). Per-app CPU is
+  shown only with a running `priv.shell` provider, from `dumpsys cpuinfo` every six seconds while the tab shows.
+- **System** (`CompanionSystemTab`) is `SystemControls` and the existing job and storage sources, no second
+  mechanism: volume; brightness and screen timeout behind the one Modify system settings grant (the tab says
+  so and offers the grant, re-checked on return); Do Not Disturb behind its own grant; Wi-Fi, Bluetooth and
+  airplane mode, which a normal app cannot switch, so with a `priv.shell` provider the row runs the shell's own
+  command (`SystemControls.radioCommand`) and without one it opens Android's own switch and says the Shizuku
+  plugin would let droidtop do it; internal storage free and total; and the running downloads and jobs from
+  `PluginJobsCenter`. `SystemControls.SCREEN_TIMEOUTS` is the one timeout list (the Gaming catalog uses it
+  too). Standard's inline controls use the same `SystemSliders` and `DndPill`.
+- **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
+  companion, last app" actions of the original request.
+
 ### iiSU uses Android's own secondary-display home
 
 ```

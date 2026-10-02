@@ -69,16 +69,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_ANDROID_LINKS = "pref_gaming_system_android_links"
     const val ID_SYSTEM_UPDATES = "pref_gaming_system_updates"
 
-    /** Real values the stock Settings app offers, labelled the same way. */
-    private val TIMEOUT_OPTIONS = listOf(
-        15_000 to "15 seconds",
-        30_000 to "30 seconds",
-        60_000 to "1 minute",
-        120_000 to "2 minutes",
-        300_000 to "5 minutes",
-        600_000 to "10 minutes",
-        1_800_000 to "30 minutes",
-    )
+    private val TIMEOUT_OPTIONS = dev.droidtop.runtime.systemstatus.SystemControls.SCREEN_TIMEOUTS
     const val ID_DOWNLOADS = "pref_gaming_downloads"
     const val ID_GAME_FOLDERS = "pref_gaming_game_folders"
     const val ID_F95_IMPORT = "pref_gaming_f95_import"

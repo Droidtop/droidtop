@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The companion's running apps, touch only (docs/SPEC.md "The task manager", Droidtop/tracker#252, #186):
- * a row of what is open with the app's icon, a tap to switch to it, a cross to close it, and Clear all
+ * a row of what is open with the app's icon, a tap to switch to it, an arrow pair to ask for it on the other screen, a cross to close it, and Clear all
  * apps in front. Nothing here takes focus or answers a controller; the controller keeps driving the
  * shell on the other screen.
  *
@@ -56,6 +56,8 @@ internal fun CompanionTasks() {
     var message by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf<List<RunningApp>?>(null) }
     LaunchedEffect(Unit) { TaskManager.watch(context) }
+    // The other screen, when there is one: where Move sends an app. Read once, a display manager call.
+    val displays = remember { TaskManager.displayIds(context) }
 
     val apps = snapshot?.apps.orEmpty()
     // Nothing running and nothing to say: no row at all, so an idle companion stays as it was.
@@ -124,6 +126,22 @@ internal fun CompanionTasks() {
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(start = 8.dp, end = 8.dp),
                         )
+                    }
+                    val other = displays.firstOrNull { it != app.displayId }
+                    if (other != null) {
+                        // Asks for the app on the other screen; whether Android moves the task is its call (SPEC "The task manager").
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .clickable {
+                                    message = TaskActions.bringTo(context, app.packageName, other)
+                                        ?: "Asked for ${app.label} on the other screen."
+                                }
+                                .padding(horizontal = 12.dp),
+                        ) {
+                            Text("⇄", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                     Box(
                         contentAlignment = Alignment.Center,

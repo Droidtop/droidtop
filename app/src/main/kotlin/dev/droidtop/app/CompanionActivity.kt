@@ -62,38 +62,34 @@ class CompanionActivity : AppCompatActivity() {
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
                 Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) {
-                    // The same mode+role selection every other second-screen
-                    // host applies (SecondScreenPresentation, :display's
-                    // SecondaryDisplayActivity): with the shell relocated to
-                    // the addon, THIS activity is what the remaining panel
-                    // shows, and in Desktop mode that panel is the input
-                    // surface (trackpad + keyboard) by default, not widgets.
+                    // The same tab host every other second-screen host draws: with the
+                    // shell relocated to the addon, THIS activity is what the remaining panel
+                    // shows, and in Desktop mode its default tab is the input surface
+                    // (trackpad + keyboard), with Home, Tasks, Performance and System beside it.
                     val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(this@CompanionActivity)
-                    if (SecondScreenInputPrefs.role(this@CompanionActivity, mode) == SecondScreenInputPrefs.Role.INPUT) {
-                        SecondScreenInputSurface(mode)
-                        return@DroidtopTheme
-                    }
-                    val entry = settledFocusedEntry()
-                    CompanionSurface(
-                        entry = entry,
-                        widgetIds = widgetIds,
-                        widgetManager = widgetManager,
-                        widgetHost = widgetHost,
-                    ) {
-                        androidx.compose.foundation.layout.BoxWithConstraints {
-                            val portrait = maxHeight > maxWidth
-                            val buttons: @Composable () -> Unit = {
-                                TextButton(onClick = { pickWidget() }) { Text("Add widget") }
-                                if (widgetIds.isNotEmpty()) {
-                                    TextButton(onClick = { removeLastWidget() }) {
-                                        Text("Remove widget", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    CompanionTabs(mode) {
+                        val entry = settledFocusedEntry()
+                        CompanionSurface(
+                            entry = entry,
+                            widgetIds = widgetIds,
+                            widgetManager = widgetManager,
+                            widgetHost = widgetHost,
+                        ) {
+                            androidx.compose.foundation.layout.BoxWithConstraints {
+                                val portrait = maxHeight > maxWidth
+                                val buttons: @Composable () -> Unit = {
+                                    TextButton(onClick = { pickWidget() }) { Text("Add widget") }
+                                    if (widgetIds.isNotEmpty()) {
+                                        TextButton(onClick = { removeLastWidget() }) {
+                                            Text("Remove widget", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
                                     }
                                 }
-                            }
-                            if (portrait) {
-                                androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) { buttons() }
-                            } else {
-                                androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) { buttons() }
+                                if (portrait) {
+                                    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) { buttons() }
+                                } else {
+                                    androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) { buttons() }
+                                }
                             }
                         }
                     }
@@ -289,7 +285,7 @@ internal fun CompanionNotifications() {
 }
 
 @androidx.compose.runtime.Composable
-internal fun CompanionSystemBar() {
+internal fun CompanionSystemBar(showControls: Boolean = true) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val status by androidx.compose.runtime.remember {
         dev.droidtop.runtime.systemstatus.SystemStatus.flow(context)
@@ -318,11 +314,13 @@ internal fun CompanionSystemBar() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-            TextButton(onClick = { controlsOpen = !controlsOpen }) {
-                Text(if (controlsOpen) "Hide controls" else "Controls")
+            if (showControls) {
+                TextButton(onClick = { controlsOpen = !controlsOpen }) {
+                    Text(if (controlsOpen) "Hide controls" else "Controls")
+                }
             }
         }
-        if (controlsOpen) {
+        if (showControls && controlsOpen) {
             SystemControlsRow()
         }
         DisplayFallbackNotice()
@@ -374,58 +372,17 @@ internal fun statusLine(status: dev.droidtop.runtime.systemstatus.SystemStatusSn
     return listOf(network, noInternet, vpn, battery).filter { it.isNotEmpty() }.joinToString("   ")
 }
 
+/** Standard's inline controls: the shared sliders and Do Not Disturb, plus links to Android's own screens. */
 @androidx.compose.runtime.Composable
 private fun SystemControlsRow() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val controls = dev.droidtop.runtime.systemstatus.SystemControls
-    var volume by androidx.compose.runtime.remember {
-        mutableStateOf(controls.volume(context).toFloat())
-    }
-    val volumeMax = androidx.compose.runtime.remember { controls.volumeRange(context).last.toFloat() }
-    var brightness by androidx.compose.runtime.remember {
-        mutableStateOf((controls.brightness(context) ?: 128).toFloat())
-    }
-    val canBrightness = androidx.compose.runtime.remember { controls.canWriteBrightness(context) }
-
     Column(modifier = Modifier.fillMaxWidth()) {
-        androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Volume", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            androidx.compose.material3.Slider(
-                value = volume,
-                onValueChange = { volume = it; controls.setVolume(context, it.toInt()) },
-                valueRange = 0f..volumeMax,
-                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-            )
-        }
-        if (canBrightness) {
-            androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Brightness", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                androidx.compose.material3.Slider(
-                    value = brightness,
-                    onValueChange = { brightness = it; controls.setBrightness(context, it.toInt()) },
-                    valueRange = 0f..255f,
-                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                )
-            }
-        }
+        SystemSliders()
         androidx.compose.foundation.layout.Row {
-            run {
-                var dnd by androidx.compose.runtime.remember { mutableStateOf(controls.dndEnabled(context)) }
-                TextButton(onClick = {
-                    if (controls.hasDndAccess(context)) {
-                        dnd = !dnd; controls.setDnd(context, dnd)
-                    } else {
-                        context.startActivity(controls.dndGrantIntent())
-                    }
-                }) { Text(if (dnd) "DND on" else "DND off") }
-            }
+            DndPill()
             TextButton(onClick = { context.startActivity(controls.internetPanelIntent()) }) { Text("Network") }
             TextButton(onClick = { context.startActivity(controls.bluetoothSettingsIntent()) }) { Text("Bluetooth") }
-            if (!canBrightness) {
-                TextButton(onClick = { context.startActivity(controls.brightnessGrantIntent(context)) }) {
-                    Text("Allow brightness control")
-                }
-            }
             TextButton(onClick = { context.startActivity(controls.allSettingsIntent()) }) { Text("All settings") }
         }
     }

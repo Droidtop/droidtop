@@ -10,8 +10,8 @@ import dev.droidtop.display.SecondaryDisplayContent
  * mode's surface (docs/SPEC.md section 4c and "Modes and what each
  * contributes").
  *
- * Gaming and Desktop each draw either the companion surface or the input
- * surface, per the user's role choice for that mode; Standard draws its
+ * Gaming and Desktop each draw the companion tabs (CompanionTabs), opening on
+ * the input surface or on Home per the user's role choice for that mode; Standard draws its
  * own launcher-style surface (StandardSecondScreenSurface) -- shown on the
  * secondary display whenever droidtop holds the HOME role, whether Home
  * itself renders Standard's own Launcher3 fork or forwards to a different
@@ -59,14 +59,11 @@ object SecondaryDisplayRegistrations {
 
     @Composable
     private fun Surface(mode: SecondaryDisplayContent.Mode) {
-        val context = androidx.compose.ui.platform.LocalContext.current
-        if (SecondScreenInputPrefs.role(context, mode) == SecondScreenInputPrefs.Role.INPUT) {
-            SecondScreenInputSurface(mode)
-        } else {
-            val entry = settledFocusedEntry()
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-                CompanionSurfaceHost(entry)
-            }
+        // One tab host for every mode: Home is the companion, the input surface is the default tab
+        // where the mode's role says so (Desktop by default), and Tasks, Performance and System are
+        // beside them (docs/SPEC.md "The companion's tabs").
+        dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+            CompanionTabs(mode) { CompanionSurfaceHost(settledFocusedEntry()) }
         }
     }
 }
