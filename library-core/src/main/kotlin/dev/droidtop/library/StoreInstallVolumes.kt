@@ -36,7 +36,7 @@ data class InstallVolume(
 fun installVolumes(context: Context): List<InstallVolume> =
     context.getExternalFilesDirs(null).filterNotNull().mapIndexedNotNull { index, dir ->
         runCatching {
-            val stats = StatFs(dir.path).stats
+            val stats = StatFs(dir.path)
             InstallVolume(
                 name = when (index) {
                     0 -> "Internal storage"
@@ -45,7 +45,7 @@ fun installVolumes(context: Context): List<InstallVolume> =
                     else -> "SD card${if (index > 2) " ${index - 1}" else ""}"
                 },
                 path = dir.path,
-                freeBytes = stats.freeBytes,
+                freeBytes = stats.availableBytes,
                 totalBytes = stats.totalBytes,
             )
         }.getOrNull()
