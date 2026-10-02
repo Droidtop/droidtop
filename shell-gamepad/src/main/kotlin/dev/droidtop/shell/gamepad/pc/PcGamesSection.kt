@@ -714,6 +714,7 @@ internal fun PcGamesSection(
             onToggleFavorite = { onToggleFavorite(pageEntry) },
             onOpenOptions = { state.menuId = pageEntry.id },
             onClose = { state.pageId = null },
+            library = library,
         )
     }
     if (menuEntry != null) {
