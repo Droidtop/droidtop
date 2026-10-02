@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,6 +67,10 @@ import dev.droidtop.shell.gamepad.input.ownPadButtons
 import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * One PC game's own page (docs/SPEC.md 7i, 2026-10-01): what the Steam
@@ -111,7 +116,13 @@ internal fun PcGamePage(
     val context = LocalContext.current
     val window = LocalShellWindow.current
     val (play, runner) = rememberPcPlayState(entry)
-    val rows = remember(entry, play, runner, siblings) { pageRows(context, entry, play, runner, siblings) }
+    val folderSize by produceState<Long?>(null, entry.id) {
+        val path = entry.id.takeIf { it.startsWith("/") } ?: return@produceState
+        value = withContext(Dispatchers.IO) { folderSizeBytes(path) }
+    }
+    val rows = remember(entry, play, runner, siblings, folderSize) {
+        pageRows(context, entry, play, runner, siblings, folderSize)
+    }
 
     // ONE cursor: row 0 is the button row, rows 1.. are the facts.
     var row by remember(entry.id) { mutableIntStateOf(0) }
@@ -383,6 +394,7 @@ private fun pageRows(
     play: PcPlayState,
     runner: dev.droidtop.library.ResolvedRunner?,
     siblings: List<LibraryEntry>,
+    folderSizeBytes: Long?,
 ): List<PageFact> = buildList {
     val now = System.currentTimeMillis()
     add(PageFact("Play time", playtimeLine(entry.playtimeSeconds, entry.playCount)))
@@ -397,11 +409,12 @@ private fun pageRows(
         )
     }
     entry.pcInfo?.let { pc ->
-        if (pc.sizeBytes > 0) {
+        val sizeBytes = if (entry.id.startsWith("/")) folderSizeBytes ?: pc.sizeBytes else pc.sizeBytes
+        if (sizeBytes > 0) {
             add(
                 PageFact(
                     "Size",
-                    android.text.format.Formatter.formatShortFileSize(context, pc.sizeBytes),
+                    android.text.format.Formatter.formatShortFileSize(context, sizeBytes),
                     subtitle = if (pc.installed) "On this device" else "To download",
                 ),
             )
@@ -411,11 +424,12 @@ private fun pageRows(
     }
     val owned = siblings.mapNotNull { it.ownership() }
     val ownedLine = owned.ownershipLabel().removePrefix("Owned on ").takeIf { it.isNotBlank() }
+    val folderPath = entry.id.takeIf { it.startsWith("/") }
     add(
         PageFact(
             "Owned on",
-            ownedLine ?: if (entry.pcInfo?.source == null || entry.pcInfo?.source == "Folder") "Your folders" else entry.sourceLabel(),
-            subtitle = if (entry.id.startsWith("/")) entry.id else null,
+            folderPath ?: ownedLine ?: if (entry.pcInfo?.source == null || entry.pcInfo?.source == "Folder") "Your folders" else entry.sourceLabel(),
+            subtitle = if (folderPath != null) "Your folders" else null,
         ),
     )
     // A version comes from a folder's own name (docs/SPEC.md 7m); a store
@@ -423,8 +437,9 @@ private fun pageRows(
     val versions = siblings.filter { it.id.startsWith("/") }
         .mapNotNull { GameNaming.derive(it.id).version.takeIf { v -> v.isNotBlank() } }
         .distinct()
-    if (versions.isNotEmpty()) {
-        add(PageFact("Version", versions.first(), subtitle = if (versions.size > 1) "Also here: ${versions.drop(1).joinToString(", ")}" else null))
+    val availableVersions = (versions + listOfNotNull(folderPath?.let { GameNaming.derive(it).version.takeIf(String::isNotBlank) })).distinct()
+    if (availableVersions.isNotEmpty()) {
+        add(PageFact("Version", availableVersions.first(), subtitle = if (availableVersions.size > 1) "Also here: ${availableVersions.drop(1).joinToString(", ")}" else null))
     }
     entry.availableUpdate?.let { add(PageFact("Update", it, subtitle = GameUpdates.line(it))) }
     add(
@@ -442,6 +457,24 @@ private fun pageRows(
         entry.description?.takeIf { it.isNotBlank() }?.let { add(PageFact("About", subtitle = it)) }
         sourcesLine(entry)?.let { add(PageFact("Where these facts came from", subtitle = it)) }
     }
+}
+
+private data class FolderSizeStamp(val path: String, val modified: Long, val length: Long)
+
+private val folderSizeCache = ConcurrentHashMap<FolderSizeStamp, Long>()
+
+/** Folder sizes are read only for the open game page, on IO, and reused by path metadata stamp. */
+private fun folderSizeBytes(path: String): Long {
+    val folder = File(path)
+    if (!folder.isDirectory) return 0L
+    val stamp = FolderSizeStamp(folder.absolutePath, folder.lastModified(), folder.length())
+    folderSizeCache[stamp]?.let { return it }
+    val size = runCatching {
+        folder.walkTopDown().sumOf { file -> if (file.isFile) file.length() else 0L }
+    }.getOrDefault(0L)
+    if (folderSizeCache.size > 256) folderSizeCache.clear()
+    folderSizeCache[stamp] = size
+    return size
 }
 
 /**

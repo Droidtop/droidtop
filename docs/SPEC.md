@@ -8959,6 +8959,13 @@ is the matching view. A library of thousands of games is a grid of
 thousands of lazily composed capsules, which is what `LazyVerticalGrid`
 is for; nothing here grows with the square of the library.
 
+The open PC game page may calculate the size of a folder-backed install,
+but it does so on IO and caches the answer by folder path and directory
+stamp. The PC list and its rows never walk game folders for size. A folder
+game's page shows its full folder path in the "Owned on" value (with
+"Your folders" as the source detail), and derives a version from that
+folder name when the name contains one under §7m's naming rules.
+
 ### Empty, and setup
 
 An empty PC library opens on **PC setup** (`pc_stores`, the one
