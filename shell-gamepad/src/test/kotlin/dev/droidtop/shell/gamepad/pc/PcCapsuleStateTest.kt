@@ -130,6 +130,18 @@ class PcCapsuleStateTest {
     }
 
     @Test
+    fun `a missing folder game says where it was and that its history is kept`() {
+        assertEquals(
+            "/games/a is not there any more. Its history, favourite and collections are kept.",
+            missingFolderLine(folder("/games/a", missing = true)),
+        )
+        assertEquals(
+            "Nothing droidtop scanned still has this game. Its history, favourite and collections are kept.",
+            missingFolderLine(store(installed = false)),
+        )
+    }
+
+    @Test
     fun `download sizes read as megabytes or gigabytes`() {
         assertEquals("1.5 GB", downloadSizeLabel(1_500_000_000L))
         assertEquals("420 MB", downloadSizeLabel(420_000_000L))
