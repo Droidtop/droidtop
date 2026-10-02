@@ -24,11 +24,11 @@ class LaunchFailureMessageTest {
     fun aCauseWithANullMessageStillGetsAPlainSentence() {
         assertEquals(
             "The game couldn't be started.",
-            LaunchFailureMessage.userMessage(null, RuntimeException(null)),
+            LaunchFailureMessage.userMessage(null, RuntimeException(null as String?)),
         )
         assertEquals(
             "\"Star Fox 64\" couldn't be started.",
-            LaunchFailureMessage.userMessage("Star Fox 64", RuntimeException(null)),
+            LaunchFailureMessage.userMessage("Star Fox 64", RuntimeException(null as String?)),
         )
     }
 
