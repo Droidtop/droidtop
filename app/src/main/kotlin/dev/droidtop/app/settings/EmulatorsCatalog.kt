@@ -81,7 +81,13 @@ object EmulatorsCatalog {
         return AsyncActionItem(
             id = id,
             title = "RetroArch core",
-            subtitle = need.core,
+            // Without root droidtop cannot see RetroArch's cores, and RetroArch itself only shows
+            // a black screen when one is missing (console, build 1386), so the row says what to check.
+            subtitle = if (state == RetroArchCores.State.UNKNOWN) {
+                "${need.core}. If games stay black, it is not installed in RetroArch"
+            } else {
+                need.core
+            },
             value = when (state) {
                 RetroArchCores.State.INSTALLED -> "Installed"
                 RetroArchCores.State.MISSING -> "Install core"

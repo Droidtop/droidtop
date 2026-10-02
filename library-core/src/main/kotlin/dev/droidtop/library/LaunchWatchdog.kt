@@ -133,9 +133,13 @@ object LaunchWatchdog {
         job = null
     }
 
-    /** Watches [packageName], launched at [launchedAtMs]; replaces any launch still being watched. */
+    /**
+     * Watches [packageName], launched at [launchedAtMs]; replaces any launch still being watched.
+     * [retroArchCorePath] is a RetroArch launch's LIBRETRO extra: a stuck RetroArch is most often a
+     * core that is not installed, which RetroArch never reports, so the alert then says so.
+     */
     @Synchronized
-    fun start(context: Context, packageName: String, launchedAtMs: Long) {
+    fun start(context: Context, packageName: String, launchedAtMs: Long, retroArchCorePath: String? = null) {
         val appContext = context.applicationContext
         job?.cancel()
         alertFlow.value = null
@@ -161,11 +165,14 @@ object LaunchWatchdog {
                     WatchVerdict.Stop -> return@launch
                     is WatchVerdict.Trouble -> {
                         ScanLog.write("launch watchdog: $packageName ${verdict.trouble} after $elapsed ms")
+                        val coreHint = retroArchCorePath?.let {
+                            runCatching { dev.droidtop.library.consoles.RetroArchCores.troubleHint(packageName, it) }.getOrNull()
+                        }
                         alertFlow.value = LaunchAlert(
                             packageName,
                             appName,
                             verdict.trouble,
-                            LaunchWatchPolicy.message(appName, verdict.trouble),
+                            listOfNotNull(LaunchWatchPolicy.message(appName, verdict.trouble), coreHint).joinToString(" "),
                             ScanLog.logPath(appContext),
                         )
                         return@launch

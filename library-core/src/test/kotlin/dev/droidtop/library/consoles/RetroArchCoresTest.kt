@@ -33,6 +33,14 @@ class RetroArchCoresTest {
     }
 
     @Test
+    fun `a launch intent's LIBRETRO extra names the same core`() {
+        val need = RetroArchCores.needForPath("com.retroarch.aarch64", "/data/user/0/com.retroarch.aarch64/cores/gambatte_libretro_android.so")
+        assertEquals("gambatte", need?.core)
+        assertNull(RetroArchCores.needForPath("com.retroarch.aarch64", "/storage/emulated/0/cores/gambatte_libretro_android.so"))
+        assertNull(RetroArchCores.needForPath("org.ppsspp.ppsspp", "/data/user/0/org.ppsspp.ppsspp/cores/gambatte_libretro_android.so"))
+    }
+
+    @Test
     fun `a players-database row under data-data maps to the same cores folder`() {
         val need = RetroArchCores.needFor(
             "com.retroarch",

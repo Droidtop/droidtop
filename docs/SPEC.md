@@ -6421,6 +6421,16 @@ Owner: "do this over the API. We want retroarch to TRY to be touchless" and, on 
   games that RetroArch runs.
 - **Without root** droidtop cannot see RetroArch's cores, so a launch goes ahead as it is, and the two
   actions open RetroArch and name the cores to get from its Core Downloader, in one line.
+- **A stuck RetroArch names its core** (console, build 1386). A Game Boy Color game launched with
+  exactly ES-DE Android's Gambatte command (CONFIGFILE, `gambatte_libretro_android.so`, ROM; the Android
+  es_systems.xml rows) sat black at 0% CPU after RetroArch's "Auto-start game" line and stopped answering
+  on Back, while mGBA ran through the same launch; the console's audit log shows RetroArch executing
+  `mgba_libretro_android.so` on every GBA launch and never `gambatte_libretro_android.so`, so the core was
+  not installed. Nothing without root tells that apart from a running game, so the launch watchdog's
+  report for a RetroArch launch (not responding, closed at once, gone) adds one sentence naming the core
+  and RetroArch's Core Downloader unless the root helper confirmed the core is there
+  (`RetroArchCores.troubleHint`, from the launch intent's LIBRETRO extra), and the system's "RetroArch
+  core" row says that games staying black means the core is missing.
 
 ## 7e3. Lutris install-script integration (directed 2026-08-30, scoped and built 2026-09-25)
 

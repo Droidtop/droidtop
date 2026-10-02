@@ -61,17 +61,35 @@ object RetroArchCores {
         val tokens = runCatching { AmStartCommandToIntentConverter.tokenize(template, null, null) }.getOrNull() ?: return null
         for (i in 1 until tokens.size - 1) {
             if (tokens[i] != "LIBRETRO" || tokens[i - 1] !in setOf("-e", "--es")) continue
-            val path = tokens[i + 1]
-            val file = File(path)
-            val parent = file.parent ?: return null
-            if (parent != coresDir(packageName) && parent != "/data/data/$packageName/cores") return null
-            val name = file.name
-            if (!name.endsWith(SUFFIX)) return null
-            val core = name.removeSuffix(SUFFIX)
-            if (!core.matches(CORE_ID)) return null
-            return Need(packageName, core, "${coresDir(packageName)}/$name")
+            return needForPath(packageName, tokens[i + 1])
         }
         return null
+    }
+
+    /** The same, from the LIBRETRO path itself (a built launch intent's extra). */
+    fun needForPath(packageName: String, path: String): Need? {
+        if (!isRetroArch(packageName)) return null
+        val file = File(path)
+        val parent = file.parent ?: return null
+        if (parent != coresDir(packageName) && parent != "/data/data/$packageName/cores") return null
+        val name = file.name
+        if (!name.endsWith(SUFFIX)) return null
+        val core = name.removeSuffix(SUFFIX)
+        if (!core.matches(CORE_ID)) return null
+        return Need(packageName, core, "${coresDir(packageName)}/$name")
+    }
+
+    /**
+     * The sentence the launch watchdog adds when a RetroArch launch is stuck: RetroArch shows no
+     * error for a missing core, it sits black and stops answering (console, build 1386: a Game Boy
+     * Color game with gambatte, which RetroArch never loaded, while mGBA ran through the same
+     * launch). Null when the core is known to be installed. Background only (it may ask the root helper).
+     */
+    fun troubleHint(packageName: String, corePath: String): String? {
+        val need = needForPath(packageName, corePath) ?: return null
+        if (state(need) == State.INSTALLED) return null
+        return "RetroArch shows a black screen when the core it is given is not installed: " +
+            "install ${need.core} in RetroArch (Online Updater > Core Downloader)."
     }
 
     private val CORE_ID = Regex("[a-z0-9_]+")
