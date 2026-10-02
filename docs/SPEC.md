@@ -2628,10 +2628,15 @@ a close path of its own. Every call works off the main thread.
     `Display #N` and `Task{...}` lines (`ActivityDump`; the filter keeps the output under the provider's
     64 KiB cap) and the standard tasks are read from that, one row per package and display, in the
     system's order. Home, recents and system surfaces are not apps and are left out.
-  - `LAUNCHED_ONLY`: the apps droidtop itself started (`LaunchLedger`), minus any no longer installed,
-    with the note "Without the Shizuku plugin droidtop can list only the apps it opened itself, and
-    cannot tell which of them you have since closed." The same note names a provider that could not
-    answer. A list is never padded with a guess.
+  - `LAUNCHED_ONLY`: the apps droidtop itself started (`LaunchLedger`), minus any no longer installed
+    and minus any Android holds in the stopped state (`ApplicationInfo.FLAG_STOPPED`, set by every
+    force-stop and cleared when the app next starts, readable without privilege; the ledger forgets
+    such an app). Before that the ledger forgot an app only when droidtop itself closed it, so an app
+    force-stopped elsewhere stayed listed for up to 12 hours (Droidtop/tracker#298, build 1397:
+    RetroArch and NetherSX2 after `am force-stop`). An app that ends by itself or is reclaimed for
+    memory is not stopped, so the note says "Without Shizuku droidtop can list only the apps it opened
+    itself, and cannot tell when one of them closed by itself." The same note names a provider that
+    could not answer. A list is never padded with a guess.
   Never listed or closed by Clear all: droidtop's own tasks (shell and companion), home apps, the
   system UI, and (Clear all only) Enginehost, which may be hosting a game.
 - **Nothing polls while the list is hidden.** `TaskManager.watch` is a loop the surface runs in the

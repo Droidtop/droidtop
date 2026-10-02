@@ -49,4 +49,12 @@ class RunningListingTest {
         assertEquals(listOf("Browser"), apps.map { it.label })
         assertEquals(2, apps.single().displayId)
     }
+
+    @Test
+    fun `the ledger drops an app Android reports force-stopped`() {
+        // Droidtop/tracker#298: RetroArch stayed listed after am force-stop.
+        val entries = listOf(LaunchLedger.Launched("org.example.browser", 2, 20))
+        val apps = RunningListing.fromLedger(entries, hidden = emptySet(), label = label, stopped = { it == "org.example.browser" })
+        assertEquals(emptyList<RunningApp>(), apps)
+    }
 }

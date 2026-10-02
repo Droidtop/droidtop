@@ -12,10 +12,19 @@ object RunningListing {
             .distinctBy { it.packageName to it.displayId }
             .map { RunningApp(it.packageName, label(it.packageName) ?: it.packageName, it.displayId, it.taskId, it.visible) }
 
-    /** From what droidtop opened: an app that is no longer installed cannot be running, so it is dropped. */
-    fun fromLedger(entries: List<LaunchLedger.Launched>, hidden: Set<String>, label: (String) -> String?): List<RunningApp> =
+    /**
+     * From what droidtop opened: an app that is no longer installed cannot be running, and one Android
+     * reports in the stopped state ([stopped]) was force-stopped after droidtop opened it, so both are dropped.
+     */
+    fun fromLedger(
+        entries: List<LaunchLedger.Launched>,
+        hidden: Set<String>,
+        label: (String) -> String?,
+        stopped: (String) -> Boolean = { false },
+    ): List<RunningApp> =
         entries.mapNotNull {
             if (it.packageName in hidden) return@mapNotNull null
+            if (stopped(it.packageName)) return@mapNotNull null
             val name = label(it.packageName) ?: return@mapNotNull null
             RunningApp(it.packageName, name, it.displayId, taskId = null, visible = false)
         }

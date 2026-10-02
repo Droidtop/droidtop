@@ -3,6 +3,7 @@ package dev.droidtop.runtime.tasks
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
 import android.util.Log
@@ -126,11 +127,14 @@ object TaskManager {
     private fun load(context: Context): RunningSnapshot {
         val hidden = TaskPolicy.hiddenFromList(context.packageName, homePackages(context))
         val label: (String) -> String? = { appLabel(context, it) }
+        // A force-stopped app is gone whoever stopped it (Settings, am force-stop, a provider), and Android
+        // says so to any app; the ledger forgets it, so it is not listed until droidtop opens it again.
+        val stopped: (String) -> Boolean = { pkg -> isStopped(context, pkg).also { if (it) LaunchLedger.forget(pkg) } }
         val fromLedger = { note: String ->
-            RunningSnapshot(RunningListing.fromLedger(LaunchLedger.entries(), hidden, label), Fidelity.LAUNCHED_ONLY, note)
+            RunningSnapshot(RunningListing.fromLedger(LaunchLedger.entries(), hidden, label, stopped), Fidelity.LAUNCHED_ONLY, note)
         }
         if (!shell.capabilities().listTasks) {
-            return fromLedger("Without Shizuku droidtop can list only the apps it opened itself, and cannot tell which of them you have since closed.")
+            return fromLedger("Without Shizuku droidtop can list only the apps it opened itself, and cannot tell when one of them closed by itself.")
         }
         val out = try {
             shell.exec(ActivityDump.COMMAND)
@@ -142,6 +146,18 @@ object TaskManager {
             return RunningSnapshot(RunningListing.fromDump(ActivityDump.parse(out.stdout), hidden, label), Fidelity.EXACT)
         }
         return fromLedger("The privileged helper could not give droidtop the system's task list, so only the apps droidtop opened are listed.")
+    }
+
+    /**
+     * Whether Android holds [packageName] in the stopped state (`ApplicationInfo.FLAG_STOPPED`): set by a
+     * force-stop and cleared when the app is next started, and readable without privilege. It is the one
+     * close signal a normal app gets about another app; an app that ended by itself or was reclaimed for
+     * memory is not stopped, so the ledger still cannot see those (docs/SPEC.md "The task manager").
+     */
+    private fun isStopped(context: Context, packageName: String): Boolean = try {
+        (context.packageManager.getApplicationInfo(packageName, 0).flags and ApplicationInfo.FLAG_STOPPED) != 0
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
     }
 
     /** Every installed home app: not something a task manager lists or clears. */
