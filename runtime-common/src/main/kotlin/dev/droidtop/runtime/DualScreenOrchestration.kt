@@ -161,21 +161,24 @@ object DualScreenOrchestration {
      * Chooser candidates in priority order: the addon/second screen FIRST,
      * so the default-highlighted row is the better surface (per direction:
      * when the add-on is attached it is the preferred screen, not an
-     * afterthought). Labels stay relative — "this screen"/"the other
-     * screen" is right however Android enumerated the panels (section 4c).
+     * afterthought). Each label names the screen first and says which one
+     * the person is looking at second: "This screen (add-on)" read as a
+     * riddle to a newcomer (console, build 1386), and droidtop knows which
+     * panel is built in and which is attached, but not where either sits,
+     * so it never says top or bottom (section 4c).
      */
     data class ChooserCandidate(val displayId: Int?, val label: String)
 
     fun chooserCandidates(secondDisplayId: Int, shellOnSecond: Boolean): List<ChooserCandidate> =
         if (shellOnSecond) {
             listOf(
-                ChooserCandidate(secondDisplayId, "This screen (add-on)"),
-                ChooserCandidate(null, "The other screen (built-in)"),
+                ChooserCandidate(secondDisplayId, "Add-on screen (this one)"),
+                ChooserCandidate(null, "Built-in screen (the other one)"),
             )
         } else {
             listOf(
-                ChooserCandidate(secondDisplayId, "The other screen (add-on)"),
-                ChooserCandidate(null, "This screen (built-in)"),
+                ChooserCandidate(secondDisplayId, "Add-on screen (the other one)"),
+                ChooserCandidate(null, "Built-in screen (this one)"),
             )
         }
 

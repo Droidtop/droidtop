@@ -774,7 +774,10 @@ private fun CatalogPane(
             contentPadding = PaddingValues(
                 start = startPadding,
                 end = LocalShellWindow.current.edgePadding,
-                top = 12.dp,
+                // Without a title the first row starts at the window's top edge, under the
+                // floating clock and battery (console, build 1386: the pill sat on "Use droidtop
+                // as home screen"); it starts below the cluster instead (StatusClusterRoom).
+                top = if (title == null) maxOf(12.dp, StatusClusterRoom.size.height) else 12.dp,
                 bottom = 12.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),

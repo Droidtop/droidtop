@@ -126,13 +126,13 @@ class DualScreenOrchestrationTest {
         // change.
         val shellOnAddon = DualScreenOrchestration.chooserCandidates(secondDisplayId = 9, shellOnSecond = true)
         assertEquals(9, shellOnAddon.first().displayId)
-        assertEquals("This screen (add-on)", shellOnAddon.first().label)
+        assertEquals("Add-on screen (this one)", shellOnAddon.first().label)
         assertEquals(null, shellOnAddon[1].displayId)
 
         val shellOnBuiltIn = DualScreenOrchestration.chooserCandidates(secondDisplayId = 9, shellOnSecond = false)
         assertEquals(9, shellOnBuiltIn.first().displayId)
-        assertEquals("The other screen (add-on)", shellOnBuiltIn.first().label)
-        assertEquals("This screen (built-in)", shellOnBuiltIn[1].label)
+        assertEquals("Add-on screen (the other one)", shellOnBuiltIn.first().label)
+        assertEquals("Built-in screen (this one)", shellOnBuiltIn[1].label)
     }
 
     @Test

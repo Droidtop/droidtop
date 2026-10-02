@@ -3129,6 +3129,11 @@ fallback:
   that remembers for this game. Asking is still the first-launch
   default; a remembered answer is the steady state, so the question is
   asked once per game, not every time.
+- Each row names the screen first and the relation second: "Add-on screen (this one)",
+  "Built-in screen (the other one)" (console, build 1386: "This screen (add-on)" read as a
+  riddle to a newcomer). droidtop knows which panel is built in and which is attached, not
+  where either sits, so the rows never say top or bottom; a hardware row that records the
+  physical arrangement would be the place to learn it.
 - Clearing is first-class ("Delete preferred Screen"): the game's
   metadata editor has a Launch screen row (Ask / Built-in / Add-on,
   writes immediately — a display choice is a launcher preference, not
@@ -9896,6 +9901,9 @@ own games, in droidtop's own treatment:
   (`artworkUri`, the same media the Retro list shows); the hero card of a
   Retro game takes its fanart, else its screenshot, and without either is
   drawn as portrait art beside the title, the PC rule (`withRetroHero`).
+- **Art that does not load is no art** (console, build 1386: three empty
+  frames on Recently added). A card whose art fails to load (`AsyncImage`
+  `onError`) draws the plate with the name, the same as a card with no art.
 - **Continue playing is the first shelf** and the first card of the first
   shelf is always the **hero card** (`isHeroCard`; on a library nothing has
   been played from, whichever shelf leads), so Home and Overview both open on

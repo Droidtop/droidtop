@@ -18,6 +18,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -158,14 +162,19 @@ internal fun PcCapsule(
     ) {
         // A hero card wants the landscape art; a capsule the box art.
         val art = if (hero) entry.heroUri else entry.artworkUri
-        if (art != null) {
+        // Art that names a file which will not load (moved, not an image Android decodes) is no
+        // art: the card falls back to the plate with the name instead of staying an empty frame
+        // (console, build 1386: three blank cards on Home's Recently added).
+        var artFailed by remember(art) { mutableStateOf(false) }
+        if (art != null && !artFailed) {
             AsyncImage(
                 model = art,
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().clip(shape),
+                onError = { artFailed = true },
             )
-        } else if (hero && entry.artworkUri != null) {
+        } else if (hero && entry.artworkUri != null && entry.artworkUri != art) {
             // Only portrait art: it is never stretched across a landscape
             // card. It sits at its own shape beside the title.
             Row(

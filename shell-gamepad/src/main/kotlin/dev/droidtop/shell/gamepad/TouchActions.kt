@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -87,24 +88,33 @@ internal fun TouchHintBar(
     if (hints.isEmpty()) return
     val window = LocalShellWindow.current
     val press = rememberGamepadTouch()
-    Row(
-        modifier = modifier
-            .then(if (fill) Modifier.fillMaxWidth() else Modifier)
-            .background(background)
-            // A plate gets the frame's hairline on its top edge; over a
-            // theme's own canvas (transparent) there is no plate and none.
-            .then(if (background.alpha > 0f) Modifier.frameEdge(atTop = true) else Modifier)
-            .horizontalScroll(rememberScrollState())
-            .heightIn(min = window.frameBarHeight)
-            .padding(horizontal = window.edgePadding),
-        horizontalArrangement = Arrangement.spacedBy(if (window.compact) 10.dp else 24.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        hints.forEach { (action, label) ->
-            TouchHint(action = action, label = label, onPress = { press(action) })
+    BoxWithConstraints(modifier.then(if (fill) Modifier.fillMaxWidth() else Modifier)) {
+        // A bar narrower than the window (the Quick Menu's sheet) spaces its pills like a compact
+        // window does: at the full window's spacing the sheet's four hints ran off its right edge,
+        // "B Close" cut in half (console, build 1386). It still scrolls if even that does not fit.
+        val tight = window.compact || maxWidth < TIGHT_HINT_BAR_WIDTH
+        Row(
+            modifier = Modifier
+                .then(if (fill) Modifier.fillMaxWidth() else Modifier)
+                .background(background)
+                // A plate gets the frame's hairline on its top edge; over a
+                // theme's own canvas (transparent) there is no plate and none.
+                .then(if (background.alpha > 0f) Modifier.frameEdge(atTop = true) else Modifier)
+                .horizontalScroll(rememberScrollState())
+                .heightIn(min = window.frameBarHeight)
+                .padding(horizontal = if (tight) minOf(window.edgePadding, 12.dp) else window.edgePadding),
+            horizontalArrangement = Arrangement.spacedBy(if (tight) 10.dp else 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            hints.forEach { (action, label) ->
+                TouchHint(action = action, label = label, onPress = { press(action) })
+            }
         }
     }
 }
+
+/** Below this width a hint bar is a sheet's, not the window's, and packs its pills. */
+private val TIGHT_HINT_BAR_WIDTH = 600.dp
 
 @Composable
 private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit) {
