@@ -2630,9 +2630,7 @@ a close path of its own. Every call works off the main thread.
   (audio hand-off, display cover, ledger). For an open app that resumes its task; whether Android also
   moves the task to the other display is Android's decision, so the UI says "asked", not "moved". There
   is no shell-side `move-task` fallback.
-- **The Quick Menu's Apps tab.** First row Clear all apps (below), then one row per running app (icon,
-  name, which screen). A switches to it on the screen it is on, X closes it, Y asks for it on the other
-  screen when there is one, B closes the menu. The same rows are touch targets, and the hint row's pills are the touch route to X and Y.
+- **The Quick Menu's Running apps section and the companion Tasks tab share one vertical list** (`SharedRunningAppsList`): one row per running app (icon, name, screen, Close, and Switch to when another screen exists), with Clear all at the top. Rows use the source's most-recent-first order and one row height. The companion is touch-only and takes no controller focus; the Quick Menu keeps pad navigation, with A switching, X closing and Y asking for the other screen. Both surfaces use the same task actions and touch buttons.
 - **Clear all apps: one action, four surfaces** (tracker#252). `TaskManager.clearAllTargets` reads the
   list fresh and applies `TaskPolicy.clearAllTargets`; `TaskManager.clearAll` closes each target by the
   one close path and returns a `ClearAllSummary` whose sentence says how many were closed, how many
@@ -2928,7 +2926,7 @@ picks the tab it opens on. Standard's own second screen keeps its launcher-style
   The strip scrolls sideways and the Performance and System pages lay out in one column in portrait and two on
   a wide window, from the window's own bounds (#213).
 - **Tasks** is `CompanionTasks`, the task manager's row (switch, ask for the other screen, close, Clear
-  all apps with an inline confirm); see "The task manager". Nothing is rebuilt for the tab.
+  all apps with an inline confirm) using `SharedRunningAppsList`; see "The task manager".
 - **Performance** (`CompanionPerformanceTab`) reads `PerformanceMonitor` in `:runtime-common`, the one shared
   sampler and history (a 90-entry ring buffer, two seconds apart, three minutes) that the Quick Menu's
   performance section also reads. Sampling runs only while the tab is composed and its window is started
@@ -2951,6 +2949,8 @@ picks the tab it opens on. Standard's own second screen keeps its launcher-style
   too). Standard's inline controls use the same `SystemSliders` and `DndPill`.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
+
+Across companion and new UI surfaces, a screen may carry at most one short helper line; sentences are for errors and confirmations. Permission and capability explanations stay behind an info affordance or appear only when the user asks for detail.
 
 ### iiSU uses Android's own secondary-display home
 
