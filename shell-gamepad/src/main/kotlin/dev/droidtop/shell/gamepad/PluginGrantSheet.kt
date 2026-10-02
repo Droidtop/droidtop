@@ -1,6 +1,5 @@
 package dev.droidtop.shell.gamepad
 
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -12,7 +11,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -21,7 +19,6 @@ import dev.droidtop.pluginhost.PermissionTier
 import dev.droidtop.pluginhost.PluginGrantPrompts
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
-import dev.droidtop.shell.gamepad.input.HintRow
 
 /**
  * Where the first-use sheet is drawn (docs/plugin-api.md 4.3). Placed once
@@ -62,6 +59,7 @@ private fun PluginGrantSheet(pending: PluginGrantPrompts.Pending) {
         MenuPanel(
             modifier = Modifier.width(window.panelWidth(460.dp)),
             focusLabel = "Plugin permission sheet",
+            hints = listOf(HintBinding(GamepadAction.A, "Choose"), HintBinding(GamepadAction.B, "Not now")),
             onPad = { press ->
                 when (press.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> selected = menuMove(selected, choices.size, press)
@@ -99,11 +97,6 @@ private fun PluginGrantSheet(pending: PluginGrantPrompts.Pending) {
                     },
                 )
             }
-            HintRow(
-                bindings = listOf(HintBinding(GamepadAction.A, "Choose"), HintBinding(GamepadAction.B, "Not now")),
-                background = Color.Transparent,
-                modifier = Modifier.padding(top = 4.dp),
-            )
         }
     }
 }

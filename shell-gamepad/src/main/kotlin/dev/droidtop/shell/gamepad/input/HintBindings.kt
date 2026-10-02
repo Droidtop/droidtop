@@ -6,6 +6,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -86,9 +87,34 @@ fun HintRow(
  * row of its own. Only the focus owner's declaration shows; a release by an
  * element that no longer owns it is ignored, so two elements trading focus
  * in either order end with the right row.
+ *
+ * A modal layer (a sheet, a menu, a chooser) is a Compose `Dialog`, its own
+ * window: the focus of the screen under it does not move, so focus alone
+ * would keep the screen's hints on the bar. A layer says so with
+ * [DeclareLayerHints]; while one is open the footer shows the TOPMOST layer's
+ * hints and nothing else, whatever the screen underneath declares.
  */
 class FocusedHints {
     private var owner: Any? = null
+
+    private class Layer(val owner: Any, val bindings: List<HintBinding>)
+
+    private val layers = mutableStateListOf<Layer>()
+
+    /** The topmost open layer's hints, or null while no layer is open; an empty list means the layer draws its own bar. */
+    val layerBindings: List<HintBinding>? get() = layers.lastOrNull()?.bindings
+
+    internal fun pushLayer(owner: Any, bindings: List<HintBinding>) {
+        val index = layers.indexOfFirst { it.owner === owner }
+        when {
+            index < 0 -> layers.add(Layer(owner, bindings))
+            layers[index].bindings !== bindings -> layers[index] = Layer(owner, bindings)
+        }
+    }
+
+    internal fun popLayer(owner: Any) {
+        layers.removeAll { it.owner === owner }
+    }
 
     /** The declared bindings, or null while no element that declares any has the focus. */
     var bindings by mutableStateOf<List<HintBinding>?>(null)
@@ -134,6 +160,20 @@ fun Modifier.declaresHints(bindings: List<HintBinding>): Modifier = composed {
 }
 
 /**
+ * Makes the `Dialog` this is called from a layer of its own on the hint bar:
+ * while it is composed, the footer shows [bindings] (the panel's own A and B)
+ * instead of the screen's underneath. An empty [bindings] hides the bar for a
+ * layer that draws its own. Called once per modal surface, by [MenuPanel].
+ */
+@Composable
+fun DeclareLayerHints(bindings: List<HintBinding>) {
+    val host = LocalFocusedHints.current ?: return
+    val token = remember { Any() }
+    SideEffect { host.pushLayer(token, bindings) }
+    DisposableEffect(host, token) { onDispose { host.popLayer(token) } }
+}
+
+/**
  * The shell's footer: the focused element's declared hints, or [fallback]
  * (what the screen means by a press when nothing declares), then the
  * [trailing] ones that hold everywhere. The ONE hint row of a screen the
@@ -149,6 +189,13 @@ fun FocusedHintRow(
     // declaration names only what is the focused element's own.
     trailing: List<HintBinding> = emptyList(),
 ) {
-    val declared = LocalFocusedHints.current?.bindings
-    HintRow(bindings = (declared ?: fallback) + trailing, modifier = modifier, background = background)
+    val host = LocalFocusedHints.current
+    // A modal layer owns the bar while it is open: its hints alone, no
+    // trailing ones (Start's menu does nothing behind a sheet).
+    val layer = host?.layerBindings
+    if (layer != null) {
+        HintRow(bindings = layer, modifier = modifier, background = background)
+        return
+    }
+    HintRow(bindings = (host?.bindings ?: fallback) + trailing, modifier = modifier, background = background)
 }

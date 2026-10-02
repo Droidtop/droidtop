@@ -10227,6 +10227,15 @@ outside it, draws through `HintRow`; `TouchHintBar` is only the drawing
 primitive under it. A hint's tap dispatches the real key press, so the
 sheets' and tiles' hints are their touch routes.
 
+**A layer owns the bar while it is open (Droidtop/tracker#279).** A sheet,
+menu or chooser is a `Dialog`, its own window, so the focus of the screen
+under it does not move and focus alone would keep that screen's hints on the
+bar. `MenuPanel` (the one modal panel) and `CatalogSheet` therefore declare
+a layer (`DeclareLayerHints`): while any layer is open the footer shows the
+topmost layer's hints and nothing else (no Start Menu, none of the screen's).
+A panel passes its own hints (`MenuPanel(hints = ...)`, default A Select,
+B Back) and draws no hint row inside itself; two sets never show at once.
+
 ## 7k. The design system: one spacing scale, one type scale, one colour source
 
 droidtop draws two kinds of surface. A **themed view** takes every colour, typeface and

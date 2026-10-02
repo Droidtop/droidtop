@@ -60,7 +60,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.DeclareLayerHints
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.input.PadPress
 import dev.droidtop.shell.gamepad.input.menuStep
@@ -532,6 +534,9 @@ internal fun MenuHint(text: String, modifier: Modifier = Modifier) {
     )
 }
 
+/** What the footer says while a [MenuPanel] is open and has no hints of its own to give. */
+private val PANEL_HINTS = listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, "Back"))
+
 /**
  * A modal menu panel with focus and the pad handled ONCE, here.
  *
@@ -547,15 +552,21 @@ internal fun MenuHint(text: String, modifier: Modifier = Modifier) {
  * held down to run through it, which none could while they acted on the
  * key's release. In the PREVIEW pass, so a row a tap gave focus to cannot
  * take the press first. The system back key is the dialog's own dismiss.
+ *
+ * The panel is a layer on the footer's hint bar ([DeclareLayerHints]): while
+ * it is open the bar shows [hints], not the screen's underneath. A panel
+ * that draws a hint row of its own passes an empty list so the two never show.
  */
 @Composable
 internal fun MenuPanel(
     modifier: Modifier = Modifier,
     focusLabel: String = "Menu",
+    hints: List<HintBinding> = PANEL_HINTS,
     onPad: (PadPress) -> Boolean,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     GatePadInThisDialog()
+    DeclareLayerHints(hints)
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, focusLabel) }
     Column(

@@ -78,7 +78,6 @@ import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
-import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -801,6 +800,7 @@ private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(520.dp)),
             focusLabel = "Settings info",
+            hints = listOf(HintBinding(GamepadAction.B, "Close")),
             onPad = { press ->
                 val closes = press.action == GamepadAction.B || press.action == GamepadAction.A || press.action == GamepadAction.Y
                 if (closes) onDismiss()
@@ -819,11 +819,6 @@ private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -
                 Text(it, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
             }
             status?.let { Text(it, color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
-            HintRow(
-                bindings = listOf(HintBinding(GamepadAction.B, "Close")),
-                background = Color.Transparent,
-                modifier = Modifier.padding(top = 8.dp),
-            )
         }
     }
 }

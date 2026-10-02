@@ -33,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
@@ -67,7 +66,6 @@ import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
-import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -228,6 +226,11 @@ internal fun LibraryFilterSheet(
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Filter",
+            hints = listOf(
+                HintBinding(GamepadAction.A, "Select"),
+                HintBinding(GamepadAction.X, "Clear") { !query.isEmpty },
+                HintBinding(GamepadAction.B, if (openFacet != null) "Back" else "Close"),
+            ),
             onPad = { press ->
                 when (press.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, rows.size, press)
@@ -273,14 +276,6 @@ internal fun LibraryFilterSheet(
                     )
                 }
             }
-            HintRow(
-                bindings = listOf(
-                    HintBinding(GamepadAction.A, "Select"),
-                    HintBinding(GamepadAction.X, "Clear") { !query.isEmpty },
-                    HintBinding(GamepadAction.B, if (openFacet != null) "Back" else "Close"),
-                ),
-                background = Color.Transparent,
-            )
         }
     }
 }
@@ -303,6 +298,7 @@ internal fun LibrarySortSheet(
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Sort by",
+            hints = listOf(HintBinding(GamepadAction.A, "Sort"), HintBinding(GamepadAction.B, "Close")),
             onPad = { press ->
                 when (press.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, scope.sorts.size, press)
@@ -339,13 +335,6 @@ internal fun LibrarySortSheet(
                     },
                 )
             }
-            HintRow(
-                bindings = listOf(
-                    HintBinding(GamepadAction.A, "Sort"),
-                    HintBinding(GamepadAction.B, "Close"),
-                ),
-                background = Color.Transparent,
-            )
         }
     }
 }
