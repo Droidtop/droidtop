@@ -7,6 +7,7 @@ import android.hardware.display.DisplayManager
 import android.view.Display
 import android.util.Log
 import dev.droidtop.library.settings.Mode
+import dev.droidtop.runtime.CompanionScreenGuard
 import dev.droidtop.runtime.DisplayArrangement
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
@@ -124,11 +125,17 @@ class SecondScreenOrchestrator(
      */
     fun reinitialize() {
         host.clearParkedDisplayId()
-        SecondaryDisplayActivity.clearCovered()
+        giveScreensBack()
         lastRelocationAttemptMs = 0L
         relocationAttempts = 0
         lastDisplayIds = emptySet()
         roleRefresh.value++
+    }
+
+    /** The user asked for the screens back: neither the idle cover nor the companion counts as covered any more. */
+    private fun giveScreensBack() {
+        SecondaryDisplayActivity.clearCovered()
+        CompanionCover.clear()
     }
 
     fun onConfigurationChanged() {
@@ -248,7 +255,7 @@ class SecondScreenOrchestrator(
                 if (arrangementSeq != lastArrangementSeq) {
                     lastArrangementSeq = arrangementSeq
                     host.clearParkedDisplayId()
-                    SecondaryDisplayActivity.clearCovered()
+                    giveScreensBack()
                     lastRelocationAttemptMs = 0L
                     relocationAttempts = 0
                 }
@@ -286,13 +293,23 @@ class SecondScreenOrchestrator(
                     coverCoveredDisplayId = SecondaryDisplayActivity.coveredDisplayId,
                 )
                 if (DualScreenOrchestration.shellIsOnSecond(currentDisplay, second?.androidDisplayId) && host.shellStarted()) {
-                    SecondaryDisplayActivity.clearCovered()
+                    giveScreensBack()
                 }
                 val parked = host.parkedDisplayId() ?: userApp
+                // The companion's own screen (the built-in one while the shell is
+                // on the add-on) is the same: an app in front of it is not
+                // covered again by the companion, and the shell is not re-fronted
+                // over it, so the pad stays with that app (tracker#265).
+                val appOnCompanionScreen = CompanionScreenGuard.appInFrontOfCompanion(
+                    shellDisplayId = currentDisplay,
+                    companionDisplayId = Display.DEFAULT_DISPLAY,
+                    parkedDisplayId = host.parkedDisplayId(),
+                    companionCoveredDisplayId = CompanionCover.displayId,
+                )
                 val secondAvailable = second != null && second.androidDisplayId != parked
                 val mainScreen = withContext(Dispatchers.IO) { MainScreen.choice(context) }
                 // Choosing the Main screen is the user asking for the screens back.
-                if (lastMainScreen != null && lastMainScreen != mainScreen) SecondaryDisplayActivity.clearCovered()
+                if (lastMainScreen != null && lastMainScreen != mainScreen) giveScreensBack()
                 lastMainScreen = mainScreen
                 val wantShellOnSecond = (gaming || desktop) && secondAvailable &&
                     mainScreen == MainScreenChoice.SECOND_WHEN_PRESENT
@@ -365,7 +382,7 @@ class SecondScreenOrchestrator(
                         lastRelocationAttemptMs = now
                         relocationAttempts++
                         runCatching {
-                            host.startCompanionOnBuiltIn()
+                            if (!appOnCompanionScreen) host.startCompanionOnBuiltIn()
                             host.relaunchOnDisplay(second.androidDisplayId)
                         }.onFailure {
                             Log.w(TAG, "Relocation to display ${second.androidDisplayId} refused", it)
@@ -373,6 +390,7 @@ class SecondScreenOrchestrator(
                             roleRefresh.value++
                         }
                     } else if (currentDisplay == second.androidDisplayId && !host.companionVisible() &&
+                        !appOnCompanionScreen &&
                         now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS
                     ) {
                         lastRelocationAttemptMs = now

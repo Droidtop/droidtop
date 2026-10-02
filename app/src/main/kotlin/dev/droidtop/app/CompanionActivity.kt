@@ -164,6 +164,26 @@ class CompanionActivity : AppCompatActivity() {
         if (intent.action == ACTION_DISMISS) finish()
     }
 
+    override fun onResume() {
+        super.onResume()
+        dev.droidtop.display.CompanionCover.resumed(displayIdCompat())
+    }
+
+    override fun onPause() {
+        // Paused with something in front of it (an app launched onto this screen,
+        // the widget picker): the orchestration leaves that app alone (tracker#265).
+        dev.droidtop.display.CompanionCover.paused(displayIdCompat(), isFinishing)
+        super.onPause()
+    }
+
+    private fun displayIdCompat(): Int? =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            display?.displayId
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay?.displayId
+        }
+
     override fun onStart() {
         super.onStart()
         widgetHost.startListening()

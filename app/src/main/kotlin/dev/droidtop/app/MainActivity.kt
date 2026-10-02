@@ -79,7 +79,21 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
      * the pad to the container (SPEC 6b), so the gate steps aside there and
      * the stick's motion reaches the desktop surface untouched.
      */
-    private val padGate = PadGate(deliver = { event -> deliverKey(event) }, enabled = { mode != Mode.DESKTOP })
+    private val padGate = PadGate(
+        deliver = { event -> deliverKey(event) },
+        enabled = { mode != Mode.DESKTOP },
+        // Made-up keys (a held stick's repeats) stop the moment another app on
+        // either screen has the pad (Droidtop/tracker#265).
+        focused = { topResumed },
+    )
+
+    /**
+     * False while another app holds the system's focus (an emulator launched
+     * onto either screen); a Dialog of our own taking window focus does not
+     * count. Only reported from API 29, so it starts true.
+     */
+    @Volatile
+    private var topResumed = true
 
     private fun deliverKey(event: KeyEvent): Boolean = super.dispatchKeyEvent(event)
 
@@ -472,6 +486,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     // (AudioHandOff, tracker#160).
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
+        topResumed = isTopResumedActivity
+        if (!isTopResumedActivity) padGate.cancel()
         if (isTopResumedActivity) dev.droidtop.runtime.AudioHandOff.reopen("top window")
     }
 

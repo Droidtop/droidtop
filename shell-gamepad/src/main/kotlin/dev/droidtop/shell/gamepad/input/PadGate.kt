@@ -265,10 +265,21 @@ internal fun axisTargetKey(
  * window's own handling ([deliver]), and what the gate makes up is
  * delivered the same way. [enabled] lets a window that sometimes hands the
  * pad to something else (Desktop mode's container) step out of the way.
+ *
+ * [focused] says whether this window is the one the system is sending input
+ * to. A key the gate makes up on a timer (a held stick's repeats, a Select
+ * hold becoming R2) is delivered straight into the window, with no input
+ * dispatch in between, so it would otherwise keep landing in a window that
+ * another app (an emulator launched onto the other screen) has taken the
+ * pad from: nothing tells the gate the stick went back to centre, because
+ * the release went to that app. A made-up key is dropped, and everything
+ * held let go, whenever the window is not [focused]
+ * (Droidtop/tracker#265).
  */
 class PadGate(
     private val deliver: (KeyEvent) -> Boolean,
     private val enabled: () -> Boolean = { true },
+    private val focused: () -> Boolean = { true },
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val core = PadGateCore(
@@ -285,10 +296,15 @@ class PadGate(
         repeatTimeoutMs = ViewConfiguration.getKeyRepeatTimeout().toLong(),
         repeatDelayMs = ViewConfiguration.getKeyRepeatDelay().toLong(),
         emit = { key ->
-            PadModality.padDriving()
-            val event = key.toKeyEvent()
-            val handled = deliver(event)
-            log(event, if (handled) "made-by-gate handled" else "made-by-gate unhandled")
+            if (focused()) {
+                PadModality.padDriving()
+                val event = key.toKeyEvent()
+                val handled = deliver(event)
+                log(event, if (handled) "made-by-gate handled" else "made-by-gate unhandled")
+            } else {
+                // Not cancelled here: this runs inside the core's own update.
+                handler.post { core.cancel() }
+            }
         },
     )
 

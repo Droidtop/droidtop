@@ -3100,6 +3100,24 @@ idle again, and the companion returns, only when that app is gone (the idle cove
 asks for the screen back. One display still means no companion (#182, #217); the companion stays
 touch-only (#186); the arrangement setting still moves the shell both ways (#163).
 
+**The pad stays with the launched app (tracker#265, 2026-10-01).** Android sends a pad or keyboard
+press to the focused window of the focused display, and a normal app cannot choose that display
+(`setFocusedTask` and `moveTaskToDisplay` are signature or root only); what moves it is starting or
+touching a focusable window. So droidtop's rule is to never start one over an app the user is using.
+The companion's own screen follows the rule the add-on side already had: an app launched there
+(`parkedDisplayId`) or one that paused the companion (`CompanionCover`, cleared when the companion
+resumes or the user asks for the screens back) is an app in front of the companion
+(`CompanionScreenGuard`), and the orchestration then neither starts the companion again nor
+re-fronts the shell over it. Before this the relocation and "companion not visible" branches
+restarted the companion and the shell over the emulator every few seconds, each start taking the
+focused display back. The cover and the companion stay `FLAG_NOT_FOCUSABLE` (#186). The shell's
+`PadGate` also drops keys it makes up (a held stick's repeats, a Select hold) and releases what is
+held whenever the shell is not the top resumed activity, because those are delivered straight into
+the window and would otherwise keep driving the shell, Start's left menu (#258) included, while an
+emulator on the other screen has the pad. Where the system still keeps the focused display on the
+shell (an app that was already running, brought forward by Android itself), touching the app's
+screen moves it; that is the supported route and nothing droidtop does fights it.
+
 ### Second display: a Presentation takes no focus, the IME follows visibility (2026-09-30)
 
 Owner, 2026-09-30: "most things on the second display aren't touchable"
