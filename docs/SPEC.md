@@ -8877,6 +8877,14 @@ identity line.
   the main executable, the Steam download marker for a recognised Steam
   install) are not covered by this decision.
 
+**Persisted engine verdicts are observable and must be reusable.** The PC
+folder walk keeps a verdict for a folder only when its path, modification
+time, entry count and engine-rule fingerprint still match. Its per-folder
+`droidtop.ScanLog` line reports cache hits and misses alongside actual
+engine checks; an unchanged second walk must report zero engine checks for
+folders with reusable verdicts. A cache miss is evidence to investigate,
+not a successful cache operation merely because the cache file exists.
+
 ## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
 
 **PC games get PC-native sources (directed 2026-09-24).** PC and engine games are scraped from the
