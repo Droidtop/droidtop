@@ -63,29 +63,54 @@ fun availablePlayers(context: Context, system: ConsoleSystemDef): List<Player.Am
 }
 
 /**
- * Which player actually launches a game, most specific choice first:
- * the GAME's own alternative emulator, then the SYSTEM's override, then
- * the first available candidate.
+ * Which player actually launches a game, most specific choice first: the
+ * GAME's own setting, then the SYSTEM's, then the person's global default
+ * emulator, then the first installed candidate. The order itself lives in
+ * [EmulatorResolution], the one place that decides it, so the screens that
+ * show the choice and this launch cannot disagree; [resolveEmulator] also
+ * says which level answered.
  *
  * [altEmulator] is real ES-DE's own per-game concept (MetaData.cpp's
- * `altemulator`), which droidtop has stored and rendered a badge for
- * since the metadata editor existed while the launch path ignored it
- * entirely -- a setting that looked applied and did nothing. Matched
- * against both the player id and its label, because a person editing
- * that field by hand types the name they see ("RetroArch"), not an
- * internal id. An alternative naming nothing installed falls through to
- * the system's own choice rather than failing the launch: the game
- * still starts, just not with a player that isn't there.
+ * `altemulator`), matched against both the player id and its label,
+ * because a person editing that field by hand types the name they see
+ * ("RetroArch"), not an internal id. An alternative naming nothing
+ * installed falls through to the next level rather than failing the
+ * launch: the game still starts, just not with a player that isn't there.
  */
-fun resolvePlayer(context: Context, system: ConsoleSystemDef, altEmulator: String? = null): Player.AmStart? {
-    val candidates = availablePlayers(context, system)
-    val alt = altEmulator?.trim()?.takeIf { it.isNotEmpty() }
-    if (alt != null) {
-        candidates.firstOrNull { it.id.equals(alt, ignoreCase = true) || it.name.equals(alt, ignoreCase = true) }
-            ?.let { return it }
+fun resolvePlayer(context: Context, system: ConsoleSystemDef, altEmulator: String? = null): Player.AmStart? =
+    resolveEmulator(context, system, altEmulator)?.player
+
+/**
+ * The launch Intent for [romFile] under [player]: the template's own
+ * placeholders plus the ones the system supplies. The one place an
+ * emulator launch is built, for a real launch and for the emulator test.
+ */
+fun buildLaunchIntent(context: Context, system: ConsoleSystemDef, player: Player.AmStart, romFile: File): android.content.Intent {
+    // Beyond {file.path}/{file.uri}: the MAME4droid presets generated
+    // from ES-DE's own es_systems.xml build a -rompath out of the
+    // game's directory and the system folder, and software-list
+    // launches pass the extensionless basename. Same placeholder
+    // vocabulary the integrations already use for the system ones.
+    //
+    // {system.folder} is the ROM's parent directory: for the flat
+    // <root>/<system>/<rom> layout droidtop scans, that IS the system
+    // folder, and for a ROM in a subfolder it degrades to the game's
+    // own directory -- which for a MAME -rompath is still a correct
+    // search entry, just a narrower one.
+    val parentPath = romFile.parentFile?.absolutePath
+    val placeholders = buildMap {
+        put("{file.dir}", parentPath ?: "")
+        put("{file.basename}", romFile.nameWithoutExtension)
+        put(IntegrationPlaceholders.SYSTEM_ID, system.id)
+        put(IntegrationPlaceholders.SYSTEM_NAME, system.displayName)
+        parentPath?.let { put(IntegrationPlaceholders.SYSTEM_FOLDER, it) }
     }
-    val overrideId = PlayerOverridePrefs.get(context, system.id)
-    return candidates.firstOrNull { it.id == overrideId } ?: candidates.firstOrNull()
+    return AmStartCommandToIntentConverter.toIntent(
+        context,
+        player.argumentsTemplate,
+        romFile.absolutePath,
+        placeholders,
+    )
 }
 
 // The `-e`/`--es` string-extra flags from AmStartCommandToIntentConverter's
@@ -821,33 +846,18 @@ class ConsoleRomProvider(
                 suggestions = usableEmulatorNames(KnownPlayers.forSystem(context, system.id).map { it.label }),
                 message = noEmulatorInstalledMessage(context, system),
             )
-        if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
-        // Beyond {file.path}/{file.uri}: the MAME4droid presets generated
-        // from ES-DE's own es_systems.xml build a -rompath out of the
-        // game's directory and the system folder, and software-list
-        // launches pass the extensionless basename. Same placeholder
-        // vocabulary the integrations already use for the system ones.
-        //
-        // {system.folder} is the ROM's parent directory: for the flat
-        // <root>/<system>/<rom> layout droidtop scans, that IS the system
-        // folder, and for a ROM in a subfolder it degrades to the game's
-        // own directory -- which for a MAME -rompath is still a correct
-        // search entry, just a narrower one.
-        val parentPath = parentFolder?.absolutePath
-        val placeholders = buildMap {
-            put("{file.dir}", parentPath ?: "")
-            put("{file.basename}", romFile.nameWithoutExtension)
-            put(IntegrationPlaceholders.SYSTEM_ID, system.id)
-            put(IntegrationPlaceholders.SYSTEM_NAME, system.displayName)
-            parentPath?.let { put(IntegrationPlaceholders.SYSTEM_FOLDER, it) }
+        val intent = when (val prepared = prepareLaunch(context, system, player, romFile)) {
+            is PreparedLaunch.Ready -> prepared.intent
+            is PreparedLaunch.Blocked -> error(prepared.reason)
         }
-        val intent = AmStartCommandToIntentConverter.toIntent(
-            context,
-            player.argumentsTemplate,
-            romFile.absolutePath,
-            placeholders,
-        )
-        LaunchDisplay.start(context, intent)
+        if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
+        try {
+            LaunchDisplay.start(context, intent)
+        } catch (e: android.content.ActivityNotFoundException) {
+            throw IllegalStateException(explainLaunchFailure(e, player.name), e)
+        } catch (e: SecurityException) {
+            throw IllegalStateException(explainLaunchFailure(e, player.name), e)
+        }
     }
 
     /**

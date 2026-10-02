@@ -8219,12 +8219,49 @@ each choice is made:
   own detail ("Runs with", 7i). The engines database's `strategies` list
   ranks only runners that are available; the per-game override is
   `LaunchStrategyOverridePrefs`, set and cleared from that row's picker.
-- **A console system's** default player is Settings › Console systems ›
-  the system › Player (`PlayerOverridePrefs`; unset means the first
-  installed player in the players database's order).
-- **A ROM's** own override is ES-DE's `altemulator` field, edited as
-  "Alternative emulator" in the game's metadata editor and read before the
-  system's default (`ConsoleRomProvider.resolvePlayer`).
+- **A console game's emulator is decided in four levels, one function.**
+  `EmulatorResolution` answers, most specific first: the game's own choice,
+  the system's choice, the person's global default emulator, then the first
+  installed emulator that can run the system. The launcher
+  (`resolvePlayer`/`resolveEmulator`) and every screen that shows or edits
+  the choice call that one function, so what a screen says is what a launch
+  does, and it reports which level answered so a screen can say where the
+  value comes from. A choice naming an emulator that is no longer installed
+  is skipped and the next level answers; a stale choice never fails a
+  launch.
+  - **Global default** is an emulator app (a package), not a per-system
+    player, so one choice such as RetroArch covers every system that app
+    can run (`EmulatorDefaults`). It is the "Default emulator" row on
+    Settings > Emulators, and it applies only to systems that app can run.
+  - **System choice** is Settings > Emulators > the system > Emulator (also
+    "Emulator setup and test" on the system's Console systems folder
+    screen), stored as `PlayerOverridePrefs`; unset means Automatic. The
+    event a manager plugin hears (`default_player_changed`) is fired from
+    that one write path. Where a system has several cores, each is its own
+    entry in the players database, so choosing the emulator is choosing the
+    core; the generic RetroArch entry names its core in the picker.
+  - **A game's own choice** is ES-DE's `altemulator` field, set from a
+    game's Edit metadata screen as "Emulator": a picker over the installed
+    emulators for that game's system, whose first row ("Follow the system")
+    is the one-press reset. The row shows the emulator that will run and
+    which level decided it. The stored value is a player id; a hand-typed
+    name is matched too.
+  - **Detected state is on the screen, not guessed.** Settings > Emulators
+    lists every emulator found on the device and what it can run, then the
+    systems that have games, those with no usable emulator first. A
+    system's screen lists the emulators droidtop knows for it as Installed
+    or Not installed (selecting one opens its store page).
+  - **The launch test** starts one of a system's own games (the file is
+    read in place, never copied or moved) through `prepareLaunch`, the
+    preparation the real launch also uses, so a passing test is the launch
+    that will run. A failure is reported in plain words naming the
+    emulator and the next step (`explainLaunchFailure`): file missing or
+    unreadable, emulator not installed, launch setting invalid, the
+    emulator has no such screen or keeps it private. A real launch that
+    fails shows the same words instead of a raw exception.
+  - Launch data stays JSON: an emulator droidtop cannot launch correctly is
+    fixed by a row in the players database (droidtop-platforms), not by
+    Kotlin.
 
 Wine is the declared fallback for Windows titles nothing else backs; a
 native Linux depot still wins where one exists (§5a).
