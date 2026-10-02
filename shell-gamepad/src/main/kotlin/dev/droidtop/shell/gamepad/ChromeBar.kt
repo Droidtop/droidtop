@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
@@ -69,19 +70,23 @@ internal fun SectionTabBar(
 ) {
     val window = LocalShellWindow.current
     val tabStyle = MaterialTheme.typography.titleMedium
+    val textMeasurer = rememberTextMeasurer()
     // L1/R1 only mean something with a pad; on a touch phone with none
     // attached they are noise in the bar, so they are not drawn there.
     val shoulders = sections.size > 1 && (!window.touchFirst || window.padPresent)
-    // Whether the equal side slots are wide enough for the readout and the
-    // R2 indicator once the tab group has what it needs. An estimate from
-    // the tab count, not a measurement, and the tabs' half of it carries
-    // the live text scale: the labels grow with text, so Largest text must
-    // pick the scrolling layout instead of a centred row that clips the
-    // selected tab at the screen edge (Droidtop/tracker#165). A guess that
-    // errs the other way only picks the scrolling layout, which is always
-    // correct, never a clipped one.
+    // Measure the actual labels with the live theme font and text scale.
+    // A per-tab estimate can say the centered layout fits while its last
+    // selected label is already outside the screen at Largest text.
+    val density = LocalDensity.current
+    val tabWidths = remember(sections, tabStyle, density.fontScale) {
+        sections.sumOf { section ->
+            textMeasurer.measure(section.displayName(), tabStyle, maxLines = 1, softWrap = false).size.width
+        }
+    }
+    // Equal side slots keep the tabs centred. Choose that layout only if
+    // both slots remain large enough after reserving the measured tabs.
     val slotDp = (window.widthDp - 2 * window.edgePadding.value -
-        sections.size * MenuTokens.TabEstimateDp * LocalDensity.current.fontScale -
+        with(density) { tabWidths.toDp().value } - sections.size * 28f -
         (sections.size - 1) * window.tabGap.value -
         (if (shoulders) 2 * MenuTokens.ShoulderEstimateDp else 0)) / 2f
     val centred = slotDp >= MenuTokens.StatusSlotMinDp

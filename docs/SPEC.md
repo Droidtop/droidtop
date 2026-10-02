@@ -9178,6 +9178,10 @@ the handful of places where the shape genuinely differs:
   console's 220dp;
 - rows that can outgrow the width scroll instead of clipping (the PC
   filter chips, the hint bar);
+- the Gaming tab bar measures its live theme labels at the current text
+  scale before choosing a centred layout; when the status slots would
+  crowd the tabs, it gives that space to a scrollable tab row and keeps
+  the selected tab completely visible;
 - a modal panel's fixed width is capped by the window, because the half
   that falls off a phone's edge is the half with the buttons on it;
 - the **Quick Menu** is a right-edge sheet in landscape and a **bottom
