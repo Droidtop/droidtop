@@ -191,7 +191,7 @@ class PcFlavourTest {
             failed = 2,
         )
         assertTrue(notes, notes.contains("SteamGridDB refused a lookup (HTTP 401: Invalid key format) and was not asked again."))
-        assertTrue(notes, notes.contains("> SteamGridDB > API key"))
+        assertTrue(notes, notes.contains("$SOURCE_SETUP > SteamGridDB"))
         assertTrue(notes, notes.contains("2 lookups for details or art could not connect."))
         assertEquals("", pcFlavourNotes(emptyList(), emptySet(), 0))
     }
