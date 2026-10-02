@@ -10,6 +10,7 @@ import dev.droidtop.library.consoles.KnownPlayers
 import dev.droidtop.library.consoles.Player
 import dev.droidtop.library.consoles.PlayerOverridePrefs
 import dev.droidtop.library.consoles.PreparedLaunch
+import dev.droidtop.library.consoles.RetroArchCores
 import dev.droidtop.library.consoles.RomDatabase
 import dev.droidtop.library.consoles.SystemFolders
 import dev.droidtop.library.consoles.availablePlayers
@@ -72,6 +73,29 @@ object EmulatorsCatalog {
         value = "Open settings",
         run = { ctx -> openAllFilesAccessSettings(ctx, packageName) },
     )
+
+    // The RetroArch core a system launches with (Droidtop/tracker#271): installed, or installed
+    // here without opening RetroArch when a root helper can place it.
+    private fun coreRow(id: String, need: RetroArchCores.Need): AsyncActionItem {
+        val state = RetroArchCores.state(need)
+        return AsyncActionItem(
+            id = id,
+            title = "RetroArch core",
+            subtitle = need.core,
+            value = when (state) {
+                RetroArchCores.State.INSTALLED -> "Installed"
+                RetroArchCores.State.MISSING -> "Install core"
+                RetroArchCores.State.UNKNOWN -> "Open RetroArch"
+            },
+            run = { ctx, onStatus -> outcomeLine(RetroArchCores.ensure(ctx, need, onStatus), need) },
+        )
+    }
+
+    private fun outcomeLine(outcome: RetroArchCores.Outcome, need: RetroArchCores.Need): String = when (outcome) {
+        RetroArchCores.Outcome.Ready -> "${need.core} is installed"
+        is RetroArchCores.Outcome.Manual -> outcome.line
+        is RetroArchCores.Outcome.Failed -> outcome.line
+    }
 
     private fun appLabel(context: Context, packageName: String): String = runCatching {
         val pm = context.packageManager
@@ -152,12 +176,15 @@ object EmulatorsCatalog {
     private fun systemsGroup(context: Context, systems: List<ConsoleSystemDef>, globalPackage: String?): CatalogGroup {
         val systemsById = systems.associateBy { it.id }
         val withGames = SystemFolders.all(context, systemsById).map { it.second }.distinctBy { it.id }
-        val rows = withGames.map { system ->
-            val resolved = EmulatorResolution.resolveWithoutGame(
+        val resolvedById = withGames.associate { system ->
+            system.id to EmulatorResolution.resolveWithoutGame(
                 availablePlayers(context, system),
                 PlayerOverridePrefs.get(context, system.id),
                 globalPackage,
             )
+        }
+        val rows = withGames.map { system ->
+            val resolved = resolvedById[system.id]
             val row = NestedScreenItem(
                 id = "emulator_system_${system.id}",
                 title = system.displayName,
@@ -181,7 +208,16 @@ object EmulatorsCatalog {
                     ),
                 )
             } else {
-                rows.map { it.third }
+                val retroArchCores = AsyncActionItem(
+                    id = "emulators_retroarch_cores",
+                    title = "RetroArch cores",
+                    subtitle = "Install the cores these systems use",
+                    run = { ctx, onStatus -> RetroArchCores.ensureForLibrary(ctx, withGames, onStatus) },
+                )
+                val usesRetroArch = resolvedById.values.any { resolved ->
+                    resolved?.player?.let { RetroArchCores.needFor(it.packageName, it.argumentsTemplate) } != null
+                }
+                (if (usesRetroArch) listOf<CatalogItem>(retroArchCores) else emptyList()) + rows.map { it.third }
             },
         )
     }
@@ -223,6 +259,9 @@ object EmulatorsCatalog {
                             *listOfNotNull(
                                 resolved?.player?.takeIf { playerNeedsAllFilesAccess(context, it) }?.let {
                                     fileAccessRow("emulator_access_${system.id}", it.name, it.packageName)
+                                },
+                                resolved?.player?.let { RetroArchCores.needFor(it.packageName, it.argumentsTemplate) }?.let { need ->
+                                    coreRow("emulator_core_${system.id}", need)
                                 },
                             ).toTypedArray(),
                             NestedScreenItem(

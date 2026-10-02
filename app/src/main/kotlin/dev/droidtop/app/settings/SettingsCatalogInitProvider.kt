@@ -37,6 +37,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // download that finished while the process was dead is re-attached and finished by these.
         dev.droidtop.pluginhost.DownloadJobs.register(appContext)
         dev.droidtop.library.integrations.PluginCatalog.registerDownloadPost()
+        dev.droidtop.library.consoles.RetroArchCores.registerDownloadPost()
         dev.droidtop.pluginhost.PluginJobsCenter.attach(appContext)
         dev.droidtop.app.JobsSummaryNotification.start(appContext)
         dev.droidtop.app.LaunchWatchNotification.start(appContext)

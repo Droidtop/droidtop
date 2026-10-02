@@ -6253,6 +6253,34 @@ change or CI goes red: since `RomDatabase` falls back to a destructive wipe
 when a bump has no migration path, this test is the only thing standing
 between a missed bump and a user's library edits.
 
+## 7e2c. RetroArch: touchless cores, games keep running (owner, 2026-10-02)
+
+Owner: "do this over the API. We want retroarch to TRY to be touchless" and, on QUITFOCUS,
+"Games should be runnable in the background". `Droidtop/tracker#271`.
+
+- **Games keep running in the background.** No RetroArch launch passes `QUITFOCUS`
+  (RetroActivityFuture quits on focus loss with it, and on two screens focus moves whenever the other
+  screen is touched). The players database rows carry none; `DefaultPlayers` never adds it.
+- **What RetroArch offers another app** (1.22.2 source): intent extras on RetroActivityFuture, the UDP
+  network commands (command.h: none downloads or installs a core), no content provider. Its core
+  loader `dlopen`s the LIBRETRO path as given; shared storage is mounted noexec; the cores folder
+  `/data/user/0/<pkg>/cores` is RetroArch's private data, out of reach of droidtop and of the shell
+  user (Shizuku). So a core can only be placed by root.
+- **The mechanism** (`RetroArchCores`, library-core): a RetroArch launch whose LIBRETRO names a
+  buildbot-named core in that package's cores folder is a core droidtop can install. With a `priv.shell`
+  provider running as root (Sui; never `su` in droidtop's process), droidtop checks the file, and when
+  it is missing downloads `https://buildbot.libretro.com/nightly/android/latest/<abi>/<core>_libretro_android.so.zip`
+  for the ABI Android runs RetroArch as, as a job in Downloads and installs; the post step accepts only
+  a zip holding exactly that `.so`, an ELF for that ABI, and places it as root: copy beside it, owner
+  RetroArch's uid, the folder's own SELinux label, no-clobber rename. An existing core is never
+  replaced; droidtop ships no cores.
+- **When it runs:** before every launch through RetroArch (a missing core is installed first, because
+  RetroArch shows no error for a missing core: it sits black); from a system's emulator screen
+  ("RetroArch core"); and from Emulators > Systems with games > "RetroArch cores" for every system with
+  games that RetroArch runs.
+- **Without root** droidtop cannot see RetroArch's cores, so a launch goes ahead as it is, and the two
+  actions open RetroArch and name the cores to get from its Core Downloader, in one line.
+
 ## 7e3. Lutris install-script integration (directed 2026-08-30, scoped and built 2026-09-25)
 
 Beyond cover art (§7h's Lutris scraper source), lutris.net's real public

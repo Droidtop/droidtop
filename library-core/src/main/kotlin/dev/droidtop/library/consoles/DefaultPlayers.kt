@@ -61,7 +61,7 @@ import android.content.Context
  * package>/` is not generally readable on modern Android.
  */
 object DefaultPlayers {
-    private val RETROARCH_PACKAGE_VARIANTS =
+    internal val RETROARCH_PACKAGE_VARIANTS =
         listOf("com.retroarch", "com.retroarch.aarch64", "com.retroarch.ra32")
 
     /**

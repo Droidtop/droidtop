@@ -848,6 +848,17 @@ class ConsoleRomProvider(
                 suggestions = usableEmulatorNames(KnownPlayers.forSystem(context, system.id).map { it.label }),
                 message = noEmulatorInstalledMessage(context, system),
             )
+        // RetroArch sits black, with no error, when the core it is handed is missing
+        // (Droidtop/tracker#271): when droidtop can see that, it installs the core first.
+        RetroArchCores.needFor(player.packageName, player.argumentsTemplate)?.let { need ->
+            val missing = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                RetroArchCores.state(need) == RetroArchCores.State.MISSING
+            }
+            if (missing) {
+                val outcome = RetroArchCores.ensure(context, need)
+                if (outcome is RetroArchCores.Outcome.Failed) error(outcome.line)
+            }
+        }
         val intent = when (val prepared = prepareLaunch(context, system, player, romFile)) {
             is PreparedLaunch.Ready -> prepared.intent
             is PreparedLaunch.Blocked -> error(prepared.reason)
