@@ -1487,7 +1487,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | Id | Group | For | What | Status |
 | --- | --- | --- | --- | --- |
 | J1 | Jobs | long-running work with progress and cancel | `startJob`/`cancelJob`, `PluginJobsCenter` (one registry, one Jobs screen); any EP op may be declared `job: true`; a job belongs to the plugin that started it (or to the caller, for a brokered provider job) | built |
-| J2 | Event bus | host → plugin notifications | `PluginEventBus`; events are namespaced `<area>.<name>`, each with its own version (§7); v1 `default_player_changed` is kept as an alias of `library.default_player_changed@2` | built (one event) |
+| J2 | Event bus | host → plugin notifications | `PluginEventBus`; events are namespaced `<area>.<name>`, each with its own version (§7); v1 `default_player_changed` is kept as an alias of `library.default_player_changed@2` | partial (registered; only default-player delivery implemented) |
 | J3 | Plugin-provided API broker | plugin → plugin | §2 | not built |
 | J4 | Host info | what this host supports | `host.info()` → {droidtopVersion, contract, supported EP/API versions, mode, device ABI, installId}; `plugins.available {api}` | not built |
 
@@ -1861,7 +1861,7 @@ into the v2 shape at parse time, so the host has one model internally.
 | `settings_rows` | EP `ui.settings@1` (C1), `target=global` → `plugin`, `system:<id>` unchanged | — | `PluginSettingsRows` |
 | `app_status` | EP `apps.bridge@1` (F1); `action:status` → `status`, `action:launch` → `action{id:launch}`, the text-entry job hint → C14 `text` + job | `provide:apps.bridge`, `apps.check`, `apps.launch` | `PluginAppStatus` (Plugins screen, Player choice screen) |
 | `startJob` / `cancelJob` / `PluginJobsCenter` | J1, unchanged | — | Get games, app_status jobs, event reactions |
-| `PluginEvent.DEFAULT_PLAYER_CHANGED` (event contract 2) | event `library.default_player_changed@2`; the old id stays an alias for as long as contract 1 is served | `library.read` | `PluginEventBus` |
+| `PluginEvent.DEFAULT_PLAYER_CHANGED` | event `library.default_player_changed@2`; `default_player_changed` remains a legacy alias translated to this id | `library.read` | `PluginEventBus` |
 | `onEvent` → `{startJob, job, ...}` reaction | unchanged; an event reply may return `{job: {...}}` in v2 | — | `PluginEventBus` |
 | `requestsRoot` + `PluginRecord.rootApproved` + `PluginContext.hasRootApproval()` | an optional `requires priv.shell (minLevel root)` + `priv.shell.root` | `host.full_trust`, `priv.shell.root` (the existing tick, carried over as the grant) | the approval screen's root tick |
 | `PluginContext.hasShizukuAccess()` | `plugins.available{api:"priv.shell"}` with `level=adb`, served by the Shizuku provider | — (the check itself is harmless) | plugins |

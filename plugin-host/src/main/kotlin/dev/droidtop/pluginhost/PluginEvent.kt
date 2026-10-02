@@ -18,7 +18,7 @@ package dev.droidtop.pluginhost
  * [PluginManifest.subscribedEvents] is silently never matched, not a
  * validation failure -- see [PluginManifest.structuralProblems]).
  */
-enum class PluginEvent(val id: String, val display: String) {
+enum class PluginEvent(val id: String, val version: Int, val display: String) {
     /**
      * Fired after [dev.droidtop.library.consoles.PlayerOverridePrefs.set]
      * (or the "first installed" default resolving to a different player)
@@ -54,11 +54,18 @@ enum class PluginEvent(val id: String, val display: String) {
      * plugin that never overrides it is simply never affected by any
      * event it happens to subscribe to.
      */
-    DEFAULT_PLAYER_CHANGED("default_player_changed", "Default player/core changed"),
+    DEFAULT_PLAYER_CHANGED("library.default_player_changed", 2, "Default player/core changed"),
+    GAME_LAUNCHING("game.launching", 1, "Game launching"),
+    GAME_EXITED("game.exited", 1, "Game exited"),
+    LIBRARY_SCAN_FINISHED("library.scan_finished", 1, "Library scan finished"),
+    MODE_CHANGED("mode.changed", 1, "Mode changed"),
     ;
 
     companion object {
-        fun fromId(id: String): PluginEvent? = entries.firstOrNull { it.id == id.trim().lowercase() }
+        fun fromId(id: String): PluginEvent? = when (id.trim().lowercase()) {
+            "default_player_changed" -> DEFAULT_PLAYER_CHANGED
+            else -> entries.firstOrNull { it.id == id.trim().lowercase() }
+        }
     }
 }
 

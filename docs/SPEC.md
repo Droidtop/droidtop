@@ -12181,7 +12181,7 @@ describes.
 - **Event hooks (`PluginEvent`, `plugin-host`; `PluginEventBus`,
   `library-core`).** The OUTGOING half of the plugin API, mirroring
   `PluginCapability` (the incoming half): droidtop fires a closed,
-  versioned (`PLUGIN_EVENT_CONTRACT_VERSION`) set of events at approved
+  namespaced, individually versioned set of events at approved
   plugins that declared them in a new manifest field,
   `PluginManifest.subscribedEvents` (an id droidtop doesn't recognise is
   silently never matched, not a validation failure -- forward/backward
@@ -12195,7 +12195,13 @@ describes.
   `invoke`. `PluginCrashPolicy.notifyEvent` checks the subscription
   BEFORE any load/bind, so a plugin that ignores every event costs
   nothing on droidtop's own state changes.
-  - **The one event that exists**: `PluginEvent.DEFAULT_PLAYER_CHANGED`,
+  - **The registered event ids**: `library.default_player_changed@2`,
+    `game.launching@1`, `game.exited@1`, `library.scan_finished@1`, and
+    `mode.changed@1`. The legacy id `default_player_changed` aliases
+    `library.default_player_changed@2`; `LegacyManifest` performs this
+    translation. Only default-player delivery is currently wired; the
+    other registrations await their real write-path dispatchers.
+  - **The delivered event**: `PluginEvent.DEFAULT_PLAYER_CHANGED`,
     fired from the one real write path that changes a system's default
     player (`AppSettingsCatalogs.playerChoiceItem`'s `onSelect`, via
     `PluginEventBus.notifyDefaultPlayerChangedAsync`) with the resolved
