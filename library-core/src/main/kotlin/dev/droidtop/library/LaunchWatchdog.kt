@@ -47,7 +47,7 @@ data class LaunchAlert(
     /** Where droidtop wrote down what it saw, for someone who has to ask for help. */
     val logPath: String,
 ) {
-    /** A notice that a launch is slow, not a fault: the shell does not hand it to a dialog that blocks play. */
+    /** A notice that a launch is slow, not a fault: its notification is silent and has no heads-up. */
     val gentle: Boolean get() = trouble == LaunchTrouble.TAKING_LONG
 }
 

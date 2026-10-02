@@ -2,6 +2,7 @@ package dev.droidtop.library.consoles
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** How a launch hands the game file over (Droidtop/tracker#270): the template choice and the provider's answer. */
@@ -75,19 +76,19 @@ class LaunchFileAccessTest {
         val game = java.io.File("/storage/x/Roms/ps2/Example Game.iso")
         val found = CompanionFiles.candidates(game)
         val dir = java.io.File("/storage/x/Roms/ps2")
-        assert(java.io.File(dir, "Example Game.sym") in found)
-        assert(java.io.File(dir, "Example Game.iso.sym") in found)
-        assert(java.io.File(dir, "Example Game.cue") in found)
-        assert(java.io.File(dir, "Example Game.pnach") in found)
+        assertTrue(java.io.File(dir, "Example Game.sym") in found)
+        assertTrue(java.io.File(dir, "Example Game.iso.sym") in found)
+        assertTrue(java.io.File(dir, "Example Game.cue") in found)
+        assertTrue(java.io.File(dir, "Example Game.pnach") in found)
     }
 
     @Test
     fun siblingsNeverIncludeTheGameOtherFilesOrAnotherFolder() {
         val game = java.io.File("/storage/x/Roms/ps2/Example Game.bin")
         val found = CompanionFiles.candidates(game)
-        assert(game !in found)
-        assert(found.all { it.parentFile == game.parentFile })
-        assert(found.all { it.name.startsWith("Example Game.") })
+        assertTrue(game !in found)
+        assertTrue(found.all { it.parentFile == game.parentFile })
+        assertTrue(found.all { it.name.startsWith("Example Game.") })
         assertEquals(found.size, found.toSet().size)
     }
 
