@@ -6513,7 +6513,10 @@ dialog in the shell's own window) hands nothing over, and the owner
 heard the static exactly there when the old path paused the audio
 before the chooser. Any navigation sample still sounding plays out
 first (capped at 3 s), as ES-DE holds the launch behind its launch
-screen for that (ViewController.cpp:1069-1071). It also runs from any
+screen for that (ViewController.cpp:1069-1071). The launch screen is drawn over the
+screen the launch came from, which stays composed under it and takes only Back, so
+the cursor is where it was after the screen chooser's Back or when the person returns
+from the game (tracker#250); it used to replace that screen, which lost its focus. It also runs from any
 droidtop activity's onPause (the next app is resumed only after that
 returns), and it is undone when a droidtop activity resumes or regains
 top focus, or on Gaming navigation input. The surfaces droidtop parks

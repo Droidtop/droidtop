@@ -61,6 +61,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
@@ -1115,26 +1116,24 @@ private fun GamepadShellBody(
                 // this is a dim rather than a transition.
                 val entry = detailEntry?.takeIf { it.id == screenKey }
                 val shownSection = GamingSection.entries.firstOrNull { "section:${it.name}" == screenKey } ?: section
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // While the launch screen covers the content, the screen under it
+                        // keeps its place but takes no presses; only Back gets through,
+                        // to leave a launch that never produces a window.
+                        .onPreviewKeyEvent { event ->
+                            launching != null && event.nativeKeyEvent.keyCode !in LAUNCH_COVER_PASS_KEYS
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
                     when {
-                        // Starting a game owns the content area until the game's
-                        // own window arrives. Checked FIRST so it covers the
-                        // detail screen the launch was triggered from.
                         screensaverOn -> {
                             Screensaver(foldedGameEntries.orEmpty()) {
                                 screensaverOn = false
                                 lastInputMs.value = android.os.SystemClock.elapsedRealtime()
                             }
                             androidx.activity.compose.BackHandler(enabled = true) { screensaverOn = false }
-                        }
-                        launching != null -> {
-                            val starting = launching
-                            if (starting != null) {
-                                LaunchScreen(starting)
-                                // A launch that never produces a window must
-                                // never trap the shell behind this.
-                                androidx.activity.compose.BackHandler(enabled = true) { launching = null }
-                            }
                         }
                         // Real bug this fixes: the loading spinner used to gate this
                         // entire content area unconditionally, before `section` was
@@ -1273,6 +1272,25 @@ private fun GamepadShellBody(
                             GamingSection.PLUGINS,
                             -> Unit
                         }
+                    }
+                    // Starting a game owns the content area until the game's own window
+                    // arrives, drawn OVER the screen the launch was triggered from rather
+                    // than instead of it: taking that screen out of the composition threw
+                    // away its focus, so the cursor came back on the first tile after the
+                    // launch screen, the screen chooser's Back included (tracker#250).
+                    launching?.let { starting ->
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    awaitPointerEventScope {
+                                        while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                                    }
+                                },
+                        ) { LaunchScreen(starting) }
+                        // A launch that never produces a window must
+                        // never trap the shell behind this.
+                        androidx.activity.compose.BackHandler(enabled = true) { launching = null }
                     }
                 }
             }
@@ -3459,6 +3477,13 @@ private fun AppIconGrid(
 }
 
 private val APP_TILE_HEIGHT = 136.dp
+
+/** The keys the shell lets through while the launch screen covers it: the ones that mean Back. */
+private val LAUNCH_COVER_PASS_KEYS = setOf(
+    android.view.KeyEvent.KEYCODE_BACK,
+    android.view.KeyEvent.KEYCODE_BUTTON_B,
+    android.view.KeyEvent.KEYCODE_ESCAPE,
+)
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
