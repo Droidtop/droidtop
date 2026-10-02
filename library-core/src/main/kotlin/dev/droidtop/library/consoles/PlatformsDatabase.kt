@@ -1,7 +1,6 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
-import java.io.File
 import org.json.JSONObject
 
 /**
@@ -30,8 +29,7 @@ object PlatformsDatabase {
         cached?.let { return it }
         synchronized(this) {
             cached?.let { return it }
-            val updated = File(context.filesDir, DB_FILE_NAME)
-                .takeIf { it.isFile }
+            val updated = PlatformDatabaseSnapshot.refreshedCopy(context, DB_FILE_NAME)
                 ?.let { runCatching { parse(it.readText()) }.getOrNull() }
             val bundled = parse(context.assets.open(DB_FILE_NAME).bufferedReader().use { it.readText() })
             // Older downloaded snapshots predate ownership metadata. Preserve

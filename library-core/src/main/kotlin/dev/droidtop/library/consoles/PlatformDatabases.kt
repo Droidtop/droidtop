@@ -2,6 +2,7 @@ package dev.droidtop.library.consoles
 
 import android.content.Context
 import dev.droidtop.library.EnginesDatabase
+import java.io.File
 import org.json.JSONObject
 
 /**
@@ -26,6 +27,8 @@ object PlatformDatabases {
             return "Updated: " + counts + " (" + result.downloaded + " files changed, " +
                 result.unchanged + " already current)"
         }
+        // A source without an index has no publish time: what it serves is taken as current.
+        PlatformDatabaseSnapshot.noteRefreshed(context, "")
         onStatus("Updating players...")
         val players = PlayersDatabaseUpdater.update(context)
         onStatus("Updating platforms...")
@@ -58,4 +61,60 @@ object PlatformDatabaseSnapshot {
 
     /** The short form used in UI text. */
     fun shortCommit(context: Context): String? = commit(context)?.take(7)
+
+    private const val REFRESHED_MARKER = "platform-db/refreshed-generatedAt"
+
+    /** When the platform index this build's seed came from was generated (ISO-8601 UTC), or "" when unknown. */
+    fun seedGeneratedAt(context: Context): String = runCatching {
+        JSONObject(context.assets.open(ASSET_NAME).bufferedReader().use { it.readText() }).optString("generatedAt", "")
+    }.getOrDefault("")
+
+    /**
+     * Records the publish time of the data a refresh is about to install, BEFORE it installs it, so
+     * [refreshedCopy] can tell it from the seed. "" for a source without an index.
+     */
+    fun noteRefreshed(context: Context, generatedAt: String) {
+        PlatformDatabaseTransport.write(File(context.filesDir, REFRESHED_MARKER), generatedAt)
+        useRefreshed = null
+    }
+
+    @Volatile
+    private var useRefreshed: Boolean? = null
+
+    /**
+     * The downloaded copy of [fileName] in filesDir, when it is at least as new as this build's
+     * bundled seed; null means read the seed. One rule for every platform database
+     * ([KnownPlayers], [PlatformsDatabase], [BiosDatabase], EnginesDatabase, HardwareDatabase), so all
+     * of them come from one snapshot.
+     *
+     * A downloaded copy used to win whatever its age, so an update that bundled newer data still
+     * ran on the older download until the next refresh: the console on build 1386 had no
+     * plain-path launch and no "needs All files access" row for NetherSX2, both of which its own
+     * seed carried (the players rows gained `storagePathTemplate` that morning), and the platforms
+     * database already carried a patch for one such case (ownership missing from older downloads).
+     * Copies with no marker predate this rule and their age is unknown, so the seed is used until
+     * the next refresh. Reads two small files: not for the main thread.
+     */
+    fun refreshedCopy(context: Context, fileName: String): File? {
+        val file = File(context.filesDir, fileName).takeIf { it.isFile } ?: return null
+        val use = useRefreshed ?: decide(context).also { useRefreshed = it }
+        return file.takeIf { use }
+    }
+
+    private fun decide(context: Context): Boolean {
+        val marker = File(context.filesDir, REFRESHED_MARKER).takeIf { it.isFile }
+        val refreshedAt = marker?.let { runCatching { it.readText().trim() }.getOrDefault("") }
+        return refreshedIsCurrent(refreshedAt, seedGeneratedAt(context))
+    }
+
+    /**
+     * The rule, pure: [refreshedAt] is the marker (null: none, a copy from before the marker
+     * existed; "": a source without an index), [seedAt] the seed's index time ("" unknown).
+     * ISO-8601 UTC timestamps of the one shape the generator writes order as text.
+     */
+    internal fun refreshedIsCurrent(refreshedAt: String?, seedAt: String): Boolean = when {
+        refreshedAt == null -> false
+        refreshedAt.isEmpty() || seedAt.isEmpty() -> true
+        else -> refreshedAt >= seedAt
+    }
 }

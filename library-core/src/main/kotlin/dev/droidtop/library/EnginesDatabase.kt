@@ -3,7 +3,6 @@ package dev.droidtop.library
 import android.content.Context
 import dev.droidtop.library.consoles.PlatformDatabaseSource
 import dev.droidtop.library.consoles.PlatformDatabaseTransport
-import java.io.File
 
 /**
  * The engine REGISTRY, data-driven from the droidtop-platforms
@@ -34,8 +33,7 @@ object EnginesDatabase {
         cached?.let { return it }
         synchronized(this) {
             cached?.let { return it }
-            val updated = File(context.filesDir, DB_FILE_NAME)
-                .takeIf { it.isFile }
+            val updated = dev.droidtop.library.consoles.PlatformDatabaseSnapshot.refreshedCopy(context, DB_FILE_NAME)
                 ?.let { file -> runCatching { EngineRegistryParser.parse(file.readText()) }.getOrNull() }
                 ?.takeIf { defs -> defs.any { it.detect.isNotEmpty() } }
             val loaded = updated

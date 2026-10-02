@@ -2,7 +2,6 @@ package dev.droidtop.library.consoles
 
 import android.content.Context
 import org.json.JSONObject
-import java.io.File
 
 /**
  * Real standalone-emulator [Player.AmStart] presets, one per (system, real
@@ -51,8 +50,7 @@ object KnownPlayers {
         cached?.let { return it }
         synchronized(this) {
             cached?.let { return it }
-            val updated = File(context.filesDir, DB_FILE_NAME)
-                .takeIf { it.isFile }
+            val updated = PlatformDatabaseSnapshot.refreshedCopy(context, DB_FILE_NAME)
                 ?.let { runCatching { parse(it.readText()) }.getOrNull() }
             val loaded = updated
                 ?: parse(context.assets.open(DB_FILE_NAME).bufferedReader().use { it.readText() })

@@ -107,8 +107,13 @@ val platformDatabaseSeed = tasks.register<Copy>("platformDatabaseSeed") {
         }
     }
     doLast {
+        // When the pinned index was generated: a downloaded copy older than this seed is not used
+        // (PlatformDatabaseSnapshot.refreshedCopy). Empty when the pin has no index.
+        val generatedAt = File(platformsRepoDir, "index.json").takeIf { it.isFile }
+            ?.let { Regex("\"generatedAt\"\\s*:\\s*\"([^\"]*)\"").find(it.readText())?.groupValues?.get(1) }
+            ?: ""
         platformDatabaseSeedDir.get().file("platform-database-snapshot.json").asFile
-            .writeText("""{"commit": "$platformDatabaseSnapshotCommit"}""")
+            .writeText("""{"commit": "$platformDatabaseSnapshotCommit", "generatedAt": "$generatedAt"}""")
     }
 }
 

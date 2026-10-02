@@ -2,7 +2,6 @@ package dev.droidtop.library.controller
 
 import android.content.Context
 import dev.droidtop.library.consoles.PlatformDatabaseTransport
-import java.io.File
 import org.json.JSONObject
 
 /** One value of a console's layout toggle: what the system does to the pad's face keys while the property holds it. */
@@ -39,8 +38,8 @@ data class ConsoleDef(
  * `hardware-database.json` and kept like every other database there
  * ([dev.droidtop.library.consoles.PlatformDatabaseIndex] refreshes it; the
  * build's seed task bundles the pinned snapshot when it has one, and a
- * refreshed copy in filesDir wins). A device with no row is simply not in the
- * table: nothing is inferred for it.
+ * refreshed copy in filesDir wins when it is not older than that seed). A
+ * device with no row is simply not in the table: nothing is inferred for it.
  */
 object HardwareDatabase {
     private const val DB_FILE_NAME = "hardware-database.json"
@@ -53,7 +52,7 @@ object HardwareDatabase {
         cached?.let { return it }
         synchronized(this) {
             cached?.let { return it }
-            val refreshed = File(context.filesDir, DB_FILE_NAME).takeIf { it.isFile }
+            val refreshed = dev.droidtop.library.consoles.PlatformDatabaseSnapshot.refreshedCopy(context, DB_FILE_NAME)
                 ?.let { file -> runCatching { parse(file.readText()) }.getOrNull() }
             val loaded = refreshed ?: runCatching {
                 parse(context.assets.open(DB_FILE_NAME).bufferedReader().use { it.readText() })

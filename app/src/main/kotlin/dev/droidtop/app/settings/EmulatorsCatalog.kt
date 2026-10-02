@@ -353,7 +353,13 @@ object EmulatorsCatalog {
             Triple(isInstalled, name, pkg)
         }.sortedWith(compareBy<Triple<Boolean, String, String>>({ !it.first }, { it.second.lowercase() }))
         val installedRows = rows.filter { it.first }
-        val missingRows = rows.filter { !it.first }.take(8)
+        // One emulator can be published under more than one package (ARMSX2 is listed as
+        // com.armsx2 and come.nanodata.armsx2): a "Not installed" row with the name of one that is
+        // installed read as the same emulator listed twice (console, build 1386).
+        val installedNames = installedRows.map { it.second.lowercase() }.toSet()
+        val missingRows = rows.filter { !it.first && it.second.lowercase() !in installedNames }
+            .distinctBy { it.second.lowercase() }
+            .take(8)
         return CatalogGroup(
             id = "emulator_system_known",
             title = "Emulators for ${system.displayName}",

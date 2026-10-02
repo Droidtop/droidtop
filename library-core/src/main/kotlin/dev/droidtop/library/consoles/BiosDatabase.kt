@@ -39,8 +39,7 @@ object BiosDatabase {
         cached?.let { return it }
         synchronized(this) {
             cached?.let { return it }
-            val updated = File(context.filesDir, DB_FILE_NAME)
-                .takeIf { it.isFile }
+            val updated = PlatformDatabaseSnapshot.refreshedCopy(context, DB_FILE_NAME)
                 ?.let { runCatching { parse(it.readText()) }.getOrNull() }
             val loaded = updated
                 ?: runCatching { parse(context.assets.open(DB_FILE_NAME).bufferedReader().use { it.readText() }) }

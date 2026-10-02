@@ -6012,7 +6012,7 @@ as the media client, feeding the same `PresencePanel`.
 Standalone-emulator launch definitions (the non-RetroArch emulators) are
 DATA, not code: `players-database.json` — refreshed from the
 droidtop-platforms repository on GitHub. `KnownPlayers` loads
-filesDir-copy-if-valid, else the bundled seed; every refresh
+filesDir-copy-if-valid-and-not-older (below), else the bundled seed; every refresh
 parse-validates before replacing anything. The previous state —
 117 presets as generated Kotlin — required an app release to add an
 emulator; now the database grows independently.
@@ -6031,6 +6031,18 @@ one identifiable state of the platform repo, and the tests parse the
 same generated files the APK ships. Enginehost takes its
 `engines-database.json` seed the same way from its own pin, and shows
 its snapshot on the version row.
+
+**A download never shadows a newer seed** (console, build 1386). The downloaded copies in filesDir used
+to win whatever their age, so an app update that bundled newer data kept running on an older download
+until the next refresh: the console had neither the NetherSX2 plain-path launch nor its "needs All files
+access" row, both in its own seed (the players rows gained `storagePathTemplate` that morning), and the
+platforms and engines loaders already carried one-off patches for older downloads (ownership metadata,
+v3 engine files). Now the seed snapshot records when its pinned `index.json` was generated
+(`platform-database-snapshot.json`, `generatedAt`), each refresh stamps the publish time of what it
+installs before installing it (`platform-db/refreshed-generatedAt`; "" for a source with no index), and
+every loader (players, platforms, BIOS, engines, hardware) reads the download only through
+`PlatformDatabaseSnapshot.refreshedCopy`: used when its stamp is not older than the seed, ignored when it
+is older or has no stamp (a copy from before this rule), so all five come from one snapshot.
 
 **The repository is a TREE with an index** (directed 2026-09-10: "the
 platform repo should have a BUNCH of jsons. One per engine, different
@@ -6149,6 +6161,15 @@ given. droidtop never grants anything. When a launch has issues, the failure dia
 "Emulator setup: Settings, Library, Emulators.", and no extra button. `launchTemplateFor` is unchanged: the
 plain path is used when the emulator holds access, the row's own template otherwise. The file provider and
 the sibling grants above are unchanged too.
+
+Why the NetherSX2 rows need the plain path (console, build 1386): ES-DE's own NetherSX2 commands pass
+`bootPath=%ROMSAF%`, a Storage Access Framework document URI from the folder the person granted ES-DE, which
+NetherSX2's file helper understands; droidtop holds All files access instead of a SAF folder grant, so it
+cannot hand out such a URI, and NetherSX2 started its emulation thread on droidtop's FileProvider URI and
+showed nothing. The plain path with the emulator's own All files access is droidtop's equivalent. The
+system page's "Emulators for <system>" list shows one row per emulator name: a package that is not installed
+is not listed beside an installed one of the same name (ARMSX2 is published as `com.armsx2` and
+`come.nanodata.armsx2`).
 
 **The launch watchdog** (`LaunchWatchdog`, `LaunchWatchPolicy`). `LaunchDisplay.dispatch`, the one point
 every launch passes, starts it for a game launch. It runs off the main thread, every 3 s for at most 90 s,

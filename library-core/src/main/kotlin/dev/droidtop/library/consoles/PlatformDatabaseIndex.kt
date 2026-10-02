@@ -146,6 +146,8 @@ object PlatformDatabaseIndex {
         }
         check(composed.isNotEmpty()) { "The index carried no database this build knows how to read" }
         val counts = LinkedHashMap<String, Int>()
+        // Stamped first, so the loaders never take this data for older than the bundled seed.
+        PlatformDatabaseSnapshot.noteRefreshed(context, JSONObject(indexText).optString("generatedAt", ""))
         for ((name, consumer, text) in composed) counts[name] = consumer.install(context, text)
 
         for ((path, text) in contents) PlatformDatabaseTransport.write(File(cache, path), text)
