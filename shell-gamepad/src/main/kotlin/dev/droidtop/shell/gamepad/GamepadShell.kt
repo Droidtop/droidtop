@@ -935,29 +935,13 @@ private fun GamepadShellBody(
                         if (!leftMenuOpen) leftMenuOpen = true
                         true
                     }
-                    // L1/R1 step the nearest tab strip: the page's own when
-                    // it has claimed them (PC Games' views), else the top
-                    // bar's sections -- the standard console-UI pattern
-                    // (Daijisho and most console launchers), which works
-                    // whatever has focus. Not over a game's detail.
+                    // L1/R1 step the page's own nearest strip only. A page
+                    // without one leaves these presses unhandled.
                     GamepadAction.L, GamepadAction.R -> {
                         val step = if (press.action == GamepadAction.L) -1 else 1
                         when (shoulderRoute(stripOwned = shoulderStrips.current != null, detailOpen = detailEntry != null)) {
                             ShoulderRoute.STRIP -> {
                                 shoulderStrips.current?.step?.invoke(step)
-                                true
-                            }
-                            ShoulderRoute.TOP_BAR -> {
-                                val sections = sectionsFor(uiMode)
-                                val currentIndex = sections.indexOf(section)
-                                // A place is not a tab: the shoulders step from its edge into the bar.
-                                selectSection(
-                                    if (currentIndex < 0) {
-                                        if (step < 0) sections.last() else sections.first()
-                                    } else {
-                                        sections[(currentIndex + step + sections.size) % sections.size]
-                                    },
-                                )
                                 true
                             }
                             ShoulderRoute.NONE -> false
@@ -979,24 +963,6 @@ private fun GamepadShellBody(
                 false
             },
     ) {
-        // The screensaver owns the whole window: the tab bar and the hint
-        // row stood on top of the slideshow (rig, dq-shell2-01).
-        if (!screensaverOn) {
-            SectionTabBar(
-                current = section,
-                onSelect = selectSection,
-                onQuickMenu = { quickMenuOpen = true },
-                onLeftMenu = { leftMenuOpen = true },
-                // A page's own tab strip, when it has claimed L1/R1, takes
-                // the glyphs from the bar: the bar says only what it does.
-                shouldersOnBar = shoulderStrips.current == null,
-                // L2 is a PC game's own menu (docs/SPEC.md 7i): live on the
-                // PC Games tab while a game is under its cursor.
-                contextMenuEnabled = section == GamingSection.PC_GAMES && detailEntry == null && focusedContextEntry != null,
-                onContextMenu = { contextMenuRequest++ },
-                sections = sectionsFor(uiMode),
-            )
-        }
         // Live setup progress (Droidtop/tracker#140): the launch path's
         // own lines about what a Windows setup is fetching, drawn as
         // chrome rather than as the failure banner below -- a
@@ -1138,7 +1104,7 @@ private fun GamepadShellBody(
             // D-pad focus target). Real content steals focus the
             // moment it has any (GamesSection/AppsSection/etc. each
             // call requestFocusWhenAttached on their own first row);
-            // this exists only so L1/R1/Page Up/Page Down still fire
+            // this exists only so shell-level pad actions still fire
             // on the very first frame or a genuinely empty library,
             // where nothing else has focus yet to bubble the key
             // event up from (see tabBarFocus's own comment).
@@ -1338,6 +1304,19 @@ private fun GamepadShellBody(
                         // never trap the shell behind this.
                         androidx.activity.compose.BackHandler(enabled = true) { launching = null }
                     }
+                }
+            }
+            // Float status over the page rather than reserving a header
+            // band; it is a readout and the tap route to the Quick Menu.
+            if (!screensaverOn) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(horizontal = shellWindow.edgePadding, vertical = 8.dp)
+                        .background(MenuTokens.Surface.copy(alpha = 0.58f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    StatusCluster(showBatteryPercent = true, onClick = { quickMenuOpen = true })
                 }
             }
             // Over the themed canvas, at the place the theme itself laid
@@ -1775,9 +1754,7 @@ private fun ButtonHintFooter(
     // that can drift from what the key handlers above actually bind.
     FocusedHintRow(
         background = background,
-        // Start is the left menu on every screen the shell draws, whatever
-        // has the focus; the chip is also its touch route.
-        trailing = listOf(HintBinding(GamepadAction.START, "Menu")),
+        leading = listOf(HintBinding(GamepadAction.START, "Menu")),
         fallback = listOf(
             HintBinding(GamepadAction.A, aLabel),
             HintBinding(GamepadAction.Y, "Info") { showInfo },
@@ -1795,10 +1772,7 @@ private fun ButtonHintFooter(
             // be tappable on its own.
             HintBinding(GamepadAction.LEFT, "Previous system") { showSystemSwitch },
             HintBinding(GamepadAction.RIGHT, "Next system") { showSystemSwitch },
-            // L1/R1 cycling the top-level sections is named beside the
-            // tab row itself now, not here (SectionTabBar's own
-            // ShoulderGlyph, owner 2026-09-25: "Can remove the
-            // next/previous section pills").
+            // L1/R1 are named by a page's own strip when one exists.
         ),
     )
 }
@@ -3134,17 +3108,14 @@ private fun GamesSection(
                         // it leaves on both edges exactly like Left/
                         // Right at a real edge, so Compose's own focus
                         // search runs. That search once walked straight
-                        // out of the grid onto the section tab bar above
-                        // it, which is why Up was swallowed here -- but
-                        // the top bar can no longer take focus at all
-                        // (SectionTabBar, docs/SPEC.md 7k), so the
+                        // out of the grid into shell chrome above it,
+                        // which is why Up was swallowed here. The
                         // swallow protected nothing while cutting the
                         // pad off from the real rows above this grid:
                         // the filter chips first, and in safe mode the
                         // banner's action behind them (docs/SPEC.md
-                        // 10c). L1/R1 (SectionTabBar's
-                        // `ShoulderGlyph`) remain the section route and
-                        // never route through focus.
+                        // 10c). Destinations are chosen in the left
+                        // menu, never through focus traversal.
                         modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding)
                             .onPad { press ->
                                 val direction = gridDirection(press.action) ?: return@onPad false

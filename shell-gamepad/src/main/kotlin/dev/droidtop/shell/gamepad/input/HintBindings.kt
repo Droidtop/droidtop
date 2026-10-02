@@ -192,6 +192,7 @@ fun FocusedHintRow(
     fallback: List<HintBinding>,
     modifier: Modifier = Modifier,
     background: Color = MenuTokens.HintBar,
+    leading: List<HintBinding> = emptyList(),
     // What the shell means on every screen (Start is the left menu), so a
     // declaration names only what is the focused element's own.
     trailing: List<HintBinding> = emptyList(),
@@ -204,5 +205,5 @@ fun FocusedHintRow(
         HintRow(bindings = layer, modifier = modifier, background = background)
         return
     }
-    HintRow(bindings = (host?.bindings ?: fallback) + trailing, modifier = modifier, background = background)
+    HintRow(bindings = leading + (host?.bindings ?: fallback) + trailing, modifier = modifier, background = background)
 }

@@ -7,14 +7,13 @@ import org.junit.Test
 
 /**
  * Who L1/R1 belong to (docs/SPEC.md 7j, "Gaming controls"): the page's tab
- * strip when it has claimed them, else the top bar, and nobody over a
- * game's detail.
+ * strip when it has claimed them; otherwise they do not switch destinations.
  */
 class ShoulderRouteTest {
 
     @Test
-    fun `a page with no strip leaves the shoulders to the top bar`() {
-        assertEquals(ShoulderRoute.TOP_BAR, shoulderRoute(stripOwned = false, detailOpen = false))
+    fun `a page with no strip leaves shoulders unhandled`() {
+        assertEquals(ShoulderRoute.NONE, shoulderRoute(stripOwned = false, detailOpen = false))
     }
 
     @Test
