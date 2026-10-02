@@ -136,9 +136,16 @@ object EsDeArtwork {
      * here rather than re-declared identically at each site.
      */
     private fun candidateMediaRoots(gamesRoot: File): List<File> = listOf(
-        File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
-        File(gamesRoot, "downloaded_media"),
+        File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/$MEDIA_DIR"),
+        File(gamesRoot, MEDIA_DIR),
     )
+
+    /**
+     * ES-DE's media folder name (its default MediaDirectory), the one droidtop's scrapers write
+     * under a games root and this object reads. It holds media, never games: [ScanPrune] keeps
+     * every library walk out of it (Droidtop/tracker#297).
+     */
+    const val MEDIA_DIR = "downloaded_media"
 
     /**
      * The one file lookup every function here makes: the first of

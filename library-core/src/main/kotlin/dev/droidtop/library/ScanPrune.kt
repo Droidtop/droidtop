@@ -13,7 +13,7 @@ import java.io.File
  * the ROM walk's add-on-directory test, the second calling the first), and
  * nothing covered a store's own tree at all.
  *
- * Three rules, in the order they are checked, each from a real failure:
+ * Four rules, each from a real failure:
  *
  *  1. **Hidden folders and filesystem bookkeeping.** A leading dot is how
  *     Syncthing, Android's own caches and every Unix tool mark "not for
@@ -53,6 +53,15 @@ import java.io.File
  *     verified on the user's own library, for the same reason the ROM
  *     walk's marker list is short: a rule that hides real games to tidy a
  *     list is worse than the bug it fixes.
+ *
+ *  4. **The scraped-media tree is not games.** ES-DE's media folder
+ *     ([EsDeArtwork.MEDIA_DIR]) is where droidtop's own scrapers write
+ *     `<root>/downloaded_media/<system>/<type>/`, and the system-folder
+ *     walk, which allows one container level (`<root>/roms/<system>`),
+ *     took `downloaded_media/gba` for a second gba system: the console
+ *     listed gba, gbc, nds and ps2 twice (Droidtop/tracker#297, build
+ *     1397). The folder is named by the same constant the media reader
+ *     uses, so the two cannot drift apart.
  *
  * What is deliberately NOT here, and why, because both were checked
  * against the real library on 2026-09-11 rather than assumed:
@@ -170,6 +179,7 @@ object ScanPrune {
         val lower = name.lowercase()
         if (lower in NEVER_A_GAME_FOLDER) return "it is a filesystem or sync marker folder"
         if (lower in STORE_PAYLOAD_FOLDERS) return "it holds a store's installer payload, not a game"
+        if (lower == EsDeArtwork.MEDIA_DIR) return "it holds scraped media, not games"
         return storeManagedReason(dir)
     }
 

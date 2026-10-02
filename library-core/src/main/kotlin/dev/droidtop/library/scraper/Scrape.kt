@@ -219,7 +219,7 @@ suspend fun scrapeSystemArtwork(
             } else null
             if (thumbnailUrl != null) thumbnailed++
             val coverUrl = screenScraperResult?.coverUrl ?: gamesDbResult?.coverUrl ?: thumbnailUrl
-            val mediaRoot = File(File(gamesRoot, "downloaded_media"), system.id)
+            val mediaRoot = File(File(gamesRoot, EsDeArtwork.MEDIA_DIR), system.id)
             val baseName = romFile.nameWithoutExtension
             val coverWritten = wantArtwork && coverUrl != null && EsDeArtwork.resolve(gamesRoot, system.id, baseName) == null
             if (coverWritten) downloadImage(coverUrl!!, File(mediaRoot, "covers/$baseName.png"))
@@ -591,14 +591,14 @@ suspend fun applyManualMatch(
     val baseName = romFile.nameWithoutExtension
     if (gamesRoot != null && metadata.coverUrl != null) {
         val destination = File(
-            File(File(File(gamesRoot, "downloaded_media"), systemId), "covers"),
+            File(File(File(gamesRoot, EsDeArtwork.MEDIA_DIR), systemId), "covers"),
             "$baseName.png",
         )
         // A hand-picked match REPLACES the wrong cover; the automatic
         // path skips an existing file, which here would leave the
         // picture of the game the user just rejected.
         runCatching { downloadImage(metadata.coverUrl, destination) }
-        val staleMiximage = File(File(File(gamesRoot, "downloaded_media"), systemId), "miximages/$baseName.png")
+        val staleMiximage = File(File(File(gamesRoot, EsDeArtwork.MEDIA_DIR), systemId), "miximages/$baseName.png")
         runCatching { staleMiximage.delete() }
         EsDeArtwork.mediaWritten(staleMiximage)
     }

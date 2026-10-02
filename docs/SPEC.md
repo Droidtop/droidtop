@@ -8779,6 +8779,16 @@ detection may look inside `steamapps/common`; nothing looks inside
 code; `Launcher` is deliberately not pruned, because a real GOG game in
 this library ships its own.
 
+**The scraped-media tree is never walked for games** (Droidtop/tracker#297).
+ES-DE's media folder, `downloaded_media` (`EsDeArtwork.MEDIA_DIR`, the name
+droidtop's scrapers write under a games root and the media reader reads), is
+pruned by `ScanPrune` like a marker folder. The system walk allows one
+container level, so `Roms/downloaded_media/gba` counted as a second gba
+system and the console's Console systems page listed gba, gbc, nds and ps2
+twice (build 1397). A rule on contents ("only folders that hold games") was
+not taken: ES-DE creates every system folder empty, and an empty system
+folder is still the person's.
+
 **A store root is not a ROM system folder, whatever it is called.**
 `steam` and `epic` are real ids in the platforms database ("Valve Steam",
 "Epic Games Store") whose extensions are `desktop`/`sh`, because in ES-DE

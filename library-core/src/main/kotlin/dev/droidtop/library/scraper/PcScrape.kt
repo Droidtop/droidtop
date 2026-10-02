@@ -250,7 +250,7 @@ object PcMediaLayout {
      * ES-DE type and goes to droidtop's own `icons`, which ES-DE ignores.
      */
     fun mediaFile(gamesRoot: File, systemFolder: String, folder: String, baseName: String): File =
-        File(File(File(gamesRoot, "downloaded_media"), systemFolder), "$folder/$baseName.png")
+        File(File(File(gamesRoot, dev.droidtop.library.EsDeArtwork.MEDIA_DIR), systemFolder), "$folder/$baseName.png")
 
     /** [name] with every character FAT/exFAT refuses in a file name replaced by a space, collapsed. */
     fun fileSafe(name: String): String =

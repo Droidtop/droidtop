@@ -55,8 +55,8 @@ object OrphanedMedia {
         val systemFolders = HashMap<File, List<Pair<File, dev.droidtop.library.consoles.ConsoleSystemDef>>>()
         roots.forEach { root ->
             val mediaRoots = listOf(
-                File(root.parentFile ?: root, "ES-DE/downloaded_media"),
-                File(root, "downloaded_media"),
+                File(root.parentFile ?: root, "ES-DE/${dev.droidtop.library.EsDeArtwork.MEDIA_DIR}"),
+                File(root, dev.droidtop.library.EsDeArtwork.MEDIA_DIR),
             ).filter { it.isDirectory }
 
             mediaRoots.forEach { mediaRoot ->
