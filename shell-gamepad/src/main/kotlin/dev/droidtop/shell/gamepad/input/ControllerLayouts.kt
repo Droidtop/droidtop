@@ -75,8 +75,9 @@ object ControllerLayouts {
 
     private data class ActivePad(val id: Int, val descriptor: String, val name: String, val vendorId: Int, val productId: Int)
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val handler = Handler(Looper.getMainLooper())
+    // Lazy: the Android Looper and the Main dispatcher do not exist in a JVM unit test, which only reads layouts.
+    private val scope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    private val handler by lazy { Handler(Looper.getMainLooper()) }
 
     private var loaded = false
     private var loading = false
