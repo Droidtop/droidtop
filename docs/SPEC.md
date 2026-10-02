@@ -5665,8 +5665,10 @@ optional), `gamepad.name`/`vendorId`/`productId` (the built-in pad's identity) a
 `{property, values{<value>: {keysSwapped, confirmOn: bottom|right}}}` for a system setting that changes
 the layout while the device runs. A value the table does not list is unknown and is never guessed. Rows
 exist only for devices someone has read: the first is the Retroid Pocket 5 (`ro.product.model=Retroid
-Pocket 5`; `persist.sys.gamepad.type` 0 is the default Xbox-style layout; 1 is the value the owner's swap
-wrote, its meaning marked `verified: false` until confirmed on the console). The property is read live,
+Pocket 5`; `persist.sys.gamepad.type` 1 is the system toggle's "xbox" position, Xbox-style and not
+swapped, confirmed by the owner on the console on 2026-10-02 after a first reading had the two values the
+other way round; 0 is the other position, taken as the opposite swap and marked `verified: false` until the
+owner names it). The property is read live,
 never once: `LayoutSignals.readInProcess` (`android.os.SystemProperties` by reflection, an in-memory read);
 when SELinux hides it from the app (it reads as empty, and empty is never taken as a value) the same read
 goes through the privileged helper (`TaskManager.shell`, Shizuku or Sui) off the main thread and is cached;

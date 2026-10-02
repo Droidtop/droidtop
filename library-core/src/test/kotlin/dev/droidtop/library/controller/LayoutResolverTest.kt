@@ -14,21 +14,21 @@ class LayoutResolverTest {
         glyphFamily = GlyphFamily.XBOX,
         toggle = LayoutToggle(
             "persist.sys.gamepad.type",
-            mapOf("0" to ToggleValue(keysSwapped = false, confirmOnRight = false), "1" to ToggleValue(keysSwapped = true, confirmOnRight = true)),
+            // As the hardware row has it: 1 is the toggle's "xbox" position, 0 the swapped one.
+            mapOf("0" to ToggleValue(keysSwapped = true, confirmOnRight = true), "1" to ToggleValue(keysSwapped = false, confirmOnRight = false)),
         ),
     )
 
     @Test
     fun theOnlyPadOnAConsoleIsItsOwnEvenUnderAnotherName() {
-        // The console's pad re-presented as "Xbox Wireless Controller" by its layout toggle (build 1386).
+        // The console's pad re-presented as "Xbox Wireless Controller" by its layout toggle (build 1386),
+        // an identity SDL's list does not classify either.
         val reason = LayoutResolver.isBuiltIn(rp5, activeMatchesTable = false, attachedGamepads = 1, anyAttachedMatchesTable = false)
         assertEquals(BuiltInReason.ONLY_PAD, reason)
-        val layout = LayoutResolver.resolve(
-            PadFacts(rp5, reason.builtIn, GlyphFamily.XBOX, toggleValue = "1", capture = null, signature = ""),
-        )
-        assertEquals(LayoutSource.CONSOLE, layout.source)
-        assertEquals(true, layout.confirmOnRight)
-        assertEquals(true, layout.keysSwapped)
+        val xbox = LayoutResolver.resolve(PadFacts(rp5, reason.builtIn, null, toggleValue = "1", capture = null, signature = ""))
+        assertEquals(FaceLayout(GlyphFamily.XBOX, confirmOnRight = false, keysSwapped = false, LayoutSource.CONSOLE), xbox)
+        val other = LayoutResolver.resolve(PadFacts(rp5, reason.builtIn, null, toggleValue = "0", capture = null, signature = ""))
+        assertEquals(FaceLayout(GlyphFamily.XBOX, confirmOnRight = true, keysSwapped = true, LayoutSource.CONSOLE), other)
     }
 
     @Test
