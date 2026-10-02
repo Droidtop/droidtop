@@ -103,8 +103,7 @@ object PluginRepoUpdates {
     /** The latest release as the last check saw it: its tag and its bundle file names, for the "install from this repository" rows. Preferences only, so a settings screen may read it on any thread. */
     fun cachedRelease(context: Context, repo: String): Pair<String, List<String>>? {
         val text = prefs(context).getString(key("release", repo), null) ?: return null
-        val lines = text.split('
-').filter { it.isNotBlank() }
+        val lines = text.split('\n').filter { it.isNotBlank() }
         return if (lines.size >= 2) lines.first() to lines.drop(1) else null
     }
 
@@ -259,8 +258,7 @@ object PluginRepoUpdates {
             connection.disconnect()
         }
         val release = newestWithBundles(releases, includePrereleases(context)) ?: return RepoCheckResult.NoBundles(checked = true)
-        prefs(context).edit().putString(key("release", repo), (listOf(release.tag) + release.bundles.map { it.name }).joinToString("
-")).apply()
+        prefs(context).edit().putString(key("release", repo), (listOf(release.tag) + release.bundles.map { it.name }).joinToString("\n")).apply()
         val seenKey = key("seen", repo)
         if (!force && prefs(context).getLong(seenKey, 0L) == release.id) return RepoCheckResult.Seen(release.tag)
         if (metered && !force) return RepoCheckResult.Deferred(release.tag)
