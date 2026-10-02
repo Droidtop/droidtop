@@ -1,8 +1,11 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -45,6 +48,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -178,15 +182,24 @@ internal fun QuickMenu(
         }
 
         val window = currentShellWindow()
+        // The panel slides in from its edge over a dimmed page, as the left menu does from the other one.
+        val enter = remember { Animatable(0f) }
+        LaunchedEffect(Unit) { enter.animateTo(1f, tween(QUICK_MENU_SLIDE_MS)) }
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            // Wide enough for a real tile grid (two columns always, three
-            // when the screen has room), capped so the sheet stays a
-            // sheet -- the shell behind it must remain visible, which is
-            // the whole point of a quick menu over a settings screen.
+            // The dimmed page: tapping it closes, as B does.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = enter.value }
+                    .background(MenuTokens.Scrim.copy(alpha = QUICK_MENU_SCRIM_ALPHA))
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
+            )
+            // About a third of the screen, the left menu's width on the other side: a side panel, not a
+            // screen. The tile grids drop to one column when that leaves them little room.
             val sheetWidth = if (window.portrait) {
                 maxWidth
             } else {
-                (maxWidth * 0.62f).coerceIn(480.dp, 760.dp).coerceAtMost(maxWidth)
+                (maxWidth * 0.34f).coerceIn(300.dp, 440.dp).coerceAtMost(maxWidth)
             }
             Surface(
                 modifier = Modifier
@@ -200,6 +213,10 @@ internal fun QuickMenu(
                         },
                     )
                     .align(if (window.portrait) Alignment.BottomCenter else Alignment.CenterEnd)
+                    .graphicsLayer {
+                        if (window.portrait) translationY = (1f - enter.value) * size.height
+                        else translationX = (1f - enter.value) * size.width
+                    }
                     // Preview: stepping the rail and closing win over the
                     // section inside, which holds focus and takes its own
                     // presses. R2 closes: the press that OPENED the sheet
@@ -293,6 +310,10 @@ internal fun QuickMenu(
 
 /** The landscape rail's width: an icon target plus its padding. */
 private const val RailWidthDp = 64
+
+/** The panel's slide-in and the dimmed page behind it, the left menu's own values. */
+private const val QUICK_MENU_SLIDE_MS = 160
+private const val QUICK_MENU_SCRIM_ALPHA = 0.55f
 
 /**
  * The icon rail: one drawn glyph per section, the current one lit. A column down the sheet's left
@@ -418,7 +439,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
                         "Processor",
                         s.cpuMhz?.let { "$it MHz fastest core" } ?: "Not readable by an app",
                         null,
-                        "Android hides whole-device load from apps." + (s.ownCpuPercent?.let { " droidtop itself uses $it%." } ?: ""),
+                        s.ownCpuPercent?.let { "droidtop uses $it%" },
                     )
                 }
                 ReadoutRow(
@@ -444,7 +465,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
                     null,
                     alarm = (s.thermalStatus ?: 0) >= 3,
                 )
-                ReadoutRow("GPU and frame rate", "Needs privilege", null, "Android gives an app neither; a privilege helper plugin could.")
+                ReadoutRow("GPU and frame rate", "Needs privilege", null, null)
             }
         }
         HintRow(
@@ -573,7 +594,6 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
         when {
             !granted -> MenuRow(
                 title = "Notification access",
-                subtitle = "One-time grant on the system screen this opens; afterwards notifications appear here",
                 value = "Needs permission",
                 selected = focusIndex == 0,
                 onClick = {
@@ -845,10 +865,10 @@ private fun GameTab(
     LaunchedEffect(entry.id) { emulatorChoice = library.getMetadataForEditing(entry)?.altEmulator }
 
     val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice) {
-        fun ending(kind: GameEnding, title: String, idle: String, restart: Boolean) = GameQuickTile(
+        fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = GameQuickTile(
             title = title,
             subtitle = when {
-                armed == kind -> "Press A again to end ${entry.title}; unsaved progress may be lost"
+                armed == kind -> "Press A again"
                 lastEnding == kind && quitOutcome != null -> quitOutcome.message
                 else -> idle
             },
@@ -867,7 +887,7 @@ private fun GameTab(
             add(
                 GameQuickTile(
                     title = "Resume",
-                    subtitle = "Back to ${entry.title}",
+                    subtitle = null,
                     action = { onResume(entry) },
                 ),
             )
@@ -877,7 +897,7 @@ private fun GameTab(
                 add(
                     GameQuickTile(
                         title = "Emulator",
-                        subtitle = gameEmulatorSummary(emulators, emulatorChoice) + ". A cycles; applies from the next start.",
+                        subtitle = gameEmulatorSummary(emulators, emulatorChoice),
                         action = {
                             val ids = listOf<String?>(null) + emulators.candidates.map { it.id }
                             val own = dev.droidtop.library.consoles.EmulatorResolution
@@ -892,8 +912,8 @@ private fun GameTab(
                     ),
                 )
             }
-            add(ending(GameEnding.RESTART, "Restart", "End ${entry.title} and start it again", restart = true))
-            add(ending(GameEnding.KILL, "Kill", "End ${entry.title}", restart = false))
+            add(ending(GameEnding.RESTART, "Restart", null, restart = true))
+            add(ending(GameEnding.KILL, "Kill", null, restart = false))
         }
     }
 

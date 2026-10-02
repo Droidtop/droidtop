@@ -247,11 +247,15 @@ object QuickTiles {
     }
 
     /**
-     * Two columns on a narrow sheet, three when there is room -- the
-     * same call Android's quick settings makes, and the reason the sheet
-     * is sized in tiles rather than in one fixed width.
+     * One column when the side panel leaves little room, two on a wider
+     * one, three when there is plenty -- the same call Android's quick
+     * settings makes. [sheetWidthDp] is the pane beside the rail.
      */
-    fun columnsFor(sheetWidthDp: Int): Int = if (sheetWidthDp >= 620) 3 else 2
+    fun columnsFor(sheetWidthDp: Int): Int = when {
+        sheetWidthDp >= 620 -> 3
+        sheetWidthDp >= 300 -> 2
+        else -> 1
+    }
 
     /**
      * A slider's D-pad step: about a twentieth of its range, so

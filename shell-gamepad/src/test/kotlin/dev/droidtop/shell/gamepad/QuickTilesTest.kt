@@ -138,7 +138,9 @@ class QuickTilesTest {
     }
 
     @Test
-    fun `the grid is two columns until the sheet is wide enough for three`() {
+    fun `the grid is one column on a narrow pane, two, then three when wide enough`() {
+        assertEquals(1, QuickTiles.columnsFor(299))
+        assertEquals(2, QuickTiles.columnsFor(300))
         assertEquals(2, QuickTiles.columnsFor(480))
         assertEquals(2, QuickTiles.columnsFor(619))
         assertEquals(3, QuickTiles.columnsFor(620))

@@ -2488,6 +2488,15 @@ the `ContainerRuntime` interface that already exists (§3):
   says something is waiting (notifications, running jobs). B closes; R2 closes. **Get games is
   not in the Quick Menu**: it is a contextual action on the pages that need it (#151, #258).
   Colours and type come from `MenuTokens` only, so the panel follows the theme.
+  **Frame (decided 2026-10-02, #273 slice 6, Steam's right panel):** in landscape the Quick Menu is a
+  full-height panel about a third of the width (34%, 300 to 440 dp), sliding in from the right edge over a
+  dimmed page (tapping the page closes it, as B and R2 do), the icon rail along its inner (left) edge,
+  L1/R1 stepping the sections and Start swapping to the left menu; the left menu is the same shape on
+  the other edge. The tile sections follow the pane width (`QuickTiles.columnsFor`: one column under
+  300 dp, two, three from 620). Rows carry a name and a value or control, not explanatory sentences:
+  idle subtitles on the Game rows, the notification grant row and the Performance readouts were removed;
+  only a prompt that changes what the next press does ("Press A again") stays. Portrait is still a bottom
+  sheet, sliding up.
 - **Quit to Library says what it did (decided 2026-09-29, Droidtop/tracker#82)**: on the owner's
   console (Android 13) the first version of this tab did not end the game — after Quit the
   emulator's process and its Recents task both stayed alive, yet droidtop had already dropped its
