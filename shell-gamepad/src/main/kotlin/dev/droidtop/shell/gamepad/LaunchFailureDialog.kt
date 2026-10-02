@@ -10,8 +10,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -19,13 +17,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import dev.droidtop.library.consoles.LaunchFileAccessPrompt
-import dev.droidtop.library.consoles.allFilesAccessIntent
-import kotlinx.coroutines.launch
 
 /**
  * The Gaming shell's launch-failure dialog (Droidtop/tracker#171): a
@@ -51,38 +45,8 @@ internal fun LaunchFailureDialog(
     /** One muted line under [message], such as where the log is. */
     detail: String? = null,
 ) {
-    // A launch that stopped for the emulator's file access (Droidtop/tracker#270) offers its two ways on: the
-    // dialog adds them itself when the pending prompt is the one this message is about.
-    val access = LaunchFileAccessPrompt.pending.collectAsState().value?.takeIf { it.message == message }
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val shown = remember(actions, access) {
-        if (access == null) actions else listOf(
-            LaunchFailureAction("Give access") {
-                val opened = runCatching { context.startActivity(allFilesAccessIntent(access.packageName)) }.isSuccess ||
-                    runCatching {
-                        context.startActivity(
-                            android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
-                    }.isSuccess
-                if (opened) {
-                    LaunchFileAccessPrompt.clear()
-                    onDismiss()
-                }
-            },
-            LaunchFailureAction("Launch anyway") {
-                LaunchFileAccessPrompt.clear()
-                onDismiss()
-                scope.launch {
-                    runCatching { access.launchAnyway() }
-                        .onFailure { android.util.Log.e("droidtop.LaunchFailureDialog", "Launch anyway failed", it) }
-                }
-            },
-        ) + actions
-    }
-    val rows = remember(shown) { shown.map { it.label } + "OK" }
-    val choose: (Int) -> Unit = { index -> if (index < shown.size) shown[index].run() else onDismiss() }
+    val rows = remember(actions) { actions.map { it.label } + "OK" }
+    val choose: (Int) -> Unit = { index -> if (index < actions.size) actions[index].run() else onDismiss() }
     var selected by remember { mutableIntStateOf(0) }
 
     val window = LocalShellWindow.current
@@ -107,10 +71,9 @@ internal fun LaunchFailureDialog(
                 color = MenuTokens.OnSurface,
                 style = MaterialTheme.typography.titleMedium,
             )
-            val shownDetail = detail ?: access?.let { "Without All files access it may open to a black screen." }
-            if (shownDetail != null) {
+            if (detail != null) {
                 Text(
-                    shownDetail,
+                    detail,
                     color = MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 6.dp),

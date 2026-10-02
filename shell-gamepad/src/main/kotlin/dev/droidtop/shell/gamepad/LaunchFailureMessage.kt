@@ -1,6 +1,5 @@
 package dev.droidtop.shell.gamepad
 
-import dev.droidtop.library.consoles.EmulatorNeedsFileAccess
 import dev.droidtop.library.consoles.NoEmulatorInstalled
 
 /**
@@ -21,7 +20,6 @@ object LaunchFailureMessage {
     fun userMessage(game: String?, cause: Throwable?): String = when {
         cause is NoEmulatorInstalled ->
             "No ${cause.systemName} emulator is installed yet."
-        cause is EmulatorNeedsFileAccess -> cause.message.orEmpty()
         else -> if (game.isNullOrBlank()) {
             "The game couldn't be started."
         } else {

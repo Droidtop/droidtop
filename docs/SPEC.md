@@ -5975,18 +5975,12 @@ not covered; those take a `storagePathTemplate` (plain path) row where the emula
 The PS2 emulator rows (NetherSX2 and the AetherSX2 families, and other PS2 rows that document a plain path
 launch) carry `storagePathTemplate` in droidtop-platforms, so with all-files access they never need the URI.
 
-**Asking for the emulator's file access first** (Droidtop/tracker#270). A preset that has a
-`storagePathTemplate` is one whose emulator may not boot from the content URI. When such an emulator does not
-hold all-files access (`emulatorReadsStoragePaths` false), a launch stops before dispatch
-(`needsFileAccessPrompt`, the pure rule `launchNeedsFileAccess`) with `EmulatorNeedsFileAccess`, and the
-shell's launch-failure dialog says "<Emulator> can't read your games." with **Give access** (Android's All
-files access screen for that package, `ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION`; the general screen if
-that cannot open) and **Launch anyway** (remembered per emulator in `LaunchAnywayPrefs`, then launches with the
-content URI as before). The check is read-only AppOps and needs no privilege; droidtop does not grant the
-permission itself (elevated grants go through Shizuku or Sui later, Droidtop/tracker#262). Once access is
-granted the next launch takes the plain path with no prompt. The Emulators launch test reports the same missing
-access in one line instead of sending the launch. Launches from the companion surface show the line without the
-two actions.
+**droidtop does not ask about another app's file access** (owner, 2026-10-02, Droidtop/tracker#270). An
+emulator's file permissions are the emulator's and the person's business, not droidtop's: a launch never stops
+to ask for, offer, or check All files access on the emulator's behalf, and there is no "Give access" or "Launch
+anyway" step. A launch builds its intent from the preset and dispatches; if the emulator cannot open the file,
+it reports that itself. Which template a launch uses (`launchTemplateFor`) and how the file reaches the emulator
+(the provider and the sibling grants above) are unchanged here and wait on a separate owner decision.
 
 **The launch watchdog** (`LaunchWatchdog`, `LaunchWatchPolicy`). `LaunchDisplay.dispatch`, the one point
 every launch passes, starts it for a game launch. It runs off the main thread, every 3 s for at most 90 s,
