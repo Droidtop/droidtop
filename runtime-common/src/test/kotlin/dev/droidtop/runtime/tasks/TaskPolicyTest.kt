@@ -10,6 +10,16 @@ class TaskPolicyTest {
     private fun app(pkg: String, display: Int = 0) = RunningApp(pkg, pkg, display, taskId = null, visible = false)
 
     @Test
+    fun `capabilities name the operations exposed by a privileged shell`() {
+        val caps = TaskPrivileges(forceStop = true, shell = true, grantPermission = true)
+
+        assertTrue(caps.listTasks)
+        assertTrue(caps.forceStop)
+        assertTrue(caps.shellCommand)
+        assertTrue(caps.grantPermission)
+    }
+
+    @Test
     fun `clear all never closes droidtop, enginehost, the system, a home app or what the user protected`() {
         val protected = TaskPolicy.protectedPackages("dev.droidtop.app", setOf("com.example.launcher"), setOf("org.example.keep"))
         val apps = listOf(

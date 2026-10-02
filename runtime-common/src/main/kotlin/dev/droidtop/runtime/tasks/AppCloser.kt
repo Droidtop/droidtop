@@ -9,7 +9,7 @@ package dev.droidtop.runtime.tasks
  * it is a lambda so the decision is testable without a device. [onClosed] runs after a confirmed close.
  */
 class AppCloser(
-    private val ops: PrivilegedOps,
+    private val ops: PrivilegedShell,
     private val killBackground: (String) -> Boolean,
     private val onClosed: (String) -> Unit = LaunchLedger::forget,
 ) {

@@ -2658,6 +2658,15 @@ a close path of its own. Every call works off the main thread.
     include an app the user already closed, so Clear all may ask Android about it too; that is
     harmless.
 
+**One privileged interface, multiple backends (Droidtop/tracker#262).** `PrivilegedShell` in
+`:runtime-common` is the only privileged boundary used by task management. Its capability snapshot
+names listing tasks, force-stop, shell commands and permission grants; `:app` installs the active
+implementation. `PluginPrivilegedOps` adapts the existing plugin broker (`priv.packages` and
+`priv.shell`, including the Shizuku provider) to that interface. The task manager does not know which
+provider supplied a capability. Local wireless debugging is intended to become another implementation
+of the same interface; this slice does not yet connect or pair it. No permission-grant operation is
+advertised by the existing plugin adapter until a provider actually implements one.
+
 ## 4a. Networking & VPN (directed 2026-08-30)
 
 Explicit direction: containerized VPNs should be able to serve the WHOLE
