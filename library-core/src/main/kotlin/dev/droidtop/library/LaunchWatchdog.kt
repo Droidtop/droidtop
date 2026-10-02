@@ -29,13 +29,6 @@ enum class LaunchTrouble {
 
     /** The app is no longer open, yet the screen it was sent to did not hand back. */
     GONE_WHILE_AWAY,
-
-    /**
-     * The app is open and responsive but the person is still waiting on it after [LaunchWatchPolicy.SLOW_MS]
-     * (a window that never draws looks exactly like this). A gentle notice, not an error: a game that is
-     * simply running also reaches it, so it says so and offers the way out.
-     */
-    TAKING_LONG,
 }
 
 /** A launch that went wrong, in the words the person is shown. */
@@ -46,10 +39,7 @@ data class LaunchAlert(
     val message: String,
     /** Where droidtop wrote down what it saw, for someone who has to ask for help. */
     val logPath: String,
-) {
-    /** A notice that a launch is slow, not a fault: its notification is silent and has no heads-up. */
-    val gentle: Boolean get() = trouble == LaunchTrouble.TAKING_LONG
-}
+)
 
 /** One look at a launched app, as [LaunchWatchPolicy] reads it. */
 internal data class WatchObservation(
@@ -85,14 +75,11 @@ internal object LaunchWatchPolicy {
     /** How long a launch is given to show up in the task list before its absence counts. */
     const val APPEAR_GRACE_MS = 9_000L
 
-    /** A launch still in front, alive and responsive this long after it began gets the gentle "taking a long time" notice. */
-    const val SLOW_MS = 45_000L
+    /** An app listed and still alive this long after launch is left alone. */
+    const val SETTLED_MS = 30_000L
 
-    /** After the notice the watch slows to this poll, and ends at [WATCH_MS]. */
-    const val SLOW_POLL_MS = 10_000L
-
-    /** The most the watchdog ever watches. */
-    const val WATCH_MS = 600_000L
+    /** The most the watchdog ever watches; after this a stuck app is the person's to notice. */
+    const val WATCH_MS = 90_000L
 
     fun judge(o: WatchObservation): WatchVerdict = when {
         o.notResponding -> WatchVerdict.Trouble(LaunchTrouble.NOT_RESPONDING)
@@ -100,18 +87,8 @@ internal object LaunchWatchPolicy {
             if (o.taskListed != true && o.elapsedMs <= EXIT_WINDOW_MS) WatchVerdict.Trouble(LaunchTrouble.EXITED_AT_ONCE)
             else WatchVerdict.Stop
         o.taskListed == false && o.elapsedMs >= APPEAR_GRACE_MS -> WatchVerdict.Trouble(LaunchTrouble.GONE_WHILE_AWAY)
-        o.elapsedMs >= SLOW_MS -> WatchVerdict.Trouble(LaunchTrouble.TAKING_LONG)
-        else -> WatchVerdict.Keep
-    }
-
-    /**
-     * What to do once the slow notice is up. The person coming back to the shell (often because of the
-     * notice) does not clear it, since its actions are what they came for; the app being closed or gone, or
-     * the watch limit, does. Android's not-responding state still escalates to its own alert.
-     */
-    fun afterNotice(o: WatchObservation): WatchVerdict = when {
-        o.notResponding -> WatchVerdict.Trouble(LaunchTrouble.NOT_RESPONDING)
-        o.taskListed == false || o.elapsedMs >= WATCH_MS -> WatchVerdict.Stop
+        o.taskListed == true && o.elapsedMs >= SETTLED_MS -> WatchVerdict.Stop
+        o.elapsedMs >= WATCH_MS -> WatchVerdict.Stop
         else -> WatchVerdict.Keep
     }
 
@@ -123,8 +100,6 @@ internal object LaunchWatchPolicy {
             "$appName has stopped responding. You can close it and try again, or go back to droidtop."
         LaunchTrouble.GONE_WHILE_AWAY ->
             "$appName is no longer running, but its screen did not return to droidtop. Go back to droidtop and try again."
-        LaunchTrouble.TAKING_LONG ->
-            "$appName is taking a long time to start. If its screen is still black you can close it and try again, or go back to droidtop."
     }
 }
 
@@ -132,7 +107,7 @@ internal object LaunchWatchPolicy {
  * Started by [LaunchDisplay]'s one dispatch point for every app droidtop
  * launches. It looks at the launched app every few seconds, off the main
  * thread, for at most [LaunchWatchPolicy.WATCH_MS], and stops as soon as the
- * policy says the launch is over (the person came back, or the app closed or gone). A problem is published once in
+ * policy says the launch is fine or settled. A problem is published once in
  * [alert], for the shell's dialog and the notification to show, instead of
  * leaving a black screen. Nothing runs while no launch is being watched.
  */
@@ -156,7 +131,6 @@ object LaunchWatchdog {
     fun cancel() {
         job?.cancel()
         job = null
-        if (alertFlow.value?.gentle == true) dismiss()
     }
 
     /** Watches [packageName], launched at [launchedAtMs]; replaces any launch still being watched. */
@@ -168,9 +142,8 @@ object LaunchWatchdog {
         job = scope.launch {
             val appName = TaskManager.appLabel(appContext, packageName) ?: packageName
             val started = System.currentTimeMillis()
-            var noticed = false
             while (isActive) {
-                delay(if (noticed) LaunchWatchPolicy.SLOW_POLL_MS else LaunchWatchPolicy.POLL_MS)
+                delay(LaunchWatchPolicy.POLL_MS)
                 val elapsed = System.currentTimeMillis() - started
                 val shellCameBack = LaunchDisplay.shellStartedMs >= launchedAtMs
                 val observation = WatchObservation(
@@ -183,13 +156,9 @@ object LaunchWatchdog {
                         null
                     },
                 )
-                val verdict = if (noticed) LaunchWatchPolicy.afterNotice(observation) else LaunchWatchPolicy.judge(observation)
-                when (verdict) {
+                when (val verdict = LaunchWatchPolicy.judge(observation)) {
                     WatchVerdict.Keep -> Unit
-                    WatchVerdict.Stop -> {
-                        if (noticed) dismiss()
-                        return@launch
-                    }
+                    WatchVerdict.Stop -> return@launch
                     is WatchVerdict.Trouble -> {
                         ScanLog.write("launch watchdog: $packageName ${verdict.trouble} after $elapsed ms")
                         alertFlow.value = LaunchAlert(
@@ -199,10 +168,6 @@ object LaunchWatchdog {
                             LaunchWatchPolicy.message(appName, verdict.trouble),
                             ScanLog.logPath(appContext),
                         )
-                        if (verdict.trouble == LaunchTrouble.TAKING_LONG) {
-                            noticed = true
-                            continue
-                        }
                         return@launch
                     }
                 }

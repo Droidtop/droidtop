@@ -5948,8 +5948,8 @@ The PS2 emulator rows (NetherSX2 and the AetherSX2 families, and other PS2 rows 
 launch) carry `storagePathTemplate` in droidtop-platforms, so with all-files access they never need the URI.
 
 **The launch watchdog** (`LaunchWatchdog`, `LaunchWatchPolicy`). `LaunchDisplay.dispatch`, the one point
-every launch passes, starts it for a game launch. It runs off the main thread, every 3 s,
-and ends when the launch is over (`clearRunning`, a quit, the person coming back, or the app gone). It
+every launch passes, starts it for a game launch. It runs off the main thread, every 3 s for at most 90 s,
+and ends the moment the launch is settled (`clearRunning`, a quit, or a listed and live app after 30 s). It
 uses only what a non-root app can see:
 
 - Android's own not-responding state for the app's processes (`ActivityManager.getProcessesInErrorState`);
@@ -5961,16 +5961,14 @@ uses only what a non-root app can see:
 It reports three things, each in plain words naming the app: it is not responding; it closed straight
 after it started (the shell came back within 10 s and the app is not open); it is no longer running
 but its screen never handed back (task list says gone after 9 s). A black window of a live, responsive
-app is indistinguishable from a game that is running, so it is never claimed as a fault. The one thing said
-about it is a gentle notice (`TAKING_LONG`, "taking a long time to start ... if its screen is still black you
-can close it"), raised 45 s after launch when the app is open, responsive and the person has not come back
-to the shell (rig, Droidtop/tracker#270: NetherSX2 sat black and idle for 60 s and nothing reported, because
-the old watch ended at 30 s for any live app). It is not an error: a game that is simply running reaches it
-too, so it is a silent default-importance notification (its own channel) with the same actions in the
-shell's dialog. Once up, the watch slows to 10 s polls, ends at 10 minutes, and the notice clears when the
-app is closed or gone or the person quits; the person returning to the shell does not clear it, since its
-actions are what they came for. A person returning to the shell on purpose before it is raised is not a
-problem. The verdict is published once
+app is indistinguishable from a game that is running and is never claimed, and a person returning to
+the shell on purpose while the app is open or after 10 s is not a problem.
+
+Considered and not built (Droidtop/tracker#270): a "taking a long time" notice for an emulator that is open
+and responsive but never draws (NetherSX2 sat black and idle for 60 s with no report). Without root nothing
+tells that apart from a healthy long-running game, so a timed notice would fire on every game. A reliable
+signal would be the app's task having no visible window in the task list while a `priv.shell` provider
+runs; only that, and only with the provider present, would justify raising it. The verdict is published once
 (`LaunchWatchdog.alert`) and written to the scan log (`logs/scan.log`, whose path is shown). The shell
 shows it as the launch-failure dialog with Close it (`TaskManager.close`, the one close path; the alert
 clears only on a confirmed close, anything else is shown as the task manager words it), Return to
