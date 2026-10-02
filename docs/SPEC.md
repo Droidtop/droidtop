@@ -9606,19 +9606,27 @@ structure, top to bottom, drawn only from theme tokens:
   Details, centred, scrolling sideways when it must, pinned under the band
   (the top edge once the band is gone), L1/R1 glyphs at its ends. `pageTabOf` is the one place that says which tab a row lives under,
   by its title; a title no tab names is a detail, so a new row is never
-  lost. Overview: About, Runs with, Compatibility, the unscraped game's
-  Scrape row, and for a game of several parts the **part list** first
-  (`partFacts`: a heading row with the count, then each part with its newest
-  version, in the order the folder names give). Versions and updates:
-  the Update row first when a source knows a newer version, then Version,
-  Owned on, Folder, Size, and the game's update source (Droidtop/tracker#288):
+  lost. No row repeats the facts strip (last played, play time, version,
+  size, runs with). Overview: About, the unscraped game's Scrape row,
+  Install state, Times played, Compatibility, and for a game of several parts
+  the **part list** first (`partFacts`: a heading row with the count, then
+  each part with its newest version, in the order the folder names give).
+  Versions and updates: the Update row first when a source knows a newer
+  version, then Version (installed), Latest, and the game's update source
+  (Droidtop/tracker#288):
   the F95zone thread row (A links it, changes it, or clears it, through the
   same `linkF95ThreadFromText` the options menu uses) and, once linked,
   "Check for update", which answers in one short line (`checkOutcomeLine`:
   "Up to date", "v0.9.6 is available", or why it failed). The rows need the
-  library handed to `PcGamePage` and appear only on folder games. Extras: Engine, Players, where the
-  facts came from. Details: play time, last played and the scraped facts
-  (developer, publisher, release date, genre, series, rating). A tab with no
+  library handed to `PcGamePage` and appear only on folder games. Extras: the
+  game's own links (A opens one, the URL is the tooltip), Manual and Video
+  when the game has them, where the facts came from. Details: Store,
+  Install location, Folder name, Engine, Runner and the scraped facts
+  (developer, publisher, release date, genre, series, rating, players).
+  Install location is a place a person names (`friendlyLocation`: "SD card /
+  Games / Folder"); the full path is only the row's HintTip (`PageFact.tip`).
+  Rollback is not offered: droidtop keeps no backup of a replaced version.
+  A tab with no
   row says so (`PageTab.emptyLine`) instead of drawing nothing.
 - **The rows** are Settings' rows, as before (one uniform height, one
   content-sized value column, the selected row's full text in the detail
@@ -9889,8 +9897,8 @@ is for; nothing here grows with the square of the library.
 The open PC game page may calculate the size of a folder-backed install,
 but it does so on IO and caches the answer by folder path and directory
 stamp. The PC list and its rows never walk game folders for size. A folder
-game's page shows its full folder path in the "Owned on" value (with
-"Your folders" as the source detail), and derives a version from that
+game's page names its place in Details ("Install location", the full path
+in a tooltip), and derives a version from that
 folder name when the name contains one under §7m's naming rules.
 
 ### Empty, and setup
@@ -10021,7 +10029,10 @@ hundred megabytes, so the press alone never starts it: A on a
 not-yet-set-up Windows game and the menu's "Set up" row both stop on an
 offer that names what would be fetched and its size
 (`PcRunnerOptions.windowsSetupConsent`), and the setup's progress lines
-render as chrome, never as the launch-failure banner.
+render as chrome, never as the launch-failure banner. A on a capsule whose
+Windows environment is not set up opens the game page instead of the offer
+(Droidtop/tracker#293): the page's primary button reads "Set up Windows
+games", and the offer then appears over the page, which stays open.
 
 **Root never gates a Gaming game.** Native Linux inside a container
 needs root today and is therefore "not on this device" on an unrooted

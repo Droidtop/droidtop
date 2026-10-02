@@ -10,7 +10,7 @@ class PcPrimaryActionLabelTest {
         assertEquals("Install", primaryActionLabel(RunnerAction.INSTALL_ENGINEHOST))
         assertEquals("Install", primaryActionLabel(RunnerAction.INSTALL_ENGINEHOST_PLUGIN))
         assertEquals("Install", primaryActionLabel(RunnerAction.INSTALL_KIRIKIROID2))
-        assertEquals("Set up", primaryActionLabel(RunnerAction.SET_UP_WINDOWS_GAMES))
+        assertEquals("Set up Windows games", primaryActionLabel(RunnerAction.SET_UP_WINDOWS_GAMES))
         assertEquals("Choose a runner", primaryActionLabel(RunnerAction.CHOOSE_ENGINE_VERSION))
         assertEquals("Choose a runner", primaryActionLabel(null))
     }

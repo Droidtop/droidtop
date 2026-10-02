@@ -128,20 +128,28 @@ class PcPageAboutTest {
 
     @Test
     fun everyFactRowLivesUnderExactlyOneTabAndPartsLeadOverview() {
-        val rows = listOf("Play time", "Last played", "Size", "Owned on", "Version", "Update", "Runs with", "Engine", "Developer", "About")
-            .map { PageFact(it) }
+        val rows = listOf("Times played", "Install location", "Version", "Latest", "Update", "Runner", "Manual", "Engine", "Developer", "About")
+            .map { PageFact(it) } + PageFact("Official site", tab = PageTab.EXTRAS)
         val parts = listOf(PageFact("Parts"), PageFact("Week 1"))
         val byTab = groupRowsByTab(rows, parts)
 
         assertEquals(PageTab.values().toList(), byTab.keys.toList())
         assertEquals(rows.size + parts.size, byTab.values.sumOf { it.size })
-        assertEquals(listOf("Parts", "Week 1", "Runs with", "About"), byTab.getValue(PageTab.OVERVIEW).map { it.title })
+        assertEquals(listOf("Parts", "Week 1", "Times played", "About"), byTab.getValue(PageTab.OVERVIEW).map { it.title })
         // An available update leads the tab.
-        assertEquals(listOf("Update", "Size", "Owned on", "Version"), byTab.getValue(PageTab.VERSIONS).map { it.title })
-        assertEquals(listOf("Engine"), byTab.getValue(PageTab.EXTRAS).map { it.title })
+        assertEquals(listOf("Update", "Version", "Latest"), byTab.getValue(PageTab.VERSIONS).map { it.title })
+        assertEquals(listOf("Manual", "Official site"), byTab.getValue(PageTab.EXTRAS).map { it.title })
         // What no tab names is a detail, so a new row is never lost.
-        assertEquals(listOf("Play time", "Last played", "Developer"), byTab.getValue(PageTab.DETAILS).map { it.title })
+        assertEquals(listOf("Install location", "Runner", "Engine", "Developer"), byTab.getValue(PageTab.DETAILS).map { it.title })
         assertEquals(PageTab.DETAILS, pageTabOf("Something new"))
+    }
+
+    @Test
+    fun aFolderIsNamedByItsPlaceNotItsPath() {
+        assertEquals("Internal storage / Games / Cool Game", friendlyLocation("/storage/emulated/0/Games/Cool Game"))
+        assertEquals("SD card / Games / Cool Game", friendlyLocation("/storage/1A2B-3C4D/Games/Cool Game"))
+        assertEquals("SD card / Games / … / B / Cool Game", friendlyLocation("/storage/1A2B-3C4D/Games/A/B/Cool Game"))
+        assertEquals("windows / Games / Cool Game", friendlyLocation("/mnt/windows/Games/Cool Game"))
     }
 
     @Test

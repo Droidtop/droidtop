@@ -134,7 +134,7 @@ internal fun primaryActionLabel(action: RunnerAction?): String = when (action) {
     RunnerAction.INSTALL_ENGINEHOST,
     RunnerAction.INSTALL_ENGINEHOST_PLUGIN,
     RunnerAction.INSTALL_KIRIKIROID2 -> "Install"
-    RunnerAction.SET_UP_WINDOWS_GAMES -> "Set up"
+    RunnerAction.SET_UP_WINDOWS_GAMES -> "Set up Windows games"
     RunnerAction.CHOOSE_ENGINE_VERSION,
     null -> "Choose a runner"
 }

@@ -569,8 +569,14 @@ internal fun MenuPanel(
     DeclareLayerHints(hints)
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, focusLabel) }
+    // A dialog window does not bound its content to the screen: without
+    // an explicit cap a long menu is centred and clipped at both edges
+    // (title and last row cut, Droidtop/tracker#295) and its scroll never
+    // starts. The cap is the screen less the edge margin each side.
+    val window = LocalShellWindow.current
     Column(
         modifier = modifier
+            .heightIn(max = maxOf(120.dp, window.heightDp.dp - window.edgePadding * 2))
             .clip(MenuTokens.OverlayShape)
             .background(MenuTokens.OverlaySurface)
             .focusRequester(focus)

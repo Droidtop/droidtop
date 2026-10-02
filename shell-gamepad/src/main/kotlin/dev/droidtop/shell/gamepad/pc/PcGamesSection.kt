@@ -47,6 +47,8 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.PartProgress
+import dev.droidtop.library.RunnerAction
+import dev.droidtop.library.RunnerState
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.isPcOrEngineGame
@@ -402,6 +404,14 @@ internal fun PcGamesSection(
             else -> openStore(entry)
         }
     }
+    // A on a capsule plays it, except a Windows game whose environment is not
+    // set up yet: that opens the game page, whose primary button is the setup
+    // step, rather than a download offer over the grid (Droidtop/tracker#293).
+    val activate: (LibraryEntry) -> Unit = { entry ->
+        val needsWindowsSetup = entry.inPcFold && entry.id == focusedEntry?.id &&
+            focusedPlay?.second?.option?.let { it.state != RunnerState.READY && it.action == RunnerAction.SET_UP_WINDOWS_GAMES } == true
+        if (needsWindowsSetup) state.pageId = entry.id else launch(entry)
+    }
     // Select and a long press on a PC game open its menu and page; on a Retro
     // game or an app from Home's mixed shelves, a small options menu that
     // launches through the same path as its own tab.
@@ -604,7 +614,7 @@ internal fun PcGamesSection(
                             }
                         }
                         GamepadAction.A -> {
-                            if (state.stripFocused) activateChip(state.stripIndex) else focusedEntry?.let(launch)
+                            if (state.stripFocused) activateChip(state.stripIndex) else focusedEntry?.let(activate)
                         }
                         GamepadAction.X -> state.filterOpen = true
                         GamepadAction.Y -> state.sortOpen = true
@@ -647,7 +657,7 @@ internal fun PcGamesSection(
                     rowState = ::rowState,
                     onTapCapsule = { shelf, item, entry ->
                         state.stripFocused = false
-                        if (state.shelfIndex == shelf && state.itemIndex == item) launch(entry) else moveTo(shelf, item)
+                        if (state.shelfIndex == shelf && state.itemIndex == item) activate(entry) else moveTo(shelf, item)
                     },
                     onLongPressCapsule = ::openPage,
                     downloads = downloads,
@@ -677,7 +687,7 @@ internal fun PcGamesSection(
                                     width = width,
                                     onTap = {
                                         state.stripFocused = false
-                                        if (state.itemIndex == index) launch(entry) else moveTo(state.shelfIndex, index)
+                                        if (state.itemIndex == index) activate(entry) else moveTo(state.shelfIndex, index)
                                     },
                                     onLongPress = { state.pageId = entry.id },
                                     download = entry.downloadKey()?.let { downloads[it] },

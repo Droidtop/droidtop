@@ -70,6 +70,7 @@ import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.scraper.FieldSources
 import dev.droidtop.shell.gamepad.CatalogDetailStrip
+import dev.droidtop.shell.gamepad.HintTip
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.LocalValueColumnWidth
 import dev.droidtop.shell.gamepad.MenuRow
@@ -189,10 +190,19 @@ internal fun PcGamePage(
     val links by produceState<GameLinks?>(null, gameIds, linksToken) {
         value = if (library != null && isFolder) library.gameLinks(gameIds) else null
     }
-    val rows = remember(entry, play, runner, siblings, folderSize, scrapeStatus, links, threadStatus) {
+    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, threadStatus) {
         pageRows(
-            context, entry, play, runner, siblings, folderSize,
+            entry, play, runner, siblings,
             scrapeStatus = scrapeStatus,
+            latest = links?.latestKnown ?: entry.latestKnown,
+            onOpenLink = { url ->
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
             sourceRows = if (library != null && isFolder) {
                 threadRows(
                     links = links,
@@ -261,7 +271,9 @@ internal fun PcGamePage(
     fun pressButton(index: Int) {
         when (index) {
             0 -> if (play.pressable) {
-                onClose()
+                // The setup step runs over the page, which stays: closing it
+                // hid the page behind the offer (Droidtop/tracker#293).
+                if (play.ready || play.store != null) onClose()
                 onPlay()
             }
             1 -> onToggleFavorite()
@@ -456,20 +468,22 @@ internal fun PcGamePage(
                             ),
                         ) {
                             itemsIndexed(current, key = { index, fact -> "$index:${fact.title}" }) { index, fact ->
-                                MenuRow(
-                                    title = fact.title,
-                                    subtitle = fact.subtitle,
-                                    value = fact.value,
-                                    chevron = fact.onActivate != null,
-                                    selected = zone == PageZone.CONTENT && row == index,
-                                    uniformHeight = true,
-                                    ownScrollKeeping = true,
-                                    onClick = {
-                                        zone = PageZone.CONTENT
-                                        row = index
-                                        fact.onActivate?.invoke()
-                                    },
-                                )
+                                HintTip(fact.tip, modifier = Modifier.fillMaxWidth()) {
+                                    MenuRow(
+                                        title = fact.title,
+                                        subtitle = fact.subtitle,
+                                        value = fact.value,
+                                        chevron = fact.onActivate != null,
+                                        selected = zone == PageZone.CONTENT && row == index,
+                                        uniformHeight = true,
+                                        ownScrollKeeping = true,
+                                        onClick = {
+                                            zone = PageZone.CONTENT
+                                            row = index
+                                            fact.onActivate?.invoke()
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -736,6 +750,10 @@ internal data class PageFact(
     val value: String? = null,
     val subtitle: String? = null,
     val onActivate: (() -> Unit)? = null,
+    /** The long form of the row (a full path, a link), in the tooltip only. */
+    val tip: String? = null,
+    /** The tab this row lives on when its title cannot say ([pageTabOf]). */
+    val tab: PageTab? = null,
 )
 
 /**
@@ -744,64 +762,23 @@ internal data class PageFact(
  * exist; a missing fact is not a row saying "unknown".
  */
 private fun pageRows(
-    context: android.content.Context,
     entry: LibraryEntry,
     play: PcPlayState,
     runner: dev.droidtop.library.ResolvedRunner?,
     siblings: List<LibraryEntry>,
-    folderSizeBytes: Long?,
     scrapeStatus: String?,
     sourceRows: List<PageFact> = emptyList(),
+    latest: String? = null,
+    onOpenLink: (String) -> Unit = {},
     onScrape: () -> Unit,
 ): List<PageFact> = buildList {
-    val now = System.currentTimeMillis()
-    add(PageFact("Play time", playtimeLine(entry.playtimeSeconds, entry.playCount)))
-    entry.lastPlayedEpochMs?.let { last ->
-        add(
-            PageFact("Last played", lastPlayedPhrase(now, last).replaceFirstChar { c -> c.uppercase() }),
-        )
+    // Each fact is on ONE tab, and none repeats the facts strip under the
+    // action band (last played, play time, version, size, runs with): Overview
+    // is the game, Versions what is installed against what is out, Extras
+    // what comes with it, Details where it lives and what runs it.
+    if (!entry.hideMetadata) {
+        entry.description?.takeIf { it.isNotBlank() }?.let { add(PageFact("About", subtitle = it)) }
     }
-    entry.pcInfo?.let { pc ->
-        val sizeBytes = if (entry.groupingPath() != null) folderSizeBytes ?: pc.sizeBytes else pc.sizeBytes
-        if (sizeBytes > 0) {
-            add(
-                PageFact(
-                    "Size",
-                    android.text.format.Formatter.formatShortFileSize(context, sizeBytes),
-                    subtitle = if (pc.installed) "On this device" else "To download",
-                ),
-            )
-        } else if (!pc.installed) {
-            add(PageFact("Install state", "Not installed"))
-        }
-    }
-    val owned = siblings.mapNotNull { it.ownership() }
-    val ownedLine = owned.ownershipLabel().removePrefix("Owned on ").takeIf { it.isNotBlank() }
-    val folderPath = entry.groupingPath()
-    add(
-        PageFact(
-            "Owned on",
-            folderPath ?: ownedLine ?: if (entry.pcInfo?.source == null || entry.pcInfo?.source == "Folder") "Your folders" else entry.sourceLabel(),
-            subtitle = if (folderPath != null) "Your folders" else null,
-        ),
-    )
-    // The name as it is on disk, beside the title drawn from it (docs/SPEC.md
-    // 7n): the raw name is never altered, only parsed.
-    // An unidentified folder is drawn by its path: its own name says nothing.
-    if (folderPath != null && entry.title == GameNaming.UNIDENTIFIED) {
-        add(PageFact("Folder", folderPath))
-    } else {
-        folderPath?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() && it != GameNaming.displayName(entry.title) }
-            ?.let { add(PageFact("Folder name", it)) }
-    }
-    // A version comes from a folder's own name (docs/SPEC.md 7m); a store
-    // row has none to derive.
-    val availableVersions = installedVersions(entry, siblings)
-    if (availableVersions.isNotEmpty()) {
-        add(PageFact("Version", availableVersions.first(), subtitle = if (availableVersions.size > 1) "Also here: ${availableVersions.drop(1).joinToString(", ")}" else null))
-    }
-    entry.availableUpdate?.let { add(PageFact("Update", it, subtitle = GameUpdates.line(it))) }
-    addAll(sourceRows)
     if (entry.isUnscraped()) {
         add(
             PageFact(
@@ -813,6 +790,19 @@ private fun pageRows(
             ),
         )
     }
+    if (entry.pcInfo?.installed == false) add(PageFact("Install state", "Not installed"))
+    if (entry.playCount > 0) add(PageFact("Times played", entry.playCount.toString()))
+    entry.pcInfo?.compatibility?.let { add(PageFact("Compatibility", subtitle = it.summary() + ". Other people's results on other hardware, not a verdict.")) }
+
+    // A version comes from a folder's own name (docs/SPEC.md 7m); a store
+    // row has none to derive.
+    val availableVersions = installedVersions(entry, siblings)
+    if (availableVersions.isNotEmpty()) {
+        add(PageFact("Version", availableVersions.first(), subtitle = if (availableVersions.size > 1) "Also here: ${availableVersions.drop(1).joinToString(", ")}" else null))
+    }
+    latest?.let { add(PageFact("Latest", it)) }
+    entry.availableUpdate?.let { add(PageFact("Update", it, subtitle = GameUpdates.line(it))) }
+    addAll(sourceRows)
     entry.pcInfo?.takeIf { entry.isStoreRow() && it.installed }?.let { pc ->
         pc.installedVersion?.takeIf { availableVersions.isEmpty() }?.let { add(PageFact("Version", it)) }
         // A store with no way to tell droidtop says so; it is never shown as up to date.
@@ -826,21 +816,58 @@ private fun pageRows(
             else -> Unit
         }
     }
+
+    entry.manualUri?.let { add(PageFact("Manual", "Available")) }
+    entry.videoUri?.let { add(PageFact("Video", "Available")) }
+    entry.links.forEach { link ->
+        add(PageFact(link.label, value = "Open", onActivate = { onOpenLink(link.url) }, tip = link.url, tab = PageTab.EXTRAS))
+    }
+    if (!entry.hideMetadata) {
+        sourcesLine(entry)?.let { add(PageFact("Where these facts came from", subtitle = it)) }
+    }
+
+    val owned = siblings.mapNotNull { it.ownership() }
+    val ownedLine = owned.ownershipLabel().removePrefix("Owned on ").takeIf { it.isNotBlank() }
+    val folderPath = entry.groupingPath()
+    add(PageFact("Store", ownedLine ?: if (entry.pcInfo?.source == null || entry.pcInfo?.source == "Folder") "Your folders" else entry.sourceLabel()))
+    // Where it lives as a person names it; the whole path is the tooltip.
+    folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it)) }
+    // The name as it is on disk, beside the title drawn from it (docs/SPEC.md
+    // 7n): the raw name is never altered, only parsed.
+    folderPath?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() && it != GameNaming.displayName(entry.title) }
+        ?.let { add(PageFact("Folder name", it)) }
+    entry.engineLabel()?.let { add(PageFact("Engine", it)) }
     add(
         PageFact(
-            "Runs with",
+            "Runner",
             runner?.label ?: if (play.pressable) "" else play.verb,
             subtitle = runner?.reason ?: play.detail,
         ),
     )
-    entry.engineLabel()?.let { add(PageFact("Engine", it)) }
-    entry.pcInfo?.compatibility?.let { add(PageFact("Compatibility", subtitle = it.summary() + ". Other people's results on other hardware, not a verdict.")) }
     if (!entry.hideMetadata) {
         aboutFacts(entry).forEach { (label, value) -> add(PageFact(label, value)) }
         entry.players?.takeIf { it.isNotBlank() }?.let { add(PageFact("Players", it)) }
-        entry.description?.takeIf { it.isNotBlank() }?.let { add(PageFact("About", subtitle = it)) }
-        sourcesLine(entry)?.let { add(PageFact("Where these facts came from", subtitle = it)) }
     }
+}
+
+/**
+ * A folder's path as a person names its place: "SD card / Games / Folder"
+ * instead of "/storage/1234-ABCD/Games/Folder". The storage root becomes its
+ * name (internal storage, SD card), a path of more than three steps keeps the
+ * first and the last two with a gap between, and a path under no known root
+ * keeps its last three steps. The full path is the row's tooltip. Pure.
+ */
+internal fun friendlyLocation(path: String): String {
+    val parts = path.split('/').filter { it.isNotEmpty() }
+    val (root, rest) = when {
+        parts.size >= 3 && parts[0] == "storage" && parts[1] == "emulated" -> "Internal storage" to parts.drop(3)
+        parts.size >= 2 && parts[0] == "storage" && parts[1] != "self" -> "SD card" to parts.drop(2)
+        parts.size >= 3 && parts[0] == "mnt" && parts[1] == "media_rw" -> "SD card" to parts.drop(3)
+        parts.isNotEmpty() && (parts[0] == "sdcard") -> "Internal storage" to parts.drop(1)
+        else -> null to parts.takeLast(3)
+    }
+    val steps = if (rest.size > 3) listOf(rest.first(), "…") + rest.takeLast(2) else rest
+    return (listOfNotNull(root) + steps).joinToString(" / ").ifEmpty { path }
 }
 
 private data class FolderSizeStamp(val path: String, val modified: Long, val length: Long)
@@ -944,16 +971,16 @@ internal enum class PageTab(val label: String, val emptyLine: String) {
  * ([pageRows]) stay a plain list. What is not named is a detail.
  */
 internal fun pageTabOf(title: String): PageTab = when (title) {
-    "About", "Not scraped yet", "Runs with", "Compatibility", "Install state" -> PageTab.OVERVIEW
-    "Version", "Update", "Owned on", "Folder", "Folder name", "Size", THREAD_ROW, CHECK_ROW -> PageTab.VERSIONS
-    "Players", "Engine", "Where these facts came from" -> PageTab.EXTRAS
+    "About", "Not scraped yet", "Compatibility", "Install state", "Times played" -> PageTab.OVERVIEW
+    "Version", "Latest", "Update", THREAD_ROW, CHECK_ROW -> PageTab.VERSIONS
+    "Manual", "Video", "Where these facts came from" -> PageTab.EXTRAS
     else -> PageTab.DETAILS
 }
 
 /** Every row under its tab, in row order; the multi-part list leads Overview. Pure, for the tests. */
 internal fun groupRowsByTab(rows: List<PageFact>, parts: List<PageFact>): Map<PageTab, List<PageFact>> =
     PageTab.values().associateWith { tab ->
-        val own = rows.filter { pageTabOf(it.title) == tab }
+        val own = rows.filter { (it.tab ?: pageTabOf(it.title)) == tab }
         // An available update leads Versions: it is what a person opens the tab for.
         val ordered = if (tab == PageTab.VERSIONS) own.sortedBy { if (it.title == "Update") 0 else 1 } else own
         (if (tab == PageTab.OVERVIEW) parts else emptyList()) + ordered
