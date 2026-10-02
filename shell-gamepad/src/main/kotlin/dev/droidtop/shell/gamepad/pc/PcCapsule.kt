@@ -58,15 +58,15 @@ internal const val HERO_ASPECT = 16f / 9f
 internal fun heroWidth(capsuleWidth: Dp): Dp = capsuleWidth * (HERO_ASPECT / CAPSULE_ASPECT)
 
 /**
- * How wide a capsule is: a share of the window's HEIGHT, so a shelf and
- * the start of the next fit under the strip on the console's 432dp-tall
- * landscape window (about 120dp wide there, three rows of the Deck's own
- * proportion), and the same rule gives a phone held upright two columns.
+ * How wide a capsule is: the window's usable width shared out so about five
+ * and a half show across (the half says there is more, as Steam's rows do),
+ * clamped so a phone held upright still gets whole, readable capsules.
  */
 @Composable
 internal fun capsuleWidth(): Dp {
     val window = LocalShellWindow.current
-    return (window.heightDp * 0.28f).dp.coerceIn(104.dp, 176.dp)
+    val usable = window.widthDp.dp - window.edgePadding * 2
+    return ((usable - Space.Md * 5) / 5.5f).coerceIn(104.dp, 220.dp)
 }
 
 /**
