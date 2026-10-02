@@ -15,6 +15,7 @@ object ScraperPrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_CLIENT_ID = "droidtop_igdb_client_id"
     private const val KEY_CLIENT_SECRET = "droidtop_igdb_client_secret"
+    private const val KEY_VERIFIED = "droidtop_igdb_verified"
 
     fun clientId(context: Context): String =
         PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_CLIENT_ID, "") ?: ""
@@ -26,6 +27,14 @@ object ScraperPrefs {
         PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putStrings(
             mapOf(KEY_CLIENT_ID to clientId, KEY_CLIENT_SECRET to clientSecret),
         )
+        setVerified(context, false)
+    }
+
+    /** Whether the stored pair passed a test call; any change to it clears this. */
+    fun verified(context: Context): Boolean = PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getBoolean(KEY_VERIFIED, false)
+
+    fun setVerified(context: Context, value: Boolean) {
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putBoolean(KEY_VERIFIED, value)
     }
 
     fun isConfigured(context: Context): Boolean = clientId(context).isNotBlank() && clientSecret(context).isNotBlank()

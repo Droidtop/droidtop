@@ -446,6 +446,11 @@
             android:name=".SteamLoginActivity"
             android:exported="false" />
 
+        <!-- The guided key setup for IGDB and SteamGridDB, opened from their rows under Accounts and sources. -->
+        <activity
+            android:name=".ScraperKeySetupActivity"
+            android:exported="false" />
+
         <!-- The PC surface's store half (docs/SPEC.md 7i, build-plan
              steps 5 to 7). All three host UI that :runtime-windows
              already compiles from the vendored gamenative tree rather

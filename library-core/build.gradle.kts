@@ -19,6 +19,16 @@ android {
 
     defaultConfig {
         minSdk = 26
+        // droidtop's own TheGamesDB application key (docs/SPEC.md 7h): read from the
+        // THEGAMESDB_APP_KEY environment variable (a CI secret) or gradle property, never
+        // committed. Blank when absent: TheGamesDB then needs the person's own key.
+        val theGamesDbKey = System.getenv("THEGAMESDB_APP_KEY")
+            ?: (project.findProperty("THEGAMESDB_APP_KEY") as String?)
+            ?: ""
+        buildConfigField("String", "THEGAMESDB_APP_KEY", "\"" + theGamesDbKey.replace("\"", "") + "\"")
+    }
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

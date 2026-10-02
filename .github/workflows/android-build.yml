@@ -129,6 +129,8 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          # droidtop's TheGamesDB application key: a build without the secret leaves it blank.
+          THEGAMESDB_APP_KEY: ${{ secrets.THEGAMESDB_APP_KEY }}
         # Both variants every time, so a channel always carries the pair
         # the in-app "Install debug builds" switch chooses between. The
         # debug APK exists to be inspectable (run-as, a debugger), never to

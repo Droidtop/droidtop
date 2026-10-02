@@ -8,6 +8,9 @@ import android.content.Context
  */
 internal const val SCRAPER_SETTINGS = "Settings > Library > Scraper"
 
+/** Where IGDB and SteamGridDB are set up: a guided screen behind each source row. */
+internal const val SOURCE_SETUP = "Settings > Accounts and sources"
+
 /**
  * Whether a scraper source can be asked at all, and what to do when it
  * cannot (docs/SPEC.md 7h). Two cases, one rule: a source with a missing
@@ -20,9 +23,9 @@ object ScraperReadiness {
 
     /** TheGamesDB asked for with no key: the pass, the manual match and the picker all say this. */
     const val THEGAMESDB_KEY_MISSING =
-        "TheGamesDB needs your own free API key, and none is set. Get one at thegamesdb.net and enter it " +
-            "under $SCRAPER_SETTINGS > TheGamesDB > API key, or choose ScreenScraper or the libretro " +
-            "database there, which need no key."
+        "TheGamesDB needs your own free API key in this build, and none is set. Get one at thegamesdb.net " +
+            "and enter it under $SCRAPER_SETTINGS > TheGamesDB > API key, or choose ScreenScraper or the " +
+            "libretro database there, which need no key."
 
     /**
      * Why the selected ROM source cannot run, with the fix; null when it can.
@@ -46,7 +49,7 @@ object ScraperReadiness {
             null
         } else {
             "IGDB needs your own free API credentials: create an application at dev.twitch.tv/console, " +
-                "then enter its Client ID and Client Secret under $SCRAPER_SETTINGS > IGDB. " +
+                "then enter its Client ID and Client Secret under $SOURCE_SETUP > IGDB. " +
                 "Lutris needs no account at all if you would rather not."
         }
         PcScraperSource.STEAMGRIDDB -> if (SteamGridDbPrefs.isConfigured(context)) null else STEAMGRIDDB_KEY_MISSING
@@ -56,7 +59,7 @@ object ScraperReadiness {
     const val STEAMGRIDDB_KEY_MISSING =
         "SteamGridDB needs your own free API key, and none is set. Sign in at steamgriddb.com and create one " +
             "under Preferences > API (steamgriddb.com/profile/preferences/api), then enter it under " +
-            "$SCRAPER_SETTINGS > SteamGridDB > API key. Lutris needs no account at all if you would rather not."
+            "$SOURCE_SETUP > SteamGridDB. Lutris needs no account at all if you would rather not."
 
     /**
      * Whether [refusal] is the server rejecting the credentials the source
@@ -82,9 +85,9 @@ object ScraperReadiness {
             refusal.source == "TheGamesDB" ->
                 "Check the API key under $SCRAPER_SETTINGS > TheGamesDB > API key."
             refusal.source.startsWith("IGDB") ->
-                "Check the Client ID and Client Secret under $SCRAPER_SETTINGS > IGDB."
+                "Check the Client ID and Client Secret under $SOURCE_SETUP > IGDB."
             refusal.source == SteamGridDbScraperClient.SOURCE ->
-                "Check the API key under $SCRAPER_SETTINGS > SteamGridDB > API key."
+                "Check the API key under $SOURCE_SETUP > SteamGridDB."
             else -> null
         }
     }

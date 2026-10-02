@@ -1,6 +1,7 @@
 package dev.droidtop.app.settings
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.LibraryCore
@@ -64,7 +65,8 @@ import dev.droidtop.pluginhost.UserOriginKey
 import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.pluginhost.AddKeyOutcome
 import dev.droidtop.library.consoles.resolvePlayer
-import dev.droidtop.library.scraper.ScraperPrefs
+import dev.droidtop.library.scraper.ScraperKeyCheck
+import dev.droidtop.library.scraper.ScraperKeyService
 import dev.droidtop.library.scraper.ScraperSource
 import dev.droidtop.library.scraper.ScraperSourcePrefs
 import dev.droidtop.library.scraper.ScreenScraperPrefs
@@ -1450,7 +1452,6 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "accounts_screenscraper",
                         title = "ScreenScraper",
-                        subtitle = "Works without an account; your own login raises how much you can scrape per day",
                         inline = screenScraperAccountScreen(),
                         valueLabel = {
                             if (ScreenScraperPrefs.userId(context).isBlank()) "No account (still works)" else "Signed in as ${ScreenScraperPrefs.userId(context)}"
@@ -1459,26 +1460,17 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "accounts_thegamesdb",
                         title = "TheGamesDB",
-                        subtitle = "A free API key from thegamesdb.net is needed before it can scrape",
                         inline = theGamesDbAccountScreen(),
-                        valueLabel = { if (TheGamesDbPrefs.apiKey(context).isBlank()) "Not set" else "Configured" },
-                    ),
-                    NestedScreenItem(
-                        id = "accounts_igdb",
-                        title = "IGDB (PC & engine games)",
-                        subtitle = "Your own free Twitch developer application credentials",
-                        inline = igdbAccountScreen(),
-                        valueLabel = { if (ScraperPrefs.clientId(context).isBlank()) "Not set" else "Configured" },
-                    ),
-                    NestedScreenItem(
-                        id = "accounts_steamgriddb",
-                        title = "SteamGridDB (PC & engine games)",
-                        subtitle = "Covers, hero art, logos and icons for PC and engine games",
-                        inline = steamGridDbAccountScreen(),
                         valueLabel = {
-                            if (dev.droidtop.library.scraper.SteamGridDbPrefs.apiKey(context).isBlank()) "Not set" else "Configured"
+                            when {
+                                TheGamesDbPrefs.ownKey(context).isNotBlank() -> "Your key"
+                                TheGamesDbPrefs.builtInKey.isNotBlank() -> "Built in"
+                                else -> "Not set"
+                            }
                         },
                     ),
+                    guidedKeyRow(context, ScraperKeyService.IGDB, "IGDB (PC & engine games)"),
+                    guidedKeyRow(context, ScraperKeyService.STEAMGRIDDB, "SteamGridDB (PC & engine games)"),
                 ),
             ),
             CatalogGroup(
@@ -1530,7 +1522,6 @@ object AppSettingsCatalogs {
     private fun theGamesDbAccountScreen() = CatalogScreen(
         id = "accounts_thegamesdb_edit",
         title = "TheGamesDB",
-        subtitle = "Free at thegamesdb.net",
         groups = { context ->
             listOf(
                 CatalogGroup(
@@ -1539,9 +1530,8 @@ object AppSettingsCatalogs {
                     items = listOf(
                         TextInputItem(
                             id = "tgdb_api_key",
-                            title = "API key",
-                            subtitle = "Free at thegamesdb.net; TheGamesDB cannot scrape without it",
-                            value = TheGamesDbPrefs.apiKey(context),
+                            title = "Your own API key",
+                            value = TheGamesDbPrefs.ownKey(context),
                             onChange = { c, v -> TheGamesDbPrefs.set(c, v.trim()) },
                         ),
                     ),
@@ -1550,67 +1540,17 @@ object AppSettingsCatalogs {
         },
     )
 
-    private fun igdbAccountScreen() = CatalogScreen(
-        id = "accounts_igdb_edit",
-        title = "IGDB",
-        subtitle = "Your own free Twitch developer application, never droidtop's",
-        groups = { context ->
-            listOf(
-                CatalogGroup(
-                    id = "accounts_igdb_fields",
-                    title = null,
-                    items = listOf(
-                        // The user's own credentials, never droidtop's:
-                        // IGDB authenticates through a free, self-service
-                        // Twitch developer application, and the ID and
-                        // secret belong to whoever created it.
-                        TextInputItem(
-                            id = "igdb_client_id",
-                            title = "Client ID",
-                            subtitle = "Create an application at dev.twitch.tv/console: it is free and instant",
-                            value = ScraperPrefs.clientId(context),
-                            onChange = { c, v -> ScraperPrefs.set(c, v.trim(), ScraperPrefs.clientSecret(c)) },
-                        ),
-                        TextInputItem(
-                            id = "igdb_client_secret",
-                            title = "Client Secret",
-                            subtitle = "From the same Twitch application; stays on this device",
-                            value = ScraperPrefs.clientSecret(context),
-                            secret = true,
-                            onChange = { c, v -> ScraperPrefs.set(c, ScraperPrefs.clientId(c), v.trim()) },
-                        ),
-                    ),
-                ),
-            )
-        },
-    )
-
-    private fun steamGridDbAccountScreen() = CatalogScreen(
-        id = "accounts_steamgriddb_edit",
-        title = "SteamGridDB",
-        subtitle = "Free: sign in at steamgriddb.com, then Preferences > API",
-        groups = { context ->
-            listOf(
-                CatalogGroup(
-                    id = "accounts_steamgriddb_fields",
-                    title = null,
-                    items = listOf(
-                        // The user's own key, stored like every credential
-                        // here: droidtop ships none, and a key belongs to
-                        // the steamgriddb.com account that made it.
-                        TextInputItem(
-                            id = "steamgriddb_api_key",
-                            title = "API key",
-                            subtitle = "Free: sign in at steamgriddb.com, then Preferences > API. " +
-                                "Covers, hero art, logos and icons for PC and engine games",
-                            value = dev.droidtop.library.scraper.SteamGridDbPrefs.apiKey(context),
-                            secret = true,
-                            onChange = { c, v -> dev.droidtop.library.scraper.SteamGridDbPrefs.set(c, v.trim()) },
-                        ),
-                    ),
-                ),
-            )
-        },
+    /**
+     * An optional source that needs the person's own credential: one row,
+     * its state ("Not set", "Not tested", "Connected") as the value, and the
+     * numbered guide, QR code and fields behind it (ScraperKeySetupActivity).
+     */
+    private fun guidedKeyRow(context: Context, service: ScraperKeyService, title: String) = ActionItem(
+        id = "accounts_" + service.name.lowercase(),
+        title = title,
+        value = ScraperKeyCheck.state(context, service),
+        icon = CatalogIcon.GLOBAL,
+        run = { ctx -> ctx.startActivity(ScraperKeySetupActivity.intent(ctx, service).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
     )
 
     private fun integrationsScreen() = CatalogScreen(

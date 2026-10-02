@@ -33,7 +33,7 @@ class PcScrapeHonestyTest {
         assertTrue(summary, summary.contains("invalid client secret"))
         // The 400 is Twitch refusing the Client ID or Secret, so the summary
         // says where to change them (ScraperReadiness.credentialFix).
-        assertTrue(summary, summary.contains("Check the Client ID and Client Secret under $SCRAPER_SETTINGS > IGDB"))
+        assertTrue(summary, summary.contains("Check the Client ID and Client Secret under $SOURCE_SETUP > IGDB"))
         assertTrue(summary, summary.contains("says nothing about whether your games are in the database"))
     }
 

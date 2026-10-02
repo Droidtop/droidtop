@@ -9149,6 +9149,25 @@ for an hour, and quota responses for fifteen minutes. A later pass therefore con
 cached answers instead of repeating completed lookups. Before a ROM has metadata, its row still
 uses `GameNaming.displayName` to turn filename slugs into readable display text.
 
+**Scraping needs no setup, and keys are guided (directed 2026-10-02, tracker #264).** A fresh
+install scrapes with nothing entered: ROMs from ScreenScraper's anonymous tier (the default
+`ScraperSource`), the libretro database, and TheGamesDB through droidtop's own application key
+when the build carries one (`TheGamesDbPrefs.builtInKey`, the `THEGAMESDB_APP_KEY` CI secret
+read by `library-core/build.gradle.kts` into `BuildConfig`; blank in a build made without it, never
+committed, and a key the person enters under Accounts and sources > TheGamesDB takes precedence).
+PC and engine games default to Lutris plus the keyless Steam store. IGDB (a Twitch developer
+application's Client ID and Secret, client-credentials token, no user sign-in) and SteamGridDB (an
+API key from the person's preferences page) are optional and never shipped: each has ONE row under
+Settings > Accounts and sources whose value is its state (`Not set`, `Not tested`, `Connected`,
+`ScraperKeyState`) and whose guide is a screen behind the row (`ScraperKeySetupActivity`):
+numbered steps of at most five words (`ScraperKeyService.steps`), the official page as a QR code
+generated on the device and an Open button for the device's browser, the input fields, and Test,
+one real request (`ScraperKeyCheck`) that ends in `Connected` or a one-line error. The state is
+`Connected` only after a test passed with the stored credential; any change to it clears that. No
+prose on the rows or the guide: the credit line (`ScraperKeyService.credit`, "Data from IGDB.com",
+"Art from SteamGridDB") is the guide's tooltip, and a game's Details already credits each source
+for the fields it supplied ("Where these facts came from", `sourcesLine`).
+
 ### PC and engine games: what the scrape asks, and of whom
 
 The ROM scrapers index console dumps by platform id and file hash; none of

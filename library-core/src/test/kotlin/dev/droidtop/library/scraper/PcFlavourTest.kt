@@ -134,9 +134,9 @@ class PcFlavourTest {
     @Test
     fun `a rejected SteamGridDB key names where to change it`() {
         val fix = ScraperReadiness.credentialFix(ScrapeLookup.Refused("SteamGridDB", 401, "Invalid key format")).orEmpty()
-        assertTrue(fix, fix.contains("$SCRAPER_SETTINGS > SteamGridDB > API key"))
+        assertTrue(fix, fix.contains("$SOURCE_SETUP > SteamGridDB"))
         assertTrue(ScraperReadiness.STEAMGRIDDB_KEY_MISSING.contains("steamgriddb.com/profile/preferences/api"))
-        assertTrue(ScraperReadiness.STEAMGRIDDB_KEY_MISSING.contains("$SCRAPER_SETTINGS > SteamGridDB > API key"))
+        assertTrue(ScraperReadiness.STEAMGRIDDB_KEY_MISSING.contains("$SOURCE_SETUP > SteamGridDB"))
     }
 
     // ---- ids ----------------------------------------------------------------
