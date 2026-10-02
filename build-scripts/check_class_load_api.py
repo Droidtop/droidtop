@@ -308,6 +308,14 @@ def main(argv):
                     continue
                 checked += 1
                 dotted = class_name.replace("/", ".")
+                if "$$ExternalSyntheticApiModelOutline" in dotted:
+                    # R8 and D8 move a call to a newer framework API into a
+                    # class of its own, so that the class that makes the call
+                    # stays loadable on older devices; the outline's return
+                    # type is exactly the shape this check looks for and is
+                    # only reached behind the caller's own version check.
+                    # They exist once the release build is shrunk.
+                    continue
                 outer = dotted.split("$", 1)[0]
                 if dotted in allowed or outer in allowed:
                     continue
