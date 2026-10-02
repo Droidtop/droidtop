@@ -40,6 +40,38 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import kotlin.math.roundToInt
 
+internal data class NarrowChromeSlots(
+    val context: Boolean,
+    val shoulders: Boolean,
+    val status: Boolean,
+    val quickMenu: Boolean,
+)
+
+/** Drop optional chrome in priority order before the selected tab loses its viewport. */
+internal fun narrowChromeSlots(
+    availableWidthDp: Float,
+    selectedTabWidthDp: Float,
+    contextWidthDp: Float,
+    shoulderWidthDp: Float,
+    statusWidthDp: Float,
+    quickMenuWidthDp: Float,
+): NarrowChromeSlots {
+    var context = true
+    var shoulders = true
+    var status = true
+    var quickMenu = true
+    fun occupied() = selectedTabWidthDp +
+        (if (context) contextWidthDp else 0f) +
+        (if (shoulders) shoulderWidthDp else 0f) +
+        (if (status) statusWidthDp else 0f) +
+        (if (quickMenu) quickMenuWidthDp else 0f)
+    if (occupied() > availableWidthDp) context = false
+    if (occupied() > availableWidthDp) shoulders = false
+    if (occupied() > availableWidthDp) quickMenu = false
+    if (occupied() > availableWidthDp) status = false
+    return NarrowChromeSlots(context, shoulders, status, quickMenu)
+}
+
 /**
  * The Gaming shell's header: section tabs, the L1/R1 glyphs that step
  * them, the L2 context-menu and R2 Quick Menu indicators (docs/SPEC.md
@@ -90,6 +122,18 @@ internal fun SectionTabBar(
         (sections.size - 1) * window.tabGap.value -
         (if (shoulders) 2 * MenuTokens.ShoulderEstimateDp else 0)) / 2f
     val centred = slotDp >= MenuTokens.StatusSlotMinDp
+    val narrowSlots = remember(window.widthDp, density.fontScale, current, tabStyle, sections, shoulders) {
+        val selectedWidth = textMeasurer.measure(current.displayName(), tabStyle, maxLines = 1, softWrap = false)
+            .size.width.let { with(density) { it.toDp().value } } + 28f
+        narrowChromeSlots(
+            availableWidthDp = window.widthDp - 2 * window.edgePadding.value,
+            selectedTabWidthDp = selectedWidth,
+            contextWidthDp = 40f,
+            shoulderWidthDp = if (shoulders) 2 * MenuTokens.ShoulderEstimateDp + 12f else 0f,
+            statusWidthDp = 120f,
+            quickMenuWidthDp = 52f,
+        )
+    }
 
     // Where each tab sits inside the scrolling row, in content pixels, as
     // the row lays out: the selected tab is kept whole in view on top of
@@ -149,8 +193,8 @@ internal fun SectionTabBar(
                 }
             }
         } else {
-            contextMenu()
-            if (shoulders) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = 6.dp))
+            if (narrowSlots.context) contextMenu()
+            if (shoulders && narrowSlots.shoulders) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = 6.dp))
             // The tabs scroll and the Quick Menu control stays pinned beside
             // them. On a phone the names do not fit across 411dp, and a plain
             // Row silently pushes the last one off the edge, which on the
@@ -171,11 +215,11 @@ internal fun SectionTabBar(
                 horizontalArrangement = Arrangement.spacedBy(window.tabGap),
                 verticalAlignment = Alignment.CenterVertically,
             ) { tabs() }
-            if (shoulders) ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = 6.dp))
-            Box(Modifier.padding(start = 8.dp)) {
+            if (shoulders && narrowSlots.shoulders) ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = 6.dp))
+            if (narrowSlots.status) Box(Modifier.padding(start = 8.dp)) {
                 StatusCluster(showBatteryPercent = false, onClick = onQuickMenu)
             }
-            Box(Modifier.padding(start = 12.dp)) { quickMenu() }
+            if (narrowSlots.quickMenu) Box(Modifier.padding(start = 12.dp)) { quickMenu() }
             LaunchedEffect(current, tabRevision.value, rowX.value, rowW.value) {
                 val i = sections.indexOf(current)
                 if (i < 0) return@LaunchedEffect

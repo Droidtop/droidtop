@@ -9201,7 +9201,9 @@ the handful of places where the shape genuinely differs:
 - the Gaming tab bar measures its live theme labels at the current text
   scale before choosing a centred layout; when the status slots would
   crowd the tabs, it gives that space to a scrollable tab row and keeps
-  the selected tab completely visible;
+  the selected tab completely visible. In the narrow layout, it drops
+  the context control, shoulder glyphs, Quick Menu glyph and status cluster
+  in that order when needed to preserve room for the selected tab;
 - the Quick Menu label stays on one line and gives way to its R2 glyph
   when enlarged text would crowd the bar; the Get games sheet is bounded
   by the persistent shell bars, and its selected-row detail area does not
