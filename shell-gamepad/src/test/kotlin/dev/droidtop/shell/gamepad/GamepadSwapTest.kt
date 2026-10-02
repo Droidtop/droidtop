@@ -67,7 +67,7 @@ class GamepadSwapTest {
     @Test
     fun `Page Up and Page Down are the keyboard's own L1 R1`() {
         // The top bar can never take real D-pad focus any more
-        // (GamepadShell's SectionTabBar), so a keyboard-only session needs
+        // (the removed Gaming navigation bar), so a keyboard-only session needs
         // a route to the shoulder buttons that switch Games/Apps/Settings
         // that isn't "click the tab" (owner, 2026-09-27).
         assertEquals(GamepadAction.L, GamepadKeyMap.actionFor(Key.PageUp))
