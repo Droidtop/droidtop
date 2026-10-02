@@ -61,7 +61,18 @@ object SourceScreens {
                 NestedScreenItem("source_result_${source.id}_${result.id}", result.title, subtitle = result.columns.joinToString(" · ").ifBlank { result.subtitle }, valueLabel = result.badges.joinToString(" · ").takeIf { it.isNotBlank() }?.let { value -> { _: Context -> value } }, inline = adapter.detailScreen(result, systemId, systemName, folder))
             })) },
             onFailure = { error -> listOf(CatalogGroup("source_error_${source.id}", null, buildList {
-                add(ActionItem("source_failure_${source.id}", error.message ?: "Search failed", run = {}))
+                // A plain sentence first; what the source actually reported (a platform exception text, a
+                // stack line) is for its developer and sits one step behind "Technical details".
+                add(ActionItem("source_failure_${source.id}", "Couldn't search ${source.label}", subtitle = "It did not answer. Try again in a moment.", run = {}))
+                val technical = error.message?.trim().orEmpty().ifBlank { error::class.java.simpleName }
+                add(
+                    NestedScreenItem(
+                        "source_failure_detail_${source.id}", "Technical details", subtitle = "What the source reported, for its developer",
+                        inline = CatalogScreen("source_failure_detail_screen_${source.id}", "Technical details", groups = {
+                            listOf(CatalogGroup("detail", null, listOf(ActionItem("source_failure_text_${source.id}", technical, run = {}))))
+                        }),
+                    ),
+                )
                 if (settings != null) add(NestedScreenItem("source_settings_${source.id}", "Open ${source.label} settings", inline = settings))
             })) },
         )

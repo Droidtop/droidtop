@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,9 @@ import dev.droidtop.library.integrations.GetGamesContext
 import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.SettingsScreenRegistry
+import dev.droidtop.shell.gamepad.input.DeclareLayerHints
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
 
 /**
  * The ONE "Get games" action (docs/SPEC.md 12a "Get games everywhere"). A menu, a page, an empty
@@ -28,9 +32,13 @@ import dev.droidtop.library.settings.SettingsScreenRegistry
 internal fun getGamesScreen(context: GetGamesContext, systemId: String? = null): CatalogScreen? =
     SettingsScreenRegistry.get(AcquireContentSources.GET_GAMES_SCREEN_ID, GetGamesEntry.systemFor(context, systemId))
 
+private val CATALOG_SHEET_HINTS = listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, "Back"))
+
 /**
  * A catalog screen in a sheet kept inside Gaming's content area, clear of the persistent top and
- * bottom bars (Droidtop/tracker#218). B and the screen's own exit close it.
+ * bottom bars (Droidtop/tracker#218). B and the screen's own exit close it. It is a layer of the
+ * hint bar ([DeclareLayerHints]) and paints the ground under itself, so the screen it opened over
+ * neither shows through nor keeps its hints.
  */
 @Composable
 internal fun CatalogSheet(root: CatalogScreen, onExit: () -> Unit) {
@@ -39,10 +47,12 @@ internal fun CatalogSheet(root: CatalogScreen, onExit: () -> Unit) {
         onDismissRequest = onExit,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        DeclareLayerHints(CATALOG_SHEET_HINTS)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = window.frameBarHeight, bottom = window.frameBarHeight),
+                .padding(top = window.frameBarHeight, bottom = window.frameBarHeight)
+                .background(MenuTokens.Ground),
         ) {
             CatalogNavigator(root = root, onExit = onExit)
         }

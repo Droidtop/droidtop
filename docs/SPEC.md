@@ -10235,6 +10235,10 @@ a layer (`DeclareLayerHints`): while any layer is open the footer shows the
 topmost layer's hints and nothing else (no Start Menu, none of the screen's).
 A panel passes its own hints (`MenuPanel(hints = ...)`, default A Select,
 B Back) and draws no hint row inside itself; two sets never show at once.
+The Get games sheet is such a layer and paints the ground under itself
+(Droidtop/tracker#278). A failed source search says one plain sentence and
+keeps what the source reported behind a "Technical details" row, never the
+raw exception text.
 
 ## 7k. The design system: one spacing scale, one type scale, one colour source
 
