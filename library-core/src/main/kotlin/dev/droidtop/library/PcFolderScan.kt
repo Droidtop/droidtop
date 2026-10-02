@@ -141,10 +141,12 @@ object PcFolderScan {
         val engineMs: Long = 0L,
         val millis: Long = 0L,
         val engineVerdictsKept: Int = 0,
+        val engineVerdictMisses: Int = 0,
     ) {
         fun describe(): String =
             "$listings listings, $entriesStatted entries statted, $cachedListings listings from cache, " +
-                "$engineChecks engine checks ($engineMs ms), $engineVerdictsKept engine verdicts remembered"
+                "$engineChecks engine checks ($engineMs ms), $engineVerdictsKept engine verdict cache hits, " +
+                "$engineVerdictMisses misses"
     }
 
     /**
@@ -372,9 +374,10 @@ object PcFolderScan {
         private var engineChecks = 0
         private var engineNanos = 0L
         private var verdictsKept = 0
+        private var verdictMisses = 0
 
         fun work(millis: Long) =
-            Work(listings, entriesStatted, cachedListings, engineChecks, engineNanos / 1_000_000L, millis, verdictsKept)
+            Work(listings, entriesStatted, cachedListings, engineChecks, engineNanos / 1_000_000L, millis, verdictsKept, verdictMisses)
 
         fun walk(folder: File, depth: Int): List<File> {
             if (!walkable(folder, depth)) return emptyList()
@@ -465,6 +468,7 @@ object PcFolderScan {
                 verdictsKept++
                 kept
             } else {
+                if (options.verdicts != null) verdictMisses++
                 val startedAt = System.nanoTime()
                 val asked = GameEngineDetector.holdsSeveralGames(
                     folder,

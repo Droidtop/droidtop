@@ -255,6 +255,7 @@ class PcFolderScanTest {
         val warm = PcFolderScan.scanTopLevel(folder, defs, PcFolderScan.Options(verdicts = restarted))
         assertEquals(0, warm.work.engineChecks)
         assertTrue(warm.work.engineVerdictsKept > 0)
+        assertEquals(0, warm.work.engineVerdictMisses)
         assertEquals(cold.games, warm.games)
     }
 
