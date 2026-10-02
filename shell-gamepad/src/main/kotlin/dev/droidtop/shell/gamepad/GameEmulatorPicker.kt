@@ -33,6 +33,7 @@ import dev.droidtop.library.consoles.SystemEmulators
 import dev.droidtop.library.consoles.libretroCoreId
 import dev.droidtop.library.consoles.loadSystemEmulators
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.onPad
 
 /**
  * The per-game emulator choice: the third level of the order game, then
