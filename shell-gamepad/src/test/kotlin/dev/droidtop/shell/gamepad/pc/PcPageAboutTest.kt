@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.F95ThreadCheck
+import dev.droidtop.library.GameLinks
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import org.junit.Assert.assertEquals
@@ -134,11 +136,38 @@ class PcPageAboutTest {
         assertEquals(PageTab.values().toList(), byTab.keys.toList())
         assertEquals(rows.size + parts.size, byTab.values.sumOf { it.size })
         assertEquals(listOf("Parts", "Week 1", "Runs with", "About"), byTab.getValue(PageTab.OVERVIEW).map { it.title })
-        assertEquals(listOf("Size", "Owned on", "Version", "Update"), byTab.getValue(PageTab.VERSIONS).map { it.title })
+        // An available update leads the tab.
+        assertEquals(listOf("Update", "Size", "Owned on", "Version"), byTab.getValue(PageTab.VERSIONS).map { it.title })
         assertEquals(listOf("Engine"), byTab.getValue(PageTab.EXTRAS).map { it.title })
         // What no tab names is a detail, so a new row is never lost.
         assertEquals(listOf("Play time", "Last played", "Developer"), byTab.getValue(PageTab.DETAILS).map { it.title })
         assertEquals(PageTab.DETAILS, pageTabOf("Something new"))
+    }
+
+    @Test
+    fun theThreadRowsLiveUnderVersionsAndCheckNowNeedsALink() {
+        assertEquals(PageTab.VERSIONS, pageTabOf(THREAD_ROW))
+        assertEquals(PageTab.VERSIONS, pageTabOf(CHECK_ROW))
+        val unlinked = threadRows(null, null, {}, {})
+        assertEquals(listOf(THREAD_ROW), unlinked.map { it.title })
+        assertEquals("Link", unlinked[0].value)
+        val linked = threadRows(GameLinks(f95Thread = 123L), "Up to date", {}, {})
+        assertEquals(listOf(THREAD_ROW, CHECK_ROW), linked.map { it.title })
+        assertEquals("#123", linked[0].value)
+        assertEquals("Up to date", linked[1].value)
+        assertEquals("Check now", threadRows(GameLinks(f95Thread = 123L), null, {}, {})[1].value)
+    }
+
+    @Test
+    fun aCheckSaysUpToDateOrWhatIsAvailableInOneLine() {
+        fun links(version: String?, gone: Boolean = false) =
+            GameLinks(f95Thread = 1L, check = F95ThreadCheck(1L, 0L, version, 0L, gone))
+        assertEquals("Up to date", checkOutcomeLine(null, links("v0.9.5"), listOf("0.9.5"), null))
+        assertEquals("v0.9.6 is available", checkOutcomeLine(null, links("v0.9.6"), listOf("0.9.5"), null))
+        assertEquals("Thread is gone: private, moved or deleted", checkOutcomeLine(null, links(null, gone = true), listOf("0.9.5"), null))
+        assertEquals("The thread gives no version", checkOutcomeLine(null, links(null), listOf("0.9.5"), null))
+        assertEquals("Newest is v1.0", checkOutcomeLine(null, links("v1.0"), listOf(""), null))
+        assertEquals("offline", checkOutcomeLine("offline", links("v1.0"), listOf("1.0"), null))
     }
 
     @Test

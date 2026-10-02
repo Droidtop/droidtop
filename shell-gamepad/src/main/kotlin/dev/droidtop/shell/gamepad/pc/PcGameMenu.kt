@@ -431,25 +431,13 @@ internal fun PcGameMenu(
     if (editingThread) {
         TextEditDialog(
             title = "F95zone thread",
-            subtitle = "Paste the game's thread link, or its number. droidtop checks a public index " +
-                "for the thread's newest version; no F95zone account is needed. Clear it and save to unlink.",
+            subtitle = F95_THREAD_HELP,
             initial = links?.f95Thread?.let { F95Thread.url(it) }.orEmpty(),
             onCommit = { text ->
                 editingThread = false
-                val thread = F95Thread.parse(text)
-                if (text.isNotBlank() && thread == null) {
-                    status = "That is not an F95zone thread link: it should look like f95zone.to/threads/<name>.<number>/"
-                } else {
-                    scope.launch {
-                        status = if (thread == null) "Unlinking..." else "Checking thread $thread..."
-                        val failure = library.linkF95Thread(gameIds, thread)
-                        status = when {
-                            failure != null -> "Linked thread $thread, but checking it failed: $failure"
-                            thread == null -> "Unlinked. This game is no longer checked for updates."
-                            else -> null
-                        }
-                        linksToken++
-                    }
+                scope.launch {
+                    linkF95ThreadFromText(library, gameIds, text) { status = it }
+                    linksToken++
                 }
             },
             onDismiss = { editingThread = false },
@@ -535,7 +523,7 @@ internal fun PcGameMenu(
                         {
                             scope.launch {
                                 status = "Checking thread $thread..."
-                                status = library.checkF95ThreadNow(thread)
+                                status = checkF95ThreadAndSay(library, gameIds, thread, versions, entry.latestKnown)
                                 linksToken++
                             }
                         },
@@ -953,6 +941,63 @@ private fun LibraryEntry.identityLine(update: String?): String = if (missing) "b
     }
     // The same words as the card's line (docs/SPEC.md 7g).
     update?.let { append(" · ").append(GameUpdates.line(it)) }
+}
+
+/** What the thread dialog says, on the menu and on the game page. */
+internal const val F95_THREAD_HELP = "Paste the game's thread link, or its number. droidtop checks a public index " +
+    "for the thread's newest version; no F95zone account is needed. Clear it and save to unlink."
+
+/**
+ * A person's text for the F95zone thread (a link, its number, or blank to
+ * unlink) applied to the game whose folders are [gameIds], with each step
+ * said through [say]. The ONE linking path: the menu's thread row and the
+ * game page's thread row both end here.
+ */
+internal suspend fun linkF95ThreadFromText(
+    library: Library,
+    gameIds: Collection<String>,
+    text: String,
+    say: (String?) -> Unit,
+) {
+    val thread = F95Thread.parse(text)
+    if (text.isNotBlank() && thread == null) {
+        say("That is not an F95zone thread link: it should look like f95zone.to/threads/<name>.<number>/")
+        return
+    }
+    say(if (thread == null) "Unlinking..." else "Checking thread $thread...")
+    val failure = library.linkF95Thread(gameIds, thread)
+    say(
+        when {
+            failure != null -> "Linked thread $thread, but checking it failed: $failure"
+            thread == null -> "Unlinked. This game is no longer checked for updates."
+            else -> null
+        },
+    )
+}
+
+/** "Check now" for [thread], then the one short line for what it found ([checkOutcomeLine]). */
+internal suspend fun checkF95ThreadAndSay(
+    library: Library,
+    gameIds: Collection<String>,
+    thread: Long,
+    versions: List<String>,
+    fallbackLatest: String?,
+): String {
+    val failure = library.checkF95ThreadNow(thread)
+    return checkOutcomeLine(failure, library.gameLinks(gameIds), versions, fallbackLatest)
+}
+
+/**
+ * What a check found, in one short line: why it failed, "Up to date", or
+ * "v1.2 is available" ([GameUpdates.line]). Pure, for the tests.
+ */
+internal fun checkOutcomeLine(failure: String?, links: GameLinks?, versions: List<String>, fallbackLatest: String?): String {
+    if (failure != null) return failure
+    val check = links?.check
+    if (check?.gone == true) return "Thread is gone: private, moved or deleted"
+    GameUpdates.available(links?.latestKnown ?: fallbackLatest, versions)?.let { return GameUpdates.line(it) }
+    val newest = check?.version ?: return "The thread gives no version"
+    return if (versions.none { it.isNotEmpty() }) "Newest is $newest" else "Up to date"
 }
 
 /**
