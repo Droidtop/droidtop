@@ -1796,12 +1796,13 @@ object AppSettingsCatalogs {
                         )
                     }
                     installed.forEach { record ->
+                        val grants = grantStore.read(record.manifest.id)
                         add(
                             pluginCard(
                                 record,
                                 userKeys,
                                 resolution.waiting[record.manifest.id],
-                                grantStore.read(record.manifest.id).wantsNewAccess,
+                                grants,
                                 PluginRuntimeNeeds.missing(context, record.manifest),
                             ),
                         )
@@ -1897,10 +1898,19 @@ object AppSettingsCatalogs {
         record: dev.droidtop.pluginhost.PluginRecord,
         userKeys: Map<String, String>,
         waiting: List<dev.droidtop.pluginhost.RequiredApi>?,
-        wantsNewAccess: Boolean,
+        grants: PluginGrants.Snapshot,
         runtimeNeed: RuntimeNeed?,
     ): NestedScreenItem {
         val m = record.manifest
+        val wantsNewAccess = grants.wantsNewAccess
+        val enabledPoints = when (record.trust) {
+            PluginTrustState.PENDING -> PluginGrants.defaultTicked(record)
+                .filterTo(HashSet()) { it.startsWith(PluginPermissions.PROVIDE_PREFIX) }
+            PluginTrustState.APPROVED -> m.v2.provides.mapNotNullTo(HashSet()) { entry ->
+                (PluginPermissions.PROVIDE_PREFIX + entry.point).takeIf { PluginGrants.provideState(record, grants, entry.point) == GrantState.GRANTED }
+            }
+            else -> emptySet()
+        }
         val state = when {
             record.trust == PluginTrustState.PENDING -> "Needs approval"
             record.trust == PluginTrustState.DENIED -> "Denied"
@@ -1918,7 +1928,7 @@ object AppSettingsCatalogs {
         return NestedScreenItem(
             id = "plugin_${m.id}",
             title = m.label,
-            subtitle = pluginSummary(m) + " - " + trustBadge,
+            subtitle = pluginSummary(m, enabledPoints) + " - " + trustBadge,
             inline = pluginDetailScreen(m.id, m.label),
             valueLabel = { state },
         )
@@ -1994,7 +2004,11 @@ object AppSettingsCatalogs {
                 userKeys.containsKey(m.origin) -> "Added by you"
                 else -> "NOT TRUSTED: no trusted key for this origin anymore (see Keys you trust)"
             }
-            add(ActionItem(id = "plugin_${m.id}_status", title = statusLine, subtitle = trustLine, run = {}))
+            // A pending status used to look like a button but had no action. The approval controls below
+            // are the action; keep the trust/status row for plugins that already have a decision.
+            if (record.trust != PluginTrustState.PENDING) {
+                add(ActionItem(id = "plugin_${m.id}_status", title = statusLine, subtitle = trustLine, run = {}))
+            }
             resolution.waiting[m.id]?.let { missing ->
                 add(
                     ActionItem(
@@ -2136,11 +2150,20 @@ object AppSettingsCatalogs {
             )
         }
 
+        val enabledPoints = when {
+            approvalTicks != null -> approvalTicks
+                .filterTo(HashSet()) { it.startsWith(PluginPermissions.PROVIDE_PREFIX) }
+            record.trust == PluginTrustState.APPROVED -> m.v2.provides.mapNotNullTo(HashSet()) { entry ->
+                val id = PluginPermissions.PROVIDE_PREFIX + entry.point
+                id.takeIf { PluginGrants.provideState(record, grantSnapshot, entry.point) == GrantState.GRANTED }
+            }
+            else -> emptySet()
+        }
         val providesGroup = buildList<CatalogItem> {
             add(
                 ActionItem(
                     id = "plugin_${m.id}_provides",
-                    title = pluginSummary(m),
+                    title = pluginSummary(m, enabledPoints),
                     run = {},
                 ),
             )
@@ -2448,10 +2471,17 @@ object AppSettingsCatalogs {
     }
 
     /** What a plugin adds, in plain words, for the installed-list row and the detail page's provides row. */
-    private fun pluginSummary(m: dev.droidtop.pluginhost.PluginManifest): String =
-        m.v2.provides.mapNotNull { ExtensionPoints.find(it.point)?.label }.distinct().joinToString()
-            .ifEmpty { m.capabilities.joinToString { it.display } }
-            .ifEmpty { "No capabilities declared" }
+    private fun pluginSummary(m: dev.droidtop.pluginhost.PluginManifest, enabledPoints: Set<String>): String =
+        if (m.v2.provides.isNotEmpty()) {
+            m.v2.provides
+                .filter { PluginPermissions.PROVIDE_PREFIX + it.point in enabledPoints }
+                .mapNotNull { ExtensionPoints.find(it.point)?.label }
+                .distinct()
+                .joinToString()
+                .ifEmpty { "No extensions allowed" }
+        } else {
+            m.capabilities.joinToString { it.display }.ifEmpty { "No capabilities declared" }
+        }
 
     /**
      * The approval list of one plugin (docs/plugin-api.md 4.3): what it adds and where, what it can do, what it

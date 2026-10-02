@@ -11547,7 +11547,11 @@ of what is built. The decisions, briefly:
     a denied point is the standard error state saying it was not allowed,
     with a row to its Permissions screen. The choices stay editable on the
     plugin's Permissions screen, and an update asks only about the items it
-    added, on the same list. This replaces the rule that approval granted
+    added, on the same list. The plugin detail page's "What it provides"
+    summary reflects the currently granted extension points (or the current
+    approval ticks); an unticked extension is never described as active. A
+    pending approval is represented by the tick boxes and Approve actions,
+    not a no-op "Awaiting approval" action row. This replaces the rule that approval granted
     every listed point (cc3367c5). Details: `docs/plugin-api.md` 4.3.
 
 The catalogue has 89 entries across ten areas (library and content,
