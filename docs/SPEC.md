@@ -12294,12 +12294,41 @@ with the same persistent key so it installs over any earlier build,
 installed, and `<profileable android:shell="true">` so the shell's profilers
 still attach to the build people actually run. The asset is `droidtop.apk`;
 the updater reads the name from `release-info.json`, so installed debug
-builds update to it by themselves. Code shrinking (R8) is
-deliberately the next step and not this one: the vendored launcher,
-gamenative and keyboard trees load classes by name and through JNI, and their
-keep rules have to be proven on a device before a shrunk build is published.
-The debug variant still exists for local work and is what lint and the unit
-tests run on.
+builds update to it by themselves. The debug variant still exists for local
+work and is what lint and the unit tests run on.
+
+**The release build is shrunk by R8 (decided 2026-10-02).** The unshrunk
+release carried 114 MB of dex in 11 files, and packaging it in the one Gradle
+daemon heap was one of the two things behind the intermittent
+`OutOfMemoryError` in `:app:packageRelease` (Droidtop/tracker#283; the other,
+27 `.tzst` assets deflated again, was fixed by storing them). With R8 the
+same release carries 55 MB of dex in 7 files and the universal APK went from
+151.7 MB to 132.4 MB (CI runs 37069908669 before, 37070705393 after). The
+posture is shrink only: `proguard-android.txt` (which is `-dontoptimize`) plus
+`-dontobfuscate`, so nothing is renamed and no code is rewritten. That is
+deliberate, not a first step: this app links native code that finds classes
+and methods by name (gamenative's Winlator JNI, host-bridge, the Python
+bridge, the keyboard dictionary), loads plugin bundles that call into it by
+name, and a renamed or inlined class is a crash on a handheld nobody can
+attach a debugger to. What it keeps is written down in `app/proguard-rules.pro`,
+beside the launcher's own Lawnchair rules (`shell-default/proguard.pro`,
+`proguard.flags`), which `app/build.gradle.kts` adds: every class with a native
+method, the packages native code calls back into (`com.winlator`,
+`dev.droidtop.hostbridge`, `dev.droidtop.pluginhost`), the plugin API surface
+(`dev.droidtop.runtime.tasks`), Flutter, Shizuku, JavaSteam and protobuf
+messages, JGit. A class that is missing at R8 time gets a `-dontwarn` only
+when it is a platform class present on the device or reached behind a version
+check; a missing class from a library is a dependency to fix. Resource
+shrinking stays off: resources are a small part of the APK and the launcher
+and gamenative look some up by name. The class-load gate
+(`build-scripts/check_class_load_api.py`) ignores the
+`$$ExternalSyntheticApiModelOutline` classes R8 generates, which exist to keep
+the calling class loadable on older devices. `useLegacyPackaging = true`
+stays (SPEC 3, native libraries are exec'd and LD_PRELOADed from
+`nativeLibraryDir`); the 53 MB of native libraries deflate to 20 MB and are
+not already-compressed payloads, so they are not stored. R8 breakage shows
+only at run time, so a shrunk build is checked on the console before it is
+trusted (the commit that turned it on lists the checks).
 
 **Channels, and the debug APK beside the release one (directed 2026-09-22).**
 The user: "add two toggles to the update and etc checker: branch (so, stable,

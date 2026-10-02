@@ -121,11 +121,23 @@ android {
         // baseline profiles Compose ships are not installed. None of that is
         // about droidtop's code; it is what "debug" means on Android.
         // Signed with the same key, so it installs over a debug "latest".
-        // Code shrinking stays off for now: R8 over the vendored launcher,
-        // gamenative and keyboard trees needs its keep rules proven on a
-        // device first, and is the next step, not this one.
+        // Code shrinking is on (R8, SPEC 10b): the release APK carried 114 MB
+        // of unshrunk dex and packaging it ran the daemon out of heap
+        // (Droidtop/tracker#283). It shrinks and does not obfuscate or
+        // optimise, see app/proguard-rules.pro. Resource shrinking stays off:
+        // resources are a small part of the APK (the assets are not touched by
+        // it) and the launcher and gamenative look some up by name. Debug
+        // stays unminified.
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android.txt"),
+                "proguard-rules.pro",
+                "../shell-default/proguard.pro",
+                "../shell-default/proguard.flags",
+                "../shell-default/systemUIPluginCore/proguard.flags",
+            )
             signingConfig = if (signingKeystorePath != null) {
                 signingConfigs.getByName("droidtop")
             } else {
