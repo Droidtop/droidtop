@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -57,7 +61,7 @@ internal fun GetGamesChip(
     primary: Boolean = false,
     onChanged: () -> Unit = {},
 ) {
-    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var open by remember { mutableStateOf(false) }
     ShellChip(GetGamesEntry.LABEL, modifier = modifier, primary = primary, onClick = { open = true })
     if (open) GetGamesSheet(context, systemId, onDismiss = { open = false }, onChanged = onChanged)
 }
