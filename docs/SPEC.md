@@ -12116,7 +12116,9 @@ fork (github.com/joshuatam/JavaSteam, branch `gamenative-latest`) has
 published no tag and no release, and Maven Central holds nothing
 under `io.github.joshuatam`, so the artifact exists only in Sonatype's
 `maven-snapshots` repository, which `settings.gradle.kts` declares
-for exactly that dependency. The pin moves onto a fixed artifact when
+for exactly that dependency, as exclusive content: the group resolves
+from that repository alone, so no other repository (jitpack's timeouts
+failed CI, Droidtop/tracker#283) is asked for its snapshot metadata. The pin moves onto a fixed artifact when
 the fork cuts a real tag; no guessing a version meanwhile.
 
 ## 10b. Releases and updates (directed 2026-09-02)

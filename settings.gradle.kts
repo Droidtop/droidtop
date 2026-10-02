@@ -19,7 +19,18 @@ dependencyResolutionManagement {
         // app.gamenative tree: gamenative pins a JavaSteam SNAPSHOT
         // (io.github.joshuatam:javasteam), published only here — the
         // same repository gamenative's own settings.gradle declares.
-        maven { url = uri("https://central.sonatype.com/repository/maven-snapshots/") }
+        // Exclusive, both ways: that group is looked up here and nowhere
+        // else, and nothing else is looked up here. A SNAPSHOT's metadata
+        // is fetched from every repository listed before the one that has
+        // it, so jitpack was asked first on every CI run, and a jitpack
+        // timeout failed the build ("could not resolve ...
+        // javasteam-depotdownloader:1.8.0.1-26-SNAPSHOT", jitpack.io
+        // maven-metadata.xml; three main runs on 2026-10-02,
+        // Droidtop/tracker#283).
+        exclusiveContent {
+            forRepository { maven { url = uri("https://central.sonatype.com/repository/maven-snapshots/") } }
+            filter { includeGroup("io.github.joshuatam") }
+        }
         // Needed by :plugin-host (docs/SPEC.md 12a, flutter_embed kind):
         // Flutter's own Maven repo for the `io.flutter:flutter_embedding_release`
         // artifact -- the Java-only embedding classes (FlutterEngine,
