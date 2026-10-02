@@ -5957,6 +5957,19 @@ not covered; those take a `storagePathTemplate` (plain path) row where the emula
 The PS2 emulator rows (NetherSX2 and the AetherSX2 families, and other PS2 rows that document a plain path
 launch) carry `storagePathTemplate` in droidtop-platforms, so with all-files access they never need the URI.
 
+**Asking for the emulator's file access first** (Droidtop/tracker#270). A preset that has a
+`storagePathTemplate` is one whose emulator may not boot from the content URI. When such an emulator does not
+hold all-files access (`emulatorReadsStoragePaths` false), a launch stops before dispatch
+(`needsFileAccessPrompt`, the pure rule `launchNeedsFileAccess`) with `EmulatorNeedsFileAccess`, and the
+shell's launch-failure dialog says "<Emulator> can't read your games." with **Give access** (Android's All
+files access screen for that package, `ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION`; the general screen if
+that cannot open) and **Launch anyway** (remembered per emulator in `LaunchAnywayPrefs`, then launches with the
+content URI as before). The check is read-only AppOps and needs no privilege; droidtop does not grant the
+permission itself (elevated grants go through Shizuku or Sui later, Droidtop/tracker#262). Once access is
+granted the next launch takes the plain path with no prompt. The Emulators launch test reports the same missing
+access in one line instead of sending the launch. Launches from the companion surface show the line without the
+two actions.
+
 **The launch watchdog** (`LaunchWatchdog`, `LaunchWatchPolicy`). `LaunchDisplay.dispatch`, the one point
 every launch passes, starts it for a game launch. It runs off the main thread, every 3 s for at most 90 s,
 and ends the moment the launch is settled (`clearRunning`, a quit, or a listed and live app after 30 s). It
