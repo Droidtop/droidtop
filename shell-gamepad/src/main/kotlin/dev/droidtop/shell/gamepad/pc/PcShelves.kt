@@ -42,10 +42,11 @@ internal const val SHELF_INSTALLED = "installed"
  * it off the main thread (one sort per shelf over the whole library: never
  * while drawing). [now] is the clock, for "recently".
  *
+ * - **Continue playing**: every game with a last-played time, newest
+ *   first; the first shelf, led by a hero card (docs/SPEC.md 7i, "Home
+ *   art"). The Deck's "Recent games" row, under the name the owner gave it.
  * - **Recently added**: indexed games with a nonzero first-seen time,
  *   newest first. Legacy rows with no timestamp do not appear.
- * - **Continue playing**: every game with a last-played time, newest
- *   first. The Deck's "Recent games" row, under the name the owner gave it.
  * - **Update available**: a source knows a newer version than any folder
  *   here (docs/SPEC.md 7g), only when there is one.
  * - **Favourites**, only when there is one.
@@ -69,11 +70,8 @@ internal fun pcShelves(games: List<LibraryEntry>, now: Long = System.currentTime
         return PcShelf(id, title, ordered.take(SHELF_LIMIT), ordered.size)
     }
     return buildList {
-        val recentlyAdded = games.filter { it.firstSeenEpochMs > 0L }
-            .sortedWith(compareByDescending<LibraryEntry> { it.firstSeenEpochMs }.thenBy { it.title.lowercase() })
-        if (recentlyAdded.isNotEmpty()) {
-            add(PcShelf(SHELF_RECENTLY_ADDED, "Recently added", recentlyAdded.take(SHELF_LIMIT), recentlyAdded.size))
-        }
+        // Continue playing leads: its first card is the hero card (PcCapsule
+        // with `hero`), the game the person most likely wants.
         // Local vals, not smart casts: LibraryEntry's properties are
         // declared in another module, which Kotlin will not smart-cast.
         shelf(
@@ -84,6 +82,11 @@ internal fun pcShelves(games: List<LibraryEntry>, now: Long = System.currentTime
                 last != null && last <= now
             },
         )?.let(::add)
+        val recentlyAdded = games.filter { it.firstSeenEpochMs > 0L }
+            .sortedWith(compareByDescending<LibraryEntry> { it.firstSeenEpochMs }.thenBy { it.title.lowercase() })
+        if (recentlyAdded.isNotEmpty()) {
+            add(PcShelf(SHELF_RECENTLY_ADDED, "Recently added", recentlyAdded.take(SHELF_LIMIT), recentlyAdded.size))
+        }
         shelf(SHELF_UPDATES, "Update available", games.filter { it.availableUpdate != null })?.let(::add)
         shelf(SHELF_FAVOURITES, "Favourites", games.filter { it.favorite })?.let(::add)
         val installed = games.filter { it.isInstalled }

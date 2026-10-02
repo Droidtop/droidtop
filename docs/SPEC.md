@@ -9041,10 +9041,10 @@ it:
 
 | Steam Deck / Big Picture | Others | PC Games |
 | --- | --- | --- |
-| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves** on Home: Recently added (nonzero indexed first-seen time, newest first), Continue playing, Update available, Favourites, Installed (only when something is not), one per store (Steam, GOG, ...), one per engine family (Visual Novels, RPG Maker, Windows, ...). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. `pcShelves`, `pc/PcShelves.kt`. |
+| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves** on Home: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (nonzero indexed first-seen time, newest first), Update available, Favourites, Installed (only when something is not), one per store (Steam, GOG, ...), one per engine family (Visual Novels, RPG Maker, Windows, ...). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. `pcShelves`, `pc/PcShelves.kt`. |
 | Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip**: Home, All games, Installed, Updates, Favourites, Continue playing, the person's saved views, Filters and sort; each built-in view carries its count ("Installed · 12"), and Updates and Favourites appear only when something is in them. One press to a view, one press to the filter dialog. The strip is the one place filter, sort, search and saved views are reached (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
 | 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule. No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is a share of the window's height (`capsuleWidth`, 104-176dp), so the console shows a shelf and the top of the next, and a phone held upright gets two columns. |
-| Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window): the hero (16:9) or capsule art as large as its column allows; the name and where it came from under the art; ONE big primary button that says what A does (`PcPlayState`: Play, Install, Set up, Choose a runner, Folder is missing -- drawn faded, with its reason under it, when it cannot be pressed); Favourite and Options beside it; and under them every fact droidtop has as rows -- Play time, Last played, Size, Owned on, Version, Update, Runs with, Engine, Compatibility, Developer, Publisher, Released, Genre, Series, Rating, Players, About, where the facts came from. Only facts that exist are rows. Achievements are not a row because droidtop has no achievement data (#143); when it does, this is where the row goes. |
+| Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons, a quiet facts strip, a tab strip (Overview, Versions and updates, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are not a row because droidtop has no achievement data (#143); when it does, this is where the row goes. |
 | The page's rows are the same rows as Steam's settings | | **Settings' rows.** The page's facts are `MenuRow(uniformHeight = true)` at `uniformRowHeight()`, with one content-sized value column (`LocalValueColumnWidth`) and the selected row's full text in the detail strip under the list (`CatalogDetailStrip`, §7k "Text in rows and tiles"); a long description is read there, never by growing a row. |
 | A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A is the primary action** (owner, 2026-10-01: "A is Primary Action. We can make it contextual using the pills."): on a capsule A does what the hint pill says -- Play when the runner is ready, else the one setup step (`PcRunnerOptions.resolveAndPlay`, the one launch handler); Y opens the page. The page exists for looking and for the game's own actions, never as a step in front of Play. |
 
@@ -9058,6 +9058,101 @@ removed the chip row because a horizontal row could not take Left/Right
 inside a themed gamelist whose Left/Right switch systems; PC Games is not
 a gamelist and has no system to switch, so Left/Right are free, and the
 Deck's library tabs are the better shape.
+
+### The game page
+
+Droidtop/tracker#254, 2026-10-02. The page keeps one job, "everything about
+this game and the one thing you most likely want to do", and has this
+structure, top to bottom, drawn only from theme tokens:
+
+- **The hero band** (`PageHero`): the game's hero art edge to edge, darkened
+  toward the ground by a gradient so what is laid over it stays legible on
+  any art, with the game's logo (`logoUri`) or, without one, its name, and
+  where it came from. Only portrait art: that art at its own shape on the
+  right of a plate, never stretched across the band. No art: the plate and
+  the name. Its height is a share of the window's (36 percent landscape, 26
+  percent portrait) and it compresses to a 64dp strip while the cursor is
+  down in the tab's rows, so the rows get the screen (`Motion.panelIn`).
+- **The action band** (`PageActionBand`): ONE large primary action
+  (`ShellChip(large)`, the same `PcPlayState` verb and detail the card's A
+  hint and the menu's first row use, so the three cannot disagree), Favourite
+  and Options as small round icon buttons (`PageIconButton`, with a spoken
+  description), and the quiet **facts strip** (`factsStrip`): Last played,
+  Play time, Version (the installed version against the latest known:
+  "0.9.5, v0.9.6 is available", the one wording of `GameUpdates.line`), Size
+  and Runs with, only those that exist. It scrolls sideways rather than
+  clipping at a large text size. Under it the one line saying why the
+  primary action is what it is. In portrait the strip sits under the
+  buttons. While the cursor is in the rows the band keeps only the buttons.
+  Store games have no installed or latest version until #222 gives them
+  one; the strip simply has no Version fact for them.
+- **The tab strip** (`PageTabStrip`): Overview, Versions and updates, Extras,
+  Details, scrolling sideways, pinned under the band, L1/R1 glyphs at its
+  ends. `pageTabOf` is the one place that says which tab a row lives under,
+  by its title; a title no tab names is a detail, so a new row is never
+  lost. Overview: About, Runs with, Compatibility, the unscraped game's
+  Scrape row, and for a game of several parts the **part list** first
+  (`partFacts`: a heading row with the count, then each part with its newest
+  version, in the order the folder names give). Versions and updates:
+  Version, Update, Owned on, Folder, Size. Extras: Engine, Players, where the
+  facts came from. Details: play time, last played and the scraped facts
+  (developer, publisher, release date, genre, series, rating). A tab with no
+  row says so (`PageTab.emptyLine`) instead of drawing nothing.
+- **The rows** are Settings' rows, as before (one uniform height, one
+  content-sized value column, the selected row's full text in the detail
+  strip while the cursor is in them).
+
+**The controls.** The page is a window of its own, so its one `onPad` handler
+(through `GatePadInThisDialog`) is what every press reaches, and it OWNS
+L1/R1 while it is open: the shell's shoulder routing (§7j, "Gaming
+controls") says the nearest strip takes them and over a game's detail the
+shell's own routing is `NONE`, so the page's strip is that nearest strip.
+L1/R1 step the tab from anywhere, clamped at the ends (`menuStep`, no
+wrapping), and the strip owns the press even at its end. ONE cursor in three
+zones: the buttons, the tabs, the rows. First focus is the primary action.
+Down from the buttons reaches the tabs, Down from the tabs the first row; Up
+goes back the same way. A zone is crossed by a fresh press only, so a held
+direction stops at an edge instead of running through the page. Left/Right
+move along the buttons or the tabs. A presses what the cursor is on (on a
+tab it enters the rows), X toggles favourite, L2 opens the game's menu, B
+closes the page and returns to the same card. This window has no top bar,
+so the D-pad never reaches one. The page draws its own hint row
+(`HintRow`, gated bindings: A names the button under the cursor, X, L2,
+Previous/Next tab only where there is one, B). A tap on a button, tab or row
+is the same press.
+
+**Not on the page yet:** the Saves and Activity tabs (#229, #230), and the
+Install, Update and Downloading verbs of the primary action (#223), which
+land in `PcPlayState` and appear here without a change to the page. No
+version rollback (#231).
+
+### Home art
+
+Droidtop/tracker#253, 2026-10-02. The PC Games home is led by the player's
+own games, in droidtop's own treatment:
+
+- **Continue playing is the first shelf** and its first card is the **hero
+  card** (`PcCapsule(hero = true)`): the game's landscape hero art at the
+  capsules' own height (`heroWidth`, `HERO_ASPECT` 16:9) so the row keeps
+  one baseline, the name under it and one quiet line,
+  "Played yesterday · 2 h 5 min" (`heroCaption`). Only portrait art: that art
+  at its own shape beside the title on the plate, never stretched. Recently
+  added follows as its own shelf, unchanged.
+- **The backdrop** (`PcBackdrop`) is the art of the game under the cursor
+  (`backdropArt`: its hero, else its box art), crossfading as the cursor
+  moves, darkened toward the ground by a scrim that is heaviest where the
+  shelves' text sits. It keeps the last game's art while the cursor is on
+  the strip, and draws nothing (the plain ground) for a game with no art.
+  Cheap on purpose: **no live blur**: the art is decoded small (640 by 360)
+  and scaled up under the scrim, so it is soft by construction and costs one
+  small bitmap; the games two either side of the cursor are **preloaded**
+  with the very same request (`PreloadBackdrops`, `neighbourBackdrops`), so
+  a step finds the next one in the memory cache. No disk work from the
+  composition: the art is a URI the entry already carries and Coil decodes
+  it off the main thread. Colours are theme tokens only (`MenuTokens.Ground`);
+  the crossfade is `Motion.AmbientFadeMs`, ambient rather than demanding.
+- It uses the art sources droidtop already has (scraped hero, logo and box
+  art, §7h); there is no scraper of its own here.
 
 ### The controls
 

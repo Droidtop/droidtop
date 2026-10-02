@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,6 +46,16 @@ import dev.droidtop.shell.gamepad.selectionFrame
  * PC Games tab draws (docs/SPEC.md 7i).
  */
 internal const val CAPSULE_ASPECT = 2f / 3f
+
+/**
+ * The hero card's shape: the landscape art (16:9) a scrape leaves as the
+ * game's hero. The Continue playing shelf's first card is drawn this way,
+ * at the capsules' own height, so the row keeps one baseline.
+ */
+internal const val HERO_ASPECT = 16f / 9f
+
+/** A hero card as wide as its landscape art is at a capsule's height. */
+internal fun heroWidth(capsuleWidth: Dp): Dp = capsuleWidth * (HERO_ASPECT / CAPSULE_ASPECT)
 
 /**
  * How wide a capsule is: a share of the window's HEIGHT, so a shelf and
@@ -100,6 +112,11 @@ internal fun capsuleStatusOf(entry: LibraryEntry, download: StoreDownloads.Progr
  * and a second tap on the selected capsule is the pad's A. Long-press is
  * the touch route to Y (the game's page), the convention every card in
  * this shell follows.
+ *
+ * [hero] draws the game as a landscape card (docs/SPEC.md 7i, "Home art"):
+ * its hero art, or, when only portrait art exists, that art beside the
+ * title on the plate, and under it the name and one quiet line of when it
+ * was last played ([heroCaption]). The caller gives it a [heroWidth].
  */
 @Composable
 internal fun PcCapsule(
@@ -111,6 +128,7 @@ internal fun PcCapsule(
     modifier: Modifier = Modifier,
     download: StoreDownloads.Progress? = null,
     parts: Int = 1,
+    hero: Boolean = false,
 ) {
     val shape = RoundedCornerShape(8.dp)
     val ring = selected && PadModality.showsFocus
@@ -118,23 +136,53 @@ internal fun PcCapsule(
     // capsule lifts and gains a shadow under the cursor and the rest sit
     // slightly dimmed.
     val title = GameNaming.displayName(entry.title)
-    Box(
+    Column(
         modifier = modifier
             .width(width)
-            .aspectRatio(CAPSULE_ASPECT)
             .pointerInput(entry.id) {
                 detectTapGestures(onTap = { onTap() }, onLongPress = { onLongPress() })
-            }
+            },
+        verticalArrangement = Arrangement.spacedBy(Space.Xs),
+    ) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(if (hero) HERO_ASPECT else CAPSULE_ASPECT)
             .focusLift(ring, shape)
             .selectionFrame(selected, shape, rest = MenuTokens.Card, restOutline = MenuTokens.CardOutline),
     ) {
-        if (entry.artworkUri != null) {
+        // A hero card wants the landscape art; a capsule the box art.
+        val art = if (hero) entry.heroUri else entry.artworkUri
+        if (art != null) {
             AsyncImage(
-                model = entry.artworkUri,
+                model = art,
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().clip(shape),
             )
+        } else if (hero && entry.artworkUri != null) {
+            // Only portrait art: it is never stretched across a landscape
+            // card. It sits at its own shape beside the title.
+            Row(
+                modifier = Modifier.fillMaxSize().padding(Space.Sm),
+                horizontalArrangement = Arrangement.spacedBy(Space.Md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AsyncImage(
+                    model = entry.artworkUri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxHeight().aspectRatio(CAPSULE_ASPECT).clip(RoundedCornerShape(6.dp)),
+                )
+                Text(
+                    title,
+                    color = MenuTokens.OnSurface,
+                    style = TypeRole.rowTitle,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         } else {
             // No art: the plate carries the name, as the Deck does for
             // a non-Steam shortcut with no artwork. Never a made-up
@@ -169,6 +217,23 @@ internal fun PcCapsule(
         }
         CapsuleStatusBadge(entry, download)
         CapsuleCorners(entry, download, parts)
+    }
+    if (hero) {
+        Text(
+            title,
+            color = if (selected) MenuTokens.OnSurface else MenuTokens.Value,
+            style = TypeRole.rowTitle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            heroCaption(entry, System.currentTimeMillis()),
+            color = MenuTokens.OnSurfaceMuted,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
     }
 }
 

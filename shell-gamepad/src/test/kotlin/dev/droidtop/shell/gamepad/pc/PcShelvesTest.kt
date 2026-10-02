@@ -51,6 +51,35 @@ class PcShelvesTest {
     }
 
     @Test
+    fun `continue playing stays ahead of recently added, which keeps its own shelf`() {
+        val shelves = pcShelves(
+            listOf(game("/a", lastPlayed = now - 10, firstSeen = now - 100), game("/b", firstSeen = now - 5)),
+            now,
+        )
+
+        assertEquals(listOf(SHELF_CONTINUE, SHELF_RECENTLY_ADDED), shelves.map { it.id }.take(2))
+        assertEquals(listOf("/b", "/a"), shelves[1].entries.map { it.id })
+    }
+
+    @Test
+    fun `the backdrop prefers the landscape hero and preloads the neighbours either side`() {
+        val list = (0..6).map { game("/g$it").copy(artworkUri = "box$it", heroUri = if (it == 3) "hero3" else null) }
+
+        assertEquals("hero3", list[3].backdropArt())
+        assertEquals("box2", list[2].backdropArt())
+        assertNull(game("/none").backdropArt())
+        // Two either side of the cursor, never the cursor's own, and none off the ends.
+        assertEquals(listOf("box0", "box1", "hero3", "box4"), neighbourBackdrops(list, 2, reach = 2))
+        assertEquals(listOf("box1", "box2"), neighbourBackdrops(list.take(3), 0, reach = 2))
+        assertEquals(emptyList<String>(), neighbourBackdrops(emptyList(), 0))
+    }
+
+    @Test
+    fun `the hero card is as wide as landscape art is at a capsule's height`() {
+        assertEquals(HERO_ASPECT / CAPSULE_ASPECT, heroWidth(androidx.compose.ui.unit.Dp(1f)).value, 0.001f)
+    }
+
+    @Test
     fun `recently added is newest first and hidden when timestamps are missing`() {
         val none = pcShelves(listOf(game("/legacy")), now)
         assertNull(none.firstOrNull { it.id == SHELF_RECENTLY_ADDED })

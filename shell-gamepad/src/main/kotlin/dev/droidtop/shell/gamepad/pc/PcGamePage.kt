@@ -1,22 +1,28 @@
 package dev.droidtop.shell.gamepad.pc
 
-import dev.droidtop.shell.gamepad.groundBackground
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,15 +37,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -50,6 +61,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.groupingPath
 import dev.droidtop.library.isUnscraped
 import dev.droidtop.library.scraper.PcScraper
+import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.scraper.FieldSources
@@ -58,18 +70,24 @@ import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.LocalValueColumnWidth
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.Motion
 import dev.droidtop.shell.gamepad.ShellChip
+import dev.droidtop.shell.gamepad.ShoulderGlyph
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.ownPadButtons
 import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
+import dev.droidtop.shell.gamepad.showsShoulderGlyphs
+import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -78,39 +96,54 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * One PC game's own page (docs/SPEC.md 7i, 2026-10-01): what the Steam
- * Deck shows when you open a game. Its art large on one side; on the
- * other, ONE big primary button that says what A does (Play, or the one
- * setup step that makes it Play, or why it cannot -- [PcPlayState]),
- * Favourite and Options beside it, and under them every fact droidtop has
- * about this game as rows: play time, last played, size, the stores it is
- * owned on, the runner, the engine, an update, the scraped facts, the
- * community compatibility reports and the description. Nothing a person
- * would look for is behind a menu (Droidtop/tracker#173).
+ * One PC game's own page (docs/SPEC.md 7i, "The game page", 2026-10-02):
+ * the structure a storefront game page has, drawn in droidtop's own
+ * tokens. From the top:
  *
- * The rows are Settings' rows: the same `MenuRow` at the same uniform
- * height, one content-sized value column, and the selected row's full text
- * in the detail strip under the list (docs/SPEC.md 7k, "Text in rows and
- * tiles"), so a long description is read there instead of growing a row.
+ * - **The hero band**: the game's hero art full-bleed with its logo (or its
+ *   name) and where it came from. With the cursor down in the tab content
+ *   the band compresses to a strip, so the content gets the screen.
+ * - **The action band**: ONE large primary action that says what A does
+ *   (Play, or the one setup step that makes it Play, or why it cannot --
+ *   [PcPlayState]), a small Favourite and Options icon button beside it,
+ *   and a quiet facts strip ([factsStrip]: last played, play time, the
+ *   version installed against the latest known, size, what runs it), with
+ *   the one-line reason under it.
+ * - **The tab strip** (Overview, Versions and updates, Extras, Details),
+ *   pinned under the band. It OWNS L1/R1 while the page is open: the page
+ *   is a window of its own over the library, so its one `onPad` handler is
+ *   what the shoulders reach, the same "nearest strip takes them" rule the
+ *   shell applies (docs/SPEC.md 7j, "Gaming controls"). The glyphs sit at
+ *   the strip's ends.
+ * - **The tab's rows**: Settings' rows ([MenuRow], one uniform height, one
+ *   content-sized value column) and, while the cursor is in them, the
+ *   selected row's full text in the detail strip under the list
+ *   (docs/SPEC.md 7k, "Text in rows and tiles"). A game of several parts
+ *   lists them first on Overview ([partFacts]). Every fact the page always
+ *   had is still a row, under the tab [pageTabOf] puts it in; nothing a
+ *   person would look for is behind a menu (Droidtop/tracker#173).
  *
  * The pad comes through the one pipeline (docs/SPEC.md 6e,
  * Droidtop/tracker#178): this is a window of its own, so it gets the
  * pipeline's front ([GatePadInThisDialog]); one `onPad` handler on its
- * root moves ONE cursor over the button row and the fact rows, A presses
- * what the cursor is on, X toggles favourite, L2 opens the game's menu, and
- * B closes from the outermost node ([ownPadButtons]) -- so the face-button
- * swap applies to every button here, and no control takes Compose focus of
- * its own. A tap on a button or a row is the same press.
+ * root moves ONE cursor through three zones (the action band's buttons,
+ * the tabs, the tab's rows). Up and Down move between zones and rows, Left
+ * and Right along the buttons or the tabs, L1/R1 the tab from anywhere, A
+ * presses what the cursor is on, X toggles favourite, L2 opens the game's
+ * menu, and B closes from the outermost node ([ownPadButtons]) -- so the
+ * face-button swap applies to every button here, and no control takes
+ * Compose focus of its own. A tap on a button, a tab or a row is the same
+ * press. The D-pad never reaches the top bar: this window has none.
  *
  * No disk work while drawing: everything shown is already on the
- * [LibraryEntry]; the one lookup, the resolved runner, runs for this one
- * game off the main thread ([rememberPcPlayState]).
+ * [LibraryEntry]; the lookups, the resolved runner, the folder's size and
+ * the parts, run for this one game off the main thread.
  */
 @Composable
 internal fun PcGamePage(
     entry: LibraryEntry,
     // Every folder and store row of this same game (docs/SPEC.md 7m), for
-    // "Owned on" and the versions line; the entry itself when there is
+    // "Owned on", the versions and the parts; the entry itself when there is
     // nothing to group with.
     siblings: List<LibraryEntry>,
     onPlay: () -> Unit,
@@ -142,16 +175,41 @@ internal fun PcGamePage(
             },
         )
     }
+    val parts by produceState(emptyList<PageFact>(), entry.id, siblings) {
+        value = withContext(Dispatchers.Default) { partFacts(siblings) }
+    }
+    val tabs = remember { PageTab.values() }
+    val rowsByTab = remember(rows, parts) { groupRowsByTab(rows, parts) }
+    val strip = remember(entry, runner, folderSize, siblings) {
+        factsStrip(
+            entry = entry,
+            now = System.currentTimeMillis(),
+            folderSizeBytes = folderSize,
+            installedVersion = installedVersions(entry, siblings).firstOrNull(),
+            runsWith = runner?.label,
+            formatSize = { android.text.format.Formatter.formatShortFileSize(context, it) },
+        )
+    }
 
-    // ONE cursor: row 0 is the button row, rows 1.. are the facts.
-    var row by remember(entry.id) { mutableIntStateOf(0) }
+    // ONE cursor in three zones: the buttons, the tabs, the tab's rows.
+    var zone by remember(entry.id) { mutableStateOf(PageZone.ACTIONS) }
     var button by remember(entry.id) { mutableIntStateOf(0) }
+    var tab by remember(entry.id) { mutableIntStateOf(0) }
+    var row by remember(entry.id) { mutableIntStateOf(0) }
     var heldStep by remember { mutableStateOf(false) }
+    val current = rowsByTab[tabs[tab]].orEmpty()
     val listState = rememberLazyListState()
+    val tabState = rememberLazyListState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "PC game page") }
-    LaunchedEffect(row, rows.size) {
-        if (row > 0 && rows.isNotEmpty()) listState.keepInView((row - 1).coerceIn(0, rows.lastIndex), animate = !heldStep)
+    LaunchedEffect(tab) {
+        listState.scrollToItem(0)
+        tabState.keepInView(tab)
+    }
+    LaunchedEffect(zone, row, current.size) {
+        if (zone == PageZone.CONTENT && current.isNotEmpty()) {
+            listState.keepInView(row.coerceIn(0, current.lastIndex), animate = !heldStep)
+        }
     }
 
     val buttons = 3
@@ -166,129 +224,31 @@ internal fun PcGamePage(
         }
     }
 
+    // L1/R1, Left/Right on the strip, and a tap: one tab change.
+    fun selectTab(next: Int) {
+        val clamped = next.coerceIn(0, tabs.lastIndex)
+        if (clamped != tab) EsDeNavigationSounds.play("scroll")
+        tab = clamped
+        row = 0
+        if (zone == PageZone.CONTENT && rowsByTab[tabs[clamped]].isNullOrEmpty()) zone = PageZone.TABS
+    }
+
+    val compact = zone == PageZone.CONTENT
+    val fullHero = (window.heightDp * (if (window.portrait) 0.26f else 0.36f)).dp
+    val heroHeight by animateDpAsState(
+        targetValue = if (compact) COMPACT_HERO_HEIGHT else fullHero,
+        animationSpec = Motion.panelIn(),
+        label = "page hero",
+    )
+    val shoulderGlyphs = window.showsShoulderGlyphs()
+
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         GatePadInThisDialog()
         HideSystemBarsInThisDialog()
-        val art: @Composable () -> Unit = {
-            PageArt(entry, modifier = Modifier.fillMaxWidth())
-        }
-        val header: @Composable () -> Unit = {
-            Text(
-                GameNaming.displayName(entry.title),
-                color = MenuTokens.OnSurface,
-                style = TypeRole.screenTitle,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                listOfNotNull(entry.sourceLabel(), entry.engineLabel()).joinToString(" · "),
-                color = MenuTokens.OnSurfaceMuted,
-                style = TypeRole.supporting,
-                modifier = Modifier.padding(top = Space.Xs),
-            )
-        }
-        val actions: @Composable () -> Unit = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Space.Md),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ShellChip(
-                    play.verb,
-                    primary = true,
-                    large = true,
-                    enabled = play.pressable,
-                    selected = row == 0 && button == 0,
-                    onClick = {
-                        row = 0
-                        button = 0
-                        pressButton(0)
-                    },
-                )
-                ShellChip(
-                    "Favourite",
-                    on = entry.favorite,
-                    selected = row == 0 && button == 1,
-                    onClick = {
-                        row = 0
-                        button = 1
-                        pressButton(1)
-                    },
-                )
-                ShellChip(
-                    "Options",
-                    selected = row == 0 && button == 2,
-                    onClick = {
-                        row = 0
-                        button = 2
-                        pressButton(2)
-                    },
-                )
-            }
-            if (play.detail.isNotBlank()) {
-                Text(
-                    play.detail,
-                    color = if (play.pressable) MenuTokens.Value else MenuTokens.OnSurfaceDisabled,
-                    style = TypeRole.supporting,
-                    modifier = Modifier.padding(top = Space.Sm),
-                )
-            }
-        }
-        val facts: @Composable (Modifier) -> Unit = { modifier ->
-            // One value column for the page, content-sized to its widest
-            // value (docs/SPEC.md 7k), as the Settings catalog does.
-            val measurer = rememberTextMeasurer()
-            val valueStyle = MaterialTheme.typography.bodyMedium
-            val density = LocalDensity.current
-            val valueColumnWidth = remember(rows, valueStyle, density.fontScale) {
-                val widest = rows.mapNotNull { it.value }
-                    .maxOfOrNull { measurer.measure(it, valueStyle, maxLines = 1, softWrap = false).size.width } ?: 0
-                with(density) { widest.toDp() }.coerceIn(MenuTokens.ValueColumnMinWidth, MenuTokens.ValueColumnMaxWidth)
-            }
-            Column(modifier) {
-                CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = Space.Lg),
-                    ) {
-                        itemsIndexed(rows, key = { _, fact -> fact.title }) { index, fact ->
-                            MenuRow(
-                                title = fact.title,
-                                subtitle = fact.subtitle,
-                                value = fact.value,
-                                chevron = fact.onActivate != null,
-                                selected = row == index + 1,
-                                uniformHeight = true,
-                                ownScrollKeeping = true,
-                                onClick = {
-                                    row = index + 1
-                                    fact.onActivate?.invoke()
-                                },
-                            )
-                        }
-                    }
-                }
-                // The selected row in full, so no row has to grow to be
-                // read: the whole description, a long value, where the
-                // facts came from.
-                val selected = rows.getOrNull(row - 1)
-                CatalogDetailStrip(
-                    selected?.let { fact ->
-                        listOfNotNull(
-                            fact.value?.takeIf { it.length > 14 },
-                            fact.subtitle,
-                        ).joinToString("\n")
-                    }.orEmpty(),
-                )
-            }
-        }
-
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 // B from the outermost node; the cursor's own presses
@@ -297,26 +257,62 @@ internal fun PcGamePage(
                 .onPad { press ->
                     heldStep = press.repeat
                     when (press.action) {
-                        GamepadAction.UP -> {
-                            // A held Up stops at the top; a fresh one too (a
-                            // page has nothing above its first row).
-                            val next = menuStep(row, rows.size + 1, -1)
-                            if (next != row) EsDeNavigationSounds.play("scroll")
-                            row = next
+                        GamepadAction.UP -> when (zone) {
+                            PageZone.ACTIONS -> Unit
+                            // A zone is crossed by a fresh press only: a held
+                            // direction stops at the edge instead of running
+                            // through the whole page.
+                            PageZone.TABS -> if (!press.repeat) {
+                                EsDeNavigationSounds.play("scroll")
+                                zone = PageZone.ACTIONS
+                            }
+                            PageZone.CONTENT -> if (row > 0) {
+                                EsDeNavigationSounds.play("scroll")
+                                row -= 1
+                            } else if (!press.repeat) {
+                                EsDeNavigationSounds.play("scroll")
+                                zone = PageZone.TABS
+                            }
                         }
-                        GamepadAction.DOWN -> {
-                            val next = menuStep(row, rows.size + 1, +1)
-                            if (next != row) EsDeNavigationSounds.play("scroll")
-                            row = next
+                        GamepadAction.DOWN -> when (zone) {
+                            PageZone.ACTIONS -> if (!press.repeat) {
+                                EsDeNavigationSounds.play("scroll")
+                                zone = PageZone.TABS
+                            }
+                            PageZone.TABS -> if (!press.repeat && current.isNotEmpty()) {
+                                EsDeNavigationSounds.play("scroll")
+                                zone = PageZone.CONTENT
+                                row = 0
+                            }
+                            PageZone.CONTENT -> {
+                                val next = menuStep(row, current.size, +1)
+                                if (next != row) EsDeNavigationSounds.play("scroll")
+                                row = next
+                            }
                         }
                         GamepadAction.LEFT, GamepadAction.RIGHT -> {
-                            if (row != 0) return@onPad false
-                            val next = menuStep(button, buttons, if (press.action == GamepadAction.LEFT) -1 else 1)
-                            if (next != button) EsDeNavigationSounds.play("scroll")
-                            button = next
+                            val step = if (press.action == GamepadAction.LEFT) -1 else 1
+                            when (zone) {
+                                PageZone.ACTIONS -> {
+                                    val next = menuStep(button, buttons, step)
+                                    if (next != button) EsDeNavigationSounds.play("scroll")
+                                    button = next
+                                }
+                                PageZone.TABS -> selectTab(tab + step)
+                                PageZone.CONTENT -> return@onPad false
+                            }
                         }
-                        GamepadAction.A -> {
-                            if (row == 0) pressButton(button) else rows.getOrNull(row - 1)?.onActivate?.invoke()
+                        // The shoulders step the tab strip from anywhere on the
+                        // page, and the strip owns them even at its end.
+                        GamepadAction.L -> selectTab(tab - 1)
+                        GamepadAction.R -> selectTab(tab + 1)
+                        GamepadAction.A -> when (zone) {
+                            PageZone.ACTIONS -> pressButton(button)
+                            PageZone.TABS -> if (current.isNotEmpty()) {
+                                zone = PageZone.CONTENT
+                                row = 0
+                            }
+                            PageZone.CONTENT -> current.getOrNull(row)?.onActivate?.invoke()
                         }
                         GamepadAction.X -> onToggleFavorite()
                         GamepadAction.L2 -> onOpenOptions()
@@ -326,72 +322,342 @@ internal fun PcGamePage(
                 }
                 .focusRequester(focus)
                 .focusable()
-                .groundBackground()
-                .padding(start = window.edgePadding, end = window.edgePadding, top = Space.Lg, bottom = Space.Lg),
+                .groundBackground(),
         ) {
-            if (window.portrait) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Box(modifier = Modifier.fillMaxWidth().height((window.heightDp * 0.3f).dp)) { art() }
-                    Column(modifier = Modifier.padding(top = Space.Md)) {
-                        header()
-                        Column(modifier = Modifier.padding(top = Space.Md)) { actions() }
+            PageHero(entry, heroHeight, compact)
+            Column(modifier = Modifier.padding(horizontal = window.edgePadding)) {
+                PageActionBand(
+                    play = play,
+                    favourite = entry.favorite,
+                    selectedButton = if (zone == PageZone.ACTIONS) button else null,
+                    strip = strip,
+                    compact = compact,
+                    portrait = window.portrait,
+                    onPress = { index ->
+                        zone = PageZone.ACTIONS
+                        button = index
+                        pressButton(index)
+                    },
+                )
+                PageTabStrip(
+                    tabs = tabs,
+                    tab = tab,
+                    cursorOnTabs = zone == PageZone.TABS,
+                    state = tabState,
+                    shoulderGlyphs = shoulderGlyphs,
+                    onSelect = { index ->
+                        zone = PageZone.TABS
+                        selectTab(index)
+                    },
+                )
+            }
+            Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                if (current.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(tabs[tab].emptyLine, color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
                     }
-                    facts(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Lg))
+                } else {
+                    // One value column for the tab, content-sized to its
+                    // widest value (docs/SPEC.md 7k), as the Settings catalog does.
+                    val measurer = rememberTextMeasurer()
+                    val valueStyle = MaterialTheme.typography.bodyMedium
+                    val density = LocalDensity.current
+                    val valueColumnWidth = remember(current, valueStyle, density.fontScale) {
+                        val widest = current.mapNotNull { it.value }
+                            .maxOfOrNull { measurer.measure(it, valueStyle, maxLines = 1, softWrap = false).size.width } ?: 0
+                        with(density) { widest.toDp() }.coerceIn(MenuTokens.ValueColumnMinWidth, MenuTokens.ValueColumnMaxWidth)
+                    }
+                    CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
+                            contentPadding = PaddingValues(
+                                start = window.edgePadding,
+                                end = window.edgePadding,
+                                top = Space.Xs,
+                                bottom = Space.Lg,
+                            ),
+                        ) {
+                            itemsIndexed(current, key = { index, fact -> "$index:${fact.title}" }) { index, fact ->
+                                MenuRow(
+                                    title = fact.title,
+                                    subtitle = fact.subtitle,
+                                    value = fact.value,
+                                    chevron = fact.onActivate != null,
+                                    selected = zone == PageZone.CONTENT && row == index,
+                                    uniformHeight = true,
+                                    ownScrollKeeping = true,
+                                    onClick = {
+                                        zone = PageZone.CONTENT
+                                        row = index
+                                        fact.onActivate?.invoke()
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    // The selected row in full, so no row has to grow to be
+                    // read: the whole description, a long value, where the
+                    // facts came from. Only while the cursor is down here,
+                    // when the band above has made the room.
+                    if (compact) {
+                        val selected = current.getOrNull(row)
+                        CatalogDetailStrip(
+                            selected?.let { fact ->
+                                listOfNotNull(
+                                    fact.value?.takeIf { it.length > 14 },
+                                    fact.subtitle,
+                                ).joinToString("\n")
+                            }.orEmpty(),
+                        )
+                    }
                 }
+            }
+            val verb = play.verb
+            val hints = remember(zone, button, row, tab, verb, play.pressable, current) {
+                listOf(
+                    HintBinding(GamepadAction.A, if (zone == PageZone.ACTIONS) pageActionLabel(button, verb) else "Select") {
+                        when (zone) {
+                            PageZone.ACTIONS -> button != 0 || play.pressable
+                            PageZone.TABS -> current.isNotEmpty()
+                            PageZone.CONTENT -> current.getOrNull(row)?.onActivate != null
+                        }
+                    },
+                    HintBinding(GamepadAction.X, "Favourite"),
+                    HintBinding(GamepadAction.L2, "Game options"),
+                    HintBinding(GamepadAction.L, "Previous tab") { tab > 0 },
+                    HintBinding(GamepadAction.R, "Next tab") { tab < tabs.lastIndex },
+                    HintBinding(GamepadAction.B, "Back"),
+                )
+            }
+            HintRow(bindings = hints)
+        }
+    }
+}
+
+/** Where the page's one cursor is: the action band's buttons, the tab strip, or the tab's rows. */
+private enum class PageZone { ACTIONS, TABS, CONTENT }
+
+/** The hero band shrinks to this when the cursor goes down into the tab's rows. */
+private val COMPACT_HERO_HEIGHT = 64.dp
+
+/**
+ * The hero band: the game's hero art edge to edge, darkened toward the
+ * page's ground so what is laid over it stays legible whatever the art is,
+ * with the logo (or the name) and where the game came from bottom-left.
+ * With only portrait art that art sits at its own shape on the right of a
+ * plate, never stretched across the band; with none, the plate carries the
+ * name, never a stand-in cover. [compact] is the band while the cursor is
+ * in the tab's rows: one line.
+ */
+@Composable
+private fun PageHero(entry: LibraryEntry, height: Dp, compact: Boolean) {
+    val window = LocalShellWindow.current
+    val title = GameNaming.displayName(entry.title)
+    val hero = entry.heroUri
+    val portraitArt = entry.artworkUri
+    Box(modifier = Modifier.fillMaxWidth().height(height).background(MenuTokens.Card)) {
+        if (hero != null) {
+            AsyncImage(
+                model = hero,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (portraitArt != null) {
+            AsyncImage(
+                model = portraitArt,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.CenterEnd,
+                modifier = Modifier.fillMaxSize().padding(vertical = Space.Sm, horizontal = window.edgePadding),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, MenuTokens.Ground))),
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = window.edgePadding, vertical = if (compact) Space.Sm else Space.Md),
+        ) {
+            val logo = entry.logoUri
+            if (logo != null && !compact) {
+                AsyncImage(
+                    model = logo,
+                    contentDescription = title,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                    modifier = Modifier.height(56.dp).widthIn(max = 280.dp),
+                )
             } else {
-                Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Space.Xl)) {
-                    Column(modifier = Modifier.weight(0.38f).fillMaxHeight()) {
-                        Box(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) { art() }
-                        Column(modifier = Modifier.padding(top = Space.Md)) { header() }
-                    }
-                    Column(modifier = Modifier.weight(0.62f).fillMaxHeight()) {
-                        actions()
-                        facts(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Lg))
-                    }
-                }
+                Text(
+                    title,
+                    color = MenuTokens.OnSurface,
+                    style = if (compact) TypeRole.rowTitle else TypeRole.screenTitle,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = if (compact) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (!compact) {
+                Text(
+                    listOfNotNull(entry.sourceLabel(), entry.engineLabel()).joinToString(" · "),
+                    color = MenuTokens.OnSurfaceMuted,
+                    style = TypeRole.supporting,
+                    modifier = Modifier.padding(top = Space.Xs),
+                )
             }
         }
     }
 }
 
 /**
- * The game's art, as large as its column allows at its own shape: the hero
- * (16:9) when one was scraped, else the capsule (2:3). With neither, the
- * same plate every capsule without art draws, carrying the name -- never
- * a stand-in cover.
+ * The action band: the one large primary action, Favourite and Options as
+ * small icon buttons, the quiet facts strip, and under them the one line
+ * saying why the primary action is what it is. [selectedButton] is the
+ * button the cursor is on (0 primary, 1 Favourite, 2 Options), null when
+ * the cursor is elsewhere. [compact] drops the strip and the line while
+ * the cursor is in the rows below.
  */
 @Composable
-private fun PageArt(entry: LibraryEntry, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(12.dp)
-    val hero = entry.heroUri
-    val art = hero ?: entry.artworkUri
-    val ratio = if (hero != null) 16f / 9f else CAPSULE_ASPECT
-    Box(modifier = modifier, contentAlignment = Alignment.TopStart) {
-        Box(
-            modifier = Modifier
-                .aspectRatio(ratio)
-                .clip(shape)
-                .background(MenuTokens.Card, shape),
-        ) {
-            if (art != null) {
-                AsyncImage(
-                    model = art,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Text(
-                    GameNaming.displayName(entry.title),
-                    color = MenuTokens.OnSurface,
-                    style = TypeRole.rowTitle,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.align(Alignment.Center).padding(Space.Lg),
-                )
+private fun PageActionBand(
+    play: PcPlayState,
+    favourite: Boolean,
+    selectedButton: Int?,
+    strip: List<Pair<String, String>>,
+    compact: Boolean,
+    portrait: Boolean,
+    onPress: (Int) -> Unit,
+) {
+    val buttons: @Composable () -> Unit = {
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.Md), verticalAlignment = Alignment.CenterVertically) {
+            ShellChip(
+                play.verb,
+                primary = true,
+                large = true,
+                enabled = play.pressable,
+                selected = selectedButton == 0,
+                onClick = { onPress(0) },
+            )
+            PageIconButton(
+                glyph = if (favourite) "★" else "☆",
+                description = if (favourite) "Remove from favourites" else "Add to favourites",
+                on = favourite,
+                selected = selectedButton == 1,
+                onClick = { onPress(1) },
+            )
+            PageIconButton(
+                glyph = "⋯",
+                description = "Game options",
+                on = false,
+                selected = selectedButton == 2,
+                onClick = { onPress(2) },
+            )
+        }
+    }
+    Column(modifier = Modifier.padding(top = Space.Sm)) {
+        if (portrait) {
+            buttons()
+            if (!compact && strip.isNotEmpty()) PageFactsStrip(strip, Modifier.fillMaxWidth().padding(top = Space.Sm))
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                buttons()
+                if (!compact && strip.isNotEmpty()) {
+                    PageFactsStrip(strip, Modifier.weight(1f).padding(start = Space.Xl))
+                }
+            }
+        }
+        if (!compact && play.detail.isNotBlank()) {
+            Text(
+                play.detail,
+                color = if (play.pressable) MenuTokens.Value else MenuTokens.OnSurfaceDisabled,
+                style = TypeRole.supporting,
+                modifier = Modifier.padding(top = Space.Sm),
+            )
+        }
+    }
+}
+
+/** A small round button for the cursor to rest on: a glyph, never a word, with a spoken description. */
+@Composable
+private fun PageIconButton(glyph: String, description: String, on: Boolean, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(48.dp)
+            .semantics { contentDescription = description }
+            .focusProperties { canFocus = false }
+            .clickable(onClick = onClick)
+            .selectionFrame(selected, CircleShape),
+    ) {
+        Text(
+            glyph,
+            color = if (on) MenuTokens.Favourite else MenuTokens.OnSurface,
+            style = MaterialTheme.typography.titleLarge,
+        )
+    }
+}
+
+/** The facts strip: a label over a value, quiet, scrolling sideways rather than clipping at a large text size. */
+@Composable
+private fun PageFactsStrip(facts: List<Pair<String, String>>, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(Space.Xl),
+    ) {
+        facts.forEach { (label, value) ->
+            Column {
+                Text(label, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                Text(value, color = MenuTokens.OnSurface, style = TypeRole.value, maxLines = 1)
             }
         }
     }
+}
+
+/**
+ * The tab strip, L1 and R1 at its ends: while the page is open it owns
+ * the shoulders. It scrolls sideways, so no tab is ever clipped at a large
+ * text size or in portrait.
+ */
+@Composable
+private fun PageTabStrip(
+    tabs: Array<PageTab>,
+    tab: Int,
+    cursorOnTabs: Boolean,
+    state: LazyListState,
+    shoulderGlyphs: Boolean,
+    onSelect: (Int) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (shoulderGlyphs) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = Space.Sm))
+        LazyRow(
+            state = state,
+            contentPadding = PaddingValues(vertical = Space.Sm),
+            horizontalArrangement = Arrangement.spacedBy(Space.Sm),
+            modifier = Modifier.weight(1f),
+        ) {
+            items(count = tabs.size, key = { "tab:$it" }) { index ->
+                ShellChip(
+                    tabs[index].label,
+                    on = index == tab,
+                    selected = cursorOnTabs && index == tab,
+                    onClick = { onSelect(index) },
+                )
+            }
+        }
+        if (shoulderGlyphs) ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = Space.Sm))
+    }
+}
+
+/** The A hint on the action band: what the button under the cursor does. */
+internal fun pageActionLabel(button: Int, primaryVerb: String): String = when (button) {
+    0 -> primaryVerb
+    1 -> "Favourite"
+    else -> "Options"
 }
 
 /** One fact on the page: a row title, what it says, and what A does on it when it does anything. */
@@ -464,10 +730,7 @@ private fun pageRows(
     }
     // A version comes from a folder's own name (docs/SPEC.md 7m); a store
     // row has none to derive.
-    val versions = siblings.mapNotNull { sibling -> sibling.groupingPath() }
-        .mapNotNull { GameNaming.derive(it).version.takeIf { v -> v.isNotBlank() } }
-        .distinct()
-    val availableVersions = (versions + listOfNotNull(folderPath?.let { GameNaming.derive(it).version.takeIf(String::isNotBlank) })).distinct()
+    val availableVersions = installedVersions(entry, siblings)
     if (availableVersions.isNotEmpty()) {
         add(PageFact("Version", availableVersions.first(), subtitle = if (availableVersions.size > 1) "Also here: ${availableVersions.drop(1).joinToString(", ")}" else null))
     }
@@ -600,4 +863,137 @@ internal fun sourcesLine(entry: LibraryEntry): String? {
         val joined = if (list.size == 1) list.single() else list.dropLast(1).joinToString(", ") + " and " + list.last()
         if (source == FieldSources.EDITED) "$joined edited by you." else "$joined from $source."
     }
+}
+
+/**
+ * The page's tabs, in the order the strip draws them (docs/SPEC.md 7i, "The
+ * game page"). [emptyLine] is what a tab with no row says, so an empty tab
+ * is an answer and not a blank.
+ */
+internal enum class PageTab(val label: String, val emptyLine: String) {
+    OVERVIEW("Overview", "Nothing is known about this game yet"),
+    VERSIONS("Versions and updates", "No version information for this game"),
+    EXTRAS("Extras", "No extras for this game yet"),
+    DETAILS("Details", "No details for this game yet"),
+}
+
+/**
+ * Which tab a fact row lives under, by its title: the one place that says
+ * so, so a new row lands under a tab by adding its title here and the rows
+ * ([pageRows]) stay a plain list. What is not named is a detail.
+ */
+internal fun pageTabOf(title: String): PageTab = when (title) {
+    "About", "Not scraped yet", "Runs with", "Compatibility", "Install state" -> PageTab.OVERVIEW
+    "Version", "Update", "Owned on", "Folder", "Folder name", "Size" -> PageTab.VERSIONS
+    "Players", "Engine", "Where these facts came from" -> PageTab.EXTRAS
+    else -> PageTab.DETAILS
+}
+
+/** Every row under its tab, in row order; the multi-part list leads Overview. Pure, for the tests. */
+internal fun groupRowsByTab(rows: List<PageFact>, parts: List<PageFact>): Map<PageTab, List<PageFact>> =
+    PageTab.values().associateWith { tab ->
+        (if (tab == PageTab.OVERVIEW) parts else emptyList()) + rows.filter { pageTabOf(it.title) == tab }
+    }
+
+/**
+ * The parts of a game of several (`Week 1`, `Week 2`, `Part3` ...) as rows
+ * for Overview: one heading row with the count, then each part with the
+ * newest version of it that is here. Empty for a game of one part. The fold
+ * is one pass over this one game's folders, off the main thread.
+ */
+internal fun partFacts(siblings: List<LibraryEntry>): List<PageFact> {
+    val game = LibraryGrouping.group(siblings)
+        .map { it.game }
+        .filter { it.segments.size > 1 }
+        .maxByOrNull { it.segments.size }
+        ?: return emptyList()
+    return buildList {
+        add(PageFact("Parts", "${game.segments.size} parts", subtitle = "Played in the order the folders name them"))
+        game.segments.forEach { segment ->
+            add(PageFact(segment.label, segment.versions.firstOrNull()?.version?.takeIf { it.isNotBlank() }))
+        }
+    }
+}
+
+/**
+ * The versions a game's own folders name (docs/SPEC.md 7m), newest-first
+ * as the folders listed them, this entry's first; a store row has none to
+ * derive. The ONE place the page reads "installed version" from, for the
+ * Version row and the facts strip alike.
+ */
+internal fun installedVersions(entry: LibraryEntry, siblings: List<LibraryEntry>): List<String> {
+    val own = entry.groupingPath()?.let { GameNaming.derive(it).version.takeIf(String::isNotBlank) }
+    val others = siblings.mapNotNull { it.groupingPath() }
+        .mapNotNull { GameNaming.derive(it).version.takeIf { v -> v.isNotBlank() } }
+    return (listOfNotNull(own) + others).distinct()
+}
+
+/**
+ * "0.9.5" alone, or "0.9.5, 0.9.6 available" when a source knows a newer
+ * one; the latest alone when nothing here names a version; null for
+ * neither. The wording of "available" is [GameUpdates.line]'s, so the page
+ * says it the way the card and the menu do.
+ */
+internal fun versionFact(installed: String?, latest: String?): String? = when {
+    installed != null && latest != null -> "$installed, ${GameUpdates.line(latest)}"
+    installed != null -> installed
+    latest != null -> GameUpdates.line(latest)
+    else -> null
+}
+
+/**
+ * The page's quiet facts strip, label then value, only the facts that
+ * exist: when it was last played, play time, the version installed against
+ * the latest known, size on this device (or to download), and what runs
+ * it. [formatSize] is the platform's byte formatter, passed in so this
+ * stays pure.
+ */
+internal fun factsStrip(
+    entry: LibraryEntry,
+    now: Long,
+    folderSizeBytes: Long?,
+    installedVersion: String?,
+    runsWith: String?,
+    formatSize: (Long) -> String,
+): List<Pair<String, String>> = listOfNotNull(
+    "Last played" to (entry.lastPlayedEpochMs?.let { lastPlayedPhrase(now, it).replaceFirstChar { c -> c.uppercase() } } ?: "Never"),
+    "Play time" to playtimeShort(entry.playtimeSeconds),
+    versionFact(installedVersion, entry.availableUpdate)?.let { "Version" to it },
+    (folderSizeBytes ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { "Size" to formatSize(it) },
+    runsWith?.takeIf { it.isNotBlank() }?.let { "Runs with" to it },
+)
+
+private const val DAY_MS = 24L * 60 * 60 * 1000
+
+/** "today", "yesterday", "5 days ago", "3 weeks ago", "4 months ago". Pure, for the tests and the hero card. */
+internal fun lastPlayedPhrase(now: Long, last: Long): String {
+    val days = ((now - last) / DAY_MS).coerceAtLeast(0)
+    return when {
+        days < 1 -> "today"
+        days == 1L -> "yesterday"
+        days < 14 -> "$days days ago"
+        days < 60 -> "${days / 7} weeks ago"
+        days < 365 -> "${days / 30} months ago"
+        else -> "over a year ago"
+    }
+}
+
+/** "2 h 5 min", "45 min", "Under a minute", "Not played yet": the short play time of the strip and the hero card. */
+internal fun playtimeShort(seconds: Long): String {
+    if (seconds <= 0) return "Not played yet"
+    val hours = seconds / 3600
+    val minutes = (seconds % 3600) / 60
+    return when {
+        hours > 0 && minutes > 0 -> "$hours h $minutes min"
+        hours > 0 -> "$hours h"
+        minutes > 0 -> "$minutes min"
+        else -> "Under a minute"
+    }
+}
+
+/** The one quiet line under the home's hero card: "Played yesterday · 2 h 5 min". */
+internal fun heroCaption(entry: LibraryEntry, now: Long): String {
+    val last = entry.lastPlayedEpochMs?.let { "Played ${lastPlayedPhrase(now, it)}" }
+    val time = playtimeShort(entry.playtimeSeconds).takeIf { entry.playtimeSeconds > 0 }
+    return listOfNotNull(last, time).joinToString(" · ").ifEmpty { "Not played yet" }
 }

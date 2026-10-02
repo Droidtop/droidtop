@@ -206,9 +206,6 @@ internal fun PcGamesSection(
         }
     }
     val games = folded?.games
-    // A multi-part game's card launches the part to continue with, not
-    // always the first (docs/SPEC.md 7n); every other card launches itself.
-    val launch: (LibraryEntry) -> Unit = { entry -> onLaunch(folded?.continuing?.get(entry.id) ?: entry) }
     // How many folders or store copies one drawn game stands for, from the
     // fold already made: a map read, never a lookup on disk.
     fun partsOf(entry: LibraryEntry): Int = folded?.siblings?.get(entry.id)?.size ?: 1
@@ -271,7 +268,9 @@ internal fun PcGamesSection(
 
     // A store game's primary action is its store's own screen (install,
     // update, download), the same answer the capsule badge and the page
-    // button read ([storeStageOf]); everything else launches.
+    // button read ([storeStageOf]); everything else launches, a multi-part
+    // game's card launching the part to continue with, not always the first
+    // (docs/SPEC.md 7n).
     val downloads by StoreDownloads.active.collectAsState()
     val launch: (LibraryEntry) -> Unit = { entry ->
         if (storeStageOf(entry, entry.downloadKey()?.let { downloads[it] }) != null) {
@@ -279,9 +278,16 @@ internal fun PcGamesSection(
                 android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
             }
         } else {
-            onLaunch(entry)
+            onLaunch(folded?.continuing?.get(entry.id) ?: entry)
         }
     }
+    // The backdrop follows the game under the cursor (docs/SPEC.md 7i, "Home
+    // art"); while the cursor is on the strip it keeps the last game's, and
+    // the games either side of the cursor are preloaded so a step shows the
+    // next one at once.
+    var backdropArt by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(focusedEntry?.id) { focusedEntry?.let { backdropArt = it.backdropArt() } }
+    PreloadBackdrops(remember(currentList, state.itemIndex) { neighbourBackdrops(currentList, state.itemIndex) })
 
     // The strip: Home, every view, Filters and sort.
     val stripCount = views.size + 2
@@ -395,6 +401,8 @@ internal fun PcGamesSection(
         state.itemIndex = item
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
+    PcBackdrop(art = backdropArt)
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -585,6 +593,7 @@ internal fun PcGamesSection(
         }
         HintRow(bindings = hints)
     }
+    }
 
     // The windows this tab opens over itself. Each is its own window and
     // takes the pad through the pipeline's front (docs/SPEC.md 6e).
@@ -722,6 +731,7 @@ private fun PcShelvesHome(
         return
     }
     val width = capsuleWidth()
+    val heroCardWidth = heroWidth(width)
     LazyColumn(
         state = columnState,
         modifier = Modifier.fillMaxSize(),
@@ -748,14 +758,18 @@ private fun PcShelvesHome(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     itemsIndexed(shelf.entries, key = { _, entry -> entry.id }) { itemIndex, entry ->
+                        // The game most likely wanted leads the first shelf as a
+                        // landscape hero card (docs/SPEC.md 7i, "Home art").
+                        val hero = shelf.id == SHELF_CONTINUE && itemIndex == 0
                         PcCapsule(
                             entry = entry,
                             selected = onThisShelf && state.itemIndex == itemIndex,
-                            width = width,
+                            width = if (hero) heroCardWidth else width,
                             onTap = { onTapCapsule(shelfIndex, itemIndex, entry) },
                             onLongPress = { onLongPressCapsule(entry) },
                             download = entry.downloadKey()?.let { downloads[it] },
                             parts = partsOf(entry),
+                            hero = hero,
                         )
                     }
                 }
