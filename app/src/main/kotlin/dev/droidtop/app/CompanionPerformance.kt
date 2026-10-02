@@ -2,6 +2,8 @@ package dev.droidtop.app
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -79,9 +82,13 @@ internal fun CompanionPerformanceTab() {
             {
                 CompanionCard("Processor") {
                     val device = history.any { it.deviceCpuPercent != null }
+                    // The headline is a value: the whole-device load when Android gives it, else droidtop's
+                    // own share, else the clock. What Android hides is a small note, never the headline.
                     Text(
                         latest.deviceCpuPercent?.let { "$it% in use" }
-                            ?: "Whole-device load is hidden from apps on this Android version",
+                            ?: latest.ownCpuPercent?.let { "droidtop: $it% of all cores" }
+                            ?: latest.cpuMhz?.let { "Fastest core: $it MHz" }
+                            ?: "Reading the processor...",
                         style = MaterialTheme.typography.titleMedium,
                         color = colors.onSurface,
                     )
@@ -89,8 +96,14 @@ internal fun CompanionPerformanceTab() {
                         history.map { (if (device) it.deviceCpuPercent else it.ownCpuPercent)?.toFloat() },
                         0f, 100f, colors.primary,
                     )
-                    CompanionNote("droidtop itself: ${latest.ownCpuPercent ?: 0}% of all cores")
-                    latest.cpuMhz?.let { CompanionNote("Fastest core: $it MHz") }
+                    if (latest.deviceCpuPercent == null) {
+                        CompanionNote("Whole-device load is hidden from apps on this Android version.")
+                    } else {
+                        CompanionNote("droidtop itself: ${latest.ownCpuPercent ?: 0}% of all cores")
+                    }
+                    if (latest.deviceCpuPercent != null || latest.ownCpuPercent != null) {
+                        latest.cpuMhz?.let { CompanionNote("Fastest core: $it MHz") }
+                    }
                     CompanionNote("GPU load and the frame rate of other apps are not readable without root or the Shizuku plugin.")
                 }
             },
@@ -140,31 +153,42 @@ private fun batteryLine(sample: PerfSample): String {
 }
 
 
-/** A line graph of [values] over the buffer's whole window, newest at the right; a missing reading breaks the line. */
+/**
+ * A line graph of [values] over the buffer's whole window, newest at the right; a missing reading breaks
+ * the line. Until two readings exist the box says it is collecting them, so it never reads as a broken
+ * empty rectangle.
+ */
 @Composable
 private fun Sparkline(values: List<Float?>, min: Float, max: Float, color: Color) {
     val track = MaterialTheme.colorScheme.surfaceVariant
-    Canvas(
+    val collecting = values.count { it != null } < 2
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(track),
+        contentAlignment = Alignment.Center,
     ) {
-        if (values.size < 2 || max <= min) return@Canvas
-        val step = size.width / (PerformanceMonitor.CAPACITY - 1)
-        val path = Path()
-        var drawing = false
-        values.forEachIndexed { index, value ->
-            if (value == null) {
-                drawing = false
-            } else {
-                val x = size.width - (values.size - 1 - index) * step
-                val y = size.height - ((value.coerceIn(min, max) - min) / (max - min)) * size.height
-                if (drawing) path.lineTo(x, y) else path.moveTo(x, y)
-                drawing = true
-            }
+        if (collecting) {
+            Text("Collecting readings...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        drawPath(path, color, style = Stroke(width = 3.dp.toPx()))
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            if (collecting || max <= min) return@Canvas
+            val step = size.width / (PerformanceMonitor.CAPACITY - 1)
+            val path = Path()
+            var drawing = false
+            values.forEachIndexed { index, value ->
+                if (value == null) {
+                    drawing = false
+                } else {
+                    val x = size.width - (values.size - 1 - index) * step
+                    val y = size.height - ((value.coerceIn(min, max) - min) / (max - min)) * size.height
+                    if (drawing) path.lineTo(x, y) else path.moveTo(x, y)
+                    drawing = true
+                }
+            }
+            drawPath(path, color, style = Stroke(width = 3.dp.toPx()))
+        }
     }
 }

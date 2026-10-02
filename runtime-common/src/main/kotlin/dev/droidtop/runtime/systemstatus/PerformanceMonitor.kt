@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.os.Process
 import android.os.SystemClock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,7 +92,15 @@ object PerformanceMonitor {
 
     suspend fun watch(context: Context, intervalMs: Long = INTERVAL_MS) {
         while (true) {
-            withContext(Dispatchers.IO) { sampleOnce(context.applicationContext) }
+            // One reading that fails (a vendor's odd battery property) must not end the loop, or the
+            // history stops growing and every graph stays empty.
+            try {
+                withContext(Dispatchers.IO) { sampleOnce(context.applicationContext) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // skipped: the next tick tries again
+            }
             delay(intervalMs)
         }
     }

@@ -2920,7 +2920,10 @@ picks the tab it opens on. Standard's own second screen keeps its launcher-style
   sampler and history (a 90-entry ring buffer, two seconds apart, three minutes) that the Quick Menu's
   performance section also reads. Sampling runs only while the tab is composed and its window is started
   (`repeatOnLifecycle(STARTED)`), on `Dispatchers.IO`; two surfaces watching share the samples. It shows
-  processor, memory, battery and heat with a graph each. What a normal app cannot read is said, not drawn:
+  processor, memory, battery and heat with a graph each; a graph with fewer than two readings says
+  "Collecting readings..." instead of drawing an empty box, and a card's headline is always a value (the
+  processor's is the device load, else droidtop's own share, else the clock; what Android hides is a small
+  note), and one failed reading never ends the sampling loop. What a normal app cannot read is said, not drawn:
   whole-device CPU load (`/proc/stat` is hidden from apps on current Android; droidtop's own share is graphed
   instead), per-core frequency (only where sysfs allows), CPU and GPU temperature (only the battery sensor and
   Android's thermal status are given), GPU load and other apps' frame rate (root or Shizuku). Per-app CPU is
