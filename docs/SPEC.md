@@ -3136,9 +3136,14 @@ fallback:
   asked once per game, not every time.
 - Each row names the screen first and the relation second: "Add-on screen (this one)",
   "Built-in screen (the other one)" (console, build 1386: "This screen (add-on)" read as a
-  riddle to a newcomer). droidtop knows which panel is built in and which is attached, not
-  where either sits, so the rows never say top or bottom; a hardware row that records the
-  physical arrangement would be the place to learn it.
+  riddle to a newcomer). droidtop knows which panel is built in and which is attached; where
+  each sits comes only from the device's hardware row (droidtop-platforms `hardware/<device>.json`,
+  `displays[].position`, top or bottom; `ConsoleDef.addonOnTop`). When the row says, the rows
+  read "Top screen (this one)" / "Bottom screen (the other one)"; otherwise they keep "Add-on" and
+  "Built-in". The Retroid Pocket 5's add-on display sits above the built-in one (owner,
+  2026-10-02, Droidtop/tracker#258). The orchestration pass reads only an already loaded table
+  (`HardwareDatabase.loadedForThisDevice`; `MainActivity` loads it at start, off the main thread),
+  so a pass before that keeps the generic names.
 - Clearing is first-class ("Delete preferred Screen"): the game's
   metadata editor has a Launch screen row (Ask / Built-in / Add-on,
   writes immediately — a display choice is a launcher preference, not

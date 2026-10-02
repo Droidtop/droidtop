@@ -163,24 +163,38 @@ object DualScreenOrchestration {
      * when the add-on is attached it is the preferred screen, not an
      * afterthought). Each label names the screen first and says which one
      * the person is looking at second: "This screen (add-on)" read as a
-     * riddle to a newcomer (console, build 1386), and droidtop knows which
-     * panel is built in and which is attached, but not where either sits,
-     * so it never says top or bottom (section 4c).
+     * riddle to a newcomer (console, build 1386). droidtop knows which panel
+     * is built in and which is attached; where each sits comes only from the
+     * device's hardware row ([addonOnTop]: true when the add-on display is
+     * above the built-in one, false below, null when the row does not say),
+     * and only then do the names say "Top screen" / "Bottom screen"
+     * (section 4c, Droidtop/tracker#258).
      */
     data class ChooserCandidate(val displayId: Int?, val label: String)
 
-    fun chooserCandidates(secondDisplayId: Int, shellOnSecond: Boolean): List<ChooserCandidate> =
-        if (shellOnSecond) {
+    fun chooserCandidates(secondDisplayId: Int, shellOnSecond: Boolean, addonOnTop: Boolean? = null): List<ChooserCandidate> {
+        val addon = when (addonOnTop) {
+            true -> "Top screen"
+            false -> "Bottom screen"
+            null -> "Add-on screen"
+        }
+        val builtIn = when (addonOnTop) {
+            true -> "Bottom screen"
+            false -> "Top screen"
+            null -> "Built-in screen"
+        }
+        return if (shellOnSecond) {
             listOf(
-                ChooserCandidate(secondDisplayId, "Add-on screen (this one)"),
-                ChooserCandidate(null, "Built-in screen (the other one)"),
+                ChooserCandidate(secondDisplayId, "$addon (this one)"),
+                ChooserCandidate(null, "$builtIn (the other one)"),
             )
         } else {
             listOf(
-                ChooserCandidate(secondDisplayId, "Add-on screen (the other one)"),
-                ChooserCandidate(null, "Built-in screen (this one)"),
+                ChooserCandidate(secondDisplayId, "$addon (the other one)"),
+                ChooserCandidate(null, "$builtIn (this one)"),
             )
         }
+    }
 
     /**
      * Whether the add-on display looks like it needs a hard reinit right

@@ -26,6 +26,8 @@ data class ConsoleDef(
     val pad: BuiltInPad?,
     val glyphFamily: GlyphFamily?,
     val toggle: LayoutToggle?,
+    /** Where the add-on display sits: true above the built-in panel, false below, null when the row does not say. */
+    val addonOnTop: Boolean? = null,
 ) {
     fun matches(deviceManufacturer: String?, deviceModel: String?): Boolean =
         deviceModel != null && model.equals(deviceModel.trim(), ignoreCase = true) &&
@@ -65,6 +67,13 @@ object HardwareDatabase {
     /** The row for this device, or null. Not for the main thread. */
     fun forThisDevice(context: Context): ConsoleDef? =
         defs(context).firstOrNull { it.matches(android.os.Build.MANUFACTURER, android.os.Build.MODEL) }
+
+    /**
+     * This device's row when the table is already loaded, reading nothing: for a caller on the main thread,
+     * which gets null until something has loaded the table ([defs] off the main thread).
+     */
+    fun loadedForThisDevice(): ConsoleDef? =
+        cached?.firstOrNull { it.matches(android.os.Build.MANUFACTURER, android.os.Build.MODEL) }
 
     /** Validate-then-replace, like the other databases. Returns the row count. */
     fun install(context: Context, text: String): Int {
@@ -115,7 +124,29 @@ object HardwareDatabase {
             },
             glyphFamily = GlyphFamily.fromId(pad?.optString("glyphFamily", "")),
             toggle = toggle,
+            addonOnTop = addonOnTop(json.optJSONArray("displays")),
         )
+    }
+
+    /**
+     * The add-on display's `position` in a row's `displays` (hardware/_meta.json): "top" or "bottom", or,
+     * when only the internal panel states one, the other side of it. Anything else says nothing.
+     */
+    private fun addonOnTop(displays: org.json.JSONArray?): Boolean? {
+        if (displays == null) return null
+        fun positionOf(role: String): String? = (0 until displays.length())
+            .mapNotNull { displays.optJSONObject(it) }
+            .firstOrNull { it.optString("role") == role }
+            ?.optString("position", "")?.ifEmpty { null }
+        return when (positionOf("addon")) {
+            "top" -> true
+            "bottom" -> false
+            else -> when (positionOf("internal")) {
+                "bottom" -> true
+                "top" -> false
+                else -> null
+            }
+        }
     }
 
     private fun hexOrNull(text: String): Int? = text.removePrefix("0x").toIntOrNull(16)

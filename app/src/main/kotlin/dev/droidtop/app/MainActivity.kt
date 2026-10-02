@@ -208,6 +208,12 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // so there is nothing for this instance to be until then, and a
         // Gaming shell composed underneath started its library scan and
         // recorded itself as the last mode before any of that was chosen.
+        // The hardware row names the screens in the launch chooser (addonScreenOnTop), which reads
+        // only an already loaded table: load it now, off the main thread.
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { dev.droidtop.library.controller.HardwareDatabase.defs(applicationContext) }
+        }
+
         if (OnboardingGate.resumeIfUnfinished(this)) {
             finish()
             return
@@ -669,6 +675,11 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun clearParkedDisplayId() {
         dev.droidtop.library.LaunchDisplay.clearRunning()
     }
+
+    // From the hardware row (docs/SPEC.md 4c), only when the table is already loaded: the
+    // orchestration pass must not read a file. The table is loaded at start, off the main thread.
+    override fun addonScreenOnTop(): Boolean? =
+        dev.droidtop.library.controller.HardwareDatabase.loadedForThisDevice()?.addonOnTop
 
     override fun publishLaunchTargeting(
         secondDisplayId: Int?,

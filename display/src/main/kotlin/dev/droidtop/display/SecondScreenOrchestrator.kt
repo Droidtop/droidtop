@@ -44,6 +44,13 @@ interface SecondScreenHost {
     fun parkedDisplayId(): Int?
     fun clearParkedDisplayId()
 
+    /**
+     * Where the add-on display physically sits, from this device's hardware row: true above the
+     * built-in one, false below, null when the row does not say (or is not loaded yet). Cheap and
+     * non-blocking: called from the orchestration pass.
+     */
+    fun addonScreenOnTop(): Boolean? = null
+
     /** Mirrors the resolved state into dev.droidtop.library.LaunchDisplay. */
     fun publishLaunchTargeting(
         secondDisplayId: Int?,
@@ -337,7 +344,7 @@ class SecondScreenOrchestrator(
                     DisplayRolePrefs.GameLaunchTarget.SECOND -> second!!.androidDisplayId
                 }
                 val askOptions = if (launchTarget == DisplayRolePrefs.GameLaunchTarget.ASK) {
-                    DualScreenOrchestration.chooserCandidates(second!!.androidDisplayId, shellOnSecondNow)
+                    DualScreenOrchestration.chooserCandidates(second!!.androidDisplayId, shellOnSecondNow, host.addonScreenOnTop())
                 } else {
                     null
                 }

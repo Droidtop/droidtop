@@ -136,6 +136,16 @@ class DualScreenOrchestrationTest {
     }
 
     @Test
+    fun `a hardware row that knows where the add-on sits names the screens top and bottom`() {
+        // Retroid Pocket 5: the add-on display sits above the built-in one (owner, Droidtop/tracker#258).
+        val above = DualScreenOrchestration.chooserCandidates(secondDisplayId = 9, shellOnSecond = false, addonOnTop = true)
+        assertEquals(listOf("Top screen (the other one)", "Bottom screen (this one)"), above.map { it.label })
+        assertEquals(9, above.first().displayId)
+        val below = DualScreenOrchestration.chooserCandidates(secondDisplayId = 9, shellOnSecond = true, addonOnTop = false)
+        assertEquals(listOf("Bottom screen (this one)", "Top screen (the other one)"), below.map { it.label })
+    }
+
+    @Test
     fun `no second display means nothing to reinit`() {
         assertFalse(
             DualScreenOrchestration.secondScreenNeedsReinit(
