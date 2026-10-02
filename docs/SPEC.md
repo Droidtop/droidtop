@@ -9472,7 +9472,13 @@ structure, top to bottom, drawn only from theme tokens:
   Scrape row, and for a game of several parts the **part list** first
   (`partFacts`: a heading row with the count, then each part with its newest
   version, in the order the folder names give). Versions and updates:
-  Version, Update, Owned on, Folder, Size. Extras: Engine, Players, where the
+  the Update row first when a source knows a newer version, then Version,
+  Owned on, Folder, Size, and the game's update source (Droidtop/tracker#288):
+  the F95zone thread row (A links it, changes it, or clears it, through the
+  same `linkF95ThreadFromText` the options menu uses) and, once linked,
+  "Check for update", which answers in one short line (`checkOutcomeLine`:
+  "Up to date", "v0.9.6 is available", or why it failed). The rows need the
+  library handed to `PcGamePage` and appear only on folder games. Extras: Engine, Players, where the
   facts came from. Details: play time, last played and the scraped facts
   (developer, publisher, release date, genre, series, rating). A tab with no
   row says so (`PageTab.emptyLine`) instead of drawing nothing.
