@@ -145,8 +145,7 @@ object GamingSettingsCatalog {
                     ChoiceItem(
                         id = ID_UI_MODE,
                         title = "UI mode",
-                        subtitle = "Kiosk hides Settings; Kid also shows only kid-friendly games. " +
-                            "Leave either from the Quick Menu's System tab",
+                        subtitle = null,
                         options = UiMode.entries.map { ChoiceOption(it.name, it.label) },
                         current = UiModePrefs.get(context).name,
                         onSelect = { ctx, value ->
@@ -161,8 +160,7 @@ object GamingSettingsCatalog {
                         // Android's own screen timeout still turns the
                         // panel off, and it wins when it is the shorter
                         // (docs/SPEC.md 7f, "Screensaver").
-                        subtitle = "Shows your library's artwork when the shell sits idle, " +
-                            "if Android's screen timeout is longer",
+                        subtitle = "Library artwork",
                         options = ScreensaverMode.entries.map { ChoiceOption(it.name, it.label) },
                         current = ScreensaverPrefs.mode(context).name,
                         onSelect = { ctx, value ->
@@ -179,9 +177,7 @@ object GamingSettingsCatalog {
                     ChoiceItem(
                         id = ID_LAUNCH_SOUND_EXPERIMENT,
                         title = "Launch sound test",
-                        subtitle = "For finding the burst of static when a game starts. A is how it works. " +
-                            "B plays the launch sound once the screen question is answered. " +
-                            "D plays no droidtop sound while launching",
+                        subtitle = null,
                         options = LaunchSoundVariant.entries.map { ChoiceOption(it.name, it.label) },
                         current = LaunchSoundExperiment.variant(context).name,
                         onSelect = { ctx, value -> LaunchSoundExperiment.set(ctx, LaunchSoundPlan.parse(value)) },
@@ -197,7 +193,7 @@ object GamingSettingsCatalog {
                     NestedScreenItem(
                         id = ID_SCRAPER,
                         title = "Scraper",
-                        subtitle = "Sources, filters, and content options for artwork and metadata",
+                        subtitle = "Artwork and metadata",
                         registryId = "rom_scraper",
                         icon = CatalogIcon.SCRAPER,
                     ),
@@ -206,7 +202,7 @@ object GamingSettingsCatalog {
                     NestedScreenItem(
                         id = ID_CONSOLE_SYSTEMS,
                         title = "Console systems",
-                        subtitle = "Folders, per-system emulators, artwork scraping, platforms",
+                        subtitle = "Systems and folders",
                         registryId = "console_systems",
                         icon = CatalogIcon.CONSOLE_SYSTEMS,
                     ),
@@ -215,7 +211,7 @@ object GamingSettingsCatalog {
                     NestedScreenItem(
                         id = ID_EMULATORS,
                         title = "Emulators",
-                        subtitle = "Default emulator, which one runs each system, and a launch test",
+                        subtitle = "System emulators",
                         registryId = "emulators",
                         icon = CatalogIcon.CONSOLE_SYSTEMS,
                     ),
@@ -230,7 +226,7 @@ object GamingSettingsCatalog {
                     NestedScreenItem(
                         id = ID_ACCOUNTS_AND_SOURCES,
                         title = "Accounts and sources",
-                        subtitle = "Store sign-ins, scraper credentials, plugins and app integrations, one row per source",
+                        subtitle = "Accounts and plugins",
                         registryId = "accounts_and_sources",
                         icon = CatalogIcon.INTEGRATIONS,
                     ),
@@ -239,7 +235,7 @@ object GamingSettingsCatalog {
                     NestedScreenItem(
                         id = ID_DOWNLOADS,
                         title = "Downloads and installs",
-                        subtitle = "Plugin downloads and long-running actions in progress or recently finished",
+                        subtitle = "Active and recent",
                         registryId = "plugin_jobs",
                         icon = CatalogIcon.INTEGRATIONS,
                     ),
@@ -322,7 +318,7 @@ object GamingSettingsCatalog {
                     NestedScreenItem(
                         id = ID_SYSTEM_ANDROID_LINKS,
                         title = "Android settings",
-                        subtitle = "Every reachable system screen, and droidtop's own permission grants",
+                        subtitle = "System settings",
                         registryId = "android_settings",
                         icon = CatalogIcon.ANDROID_SETTINGS,
                     ),
@@ -341,7 +337,7 @@ object GamingSettingsCatalog {
                     ActionItem(
                         id = ID_CONTROLLER,
                         title = "Controller",
-                        subtitle = "Which pad is attached, whether droidtop reads it, and which face button confirms",
+                        subtitle = "Controller setup",
                         run = launchComponent(
                             "dev.droidtop.app.OnboardingActivity",
                             "dev.droidtop.app.EXTRA_START_STEP" to "CONTROLLER",
@@ -388,7 +384,6 @@ object GamingSettingsCatalog {
                     ActionItem(
                         id = ID_BROWSE_THEMES,
                         title = "Browse themes",
-                        subtitle = "Download or update a theme from the ES-DE community's theme list",
                         // Default fulfillment: deep-link into the shell's
                         // ThemeBrowserScreen. The in-shell renderer opens
                         // the browser inline instead (by id).
@@ -429,7 +424,7 @@ object GamingSettingsCatalog {
                     ActionItem(
                         id = ID_SYSTEM_SWITCH_MODE,
                         title = "Switch mode",
-                        subtitle = "The Android home screen, Desktop, or droidtop's modes and settings",
+                        subtitle = "Home screen",
                         run = launchComponent("dev.droidtop.shell.standard.ModeSwitcherActivity"),
                     ),
                 )
@@ -447,7 +442,7 @@ object GamingSettingsCatalog {
                     ActionItem(
                         id = ID_SYSTEM_OPEN_SETTINGS,
                         title = "Settings",
-                        subtitle = "Library, appearance, input, and everything else Gaming configures",
+                        subtitle = "Gaming settings",
                         run = launchComponent(
                             "dev.droidtop.app.MainActivity",
                             "dev.droidtop.app.EXTRA_MODE" to "gaming",

@@ -79,19 +79,6 @@ internal fun LaunchFailureDialog(
                     modifier = Modifier.padding(top = 6.dp),
                 )
             }
-            // A subtle pointer, not a step: where the emulator's own setup lives (Droidtop/tracker#270).
-            Text(
-                "Emulator setup: Settings, Library, Emulators.",
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-            Text(
-                "A confirms · B closes",
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
-            )
             rows.forEachIndexed { index, row ->
                 Text(
                     row,

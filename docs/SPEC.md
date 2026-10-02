@@ -5666,7 +5666,15 @@ owns it, found by the rig's new-user pass and fixed there.
 
 ### Copy
 
-Warm, natural, short sentences, for a person who heard about emulators yesterday (owner, 2026-10-01). The same terms as the rest of the app. No claim droidtop cannot keep: it reads the folders you choose, never "it can't read anything else".
+Use labels and short values across screens, dialogs, settings, launcher and desktop. No explanatory
+sentences on screens; row subtitles are values or 2–4 words. Remove "what this does" and "why"
+text. Put useful explanations in one shared tooltip: pointer hover, delayed pad focus or touch
+long-press. No Info links or parallel detail sheets. Hide Shizuku/Sui actions while unavailable.
+Errors and confirmations may use one short sentence; empty states use 2–3 words. Keep one-line
+warnings for deletion, trust and sign-in. Use sentence case, one name per concept, verb labels on
+buttons, no developer notation or backend errors. Keep ids, package names, URLs and paths out of
+list rows. No claim droidtop cannot keep: it reads the folders you choose, never "it can't read
+anything else".
 
 A summary states what it knows, and says so when it does not know yet:
 "You're set up" reported `Gaming: set up, with no games found yet.` while
@@ -13712,10 +13720,8 @@ the secondary path for sources that publish no key.
   A pasted token is never widened this way; paste a new one. Signing out removes
   the token from the device; GitHub keeps the authorisation until the person
   revokes it in their GitHub settings.
-  **Copy (Droidtop/tracker#290, rule of #285).** Settings rows carry a short label
-  and value; a screen has at most one short helper line. Plugins and Plugin
-  repositories follow it; no info affordance exists, so long explanations were
-  cut rather than moved.
+  **Copy (Droidtop/tracker#290, rule of #285).** Follow the app-wide Copy rule
+  above. Keep trust decisions to one line.
 - **Plugin repositories (owner, 2026-10-01, Droidtop/tracker#259: add the
   repository, trust its key automatically, and auto-update).** Plugins screen,
   "Plugin repositories": the person types `owner/name` (or pastes the address

@@ -3,13 +3,8 @@ package dev.droidtop.shell.gamepad
 import dev.droidtop.library.consoles.NoEmulatorInstalled
 
 /**
- * The one mapping from a launch failure's raw cause to the plain sentence
- * the shell's failure dialog shows (Droidtop/tracker#171). The cause's
- * detail -- exception class, stack, raw message -- stays only in the
- * shell's Log.e, and never reaches the user: a failure on a handheld is
- * one focused moment of "what happened, what now", so every cause gets a
- * short plain sentence, and the one kind the user can actually fix (no
- * emulator installed for the system) is named as such.
+ * Maps launch failures to one short sentence (Droidtop/tracker#171).
+ * Raw exception details stay in the shell log.
  */
 object LaunchFailureMessage {
     /**

@@ -68,8 +68,7 @@ object F95ImportCatalog {
                     items = listOf(
                         ActionItem(
                             id = "f95_matches_wait",
-                            title = "The library is still being read",
-                            subtitle = "Its first scan is running; select this again once games appear on the Games screen",
+                            title = "Scanning games",
                             run = {},
                         ),
                     ),
@@ -119,8 +118,6 @@ object F95ImportCatalog {
     private fun pickRow() = DocumentPickItem(
         id = "f95_pick",
         title = "Choose F95Checker's database",
-        subtitle = "Pick the db.sqlite3 F95Checker keeps its watch list in (on Windows: AppData/Roaming/f95checker). " +
-            "It is only read, never copied or changed",
         // Not a database mime type: file managers label a .sqlite3 as
         // application/octet-stream or nothing at all, which a narrower
         // filter would hide. The file is opened as a database before

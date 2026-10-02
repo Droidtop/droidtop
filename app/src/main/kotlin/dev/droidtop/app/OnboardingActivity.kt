@@ -1231,8 +1231,7 @@ private fun ModeStep(
         // Two lines, so the "also" row below the two answers is on screen
         // on a 1080p landscape handheld: a three-line body put it under the
         // action area (emulator-5560, d01-welcome.png).
-        body = "droidtop can be a games console or a desktop computer. Which should it open into? " +
-            "You can change this later in Settings.",
+        body = null,
         progress = progress,
         onBack = onBack,
         primary = StepAction(if (isReEntry) "Done" else "Next", onClick = onContinue),
@@ -1240,14 +1239,13 @@ private fun ModeStep(
     ) {
         SelectableRow(
             title = "Gaming",
-            supporting = "All your games in one place, made for a controller or touch.",
+            supporting = null,
             selected = opensInto == Mode.GAMING,
             onClick = { onOpensInto(Mode.GAMING) },
         )
         SelectableRow(
             title = "Desktop",
-            supporting = "A Linux desktop that runs PC programs in windows. It downloads a Linux system " +
-                "the first time it starts.",
+            supporting = null,
             selected = opensInto == Mode.DESKTOP,
             onClick = { onOpensInto(Mode.DESKTOP) },
         )
