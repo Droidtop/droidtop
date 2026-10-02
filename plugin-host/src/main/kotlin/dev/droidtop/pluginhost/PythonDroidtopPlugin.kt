@@ -92,23 +92,29 @@ class PythonDroidtopPlugin(
     }
 
     override fun startJob(jobId: String, capability: PluginCapability, args: PluginArgs, progress: PluginJobProgress) {
+        val callJson = args.string("call") ?: "{}"
         val payload = JSONObject().apply {
             put("job_id", jobId)
-            put("call", JSONObject().apply { args.keys().forEach { put(it, args.string(it)) } })
+            put("call", runCatching { JSONObject(callJson) }.getOrElse { JSONObject() })
         }.toString()
-        val result = JSONObject(PythonBridge.nativeCallFunction(uniqueName, "start_job", payload))
-        val reports = result.optJSONArray("progress")
-        if (reports != null) {
-            for (index in 0 until reports.length()) {
+        PythonBridge.nativeCallFunction(uniqueName, "start_job", payload)
+        while (true) {
+            val result = JSONObject(PythonBridge.nativeCallFunction(uniqueName, "poll_job", JSONObject().put("job_id", jobId).toString()))
+            val reports = result.optJSONArray("progress")
+            if (reports != null) for (index in 0 until reports.length()) {
                 val report = reports.optJSONObject(index) ?: continue
                 progress.report(report.optInt("percent", -1), report.optString("status", ""))
             }
+            if (result.optBoolean("done", false)) {
+                val reply = JSONObject(result.optString("result", "{}"))
+                val values = reply.optJSONObject("values") ?: JSONObject()
+                progress.complete(if (reply.optBoolean("ok", false)) {
+                    PluginResult.success(buildMap { values.keys().forEach { key -> put(key, values.optString(key)) } })
+                } else PluginResult.failure(reply.optString("error", "python plugin job failed")))
+                return
+            }
+            Thread.sleep(50L)
         }
-        val ok = result.optBoolean("ok", false)
-        val values = result.optJSONObject("values") ?: JSONObject()
-        progress.complete(if (ok) {
-            PluginResult.success(buildMap { values.keys().forEach { key -> put(key, values.optString(key)) } })
-        } else PluginResult.failure(result.optString("error", "python plugin job failed")))
     }
 
     override fun cancelJob(jobId: String) {

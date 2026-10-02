@@ -11385,9 +11385,13 @@ one runner per kind:
     compiler at all (a python-kind plugin's payload is its own source),
     so the `sample-plugin-python` CI job runs it with no Android
     SDK/NDK setup.
-  - **Not built**: `startJob` for python-kind plugins (defaults to "not
-    supported", same as any `DroidtopPlugin` that doesn't override it);
-    a catalog-repo install source for the runtime itself (today's pinned
+  - **Jobs (built 2026-10-01, Droidtop/tracker#64)**: Python jobs run on
+    interpreter-owned worker threads so the binder call can poll live
+    progress while the plugin's work runs. `cancel_job(job_id)` is called
+    from the runtime's cancellation path; plugins cooperate by checking
+    their own cancellation state. The Python sample exposes a cancellable
+    job from its contract 2 settings page. A catalog-repo install source
+    for the runtime itself (today's pinned
     single version in `python-runtimes.json` is hand-updated, matching
     how plugin bundles themselves are installed today).
 - **`flutter_embed`** — **built and rig-verified 2026-09-26**, added
@@ -12055,9 +12059,8 @@ official-first resolution, the source-key fetch with its TOFU confirm
 and changed-key warning, and the trust badge on the Plugins screen.
 Open: the catalog half of a plugin source (listing plugins in, and
 downloading bundles from, a source whose key you trusted — the KEY half
-is what "Keys you trust" built); `startJob` support for
-python-kind plugins; and the rig check for the python leg specifically
-(queued, `device/QUEUE.md`) — the `native_bundle` leg's own rig check
+is what "Keys you trust" built); and the rig check for the python leg
+specifically — the `native_bundle` leg's own rig check
 (`dq-plugins-01`) already passed.
 
 **The rest of the plugin API finally has real UI callers (built

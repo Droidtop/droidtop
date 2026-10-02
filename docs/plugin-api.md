@@ -202,7 +202,7 @@ The reply uses the same `{ok, data|error}` shape.
 | Kind | Host → plugin | Plugin → host | Jobs |
 | --- | --- | --- | --- |
 | `native_bundle` | `DroidtopPlugin.handle(call: PluginCall): PluginReply` (v2); v1 `invoke(capability, args)` still served via the legacy translation | `PluginHost.call(api, version, op, args)` handed to `onLoad(host)` | `startJob(jobId, call, progress)` / `cancelJob` (as today) |
-| `python` | module-level `handle(call_json) -> reply_json` (JSON text both ways, like `invoke`; called for a contract 2 manifest, built 2026-10-01); v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args, version=1)`: a module the bootstrap injects before `plugin.py` is imported | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: adapter dispatch exists; live progress callback plumbing remains incomplete (P1-8) |
+| `python` | module-level `handle(call_json) -> reply_json` (JSON text both ways, like `invoke`; called for a contract 2 manifest, built 2026-10-01); v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args, version=1)`: a module the bootstrap injects before `plugin.py` is imported | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: the bridge runs jobs on Python worker threads, forwards progress live, and calls `cancel_job(job_id)` cooperatively |
 | `flutter_embed` | the plugin's `MethodChannel("dev.droidtop.pluginhost/<plugin id>")`, method `handle`, envelope and reply as JSON strings (called for a contract 2 manifest, built 2026-10-01) | the same channel's `hostCall`, with `{api, version, op, args}` as JSON text and the broker reply as JSON text | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
 
 The rules that make this "no kind-specific features":
@@ -214,7 +214,7 @@ The rules that make this "no kind-specific features":
 2. **Parity is tested, not claimed.** One conformance script (the fake
    host, §3 I2) drives the same calls against each kind's sample, and a
    kind that fails a case is a bug in that kind's adapter. The known gaps
-   (audit 2026-10-01): `startJob` for `python` (P1-8, #64), and event delivery
+   (audit 2026-10-01): event delivery
    (`onEvent`) for `python` and `flutter_embed`, which both still answer
    every event with the default no-op. `host.call` for python and `hostCall`
    for Flutter are now exposed through their adapters. `handle` reaches all

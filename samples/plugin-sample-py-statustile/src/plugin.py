@@ -30,6 +30,8 @@ and must reply with {"ok": true, "data": {...}} or
 """
 import json
 import os
+import threading
+import time
 
 _load_count = 0
 _settings_path = None
@@ -173,6 +175,13 @@ def handle(call_json):
                                         "title": "Say it",
                                         "action": {"kind": "call", "op": "greet"},
                                     },
+                                    {
+                                        "type": "button",
+                                        "id": "run_job",
+                                        "title": "Run sample job",
+                                        "subtitle": "Reports live progress and can be cancelled from Jobs",
+                                        "action": {"kind": "job", "op": "sample_job", "title": "Python sample job"},
+                                    },
                                 ],
                             }
                         ],
@@ -202,26 +211,38 @@ def handle(call_json):
     )
 
 
-_cancelled_jobs = set()
+_job_cancellations = {}
+_cancelled_before_start = set()
+_job_cancellations_lock = threading.Lock()
 
 
-def start_job(payload_json):
-    """Sample long-running operation; progress records reach the host callbacks."""
-    job = json.loads(payload_json)
-    job_id = job["job_id"]
-    _cancelled_jobs.discard(job_id)
-    if job_id in _cancelled_jobs:
-        return json.dumps({"ok": False, "error": "cancelled", "progress": []})
-    return json.dumps({
-        "ok": True,
-        "values": {"message": "Python sample job complete"},
-        "progress": [{"percent": 100, "status": "Complete"}],
-    })
+def start_job(job_id, call, progress):
+    """Small visible job that reports live progress and checks cancellation."""
+    cancelled = threading.Event()
+    with _job_cancellations_lock:
+        _job_cancellations[job_id] = cancelled
+        if job_id in _cancelled_before_start:
+            cancelled.set()
+            _cancelled_before_start.discard(job_id)
+    try:
+        for step in range(1, 6):
+            if cancelled.is_set():
+                return json.dumps({"ok": False, "error": "cancelled"})
+            progress(step * 20, "Python sample job: step %d of 5" % step)
+            time.sleep(0.4)
+        return json.dumps({"ok": True, "values": {"message": "Python sample job complete"}})
+    finally:
+        with _job_cancellations_lock:
+            _job_cancellations.pop(job_id, None)
 
 
-def cancel_job(payload_json):
-    _cancelled_jobs.add(json.loads(payload_json)["job_id"])
-    return "{}"
+def cancel_job(job_id):
+    with _job_cancellations_lock:
+        cancelled = _job_cancellations.get(job_id)
+        if cancelled is not None:
+            cancelled.set()
+        else:
+            _cancelled_before_start.add(job_id)
 
 
 def on_unload():
