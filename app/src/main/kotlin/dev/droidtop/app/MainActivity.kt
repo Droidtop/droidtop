@@ -622,6 +622,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     override fun activityMode(): Mode? = mode
 
+    override fun shellStarted(): Boolean =
+        lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+
     override fun parkedDisplayId(): Int? = dev.droidtop.library.LaunchDisplay.parkedDisplayId
 
     override fun clearParkedDisplayId() {

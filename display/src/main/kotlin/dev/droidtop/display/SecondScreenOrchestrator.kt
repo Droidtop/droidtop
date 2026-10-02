@@ -65,6 +65,9 @@ interface SecondScreenHost {
     /** Whether a companion instance is currently started/visible (CompanionActivity.visible). */
     fun companionVisible(): Boolean
 
+    /** Whether the shell Activity is started (visible), false while something else is in front of it. */
+    fun shellStarted(): Boolean
+
     /** Published for the "Reinitialize displays" pill (CompanionState.dualScreenBroken). */
     fun setDualScreenBroken(broken: Boolean)
 }
@@ -96,6 +99,7 @@ class SecondScreenOrchestrator(
 
     private var lastDisplayIds: Set<Int> = emptySet()
     private var lastArrangementSeq: Int = -1
+    private var lastMainScreen: MainScreenChoice? = null
     private var secondScreenPresentation: SecondScreenPresentation? = null
     private var healthCheckJob: Job? = null
 
@@ -120,6 +124,7 @@ class SecondScreenOrchestrator(
      */
     fun reinitialize() {
         host.clearParkedDisplayId()
+        SecondaryDisplayActivity.clearCovered()
         lastRelocationAttemptMs = 0L
         relocationAttempts = 0
         lastDisplayIds = emptySet()
@@ -243,6 +248,7 @@ class SecondScreenOrchestrator(
                 if (arrangementSeq != lastArrangementSeq) {
                     lastArrangementSeq = arrangementSeq
                     host.clearParkedDisplayId()
+                    SecondaryDisplayActivity.clearCovered()
                     lastRelocationAttemptMs = 0L
                     relocationAttempts = 0
                 }
@@ -271,9 +277,23 @@ class SecondScreenOrchestrator(
                 val gaming = mode == Mode.GAMING
                 val desktop = mode == Mode.DESKTOP
 
-                val parked = host.parkedDisplayId()
+                // A user-launched app on the second screen is parked too: independent
+                // screens, nothing here is moved off it on its own (tracker#243).
+                val userApp = DualScreenOrchestration.userAppDisplayId(
+                    shellDisplayId = currentDisplay,
+                    secondDisplayId = second?.androidDisplayId,
+                    shellStarted = host.shellStarted(),
+                    coverCoveredDisplayId = SecondaryDisplayActivity.coveredDisplayId,
+                )
+                if (DualScreenOrchestration.shellIsOnSecond(currentDisplay, second?.androidDisplayId) && host.shellStarted()) {
+                    SecondaryDisplayActivity.clearCovered()
+                }
+                val parked = host.parkedDisplayId() ?: userApp
                 val secondAvailable = second != null && second.androidDisplayId != parked
                 val mainScreen = withContext(Dispatchers.IO) { MainScreen.choice(context) }
+                // Choosing the Main screen is the user asking for the screens back.
+                if (lastMainScreen != null && lastMainScreen != mainScreen) SecondaryDisplayActivity.clearCovered()
+                lastMainScreen = mainScreen
                 val wantShellOnSecond = (gaming || desktop) && secondAvailable &&
                     mainScreen == MainScreenChoice.SECOND_WHEN_PRESENT
                 val relocationGaveUp = currentDisplay != second?.androidDisplayId &&

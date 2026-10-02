@@ -46,6 +46,19 @@ class SecondaryDisplayActivity : ComponentActivity() {
         @Volatile
         var resumedDisplayId: Int? = null
             private set
+
+        /**
+         * The display this cover was paused on by something else (a user
+         * launched app, tracker#243) and has not resumed on since. Cleared by
+         * the cover resuming there or by [clearCovered].
+         */
+        @Volatile
+        var coveredDisplayId: Int? = null
+            private set
+
+        fun clearCovered() {
+            coveredDisplayId = null
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,10 +98,14 @@ class SecondaryDisplayActivity : ComponentActivity() {
         // here rather than only at creation.
         render()
         resumedDisplayId = displayIdCompat()
+        if (coveredDisplayId == displayIdCompat()) coveredDisplayId = null
     }
 
     override fun onPause() {
-        if (resumedDisplayId == displayIdCompat()) resumedDisplayId = null
+        if (resumedDisplayId == displayIdCompat()) {
+            resumedDisplayId = null
+            if (!isFinishing) coveredDisplayId = displayIdCompat()
+        }
         super.onPause()
     }
 

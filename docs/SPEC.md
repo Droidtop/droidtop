@@ -2989,6 +2989,19 @@ display (`displayId ?: Display.DEFAULT_DISPLAY`) and always passes
 now always land where droidtop actually asked, never wherever Android's
 ambient default happens to be.
 
+
+**Independent screens: a user's app stays (tracker#243, 2026-10-01).** The two screens are
+independent. An app the user launches on either screen stays there; droidtop brings a screen back
+to the shell or the companion only when the USER asks (the Main screen setting, the screen
+chooser, an explicit Home or Back press or the reinitialize double-tap) and never on a timer or on
+its own lifecycle callbacks. A display with a user-launched app in front of droidtop's surface
+(`DualScreenOrchestration.userAppDisplayId`: the idle cover was paused there by something else, or
+the shell is on that display and no longer started) is treated exactly like a parked display: no
+companion Presentation, no shell move onto it, no relaunch, no "Reinitialize displays" flag. It is
+idle again, and the companion returns, only when that app is gone (the idle cover resumes) or the user
+asks for the screen back. One display still means no companion (#182, #217); the companion stays
+touch-only (#186); the arrangement setting still moves the shell both ways (#163).
+
 ### Second display: a Presentation takes no focus, the IME follows visibility (2026-09-30)
 
 Owner, 2026-09-30: "most things on the second display aren't touchable"

@@ -295,4 +295,37 @@ class DualScreenOrchestrationTest {
         assertFalse(DualScreenOrchestration.shellIsOnSecond(shellDisplayId = 0, secondDisplayId = 10))
         assertFalse(DualScreenOrchestration.shellIsOnSecond(shellDisplayId = 0, secondDisplayId = null))
     }
+
+    @Test
+    fun `a user app over the idle cover on the second display owns it and is never evicted`() {
+        // Tracker#243: Settings opened on display 10 while the shell is on 0.
+        val owned = DualScreenOrchestration.userAppDisplayId(0, 10, shellStarted = true, coverCoveredDisplayId = 10)
+        assertEquals(10, owned)
+        // Treated as parked: no companion there, no shell move onto it.
+        assertEquals(null, DualScreenOrchestration.companionPresentationDisplayId(
+            0, 10, secondParked = owned != null, move = DualScreenOrchestration.ShellMove.NONE))
+        assertEquals(DualScreenOrchestration.ShellMove.NONE,
+            DualScreenOrchestration.shellMove(0, 10, true, true, secondParked = true, relocationFailed = false))
+        assertFalse(DualScreenOrchestration.secondScreenNeedsReinit(10, 10, false, null, null))
+    }
+
+    @Test
+    fun `a user app over the shell on the second display owns it only while the shell is not started`() {
+        assertEquals(10, DualScreenOrchestration.userAppDisplayId(10, 10, shellStarted = false, coverCoveredDisplayId = null))
+        assertEquals(null, DualScreenOrchestration.userAppDisplayId(10, 10, shellStarted = true, coverCoveredDisplayId = null))
+        // A cover covered while the shell itself sits there is not a user app.
+        assertEquals(null, DualScreenOrchestration.userAppDisplayId(10, 10, shellStarted = true, coverCoveredDisplayId = 10))
+    }
+
+    @Test
+    fun `the display is idle again once the user app is gone`() {
+        assertEquals(null, DualScreenOrchestration.userAppDisplayId(0, 10, true, coverCoveredDisplayId = null))
+        assertEquals(10, DualScreenOrchestration.companionPresentationDisplayId(
+            0, 10, secondParked = false, move = DualScreenOrchestration.ShellMove.NONE))
+    }
+
+    @Test
+    fun `no second display means no user-owned display`() {
+        assertEquals(null, DualScreenOrchestration.userAppDisplayId(0, null, false, 10))
+    }
 }

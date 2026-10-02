@@ -127,6 +127,37 @@ object DualScreenOrchestration {
     }
 
     /**
+     * The second display a USER-launched app is in the foreground of, or
+     * null (tracker#243). The two screens are independent: an app the user
+     * opened there (Android Settings, anything) stays, and droidtop does not
+     * relaunch the companion, move the shell or re-front itself over it on
+     * a timer or its own lifecycle callbacks. The caller treats the display
+     * exactly like a parked one until this returns null again, which
+     * happens only when that app is gone (the idle cover resumes there, so
+     * [coverCoveredDisplayId] clears) or the user asks for the screen back
+     * (Home, the screen chooser, Main screen, reinitialize).
+     *
+     * Two signals, since the shell and the idle cover are the two droidtop
+     * surfaces something can be opened over:
+     * - the shell is on the second display and is no longer started, so
+     *   something else is in front of it;
+     * - the idle cover was paused on the second display by something that
+     *   is not the shell ([coverCoveredDisplayId]) and has not resumed.
+     */
+    fun userAppDisplayId(
+        shellDisplayId: Int,
+        secondDisplayId: Int?,
+        shellStarted: Boolean,
+        coverCoveredDisplayId: Int?,
+    ): Int? {
+        if (secondDisplayId == null) return null
+        return if (shellIsOnSecond(shellDisplayId, secondDisplayId)) {
+            if (!shellStarted) secondDisplayId else null
+        } else {
+            if (coverCoveredDisplayId == secondDisplayId) secondDisplayId else null
+        }
+    }
+    /**
      * Chooser candidates in priority order: the addon/second screen FIRST,
      * so the default-highlighted row is the better surface (per direction:
      * when the add-on is attached it is the preferred screen, not an
