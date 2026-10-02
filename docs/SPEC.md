@@ -12586,7 +12586,7 @@ the secondary path for sources that publish no key.
   trusted at fetch time. The screen shows WHO (the origin id) and WHICH
   key (a SHA-256 fingerprint of the SPKI bytes, in groups of four so it
   is comparable by eye) and says what trusting does NOT mean
-  ("third-party source, not official — droidtop has not vetted it"),
+  ("third-party, not official: droidtop has not vetted it"),
   and the user confirms once. https only: a plaintext fetch would make
   the TOFU step itself the attack.
 - **The user's own GitHub token for plugin sources (owner, 2026-09-28,

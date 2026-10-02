@@ -2566,7 +2566,7 @@ object AppSettingsCatalogs {
         id = SCREEN_PLUGIN_KEYS,
         title = "Keys you trust",
         subtitle = "Origins whose plugin signatures droidtop verifies. The official one is certified inside droidtop itself; " +
-            "any other is one YOU chose to trust -- third-party, not official, and droidtop has not vetted it",
+            "any other is one YOU chose to trust: third-party, not official, and droidtop has not vetted it",
         groups = { context ->
             val userKeys = withContext(Dispatchers.IO) { UserOriginKeys.load(UserOriginKeys.storeFile(context)) }
             val proposal = pendingKeyProposal
@@ -2579,7 +2579,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "plugin_keys_official",
                                 title = PluginOriginKeys.OFFICIAL_ORIGIN,
-                                subtitle = "Official -- certified inside droidtop itself. Key fingerprint " +
+                                subtitle = "Official: certified inside droidtop itself. Key fingerprint " +
                                     (UserOriginKeys.fingerprint(PluginOriginKeys.officialKeyBase64()) ?: "unavailable"),
                                 run = {},
                             ),
@@ -2600,7 +2600,7 @@ object AppSettingsCatalogs {
                                     id = "plugin_key_${entry.origin}",
                                     title = entry.origin,
                                     subtitle = buildString {
-                                        append("Added by you -- third-party, NOT official. Key fingerprint ")
+                                        append("Added by you: third-party, NOT official. Key fingerprint ")
                                         append(UserOriginKeys.fingerprint(entry.keyBase64) ?: "unreadable")
                                         entry.source?.let { append(". Added from $it") }
                                     },
@@ -2616,7 +2616,7 @@ object AppSettingsCatalogs {
                                     run = { ctx, _ ->
                                         if (UserOriginKeys.remove(UserOriginKeys.storeFile(ctx), entry.origin)) {
                                             PluginStatusWidgetProvider.requestUpdate(ctx)
-                                            "No longer trusting \"${entry.origin}\" -- its plugins are flagged on the Plugins screen"
+                                            "No longer trusting \"${entry.origin}\": its plugins are flagged on the Plugins screen"
                                         } else {
                                             "Nothing to remove"
                                         }
@@ -2628,14 +2628,14 @@ object AppSettingsCatalogs {
                 ),
                 CatalogGroup(
                     id = "plugin_keys_source",
-                    title = "Add a plugin source -- fetches its key",
+                    title = "Add a plugin source",
                     items = listOf(
                         TextInputItem(
                             id = "plugin_keys_source_url",
                             title = "Source address",
                             subtitle = "A GitHub plugin repo (https://github.com/<owner>/<repo>), a catalog index ending in .json, " +
-                                "or a plain https address. droidtop fetches the key it publishes and asks you to trust it below -- " +
-                                "plaintext http is refused",
+                                "or a plain https address. droidtop fetches the key it publishes and asks you to trust it below; " +
+                                "plain http addresses are refused",
                             value = pendingKeySourceUrl,
                             onChange = { _, v -> pendingKeySourceUrl = v.trim() },
                         ),
@@ -2651,12 +2651,12 @@ object AppSettingsCatalogs {
                 proposal?.let { proposedKeyGroup(it) },
                 CatalogGroup(
                     id = "plugin_keys_manual",
-                    title = "Add a key by hand -- for sources that publish no key",
+                    title = "Add a key by hand (for sources that publish no key)",
                     items = listOf(
                         TextInputItem(
                             id = "plugin_keys_manual_origin",
                             title = "Origin id",
-                            subtitle = "The origin's own id, e.g. acme -- it prefixes every plugin id it signs (<origin>.<name>). " +
+                            subtitle = "The origin's own id, e.g. acme; every plugin it signs carries it in its name (<origin>.<name>). " +
                                 "It can never be \"${PluginOriginKeys.OFFICIAL_ORIGIN}\": that one is official",
                             value = pendingKeyManualOrigin,
                             onChange = { _, v -> pendingKeyManualOrigin = v.trim() },
@@ -2664,7 +2664,7 @@ object AppSettingsCatalogs {
                         TextInputItem(
                             id = "plugin_keys_manual_key",
                             title = "Public key",
-                            subtitle = "Base64 of the P-256 public key (X.509 SubjectPublicKeyInfo), as its author publishes it",
+                            subtitle = "The origin's public key, pasted exactly as its author publishes it",
                             // The value column beside a row's title is narrow:
                             // the whole ~124-char base64 squeezed this row's
                             // title and description out of the row once one
@@ -2685,7 +2685,7 @@ object AppSettingsCatalogs {
                         DocumentPickItem(
                             id = "plugin_keys_manual_file",
                             title = "Add key from a file",
-                            subtitle = "A droidtop-plugin-key.json (origin + key), or a raw base64 key file with the Origin id filled in above",
+                            subtitle = "A droidtop-plugin-key.json file (it holds the origin and the key), or a plain key file with the Origin id filled in above",
                             // Not application/json: many file managers label a
                             // .json as octet-stream, which a narrower filter
                             // would hide. The file is parsed before it is kept.
@@ -2714,11 +2714,11 @@ object AppSettingsCatalogs {
                         "WARNING: ${proposal.sourceUrl} now publishes a DIFFERENT key for \"${proposal.origin}\""
                     },
                     subtitle = if (proposal.existing == null) {
-                        "Key fingerprint $fingerprint. Third-party source, not official: droidtop has not vetted this key " +
-                            "or anything it signs -- trusting it is your call. Plugins from it will show as \"Added by you\"."
+                        "Key fingerprint $fingerprint. Third-party, not official: droidtop has not vetted it, so trusting it " +
+                            "is your call; plugins from it will show as \"Added by you\"."
                     } else {
                         "You trusted fingerprint $existingFingerprint; this fetch publishes $fingerprint. A changed key can " +
-                            "mean the source rotated it, or that the source or this fetch is compromised -- droidtop cannot " +
+                            "mean the source rotated it, or that the source or this fetch is compromised, and droidtop cannot " +
                             "tell the two apart. Nothing has been changed yet; replacing the stored key means plugins signed " +
                             "by the OLD key stop running."
                     },
@@ -2832,7 +2832,7 @@ object AppSettingsCatalogs {
         }
         if (pendingKeyManualOrigin.isBlank()) {
             return "That file isn't a droidtop-plugin-key.json (it needs \"origin\" and \"key\"), " +
-                "and the Origin id field above is empty -- fill it in to add a raw base64 key file"
+                "and the Origin id field above is empty; fill it in to add a plain key file"
         }
         return addKeyOutcomeMessage(UserOriginKeys.add(store, pendingKeyManualOrigin, text, source = null))
     }
@@ -2988,9 +2988,9 @@ object AppSettingsCatalogs {
         // The ScreenScraper sentence used to say droidtop had no developer ID,
         // long after one was registered (ScreenScraperDevCredentials), so the
         // page argued against its own default (UI pass 2026-09-24, finding H7).
-        subtitle = "One source at a time, like real ES-DE. ScreenScraper works without an account; " +
-            "your own ScreenScraper login raises how much you can scrape per day. TheGamesDB needs " +
-            "its own free API key. The libretro database needs no account at all",
+        subtitle = "One source at a time, like real ES-DE. ScreenScraper and the libretro database " +
+            "work without an account; TheGamesDB needs a free API key, and your own ScreenScraper " +
+            "login raises how much you can scrape per day",
         groups = { context ->
             listOf(
                 CatalogGroup(
@@ -3073,7 +3073,7 @@ object AppSettingsCatalogs {
                         ToggleItem(
                             id = "scrape_content_artwork",
                             title = "Fetch box art",
-                            subtitle = "Cover images, including the keyless libretro fallback",
+                            subtitle = "Cover images, including from the libretro database, which needs no account",
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeArtwork(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setScrapeArtwork(ctx, value) },
                         ),
