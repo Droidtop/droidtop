@@ -343,30 +343,48 @@ suspend fun scrapeSystemArtwork(
             // Text the options switched off is neither written nor recorded.
             if (!wantMetadata) sources.keys.retainAll(setOf(FieldSources.COVER))
             fun <T> text(value: T?): T? = if (wantMetadata) value else null
-            if (hasAnyMetadata || coverWritten) {
-                // Real fix: this used to build a fresh GameMetadataEntity
-                // with a hardcoded favorite=false, silently wiping out a
-                // real user's favorite toggle (and, now that
-                // GameMetadataEditor exists, every other real user-edited
-                // field too) on every rescrape. Read the existing row
-                // first and only overwrite the real scraper-owned fields
-                // -- same real "don't clobber user data with a rescan"
-                // principle RomEntity/GameMetadataEntity's own doc
-                // comments already establish for the filesystem-scan
-                // side of this database.
-                val existing = dao.getGameMetadataSingle(romFile.absolutePath)
-                val had = existing?.fieldSources
+            // The selected source looked this game up and said "no match" (a fact, not a refusal):
+            // whatever it wrote for the game before was another game's (FieldSources.retracted).
+            val unmatchedSource = when {
+                screenScraperLookup is ScrapeLookup.NoMatch -> ss
+                gamesDbLookup is ScrapeLookup.NoMatch -> tgdb
+                else -> null
+            }
+            // Real fix: this used to build a fresh GameMetadataEntity
+            // with a hardcoded favorite=false, silently wiping out a
+            // real user's favorite toggle (and, now that
+            // GameMetadataEditor exists, every other real user-edited
+            // field too) on every rescrape. Read the existing row
+            // first and only overwrite the real scraper-owned fields
+            // -- same real "don't clobber user data with a rescan"
+            // principle RomEntity/GameMetadataEntity's own doc
+            // comments already establish for the filesystem-scan
+            // side of this database.
+            val existing = if (hasAnyMetadata || coverWritten || (wantMetadata && unmatchedSource != null)) {
+                dao.getGameMetadataSingle(romFile.absolutePath)
+            } else {
+                null
+            }
+            val had = existing?.fieldSources
+            val retracted = if (wantMetadata && unmatchedSource != null) {
+                FieldSources.retracted(had, unmatchedSource) - sources.keys
+            } else {
+                emptySet()
+            }
+            if (hasAnyMetadata || coverWritten || retracted.isNotEmpty()) {
+                fun <T> field(name: String, scraped: T?, current: T?): T? =
+                    if (name in retracted) null else FieldSources.keep(had, name, scraped, current)
                 dao.upsertGameMetadata(
                     (existing ?: GameMetadataEntity(id = romFile.absolutePath)).copy(
                         scrapeConfidence = confidence ?: existing?.scrapeConfidence,
-                        description = FieldSources.keep(had, FieldSources.DESCRIPTION, text(description), existing?.description),
-                        developer = FieldSources.keep(had, FieldSources.DEVELOPER, text(developer), existing?.developer),
-                        publisher = FieldSources.keep(had, FieldSources.PUBLISHER, text(publisher), existing?.publisher),
-                        genre = FieldSources.keep(had, FieldSources.GENRE, text(genre), existing?.genre),
-                        releaseDate = FieldSources.keep(had, FieldSources.RELEASE_DATE, text(releaseDate), existing?.releaseDate),
-                        rating = FieldSources.keep(had, FieldSources.RATING, text(rating), existing?.rating),
-                        players = FieldSources.keep(had, FieldSources.PLAYERS, text(players), existing?.players),
-                        fieldSources = FieldSources.merge(had, sources),
+                        description = field(FieldSources.DESCRIPTION, text(description), existing?.description),
+                        developer = field(FieldSources.DEVELOPER, text(developer), existing?.developer),
+                        publisher = field(FieldSources.PUBLISHER, text(publisher), existing?.publisher),
+                        genre = field(FieldSources.GENRE, text(genre), existing?.genre),
+                        releaseDate = field(FieldSources.RELEASE_DATE, text(releaseDate), existing?.releaseDate),
+                        rating = field(FieldSources.RATING, text(rating), existing?.rating),
+                        players = field(FieldSources.PLAYERS, text(players), existing?.players),
+                        fieldSources = FieldSources.withdraw(FieldSources.merge(had, sources), retracted),
                     ),
                 )
             }

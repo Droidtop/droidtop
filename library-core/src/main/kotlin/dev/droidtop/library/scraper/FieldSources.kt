@@ -91,6 +91,21 @@ object FieldSources {
         if (scraped != null && writable(existing, field)) scraped else current
 
     /**
+     * The editable fields [source] wrote and no longer stands behind, because a fresh lookup of the
+     * same game at [source] answered "no match" (not a refusal): its earlier answer was another
+     * game. A TheGamesDB name search used to take the API's first result, so "Pokemon - Crystal
+     * Version" kept a fan game's description and date (Droidtop/tracker#251); the search was fixed,
+     * but nothing took the old values back, and the console on build 1386 still showed them.
+     * Fields the person edited are never in here (their source is [EDITED]).
+     */
+    fun retracted(existing: String?, source: String): Set<String> =
+        decode(existing).filter { (field, from) -> from == source && field in EDITABLE }.keys
+
+    /** [existing] without [fields]: they have no source any more. */
+    fun withdraw(existing: String?, fields: Set<String>): String? =
+        if (fields.isEmpty()) existing else encode(decode(existing) - fields)
+
+    /**
      * The sources after the editor saved [after] over [before]: every
      * editable field whose value the person changed is now [EDITED]. A
      * field they did not touch keeps whatever source it had.

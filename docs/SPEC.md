@@ -9199,6 +9199,13 @@ the same care as the art.
   a field changed in the metadata editor. A scrape never writes over a field whose source is
   "you"; that is what makes "a rescrape keeps your edits" true for text, not only for
   favourites.
+- **A source that now says "no match" takes back what it wrote** (console, build 1386). When
+  the selected ROM source looks a game up and answers no match (never a refusal), the editable
+  fields recorded as that source's are cleared with their source (`FieldSources.retracted`,
+  `withdraw`), unless another source fills them in the same pass; edited fields are never
+  touched and media files stay. TheGamesDB's name search used to take the API's first result,
+  and fixing the search (tracker#251) left the fan game's description and date it had already
+  written on "Pokemon - Crystal Version" in place, because a no match wrote nothing.
 - **A refusal on the way is reported, not swallowed.** A source asked by identity that
   refuses is not asked again in that pass once it rejected its key (401, 403, or the
   Twitch sign-in's 400 for a wrong IGDB Client ID or Secret) or refused five
