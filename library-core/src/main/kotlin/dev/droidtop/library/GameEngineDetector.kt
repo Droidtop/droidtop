@@ -286,6 +286,33 @@ object GameEngineDetector {
         val games: List<DetectedGame>,
         val skipped: ScanSkips = ScanSkips(),
         val stoppedAt: File? = null,
+        /** How many engine questions the walk had to answer by looking at the disk (verdict misses). */
+        val engineChecks: Int = 0,
+        /** How many it answered from the kept verdicts ([EngineWalkOptions.verdicts]). */
+        val engineVerdictsKept: Int = 0,
+        /** The walk ran past [EngineWalkOptions.folderBudgetMs] and was abandoned: [games] is empty because it was not finished, not because there are none. */
+        val slow: Boolean = false,
+    )
+
+    /**
+     * What a walk of one top-level folder may be given beyond the rules.
+     *
+     * [verdicts] is the process' [PcFolderScan.EngineVerdicts] ([EngineVerdictStore]),
+     * which the PC walk reads and writes too: a folder either walk has
+     * checked is not checked again by the other, by a second pass over a
+     * root nested in another root, or by the next scan while it is
+     * unchanged; null remembers nothing, which is what a test wants.
+     * [folderBudgetMs] bounds the WHOLE folder's walk (0 is no limit),
+     * unlike the per-step [ScanBudget]: a folder over it is abandoned,
+     * reported [FolderScan.slow], and walked again by the next scan with
+     * every verdict it finished kept. [onEngineWork] is told, from any
+     * thread, how many folders an engine check is about to look at and
+     * how many it has finished, as (planned, finished) deltas.
+     */
+    class EngineWalkOptions(
+        val verdicts: PcFolderScan.EngineVerdicts? = null,
+        val folderBudgetMs: Long = 0L,
+        val onEngineWork: (planned: Int, finished: Int) -> Unit = { _, _ -> },
     )
 
     /**
@@ -320,11 +347,26 @@ object GameEngineDetector {
         systemsById: Map<String, ConsoleSystemDef>,
         defs: List<EngineDef>,
         override: (File) -> GameEngine? = { null },
+        options: EngineWalkOptions = EngineWalkOptions(),
         budget: () -> ScanBudget? = { null },
     ): FolderScan {
-        val state = WalkState(budget)
-        val games = gamesUnder(folder, systemsById, defs, override, depth = 1, state = state).map { it.game }
-        return FolderScan(games, state.skipped, state.stoppedAt)
+        val state = WalkState(budget, options)
+        val games = try {
+            gamesUnder(folder, systemsById, defs, override, depth = 1, state = state).map { it.game }
+        } catch (cancelled: CancellationException) {
+            // An engine check stops with a cancellation when the folder budget ran out; any other cancel is the caller's.
+            if (!state.timedOut) throw cancelled
+            emptyList()
+        }
+        if (state.timedOut) state.skip(folder, PcFolderScan.SLOW_FOLDER_REASON)
+        return FolderScan(
+            games = if (state.timedOut) emptyList() else games,
+            skipped = state.skipped,
+            stoppedAt = state.stoppedAt,
+            engineChecks = state.verdictMisses.get(),
+            engineVerdictsKept = state.verdictHits.get(),
+            slow = state.timedOut,
+        )
     }
 
     /**
@@ -359,9 +401,45 @@ object GameEngineDetector {
      * returned up it, because a recursive walk that has to thread three
      * accumulators through every return value stops being readable.
      */
-    private class WalkState(val newBudget: () -> ScanBudget?) {
+    private class WalkState(val newBudget: () -> ScanBudget?, val options: EngineWalkOptions = EngineWalkOptions()) {
         val skipped = ScanSkips()
         var stoppedAt: File? = null
+        val verdictHits = java.util.concurrent.atomic.AtomicInteger()
+        val verdictMisses = java.util.concurrent.atomic.AtomicInteger()
+        private val startedNanos = System.nanoTime()
+
+        /** Set once the folder budget ran out, from whichever thread noticed. */
+        @Volatile
+        var timedOut = false
+            private set
+
+        fun overBudget(): Boolean {
+            if (options.folderBudgetMs <= 0L) return false
+            if (!timedOut && (System.nanoTime() - startedNanos) / 1_000_000L >= options.folderBudgetMs) timedOut = true
+            return timedOut
+        }
+
+        /**
+         * [folder]'s remembered verdicts, or null when this walk keeps none.
+         * A verdict is not kept when the folder's own step ran past its
+         * [own] budget or the folder budget ran out: the evidence may be
+         * incomplete.
+         */
+        fun memoFor(folder: File, own: ScanBudget?): FolderMemo? {
+            val store = options.verdicts ?: return null
+            return FolderMemo.of(
+                store,
+                folder,
+                mayKeep = { !timedOut && (own == null || !own.expired) },
+                counted = { hit -> if (hit) verdictHits.incrementAndGet() else verdictMisses.incrementAndGet() },
+            )
+        }
+
+        /** [GameEngineDetector.isGameRoot] through the verdicts, for the probes of [holdsSeveralGames]. */
+        fun isGame(child: File, defs: List<EngineDef>): Boolean {
+            val memo = memoFor(child, own = null) ?: return GameEngineDetector.isGameRoot(child, defs)
+            return memo.precise { GameEngineDetector.engineHere(child, defs) } != null
+        }
 
         fun skip(folder: File, reason: String) {
             skipped.add(folder, reason)
@@ -476,6 +554,7 @@ object GameEngineDetector {
         defs: List<EngineDef>,
         systemsById: Map<String, ConsoleSystemDef> = emptyMap(),
         subfolders: List<File>? = null,
+        isGame: (File) -> Boolean = { child -> isGameRoot(child, defs) },
         hooks: ProbeHooks = ProbeHooks(),
     ): Boolean {
         val children = (subfolders ?: folder.listFiles().orEmpty().filter { it.isDirectory })
@@ -487,13 +566,23 @@ object GameEngineDetector {
             var found = 0
             for (child in children) {
                 if (hooks.cancelled()) throw CancellationException("engine check cancelled")
-                val isGame = isGameRoot(child, defs)
+                val asked = isGame(child)
                 hooks.finished()
-                if (isGame && ++found >= 2) return true
+                if (asked && ++found >= 2) return true
             }
             return false
         }
-        return probeConcurrently(children, defs, hooks)
+        return probeConcurrently(children, isGame, hooks)
+    }
+
+    /**
+     * [isGameRoot] through the kept [verdicts] (null keeps none): the PC
+     * walk's probes use it so that what they find out about a folder is
+     * known to the engine walk, which asks the same question of it.
+     */
+    internal fun isGameRootRemembered(folder: File, defs: List<EngineDef>, verdicts: PcFolderScan.EngineVerdicts?): Boolean {
+        val memo = verdicts?.let { FolderMemo.of(it, folder, mayKeep = { true }, counted = { }) } ?: return isGameRoot(folder, defs)
+        return memo.precise { engineHere(folder, defs) } != null
     }
 
     /**
@@ -528,12 +617,12 @@ object GameEngineDetector {
     }
 
     /** The probes of [holdsSeveralGames], run on [probePool]; stops asking once two games are known. */
-    private fun probeConcurrently(children: List<File>, defs: List<EngineDef>, hooks: ProbeHooks): Boolean {
+    private fun probeConcurrently(children: List<File>, isGame: (File) -> Boolean, hooks: ProbeHooks): Boolean {
         val enough = java.util.concurrent.atomic.AtomicBoolean(false)
         val futures = children.map { child ->
             probePool.submit(java.util.concurrent.Callable<Boolean> {
                 try {
-                    !enough.get() && !hooks.cancelled() && isGameRoot(child, defs)
+                    !enough.get() && !hooks.cancelled() && isGame(child)
                 } finally {
                     hooks.finished()
                 }
@@ -570,8 +659,9 @@ object GameEngineDetector {
         systemsById: Map<String, ConsoleSystemDef>,
         state: WalkState,
         childDepth: Int,
+        listed: Array<File>? = null,
     ): List<File> =
-        (folder.listFiles() ?: emptyArray())
+        (listed ?: folder.listFiles() ?: emptyArray())
             .filter { it.isDirectory }
             .filter { dir ->
                 val reason = ScanPrune.skipReason(dir)
@@ -633,7 +723,14 @@ object GameEngineDetector {
         // big healthy library look like a pathological one. See
         // ScanBudget's own doc comment for the rig evidence.
         val own = state.newBudget()
+        // The folder budget bounds the whole folder's walk; a walk past it
+        // stops here and the caller reports the folder as slow.
+        if (state.overBudget()) return emptyList()
         override(folder)?.let { return listOf(Walked(DetectedGame(folder, folder, it), precise = true)) }
+        // What the engine questions below were already answered for this
+        // folder, by this walk, the PC walk or an earlier scan (null: no
+        // verdicts are kept and every question is asked of the disk).
+        val memo = state.memoFor(folder, own)
         // A folder that holds games is a container, whatever evidence it
         // carries of its own -- the rule [PcFolderScan] already states
         // for the PC half (DECISIONS 2026-09-16 18:11), asked here too so
@@ -645,7 +742,23 @@ object GameEngineDetector {
         // Lazy deliberately: this costs one directory listing per child,
         // and only a folder that would otherwise END the walk needs the
         // answer -- which is one folder per game, not one per folder.
-        val holdsGames by lazy { holdsSeveralGames(folder, defs, systemsById) }
+        val holdsGames by lazy {
+            val ask = {
+                holdsSeveralGames(
+                    folder,
+                    defs,
+                    systemsById,
+                    subfolders = memo?.listed?.filter { it.isDirectory },
+                    isGame = { child -> state.isGame(child, defs) },
+                    hooks = ProbeHooks(
+                        cancelled = { state.overBudget() },
+                        planned = { state.options.onEngineWork(it, 0) },
+                        finished = { state.options.onEngineWork(0, 1) },
+                    ),
+                )
+            }
+            if (memo != null) memo.holdsEngine(ask) else ask()
+        }
         // A store's own install root is the store's business, never a
         // game, however much evidence its client drops in it -- the rule
         // [PcFolderScan] already applies on the PC half, asked here so
@@ -656,18 +769,27 @@ object GameEngineDetector {
         val isStoreRoot = ScanPrune.storeRootOwner(folder) != null
         // Precise evidence that THIS folder is a game root ends the
         // descent: a game's own subfolders are not further games.
-        val preciseHere = engineHere(folder, defs)
+        val preciseHere = if (memo != null) memo.precise { engineHere(folder, defs) } else engineHere(folder, defs)
         if (preciseHere != null && !holdsGames && !isStoreRoot) {
             return listOf(Walked(DetectedGame(folder, folder, preciseHere), precise = true))
         }
 
-        val subtreeHere = detect(folder, defs) { it.readsUnnamedSubtree }
+        val subtreeHere = if (memo != null) {
+            memo.subtree { detect(folder, defs) { it.readsUnnamedSubtree } }
+        } else {
+            detect(folder, defs) { it.readsUnnamedSubtree }
+        }
         // THE rule both walks share ([isPlainPcGameFolder]): a folder that
         // directly holds an executable and carries no engine evidence of
         // its own is a PC game -- [PcFolderScan] lists it -- and a PC
         // game's own subfolders are its payload, not further games,
         // whatever sits in them.
-        if (isPlainPcGameFolder(folder, preciseHere, subtreeHere) && !holdsGames && !isStoreRoot) {
+        val plainHere = if (memo != null) {
+            memo.plain { isPlainPcGameFolder(folder, preciseHere, subtreeHere) }
+        } else {
+            isPlainPcGameFolder(folder, preciseHere, subtreeHere)
+        }
+        if (plainHere && !holdsGames && !isStoreRoot) {
             return emptyList()
         }
         val tooSlow = state.tooSlow(folder, own)
@@ -681,7 +803,7 @@ object GameEngineDetector {
         // enginehost was handed a folder with no game in it (build 550).
         // The bound still holds for everything else: a mistakenly added
         // root is walked four TITLE folders deep and no further.
-        val below = candidateFolders(folder, systemsById, state, childDepth = depth + 1).flatMap { child ->
+        val below = candidateFolders(folder, systemsById, state, childDepth = depth + 1, listed = memo?.listed).flatMap { child ->
             when {
                 GameNaming.isStructuralFolderName(child.name) -> gamesUnder(child, systemsById, defs, override, depth, state)
                 depth < MAX_SCAN_DEPTH -> gamesUnder(child, systemsById, defs, override, depth + 1, state)
@@ -836,6 +958,81 @@ object GameEngineDetector {
         defs: List<EngineDef>,
         override: (File) -> GameEngine? = { null },
     ): Boolean = detectGame(installDir, defs, override) != null
+}
+
+private typealias Verdict = PcFolderScan.EngineVerdicts.Verdict
+
+/**
+ * One folder's engine questions, each asked of the disk at most once for
+ * as long as [PcFolderScan.EngineVerdicts] remembers the folder: the same
+ * path, modification time and entry count give the same answers
+ * (docs/SPEC.md 7g). [listed] is the folder's own listing, read once here
+ * so the walk does not read it again. [counted] hears each question as
+ * answered from the kept verdicts (true) or from the disk (false), and
+ * [mayKeep] says whether an answer just found may be remembered (it may
+ * not when a budget cut the evidence short).
+ */
+internal class FolderMemo private constructor(
+    private val store: PcFolderScan.EngineVerdicts,
+    private val folder: File,
+    private val mtime: Long,
+    private val entries: Int,
+    val listed: Array<File>,
+    private val mayKeep: () -> Boolean,
+    private val counted: (hit: Boolean) -> Unit,
+) {
+    fun holdsEngine(compute: () -> Boolean): Boolean =
+        slot({ it.holdsEngine }, { v, answer -> v.copy(holdsEngine = answer) }, compute)
+
+    fun plain(compute: () -> Boolean): Boolean =
+        slot({ it.plain }, { v, answer -> v.copy(plain = answer) }, compute)
+
+    /** The engine whose evidence names this folder ([GameEngineDetector.engineHere]). */
+    fun precise(compute: () -> GameEngine?): GameEngine? =
+        engineSlot({ it.precise }, { v, answer -> v.copy(precise = answer) }, compute)
+
+    /** The engine a subtree rule finds below this folder. */
+    fun subtree(compute: () -> GameEngine?): GameEngine? =
+        engineSlot({ it.subtree }, { v, answer -> v.copy(subtree = answer) }, compute)
+
+    private fun engineSlot(
+        read: (Verdict) -> String?,
+        write: (Verdict, String) -> Verdict,
+        compute: () -> GameEngine?,
+    ): GameEngine? {
+        // A name this build does not know (a file from a newer build) is a miss, not "no engine".
+        val name = slot({ v -> read(v)?.takeIf { it.isEmpty() || engineNamed(it) != null } }, write) {
+            compute()?.name ?: ""
+        }
+        return if (name.isEmpty()) null else engineNamed(name)
+    }
+
+    private fun engineNamed(name: String): GameEngine? = GameEngine.entries.firstOrNull { it.name == name }
+
+    private fun <T : Any> slot(read: (Verdict) -> T?, write: (Verdict, T) -> Verdict, compute: () -> T): T {
+        store.lookup(folder, mtime, entries)?.let(read)?.let {
+            counted(true)
+            return it
+        }
+        counted(false)
+        val answer = compute()
+        if (mayKeep()) store.record(folder, mtime, entries) { write(it, answer) }
+        return answer
+    }
+
+    companion object {
+        /** The modification time is read BEFORE the listing, as [PcFolderScan.ListingCache] does: a change during the read then moves it past the stamp kept. */
+        fun of(
+            store: PcFolderScan.EngineVerdicts,
+            folder: File,
+            mayKeep: () -> Boolean,
+            counted: (hit: Boolean) -> Unit,
+        ): FolderMemo {
+            val mtime = folder.lastModified()
+            val listed = folder.listFiles() ?: emptyArray()
+            return FolderMemo(store, folder, mtime, listed.size, listed, mayKeep, counted)
+        }
+    }
 }
 
 /**
@@ -1194,54 +1391,108 @@ class EngineGameProvider(
         // here so this provider works from a bare list of installs too.
         val roots = (GamesRoots.current(context) + extraRoots() + installs.mapNotNull { it.installDir.parentFile })
             .distinctBy { it.absolutePath }
-        for (root in roots) {
-            if (!rootMounted(root)) {
-                ScanLog.write("engine root ${root.absolutePath}: not mounted right now, left as-is")
-                continue
-            }
-            val rootStartedAt = System.currentTimeMillis()
-            val top = GameEngineDetector.topLevelFolders(root, systemsById)
-            val rootSkips = ScanSkips().apply { addAll(top.skipped) }
-            var rootGames = 0
-            for (folder in top.folders) {
-                if (skip(root, folder)) continue
-                val folderStartedAt = System.currentTimeMillis()
-                val scanned = GameEngineDetector.scanFolder(
-                    folder,
-                    systemsById,
-                    defs,
-                    override = { candidate -> EngineOverridePrefs.engineFor(context, candidate.absolutePath) },
-                    budget = { ScanBudget.start() },
-                )
-                rootSkips.addAll(scanned.skipped)
-                rootGames += scanned.games.size
+        // The verdicts every walk shares (the PC walk too, [EngineVerdictStore]),
+        // so a folder reached through two overlapping roots, or already
+        // checked by the PC walk or the last scan, is not checked again.
+        val verdicts = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            EngineVerdictStore.forRules(context, defs)
+        }
+        // The Rescan row's line for this walk: where it is, and how many
+        // engine checks it has finished of those it has planned so far.
+        val enginePlanned = java.util.concurrent.atomic.AtomicInteger()
+        val engineFinished = java.util.concurrent.atomic.AtomicInteger()
+        val place = java.util.concurrent.atomic.AtomicReference("Looking for engine games")
+        fun showProgress() {
+            val planned = enginePlanned.get()
+            val engines = if (planned > 0) ", checking engines: ${engineFinished.get()} of $planned" else ""
+            ScanActivity.set(ENGINE_SCAN_SOURCE, place.get() + engines)
+        }
+        val walkOptions = GameEngineDetector.EngineWalkOptions(
+            verdicts = verdicts,
+            folderBudgetMs = ScanBudget.DEFAULT_TOP_FOLDER_BUDGET_MS,
+            onEngineWork = { planned, finished ->
+                enginePlanned.addAndGet(planned)
+                engineFinished.addAndGet(finished)
+                showProgress()
+            },
+        )
+        try {
+            showProgress()
+            for (root in roots) {
+                if (!rootMounted(root)) {
+                    ScanLog.write("engine root ${root.absolutePath}: not mounted right now, left as-is")
+                    continue
+                }
+                val rootStartedAt = System.currentTimeMillis()
+                val top = GameEngineDetector.topLevelFolders(root, systemsById)
+                val rootSkips = ScanSkips().apply { addAll(top.skipped) }
+                var rootGames = 0
+                for ((index, folder) in top.folders.withIndex()) {
+                    if (skip(root, folder)) continue
+                    place.set("Looking for engine games in ${root.name}: folder ${index + 1} of ${top.folders.size}")
+                    showProgress()
+                    val folderStartedAt = System.currentTimeMillis()
+                    val scanned = GameEngineDetector.scanFolder(
+                        folder,
+                        systemsById,
+                        defs,
+                        override = { candidate -> EngineOverridePrefs.engineFor(context, candidate.absolutePath) },
+                        options = walkOptions,
+                        budget = { ScanBudget.start() },
+                    )
+                    // What the walk finished is kept, slow or not, so the next
+                    // scan (or a restart) starts from it.
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { EngineVerdictStore.save(context) }
+                    rootSkips.addAll(scanned.skipped)
+                    val verdictNote = "${scanned.engineChecks} engine checks, ${scanned.engineVerdictsKept} engine verdict cache hits"
+                    if (scanned.slow) {
+                        // Not published: the index keeps what the last walk found
+                        // here, and the next scan walks the folder again.
+                        ScanLog.write(
+                            label = "engine folder ${folder.absolutePath}",
+                            games = 0,
+                            skipped = scanned.skipped,
+                            durationMs = System.currentTimeMillis() - folderStartedAt,
+                            note = verdictNote,
+                            base = folder,
+                        )
+                        continue
+                    }
+                    rootGames += scanned.games.size
+                    ScanLog.write(
+                        label = "engine folder ${folder.absolutePath}",
+                        games = scanned.games.size,
+                        skipped = scanned.skipped,
+                        durationMs = System.currentTimeMillis() - folderStartedAt,
+                        // A budget no longer drops what is under the folder it
+                        // fired on, so this says where it fired and nothing
+                        // more -- see ScanBudget and the walk's own tooSlow.
+                        note = listOfNotNull(
+                            scanned.stoppedAt?.let { "read too slowly in ${it.absolutePath}, so only its own evidence was dropped" },
+                            verdictNote,
+                        ).joinToString("; "),
+                        base = folder,
+                    )
+                    publish(root, folder, scanned.games.map { it.toEntry(root, folder, installsByDir) })
+                    if (pauseMs > 0) delay(pauseMs)
+                }
+                rootDone(root, top.folders)
                 ScanLog.write(
-                    label = "engine folder ${folder.absolutePath}",
-                    games = scanned.games.size,
-                    skipped = scanned.skipped,
-                    durationMs = System.currentTimeMillis() - folderStartedAt,
-                    // A budget no longer drops what is under the folder it
-                    // fired on, so this says where it fired and nothing
-                    // more -- see ScanBudget and the walk's own tooSlow.
-                    note = scanned.stoppedAt?.let {
-                        "read too slowly in ${it.absolutePath}, so only its own evidence was dropped"
-                    },
-                    base = folder,
+                    label = "games root ${root.absolutePath}",
+                    games = rootGames,
+                    skipped = rootSkips,
+                    durationMs = System.currentTimeMillis() - rootStartedAt,
+                    note = "${top.folders.size} folders scanned",
+                    base = root,
                 )
-                publish(root, folder, scanned.games.map { it.toEntry(root, folder, installsByDir) })
-                if (pauseMs > 0) delay(pauseMs)
             }
-            rootDone(root, top.folders)
-            ScanLog.write(
-                label = "games root ${root.absolutePath}",
-                games = rootGames,
-                skipped = rootSkips,
-                durationMs = System.currentTimeMillis() - rootStartedAt,
-                note = "${top.folders.size} folders scanned",
-                base = root,
-            )
+        } finally {
+            ScanActivity.finish(ENGINE_SCAN_SOURCE)
         }
     }
+
+    /** The key the engine walk's progress is shown under ([ScanActivity]). */
+    private val ENGINE_SCAN_SOURCE = "engines"
 
     private fun DetectedGame.toEntry(root: File, part: File, installsByDir: Map<String, StoreInstall>): LibraryEntry {
         val entry = LibraryEntry(
