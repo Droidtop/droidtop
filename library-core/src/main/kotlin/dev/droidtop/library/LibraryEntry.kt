@@ -337,7 +337,26 @@ data class PcInfo(
      * bad decision-maker.
      */
     val compatibility: PcCompatibility? = null,
+    /**
+     * The build this device has installed, as the store words it, or null
+     * when the store does not say (docs/SPEC.md 7g, "Where an update comes
+     * from"). Never invented: a store that gives no version leaves it null.
+     */
+    val installedVersion: String? = null,
+    /** The newest build the store last named, or null until asked or when it only says "newer". */
+    val latestVersion: String? = null,
+    /** Whether a newer build exists; [StoreUpdate.UNKNOWN] is the honest default, never "up to date". */
+    val update: StoreUpdate = StoreUpdate.UNKNOWN,
 )
+
+/**
+ * What a store said about a newer build of an installed game. Three
+ * values because "nobody asked" and "asked, current" are different
+ * answers: a store with no way to tell droidtop stays [UNKNOWN] and is
+ * never drawn as current (docs/SPEC.md 7g).
+ */
+@Serializable
+enum class StoreUpdate { UNKNOWN, CURRENT, AVAILABLE }
 
 /** @see PcInfo.compatibility — reference only. */
 @Serializable

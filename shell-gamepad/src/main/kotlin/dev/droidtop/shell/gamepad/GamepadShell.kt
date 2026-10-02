@@ -75,6 +75,7 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
+import dev.droidtop.shell.gamepad.pc.CapsuleStatusBadge
 import dev.droidtop.shell.gamepad.pc.onPcGamesTab
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.PlatformsDatabase
@@ -3363,6 +3364,7 @@ internal fun GameCard(
             // third one. The rig counted three at once -- this card's 1px
             // white rectangle, the menus' brightened card, and the
             // theme's own highlight.
+            .focusLift(focused, RoundedCornerShape(12.dp))
             .selectionFrame(
                 selected = focused,
                 shape = RoundedCornerShape(12.dp),
@@ -3436,6 +3438,9 @@ internal fun GameCard(
                 modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
             )
         }
+        // The same state badge a PC capsule carries (installed, update,
+        // missing), from what the entry already says.
+        CapsuleStatusBadge(entry)
     }
 }
 

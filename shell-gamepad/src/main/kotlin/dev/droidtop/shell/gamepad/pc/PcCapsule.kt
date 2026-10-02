@@ -4,10 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,13 +27,13 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.kindLine
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.focusLift
-import dev.droidtop.shell.gamepad.focusMarquee
 import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.selectionFrame
 
@@ -56,12 +58,41 @@ internal fun capsuleWidth(): Dp {
 }
 
 /**
+ * The one fact a capsule's top-left corner carries, from state already on
+ * the entry and the live download map (no per-card lookup): a download
+ * running or stopped, an update, a store game that is not installed, a
+ * folder that went missing, or a store game that is installed. Null for the
+ * rest (a folder game on this device needs no badge).
+ */
+internal enum class CapsuleStatus { DOWNLOADING, PAUSED, UPDATE, NOT_INSTALLED, MISSING, INSTALLED }
+
+/** The [CapsuleStatus] of [entry]; pure, and built on the same [storeStageOf] the primary button reads. */
+internal fun capsuleStatusOf(entry: LibraryEntry, download: StoreDownloads.Progress?): CapsuleStatus? {
+    if (entry.missing) return CapsuleStatus.MISSING
+    return when (storeStageOf(entry, download)) {
+        StoreStage.DOWNLOADING -> CapsuleStatus.DOWNLOADING
+        StoreStage.PAUSED -> CapsuleStatus.PAUSED
+        StoreStage.UPDATE -> CapsuleStatus.UPDATE
+        StoreStage.INSTALL -> CapsuleStatus.NOT_INSTALLED
+        // A folder game whose update source names a newer version.
+        null -> when {
+            entry.availableUpdate != null -> CapsuleStatus.UPDATE
+            entry.isStoreRow() -> CapsuleStatus.INSTALLED
+            else -> null
+        }
+    }
+}
+
+/**
  * One game as the PC Games tab draws it: its box art, or the same plate
- * with its name when it has none, and its name under it. Nothing is
- * drawn over the art (owner, 2026-10-01: "I don't like the grid and
- * weird backing"): Steam draws no text on a capsule because the art is
- * the name, and a name a person has to read belongs beside it, not on a
- * dark plate across it.
+ * with its name when it has none. Nothing is drawn over the art but the
+ * corner badges (owner, 2026-10-01: "I don't like the grid and weird
+ * backing"): the art is the name, and the focused game's name and facts
+ * are said once, in the tab's one line ([focusLine]), not on every card.
+ * The corners: top-left the game's state ([CapsuleStatus]), top-right a
+ * favourite, bottom-left the store it is from, bottom-right how many
+ * folders or copies it stands for; a running download also draws a thin
+ * progress bar along the bottom edge.
  *
  * The capsule is not a focus target. The tab moves ONE selection through
  * its one `onPad` handler (docs/SPEC.md 6e) and tells each capsule whether
@@ -78,96 +109,140 @@ internal fun PcCapsule(
     onTap: () -> Unit,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
+    download: StoreDownloads.Progress? = null,
+    parts: Int = 1,
 ) {
     val shape = RoundedCornerShape(8.dp)
     val ring = selected && PadModality.showsFocus
     // The one focus treatment (docs/SPEC.md "Gaming motion and focus"): the
     // capsule lifts and gains a shadow under the cursor and the rest sit
-    // slightly dimmed; the title under it stays put so the row does not
-    // reflow.
+    // slightly dimmed.
     val title = GameNaming.displayName(entry.title)
-    Column(
+    Box(
         modifier = modifier
             .width(width)
+            .aspectRatio(CAPSULE_ASPECT)
             .pointerInput(entry.id) {
                 detectTapGestures(onTap = { onTap() }, onLongPress = { onLongPress() })
-            },
-        verticalArrangement = Arrangement.spacedBy(Space.Xs),
+            }
+            .focusLift(ring, shape)
+            .selectionFrame(selected, shape, rest = MenuTokens.Card, restOutline = MenuTokens.CardOutline),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(CAPSULE_ASPECT)
-                .focusLift(ring, shape)
-                .selectionFrame(selected, shape, rest = MenuTokens.Card, restOutline = MenuTokens.CardOutline),
-        ) {
-            if (entry.artworkUri != null) {
-                AsyncImage(
-                    model = entry.artworkUri,
-                    contentDescription = title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().clip(shape),
-                )
-            } else {
-                // No art: the plate carries the name, as the Deck does for
-                // a non-Steam shortcut with no artwork. Never a made-up
-                // cover (design language, 2026-09-17).
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(Space.Md),
-                    verticalArrangement = Arrangement.Bottom,
-                ) {
-                    Text(
-                        title,
-                        color = MenuTokens.OnSurface,
-                        style = TypeRole.rowTitle,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        entry.kindLine(),
-                        color = MenuTokens.OnSurfaceMuted,
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            if (entry.favorite) {
+        if (entry.artworkUri != null) {
+            AsyncImage(
+                model = entry.artworkUri,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(shape),
+            )
+        } else {
+            // No art: the plate carries the name, as the Deck does for
+            // a non-Steam shortcut with no artwork. Never a made-up
+            // cover (design language, 2026-09-17).
+            Column(
+                modifier = Modifier.fillMaxSize().padding(Space.Md),
+                verticalArrangement = Arrangement.Bottom,
+            ) {
                 Text(
-                    "★",
-                    color = MenuTokens.Favourite,
+                    title,
+                    color = MenuTokens.OnSurface,
                     style = TypeRole.rowTitle,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(Space.Sm),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            }
-            if (entry.availableUpdate != null) {
-                // The one fact a capsule carries beyond its art: a newer
-                // version exists (docs/SPEC.md 7g). A small affirmative
-                // mark in the corner, never a plate over the art.
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(Space.Sm)
-                        .background(MenuTokens.Affirmative, RoundedCornerShape(50))
-                        .padding(horizontal = Space.Sm, vertical = Space.Hair),
-                ) {
-                    Text("Update", color = MenuTokens.OnSelected, style = MaterialTheme.typography.labelSmall)
-                }
+                Text(
+                    entry.kindLine(),
+                    color = MenuTokens.OnSurfaceMuted,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
-        // The name under the art, one line, scrolling while selected (the
-        // one place scrolling text is allowed, docs/SPEC.md 7k "Text in
-        // rows and tiles"). Under a plate that already carries the name
-        // it would say the same thing twice, so it is left out there.
-        if (entry.artworkUri != null) {
+        if (entry.favorite) {
             Text(
-                title,
-                color = if (selected) MenuTokens.OnSurface else MenuTokens.Value,
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().focusMarquee(selected),
+                "★",
+                color = MenuTokens.Favourite,
+                style = TypeRole.rowTitle,
+                modifier = Modifier.align(Alignment.TopEnd).padding(Space.Sm),
+            )
+        }
+        CapsuleStatusBadge(entry, download)
+        CapsuleCorners(entry, download, parts)
+    }
+}
+
+/** The top-left badge: the game's [CapsuleStatus], on a plate that stays legible over any art. */
+@Composable
+internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: StoreDownloads.Progress? = null) {
+    val status = capsuleStatusOf(entry, download) ?: return
+    val (text, fill, ink) = when (status) {
+        CapsuleStatus.UPDATE -> Triple("Update", MenuTokens.Affirmative, MenuTokens.OnSelected)
+        CapsuleStatus.DOWNLOADING -> Triple("${download?.percent ?: 0}%", MenuTokens.Selected, MenuTokens.OnSelected)
+        CapsuleStatus.PAUSED -> Triple("Paused", MenuTokens.Scrim, MenuTokens.OnSurface)
+        CapsuleStatus.NOT_INSTALLED -> Triple("Not installed", MenuTokens.Scrim, MenuTokens.OnSurface)
+        CapsuleStatus.MISSING -> Triple("Missing", MenuTokens.Scrim, MenuTokens.Danger)
+        CapsuleStatus.INSTALLED -> Triple("✓", MenuTokens.Scrim, MenuTokens.Affirmative)
+    }
+    Box(
+        modifier = Modifier
+            .align(Alignment.TopStart)
+            .padding(Space.Sm)
+            .background(fill, RoundedCornerShape(50))
+            .padding(horizontal = Space.Sm, vertical = Space.Hair),
+    ) {
+        Text(text, color = ink, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+    }
+}
+
+/**
+ * The bottom corners and the progress bar: the store a game is from (one
+ * letter, no store's own artwork), how many copies it stands for when more
+ * than one, and a thin bar while a download runs.
+ */
+@Composable
+private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownloads.Progress?, parts: Int) {
+    val source = entry.pcInfo?.source?.firstOrNull()?.uppercaseChar()
+    if (entry.isStoreRow() && source != null) {
+        CornerMark(source.toString(), Modifier.align(Alignment.BottomStart))
+    }
+    if (parts > 1) CornerMark("×$parts", Modifier.align(Alignment.BottomEnd))
+    if (download != null) {
+        Box(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(MenuTokens.Scrim)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(download.fraction.coerceIn(0f, 1f))
+                    .height(4.dp)
+                    .background(MenuTokens.Selected),
             )
         }
     }
 }
+
+@Composable
+private fun CornerMark(text: String, modifier: Modifier) {
+    Text(
+        text,
+        color = MenuTokens.OnSurface,
+        style = MaterialTheme.typography.labelSmall,
+        maxLines = 1,
+        modifier = modifier
+            .padding(Space.Sm)
+            .background(MenuTokens.Scrim, RoundedCornerShape(50))
+            .padding(horizontal = Space.Sm, vertical = Space.Hair),
+    )
+}
+
+/**
+ * The one line that names the focused game and its facts, drawn once under
+ * the capsules instead of on every card (docs/SPEC.md 7i): title, store,
+ * state, version, size. Pure, for the tests.
+ */
+internal fun focusLine(entry: LibraryEntry, play: PcPlayState?, parts: Int): String = buildList {
+    add(GameNaming.displayName(entry.title))
+    entry.pcInfo?.takeIf { entry.isStoreRow() }?.let { add(it.source) }
+    play?.takeIf { it.store != null }?.let { add(if (it.progress != null) "${it.verb} ${(it.progress * 100).toInt()}%" else it.verb) }
+    entry.pcInfo?.installedVersion?.let { add(it) }
+    entry.pcInfo?.sizeBytes?.takeIf { it > 0 }?.let { add(downloadSizeLabel(it)) }
+    if (parts > 1) add("$parts copies")
+}.joinToString(" · ")

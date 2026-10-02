@@ -23,6 +23,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -38,11 +39,13 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.PartProgress
+import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.CatalogNavigator
@@ -206,6 +209,9 @@ internal fun PcGamesSection(
     // A multi-part game's card launches the part to continue with, not
     // always the first (docs/SPEC.md 7n); every other card launches itself.
     val launch: (LibraryEntry) -> Unit = { entry -> onLaunch(folded?.continuing?.get(entry.id) ?: entry) }
+    // How many folders or store copies one drawn game stands for, from the
+    // fold already made: a map read, never a lookup on disk.
+    fun partsOf(entry: LibraryEntry): Int = folded?.siblings?.get(entry.id)?.size ?: 1
 
     val scope = remember {
         LibraryQueryScope(
@@ -234,12 +240,16 @@ internal fun PcGamesSection(
     }
     var savedViews by remember { mutableStateOf<List<NamedLibraryView>>(emptyList()) }
     LaunchedEffect(Unit) { savedViews = withContext(Dispatchers.IO) { LibraryViewPrefs.savedViews(context, scope.id) } }
-    val views = pcBuiltInViews + savedViews
+    // The strip's counts (All, Installed, Updates, Favourites), worked out with
+    // the shelves; Updates and Favourites show only when they hold something.
+    var counts by remember { mutableStateOf(emptyMap<String, Int>()) }
+    val views = pcStripViews(counts, savedViews)
 
     var shelves by remember { mutableStateOf(emptyList<PcShelf>()) }
     LaunchedEffect(games) {
         val all = games ?: return@LaunchedEffect
         shelves = withContext(Dispatchers.Default) { pcShelves(all) }
+        counts = withContext(Dispatchers.Default) { pcViewCounts(all, scope) }
     }
     var grid by remember { mutableStateOf(emptyList<LibraryEntry>()) }
     LaunchedEffect(games, state.query) {
@@ -258,6 +268,20 @@ internal fun PcGamesSection(
     val focusedEntry = if (state.stripFocused) null else currentList.getOrNull(state.itemIndex)
     LaunchedEffect(focusedEntry?.id) { onFocusedEntryChanged(focusedEntry) }
     val focusedPlay = focusedEntry?.let { rememberPcPlayState(it) }
+
+    // A store game's primary action is its store's own screen (install,
+    // update, download), the same answer the capsule badge and the page
+    // button read ([storeStageOf]); everything else launches.
+    val downloads by StoreDownloads.active.collectAsState()
+    val launch: (LibraryEntry) -> Unit = { entry ->
+        if (storeStageOf(entry, entry.downloadKey()?.let { downloads[it] }) != null) {
+            openStoreScreen(context, entry)?.let {
+                android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+            }
+        } else {
+            onLaunch(entry)
+        }
+    }
 
     // The strip: Home, every view, Filters and sort.
     val stripCount = views.size + 2
@@ -451,7 +475,7 @@ internal fun PcGamesSection(
                             val label = when (index) {
                                 0 -> "Home"
                                 filtersChip -> "Filters and sort"
-                                else -> views[index - 1].name
+                                else -> pcStripLabel(views[index - 1], counts)
                             }
                             val on = when (index) {
                                 0 -> state.home
@@ -486,6 +510,8 @@ internal fun PcGamesSection(
                         if (state.shelfIndex == shelf && state.itemIndex == item) launch(entry) else moveTo(shelf, item)
                     },
                     onLongPressCapsule = { state.pageId = it.id },
+                    downloads = downloads,
+                    partsOf = ::partsOf,
                 )
                 else -> {
                     Text(
@@ -518,12 +544,26 @@ internal fun PcGamesSection(
                                         if (state.itemIndex == index) launch(entry) else moveTo(state.shelfIndex, index)
                                     },
                                     onLongPress = { state.pageId = entry.id },
+                                    download = entry.downloadKey()?.let { downloads[it] },
+                                    parts = partsOf(entry),
                                 )
                             }
                         }
                     }
                 }
             }
+        }
+        // The focused game's name and facts, said once (docs/SPEC.md 7i)
+        // instead of on every capsule.
+        focusedEntry?.let { entry ->
+            Text(
+                focusLine(entry, focusedPlay?.first, partsOf(entry)),
+                color = MenuTokens.OnSurfaceMuted,
+                style = TypeRole.supporting,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = window.edgePadding, vertical = Space.Xs),
+            )
         }
         // This tab's own hint row: the one legend AND the touch route to
         // these buttons (docs/SPEC.md 7j), promising only what dispatches.
@@ -668,6 +708,8 @@ private fun PcShelvesHome(
     rowState: (String) -> LazyListState,
     onTapCapsule: (shelf: Int, item: Int, entry: LibraryEntry) -> Unit,
     onLongPressCapsule: (LibraryEntry) -> Unit,
+    downloads: Map<String, StoreDownloads.Progress>,
+    partsOf: (LibraryEntry) -> Int,
 ) {
     val window = LocalShellWindow.current
     if (shelves.isEmpty()) {
@@ -712,6 +754,8 @@ private fun PcShelvesHome(
                             width = width,
                             onTap = { onTapCapsule(shelfIndex, itemIndex, entry) },
                             onLongPress = { onLongPressCapsule(entry) },
+                            download = entry.downloadKey()?.let { downloads[it] },
+                            parts = partsOf(entry),
                         )
                     }
                 }

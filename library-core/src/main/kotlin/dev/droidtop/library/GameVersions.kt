@@ -88,6 +88,28 @@ object GameUpdates {
         return if (here.any { it.equals(newest, ignoreCase = true) }) null else newest
     }
 
+    /**
+     * What an update reads as when a store knows a newer build exists but
+     * names no version (Steam compares manifests, not versions): the one
+     * wording [line] turns into "A newer build is available".
+     */
+    const val NEWER_BUILD = "A newer build"
+
+    /**
+     * The update a store row carries (docs/SPEC.md 7g): what the store last
+     * named, or [NEWER_BUILD] when it only said "newer", and null for every
+     * other answer. An installed copy only: a game that is not here has
+     * nothing to update. The store's answer feeds the card, the shelf and
+     * the Update filter through [LibraryEntry.availableUpdate], the way
+     * the F95 index feeds it for a folder.
+     */
+    fun forStore(pc: PcInfo?): String? =
+        if (pc != null && pc.installed && pc.update == StoreUpdate.AVAILABLE) {
+            pc.latestVersion?.takeIf { it.isNotBlank() } ?: NEWER_BUILD
+        } else {
+            null
+        }
+
     /** "v0.9.6 is available": a version that starts with a digit gets its `v`, a name ("Final") does not. */
     fun line(available: String): String =
         (if (available.firstOrNull()?.isDigit() == true) "v$available" else available) + " is available"

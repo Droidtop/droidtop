@@ -2,12 +2,15 @@ package dev.droidtop.shell.gamepad.pc
 
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.displayName
+import dev.droidtop.shell.gamepad.query.FAVOURITES_YES
 import dev.droidtop.shell.gamepad.query.INSTALLED_YES
 import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryQuery
+import dev.droidtop.shell.gamepad.query.LibraryQueryScope
 import dev.droidtop.shell.gamepad.query.LibrarySortKey
 import dev.droidtop.shell.gamepad.query.NamedLibraryView
 import dev.droidtop.shell.gamepad.query.RECENT_YES
+import dev.droidtop.shell.gamepad.query.UPDATE_YES
 
 /**
  * One row of the PC Games home (docs/SPEC.md 7i): a title, the games on
@@ -99,17 +102,46 @@ internal fun pcShelves(games: List<LibraryEntry>, now: Long = System.currentTime
     }
 }
 
+/** The strip's built-in view names, which the counts below are keyed by. */
+internal const val VIEW_ALL = "All games"
+internal const val VIEW_INSTALLED = "Installed"
+internal const val VIEW_UPDATES = "Updates"
+internal const val VIEW_FAVOURITES = "Favourites"
+internal const val VIEW_CONTINUE = "Continue playing"
+
 /**
- * The views the strip always offers, in the strip's order after Home:
- * the whole library, what is installed, what was played lately. The same
- * shape as a person's own saved view ([NamedLibraryView]), so the strip,
- * the filter dialog and the saved views are one mechanism.
+ * The views the strip can offer, in the strip's order after Home: the whole
+ * library, what is installed, what has an update, the favourites, what was
+ * played lately. The same shape as a person's own saved view
+ * ([NamedLibraryView]), so the strip, the filter dialog and the saved views
+ * are one mechanism. Updates and Favourites appear only when there is
+ * something in them ([pcStripViews]), like their shelves.
  */
 internal val pcBuiltInViews: List<NamedLibraryView> = listOf(
-    NamedLibraryView("All games", LibraryQuery()),
-    NamedLibraryView("Installed", LibraryQuery(facets = mapOf(LibraryFacet.INSTALLED.key to setOf(INSTALLED_YES)))),
+    NamedLibraryView(VIEW_ALL, LibraryQuery()),
+    NamedLibraryView(VIEW_INSTALLED, LibraryQuery(facets = mapOf(LibraryFacet.INSTALLED.key to setOf(INSTALLED_YES)))),
+    NamedLibraryView(VIEW_UPDATES, LibraryQuery(facets = mapOf(LibraryFacet.UPDATE.key to setOf(UPDATE_YES)))),
+    NamedLibraryView(VIEW_FAVOURITES, LibraryQuery(facets = mapOf(LibraryFacet.FAVOURITES.key to setOf(FAVOURITES_YES)))),
     NamedLibraryView(
-        "Continue playing",
+        VIEW_CONTINUE,
         LibraryQuery(facets = mapOf(LibraryFacet.RECENTLY_PLAYED.key to setOf(RECENT_YES)), sort = LibrarySortKey.RECENT),
     ),
 )
+
+/**
+ * How many games each built-in view holds, by view name, worked out once per
+ * library change off the main thread (one pass of the view's own filter over
+ * the folded library, no sort): the strip's counts (docs/SPEC.md 7i).
+ */
+internal fun pcViewCounts(games: List<LibraryEntry>, scope: LibraryQueryScope): Map<String, Int> =
+    pcBuiltInViews.associate { view -> view.name to games.count { view.query.matches(it, scope) } }
+
+/** The strip's views: the built-in ones that have something in them, then the person's own saved views. */
+internal fun pcStripViews(counts: Map<String, Int>, saved: List<NamedLibraryView>): List<NamedLibraryView> =
+    pcBuiltInViews.filter { view ->
+        (view.name != VIEW_UPDATES && view.name != VIEW_FAVOURITES) || (counts[view.name] ?: 0) > 0
+    } + saved
+
+/** A chip's label: a built-in view carries its count ("Installed · 12"), a saved view is just its name. */
+internal fun pcStripLabel(view: NamedLibraryView, counts: Map<String, Int>): String =
+    if (pcBuiltInViews.any { it.name == view.name }) counts[view.name]?.let { "${view.name} · $it" } ?: view.name else view.name

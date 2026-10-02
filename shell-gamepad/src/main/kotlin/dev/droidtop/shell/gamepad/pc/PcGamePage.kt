@@ -483,6 +483,19 @@ private fun pageRows(
             ),
         )
     }
+    entry.pcInfo?.takeIf { entry.isStoreRow() && it.installed }?.let { pc ->
+        pc.installedVersion?.takeIf { availableVersions.isEmpty() }?.let { add(PageFact("Version", it)) }
+        // A store with no way to tell droidtop says so; it is never shown as up to date.
+        when {
+            // Already said above, under the same row.
+            entry.availableUpdate != null -> Unit
+            pc.update == dev.droidtop.library.StoreUpdate.UNKNOWN ->
+                add(PageFact("Update", "Not known", subtitle = "${pc.source} does not tell droidtop whether a newer build exists"))
+            pc.update == dev.droidtop.library.StoreUpdate.CURRENT ->
+                add(PageFact("Update", "Up to date", subtitle = "${pc.source} says this is the newest build"))
+            else -> Unit
+        }
+    }
     add(
         PageFact(
             "Runs with",

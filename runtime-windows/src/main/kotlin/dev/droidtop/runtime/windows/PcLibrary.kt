@@ -19,6 +19,7 @@ import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.PcCompatibility
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.StoreInstall
+import dev.droidtop.library.StoreUpdate
 import java.io.File
 
 /**
@@ -84,6 +85,8 @@ object PcLibrary {
         val sizeBytes: Long,
         val artUrl: String?,
         val compatibility: Compatibility?,
+        /** The build installed, when the store words one; never made up ([PcInfo.installedVersion]). */
+        val installedVersion: String? = null,
     ) {
         val installDir: File? get() = installPath?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { it.isDirectory }
     }
@@ -142,6 +145,10 @@ object PcLibrary {
      */
     suspend fun storeGames(context: Context): List<Game> {
         val dao = daos(context)
+        // What the stores last said about newer builds, and the downloads
+        // they are running: files and memory only, no network here.
+        StoreUpdates.load(context)
+        StoreDownloadWatch.start(context)
         return buildList {
             addAll(runCatching { dao.steamAppDao().getAllOwnedAppsAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(runCatching { dao.gogGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
@@ -175,7 +182,11 @@ object PcLibrary {
                 }.getOrDefault(emptyList()),
             )
         }.sortedBy { it.title.lowercase() }
-            .also { games -> storeSourceInstalls = games.mapNotNull { it.toStoreInstall() } }
+            .also { games ->
+                storeSourceInstalls = games.mapNotNull { it.toStoreInstall() }
+                // Asked in the background, for the next walk to read.
+                StoreUpdates.refreshInBackground(context, games.filter { it.installed }.map { it.id })
+            }
     }
 
     /**
@@ -359,6 +370,7 @@ object PcLibrary {
         sizeBytes = installSize,
         artUrl = iconUrl.takeIf { it.isNotEmpty() },
         compatibility = compatibilityFor(title),
+        installedVersion = version.takeIf { isInstalled && it.isNotBlank() },
     )
 
     private fun AmazonGame.toGame(): Game = Game(
@@ -633,6 +645,9 @@ fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
     installed = installed,
     sizeBytes = sizeBytes,
     installPath = installPath,
+    installedVersion = installedVersion,
+    latestVersion = StoreUpdates.resultFor(id)?.latest,
+    update = StoreUpdates.resultFor(id)?.update ?: StoreUpdate.UNKNOWN,
     compatibility = compatibility?.let {
         PcCompatibility(
             averageRating = it.averageRating,

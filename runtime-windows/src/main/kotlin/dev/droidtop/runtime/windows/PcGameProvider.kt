@@ -141,6 +141,9 @@ class PcGameProvider(
         val database = context.getDatabasePath(app.gamenative.db.DATABASE_NAME)
         paths += database.absolutePath
         paths += database.absolutePath + "-wal"
+        // The stores' update answers (StoreUpdates) arrive after a walk and
+        // are read by the next one, so their file moves the stamp.
+        paths += StoreUpdates.file(context).absolutePath
         runCatching { ContainerManager(context).containers.forEach { paths += it.desktopDir.absolutePath } }
         runCatching { paths += app.gamenative.PrefManager.customGameManualFolders }
         runCatching { paths += app.gamenative.PrefManager.customGameScanRoots }

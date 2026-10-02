@@ -54,7 +54,10 @@ data class LibraryGameGroup(
         get() {
             val entry = defaultCopy?.let { entriesByPath[it.path] }
                 ?: entriesByPath.values.first()
+            // A folder's update comes from the F95 index; a store row's
+            // from its store ([GameUpdates.forStore]).
             val update = game.availableUpdate
+                ?: entriesByPath.values.firstNotNullOfOrNull { GameUpdates.forStore(it.pcInfo) }
             return if (entry.title == game.name && entry.availableUpdate == update) {
                 entry
             } else {

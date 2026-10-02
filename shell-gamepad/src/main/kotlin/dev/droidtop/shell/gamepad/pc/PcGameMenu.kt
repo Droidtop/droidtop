@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -43,6 +44,7 @@ import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameUpdates
+import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.LaunchStrategyOverridePrefs
 import dev.droidtop.library.Library
@@ -601,7 +603,8 @@ internal fun PcGameMenu(
     var pageAbout: List<PcMenuEntry> = emptyList()
     val isReady = runner?.option?.state == RunnerState.READY
     val setupAction = runner?.option?.action
-    val playState = if (loaded) playStateOf(runner, entry) else PcPlayStateLoading
+    val downloads by StoreDownloads.active.collectAsState()
+    val playState = if (loaded) playStateOf(runner, entry, entry.downloadKey()?.let { downloads[it] }) else PcPlayStateLoading
 
     // Flattened once per recomposition into what this Dialog actually
     // draws and what Up/Down/A navigate: a section header (never
@@ -650,7 +653,10 @@ internal fun PcGameMenu(
                         detail = playState.detail,
                         onSelect = if (loaded && playState.pressable) {
                             {
-                                if (isReady) {
+                                if (playState.store != null) {
+                                    // Install, Update, Downloading: the store's own screen.
+                                    status = openStoreScreen(context, entry)
+                                } else if (isReady) {
                                     onClose()
                                     onLaunch()
                                 } else if (setupAction != null) {
@@ -668,6 +674,9 @@ internal fun PcGameMenu(
                     ),
                 ),
             )
+        }
+        if (playState.store == StoreStage.UPDATE && isReady) {
+            add(PcMenuEntry.Row(PcActionRow("Play without updating", "Starts the installed build as it is", { onClose(); onLaunch() })))
         }
         actions.play.forEach { add(PcMenuEntry.Row(it)) }
     }
@@ -1009,7 +1018,9 @@ private fun rememberPcActions(
             // this game's source, with its GameManagerDialog /
             // EpicGameManagerDialog / AmazonInstallDialog).
             PcActionRow(
-                if (entry.pcInfo?.installed == false) "Install" else "Manage install",
+                // Install and Update are the primary row above; this is the
+                // place for verify, extras and remove.
+                "Manage install",
                 if (isStoreGame) {
                     "Install, verify, update or remove it, and pick which extras come with it"
                 } else {
@@ -1301,9 +1312,9 @@ private val STORE_PREFIXES = setOf("steam", "gog", "epic", "amazon")
 // :app's hosts for the gamenative screens droidtop adopts, by name
 // because this module cannot depend on :app. Kept together so the two
 // sides are one edit apart if a class ever moves.
-private const val PC_STORE_ACTIVITY = "dev.droidtop.app.PcStoreActivity"
+internal const val PC_STORE_ACTIVITY = "dev.droidtop.app.PcStoreActivity"
 private const val PC_CONTAINER_CONFIG_ACTIVITY = "dev.droidtop.app.PcContainerConfigActivity"
-private const val EXTRA_PC_ENTRY_ID = "dev.droidtop.app.extra.PC_ENTRY_ID"
+internal const val EXTRA_PC_ENTRY_ID = "dev.droidtop.app.extra.PC_ENTRY_ID"
 private const val EXTRA_PC_TITLE = "dev.droidtop.app.extra.PC_TITLE"
 
 

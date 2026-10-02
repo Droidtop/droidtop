@@ -7723,9 +7723,34 @@ where it came from.
 linked to their F95zone thread. It is the index F95Checker itself reads
 (its `modules/api.py`, `fast_check` and `full_check`), ported through the
 user's own Pythia (`plugin_sources/library/f95/f95_update_check.py`), and
-it needs no F95zone account: neither call sends a cookie. Nothing else
-claims an update; a game with no link says nothing about updates, which is
-not the same as "up to date" and is not shown as such.
+it needs no F95zone account: neither call sends a cookie. For a FOLDER game
+nothing else claims an update; a game with no link says nothing about
+updates, which is not the same as "up to date" and is not shown as such. A
+STORE game's update comes from its store (next paragraphs).
+
+**A store game's update (2026-10-02, Droidtop/tracker#222).** `PcInfo` carries
+`installedVersion` (the build the store words, null when it gives none),
+`latestVersion` (null unless the store names one) and `update`, a
+three-valued `StoreUpdate`: `UNKNOWN`, `CURRENT`, `AVAILABLE`. Only two
+vendored store services can answer: Steam (`SteamService.isUpdatePending`,
+a manifest comparison, so it says "newer", not which version) and Amazon
+(`AmazonService.isUpdatePending`, a live version id; a `false` from it is
+also what a missing session returns, so it is read as `UNKNOWN`, never as
+current). GOG, Epic and itch.io have no update check in the vendored
+services, so they stay `UNKNOWN`, and their game page says "<store> does
+not tell droidtop whether a newer build exists"; nothing ever shows a store
+game as up to date unless its store said so. The answers are asked in the
+background by `StoreUpdates` (`:runtime-windows`), for installed games of a
+signed-in store, at most every six hours and once more for a game whose
+download just ended; never inside a scan and never while drawing. They are
+kept in a small file in the app's files directory, which the PC provider's
+store stamp includes, so the next walk picks them up and a library scan
+itself makes no network call. `GameUpdates.forStore(pcInfo)` turns an
+installed copy's `AVAILABLE` into `LibraryEntry.availableUpdate` on the card
+a list draws (`LibraryGameGroup.displayEntry`), which is what the Update
+available shelf and the Update filter already read; a store that names no
+version reads "A newer build" so `GameUpdates.line` is still the one wording
+("A newer build is available").
 
 **How droidtop learns a game's thread: the user tells it.** A folder game's
 detail has an "F95zone thread" row; the user pastes the thread's link (the
@@ -9017,8 +9042,8 @@ it:
 | Steam Deck / Big Picture | Others | PC Games |
 | --- | --- | --- |
 | Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves** on Home: Recently added (nonzero indexed first-seen time, newest first), Continue playing, Update available, Favourites, Installed (only when something is not), one per store (Steam, GOG, ...), one per engine family (Visual Novels, RPG Maker, Windows, ...). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. `pcShelves`, `pc/PcShelves.kt`. |
-| Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip**: Home, All games, Installed, Continue playing, the person's saved views, Filters and sort. One press to a view, one press to the filter dialog. The strip is the one place filter, sort, search and saved views are reached (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
-| 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it, the name under it on one line (scrolling while selected, the one place scrolling text is allowed, §7k), a plate with the name and kind where there is no art, a small favourite star and an "Update" mark in the corners. No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is a share of the window's height (`capsuleWidth`, 104-176dp), so the console shows a shelf and the top of the next, and a phone held upright gets two columns. |
+| Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip**: Home, All games, Installed, Updates, Favourites, Continue playing, the person's saved views, Filters and sort; each built-in view carries its count ("Installed · 12"), and Updates and Favourites appear only when something is in them. One press to a view, one press to the filter dialog. The strip is the one place filter, sort, search and saved views are reached (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
+| 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule. No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is a share of the window's height (`capsuleWidth`, 104-176dp), so the console shows a shelf and the top of the next, and a phone held upright gets two columns. |
 | Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window): the hero (16:9) or capsule art as large as its column allows; the name and where it came from under the art; ONE big primary button that says what A does (`PcPlayState`: Play, Install, Set up, Choose a runner, Folder is missing -- drawn faded, with its reason under it, when it cannot be pressed); Favourite and Options beside it; and under them every fact droidtop has as rows -- Play time, Last played, Size, Owned on, Version, Update, Runs with, Engine, Compatibility, Developer, Publisher, Released, Genre, Series, Rating, Players, About, where the facts came from. Only facts that exist are rows. Achievements are not a row because droidtop has no achievement data (#143); when it does, this is where the row goes. |
 | The page's rows are the same rows as Steam's settings | | **Settings' rows.** The page's facts are `MenuRow(uniformHeight = true)` at `uniformRowHeight()`, with one content-sized value column (`LocalValueColumnWidth`) and the selected row's full text in the detail strip under the list (`CatalogDetailStrip`, §7k "Text in rows and tiles"); a long description is read there, never by growing a row. |
 | A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A is the primary action** (owner, 2026-10-01: "A is Primary Action. We can make it contextual using the pills."): on a capsule A does what the hint pill says -- Play when the runner is ready, else the one setup step (`PcRunnerOptions.resolveAndPlay`, the one launch handler); Y opens the page. The page exists for looking and for the game's own actions, never as a step in front of Play. |
@@ -9086,6 +9111,58 @@ the pipeline applies it.
   Each is a `HintBinding` gated on its action really dispatching (§7j).
   Over the PC setup screen the claim is `NONE` and the shell's bar draws,
   because that screen has no row of its own.
+
+### Capsules and the primary action (decided 2026-10-02, Droidtop/tracker#255, #222, #223)
+
+**The art is the interface.** A capsule with art draws the art and its
+corner badges and nothing else; a capsule without art draws a plate with
+the name and kind (never a made-up cover). The corners, each at most one
+mark, all from state already on the entry or in the live download map, so
+a card costs no lookup of its own: top-left the game's state
+(`CapsuleStatus`, from `capsuleStatusOf`): a download's percent or Paused,
+Update, Not installed, Missing (a folder the walk lost), or an installed
+tick for a store game (a folder game that is simply here needs no mark);
+top-right the favourite star; bottom-left the store it is from, one letter
+(droidtop draws no store's own artwork); bottom-right "x3" when the card
+stands for several folders or store copies (`LibraryGameGroup`'s
+entries). A running download also draws a thin progress bar along the
+bottom edge. The focus treatment is the one `focusLift` of "Gaming motion
+and focus"; `GameCard` (the launcher and library tiles that are not
+theme-rendered) takes the same `focusLift` and the same state badge, and
+the ES-DE theme renderer is untouched. The focused game's one line
+(`focusLine`: name, store, stage, version, size, copies) sits above the
+hint row.
+
+**One state function.** `storeStageOf(entry, download)` answers, for a
+store row (a row with a store's id that is not a folder or a Wine
+shortcut), whether the next thing is `INSTALL` (not installed), `UPDATE`
+(its store said a newer build exists, `StoreUpdate.AVAILABLE`),
+`DOWNLOADING` or `PAUSED` (a running or stopped download, which beats the
+other two), or nothing. `playStateOf` puts it first, so the primary
+button reads Install (with the download size), Update ("A newer build is
+available"), Downloading (percent) or Resume; the capsule badge, the page's
+big button, the menu's first row and the hint pill all read that one
+answer, and `capsuleStatusOf` is built on the same stage. A on a capsule,
+the page button and the menu's first row for such a game open the game's
+own store screen (`openStoreScreen`, `PcStoreActivity`), the one place
+install, update, pause, verify, extras and remove happen, so the size and
+free space are named by the store's own install dialog and not by a second
+consent sheet of droidtop's; "Manage install" stays in the menu for the
+rest, and an installed game with an update also gets "Play without
+updating". Epic downloads are not mapped yet (its service keys a download
+by a row number the library does not carry), so an Epic game shows Install
+or Update but not Downloading.
+
+**Live downloads.** `StoreDownloads` (`:library-core`) is an in-memory map
+by store id, written by `StoreDownloadWatch` (`:runtime-windows`) from the
+Steam, Amazon and GOG services' own download maps once a second while one
+runs and every few seconds when none does; the shell collects it. A
+download that reaches 100 percent leaves the map and its game is asked
+about again.
+
+**The strip's counts.** `pcViewCounts` counts each built-in view with the
+view's own query, once per library change, off the main thread; the chip
+labels read it (`pcStripLabel`).
 
 ### Where the state lives
 
