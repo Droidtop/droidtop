@@ -153,7 +153,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
                 apps = apps,
                 displays = displays,
                 selectedIndex = index,
-                clearLabel = if (index == 0 && message != null) message else "Clear all",
+                clearLabel = (if (index == 0) message else null) ?: "Clear all",
                 rowMessage = { i -> if (i + 1 == index) message else null },
                 onClear = { focusIndex = 0; press(GamepadAction.A) },
                 onSwitch = { i, app -> focusIndex = i + 1; press(GamepadAction.A) },
