@@ -71,6 +71,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 else -> id
             }
         }
+        // The task manager asks a running provider plugin (Shizuku, or a root one) to force-stop an app and
+        // to read the system's task list; with none, it says what to enable (docs/SPEC.md "The task manager").
+        dev.droidtop.runtime.tasks.TaskManager.install(dev.droidtop.pluginhost.PluginPrivilegedOps(this))
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).
         LibraryCore.followGamesRoots(this)

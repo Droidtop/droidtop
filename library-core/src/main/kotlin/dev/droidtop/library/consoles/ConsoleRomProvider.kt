@@ -13,6 +13,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
 import dev.droidtop.library.QuitResult
+import dev.droidtop.library.toQuitResult
 import dev.droidtop.library.PartRef
 import dev.droidtop.library.ScanStep
 import dev.droidtop.library.withScrapedMetadata
@@ -956,26 +957,18 @@ class ConsoleRomProvider(
 
     /**
      * [LibraryProvider.quit] for ROM entries (Droidtop/tracker#82): the
-     * exact same system/player resolution [launch] runs, then the same
-     * best-effort kill pre-launch cleanup already uses below, plus the
-     * task-removal a non-privileged app is allowed to do for a task IT
-     * launched. Returns [QuitResult.Unresolvable] (never attempted, not
+     * exact same system/player resolution [launch] runs, then the task
+     * manager's one close path for the player's package
+     * ([dev.droidtop.runtime.tasks.TaskManager.close], docs/SPEC.md "The
+     * task manager"). Returns [QuitResult.Unresolvable] (never attempted, not
      * "failed") when the entry's system or player can't be resolved at
      * all, e.g. it was uninstalled since launch.
      *
-     * Why the task removal is the part that actually works on Android 13:
-     * `killBackgroundProcesses` is restricted on Android 14+ to the
-     * caller's own processes (docs/SPEC.md 7i), so it alone left the
-     * emulator's process and its Recents task alive -- which is the
-     * exact tracker#82 report. droidtop launched this activity with
-     * [LaunchDisplay.start] -> `startActivity` with an explicit display,
-     * so Android records it as a task droidtop started, and
-     * [android.app.ActivityManager.getAppTasks] lists it for this
-     * package; [android.app.AppTask.finishAndRemoveTask] ends that task
-     * and its process, which is the non-privileged path for a task the
-     * launcher owns. It is still best-effort: a game the user launched
-     * from another app, or started before this droidtop install, has no
-     * task here and comes back as [QuitResult.NotEnded] with the reason.
+     * An earlier version also called `getAppTasks().finishAndRemoveTask()`
+     * here, which only lists tasks whose root activity is droidtop's own, so
+     * it never found a third-party emulator's task (tracker#245). Without a
+     * privileged helper the result is an honest [QuitResult.NotEnded] that
+     * says what to enable.
      */
     override suspend fun quit(entry: LibraryEntry): QuitResult {
         val romFile = File(entry.id)
@@ -988,40 +981,7 @@ class ConsoleRomProvider(
             ?: return QuitResult.Unresolvable("Couldn't resolve a console system for ${entry.id}; the game may have been uninstalled")
         val player = resolvePlayer(context, system, entry.altEmulator)
             ?: return QuitResult.Unresolvable("No emulator is installed for ${system.displayName}, so ${entry.title} can't be ended")
-        // The one thing that really ends another app's game on Android 13: a privileged helper. A plugin
-        // that provides priv.packages (the official Shizuku one) force-stops the package for us; with none
-        // installed this falls through to what a non-privileged app can do, with its honest message.
-        val forced = dev.droidtop.pluginhost.ForceStop.request(dev.droidtop.pluginhost.PluginBrokers.hostCaller(context), player.packageName)
-        if (forced == dev.droidtop.pluginhost.ForceStop.Result.Stopped) return QuitResult.Ended
-        killPackageProcessesBestEffort(player.packageName)
-        if (endLaunchedTaskBestEffort(player.packageName)) return QuitResult.Ended
-        return QuitResult.NotEnded(
-            when (forced) {
-                is dev.droidtop.pluginhost.ForceStop.Result.Failed ->
-                    "The privileged helper couldn't end ${player.name}: ${forced.message}. Close it from Recents."
-                else ->
-                    "Asked ${player.name} to close, but Android doesn't let droidtop end or confirm another app's game. " +
-                        "Close it from Recents, or install the Shizuku plugin so droidtop can end it."
-            },
-        )
-    }
-
-    /**
-     * Removes the player's task when it is one droidtop owns.
-     * [android.app.ActivityManager.getAppTasks] lists only tasks whose root
-     * activity belongs to THIS package, so it never finds a third-party
-     * emulator's task (Android hides those from a non-privileged app); it is
-     * here for players that run inside droidtop's own task. True only when a
-     * task was found and removed, never a guess.
-     */
-    private fun endLaunchedTaskBestEffort(packageName: String): Boolean {
-        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        val mine = am.appTasks.orEmpty().filter {
-            it.taskInfo?.baseIntent?.component?.packageName == packageName
-        }
-        if (mine.isEmpty()) return false
-        mine.forEach { it.finishAndRemoveTask() }
-        return true
+        return dev.droidtop.runtime.tasks.TaskManager.close(context, player.packageName).toQuitResult()
     }
 
     // Players with this Daijishō-preset flag (DuckStation among them) do

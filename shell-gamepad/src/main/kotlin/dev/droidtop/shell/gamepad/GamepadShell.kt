@@ -70,6 +70,7 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.settings.CatalogPrefs
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.EngineGameProvider
+import dev.droidtop.library.toQuitResult
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.LibraryEntry
@@ -628,7 +629,17 @@ private fun GamepadShellBody(
                 // The sheet stays open until the game really ended, so a
                 // quit that could not end it shows its reason in the row.
                 scope.launch {
-                    val outcome = runCatching { library.quit(entry) }.getOrElse {
+                    // The app in front is the one droidtop last started (LaunchLedger, noted at the one
+                    // dispatch point), whatever kind of entry it was; the task manager's one close path
+                    // ends it, and anything short of a confirmed close reads as such (tracker#245).
+                    val outcome = runCatching {
+                        val running = dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName
+                        if (running != null) {
+                            dev.droidtop.runtime.tasks.TaskManager.close(context, running).toQuitResult()
+                        } else {
+                            library.quit(entry)
+                        }
+                    }.getOrElse {
                         dev.droidtop.library.QuitResult.NotEnded("Quit failed: ${it.message ?: it.javaClass.simpleName}")
                     }
                     quitOutcome = outcome

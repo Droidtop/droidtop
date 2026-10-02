@@ -2440,10 +2440,9 @@ the `ContainerRuntime` interface that already exists (§3):
   <game>" until a quit runs). What a non-privileged app can actually do to another app's game:
   `killBackgroundProcesses` (only while its processes are cached; not on Android 14+ for other
   apps, 7i) and `ActivityManager.getAppTasks`, which lists only tasks whose root activity is
-  droidtop's own, so it never finds a third-party emulator's task. `ConsoleRomProvider.quit` tries
-  both and reports `Ended` only when it removed a task; for an emulator it can neither end nor
-  confirm it says so and names Recents as the way out. Nothing here claims an end it did not see.
-  PC/engine games and native apps return `NotEnded` by default.
+  droidtop's own, so it never finds a third-party emulator's task. Nothing here claims an end it did
+  not see. Since 2026-10-01 (tracker#245) the Quit row closes the app droidtop last started through
+  the task manager's one path, for every kind of entry, not only ROMs ("The task manager", below).
 - **Playtime label**: droidtop records launches (last played, count) but not session length, so a
   launched game's `playtime` theme binding reads "Played", never "Never played" (console pass,
   2026-09-28). The launch itself republishes the lists the shell is already showing, like an F95
@@ -2513,6 +2512,38 @@ the `ContainerRuntime` interface that already exists (§3):
   modular, discoverable settings" to learn conventions from as more of
   this gets built out (workspace switching, per-app window rules, etc.),
   not a component to fork code from.
+
+### The task manager (decided 2026-10-01, Droidtop/tracker#245, #252, #247)
+
+droidtop is a general compute device in every mode, so seeing what is open and ending it stay
+reachable from the Gaming UI, not only from Android's own Recents. The owner's reports that started
+this: the Quick Menu's Quit row did nothing for a plain app (the calendar), and nothing let you clear
+the stack. One mechanism serves every surface: `TaskManager` in `:runtime-common`
+(`dev.droidtop.runtime.tasks`). The Quick Menu, the companion and Standard's home call it; none has
+a close path of its own. Every call works off the main thread.
+
+- **Ending an app: one path, strongest first** (`TaskPolicy.closeSteps`, `AppCloser`):
+  1. A `priv.packages` provider force-stops the package (the official Shizuku plugin, or a root
+     provider: root and Shizuku are provider plugins reached through `PrivilegedOps`, never code in
+     the task manager, and root is only ever an enhancement behind the same interface).
+  2. `ActivityManager.killBackgroundProcesses` (the `KILL_BACKGROUND_PROCESSES` normal permission),
+     always tried last. It ends a process only while it is cached, and nothing confirms the result, so
+     it is never reported as a close.
+  `ActivityManager.getAppTasks` / `AppTask.finishAndRemoveTask` is deliberately not a step: Android
+  lists only tasks whose root activity is droidtop's own, so it can never find another package's task
+  (this was the dead leg of the old `ConsoleRomProvider.quit`), and droidtop never closes its own tasks
+  (the shell and the companion).
+- **The outcome is stated, never assumed** (`CloseOutcome`): `Closed` only when a provider confirmed
+  the force-stop; `Requested` when droidtop only asked Android and cannot tell; `Failed` with the
+  provider's own words. `Requested` and `Failed` always end with the same plain sentence
+  (`TaskPolicy.ENABLE_HINT`): what Android does not allow and that the Shizuku plugin lifts it. A
+  surface never does nothing silently, and only `Closed` is the Quick Menu's `QuitResult.Ended`
+  (droidtop's running-game state clears on that alone, as the rule above already says).
+- **The app in front is what droidtop last started.** `LaunchDisplay.dispatch`, the one point every
+  droidtop launch passes, notes the package and display in `LaunchLedger` (process memory; a
+  restart forgets it, which is the honest direction). The Quick Menu's Quit row closes
+  `LaunchLedger.last` whatever kind of entry it was: a ROM's player, an engine game's host, a plain
+  app. `Library.quit` stays only as the fallback when no launch was noted.
 
 ## 4a. Networking & VPN (directed 2026-08-30)
 

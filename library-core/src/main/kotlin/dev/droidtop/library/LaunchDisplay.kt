@@ -7,6 +7,7 @@ import android.content.pm.ApplicationInfo
 import android.util.Log
 import android.view.Display
 import dev.droidtop.runtime.AudioHandOff
+import dev.droidtop.runtime.tasks.LaunchLedger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -244,6 +245,9 @@ object LaunchDisplay {
         val resolvedDisplayId = displayId ?: Display.DEFAULT_DISPLAY
         context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(resolvedDisplayId).toBundle())
         runningPackageName = packageName
+        // The one place every app droidtop starts passes: the task manager's list of what droidtop opened,
+        // and the app the Quick Menu's Quit row ends (docs/SPEC.md "The task manager").
+        packageName?.let { LaunchLedger.note(it, resolvedDisplayId) }
         parkedDisplayId = resolvedDisplayId
         onLaunched?.invoke(resolvedDisplayId)
     }

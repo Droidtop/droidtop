@@ -779,6 +779,13 @@ val QuitResult.message: String
         is QuitResult.Unresolvable -> message
     }
 
+/** The task manager's answer as the Quick Menu's Quit row reports it: only a confirmed close is [QuitResult.Ended]. */
+fun dev.droidtop.runtime.tasks.CloseOutcome.toQuitResult(): QuitResult = when (this) {
+    dev.droidtop.runtime.tasks.CloseOutcome.Closed -> QuitResult.Ended
+    is dev.droidtop.runtime.tasks.CloseOutcome.Requested -> QuitResult.NotEnded(message)
+    is dev.droidtop.runtime.tasks.CloseOutcome.Failed -> QuitResult.NotEnded(message)
+}
+
 class Library(
     private val providers: List<LibraryProvider>,
     private val playHistory: PlayHistoryStore = NoOpPlayHistoryStore,
