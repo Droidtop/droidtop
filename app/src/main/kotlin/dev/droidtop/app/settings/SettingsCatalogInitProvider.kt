@@ -38,6 +38,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.library.integrations.PluginCatalog.registerDownloadPost()
         dev.droidtop.pluginhost.PluginJobsCenter.attach(appContext)
         dev.droidtop.app.JobsSummaryNotification.start(appContext)
+        dev.droidtop.app.LaunchWatchNotification.start(appContext)
         AppSettingsCatalogs.ensureRegistered()
         dev.droidtop.library.settings.LibraryRescan.handler = { ctx, onStatus ->
             onStatus("Looking for new or changed games and apps\u2026")

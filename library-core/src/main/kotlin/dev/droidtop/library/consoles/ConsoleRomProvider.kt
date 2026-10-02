@@ -108,7 +108,7 @@ fun buildLaunchIntent(context: Context, system: ConsoleSystemDef, player: Player
     }
     return AmStartCommandToIntentConverter.toIntent(
         context,
-        player.argumentsTemplate,
+        launchTemplateFor(player, player.storagePathTemplate != null && emulatorReadsStoragePaths(context, player.packageName)),
         romFile.absolutePath,
         placeholders,
     )

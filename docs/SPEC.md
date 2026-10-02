@@ -5910,6 +5910,64 @@ whatever the template's source, rather than trusting any one source:
 
 Findings and reasoning: `docs/security/2026-09-24-droidtop-intents-updater.md`.
 
+### Launch file access and the launch watchdog (decided 2026-10-02, Droidtop/tracker#270, #271, #168)
+
+**How the game file reaches the emulator.** A preset states it, in data. The players database row
+carries `argumentsTemplate` (the content-URI launch, `{file.uri}`, or whatever the preset needs) and may
+carry `storagePathTemplate`, the same launch with `{file.path}`. `launchTemplateFor` uses the path variant
+only when the preset has one AND the emulator holds all-files access (`emulatorReadsStoragePaths`: the
+`MANAGE_EXTERNAL_STORAGE` app-op on API 30+, `READ_EXTERNAL_STORAGE` below); otherwise the row's own
+template runs, so no preset changes behaviour until its row opts in, and one that cannot be read directly
+never loses its URI. A plain path never depends on how much of a content URI an emulator's own file helper
+reads.
+
+**The provider answers a full stat.** `{file.uri}` is issued by `DroidtopFileProvider`, androidx's
+`FileProvider` with one change: `query` answers exactly the columns asked for, in the order asked, from
+the document set (`_display_name`, `_size`, `last_modified`, `mime_type`, `flags`, `document_id`), null for
+a column it does not know. Stock `FileProvider` returns only the first two whatever is asked, so an emulator
+that stats the URI read past its one-column cursor and died (NetherSX2's `FileHelper.statFile`, "Failed to
+read row 0, column 1 from a window with 1 rows, 1 columns", Droidtop/tracker#270). URI issuing, grants,
+`file_paths.xml` and `openFile` are unchanged and the private-storage and exact-URI rules above still hold.
+The audit of presets that use `{file.uri}` (about 66 packages, among them DuckStation, PPSSPP, DraStic, the
+Dolphin and AetherSX2 families): the provider change covers every one of them, so no preset's template was edited; a preset that works only from a
+real path gets a `storagePathTemplate` row in droidtop-platforms, not Kotlin.
+
+**The launch watchdog** (`LaunchWatchdog`, `LaunchWatchPolicy`). `LaunchDisplay.dispatch`, the one point
+every launch passes, starts it for a game launch. It runs off the main thread, every 3 s for at most 90 s,
+and ends the moment the launch is settled (`clearRunning`, a quit, or a listed and live app after 30 s). It
+uses only what a non-root app can see:
+
+- Android's own not-responding state for the app's processes (`ActivityManager.getProcessesInErrorState`);
+- whether the shell was started again after the launch began (`LaunchDisplay.shellStartedMs`, the same
+  signal as the bounce check);
+- when a `priv.shell` provider runs, whether the app's task is in the system's task list
+  (`TaskManager`, exact fidelity only); without one this is unknown and claims nothing.
+
+It reports three things, each in plain words naming the app: it is not responding; it closed straight
+after it started (the shell came back within 10 s and the app is not open); it is no longer running
+but its screen never handed back (task list says gone after 9 s). A black window of a live, responsive
+app is indistinguishable from a game that is running and is never claimed, and a person returning to
+the shell on purpose while the app is open or after 10 s is not a problem. The verdict is published once
+(`LaunchWatchdog.alert`) and written to the scan log (`logs/scan.log`, whose path is shown). The shell
+shows it as the launch-failure dialog with Close it (`TaskManager.close`, the one close path; the alert
+clears only on a confirmed close, anything else is shown as the task manager words it), Return to
+droidtop, and OK; `LaunchWatchNotification` posts the same sentence as a notification when droidtop may
+post them, because the shell may be hidden behind the stuck app and a notification is drawn by the system
+over any app. Tapping it returns to droidtop.
+
+**Platform limit: the pad belongs to the app in front.** Android sends a controller's keys to the focused
+window only. While an emulator is in front, droidtop gets no pad input and the Quick Menu and left menu
+cannot open (Start belongs to the game, Home is never used). So a stuck emulator on the same screen is
+left by touch (the notification, Android's own not-responding dialog, which is pad-navigable) or by the
+emulator's own exit; a stuck emulator on the other screen with the shell on the built-in one shows the
+dialog on the shell, which has the pad. A pad-only escape from a hung full-screen app needs a system-wide
+key listener (an accessibility service with key filtering), which droidtop does not request; it is left as
+an owner decision rather than built.
+
+`Droidtop/tracker#271`: RetroArch hanging when a ROM is read from `/storage/<card>` is not droidtop's to
+fix from here (the evidence points at RetroArch's read stalling in the platform's storage layer, not at the launch); only the watchdog
+applies to it.
+
 ## 7e2b. Launch resolution FROM the platforms database (directed 2026-08-31)
 
 Extends §7e2 to the whole launch pipeline: droidtop-platforms is the

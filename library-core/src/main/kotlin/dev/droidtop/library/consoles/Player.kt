@@ -45,6 +45,15 @@ sealed interface Player {
         // installed" (PackageManager) without re-parsing the whole
         // template -- see ConsoleRomProvider.availablePlayers.
         val packageName: String,
+        /**
+         * The same launch with plain paths, for an emulator that can open a file
+         * path itself: used instead of [argumentsTemplate] when the emulator holds
+         * storage access ([launchTemplateFor]). Optional data in the
+         * players database (`storagePathTemplate`); null leaves the preset on
+         * [argumentsTemplate] always. A plain path never depends on how much of a
+         * content URI the emulator's own file helper reads (Droidtop/tracker#270).
+         */
+        val storagePathTemplate: String? = null,
     ) : Player
 
     /**

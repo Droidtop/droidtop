@@ -3,7 +3,9 @@ package dev.droidtop.library.consoles
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.app.AppOpsManager
 import android.content.pm.PackageManager
+import android.os.Build
 import java.io.File
 
 /**
@@ -31,6 +33,31 @@ fun explainLaunchFailure(failure: Throwable, emulatorName: String): String {
             "$emulatorName could not be started: ${detail ?: failure.javaClass.simpleName}."
     }
 }
+
+/**
+ * The template a launch is built from: the preset's plain-path variant when it
+ * has one and the emulator can read plain paths, else the one it always had.
+ * Pure so the choice is testable without a device.
+ */
+fun launchTemplateFor(player: Player.AmStart, emulatorReadsPaths: Boolean): String =
+    if (emulatorReadsPaths) player.storagePathTemplate ?: player.argumentsTemplate else player.argumentsTemplate
+
+/**
+ * Whether [packageName] holds all-files access (API 30+) or the legacy storage
+ * permission, i.e. can open a plain `/storage/...` path itself. Reads AppOps and
+ * PackageManager, so not for the main thread; any failure answers false, which
+ * keeps the content URI launch.
+ */
+fun emulatorReadsStoragePaths(context: Context, packageName: String): Boolean = runCatching {
+    val pm = context.packageManager
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        val uid = pm.getApplicationInfo(packageName, 0).uid
+        val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+        ops.unsafeCheckOpNoThrow("android:manage_external_storage", uid, packageName) == AppOpsManager.MODE_ALLOWED
+    } else {
+        pm.checkPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE, packageName) == PackageManager.PERMISSION_GRANTED
+    }
+}.getOrDefault(false)
 
 /** The outcome of getting a launch ready: an Intent to send, or why none can be built. */
 sealed interface PreparedLaunch {

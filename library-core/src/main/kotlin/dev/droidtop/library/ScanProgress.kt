@@ -240,6 +240,9 @@ object ScanLog {
     /** The one folder droidtop records everything about itself in (docs/SPEC.md 10c): scan log, container log, crash notes. */
     fun logsDir(context: Context): File = File(filesRoot(context), LOG_DIR)
 
+    /** The scan log file's path, for a message that tells a person where to look (the launch watchdog's). */
+    fun logPath(context: Context): String = File(logsDir(context), LOG_NAME).path
+
     /**
      * Points the scan log at this app's own files and records that the
      * process has started. Called once, from the Application: the log

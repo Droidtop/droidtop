@@ -197,6 +197,7 @@ object LaunchDisplay {
      * already stopped treating as parked.
      */
     fun clearRunning() {
+        LaunchWatchdog.cancel()
         parkedDisplayId = null
         runningGame = null
         runningPackageName = null
@@ -255,11 +256,15 @@ object LaunchDisplay {
         // An explicit DEFAULT_DISPLAY closes the ambiguity: the game
         // lands where we actually asked, and parkedDisplayId tracks it.
         val resolvedDisplayId = displayId ?: Display.DEFAULT_DISPLAY
+        val launchedAtMs = System.currentTimeMillis()
         context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(resolvedDisplayId).toBundle())
         runningPackageName = packageName
         // The one place every app droidtop starts passes: the task manager's list of what droidtop opened,
         // and the app the Quick Menu's Quit row ends (docs/SPEC.md "The task manager").
         packageName?.let { LaunchLedger.note(it, resolvedDisplayId) }
+        // A game's launch is watched for an app that never answers or leaves at once (docs/SPEC.md
+        // "The launch watchdog"); a plain app switch is not, since it has nothing to be stuck on.
+        if (packageName != null && runningGame != null) LaunchWatchdog.start(context, packageName, launchedAtMs)
         parkedDisplayId = resolvedDisplayId
         onLaunched?.invoke(resolvedDisplayId)
     }

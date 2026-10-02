@@ -85,6 +85,7 @@ object KnownPlayers {
                     argumentsTemplate = p.getString("argumentsTemplate"),
                     killPackageProcesses = p.optBoolean("killPackageProcesses", false),
                     packageName = pkg,
+                    storagePathTemplate = p.optString("storagePathTemplate").takeIf { it.isNotEmpty() },
                 ),
             )
         }

@@ -48,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import dev.droidtop.runtime.tasks.text
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -975,8 +976,8 @@ private fun GamepadShellBody(
         launchError?.let { message ->
             LaunchFailureDialog(
                 message = message,
-                onGetEmulator = missingEmulator?.let { problem ->
-                    {
+                actions = listOfNotNull(missingEmulator?.let { problem ->
+                    LaunchFailureAction("Get an emulator") {
                         // The players database's own package for this
                         // system, straight to the store: the fix, at
                         // the point of failure.
@@ -997,11 +998,36 @@ private fun GamepadShellBody(
                         missingEmulator = null
                         launchError = null
                     }
-                },
+                }),
                 onDismiss = {
                     missingEmulator = null
                     launchError = null
                 },
+            )
+        }
+        // A launch that never answered or left at once (LaunchWatchdog, docs/SPEC.md "The launch
+        // watchdog"): plain words and the three ways out, where a black screen used to be.
+        val watchAlert by dev.droidtop.library.LaunchWatchdog.alert.collectAsState()
+        watchAlert?.let { alert ->
+            LaunchFailureDialog(
+                message = alert.message,
+                actions = listOf(
+                    LaunchFailureAction("Close it") {
+                        scope.launch {
+                            val outcome = dev.droidtop.library.LaunchWatchdog.closeIt(context, alert)
+                            if (outcome !is dev.droidtop.runtime.tasks.CloseOutcome.Closed) {
+                                dev.droidtop.library.LaunchWatchdog.dismiss()
+                                launchError = outcome.text
+                            }
+                        }
+                    },
+                    LaunchFailureAction("Return to droidtop") {
+                        dev.droidtop.library.LaunchWatchdog.returnToShell(context)
+                        dev.droidtop.library.LaunchWatchdog.dismiss()
+                    },
+                ),
+                detail = "What droidtop saw is written to ${alert.logPath}",
+                onDismiss = dev.droidtop.library.LaunchWatchdog::dismiss,
             )
         }
         // ONE definition of the shell's help row, placed in one of two
