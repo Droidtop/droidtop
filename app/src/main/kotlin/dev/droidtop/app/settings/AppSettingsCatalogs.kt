@@ -1244,7 +1244,7 @@ object AppSettingsCatalogs {
                             id = "windows_provision",
                             title = if (provisioned) "Reinstall the Windows environment" else "Set up Windows games",
                             value = dev.droidtop.library.WindowsSetup.label(setupState),
-                            confirmTitle = if (provisioned) "Reinstall the Windows environment?" else "Download Windows system files? Several hundred megabytes",
+                            confirmTitle = if (provisioned) "Reinstall the Windows environment?" else "Download Windows system files?",
                             run = { ctx, onStatus ->
                                 val result = dev.droidtop.library.WindowsSetup.provision(ctx, onStatus)
                                 if (result.succeeded) result.detail else "Failed: ${result.detail}"

@@ -74,8 +74,10 @@ internal fun WindowsSetupOfferDialog(
                 modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
             )
             Text(
+                // No size: what is fetched depends on what the device already has
+                // (Droidtop/tracker#301), and a figure that can be wrong is worse than none.
                 "droidtop will download Wine and the Windows base system, " +
-                    "several hundred megabytes, then set up the environment Windows games run in.",
+                    "then set up the environment Windows games run in.",
                 color = MenuTokens.Value,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 12.dp),

@@ -10412,7 +10412,7 @@ the four can never disagree. **One exception (2026-09-29,
 Droidtop/tracker#140):** the Windows system-files setup downloads several
 hundred megabytes, so the press alone never starts it: A on a
 not-yet-set-up Windows game and the menu's "Set up" row both stop on an
-offer that names what would be fetched and its size
+offer that names what would be fetched, never a size (what is fetched depends on what the device already has, Droidtop/tracker#301)
 (`PcRunnerOptions.windowsSetupConsent`), and the setup's progress lines
 render as chrome, never as the launch-failure banner. A on a capsule whose
 Windows environment is not set up opens the game page instead of the offer

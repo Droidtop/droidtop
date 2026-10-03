@@ -163,8 +163,13 @@ internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, Resolve
     val downloads by StoreDownloads.active.collectAsState()
     val download = entry.downloadKey()?.let { downloads[it] }
     val windowsSetup by WindowsSetup.live.collectAsState()
-    val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id) {
-        value = Triple(false, null, null)
+    // The runner is worked out again when a Windows setup starts or ends: the
+    // page stayed on "Set up Windows games" after it finished because nothing
+    // re-asked (Droidtop/tracker#300). Progress lines do not re-ask.
+    val setupRunning = windowsSetup is WindowsSetup.State.Installing
+    val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id, setupRunning) {
+        // Keep the last answer on screen while it is re-asked after a setup, so the button does not flash.
+        if (!value.first) value = Triple(false, null, null)
         val (runner, line) = withContext(Dispatchers.IO) {
             val runners = PcRunnerOptions.forEntry(context, entry)
             PcRunnerOptions.resolvedFor(context, entry, runners) to runners.noRunnerLine
