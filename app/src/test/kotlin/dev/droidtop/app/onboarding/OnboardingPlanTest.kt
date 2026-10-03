@@ -18,13 +18,13 @@ class OnboardingPlanTest {
     fun `a gaming-only run with no controller is five steps`() {
         assertEquals(
             listOf(OnboardingStep.MODE, OnboardingStep.HOME, OnboardingStep.GAMES, OnboardingStep.APPEARANCE, OnboardingStep.DONE),
-            plannedSteps(Mode.GAMING, alsoOther = false, controllerAttached = false),
+            plannedSteps(Mode.GAMING, alsoOther = false, controllerAsks = false),
         )
     }
 
     @Test
     fun `desktop brings its own two steps and nothing of gaming`() {
-        val steps = plannedSteps(Mode.DESKTOP, alsoOther = false, controllerAttached = false)
+        val steps = plannedSteps(Mode.DESKTOP, alsoOther = false, controllerAsks = false)
         assertTrue(OnboardingStep.GAMES !in steps)
         assertTrue(OnboardingStep.APPEARANCE !in steps)
         assertTrue(OnboardingStep.DESKTOP_SETUP in steps)
@@ -42,17 +42,17 @@ class OnboardingPlanTest {
     }
 
     @Test
-    fun `the controller is asked only when one was attached, after the modes`() {
-        val with = plannedSteps(Mode.GAMING, alsoOther = true, controllerAttached = true)
+    fun `the controller is asked only when there is a question, after the modes`() {
+        val with = plannedSteps(Mode.GAMING, alsoOther = true, controllerAsks = true)
         assertEquals(OnboardingStep.CONTROLLER, with[with.size - 2])
-        assertTrue(OnboardingStep.CONTROLLER !in plannedSteps(Mode.GAMING, alsoOther = true, controllerAttached = false))
+        assertTrue(OnboardingStep.CONTROLLER !in plannedSteps(Mode.GAMING, alsoOther = true, controllerAsks = false))
     }
 
     @Test
     fun `every plan starts with the two questions and ends with the summary`() {
         listOf(
             plannedSteps(Mode.GAMING, alsoOther = false),
-            plannedSteps(Mode.DESKTOP, alsoOther = true, controllerAttached = false),
+            plannedSteps(Mode.DESKTOP, alsoOther = true, controllerAsks = false),
         ).forEach { steps ->
             assertEquals(listOf(OnboardingStep.MODE, OnboardingStep.HOME), steps.take(2))
             assertEquals(OnboardingStep.DONE, steps.last())

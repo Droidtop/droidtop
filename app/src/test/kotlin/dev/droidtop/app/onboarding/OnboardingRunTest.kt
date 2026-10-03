@@ -122,4 +122,45 @@ class OnboardingRunTest {
         assertEquals(Mode.DESKTOP, again.defaultMode)
         assertEquals(false, again.controllerAttachedAtEntry)
     }
+
+    @Test
+    fun `an identified pad takes the controller step out of the plan, but only on the first step`() {
+        val run = OnboardingRun()
+        run.start(startStep = null, controllerAttached = true)
+        fun planNow() = plannedSteps(run.opensInto.value, run.alsoOther.value, run.controllerAsks)
+        assertTrue(OnboardingStep.CONTROLLER in planNow())
+
+        run.settleController(identified = true)
+        assertTrue(OnboardingStep.CONTROLLER !in planNow())
+
+        // A pad nothing could identify keeps its question.
+        run.settleController(identified = false)
+        assertTrue(OnboardingStep.CONTROLLER in planNow())
+
+        // Once the person has answered the first step the total no longer moves.
+        run.history.add(OnboardingStep.MODE)
+        run.step.value = OnboardingStep.HOME
+        run.settleController(identified = true)
+        assertTrue(OnboardingStep.CONTROLLER in planNow())
+    }
+
+    @Test
+    fun `no pad attached means no controller step whatever the resolver says`() {
+        val run = OnboardingRun()
+        run.start(startStep = null, controllerAttached = false)
+        assertEquals(false, run.controllerAsks)
+        run.settleController(identified = false)
+        assertEquals(false, run.controllerAsks)
+    }
+
+    @Test
+    fun `the identified answer is written down with the run`() {
+        val run = OnboardingRun()
+        run.start(startStep = null, controllerAttached = true)
+        run.settleController(identified = true)
+
+        val again = OnboardingRun()
+        again.start(startStep = null, saved = JSONObject(run.toJson()))
+        assertEquals(false, again.controllerAsks)
+    }
 }

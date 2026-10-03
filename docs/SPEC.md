@@ -5463,7 +5463,7 @@ merge); re-entering runs that one step and returns.
 
 The flow asks, in order: what droidtop opens into, what the Home button does, then only the steps
 those answers need (Gaming: the game folders and a look; Desktop: a Linux system and a keyboard),
-the controller when one is attached, and a summary that opens the mode.
+the controller when one is attached and unidentified, and a summary that opens the mode.
 
 ### The frame every step renders into
 
@@ -5525,17 +5525,16 @@ welcome, "Anything else to set up?" and "Which should droidtop open into?" are o
 steps became eight, of which a Gaming-only run with no controller sees five. The exact wording is
 below; it is the copy, not a paraphrase of it. Onboarding text never describes how the UI looks
 (every person's Gaming UI is drawn by their own theme); it names buttons, places in Settings and
-what happens.
+what happens. **Labels and values, no explanation (2026-10-03, Droidtop/tracker#273, UI review slice
+12):** a page is one question plus its answers; a step that would only confirm a fact droidtop
+already knows is not a step (the controller, below), and the facts it would have shown go on the
+last screen. Where a reason must come before a system prompt (file access, the keyboard) it is one
+line.
 
 1. **What droidtop opens into** (`MODE`; this is also the welcome). Title "Welcome to droidtop".
-   Body: "droidtop can be a games console or a desktop computer. Which should it open into? You can
-   change this later in Settings." Rows: **Gaming** ("All your games in one place, made for a
-   controller or touch."; preselected) and **Desktop** ("A Linux desktop that runs PC programs in
-   windows. It downloads a Linux system the first time it starts."), then one title-only tick row,
-   **Set up Desktop too** (or "Gaming too", whichever is not chosen). Forward: Next. The body is two
-   lines and the tick row has no supporting line so that all three rows are on screen on a 1080p
-   landscape handheld; with a section label and a third body line the tick row sat under the action
-   area (emulator-5560, 2026-10-01, d01-welcome.png). The chosen mode is
+   No body. Rows: **Gaming** (preselected) and **Desktop**, then one tick row, **Set up Desktop too**
+   (or "Gaming too", whichever is not chosen). Forward: Next. Every row is title-only so all three are
+   on screen on a 1080p landscape handheld (emulator-5560, 2026-10-01, d01-welcome.png). The chosen mode is
    what droidtop's icon opens and, with droidtop as the Home app, where Home goes; a mode not set up
    is switched off at the end and runs nothing (§2c, Rule 1; `appModesOnAfterOnboarding`). The
    modes are written only at the end, so leaving part-way changes nothing. A rerun starts from the
@@ -5543,37 +5542,31 @@ what happens.
 2. **The Home button** (`HOME`). Body: "What should open when you press Home?" (one line, so three
    rows fit above the action area at 1080p landscape; the Android confirmation is said on the rows
    that cause it). Rows, with the chosen mode's name where "Gaming" stands here: **Keep my home
-   screen as it is** ("Nothing changes. Open droidtop from its icon, like any other app."; preselected,
-   so a straight run through never changes the home screen); **droidtop** ("Home takes you straight to
-   Gaming. Android asks you to confirm the change."); **droidtop's home screen** ("An app drawer and
-   widgets, made by droidtop. Gaming opens from its icon."); and one row per other installed launcher,
-   by its own application label and icon (never a class name; Android's FallbackHome is not a
-   launcher): "Home opens Pixel Launcher, with droidtop underneath to switch to Gaming and back."
-   More rows than fit scroll, by D-pad or by swipe. Forward: Next. What the rows mean: "droidtop" is Standard with the chosen mode as
+   screen as it is** (title only; preselected, so a straight run through never changes the home
+   screen); **droidtop** ("Home opens Gaming. Android asks you to confirm."); **droidtop's home
+   screen** ("Its own app drawer and widgets"); and one row per other installed launcher, by its own
+   application label and icon, title only (never a class name; Android's FallbackHome is not a
+   launcher). More rows than fit scroll, by D-pad or by swipe. Forward: Next. What the rows mean: "droidtop" is Standard with the chosen mode as
    the default mode (Home goes to the default mode, §2c); "droidtop's home screen" is Standard with
    the home screen as the default mode (the old "Opens into Android" answer, folded in here); a
    launcher row is Alternative with that launcher as the target. Next enables the matching HOME
    activity and, when droidtop does not hold Home, asks Android for the role (§2c, "Holding the
    role"): Android's own screen appears over the next step, and the summary says whether it took.
    droidtop never picks a launcher for anyone; the default is to change nothing.
-3. **Your games** (`GAMES`; Gaming only). One page with two states. Without file access, body: "Where
-   are your games? droidtop reads only the folders you choose. Before it can look inside them, Android
-   needs you to allow file access on its own settings screen: tap Allow file access, turn on "Allow
-   access to manage all files", then come back here." (API 26-29: "... Android asks you to allow file
-   access. Tap Allow file access, and Android will ask you to confirm."). Primary: **Allow file
+3. **Your games** (`GAMES`; Gaming only). One page with two states. Without file access, body:
+   "droidtop reads only the folders you choose. Allow file access, turn on "Allow access to manage all
+   files", then come back." (API 26-29: "droidtop reads only the folders you choose. Allow file access
+   to look inside them."). Primary: **Allow file
    access** (API 30+ opens droidtop's own All files access page; below, the runtime permission);
    secondary: Skip this step. The real state is re-read on every resume rather than trusted from a
-   result code; on denial the page says what is now unavailable and where to allow it later ("Without
-   it, droidtop can't look in your folders. Everything else still works, and you can allow it later
-   under Game folders in Settings."), and once Android stops asking it says so instead of asking
-   again. The page never claims droidtop CANNOT read other data, since all-files access is exactly the
+   result code; on denial the page says what is now unavailable ("Without it, droidtop can't look in your
+   folders."), and once Android stops asking it says so instead of asking again ("Android won't ask
+   again. Allow it in Android's settings for droidtop."). The page never claims droidtop CANNOT read other data, since all-files access is exactly the
    ability to; it says what droidtop reads. With file access (held at entry or granted on the page),
-   body: "Where are your games? Add each folder they are in: on this device, on a memory card, or on a
-   USB drive. droidtop reads only the folders you choose, and you can change them later in Settings,
-   under Game folders." Content: the added folders under "Your game folders", each with what the scan
+   body: "Add each folder your games are in." Content: the added folders under "Your game folders", each with what the scan
    found under it and Remove; readable folders the picker cannot offer under "Found on this device"
    (volumes under `/storage` other than the emulated internal storage, and under `/mnt/windows`), each
-   with Add; **Add a folder** (filled; the pad's selection starts here) opening the system picker; and
+   with Add (title and button only); **Add a folder** (filled; the pad's selection starts here) opening the system picker; and
    **Can't find it? Type its path**, which reveals the typed-path field for what the picker cannot
    reach (an emulator's host share, a mount a rooted device adds, a USB drive), validated for real
    before it is stored, with an error only after a path was tried. Forward: "Skip this step" with no
@@ -5583,59 +5576,62 @@ what happens.
    create the conventional `roms/<system>` plus `bios` layout under ES-DE's own system ids and report
    what was created (safe to re-run, never overwrites). "Game folders" is the single name for this
    concept everywhere in droidtop.
-4. **Choose a look** (`APPEARANCE`; Gaming only). Body: "A theme sets how your games are shown. Pick one,
-   or download more. You can change this later in Settings." (on a tall screen: "... This screen is
-   taller than it is wide, so themes made for a tall screen say so; the others are stretched to fit.
-   ..."). Themes as the one choice component with a real rendered preview (the theme's own `system`
+4. **Choose a look** (`APPEARANCE`; Gaming only). Body: "Pick a look for your games." Themes as the one choice component with a real rendered preview (the theme's own `system`
    view, parsed by the one theme parser and drawn by the one renderer the Gaming shell uses,
    `ThemeSystemPreview` -> `EsDeThemedView`, with no list items: a carousel of systems this device has
    not scanned would be invented content), named by display name (the theme's own `<themeName>`,
-   resolved for the running language with `en_US` as the floor, never a directory id). Each row says
-   what screens it is made for and whether it is "Included with droidtop." or "Downloaded."; on a tall
-   screen the portrait-capable theme is preselected and marked "Recommended here." The choice is
+   resolved for the running language with `en_US` as the floor, never a directory id). Each row's value
+   says what screens it is made for and where it came from ("Wide and tall · Included", "Wide only ·
+   Downloaded"); on a tall screen the portrait-capable theme is preselected and marked "recommended
+   here", and a wide-only one "stretched here". The choice is
    written the moment it is made, so rotating never moves the theme under the person. Secondary:
    **Download more themes**, the same `ThemeBrowserScreen` Settings opens, drawn in place with the
    same Back. The recommended theme's background download is not announced (a notice nobody can act
    on); only a failure is, once. Forward: Next.
-5. **Desktop setup** (`DESKTOP_SETUP`; Desktop only). Body: "Desktop needs a Linux system to run. Pick
-   one here; it downloads the first time Desktop starts." States the root situation first, as a
-   statement a person can act on ("Desktop can run here. This device isn't rooted, so it runs a little
-   slower. There is nothing to allow."), never a backend error string, which goes to the log. When the
+5. **Desktop setup** (`DESKTOP_SETUP`; Desktop only). Body: "Choose a Linux system." States the root
+   situation first, as a value ("Desktop can run here (not rooted, a little slower)."; rooted: "(rooted,
+   full speed)"), never a backend error string, which goes to the log. When the
    mode cannot run on this device, droidtop says so, presents no list, and the forward action is
    "Continue without Desktop"; a Desktop ticked on such a device stays off. When it can, the Linux
-   systems are the one choice component, each named and described ("Made by the distro itself." or "A
-   community build for ARM."). droidtop never pre-selects an image the person did not choose (§3a):
+   systems are the one choice component, each named, with "Official" or "Community build" as its value. droidtop never pre-selects an image the person did not choose (§3a):
    forward is "Skip this step" until one is chosen, then "Next". Desktop counts as set up only when a
    system was chosen and the check passed.
-6. **Keyboard** (`KEYBOARD`; Desktop only). Body: `Keyboards.WHY`. droidtop cannot set the system input
+6. **Keyboard** (`KEYBOARD`; Desktop only). Body: "Terminals and Windows programs need Ctrl, Alt, Esc and
+   the arrow keys." (Settings keeps `Keyboards.WHY` as the row's hint.) droidtop cannot set the system input
    method itself, so the primary hands over to Android's own screens ("Turn it on in Android", then
    "Switch to it") with "Skip this step" beside it until Hacker's Keyboard is active, when the forward
    action becomes "Next". Declining is a real answer, not a nag.
-7. **Your controller** (`CONTROLLER`; only when a controller was attached when the run started, since
-   with none there is nothing to test or map). It no longer asks whether the face buttons are
+7. **Your controller** (`CONTROLLER`; planned only when a controller was attached when the run started
+   AND droidtop could not identify its layout). It no longer asks whether the face buttons are
    Nintendo-style: a stored answer went stale the moment a handheld's own layout toggle was flipped.
-   droidtop works the layout out (see "Console and controller detection" below) and the step says what
-   it concluded and from what: "droidtop sees <pad name>. It knows this device: A (the bottom button)
-   confirms and B goes back." / "It is a Nintendo-style pad: A (the right button) confirms and B goes
-   back." / "You set it: ...". Only when nothing knows the pad does the step become the capture: "droidtop
-   sees <pad name> but cannot tell which of its buttons confirms", a box that takes the selection by
-   D-pad and reads the next face-button press as "the button labelled A", and the forward action is
-   "Skip this step" until that press has been made (then "Next"): a skipped step is not an answer, and
-   the last screen lists it ("Controller: Input"). When the layout is known, a row "Not right? Press the
-   button labelled A instead" runs the same capture. Under "Test your buttons", a box that names any
-   button pressed while it has the selection, by POSITION; it takes the selection only when moved into,
-   so B elsewhere on the step is Back. The step is only a view: everything it shows is
+   droidtop works the layout out (see "Console and controller detection" below). A pad it identified (the
+   device's own layout, or the pad's family) has nothing to ask, so the step is not in the plan and the
+   last screen says "Controller: A (the bottom button) confirms and B goes back." (2026-10-03, UI review
+   slice 12; `OnboardingRun.settleController`: the resolver reads its tables off the main thread, so
+   the answer lands a moment after the run starts and the plan's total may move only on the first
+   step). Only when nothing knows the pad is the step the capture: "<pad name>: which button
+   confirms?", a box that takes the selection by D-pad and reads the next face-button press as "the
+   button labelled A", and the forward action is "Skip this step" until that press has been made
+   (then "Next"): a skipped step is not an answer, and the last screen lists it ("Controller: Input").
+   Opened from Settings (Input, Controller) with an identified pad the same step shows "<pad name>: A
+   (the bottom button) confirms and B goes back.", a row "Not right? Press the button labelled A
+   instead" that runs the same capture, and under "Test your buttons" a box that names any button
+   pressed while it has the selection ("Read: X"), by POSITION; it takes the selection only when moved
+   into, so B elsewhere on the step is Back. The step is only a view: everything it shows is
    `ControllerLayouts`, the same resolver the key map and every hint pill read, so there is no separate
    onboarding answer and no one-time flag.
 8. **All done!** (`DONE`). "What's set up": the Home button's outcome when droidtop holds Home ("Home
    button: opens Gaming." / "... droidtop's home screen." / "... Pixel Launcher."); Gaming's count,
    stated as what it knows ("Gaming: 12 games found." / "Gaming: still counting your folders, 3 games so
    far." / "Gaming: no game folders added yet." / "Gaming: no games found in your folders yet."); Desktop
-   when a system was chosen; and "droidtop opens into Gaming." "Skipped", with "Find these later in
-   Settings." and each line naming its Settings section: the Home button when Android did not hand
-   Home over, file access, Desktop without a system, the controller, the keyboard. "Not set up": what a
-   newcomer will want a minute later and is asked where it is used (scraping, the Windows games
-   download). Then "All settings can be changed later." Primary: **Open Gaming** (or Desktop, or "Open
+   when a system was chosen ("Desktop: Linux system chosen."); an identified controller ("Controller:
+   A (the bottom button) confirms and B goes back."); and "droidtop opens into Gaming." "Skipped",
+   each line naming its Settings section: the Home button when Android did not hand Home over, file
+   access, Desktop without a system, the controller (only when one was attached and nothing identified
+   it), the keyboard. "Not set up": what a newcomer will want a minute later and is asked where it is
+   used (scraping, the Windows games download). The three sentences that used to close these sections
+   ("Find these later in Settings.", "Set these up when you want them.", "All settings can be
+   changed later.") are gone: the section labels say it. Primary: **Open Gaming** (or Desktop, or "Open
    my home screen" when Home shows the home screen); with Gaming set up and no folder added, a second
    action **Add your games** goes back to the Your games step (Droidtop/tracker#172). Finishing writes
    the mode switches and the default mode, marks setup complete, and opens the mode; with droidtop's

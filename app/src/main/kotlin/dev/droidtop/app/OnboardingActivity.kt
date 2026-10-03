@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -92,8 +91,6 @@ import dev.droidtop.shell.gamepad.currentShellWindow
 import dev.droidtop.library.controller.FaceLayout
 import dev.droidtop.library.controller.FacePosition
 import dev.droidtop.library.controller.FaceRole
-import dev.droidtop.library.controller.GlyphFamily
-import dev.droidtop.library.controller.LayoutSource
 import dev.droidtop.shell.gamepad.input.ControllerLayouts
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.ThemeSystemPreview
@@ -292,6 +289,23 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
     var controllerAttachedAtEntry: Boolean = true
         private set
 
+    /**
+     * Whether the pad's layout was already identified (by the device, or by the pad's family)
+     * when the run settled its plan. An identified pad has nothing to ask: the step would only
+     * confirm what droidtop already knows, so it is not in the plan and the last screen names
+     * the result instead. The answer arrives a moment after the run starts (the resolver
+     * reads its tables off the main thread), so it can change only on the first step, the one
+     * place the plan's total may change.
+     */
+    val controllerIdentified = mutableStateOf(false)
+
+    /** The controller step is planned only for an attached pad nothing could identify. */
+    val controllerAsks: Boolean get() = controllerAttachedAtEntry && !controllerIdentified.value
+
+    fun settleController(identified: Boolean) {
+        if (history.isEmpty() && step.value == OnboardingStep.MODE) controllerIdentified.value = identified
+    }
+
     fun start(
         startStep: OnboardingStep?,
         controllerAttached: Boolean = true,
@@ -342,6 +356,7 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
         put("desktopImage", desktopImageChosen.value)
         put("desktopCapable", desktopCapable.value)
         put("controllerAtEntry", controllerAttachedAtEntry)
+        put("controllerIdentified", controllerIdentified.value)
     }.toString()
 
     /**
@@ -374,6 +389,7 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
         desktopImageChosen.value = saved.optBoolean("desktopImage")
         desktopCapable.value = saved.optBoolean("desktopCapable")
         controllerAttachedAtEntry = saved.optBoolean("controllerAtEntry", controllerAttachedAtEntry)
+        controllerIdentified.value = saved.optBoolean("controllerIdentified", controllerIdentified.value)
     }
 
     // Each answer is a MutableState the screen delegates to (`var step by
@@ -478,7 +494,7 @@ internal enum class OnboardingStep {
 internal fun plannedSteps(
     opensInto: Mode,
     alsoOther: Boolean,
-    controllerAttached: Boolean = true,
+    controllerAsks: Boolean = true,
 ): List<OnboardingStep> = buildList {
     val gaming = opensInto == Mode.GAMING || alsoOther
     val desktop = opensInto == Mode.DESKTOP || alsoOther
@@ -497,9 +513,10 @@ internal fun plannedSteps(
         // dq-coordinator-24, finding 10).
         add(OnboardingStep.KEYBOARD)
     }
-    // The pad is how the shell itself is driven, whichever mode is set up;
-    // with none attached there is nothing to test or map.
-    if (controllerAttached) add(OnboardingStep.CONTROLLER)
+    // The pad is how the shell itself is driven, whichever mode is set up. It is a step only when
+    // there is a question: with none attached there is nothing to map, and a pad droidtop already
+    // identified is a fact the last screen states (2026-10-03).
+    if (controllerAsks) add(OnboardingStep.CONTROLLER)
     add(OnboardingStep.DONE)
 }
 
@@ -660,7 +677,10 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
 
     // ONE plan per run, built from the first step's answer and from
     // whether a controller was attached when the run started.
-    val plan = plannedSteps(opensInto, alsoOther, run.controllerAttachedAtEntry)
+    val plan = plannedSteps(opensInto, alsoOther, run.controllerAsks)
+    val padReady = ControllerLayouts.ready
+    val padKnown = ControllerLayouts.layout.known
+    LaunchedEffect(padReady, padKnown) { if (padReady) run.settleController(padKnown) }
 
     // Written down as it changes, so a new process resumes this run where
     // it was (OnboardingRun.persistent): becoming the Home app, a kill from
@@ -917,7 +937,8 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             gamesSoFar = rootProgress.filterKeys { it !in rootReports.keys }.values.sumOf { it.gamesSoFar },
             noFolders = roots.isEmpty(),
             storageGranted = storageAccessGranted,
-            controllerAnswered = ControllerLayouts.isAnswered(),
+            controllerFacts = ControllerLayouts.layout.takeIf { run.controllerAttachedAtEntry && it.known }?.let(::controllerFacts),
+            controllerAnswered = !run.controllerAttachedAtEntry || ControllerLayouts.isAnswered(),
             keyboardSkipped = run.configureDesktop && !dev.droidtop.library.settings.Keyboards.ownKeyboardActive(context),
             onAddGames = { goTo(OnboardingStep.GAMES) },
             onFinish = {
@@ -1303,26 +1324,26 @@ private fun HomeStep(
     ) {
         SelectableRow(
             title = "Keep my home screen as it is",
-            supporting = "Nothing changes. Open droidtop from its icon, like any other app.",
+            supporting = null,
             selected = choice == HomeImplementation.NONE,
             onClick = { onSelect(HomeImplementation.NONE, false, null) },
         )
         SelectableRow(
             title = "droidtop",
-            supporting = "Home takes you straight to $mode. Android asks you to confirm the change.",
+            supporting = "Home opens $mode. Android asks you to confirm.",
             selected = choice == HomeImplementation.STANDARD && !showsHomeScreen,
             onClick = { onSelect(HomeImplementation.STANDARD, false, null) },
         )
         SelectableRow(
             title = "droidtop's home screen",
-            supporting = "An app drawer and widgets, made by droidtop. $mode opens from its icon.",
+            supporting = "Its own app drawer and widgets",
             selected = choice == HomeImplementation.STANDARD && showsHomeScreen,
             onClick = { onSelect(HomeImplementation.STANDARD, true, null) },
         )
         launchers?.forEach { launcher ->
             SelectableRow(
                 title = launcher.label,
-                supporting = "Home opens ${launcher.label}, with droidtop underneath to switch to $mode and back.",
+                supporting = null,
                 selected = choice == HomeImplementation.ALTERNATIVE && alternative == launcher.component,
                 icon = launcher.icon,
                 onClick = { onSelect(HomeImplementation.ALTERNATIVE, true, launcher.component) },
@@ -1397,21 +1418,20 @@ private fun DesktopSetupStep(
         onCapabilityKnown(result.succeeded)
         checkMessage = when {
             result.succeeded && runtime is DroidSpacesRuntime ->
-                "Desktop can run here. This device is rooted, so it runs at full speed, kept apart from the rest of your device."
+                "Desktop can run here (rooted, full speed)."
             result.succeeded ->
-                "Desktop can run here. This device isn't rooted, so it runs a little slower. There is nothing to allow."
+                "Desktop can run here (not rooted, a little slower)."
             runtime is DroidSpacesRuntime ->
-                "This device is rooted, but the test did not pass, so Desktop can't start yet. " +
-                    "Finish setup now and try again later in Settings."
+                "Desktop can't start yet. Try again later in Settings."
             else ->
-                "Desktop can't run on this device: it could not start a test program. You can finish setup without it."
+                "Desktop can't run on this device."
         }
     }
 
     val capable = checkResult == true
     OnboardingScaffold(
         title = "Desktop setup",
-        body = "Desktop needs a Linux system to run. Pick one here; it downloads the first time Desktop starts.",
+        body = "Choose a Linux system.",
         progress = progress,
         onBack = onBack,
         // One forward action (docs/SPEC.md 7b): the skip, until an image
@@ -1433,7 +1453,7 @@ private fun DesktopSetupStep(
         },
     ) {
         when (checkResult) {
-            null -> StepNote("Checking whether this device can run Desktop.")
+            null -> StepNote("Checking this device.")
             true -> StepNote(checkMessage, accent = true)
             false -> StepNote(checkMessage)
         }
@@ -1445,7 +1465,7 @@ private fun DesktopSetupStep(
             repositories.forEach { repo ->
                 SelectableRow(
                     title = repo.desktopEnvironment?.let { "${repo.os} with $it" } ?: repo.os,
-                    supporting = if (repo.officialSource) "Made by the distro itself." else "A community build for ARM.",
+                    supporting = if (repo.officialSource) "Official" else "Community build",
                     selected = repo.id == selectedId,
                     onClick = { selectedId = repo.id },
                 )
@@ -1505,13 +1525,10 @@ private fun GamesStep(
             // The reason comes BEFORE the prompt, per Android's own guidance
             // and SPEC 7b: what droidtop reads, and what the button does.
             body = if (storage.legacy) {
-                "Where are your games? droidtop reads only the folders you choose. Before it can look " +
-                    "inside them, Android asks you to allow file access. Tap Allow file access, and Android " +
-                    "will ask you to confirm."
+                "droidtop reads only the folders you choose. Allow file access to look inside them."
             } else {
-                "Where are your games? droidtop reads only the folders you choose. Before it can look " +
-                    "inside them, Android needs you to allow file access on its own settings screen: tap " +
-                    "Allow file access, turn on \"Allow access to manage all files\", then come back here."
+                "droidtop reads only the folders you choose. Allow file access, turn on " +
+                    "\"Allow access to manage all files\", then come back."
             },
             progress = progress,
             onBack = onBack,
@@ -1519,14 +1536,8 @@ private fun GamesStep(
             secondary = StepAction(if (isReEntry) "Done" else "Skip this step", onClick = onContinue),
         ) {
             when {
-                storage.permanentlyDenied -> StepNote(
-                    "Android won't ask again. To allow it later, open Android's settings for droidtop, " +
-                        "then come back to Game folders in Settings.",
-                )
-                storage.denied -> StepNote(
-                    "Without it, droidtop can't look in your folders. Everything else still works, and " +
-                        "you can allow it later under Game folders in Settings.",
-                )
+                storage.permanentlyDenied -> StepNote("Android won't ask again. Allow it in Android's settings for droidtop.")
+                storage.denied -> StepNote("Without it, droidtop can't look in your folders.")
                 else -> Unit
             }
         }
@@ -1553,9 +1564,7 @@ private fun GamesStep(
     // folders" here, two names one navigation step apart.
     OnboardingScaffold(
         title = "Your games",
-        body = "Where are your games? Add each folder they are in: on this device, on a memory card, " +
-            "or on a USB drive. droidtop reads only the folders you choose, and you can change them " +
-            "later in Settings, under Game folders.",
+        body = "Add each folder your games are in.",
         progress = progress,
         onBack = onBack,
         primary = StepAction(onboardingForwardLabel(reEntry = isReEntry, answered = roots.isNotEmpty()), onClick = onContinue),
@@ -1578,10 +1587,7 @@ private fun GamesStep(
                 // (SPEC 7b, "No games yet"). Choice one is "add a
                 // different folder", already on this page.
                 if (report != null && report.exists && report.empty) {
-                    StepNote(
-                        "No games found here. Add a different folder, or create the standard folder " +
-                            "layout inside this one and put your games there.",
-                    )
+                    StepNote("No games found here.")
                     PadButton("Create the standard folder layout here", { onGenerateStructure(path) })
                 }
             }
@@ -1590,7 +1596,7 @@ private fun GamesStep(
         structureReport?.let { StepNote(it, accent = true) }
 
         if (unresolvedFolderWarning) {
-            StepNote("droidtop can't read that folder directly. It may be stored in the cloud. Type its path instead.")
+            StepNote("droidtop can't read that folder directly. Type its path instead.")
         }
 
         // Places the picker cannot offer, found on this device: a memory
@@ -1603,7 +1609,6 @@ private fun GamesStep(
             suggestions.forEach { path ->
                 SelectableRow(
                     title = path,
-                    supporting = "Add it to look for games there.",
                     trailing = { PadButton("Add", { onAddSuggested(path) }) },
                 )
             }
@@ -1626,7 +1631,6 @@ private fun GamesStep(
         if (!typingPath) {
             PadButton("Can't find it? Type its path", { typingPath = true })
         } else {
-            StepNote("Type the folder's full path, for example an emulator's shared folder or a USB drive.")
             OutlinedTextField(
                 value = pathEntry,
                 onValueChange = onPathEntryChange,
@@ -1708,12 +1712,10 @@ private fun ControllerStep(
     OnboardingScaffold(
         title = "Your controller",
         body = when {
-            controllers.isEmpty() -> "No controller is connected right now. You can carry on with touch and set " +
-                "one up later in the Quick Menu, under System."
-            !ready -> "droidtop sees $names."
-            layout.known -> "droidtop sees $names. ${controllerConclusion(layout)} You can change this at any " +
-                "time in the Quick Menu, under System."
-            else -> "droidtop sees $names but cannot tell which of its buttons confirms."
+            controllers.isEmpty() -> "No controller connected."
+            !ready -> names
+            layout.known -> "$names: ${controllerFacts(layout)}."
+            else -> "$names: which button confirms?"
         },
         progress = progress,
         onBack = onBack,
@@ -1739,7 +1741,7 @@ private fun ControllerStep(
                 contentAlignment = Alignment.CenterStart,
             ) {
                 Text(
-                    "Move here with the D-pad, then press the button labelled A on your controller.",
+                    "Move here with the D-pad, then press the button labelled A.",
                     color = MenuTokens.OnSurfaceMuted,
                     style = TypeRole.supporting,
                 )
@@ -1747,7 +1749,6 @@ private fun ControllerStep(
         } else if (ready && controllers.isNotEmpty()) {
             SelectableRow(
                 title = "Not right? Press the button labelled A instead",
-                supporting = "Use this when droidtop has the buttons the wrong way round.",
                 selected = false,
                 onClick = { recapturing = true },
             )
@@ -1775,10 +1776,10 @@ private fun ControllerStep(
         ) {
             Text(
                 when {
-                    !testing && pressed == null -> "Move here with the D-pad, then press any button to see droidtop read it."
-                    !testing -> "droidtop read $pressed. Move here again to test another."
-                    pressed == null -> "Press any button, B too, and droidtop names it. Use the D-pad to move on."
-                    else -> "droidtop read $pressed. Use the D-pad to move on."
+                    !testing && pressed == null -> "Move here with the D-pad, then press any button."
+                    !testing -> "Read: $pressed"
+                    pressed == null -> "Press any button, B too."
+                    else -> "Read: $pressed"
                 },
                 color = if (pressed != null) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
                 style = TypeRole.supporting,
@@ -1787,23 +1788,10 @@ private fun ControllerStep(
     }
 }
 
-/** What the resolver concluded, in a sentence, and from what. */
-private fun controllerConclusion(layout: FaceLayout): String {
-    val confirm = layout.glyph(FaceRole.CONFIRM)
-    val cancel = layout.glyph(FaceRole.CANCEL)
+/** What the resolver concluded, as the two facts a person acts on: "A (the bottom button) confirms and B goes back". */
+private fun controllerFacts(layout: FaceLayout): String {
     val where = if (layout.positionOf(FaceRole.CONFIRM) == FacePosition.RIGHT) "the right button" else "the bottom button"
-    val facts = "$confirm ($where) confirms and $cancel goes back."
-    val style = when (layout.family) {
-        GlyphFamily.XBOX -> "an Xbox-style"
-        GlyphFamily.PLAYSTATION -> "a PlayStation-style"
-        GlyphFamily.NINTENDO -> "a Nintendo-style"
-    }
-    return when (layout.source) {
-        LayoutSource.CONSOLE -> "It knows this device: $facts"
-        LayoutSource.FAMILY -> "It is $style pad: $facts"
-        LayoutSource.CAPTURED -> "You set it: $facts"
-        LayoutSource.UNKNOWN -> facts
-    }
+    return "${layout.glyph(FaceRole.CONFIRM)} ($where) confirms and ${layout.glyph(FaceRole.CANCEL)} goes back"
 }
 
 /**
@@ -1956,13 +1944,7 @@ private fun AppearanceStep(
 
     OnboardingScaffold(
         title = "Choose a look",
-        body = if (portraitScreen) {
-            "A theme sets how your games are shown. This screen is taller than it is wide, so themes made " +
-                "for a tall screen say so; the others are stretched to fit. You can change this later in Settings."
-        } else {
-            "A theme sets how your games are shown. Pick one, or download more. You can change this later " +
-                "in Settings."
-        },
+        body = "Pick a look for your games.",
         progress = progress,
         onBack = onBack,
         primary = StepAction(if (isReEntry) "Done" else "Next", onClick = onContinue),
@@ -1971,7 +1953,7 @@ private fun AppearanceStep(
     ) {
         val themes = catalog?.themes
         if (themes != null && themes.isEmpty()) {
-            StepNote("No themes are installed. Your games will be shown in a plain layout.")
+            StepNote("No themes installed.")
         }
         // Shown only until Art Book Next has its own row below (either it
         // downloaded, in which case the catalog now lists it, or it never
@@ -1979,21 +1961,18 @@ private fun AppearanceStep(
         // regardless.
         val recommendedListed = themes?.any { it.name == OnboardingThemeDownload.RECOMMENDED_THEME_DIR } == true
         if (!recommendedListed && downloadStatus == OnboardingThemeDownload.Status.FAILED) {
-            StepNote(
-                "Couldn't download Art Book Next, the recommended theme. Check your connection; " +
-                    "Download more themes offers it again later.",
-            )
+            StepNote("Couldn't download Art Book Next. Check your connection.")
         }
         themes?.forEach { theme ->
             val hasVertical = theme.hasVertical
             SelectableRow(
                 title = theme.displayName,
                 supporting = (when {
-                    hasVertical && portraitScreen -> "Made for a tall screen too. Recommended here."
-                    hasVertical -> "Made for wide and tall screens."
-                    portraitScreen -> "Made for wide screens only. It will be stretched on this screen."
-                    else -> "Made for wide screens."
-                }) + (if (theme.bundled) " Included with droidtop." else " Downloaded."),
+                    hasVertical && portraitScreen -> "Wide and tall, recommended here"
+                    hasVertical -> "Wide and tall"
+                    portraitScreen -> "Wide only, stretched here"
+                    else -> "Wide only"
+                }) + (if (theme.bundled) " · Included" else " · Downloaded"),
                 selected = chosen == theme.name,
                 leading = {
                     ThemeSystemPreview(
@@ -2066,7 +2045,7 @@ private fun KeyboardStep(
 
     OnboardingScaffold(
         title = "Keyboard",
-        body = dev.droidtop.library.settings.Keyboards.WHY,
+        body = "Terminals and Windows programs need Ctrl, Alt, Esc and the arrow keys.",
         progress = progress,
         onBack = onBack,
         // A hand-off step, shaped like the storage one (docs/SPEC.md 7b):
@@ -2081,12 +2060,9 @@ private fun KeyboardStep(
         secondary = if (active) null else StepAction(if (isReEntry) "Done" else "Skip this step", onClick = onContinue),
     ) {
         when {
-            active -> StepNote("Hacker's Keyboard is your keyboard now.", accent = true)
-            enabled -> StepNote("Hacker's Keyboard is turned on but not in use yet. Switch to it to use it.")
-            else -> StepNote(
-                "Android decides which keyboard is used, so this opens Android's own screen. " +
-                    "If nothing opens on this device, skip this step.",
-            )
+            active -> StepNote("Hacker's Keyboard is in use.", accent = true)
+            enabled -> StepNote("Hacker's Keyboard is on, not in use yet.")
+            else -> StepNote("Opens Android's keyboard settings.")
         }
     }
 }
@@ -2115,6 +2091,7 @@ private fun DoneStep(
     gamesSoFar: Int,
     noFolders: Boolean,
     storageGranted: Boolean,
+    controllerFacts: String?,
     controllerAnswered: Boolean,
     keyboardSkipped: Boolean,
     onAddGames: () -> Unit,
@@ -2147,7 +2124,8 @@ private fun DoneStep(
                 },
             )
         }
-        if (desktopConfigured) add("Desktop: Linux system chosen. It downloads the first time Desktop starts.")
+        if (desktopConfigured) add("Desktop: Linux system chosen.")
+        controllerFacts?.let { add("Controller: $it.") }
         add("droidtop opens into ${if (defaultMode == Mode.LAUNCHER) "its home screen" else defaultMode.label}.")
     }
     // Each line names the Settings section it lives in.
@@ -2182,15 +2160,11 @@ private fun DoneStep(
         done.forEach { StepNote("• $it") }
         if (skipped.isNotEmpty()) {
             StepSectionLabel("Skipped")
-            StepNote("Find these later in Settings.")
             skipped.forEach { StepNote("• $it") }
         }
         if (later.isNotEmpty()) {
             StepSectionLabel("Not set up")
-            StepNote("Set these up when you want them.")
             later.forEach { StepNote("• $it") }
         }
-        Spacer(modifier = Modifier.padding(top = Space.Sm))
-        StepNote("All settings can be changed later.")
     }
 }
