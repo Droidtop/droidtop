@@ -147,17 +147,15 @@ object QuickTiles {
 
     /**
      * The configuration rows the System tab shows besides the catalog's
-     * own quick-only System group: the two display roles, and the two
-     * screens that manage droidtop and the device. They live in Settings'
-     * System group (they are configuration), but they are exactly what
-     * someone opens this menu for after plugging a screen in or when an
-     * update is due, so the tab takes a view of them too -- by id, the
-     * same items, never a copy.
+     * own quick-only System group: the two display roles, and the screen
+     * that manages the device. They live in Settings (they are
+     * configuration), but they are exactly what someone opens this menu for
+     * after plugging a screen in, so the tab takes a view of them too -- by
+     * id, the same items, never a copy.
      */
     val CONFIGURATION_IDS = listOf(
         GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
         GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
-        GamingSettingsCatalog.ID_SYSTEM_UPDATES,
         GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS,
     )
 

@@ -5,21 +5,24 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import dev.droidtop.app.MainActivity
 import dev.droidtop.app.R
 import dev.droidtop.library.integrations.PluginRepoUpdates
 import dev.droidtop.library.integrations.RepoCheckResult
+import dev.droidtop.library.settings.Mode
+import dev.droidtop.shell.standard.BackButtonMenu
 
 /**
  * The one notification the plugin-repository update pass posts (docs/SPEC.md 12a "Plugin
  * repositories"): what was updated, and what now needs the person (an approval, or access an
  * update newly asks for). Posted only when notifications are already allowed for droidtop, like
  * [dev.droidtop.app.JobsSummaryNotification]; without that permission the same words are on the
- * repository's screen under "Checked ...". Tapping it opens Settings.
+ * repository's screen under "Checked ...". Tapping it opens the Updates place in Gaming, the one screen that
+ * lists what has a newer version.
  */
 object PluginRepoUpdateNotification {
     private const val CHANNEL_ID = "plugin_repo_updates"
@@ -35,7 +38,9 @@ object PluginRepoUpdateNotification {
             val open = PendingIntent.getActivity(
                 context,
                 0,
-                Intent().setComponent(ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity"))
+                Intent(context, MainActivity::class.java)
+                    .putExtra(BackButtonMenu.EXTRA_MODE, Mode.GAMING.id)
+                    .putExtra(BackButtonMenu.EXTRA_GAMING_START_SECTION, "UPDATES")
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )

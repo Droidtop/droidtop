@@ -777,6 +777,12 @@ private fun GamepadShellBody(
                 quickMenuOpen = false
                 leftMenuOpen = true
             },
+            openPlace = { screenId ->
+                placeForScreen(screenId, menuSectionsFor(uiMode))?.let { place ->
+                    quickMenuOpen = false
+                    nav.openSection(place)
+                } != null
+            },
             onDismiss = { quickMenuOpen = false },
         )
     }
@@ -1912,6 +1918,14 @@ internal const val PLACE_STORES_SCREEN_ID = "stores"
 internal const val PLACE_DOWNLOADS_SCREEN_ID = "plugin_jobs"
 internal const val PLACE_UPDATES_SCREEN_ID = "updates"
 internal const val PLACE_PLUGINS_SCREEN_ID = "plugins"
+
+/**
+ * The place a settings screen id IS, when the left menu lists it ([allowed]: a mode that hides
+ * Settings hides the places). A link to such a screen opens the place in the shell instead of a
+ * second copy of the screen inside a sheet, so a screen has one home (docs/SPEC.md 7j "Places").
+ */
+internal fun placeForScreen(screenId: String, allowed: List<GamingSection>): GamingSection? =
+    allowed.firstOrNull { it.isPlace && it.placeScreenId == screenId }
 
 /**
  * How long one shell-drawn screen takes to become another. ES-DE's own

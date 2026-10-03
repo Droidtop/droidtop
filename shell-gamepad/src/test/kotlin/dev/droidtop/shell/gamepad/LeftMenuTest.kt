@@ -93,4 +93,17 @@ class LeftMenuTest {
         assertTrue(GamingSection.STORES.managesDevice)
         assertFalse(GamingSection.GAMES.managesDevice)
     }
+
+    @Test
+    fun `a link to a place's screen opens the place`() {
+        val full = menuSectionsFor(UiMode.FULL)
+        assertEquals(GamingSection.UPDATES, placeForScreen(PLACE_UPDATES_SCREEN_ID, full))
+        assertEquals(GamingSection.PLUGINS, placeForScreen(PLACE_PLUGINS_SCREEN_ID, full))
+    }
+
+    @Test
+    fun `a screen that is no place, or a place the mode hides, stays a nested screen`() {
+        assertEquals(null, placeForScreen("android_settings", menuSectionsFor(UiMode.FULL)))
+        assertEquals(null, placeForScreen(PLACE_UPDATES_SCREEN_ID, menuSectionsFor(UiMode.KIOSK)))
+    }
 }

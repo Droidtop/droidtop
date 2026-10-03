@@ -95,6 +95,7 @@ import java.util.Date
 internal fun QuickSettingsPanel(
     section: QuickSection,
     sheetWidthDp: Int,
+    openPlace: (screenId: String) -> Boolean,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -152,7 +153,9 @@ internal fun QuickSettingsPanel(
             QuickPress.TOGGLE, QuickPress.CYCLE -> if (adjustCatalogItem(context, item, +1)) refresh()
             QuickPress.PICK -> picking = item as ChoiceItem
             QuickPress.OPEN -> {
-                val child = (item as NestedScreenItem).resolve()
+                // A screen the left menu lists as a place opens there, not as a copy in this sheet.
+                if ((item as NestedScreenItem).registryId?.let(openPlace) == true) return
+                val child = item.resolve()
                 if (child != null) nested = child else statusById[item.id] = "Screen unavailable"
             }
             QuickPress.RUN -> {

@@ -1205,23 +1205,6 @@ object AppSettingsCatalogs {
 
         return listOf(
             CatalogGroup(
-                id = "windows_steam",
-                title = "Steam",
-                items = listOf(
-                    ActionItem(
-                        id = "windows_steam_account",
-                        title = "Steam account and library",
-                        subtitle = "Sign in (QR or password), browse your games, and download them here",
-                        run = { ctx ->
-                            ctx.startActivity(
-                                android.content.Intent(ctx, dev.droidtop.app.SteamLoginActivity::class.java)
-                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        },
-                    ),
-                ),
-            ),
-            CatalogGroup(
                 id = "windows_setup",
                 title = null,
                 items = buildList {
@@ -1648,8 +1631,6 @@ object AppSettingsCatalogs {
 
     private suspend fun pluginsGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val installed = PluginStore.installed(context)
-        val cachedIndex = PluginCatalog.lastGoodIndex(context)
-        val updates = cachedIndex?.let { PluginCatalog.updatesFor(installed, it) }.orEmpty()
         // Read once here, off the main thread; valueLabel below is a
         // plain (non-suspend) closure the renderer may call on the main
         // thread, so it must not touch the key store itself.
@@ -1687,47 +1668,7 @@ object AppSettingsCatalogs {
                     }
                 },
             ),
-        ) + providedByGroups(resolution, providerChoices) + (
-            if (installed.isEmpty()) {
-                emptyList()
-            } else {
-                listOf(
-                    CatalogGroup(
-                        id = "plugins_updates",
-                        title = "Updates",
-                        items = buildList {
-                            add(
-                                ActionItem(
-                                    id = "plugins_updates_status",
-                                    title = when {
-                                        cachedIndex == null -> "Catalog not fetched yet"
-                                        updates.isEmpty() -> "Up to date"
-                                        else -> "${updates.size} update${if (updates.size == 1) "" else "s"} available"
-                                    },
-                                    subtitle = if (cachedIndex == null) {
-                                        "Open Add > Browse catalog to check"
-                                    } else {
-                                        updates.joinToString { (record, release) -> "${record.manifest.label} -> ${release.version}" }
-                                            .ifEmpty { "Every installed plugin matches the catalog's latest stable release" }
-                                    },
-                                    run = {},
-                                ),
-                            )
-                            if (updates.isNotEmpty()) {
-                                add(
-                                    AsyncActionItem(
-                                        id = "plugins_update_all",
-                                        title = "Update all",
-                                        subtitle = "Downloads and verifies each update, then installs it the same way a single update would",
-                                        run = { ctx, onStatus -> PluginCatalog.updateAll(ctx, onStatus) },
-                                    ),
-                                )
-                            }
-                        },
-                    ),
-                )
-            }
-        ) + listOf(
+        ) + providedByGroups(resolution, providerChoices) + listOf(
             CatalogGroup(
                 id = "plugins_add",
                 title = "Add",

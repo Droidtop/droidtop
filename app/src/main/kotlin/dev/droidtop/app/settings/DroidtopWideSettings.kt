@@ -108,6 +108,20 @@ object DroidtopWideSettings {
                         ),
                     ),
                 ),
+                // The one Updates screen, reachable from every mode's settings. Gaming also has it as a
+                // left-menu place (and the Quick Menu opens that place); all are links to this screen.
+                CatalogGroup(
+                    id = "global_updates",
+                    title = null,
+                    items = listOf(
+                        dev.droidtop.library.settings.NestedScreenItem(
+                            id = "pref_global_updates", title = "Updates",
+                            subtitle = "droidtop, plugins and games with a newer version",
+                            registryId = AppSettingsCatalogs.SCREEN_UPDATES,
+                            icon = dev.droidtop.library.settings.CatalogIcon.SYSTEM_UPDATES,
+                        ),
+                    ),
+                ),
                 CatalogGroup(
                     id = "global_accessibility",
                     title = "Accessibility",

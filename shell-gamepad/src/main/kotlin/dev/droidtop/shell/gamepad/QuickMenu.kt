@@ -131,6 +131,7 @@ internal fun QuickMenu(
     onQuit: (entry: dev.droidtop.library.LibraryEntry, restart: Boolean) -> Unit,
     quitOutcome: dev.droidtop.library.QuitResult?,
     onOpenLeftMenu: () -> Unit,
+    openPlace: (screenId: String) -> Boolean,
     onDismiss: () -> Unit,
 ) {
     val window = currentShellWindow()
@@ -226,7 +227,7 @@ internal fun QuickMenu(
                         QuickSection.APPS -> AppsTab(close)
                         QuickSection.NOTIFICATIONS -> NotificationsTab(close)
                         QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
-                            QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, close)
+                            QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close)
                         QuickSection.PERFORMANCE -> PerformanceSection(close)
                         QuickSection.DOWNLOADS -> DownloadsSection(close)
                         QuickSection.PLUGINS -> PluginTilesTab(pluginTiles, close)

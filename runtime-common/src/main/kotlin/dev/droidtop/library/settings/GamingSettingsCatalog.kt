@@ -305,17 +305,6 @@ object GamingSettingsCatalog {
                 add(secondScreenRoleItem(context, MODE_DESKTOP))
                 add(
                     NestedScreenItem(
-                        id = ID_SYSTEM_UPDATES,
-                        title = "Software updates",
-                        subtitle = "Check for and install newer droidtop builds",
-                        // Owned by :app (which this module cannot depend on),
-                        // resolved through the registry like android_settings.
-                        registryId = "updates",
-                        icon = CatalogIcon.SYSTEM_UPDATES,
-                    ),
-                )
-                add(
-                    NestedScreenItem(
                         id = ID_SYSTEM_ANDROID_LINKS,
                         title = "Android settings",
                         subtitle = "System settings",
@@ -687,6 +676,17 @@ object GamingSettingsCatalog {
                         title = "Audio output",
                         subtitle = "Opens Android's output switcher",
                         run = { ctx -> ctx.startActivity(controls.audioOutputIntent()) },
+                    ),
+                )
+                // The Updates place's way in from the Quick Menu: pressing it closes the menu and opens
+                // that place (docs/SPEC.md 7j "Updates"). Not in Settings: one Updates destination.
+                add(
+                    NestedScreenItem(
+                        id = ID_SYSTEM_UPDATES,
+                        title = "Updates",
+                        subtitle = "Droidtop, plugins and games with a newer version",
+                        registryId = "updates",
+                        icon = CatalogIcon.SYSTEM_UPDATES,
                     ),
                 )
             },

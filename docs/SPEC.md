@@ -11437,7 +11437,9 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   signs out, syncs and says whether it is signed in; the checks that were
   written out three times in the accounts screen are gone, and **Accounts
   and sources** and **PC setup** now link to Stores instead of carrying
-  their own sign-in rows. Credentials are never entered by droidtop: Sign
+  their own sign-in rows (the "Steam account and library" row on the Windows
+  games screen, which started the Steam sign-in a second way, is gone too:
+  Stores > Steam is the one entry, 2026-10-03). Credentials are never entered by droidtop: Sign
   in starts the store's own screen. **Open library** sets the PC Games
   tab's Store filter to that store and opens the tab (`PcGamesState.showStore`),
   so a store is a filter on the one library and not a second place to
@@ -11468,8 +11470,20 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   before. Android apps are not listed: nothing yet knows an installed app's
   latest version, and the install and update manager (Droidtop/tracker#261)
   is what will feed this group.
+  **One Updates screen, one list of ways in** (2026-10-03, Droidtop/tracker#273):
+  the plugin updates status and "Update all" that the Plugins screen also
+  carried are gone (the Plugins screen lists plugins, approvals, repositories
+  and the catalog; what has a newer version is read in Updates). The ways in
+  are links to this one screen: the left-menu place in Gaming, the Quick
+  Menu's System tab tile (it closes the menu and opens the place; a link to
+  any screen that is a place does the same, `placeForScreen`, never a second
+  copy of the screen inside the sheet), Global settings, for Standard and
+  Desktop which have no left menu, and the plugin-repository update
+  notification, which opens Gaming on the Updates place
+  (`EXTRA_GAMING_START_SECTION` = `UPDATES`). Settings > System no longer
+  carries a "Software updates" row of its own.
 - **Plugins** (`plugins`): the existing Plugins screen (installed,
-  approvals, repositories, updates, catalog), opened in place.
+  approvals, repositories, catalog), opened in place.
 
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 
@@ -12857,7 +12871,7 @@ ways. Over adb:
 
     adb shell am broadcast -a dev.droidtop.UPDATE_NOW -n dev.droidtop.app/.UpdateNowReceiver
 
-and from Settings > Software updates, the row "Check now", which is the
+and from the Updates screen (Updates place, Global settings), the row "Check now", which is the
 page's only check (its value is the installed version, its line when it
 last checked; a check-only row beside it was a second way to do one job
 and was removed, UI pass 2026-09-24 L4). It
@@ -14006,12 +14020,10 @@ what the index says is display data, never a trust decision.
     (`docs/plugin-
     api.md`) exists; this page has the group structure for it already
     but no invented controls ahead of that data being real.
-  - **Updates** (only shown once a plugin is installed) — "N updates
-    available" or "Up to date" against the last fetched catalog index,
-    or "Catalog not fetched yet" when no index has been fetched (never
-    "Up to date" on a catalog that was never read; the subtitle points
-    at Add > Browse catalog), with "Update all"
-    (`PluginCatalog.updateAll`) when any exist.
+  - **Updates** moved out (2026-10-03): the status ("N updates
+    available", "Up to date", never "Up to date" on a catalog that was
+    never read) and "Update all" (`PluginCatalog.updateAll`) are the
+    Updates screen's "Available" group, see "Places".
   - **Add** — "Browse catalog" (the catalog screen below) and "Install
     plugin file" (the file picker), both install sources in one place
     instead of the file picker being the very last row of the old flat
