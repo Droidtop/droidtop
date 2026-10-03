@@ -4363,7 +4363,11 @@ has to be done by droidtop, and only that (Droidtop/tracker#249,
   whose config never landed ends in a message, not in the same offer
   again;
 - each failed step logs its whole exception under `droidtop.WineSetup`;
-  the screen gets one line.
+  the screen gets one line. Setup logs under the same tag from start to
+  end: `started`, each step the screen shows (once per step, not per
+  percent) and `done` or `failed` with the screen's line, so a setup that
+  worked is visible in a rig's log too (the 2026-10-03 rig run found no
+  lines because nothing had failed).
 
 The fork derives every path to the app's own data from the `Context`, never
 from the upstream package name (`/data/data/app.gamenative`): the gamepad

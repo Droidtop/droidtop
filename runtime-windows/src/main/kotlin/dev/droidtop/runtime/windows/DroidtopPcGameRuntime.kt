@@ -97,7 +97,31 @@ class DroidtopPcGameRuntime(
     override val isLinuxContainerAvailable: Boolean
         get() = primarySession() != null
 
+    /**
+     * Setup, logged under [TAG] from start to end: each step the screen
+     * shows (once per step, not per percent) and the outcome, so a setup
+     * that worked is as visible in a rig's log as one that failed. The
+     * failed step's exception is logged by [failed].
+     */
     override suspend fun provision(
+        gamesRoots: List<File>,
+        onStatus: (String) -> Unit,
+    ): PcProvisionResult {
+        android.util.Log.i(TAG, "Windows setup: started")
+        var lastStep: String? = null
+        val result = provisionSteps(gamesRoots) { line ->
+            val step = line.substringBefore('…')
+            if (step != lastStep) {
+                lastStep = step
+                android.util.Log.i(TAG, "Windows setup: $line")
+            }
+            onStatus(line)
+        }
+        android.util.Log.i(TAG, "Windows setup: ${if (result.succeeded) "done" else "failed"}: ${result.detail}")
+        return result
+    }
+
+    private suspend fun provisionSteps(
         gamesRoots: List<File>,
         onStatus: (String) -> Unit,
     ): PcProvisionResult = withContext(Dispatchers.IO) {
