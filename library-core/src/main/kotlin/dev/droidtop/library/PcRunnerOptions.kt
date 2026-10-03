@@ -127,7 +127,9 @@ object PcRunnerOptions {
                 // offer's own going away is the whole answer.
                 windowsSetupConsent?.invoke() == false -> null
                 else -> {
-                    val result = runtime.provision(GamesRoots.current(context), onStatus)
+                    // The one setup path Settings' row uses too, so the state
+                    // every surface shows is the one launch just changed.
+                    val result = WindowsSetup.provision(context, onStatus)
                     if (result.succeeded) null else result.detail
                 }
             }

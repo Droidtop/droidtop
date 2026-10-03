@@ -1200,6 +1200,8 @@ object AppSettingsCatalogs {
         val runtime = dev.droidtop.library.PcGameRuntimeRegistry.runtime
         val roots = withContext(Dispatchers.IO) { GamesRootPrefs.gamesRootPaths(context).sorted() }
         val provisioned = withContext(Dispatchers.IO) { runtime?.isProvisioned == true }
+        // The state launch changes too: Not set up, Installing N%, Ready, or why it failed.
+        val setupState = withContext(Dispatchers.IO) { dev.droidtop.library.WindowsSetup.current(context) }
 
         return listOf(
             CatalogGroup(
@@ -1234,24 +1236,18 @@ object AppSettingsCatalogs {
                         )
                         return@buildList
                     }
+                    // The row says where setup is (its value) and asks once before
+                    // the long download or reinstall starts (Droidtop/tracker#299);
+                    // the same WindowsSetup path launch and the game page use.
                     add(
                         AsyncActionItem(
                             id = "windows_provision",
                             title = if (provisioned) "Reinstall the Windows environment" else "Set up Windows games",
-                            subtitle = if (provisioned) {
-                                "Already set up. Running this again only reinstalls what is missing or out of date."
-                            } else {
-                                "Downloads and installs Wine's system files once, then maps your game folders into it. Several hundred megabytes."
-                            },
+                            value = dev.droidtop.library.WindowsSetup.label(setupState),
+                            confirmTitle = if (provisioned) "Reinstall the Windows environment?" else "Download Windows system files? Several hundred megabytes",
                             run = { ctx, onStatus ->
-                                val gamesRoots = GamesRootPrefs.gamesRootPaths(ctx).map { File(it) }
-                                val result = dev.droidtop.library.PcGameRuntimeRegistry.runtime
-                                    ?.provision(gamesRoots, onStatus)
-                                when {
-                                    result == null -> "Windows support isn't loaded in this build"
-                                    result.succeeded -> result.detail
-                                    else -> "Setup failed: ${result.detail}"
-                                }
+                                val result = dev.droidtop.library.WindowsSetup.provision(ctx, onStatus)
+                                if (result.succeeded) result.detail else "Failed: ${result.detail}"
                             },
                         ),
                     )

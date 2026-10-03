@@ -16,6 +16,7 @@ import dev.droidtop.library.RunnerState
 import dev.droidtop.library.RunnerAction
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.StoreUpdate
+import dev.droidtop.library.WindowsSetup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -112,6 +113,8 @@ internal fun playStateOf(
     entry: LibraryEntry,
     download: StoreDownloads.Progress? = null,
     noRunnerLine: String = "No runner on this device offers this game",
+    /** What Windows setup is doing or last did ([WindowsSetup.live]); null when nothing has happened this process. */
+    windowsSetup: WindowsSetup.State? = null,
 ): PcPlayState {
     if (entry.missing) {
         return PcPlayState("Folder is missing", missingFolderLine(entry), pressable = false, ready = false)
@@ -122,6 +125,15 @@ internal fun playStateOf(
     return when {
         option?.state == RunnerState.READY ->
             PcPlayState("Play", option.caveat ?: "Starts now on $label", pressable = true, ready = true)
+        // The shared setup's own state is the line under its button: it is
+        // running (A does not start it twice), or why the last try failed.
+        option?.action == RunnerAction.SET_UP_WINDOWS_GAMES && windowsSetup is WindowsSetup.State.Installing ->
+            PcPlayState(
+                "Installing", WindowsSetup.label(windowsSetup), pressable = false, ready = false,
+                progress = windowsSetup.percent?.let { it / 100f },
+            )
+        option?.action == RunnerAction.SET_UP_WINDOWS_GAMES && windowsSetup is WindowsSetup.State.Failed ->
+            PcPlayState(primaryActionLabel(option.action), WindowsSetup.label(windowsSetup), pressable = true, ready = false)
         option?.action != null ->
             PcPlayState(primaryActionLabel(option.action), option.reason ?: "One step, then this becomes Play", pressable = true, ready = false)
         else ->
@@ -150,6 +162,7 @@ internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, Resolve
     val context = LocalContext.current
     val downloads by StoreDownloads.active.collectAsState()
     val download = entry.downloadKey()?.let { downloads[it] }
+    val windowsSetup by WindowsSetup.live.collectAsState()
     val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id) {
         value = Triple(false, null, null)
         val (runner, line) = withContext(Dispatchers.IO) {
@@ -161,7 +174,11 @@ internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, Resolve
     val (loaded, runner, noRunnerLine) = resolved
     // A store stage needs no runner, so it is never held back by the lookup.
     val state = if (loaded || storeStageOf(entry, download) != null) {
-        if (noRunnerLine != null) playStateOf(runner, entry, download, noRunnerLine) else playStateOf(runner, entry, download)
+        if (noRunnerLine != null) {
+            playStateOf(runner, entry, download, noRunnerLine, windowsSetup)
+        } else {
+            playStateOf(runner, entry, download, windowsSetup = windowsSetup)
+        }
     } else {
         PcPlayStateLoading
     }

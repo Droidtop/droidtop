@@ -10418,6 +10418,18 @@ render as chrome, never as the launch-failure banner. A on a capsule whose
 Windows environment is not set up opens the game page instead of the offer
 (Droidtop/tracker#293): the page's primary button reads "Set up Windows
 games", and the offer then appears over the page, which stays open.
+**One state, one way to start it (owner ask, Droidtop/tracker#299).**
+`WindowsSetup` (library-core) is the only code that provisions the Windows
+environment and the only source of its state: Settings' "Set up Windows
+games" row, the Steam screen's button, A on a game and the game menu's row all
+call `WindowsSetup.provision`, and every surface reads `WindowsSetup.State`
+(Not set up, Installing N%, Ready, Failed: reason) beside `isProvisioned`,
+which launch reads. Settings' row carries that state as its value and asks
+once ("Download Windows system files?", "Reinstall the Windows
+environment?") before the download or reinstall starts; the game page's
+primary button shows Installing N% (not pressable while it runs) or the failure
+reason under it. A failure is kept across restarts until the next attempt
+starts; a second ask during an install waits for the first, never runs two.
 
 **Root never gates a Gaming game.** Native Linux inside a container
 needs root today and is therefore "not on this device" on an unrooted

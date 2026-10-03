@@ -219,11 +219,8 @@ private fun LibraryPanel(username: String?) {
         setupRunning = true
         setupStatus = "Setting up the Windows environment..."
         scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runtime.provision(dev.droidtop.library.GamesRoots.current(context)) { status ->
-                    setupStatus = status
-                }
-            }
+            // The one setup path (WindowsSetup), shared with Settings and launch.
+            val result = dev.droidtop.library.WindowsSetup.provision(context) { status -> setupStatus = status }
             setupStatus = result.detail
             setupRunning = false
         }
