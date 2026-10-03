@@ -139,3 +139,22 @@ internal suspend fun mergeShortScreens(
     }
     return out
 }
+
+/**
+ * [groups] without the links that open a screen the left menu already lists as a place
+ * ([placeScreenIds], the registry ids of [GamingSection.placeScreenId]), and without a group that
+ * held nothing else: in a mode with a left menu a place has one way in, the menu, not a second
+ * row in Settings (docs/SPEC.md "Settings layout", Droidtop/tracker#273).
+ */
+internal fun withoutPlaceLinks(groups: List<CatalogGroup>, placeScreenIds: Set<String>): List<CatalogGroup> {
+    if (placeScreenIds.isEmpty()) return groups
+    fun isPlaceLink(item: Any) = (item as? NestedScreenItem)?.registryId in placeScreenIds
+    return groups.mapNotNull { group ->
+        val kept = group.items.filterNot { isPlaceLink(it) }
+        when {
+            kept.size == group.items.size -> group
+            kept.isEmpty() -> null
+            else -> group.copy(items = kept)
+        }
+    }
+}

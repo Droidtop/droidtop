@@ -1266,6 +1266,7 @@ private fun GamepadShellBody(
                             SettingsCatalogView(
                                 onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
                                 browseThemesToken = browseThemesRequest,
+                                placeScreenIds = menuSectionsFor(uiMode).filter { it.isPlace }.mapNotNull { it.placeScreenId }.toSet(),
                                 onHelpRowClaim = { claim ->
                                     if (screenKey == currentScreenKey) {
                                         helpRowClaimant = screenKey to claim

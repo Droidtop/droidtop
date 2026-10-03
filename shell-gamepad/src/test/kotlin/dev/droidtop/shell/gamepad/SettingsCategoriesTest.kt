@@ -124,4 +124,20 @@ class SettingsCategoriesTest {
         assertEquals(listOf("Home", "System", "Unlisted"), categories.map { it.label })
         assertEquals(listOf("x", "w"), categories[1].groupIds)
     }
+
+    @Test
+    fun `a link to a left-menu place is dropped, and a group left empty goes with it`() {
+        fun placeLink(id: String) = NestedScreenItem(id = id, title = id, registryId = "plugin_jobs")
+        val groups = listOf(
+            CatalogGroup(id = "library", title = "Library", items = listOf(link("a", screen("sa")), placeLink("downloads"))),
+            CatalogGroup(id = "only", title = "Only", items = listOf(placeLink("d2"))),
+        )
+
+        val out = withoutPlaceLinks(groups, setOf("plugin_jobs"))
+
+        assertEquals(listOf("library"), out.map { it.id })
+        assertEquals(listOf("a"), out.single().items.map { it.id })
+        // No left menu, no places: the same list comes back.
+        assertSame(groups, withoutPlaceLinks(groups, emptySet()))
+    }
 }

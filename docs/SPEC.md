@@ -11590,7 +11590,8 @@ Settings tab, the left menu's places, Console systems and Containers.
   in (Global settings) contribute groups to several categories. The Gaming
   Settings column is, in order: **Home & modes** (Home screen, Modes, Shell),
   **Library** (Console systems, Emulators, Game folders, Windows games,
-  Scraper, F95Checker import and Downloads as rows that open their screens),
+  Scraper and F95Checker import as rows that open their screens; Downloads
+  too in a mode with no left menu, see below),
   **Accounts and sources** (its screen drawn directly, a hub of one),
   **Appearance** (theme rows and Accessibility), **Controls**, **Displays**
   (orientation and the display roles), **System** (Updates, Android settings,
@@ -11605,6 +11606,18 @@ Settings tab, the left menu's places, Console systems and Containers.
   drawn as sections of the pane that links it instead
   (`mergeShortScreens`; Standard mode's one row inside Global settings).
   Merging is one level deep and keeps each row's id and write path.
+- **Which screens merge, and one way in per mode (2026-10-03,
+  Droidtop/tracker#273).** A screen is merged only if it is a handful of
+  fixed rows with no list and no screen of its own behind it (about six or
+  fewer). Evaluated and kept as pushed screens: Scraper (about twenty option
+  rows), Game folders (a live list of the scanned folders, plus path entry),
+  Windows games (the Wine option rows open their own pickers and the drive
+  list varies) and F95Checker import (a matches list built from the picked
+  database). A link to a screen the left menu lists as a place is not drawn
+  in Gaming's Settings (`withoutPlaceLinks`, fed by `menuSectionsFor`): in
+  Gaming, Downloads is the left menu's place, so the Library category has no
+  "Downloads and installs" row; Standard and Desktop, which have no left menu,
+  keep it, and Global settings keeps its Updates link for the same reason.
 - **Rows.** A row is its name and, right-aligned in the screen's one value
   column, what it is set to: a switch for a toggle, an inline track and the
   number for a slider, `‹ value ›` for a short choice, a chevron for a row

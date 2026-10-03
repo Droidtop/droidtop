@@ -996,6 +996,7 @@ internal val selectionByDepthSaver: Saver<SnapshotStateMap<Int, Int>, Any> = lis
 internal fun SettingsCatalogView(
     onBack: () -> Unit,
     browseThemesToken: Int = 0,
+    placeScreenIds: Set<String> = emptySet(),
     onHelpRowClaim: (HelpRowClaim) -> Unit = {},
 ) {
     var browseThemes by remember { mutableStateOf(false) }
@@ -1015,12 +1016,12 @@ internal fun SettingsCatalogView(
         return
     }
 
-    val root = remember {
+    val root = remember(placeScreenIds) {
         CatalogScreen(
             id = "gaming_settings",
             title = "Settings",
             categoryOrder = GamingSettingsCatalog.CATEGORY_ORDER,
-            groups = { ctx -> GamingSettingsCatalog.settingsGroups(ctx) },
+            groups = { ctx -> withoutPlaceLinks(GamingSettingsCatalog.settingsGroups(ctx), placeScreenIds) },
         )
     }
     CatalogNavigator(
