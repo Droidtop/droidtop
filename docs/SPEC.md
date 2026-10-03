@@ -4411,7 +4411,14 @@ The fork derives every path to the app's own data from the `Context`, never
 from the upstream package name (`/data/data/app.gamenative`): the gamepad
 shared memory (`EVSHIM_BASE_PATH`), the DXVK state cache and the default E:
 drive. Under the upstream package these resolve to the same folders, so the
-change goes upstream as it is.
+change goes upstream as it is. The gamepad memory has two sides: Wine
+processes read `EVSHIM_BASE_PATH`, and droidtop's own process, where
+`libevshim` is loaded before any variable could be set, gets the files
+directory from `WinHandler.attachSharedMemory`. Until 2026-10-03 that side
+fell back to the upstream path, mapped nothing, and the four rumble pollers
+spun a core each for as long as a game ran (3.2 of the rig's 4 cores,
+Droidtop/tracker#304); a session whose memory cannot be mapped now runs
+without rumble instead.
 
 **Milestone 1 is met.** On build 388 the ImageFs rootfs installs for the
 first time: 175MB base system downloaded and extracted to a 947MB rootfs
