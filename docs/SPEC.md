@@ -12646,7 +12646,27 @@ app gets it too:
   preload instead: an exec that failed with EACCES on an app-private ELF is
   retried as `linker64 <path>`, and `/proc/self/exe` answers with the real
   program when the kernel's answer is the linker. Where exec is allowed it
-  changes nothing.
+  changes nothing. Wine finds everything from that answer: its loader
+  opens `ntdll.so` relative to `realpath("/proc/self/exe")` and ntdll takes
+  the same directory as the one holding `wineserver` and the loader (Wine
+  9.0 `loader/main.c` `load_ntdll`, `dlls/ntdll/unix/loader.c`
+  `init_paths`). "The linker" means either of its names: from Android 10
+  on `/system/bin/linker64` is a symlink into the runtime APEX and the
+  kernel reports `/apex/com.android.runtime/bin/linker64`; matching only
+  the first name left Wine looking for `ntdll.so` under the APEX on the
+  BlueStacks rig (2026-10-03).
+- **SDL2** is in the guest libraries too: `libevshim`, preloaded into every
+  Wine process, dlopens `libSDL2-2.0.so.0` for its virtual joysticks, and
+  winebus.sys's SDL backend opens the same name; on arm64 the aarch64
+  image has it. Upstream's release, built as a Linux library on bionic
+  rather than as SDL's Android port (whose joystick code calls into SDL's
+  own Java activity through JNI, which a Wine process does not have), with
+  the controller subsystems only, so it needs nothing beyond libc, libm
+  and libdl.
+- **Pinned assets say what they checked.** Each pinned release asset
+  (`PinnedReleaseAsset`: the guest libraries, the graphics drivers) logs
+  the SHA-256 it computed and whether it matched the pin before
+  unpacking.
 - **SysV shared memory** for the X server's MIT-SHM is `libandroid-sysvshm`
   from `Droidtop/proton-wine-tux`, built into the same asset.
 - **Audio**: the PulseAudio modules extracted for a Wine launch are the
