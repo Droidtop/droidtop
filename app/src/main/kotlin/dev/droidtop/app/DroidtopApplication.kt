@@ -53,6 +53,10 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // Crash notes and crash-loop safe mode (SPEC 10c): after ScanLog so
         // a note can carry its tail, before anything that could crash.
         dev.droidtop.library.diagnostics.CrashRecovery.install(this)
+        // OkHttp's androidx.startup initializer never runs (shell-default's
+        // manifest removes the startup provider), so its public suffix list
+        // is unreadable until it gets the context here (SPEC 10b).
+        dev.droidtop.runtime.windows.OkHttpPlatform.install(this)
         // Everything mode-specific this process starts, and nothing else:
         // the mode snapshot was already taken by
         // SettingsCatalogInitProvider (a ContentProvider's onCreate runs

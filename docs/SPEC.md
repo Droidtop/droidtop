@@ -12465,6 +12465,16 @@ not already-compressed payloads, so they are not stored. R8 breakage shows
 only at run time, so a shrunk build is checked on the console before it is
 trusted (the commit that turned it on lists the checks).
 
+**No androidx.startup initializers run.** The launcher's manifest
+(`shell-default`) removes androidx.startup's `InitializationProvider` for
+the whole app, as Launcher3 does, so a library that initialises itself that
+way does not start on its own; droidtop starts the ones it needs from
+`DroidtopApplication`. The one so far is OkHttp 5, whose
+`PlatformInitializer` gives it the context it reads its public suffix list
+from (`assets/PublicSuffixDatabase.list`); without it every DNS-over-HTTPS
+lookup gamenative makes failed with "Unable to load PublicSuffixDatabase.list
+resource" and fell back to system DNS (`OkHttpPlatform`, rig run 2026-10-03).
+
 **Channels, and the debug APK beside the release one (directed 2026-09-22).**
 The user: "add two toggles to the update and etc checker: branch (so, stable,
 unstable, etc), and a debug checkbox, along with a warning if it's enabled."
