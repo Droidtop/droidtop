@@ -43,6 +43,16 @@
 # classes are in dev.droidtop.pluginhost above.
 -keep class dev.droidtop.runtime.tasks.** { *; }
 
+# Custom widget plugins. Launcher3's CustomWidgetManager reads their class
+# names from the custom_widget_providers array (shell-default/res/values/config.xml)
+# and ModelCallbacks builds the provider name from the class name, then
+# Class.forName(name).getConstructor(Context.class) creates them, so R8 must
+# keep the constructor even though no code calls it (a console build logged
+# NoSuchMethodException on MurineClockWidgetPlugin.<init>(Context)).
+-keep class * implements com.android.launcher3.widget.custom.CustomWidgetPlugin {
+    public <init>(...);
+}
+
 # Flutter plugin host: the engine calls FlutterJNI by name, and the registrant
 # is found with Class.forName (FlutterEngineHost.kt).
 -keep class io.flutter.** { *; }
