@@ -12728,7 +12728,12 @@ app gets it too:
     path, and presentation is Mesa's socket copy (`MESA_VK_WSI_DEBUG=sw,
     noshm`). The X server answers `PresentQueryCapabilities`, which Mesa's
     X11 WSI needs for a swapchain. Slow (CPU rendering) but on every x86_64
-    device. The approach follows Bliss-Bass/GameNative-x64, which runs it on
+    device. The app's own X server shows each window through its Vulkan
+    renderer by importing the window's AHardwareBuffer; where the device's
+    Vulkan cannot import one (BlueStacks' Mesa rejects the BGRA buffers,
+    "android_format_is_yuv: unhandled format: 5", and the game stayed
+    black), the first failure switches it to uploading the window's pixels
+    for the rest of the session. The approach follows Bliss-Bass/GameNative-x64, which runs it on
     x86_64 tablets.
   - **None:** no guest Vulkan driver; 2D and GDI only.
   - **Not offered until they exist:** a hardware Vulkan ICD with X11 WSI
