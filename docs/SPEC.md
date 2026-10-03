@@ -5875,7 +5875,13 @@ Two concrete references to build from rather than design blind:
   prefix, or its own prefix once it picks another Wine build), from the fork's
   lists and component manifest, not from gamenative's Android-styled
   dialog. The dialog remains the "All prefix settings" row of both, for
-  the rest (controller, drives, environment, components).
+  the rest (controller, drives, environment, components). On an x86_64
+  device its Graphics tab lists the x86_64 drivers only, under the names
+  droidtop's rows use (`X86_64Graphics.label`, which parse back to the
+  ids), and hides the rows only the Wrapper driver reads (its build,
+  exposed extensions, device memory, adrenotools Turnip, resource type,
+  BCn emulation); it used to show "Wrapper" for a lavapipe prefix and mark
+  itself changed on open (Droidtop/tracker#303).
 - **Linux container management**: distrobox itself is CLI-only (no
   official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
   real, actively-maintained GTK4 GUI for it — confirmed feature set:
@@ -12849,6 +12855,19 @@ app gets it too:
     black), the first failure switches it to uploading the window's pixels
     for the rest of the session. The approach follows Bliss-Bass/GameNative-x64, which runs it on
     x86_64 tablets.
+  - **A window's pixels must reach the GPU (2026-10-03, Droidtop/tracker#242).**
+    Mesa's X11 WSI selects Present events on the window it presents to, and
+    the X server then keeps that window's content in a `GPUImage`: an
+    AHardwareBuffer that stays locked for its whole life and that the GL
+    renderer samples through an EGLImage without uploading. That only shows
+    the pixels where the CPU mapping and the GPU's copy are one memory.
+    BlueStacks' emulated gralloc keeps an ashmem region beside a host colour
+    buffer and copies on unlock, so a Vulkan game's window stayed black under
+    the GL renderer while the X cursor showed. `GPUImage.checkIsSupported`
+    therefore proves it: with the GL renderer's context current it writes a
+    pattern through the mapping and reads it back through the texture, and
+    where the pattern does not arrive the X server keeps plain textures,
+    uploaded each frame. The result is logged under `GPUImage`.
   - **None:** no guest Vulkan driver; 2D and GDI only.
   - **Not offered until they exist:** a hardware Vulkan ICD with X11 WSI
     (Mesa ANV/RADV built for bionic, or a wrapper ICD over the device's own
