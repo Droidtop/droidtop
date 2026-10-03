@@ -12,6 +12,7 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.runtime.windows.WineOptionRow
 import dev.droidtop.runtime.windows.WineOptions
+import dev.droidtop.runtime.windows.WinePrefixes
 
 /**
  * Wine build, x86 emulation, graphics driver and Direct3D as settings rows
@@ -128,6 +129,18 @@ object WineOptionsCatalog {
                         "GameNative's full configuration: controller, drives, environment, components and the rest"
                     },
                     run = { ctx -> ctx.startActivity(PcContainerConfigActivity.intent(ctx, if (overGame) null else entryId, title)) },
+                ),
+            )
+            add(
+                AsyncActionItem(
+                    id = "wine_options_winecfg",
+                    title = "Wine configuration",
+                    subtitle = if (overGame) {
+                        "Wine's own settings window (winecfg) for the shared prefix: Windows version, libraries, drives, audio. Changes apply to every game that shares it"
+                    } else {
+                        "Wine's own settings window (winecfg) for this prefix: Windows version, libraries, drives, audio"
+                    },
+                    run = { ctx, _ -> WinePrefixes.configure(ctx, entryId) },
                 ),
             )
             add(

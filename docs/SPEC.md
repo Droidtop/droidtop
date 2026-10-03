@@ -5882,6 +5882,12 @@ Two concrete references to build from rather than design blind:
   exposed extensions, device memory, adrenotools Turnip, resource type,
   BCn emulation); it used to show "Wrapper" for a lavapipe prefix and mark
   itself changed on open (Droidtop/tracker#303).
+  **Wine configuration** (`WinePrefixes.configure`), a row in both places,
+  opens Wine's own `winecfg` in that prefix the way a game starts there:
+  Windows version, DLL overrides, drives and audio are Wine's settings and
+  winecfg is where Wine keeps them, so droidtop does not copy them into
+  rows of its own. For a game in the shared prefix the row says that the
+  changes reach every game sharing it.
 - **Linux container management**: distrobox itself is CLI-only (no
   official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
   real, actively-maintained GTK4 GUI for it — confirmed feature set:
