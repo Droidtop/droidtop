@@ -68,7 +68,29 @@ object WineOptionPlan {
 
     /** The Wine builds this CPU can run, from every build the device knows of. */
     fun wineBuilds(x86Host: Boolean, known: List<String>): List<String> =
-        known.distinct().filter { !x86Host || !isArm64ec(it) }
+        known.distinct().filter { !x86Host || runsOnX86Host(it) }
+
+    /** The release a build id names ("proton-10.0-4-x86_64-1" is 10), or null when it names none. */
+    fun wineMajor(wine: String): Int? =
+        Regex("""^(?:proton|wine)-(\d+)""", RegexOption.IGNORE_CASE).find(wine)?.groupValues?.get(1)?.toIntOrNull()
+
+    /**
+     * Whether an x86_64 CPU runs [wine] directly. Never an ARM (arm64ec)
+     * build. Nor an x86_64 one older than Wine 10: GameNative's Android builds
+     * fix Wine's address space at 39 bits for box64 on arm64 phones
+     * (proton-wine android/patches/x86_64/dlls_ntdll_unix_virtual_c.patch),
+     * and before Wine 10 ntdll sized its page table from that fixed limit
+     * while the preloader's reservation near the 47-bit top raised the limit
+     * after it, so the first DLL mapped above 39 bits stops Wine on
+     * "alloc_pages_vprot: assertion end <= pages_vprot_size << pages_vprot_shift"
+     * (Proton 9 on the BlueStacks rig, 2026-10-03). From Wine 10 ntdll asks the
+     * host how far its address space reaches (get_host_addr_space_limit) and
+     * sizes the table from that answer, so the same build runs under box64
+     * and directly (Proton 10.0-4 and 11.0-1 start wineboot's Windows
+     * processes on the rig where Proton 9 stops at the assertion).
+     */
+    fun runsOnX86Host(wine: String): Boolean =
+        !isArm64ec(wine) && (wineMajor(wine)?.let { it >= 10 } ?: true)
 
     /** The 32-bit emulators to choose from; empty when the Wine build and CPU leave no choice. */
     fun emulators(x86Host: Boolean, wine: String): List<String> =

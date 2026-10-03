@@ -4104,9 +4104,31 @@ source in [vendor/gamenative](../vendor/gamenative):
     `setContainerDefaults`, which droidtop never ran before: on arm64 the
     arm64ec `proton-10.0-arm64ec-2` with FEXCore, the Wrapper driver with
     the Turnip build picked for the GPU class, and that class's DXVK; on
-    x86_64 the fork's own branch, `proton-9.0-x86_64` run directly with
-    software Vulkan. A new environment starts there; an existing one keeps
-    the Wine it has (switching a prefix's Wine is the person's choice).
+    x86_64 the fork's own branch, `proton-10.0-4-x86_64-1` run directly
+    with software Vulkan. A new environment starts there; an existing one keeps
+    the Wine it has (switching a prefix's Wine is the person's choice), with
+    one exception below.
+  - **On x86_64, only Wine 10 and later (decided 2026-10-03).** GameNative's
+    x86_64 Android builds fix Wine's address space at 39 bits, for box64 on
+    arm64 phones (proton-wine `android/patches/x86_64/
+    dlls_ntdll_unix_virtual_c.patch`). Proton 9's ntdll sizes its page table
+    from that fixed limit, the preloader's reservation near the 47-bit top
+    then raises the limit, and the first DLL placed above 39 bits (ntdll.dll
+    at its preferred base 0x6ffffff40000) stops Wine on `alloc_pages_vprot:
+    assertion "end <= pages_vprot_size << pages_vprot_shift"`; from Wine 10
+    ntdll sizes the table from the host's own limit
+    (`get_host_addr_space_limit`), so the same build runs under box64 and
+    directly. Found on the BlueStacks rig with a shell-run copy of the
+    launch: Proton 9.0 stops there, Proton 10.0-4 and 11.0-1 start their
+    Windows processes, and Proton 9 with its three limits set to the
+    upstream 47 bits (an experiment, never shipped) boots a prefix. So
+    `WineOptionPlan.runsOnX86Host` offers an x86_64 device only x86_64
+    builds from Wine 10 on; a launch in a prefix on an older one ends at
+    once with a message instead of the assertion; and an x86_64 device whose
+    shared environment is on one is offered Set up again, which moves it to
+    the default (Wine never started in it, so nothing of the person's is
+    lost; the next launch unpacks the new build's prefix files, as after
+    any change of Wine build).
   - **Components arrive on demand, never in an image.** One step,
     `WineComponents.ensure`, runs at setup, before every launch and from the
     settings' "Download what these settings need" row: the two Proton 9
@@ -12633,8 +12655,9 @@ x86_64 userland too, because the base system droidtop installs
 Wine's library calls onto it. The shape, all in the fork so the standalone
 app gets it too:
 
-- **x86_64 Wine, run directly.** `proton-9.0-x86_64` (the default there)
-  and the manifest's later x86_64 Protons are x86_64 Android (bionic)
+- **x86_64 Wine, run directly.** The manifest's x86_64 Protons
+  (`proton-10.0-4-x86_64-1`, the default there, and later; not Proton 9,
+  see "On x86_64, only Wine 10 and later" in §5a) are x86_64 Android (bionic)
   builds; on an x86_64 device `BionicProgramLauncherComponent` starts
   `<wine>/bin/wine` directly through `/system/bin/linker64`, with no box64
   extraction, no Box64/FEX environment and no aarch64 preloads. The Wine

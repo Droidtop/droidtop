@@ -265,7 +265,7 @@ object WineOptions {
         add(
             row(
                 WINE, "Wine build",
-                if (x86) "x86_64 builds run directly on this device" else
+                if (x86) "x86_64 builds from Proton 10 on run directly on this device; earlier ones are made for Box64 on ARM and are not offered" else
                     "An ARM (arm64ec) build runs Windows code through FEXCore or Box64 inside Wine; an x86_64 build runs the whole of Wine under Box64",
                 s.wine, wines,
             ),

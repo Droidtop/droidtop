@@ -73,11 +73,20 @@ class DroidtopPcGameRuntime(
         get() = isProvisioned || primarySession() != null
 
     // On an x86_64 device the environment also needs the x86_64 guest
-    // libraries; a device set up before they existed is offered Set up again,
-    // which fetches only them (Droidtop/tracker#242).
+    // libraries, and a Wine build that runs there directly
+    // (WineOptionPlan.runsOnX86Host); a device set up before either is
+    // offered Set up again, which fetches the libraries and moves the shared
+    // environment to such a build (Droidtop/tracker#242).
     override val isProvisioned: Boolean
-        get() = runCatching { ContainerManager(context).containers.isNotEmpty() }.getOrDefault(false) &&
-            (!X86_64GuestLibs.isX86_64Host() || X86_64GuestLibs.isInstalled(context))
+        get() {
+            val shared = runCatching { sharedContainer(ContainerManager(context)) }.getOrNull() ?: return false
+            if (!X86_64GuestLibs.isX86_64Host()) return true
+            return X86_64GuestLibs.isInstalled(context) && WineOptionPlan.runsOnX86Host(shared.wineVersion.orEmpty())
+        }
+
+    /** droidtop's own environment: the one every game without a prefix of its own runs in. */
+    private fun sharedContainer(manager: ContainerManager): Container? =
+        manager.containers.let { all -> all.firstOrNull { it.id == CONTAINER_ID } ?: all.firstOrNull() }
 
     /**
      * A failed setup step: the whole exception goes to the log (the screen
@@ -131,7 +140,7 @@ class DroidtopPcGameRuntime(
         // droidtop's own environment, the one every game without Wine
         // settings of its own runs in; a game's own container (made from
         // its Wine settings) is not this.
-        val existing = manager.containers.let { all -> all.firstOrNull { it.id == CONTAINER_ID } ?: all.firstOrNull() }
+        val existing = sharedContainer(manager)
 
         // What this device's Wine environment should be: upstream
         // GameNative's own per-device defaults (ContainerUtils.
@@ -163,6 +172,17 @@ class DroidtopPcGameRuntime(
         if (existing != null && existing.containerVariant != Container.BIONIC) {
             onStatus("Switching the Windows environment to the no-root runtime…")
             existing.containerVariant = Container.BIONIC
+            existing.wineVersion = defaults.wineVersion
+            runCatching { existing.saveData() }
+        }
+        // The other repair: an x86_64 device's environment on a Wine build
+        // that cannot run there (WineOptionPlan.runsOnX86Host; Proton 9 was
+        // the x86_64 default until 2026-10-03). Wine never started in it, so
+        // nothing of the person's is in it; the next launch unpacks the new
+        // build's prefix files, as it does after any change of Wine build
+        // (gamenative's needReextract on wineVersionChanged).
+        if (existing != null && X86_64GuestLibs.isX86_64Host() && !WineOptionPlan.runsOnX86Host(existing.wineVersion.orEmpty())) {
+            onStatus("Moving the Windows environment to a Wine build that runs on this device…")
             existing.wineVersion = defaults.wineVersion
             runCatching { existing.saveData() }
         }
@@ -395,6 +415,17 @@ class DroidtopPcGameRuntime(
                 // place they cannot reach is worse than saying nothing.
                 "the Windows environment isn't set up yet -- run \"Set up Windows games\" in Settings",
             )
+        // Said before Wine is started, in words a person can act on: on an
+        // x86_64 device a build older than Wine 10 stops on an assertion
+        // inside ntdll (WineOptionPlan.runsOnX86Host).
+        val wine = container.wineVersion.orEmpty()
+        if (X86_64GuestLibs.isX86_64Host() && !WineOptionPlan.runsOnX86Host(wine)) {
+            return PcLaunchResult(
+                false,
+                "$wine cannot run on this x86_64 device; choose Proton 10 or later under this game's Wine and graphics, " +
+                    "or run Set up Windows games again",
+            )
+        }
         // A game sharing the prefix runs with its own Wine choices laid over
         // it for this launch only (docs/SPEC.md 5a); the shared prefix's
         // saved settings are not touched.

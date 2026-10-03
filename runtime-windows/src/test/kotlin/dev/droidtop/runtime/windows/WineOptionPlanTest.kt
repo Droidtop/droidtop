@@ -29,10 +29,24 @@ class WineOptionPlanTest {
         )
 
     @Test
-    fun `an x86_64 device is never offered an ARM Wine build`() {
-        val known = listOf(arm64ec, x86Wine, "proton-11.0-1-x86_64-1", "proton-11.0-1-arm64ec-1")
-        assertEquals(listOf(x86Wine, "proton-11.0-1-x86_64-1"), WineOptionPlan.wineBuilds(x86Host = true, known = known))
+    fun `an x86_64 device is offered only x86_64 builds from Wine 10 on`() {
+        val known = listOf(arm64ec, x86Wine, "proton-10.0-4-x86_64-1", "proton-11.0-1-x86_64-1", "proton-11.0-1-arm64ec-1")
+        assertEquals(
+            listOf("proton-10.0-4-x86_64-1", "proton-11.0-1-x86_64-1"),
+            WineOptionPlan.wineBuilds(x86Host = true, known = known),
+        )
         assertEquals(known, WineOptionPlan.wineBuilds(x86Host = false, known = known))
+    }
+
+    @Test
+    fun `the release is read from the build id, and an id without one is not ruled out`() {
+        assertEquals(9, WineOptionPlan.wineMajor("proton-9.0-x86_64"))
+        assertEquals(10, WineOptionPlan.wineMajor("proton-10.0-4-x86_64-1"))
+        assertEquals(11, WineOptionPlan.wineMajor("Wine-11.2-x86_64"))
+        assertEquals(null, WineOptionPlan.wineMajor("custom-x86_64"))
+        assertFalse(WineOptionPlan.runsOnX86Host(x86Wine))
+        assertTrue(WineOptionPlan.runsOnX86Host("custom-x86_64"))
+        assertFalse(WineOptionPlan.runsOnX86Host("proton-11.0-1-arm64ec-1"))
     }
 
     @Test
