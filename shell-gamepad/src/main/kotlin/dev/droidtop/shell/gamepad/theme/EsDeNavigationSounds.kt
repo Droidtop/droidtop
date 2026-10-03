@@ -125,6 +125,13 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
     private val describedPaths = mutableSetOf<String>()
 
     private val ioScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
+    private val loadScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+
+    /** Bumped by every [load] and hand-off release, so a slow earlier load never binds over a newer one. */
+    private var loadGeneration = 0
+
+    /** Where rewritten samples live: the app's cache folder, which Android names as java.io.tmpdir. */
+    private fun normalizedDir() = File(System.getProperty("java.io.tmpdir") ?: ".", "nav-sounds")
 
     private fun obtainPool(): SoundPool = soundPool ?: SoundPool.Builder()
         .setMaxStreams(MAX_STREAMS)
@@ -170,11 +177,24 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
         }
         // No pool while another app has the audio: [reopen] loads this theme.
         if (AudioHandOff.handedOff.value) return
-        val pool = obtainPool()
-        soundIdByName = buildMap {
-            for ((name, path) in declared) {
-                if (!File(path).exists()) continue
-                put(name, soundIdsByPath.getOrPut(path) { pool.load(path, 1).also { AudioHandOff.mark("navigation sample $it = $name, loading") } })
+        val generation = ++loadGeneration
+        loadScope.launch {
+            // SoundPool plays every sample as 16-bit PCM, so a theme's 24-bit, 32-bit or float wav is first
+            // rewritten as 16-bit, off the main thread (docs/SPEC.md "Launch audio hand-off", tracker#160).
+            val playable = withContext(Dispatchers.IO) {
+                declared.filterValues { File(it).exists() }
+                    .mapValues { (name, path) ->
+                        val playable = playableWav(File(path), normalizedDir())
+                        if (playable.path != path) AudioHandOff.mark("navigation sample $name is not 16-bit PCM, SoundPool loads a 16-bit copy")
+                        playable.path
+                    }
+            }
+            if (generation != loadGeneration || AudioHandOff.handedOff.value) return@launch
+            val pool = obtainPool()
+            soundIdByName = buildMap {
+                for ((name, path) in playable) {
+                    put(name, soundIdsByPath.getOrPut(path) { pool.load(path, 1).also { AudioHandOff.mark("navigation sample $it = $name, loading") } })
+                }
             }
         }
         // What each file really is (format, rate, channels, bit depth, size), read off the main thread (tracker#160).
@@ -245,6 +265,7 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
      * already coming in) the samples are stopped at once.
      */
     override suspend fun release(fade: Boolean): String? {
+        loadGeneration++
         val pool = soundPool ?: return null
         val streams = synchronized(liveStreams) { liveStreams.toList().also { liveStreams.clear() } }
         var waited = 0L
@@ -284,6 +305,8 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
     private val liveStreams = ArrayDeque<Sounding>()
 }
 
+internal const val WAVE_FORMAT_EXTENSIBLE = 0xFFFE
+
 /** What a .wav file's RIFF header says about it: the format a SoundPool has to decode. */
 internal class WavInfo(
     val formatTag: Int,
@@ -292,6 +315,10 @@ internal class WavInfo(
     val byteRate: Long,
     val bitsPerSample: Int,
     val dataBytes: Long,
+    /** Where the `data` chunk's samples start in the file. */
+    val dataOffset: Long = 0L,
+    /** The sample encoding: [formatTag], or the sub-format a WAVE_FORMAT_EXTENSIBLE (0xFFFE) header names. */
+    val encoding: Int = formatTag,
 ) {
     val durationMs: Long? get() = if (byteRate > 0) dataBytes * 1000 / byteRate else null
 
@@ -337,6 +364,7 @@ internal fun wavInfo(file: File): WavInfo? = runCatching {
         var sampleRate = 0L
         var byteRate = 0L
         var bits = 0
+        var encoding = 0
         while (raf.filePointer + 8 <= raf.length()) {
             val id = tag()
             val size = u32()
@@ -349,8 +377,15 @@ internal fun wavInfo(file: File): WavInfo? = runCatching {
                     byteRate = u32()
                     u16()
                     bits = u16()
+                    encoding = formatTag
+                    if (formatTag == WAVE_FORMAT_EXTENSIBLE && size >= 40) {
+                        u16()
+                        u16()
+                        u32()
+                        encoding = u16()
+                    }
                 }
-                "data" -> return@use if (byteRate > 0) WavInfo(formatTag, channels, sampleRate, byteRate, bits, size) else null
+                "data" -> return@use if (byteRate > 0) WavInfo(formatTag, channels, sampleRate, byteRate, bits, size, body, encoding) else null
             }
             raf.seek(body + size + (size and 1))
         }

@@ -6988,11 +6988,24 @@ Desktop audio bridge (open only for a Desktop session, closed by the
 hand-off); the microphone bridge, Wine's PulseAudio and the vendored Windows
 runtime hold an output only inside a container or Windows session of
 droidtop's own process, and nothing else (no screensaver, Quick Menu,
-companion, haptic or notification sound) opens an output. The bundled theme's
-samples are not the suspect: the launch sample is 48 kHz stereo 16-bit PCM,
-4.6 s and 888 KB (under SoundPool's 1 MB sample limit) and decays to silence
-before the 3 s play-out cap, and the other six are 48 kHz 16-bit PCM of
-0.1 to 1.9 s.
+companion, haptic or notification sound) opens an output. The bundled
+decaffe theme's samples are not the suspect (16-bit PCM, 0.1 to 4.6 s), but the
+theme on the owner's console is: its `launch` sample is 48 kHz stereo 32-bit
+integer PCM and `systembrowse` and `scroll` are 32-bit too (the
+`droidtop.audio` file lines of the 1386 capture). The experiment's own data
+fits that: variant D (no launch sample) had no static, A and B (the sample
+played, at the press or after the question) had it.
+**Samples are played as 16-bit PCM (2026-10-03, tracker#160).** SoundPool
+plays every sample as 16-bit PCM, so a theme's 8-bit, 24-bit, 32-bit or float
+wav is played as noise: the owner's "chirp, then static like rain".
+`EsDeNavigationSounds.load` therefore asks `playableWav` (off the main
+thread) for the file to load: a 16-bit PCM wav, or a compressed one, loads as
+it is; any other PCM or float wav is rewritten once as a 16-bit PCM copy in the
+app's cache folder (`nav-sounds`, named by the source's path, size and
+modification time) and that copy is loaded. The theme's own file is never
+touched. The experiment rows below stay until the owner has listened to a
+build with this change; if the static is gone in variant A, the row and its
+variants go and A is the behaviour.
 Until the cause is known there is a test row, "Launch sound test" in the
 Shell group of Settings, with three variants that change only the launch
 sample between the A press and the dispatch (`LaunchSoundVariant`,
