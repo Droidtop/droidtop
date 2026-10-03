@@ -889,8 +889,13 @@ private fun GamepadShellBody(
     // Composed FIRST, so every deeper BackHandler (detail close, drill-up)
     // registers later on the dispatcher and takes precedence while active.
     androidx.activity.compose.BackHandler(enabled = true) {
-        // Deliberate no-op: top-of-shell back goes nowhere, same as any
-        // Android home screen.
+        // Home is the hub and the top of the shell, where back goes nowhere
+        // (as on any Android home screen). From any other section whose own
+        // handlers have nothing left to close, back returns to Home.
+        if (GamingSection.PC_GAMES in menuSectionsFor(uiMode) && !(section == GamingSection.PC_GAMES && pcGames.home)) {
+            pcGames.open(home = true)
+            selectSection(GamingSection.PC_GAMES)
+        }
     }
     // Real dispatcher-route for closing the detail screen with B/back --
     // same reason as the drill-up BackHandler in GamesSection.
@@ -1321,6 +1326,10 @@ private fun GamepadShellBody(
                                 },
                                 onCanGoBackChanged = { canGoBack = it },
                                 onRequestRescan = { rescanTrigger++ },
+                                onOpenSection = { target ->
+                                    if (target == GamingSection.PC_GAMES) pcGames.open(home = false)
+                                    selectSection(target)
+                                },
                             )
                             GamingSection.APPS -> {
                                 canGoBack = false

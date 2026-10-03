@@ -10046,9 +10046,18 @@ own games, in droidtop's own treatment:
   start never restores the last place (`sessionOnly` drops saved shell state
   from an earlier process; a recreate in the same process keeps it). Home has
   no strip and the shoulders do nothing there; B does nothing on Home (it is
-  the root). Home carries no chrome of its own: the shelves and the shell footer,
-  its first row starting under the floating status cluster (the band Steam's top
-  bar takes).
+  the root). Home carries no chrome of its own: the shelves, a destination row
+  and the shell footer, its first row starting under the floating status
+  cluster (the band Steam's top bar takes).
+- **Home links to the libraries** (owner, 2026-10-03, Droidtop/tracker#273: Home
+  is the hub and links to the Retro and PC menus): a row of two tiles, Retro
+  Games and PC Games (`HOME_DESTINATIONS`), is the last stop of Home's one list,
+  not a bar above it. Down from the last shelf reaches it, Up leaves it, Left and
+  Right step the tiles, A (or a tap) opens one; with nothing on the shelves it is
+  the only stop and holds the cursor. PC Games opens on Overview. **Back is the
+  hub's:** from a PC grid view B returns to Overview, from Overview to Home, and
+  from any other section whose own handlers have nothing left to close (Retro
+  Games' system list, Apps, a place, Settings) to Home; on Home it does nothing.
 - **Home shows all recent activity, and only that** (Droidtop/tracker#273):
   its shelves are Continue playing, Recently added and Update available; the
   library's other shelves are PC Games' Overview. Continue playing
@@ -10139,7 +10148,8 @@ the pipeline applies it.
   Droidtop/tracker#175), which is also the Filter sheet's last row, "List
   options", so it stays reachable from an empty library.
   **B** goes back one level: from a grid view to Overview, from PC setup to
-  the library; on Home and Overview it is the shell's top level and does nothing.
+  the library; Overview goes back to Home, which is the shell's top level and
+  does nothing.
 - **Touch is the same cursor.** A tap on a capsule that is not selected
   selects it (pointer and focus are one selection, and the hint row then
   names what A would do); a tap on the selected capsule is A (design
