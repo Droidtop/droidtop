@@ -17,7 +17,6 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.scraper.isPcOrEngineGame
@@ -148,18 +147,18 @@ class LauncherGamesActivity : AppCompatActivity() {
         private const val ICON_PX = 192
 
         /**
-         * What the grid lists: games that can be launched, by name, one card
-         * per game under the name Gaming gives it. PC and engine games are
+         * What the grid lists before the query: games that can be launched, one card
+         * per game under the name Gaming gives it. Order and the Hidden rule are the
+         * shared query's (LibraryQuery), the same as every Gaming list. PC and engine games are
          * grouped exactly as Gaming's PC grid groups them (docs/SPEC.md 7m:
          * a game found in several folders is one card, named for the game,
          * not "30YearOldVirgin 0.37.dv pc"; rig, dq-shell2-02), and a tap
          * plays the copy that card's Play would.
          */
         private fun shown(entries: List<LibraryEntry>): List<LibraryEntry> {
-            val playable = entries.filter { !it.hidden && !it.missing }
+            val playable = entries.filter { !it.missing }
             val (pc, others) = playable.partition { it.isPcOrEngineGame }
-            return (LibraryGrouping.group(pc).map { it.displayEntry } + others)
-                .sortedBy { GameNaming.displayName(it.title).lowercase() }
+            return LibraryGrouping.group(pc).map { it.displayEntry } + others
         }
 
         /**

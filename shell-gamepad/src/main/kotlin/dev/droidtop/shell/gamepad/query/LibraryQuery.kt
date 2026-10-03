@@ -425,6 +425,23 @@ fun retroQueryScope(groupLabel: String): LibraryQueryScope = LibraryQueryScope(
     sortLabels = mapOf(LibrarySortKey.YEAR to "Release date"),
 )
 
+/**
+ * The Standard launcher's Games list (docs/SPEC.md 2c, "Games in the Launcher"): one remembered view
+ * over every game the library holds, console, PC and engine alike, with the facts any of them has.
+ */
+fun launcherGamesQueryScope(): LibraryQueryScope = LibraryQueryScope(
+    id = LAUNCHER_GAMES_SCOPE_ID,
+    facets = listOf(
+        LibraryFacet.FAVOURITES, LibraryFacet.RECENTLY_PLAYED, LibraryFacet.PLAYED, LibraryFacet.GENRE,
+        LibraryFacet.DEVELOPER, LibraryFacet.YEAR, LibraryFacet.HIDDEN,
+    ),
+    sorts = listOf(LibrarySortKey.NAME, LibrarySortKey.RECENT, LibrarySortKey.MOST_USED, LibrarySortKey.YEAR, LibrarySortKey.RATING),
+    sortLabels = mapOf(LibrarySortKey.YEAR to "Release date"),
+)
+
+/** The launcher's Games list keeps its own remembered view under this scope id ([LibraryViewPrefs]). */
+const val LAUNCHER_GAMES_SCOPE_ID = "launcher_games"
+
 /** Apps keep their own remembered view under this scope id ([LibraryViewPrefs]). */
 const val APPS_SCOPE_ID = "apps"
 

@@ -429,16 +429,16 @@ package from the drawer. It now works like this:
   grid of the library's games — the same `LibraryKinds.GAMES` scan the
   Gaming shell's Games section reads, run by the same loop
   (`Library.scanFollowingGamesRoots`, which follows the games roots as they
-  change), so with both on there is one scan, and hidden or missing games
-  are left out. No themes, no scraped detail views, no Quick Menu: those
+  change), so with both on there is one scan, and missing games are left
+  out (hidden ones by the query's one Hidden rule, §7j). No themes, no scraped detail views, no Quick Menu: those
   are Gaming's.
 - **It is droidtop's own chrome, not a stock screen** (decided 2026-09-25,
   after the rig's user did not recognise the first version as droidtop's).
   It is drawn by the shell (`LauncherGamesScreen`, `:shell-gamepad`) from
   the shell's own pieces: the Games section's card with the one selection
   idiom (§7k), the black ground drawn under the system bars, a screen header
-  named "Games" with the count, and a hint row — A Play, Y Pin to home
-  screen, Select Game folders, B Back — whose every hint dispatches (§7j).
+  named "Games" with the count, and a hint row — A Play, X Filter, Y Sort
+  By, Select Options, B Back — whose every hint dispatches (§7j).
   Game folders opens in place through the settings navigator, and an empty
   grid offers "Add a games folder" rather than a sentence. It runs in a task
   of its own (`taskAffinity`), so the icon never brings back another
@@ -452,7 +452,19 @@ package from the drawer. It now works like this:
   card per game under the game's name (`LibraryGrouping`, §7m).
 - A tap or A launches through `GameLaunchActivity.dispatch`, which is
   `Library.launch` (play history and launch-screen memory included).
-- Y or a long press pins the game to the home screen as an ordinary icon: a
+- **Filter and sort are the one query model (2026-10-03,
+  Droidtop/tracker#273).** The list is a `LibraryQuery` over
+  `launcherGamesQueryScope` (facets Favourites, Recently played, Played,
+  Genre, Developer, Year, Hidden; sorts Name, Last played, Most played,
+  Release date, Rating), remembered under `launcher_games`, applied off the
+  main thread, with the shared Filter and Sort By sheets on X and Y and the
+  one pill while something filters ("Favourites, 3 of 20", cleared by one
+  press). A filter that leaves nothing says so and offers "Clear filters".
+  The header count reads "3 of 20 games" while filtering. Name order is the
+  default, as it was. Select opens Options: Pin to home screen (the focused
+  game) and Game folders; this replaces Y-for-pin and Select-for-folders, so
+  the controller vocabulary matches every other list (§7j).
+- Select's Pin to home screen, or a long press, pins the game to the home screen as an ordinary icon: a
   launcher shortcut whose intent is `GameLaunchActivity` with the entry's
   id, so a pinned game keeps working with Gaming off. Its icon is the
   entry's local artwork cropped square, or droidtop's icon when there is

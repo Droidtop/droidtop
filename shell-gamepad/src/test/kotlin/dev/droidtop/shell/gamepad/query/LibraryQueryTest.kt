@@ -448,4 +448,22 @@ class LibraryQueryTest {
         assertEquals("retro:Switch", retro.id)
         assertEquals("Release date", retro.sortLabel(LibrarySortKey.YEAR))
     }
+
+    @Test
+    fun `the launcher games scope is one remembered view that sorts by name until told otherwise`() {
+        val launcher = launcherGamesQueryScope()
+        val seen = game("a", "Zelda", favorite = true)
+        val hidden = game("b", "Alpha", hidden = true)
+        val plain = game("c", "Mario")
+        val all = listOf(seen, hidden, plain)
+
+        assertEquals(LAUNCHER_GAMES_SCOPE_ID, launcher.id)
+        assertTrue(LibraryFacet.HIDDEN in launcher.facets)
+        // Name order is the default, and a hidden game is out of the list by the one hidden rule.
+        assertEquals(listOf("Mario", "Zelda"), LibraryQuery().applyTo(all, launcher).map { it.title })
+        // The shared Filter and Sort sheets read these.
+        assertEquals(listOf("Zelda"), LibraryQuery().withToggled(LibraryFacet.FAVOURITES, FAVOURITES_YES, true).applyTo(all, launcher).map { it.title })
+        assertEquals(listOf("Alpha"), LibraryQuery().withToggled(LibraryFacet.HIDDEN, HIDDEN_YES, true).applyTo(all, launcher).map { it.title })
+        assertEquals(LibrarySortKey.NAME, launcher.sorts.first())
+    }
 }

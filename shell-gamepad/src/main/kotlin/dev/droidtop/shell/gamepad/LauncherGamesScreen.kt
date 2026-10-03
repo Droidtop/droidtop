@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -21,6 +23,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -31,6 +35,19 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import dev.droidtop.shell.gamepad.query.LAUNCHER_GAMES_SCOPE_ID
+import dev.droidtop.shell.gamepad.query.LibraryFilterSheet
+import dev.droidtop.shell.gamepad.query.LibraryQuery
+import dev.droidtop.shell.gamepad.query.LibrarySortSheet
+import dev.droidtop.shell.gamepad.query.PersistQuery
+import dev.droidtop.shell.gamepad.query.launcherGamesQueryScope
+import dev.droidtop.shell.gamepad.query.pillText
+import dev.droidtop.shell.gamepad.query.queryCountLine
+import dev.droidtop.shell.gamepad.query.rememberSavedViews
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -53,11 +70,12 @@ internal const val GAME_FOLDERS_SCREEN_ID = "rom_folders"
  * raised fill), the black ground, the screen header, and a [TouchHintBar]
  * that names every action and dispatches it.
  *
- * What it does is Launcher mode's and no more: A plays, Y (or a long
- * press) pins the game to the home screen, Select opens Game folders in
- * place -- the settings screen that fills an empty grid, rendered by the
- * same navigator the shell's settings use -- and B leaves. There are no
- * themes, detail pages or Quick Menu here; those are Gaming's.
+ * What it does is Launcher mode's and no more: A plays, X filters and Y
+ * sorts over the one query model every list uses (a long press, or Select's
+ * Options, pins the game to the home screen; Options also opens Game
+ * folders in place -- the settings screen that fills an empty grid, rendered
+ * by the same navigator the shell's settings use) and B leaves. There are
+ * no themes, detail pages or Quick Menu here; those are Gaming's.
  *
  * [games] null is "not read yet", which says so rather than "no games".
  */
@@ -122,6 +140,24 @@ private fun GamesGrid(
     val window = LocalShellWindow.current
     val pad = rememberGridPad()
     val emptyAction = remember { FocusRequester() }
+    // The one query model the Gaming lists use (docs/SPEC.md 7j): this view's filters and sort are
+    // remembered, and applied off the main thread.
+    val scope = remember { launcherGamesQueryScope() }
+    var query by remember { mutableStateOf(LibraryQuery()) }
+    var queryLoaded by remember { mutableStateOf(false) }
+    PersistQuery(LAUNCHER_GAMES_SCOPE_ID, query, queryLoaded) {
+        query = it
+        queryLoaded = true
+    }
+    val savedViews = rememberSavedViews(LAUNCHER_GAMES_SCOPE_ID)
+    val shown by produceState<List<LibraryEntry>?>(null, games, query, scope) {
+        value = games?.let { withContext(Dispatchers.Default) { query.applyTo(it, scope) } }
+    }
+    var filterOpen by remember { mutableStateOf(false) }
+    var sortOpen by remember { mutableStateOf(false) }
+    var optionsOpen by remember { mutableStateOf(false) }
+    val list = shown.takeIf { queryLoaded }
+    val total = remember(games, query, scope) { games?.let { query.totalIn(it, scope) } ?: 0 }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -135,8 +171,16 @@ private fun GamesGrid(
                         pad.move(direction)
                         true
                     }
-                    press.action == GamepadAction.SELECT && onOpenFolders != null -> {
-                        onOpenFolders()
+                    press.action == GamepadAction.X && games != null -> {
+                        filterOpen = true
+                        true
+                    }
+                    press.action == GamepadAction.Y && games != null -> {
+                        sortOpen = true
+                        true
+                    }
+                    press.action == GamepadAction.SELECT && (onOpenFolders != null || !list.isNullOrEmpty()) -> {
+                        optionsOpen = true
                         true
                     }
                     else -> false
@@ -145,15 +189,33 @@ private fun GamesGrid(
     ) {
         MenuHeader(
             title = "Games",
-            subtitle = when {
-                games == null -> null
-                games.size == 1 -> "1 game"
-                else -> "${games.size} games"
-            },
+            subtitle = list?.let { queryCountLine(it.size, total, !query.isEmpty, scope) },
         )
+        // The one pill the other lists draw while something filters, cleared by one press.
+        list?.let { query.pillText(scope, it.size, total) }?.let { pill ->
+            Row(modifier = Modifier.padding(horizontal = window.edgePadding, vertical = Space.Sm)) {
+                ShellChip(pill, on = true, onClick = { query = query.cleared })
+            }
+        }
         Box(modifier = Modifier.weight(1f)) {
             when {
-                games == null -> EmptyLine("Reading the library…")
+                games == null || list == null -> EmptyLine("Reading the library…")
+                games.isNotEmpty() && list.isEmpty() -> {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center).padding(window.edgePadding),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(Space.Lg),
+                    ) {
+                        Text("No games match these filters", color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
+                        ShellChip(
+                            "Clear filters",
+                            primary = true,
+                            modifier = Modifier.focusRequester(emptyAction),
+                            onClick = { query = query.cleared },
+                        )
+                        LaunchedEffect(Unit) { requestFocusWhenAttached(emptyAction, "Launcher games filtered empty") }
+                    }
+                }
                 games.isEmpty() -> {
                     // An empty grid offers the one thing that fills it.
                     Column(
@@ -184,7 +246,7 @@ private fun GamesGrid(
                         verticalArrangement = Arrangement.spacedBy(Space.Xl),
                         contentPadding = PaddingValues(top = Space.Sm, bottom = Space.Xl),
                     ) {
-                        itemsIndexed(games, key = { _, entry -> entry.id }) { index, entry ->
+                        itemsIndexed(list, key = { _, entry -> entry.id }) { index, entry ->
                             GameCard(
                                 entry = entry,
                                 modifier = Modifier.focusRequester(pad.requester(index)),
@@ -200,16 +262,88 @@ private fun GamesGrid(
             }
         }
         // The same gated row the shell's own footer uses: only what
-        // dispatches right now is named -- A and Y need a card to act
-        // on, Select needs the folders screen to exist, B always leaves.
+        // dispatches right now is named -- A needs a card to act on, X and
+        // Y need a list, Select needs something to offer, B always leaves.
         HintRow(
             bindings = listOf(
-                HintBinding(GamepadAction.A, "Play") { !games.isNullOrEmpty() },
-                HintBinding(GamepadAction.Y, "Pin to home screen") { !games.isNullOrEmpty() },
-                HintBinding(GamepadAction.SELECT, "Game folders") { onOpenFolders != null },
+                HintBinding(GamepadAction.A, "Play") { !list.isNullOrEmpty() },
+                HintBinding(GamepadAction.X, "Filter") { games != null },
+                HintBinding(GamepadAction.Y, "Sort By") { games != null },
+                HintBinding(GamepadAction.SELECT, "Options") { onOpenFolders != null || !list.isNullOrEmpty() },
                 HintBinding(GamepadAction.B, "Back"),
             ),
         )
+    }
+    if (filterOpen && games != null) {
+        LibraryFilterSheet(
+            scope = scope,
+            base = games,
+            query = query,
+            savedViews = savedViews.views,
+            onQueryChange = { query = it },
+            onSaveView = { savedViews.save(it, query) },
+            onForgetView = { savedViews.forget(it) },
+            onSearch = null,
+            onDismiss = { filterOpen = false },
+        )
+    }
+    if (sortOpen) {
+        LibrarySortSheet(scope = scope, query = query, onQueryChange = { query = it }, onDismiss = { sortOpen = false })
+    }
+    if (optionsOpen) {
+        val focused = list?.getOrNull(pad.focused)
+        LauncherGamesOptions(
+            game = focused,
+            onPin = onPin,
+            onOpenFolders = onOpenFolders,
+            onDismiss = { optionsOpen = false },
+        )
+    }
+}
+
+/**
+ * Select on the Launcher's Games list: the focused game's own row (pin it to the home screen) and
+ * Game folders, in the one menu shape the Apps view's options use. Controller-first: Up/Down moves,
+ * A chooses, B or Select closes, and every row is a touch target.
+ */
+@Composable
+private fun LauncherGamesOptions(
+    game: LibraryEntry?,
+    onPin: (LibraryEntry) -> Unit,
+    onOpenFolders: (() -> Unit)?,
+    onDismiss: () -> Unit,
+) {
+    class Option(val title: String, val onClick: () -> Unit)
+
+    val options = remember(game, onOpenFolders) {
+        buildList<Option> {
+            if (game != null) add(Option("Pin to home screen") { onDismiss(); onPin(game) })
+            if (onOpenFolders != null) add(Option("Game folders") { onDismiss(); onOpenFolders() })
+        }
+    }
+    var focusIndex by remember { mutableIntStateOf(0) }
+    Dialog(onDismissRequest = onDismiss) {
+        MenuPanel(
+            modifier = Modifier.width(LocalShellWindow.current.panelWidth(480.dp)),
+            focusLabel = "Options",
+            hints = listOf(HintBinding(GamepadAction.A, "Choose"), HintBinding(GamepadAction.B, "Close")),
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, options.size, press)
+                    GamepadAction.A -> options.getOrNull(focusIndex)?.onClick?.invoke()
+                    GamepadAction.B, GamepadAction.SELECT -> onDismiss()
+                    else -> Unit
+                }
+                true
+            },
+        ) {
+            if (game != null) {
+                Text(game.title, style = androidx.compose.material3.MaterialTheme.typography.titleLarge, color = MenuTokens.OnSurface, maxLines = 1)
+            }
+            options.forEachIndexed { index, option ->
+                MenuRow(title = option.title, subtitle = null, selected = index == focusIndex, onClick = option.onClick)
+            }
+        }
     }
 }
 
