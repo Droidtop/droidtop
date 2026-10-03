@@ -86,6 +86,7 @@ internal fun LaunchFailureDialog(
                     fontWeight = if (index == selected) FontWeight.SemiBold else FontWeight.Normal,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier
+                        .padding(top = if (index == 0) 10.dp else 0.dp)
                         .fillMaxWidth()
                         // A row is a button here, so it is at least as
                         // big as a finger on a screen without a pad.
