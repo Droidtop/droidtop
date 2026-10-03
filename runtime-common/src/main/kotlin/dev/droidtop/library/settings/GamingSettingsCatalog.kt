@@ -675,21 +675,23 @@ object GamingSettingsCatalog {
                         run = { ctx -> ctx.startActivity(controls.airplaneModeSettingsIntent()) },
                     ),
                 )
-                // The power menu (shut down, restart) belongs to the system
-                // and to accessibility services; a plain app has no call that
-                // opens it. Said on the tile when it is pressed, never a
-                // silent nothing.
-                add(
-                    AsyncActionItem(
-                        id = ID_SYSTEM_POWER_MENU,
-                        title = "Power menu",
-                        subtitle = "Hold the power button",
-                        value = "Needs privilege",
-                        run = { _, _ ->
-                            "Android only lets the system open it. Hold the power button; a privilege helper plugin is the route that can do it from here."
-                        },
-                    ),
-                )
+                // The power menu (shut down, restart) belongs to the system; a plain app has no call that
+                // opens it. With a privilege provider (Shizuku or Sui, the `priv.shell` capability) the
+                // shell's own long press of the power key does; without one the row is not drawn at all
+                // (docs/SPEC.md "Copy: labels and values", privileged controls).
+                if (dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand) {
+                    add(
+                        AsyncActionItem(
+                            id = ID_SYSTEM_POWER_MENU,
+                            title = "Power menu",
+                            run = { _, _ ->
+                                val out = dev.droidtop.runtime.tasks.TaskManager.shell
+                                    .exec(listOf("input", "keyevent", "--longpress", "KEYCODE_POWER"))
+                                if (out != null && out.exit == 0) "" else "Failed: the helper could not open it"
+                            },
+                        ),
+                    )
+                }
                 // Where the sound goes (speaker, headphones, Bluetooth): the
                 // system's own output switcher, which an app cannot replace.
                 add(

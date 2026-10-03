@@ -2991,7 +2991,7 @@ picks the tab it opens on. Standard's own second screen keeps its launcher-style
 explanatory sentence is ever visible on a companion screen or the shared running-apps list. State is shown by
 the control itself: a row reading "Closing…" and then disappearing, a greyed slider with an "Allow" chip,
 "Nothing running" for an empty list (an empty state is two or three words). A control that needs the Shizuku
-plugin (the radio switches, per-app load) is not drawn at all without a shell provider, and simply works when
+plugin (the radio switches, per-app load, the Quick Menu's Power menu, which sends the power key's long press through `priv.shell`) is not drawn at all without a shell provider, and simply works when
 one is present; there is no greyed control, no "opens Android's switch" fallback and no text about it. Any
 explanation that still has to exist lives in `HintTip` (`:shell-gamepad`), the app's one tooltip: long-press
 on touch, rest the pointer for a mouse, a short focus dwell for the pad. Sentences are for real errors only;
