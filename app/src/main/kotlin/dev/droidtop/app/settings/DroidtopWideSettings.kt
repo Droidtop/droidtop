@@ -61,11 +61,15 @@ object DroidtopWideSettings {
         id = SCREEN_GLOBAL,
         title = "Global settings",
         subtitle = "Home screen and modes",
+        // The Gaming settings page draws these groups as sections of its own categories (each group
+        // names one) instead of a level of its own; every other surface still opens this screen.
+        merged = true,
         groups = { context ->
             listOf(
                 CatalogGroup(
                     id = "global_home",
-                    title = null,
+                    title = "Home screen",
+                    category = "Home & modes",
                     items = listOf(
                         // STANDARD <-> NONE only: a person on ALTERNATIVE
                         // (another launcher droidtop forwards to) chose that
@@ -97,6 +101,7 @@ object DroidtopWideSettings {
                 CatalogGroup(
                     id = "global_modes",
                     title = "Modes",
+                    category = "Home & modes",
                     items = listOf(
                         defaultModeItem(context),
                         modeToggle(context, Mode.DESKTOP),
@@ -113,6 +118,7 @@ object DroidtopWideSettings {
                 CatalogGroup(
                     id = "global_updates",
                     title = null,
+                    category = "System",
                     items = listOf(
                         dev.droidtop.library.settings.NestedScreenItem(
                             id = "pref_global_updates", title = "Updates",
@@ -125,6 +131,7 @@ object DroidtopWideSettings {
                 CatalogGroup(
                     id = "global_accessibility",
                     title = "Accessibility",
+                    category = "Appearance",
                     items = listOf(
                         ChoiceItem(
                             id = AccessibilityPrefs.KEY_COLOR_VISION,
@@ -164,6 +171,7 @@ object DroidtopWideSettings {
                 CatalogGroup(
                     id = "global_data",
                     title = "Data",
+                    category = "System",
                     items = listOf(
                         ActionItem(
                             id = "pref_global_rerun_onboarding",

@@ -231,7 +231,7 @@ fun CatalogNavigator(
         value = mergeShortScreens(root.groups(context)) { it.groups(context) }
     }
     val categories = remember(rootGroups, root) {
-        rootGroups?.let { settingsCategories(it, root.title, nativeActions.keys) }.orEmpty()
+        rootGroups?.let { settingsCategories(it, root.title, nativeActions.keys, root.categoryOrder) }.orEmpty()
     }
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val categoryMode = hostWidth >= screenWidth * PAGE_WIDTH_FRACTION && categories.size >= MIN_SETTINGS_CATEGORIES
@@ -259,8 +259,10 @@ fun CatalogNavigator(
     val groups = remember(screen, rootGroups, paneLoaded, category?.key) {
         when {
             screen !== root -> paneLoaded?.takeIf { it.first === screen }?.second.orEmpty()
-            // A plain category: its own group, unheaded (the column names it).
-            category != null -> rootGroups.orEmpty().filter { it.id == category.groupId }.map { it.copy(title = null) }
+            // A plain category: its groups. One group is unheaded (the column names it); several keep
+            // their titles as section labels, except a title that repeats the category's own name.
+            category != null -> rootGroups.orEmpty().filter { it.id in category.groupIds }
+                .map { if (it.title == category.label || category.groupIds.size == 1) it.copy(title = null) else it }
             else -> rootGroups.orEmpty()
         }
     }
@@ -472,8 +474,7 @@ fun CatalogNavigator(
                 linked
             } else if (result.target.id == root.id) {
                 categories.indexOfFirst { cat ->
-                    cat.groupId != null &&
-                        rootGroups.orEmpty().any { group -> group.id == cat.groupId && group.items.any { it.id == result.itemId } }
+                    rootGroups.orEmpty().any { group -> group.id in cat.groupIds && group.items.any { it.id == result.itemId } }
                 }
             } else {
                 -1
@@ -1018,6 +1019,7 @@ internal fun SettingsCatalogView(
         CatalogScreen(
             id = "gaming_settings",
             title = "Settings",
+            categoryOrder = GamingSettingsCatalog.CATEGORY_ORDER,
             groups = { ctx -> GamingSettingsCatalog.settingsGroups(ctx) },
         )
     }

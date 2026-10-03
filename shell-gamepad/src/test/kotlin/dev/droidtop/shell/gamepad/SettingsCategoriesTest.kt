@@ -7,7 +7,6 @@ import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.ToggleItem
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
 
@@ -39,7 +38,7 @@ class SettingsCategoriesTest {
         assertEquals(listOf("Link a", "Link b"), categories.map { it.label })
         assertEquals(listOf("Library", null), categories.map { it.sectionAbove })
         assertEquals(CatalogIcon.SCRAPER, categories[0].icon)
-        assertNull(categories[0].groupId)
+        assertEquals(emptyList<String>(), categories[0].groupIds)
     }
 
     @Test
@@ -54,7 +53,7 @@ class SettingsCategoriesTest {
 
         assertEquals(listOf("group:top", "group:shell"), categories.map { it.key })
         assertEquals(listOf("Settings", "Shell"), categories.map { it.label })
-        assertEquals(listOf("top", "shell"), categories.map { it.groupId })
+        assertEquals(listOf("top", "shell"), categories.map { it.groupIds.single() })
         assertEquals(CatalogIcon.GAMING, categories[1].icon)
     }
 
@@ -89,5 +88,40 @@ class SettingsCategoriesTest {
         val groups = listOf(CatalogGroup(id = "g", title = "G", items = listOf(toggle("t"), link("l", screen("s")))))
 
         assertSame(groups, mergeShortScreens(groups) { error("nothing to load") })
+    }
+
+    @Test
+    fun `groups that name one category are one entry, even when they hold only links`() {
+        val groups = listOf(
+            CatalogGroup(id = "home", title = null, items = listOf(toggle("t1")), category = "Home"),
+            CatalogGroup(id = "library", title = "Library", items = listOf(link("a", screen("sa")), link("b", screen("sb"))), category = "Library"),
+            CatalogGroup(id = "modes", title = "Modes", items = listOf(toggle("t2")), category = "Home", icon = CatalogIcon.MODES),
+            CatalogGroup(id = "plain", title = "Plain", items = listOf(toggle("t3"))),
+        )
+
+        val categories = settingsCategories(groups, untitledLabel = "Settings")
+
+        assertEquals(listOf("category:Home", "category:Library", "group:plain"), categories.map { it.key })
+        assertEquals(listOf("Home", "Library", "Plain"), categories.map { it.label })
+        assertEquals(listOf("home", "modes"), categories[0].groupIds)
+        assertEquals(listOf("library"), categories[1].groupIds)
+        // The icon is the first one the category's groups name.
+        assertEquals(CatalogIcon.MODES, categories[0].icon)
+        assertEquals(null, categories[0].link)
+    }
+
+    @Test
+    fun `the order puts named categories first in that order and keeps the rest after them`() {
+        val groups = listOf(
+            CatalogGroup(id = "x", title = null, items = listOf(toggle("a")), category = "System"),
+            CatalogGroup(id = "y", title = "Unlisted", items = listOf(toggle("b"))),
+            CatalogGroup(id = "z", title = null, items = listOf(toggle("c")), category = "Home"),
+            CatalogGroup(id = "w", title = null, items = listOf(toggle("d")), category = "System"),
+        )
+
+        val categories = settingsCategories(groups, untitledLabel = "Settings", order = listOf("Home", "System"))
+
+        assertEquals(listOf("Home", "System", "Unlisted"), categories.map { it.label })
+        assertEquals(listOf("x", "w"), categories[1].groupIds)
     }
 }

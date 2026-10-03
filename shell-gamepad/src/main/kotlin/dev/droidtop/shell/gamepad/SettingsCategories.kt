@@ -13,8 +13,9 @@ import dev.droidtop.library.settings.NestedScreenItem
  */
 
 /**
- * One entry of the settings category column. A plain category shows its own
- * group's rows ([groupId]); a link category shows the screen [link] opens,
+ * One entry of the settings category column. A plain category shows the rows
+ * of its groups ([groupIds]: one group, or every group that names the
+ * category); a link category shows the screen [link] opens,
  * directly in the pane, one level less than opening it from a row.
  * [sectionAbove] is the column label drawn above the entry (the title of the
  * group its links came from, on the first of them only).
@@ -24,7 +25,7 @@ internal data class SettingsCategory(
     val label: String,
     val icon: CatalogIcon?,
     val sectionAbove: String?,
-    val groupId: String?,
+    val groupIds: List<String>,
     val link: NestedScreenItem?,
 )
 
@@ -39,7 +40,9 @@ internal const val MIN_SETTINGS_CATEGORIES = 3
  * other screens (Library: Scraper, Console systems, Emulators, ...) is a hub:
  * each link becomes a category of its own, under the group's title. Any other
  * group is one category whose rows are its own, named by its title, or by
- * [untitledLabel] for the untitled run at the top. A link the renderer
+ * [untitledLabel] for the untitled run at the top. Groups that name a `category`
+ * are one entry together, never a hub. [order] lists the labels the column puts
+ * first, in that order. A link the renderer
  * fulfils natively ([nativeIds]) is not a screen, so its group stays a plain
  * category.
  */
@@ -47,9 +50,34 @@ internal fun settingsCategories(
     groups: List<CatalogGroup>,
     untitledLabel: String,
     nativeIds: Set<String> = emptySet(),
-): List<SettingsCategory> = buildList {
+    order: List<String> = emptyList(),
+): List<SettingsCategory> = buildList<SettingsCategory> {
     for (group in groups) {
         if (group.items.isEmpty()) continue
+        val named = group.category
+        if (named != null) {
+            val key = "category:$named"
+            val at = indexOfFirst { it.key == key }
+            if (at >= 0) {
+                val existing = this[at]
+                this[at] = existing.copy(
+                    icon = existing.icon ?: group.icon ?: group.items.firstNotNullOfOrNull { it.icon },
+                    groupIds = existing.groupIds + group.id,
+                )
+            } else {
+                add(
+                    SettingsCategory(
+                        key = key,
+                        label = named,
+                        icon = group.icon ?: group.items.firstNotNullOfOrNull { it.icon },
+                        sectionAbove = null,
+                        groupIds = listOf(group.id),
+                        link = null,
+                    ),
+                )
+            }
+            continue
+        }
         val hub = group.items.all { it is NestedScreenItem && it.id !in nativeIds }
         if (hub) {
             group.items.forEachIndexed { index, item ->
@@ -59,7 +87,7 @@ internal fun settingsCategories(
                         label = item.title,
                         icon = item.icon,
                         sectionAbove = if (index == 0) group.title else null,
-                        groupId = null,
+                        groupIds = emptyList(),
                         link = item as NestedScreenItem,
                     ),
                 )
@@ -71,12 +99,15 @@ internal fun settingsCategories(
                     label = group.title ?: untitledLabel,
                     icon = group.icon ?: group.items.firstNotNullOfOrNull { it.icon },
                     sectionAbove = null,
-                    groupId = group.id,
+                    groupIds = listOf(group.id),
                     link = null,
                 ),
             )
         }
     }
+}.let { built ->
+    // A stable sort: a label the order does not name keeps its place after the ones it does.
+    if (order.isEmpty()) built else built.sortedBy { category -> order.indexOf(category.label).takeIf { it >= 0 } ?: Int.MAX_VALUE }
 }
 
 /**

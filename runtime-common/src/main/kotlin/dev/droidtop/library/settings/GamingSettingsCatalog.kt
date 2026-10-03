@@ -38,6 +38,19 @@ object GamingSettingsCatalog {
     const val GROUP_APPEARANCE = "gaming_appearance"
     const val GROUP_SCREENS = "gaming_screens"
     const val GROUP_INPUT = "gaming_input"
+    const val GROUP_ACCOUNTS = "gaming_accounts"
+    const val GROUP_ANDROID = "gaming_android"
+
+    /**
+     * The settings category column, top to bottom (docs/SPEC.md "Settings layout"): the catalog's own
+     * groups and the groups of the screens merged into it (Global settings) name these as their
+     * `category`, and the column sorts by this list, so where a group sits in the catalog does not
+     * decide where its category sits.
+     */
+    val CATEGORY_ORDER = listOf(
+        "Home & modes", "Library", "Accounts and sources", "Appearance", "Controls", "Displays", "System",
+        "Other shells",
+    )
     const val ID_CONTROLLER = "pref_gaming_controller"
     const val GROUP_OTHER_SHELLS = "other_shells"
 
@@ -129,6 +142,7 @@ object GamingSettingsCatalog {
             id = GROUP_GAMING,
             title = "Shell",
             icon = CatalogIcon.GAMING,
+            category = "Home & modes",
             items = buildList {
                 add(defaultSectionItem(context))
                 add(showHintsItem(context))
@@ -188,6 +202,7 @@ object GamingSettingsCatalog {
         CatalogGroup(
             id = GROUP_LIBRARY,
             title = "Library",
+            category = "Library",
             items = buildList {
                 add(
                     NestedScreenItem(
@@ -214,21 +229,6 @@ object GamingSettingsCatalog {
                         subtitle = "System emulators",
                         registryId = "emulators",
                         icon = CatalogIcon.CONSOLE_SYSTEMS,
-                    ),
-                )
-                // The one place for every account and source droidtop
-                // has -- store sign-ins, scraper credentials, plugins and
-                // app integrations (docs/SPEC.md settings architecture:
-                // "a source is a detail on a game and a filter, never its
-                // own screen"). Next to Scraper and Console systems,
-                // where the other library-source rows already live.
-                add(
-                    NestedScreenItem(
-                        id = ID_ACCOUNTS_AND_SOURCES,
-                        title = "Accounts and sources",
-                        subtitle = "Accounts and plugins",
-                        registryId = "accounts_and_sources",
-                        icon = CatalogIcon.INTEGRATIONS,
                     ),
                 )
                 add(
@@ -280,13 +280,28 @@ object GamingSettingsCatalog {
                 // menu and on Game folders (the same item, by id).
             },
         ),
+        // A group of one link is a hub: its screen is drawn directly in the pane, one level less.
+        CatalogGroup(
+            id = GROUP_ACCOUNTS,
+            title = null,
+            items = listOf(
+                NestedScreenItem(
+                    id = ID_ACCOUNTS_AND_SOURCES,
+                    title = "Accounts and sources",
+                    subtitle = "Accounts and plugins",
+                    registryId = "accounts_and_sources",
+                    icon = CatalogIcon.INTEGRATIONS,
+                ),
+            ),
+        ),
         // Settings' own System group is configuration only: which screen
         // is which, and the two screens that manage droidtop and the
         // device. The live controls are the quick-only group below.
         CatalogGroup(
             id = GROUP_SCREENS,
-            title = "System",
+            title = "Displays",
             icon = CatalogIcon.DISPLAY,
+            category = "Displays",
             items = buildList {
                 add(ChoiceItem(
                     id = ID_ORIENTATION,
@@ -303,20 +318,26 @@ object GamingSettingsCatalog {
                 add(displayGameLaunchTargetItem(context))
                 add(secondScreenRoleItem(context, MODE_GAMING))
                 add(secondScreenRoleItem(context, MODE_DESKTOP))
-                add(
-                    NestedScreenItem(
-                        id = ID_SYSTEM_ANDROID_LINKS,
-                        title = "Android settings",
-                        subtitle = "System settings",
-                        registryId = "android_settings",
-                        icon = CatalogIcon.ANDROID_SETTINGS,
-                    ),
-                )
             },
         ),
         CatalogGroup(
+            id = GROUP_ANDROID,
+            title = "Android",
+            category = "System",
+            items = listOf(
+                NestedScreenItem(
+                    id = ID_SYSTEM_ANDROID_LINKS,
+                    title = "Android settings",
+                    subtitle = "System settings",
+                    registryId = "android_settings",
+                    icon = CatalogIcon.ANDROID_SETTINGS,
+                ),
+            ),
+        ),
+        CatalogGroup(
             id = GROUP_INPUT,
-            title = "Input",
+            title = "Controls",
+            category = "Controls",
             icon = CatalogIcon.INPUT,
             items = buildList {
                 // Onboarding's own Controller step, re-entered (docs/SPEC.md
@@ -363,6 +384,7 @@ object GamingSettingsCatalog {
         CatalogGroup(
             id = GROUP_APPEARANCE,
             title = "Appearance",
+            category = "Appearance",
             icon = CatalogIcon.APPEARANCE,
             items = buildList {
                 add(themeItem(context))

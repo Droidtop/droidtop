@@ -261,6 +261,8 @@ class CatalogScreen(
      * and write paths; only where they are drawn changes.
      */
     val merged: Boolean = false,
+    /** The settings category column's order, for a root whose groups name categories (docs/SPEC.md "Settings layout"). */
+    val categoryOrder: List<String> = emptyList(),
 )
 
 /**
@@ -327,6 +329,13 @@ data class CatalogGroup(
      * "Settings layout"). Null: the first glyph one of its rows carries, else none.
      */
     val icon: CatalogIcon? = null,
+    /**
+     * The settings category this group belongs to (docs/SPEC.md "Settings layout"). Groups that name
+     * the same category are one entry of the category column and their titles become the section
+     * labels of its pane; a group with a category is never read as a hub of links. Null: the group
+     * is its own category (or a hub, when it holds only links to other screens).
+     */
+    val category: String? = null,
 )
 
 /**

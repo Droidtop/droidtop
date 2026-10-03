@@ -11572,6 +11572,24 @@ Settings tab, the left menu's places, Console systems and Containers.
   shows directly. Any other group is one category with its own rows, named
   by its title (the untitled top group by the screen's). A group may name
   its glyph (`CatalogGroup.icon`); otherwise the first glyph a row carries.
+  **One category can hold several groups** (decided 2026-10-03,
+  Droidtop/tracker#273, the UI review's taxonomy): a group names the
+  `CatalogGroup.category` it belongs to, every group with the same name is
+  one entry of the column (never read as a hub), and the groups' titles
+  become the section labels of its pane (a title equal to the category's
+  own name is dropped). The column's order is the root's `categoryOrder`,
+  not the order the groups happen to be built in, because the screens merged
+  in (Global settings) contribute groups to several categories. The Gaming
+  Settings column is, in order: **Home & modes** (Home screen, Modes, Shell),
+  **Library** (Console systems, Emulators, Game folders, Windows games,
+  Scraper, F95Checker import and Downloads as rows that open their screens),
+  **Accounts and sources** (its screen drawn directly, a hub of one),
+  **Appearance** (theme rows and Accessibility), **Controls**, **Displays**
+  (orientation and the display roles), **System** (Updates, Android settings,
+  Data) and **Other shells**. Global settings is `merged`: its groups are
+  sections of those categories, not a column entry of its own, and every
+  other surface still opens it as a screen. Eight Library entries and the
+  Global settings entry left the column; no setting moved out of reach.
 - **At most two levels: category, then row or detail.** A row opens a
   further screen only when that screen holds a list or a long form (an
   account sign-in, a per-emulator page), and that screen replaces the pane,
