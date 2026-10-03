@@ -230,6 +230,9 @@ class WineGameActivity : Activity() {
         val report = WinePresentation.exitReport(status, ranMs, guestShowedWindow, session?.output().orEmpty())
         Timber.i("Wine exited %d after %d ms", status, ranMs)
         runOnUiThread {
+            // The person left the game (Back): stopping the session killed
+            // Wine (code 137), which is the quit itself, not a failure to report.
+            if (isFinishing || isDestroyed) return@runOnUiThread
             if (report != null) showFailure(report.detail, title = report.title) else finish()
         }
     }
