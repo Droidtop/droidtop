@@ -3,6 +3,8 @@ package dev.droidtop.library
 import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -47,6 +49,33 @@ object WineGameSettingsPrefs {
         } else {
             prefs.putString(KEY_PREFIX + entryId, json.encodeToString(WineGameSettings.serializer(), settings))
         }
+        prefs.apply()
+    }
+}
+
+/**
+ * One game's own Wine choices over the shared prefix (docs/SPEC.md 5a):
+ * graphics driver and its build, Direct3D and the DXVK/VKD3D versions, the
+ * emulator and its FEXCore/Box64 version, by name, only those that differ
+ * from the shared settings. Applied at launch; the shared prefix itself is
+ * never changed by them. Kept apart from [WineGameSettings] so clearing a
+ * game's program does not clear its graphics. By [LibraryEntry.id].
+ */
+object WineGameOptionsPrefs {
+    private const val KEY_PREFIX = "droidtop_wine_game_options_"
+    private val json = Json { ignoreUnknownKeys = true }
+    private val serializer = MapSerializer(String.serializer(), String.serializer())
+
+    fun get(context: Context, entryId: String): Map<String, String> =
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_PREFIX + entryId, null)
+            ?.let { runCatching { json.decodeFromString(serializer, it) }.getOrNull() }
+            .orEmpty()
+
+    /** Stores [choices]; an empty map removes the game's entry. */
+    fun set(context: Context, entryId: String, choices: Map<String, String>) {
+        val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
+        if (choices.isEmpty()) prefs.remove(KEY_PREFIX + entryId) else prefs.putString(KEY_PREFIX + entryId, json.encodeToString(serializer, choices))
         prefs.apply()
     }
 }

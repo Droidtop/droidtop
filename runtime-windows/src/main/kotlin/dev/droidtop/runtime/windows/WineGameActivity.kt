@@ -109,6 +109,9 @@ class WineGameActivity : Activity() {
             showFailure("the Windows launch was missing its prefix or its target")
             return
         }
+        // Before anything reads the prefix: the game's own Wine choices, if it
+        // has any, answer for its graphics driver, Direct3D and emulator.
+        prefix.setLaunchOverrides(launchOverrides(intent))
 
         val xServer = XServer(ScreenInfo(prefix.screenSize), false)
         this.xServer = xServer
@@ -344,7 +347,22 @@ class WineGameActivity : Activity() {
                 putExtra(EXTRA_TARGET, target)
                 putExtra(EXTRA_WORKING_DIR, workingDir.absolutePath)
                 putStringArrayListExtra(EXTRA_ARGUMENTS, ArrayList(arguments))
+                // A game's own Wine choices over a shared prefix are this
+                // launch's, not the prefix's (docs/SPEC.md 5a), so they
+                // travel with the launch rather than being saved into it.
+                if (prefix.launchOverrides.isNotEmpty()) {
+                    putExtra(EXTRA_LAUNCH_OVERRIDES, org.json.JSONObject(prefix.launchOverrides).toString())
+                }
             }
+
+        private const val EXTRA_LAUNCH_OVERRIDES = "dev.droidtop.wine.LAUNCH_OVERRIDES"
+
+        /** The overrides [intent] carried, read back. */
+        internal fun launchOverrides(intent: Intent): Map<String, String> {
+            val json = intent.getStringExtra(EXTRA_LAUNCH_OVERRIDES)?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
+                ?: return emptyMap()
+            return json.keys().asSequence().associateWith { json.getString(it) }
+        }
     }
 }
 

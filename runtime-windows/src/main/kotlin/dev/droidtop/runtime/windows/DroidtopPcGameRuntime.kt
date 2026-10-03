@@ -5,6 +5,7 @@ import app.gamenative.service.SteamService
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.X86_64GuestLibs
 import com.winlator.container.Container
+import com.winlator.container.ContainerData
 import com.winlator.container.ContainerManager
 import com.winlator.core.KeyValueSet
 import com.winlator.core.envvars.EnvVars
@@ -370,6 +371,10 @@ class DroidtopPcGameRuntime(
                 // place they cannot reach is worse than saying nothing.
                 "the Windows environment isn't set up yet -- run \"Set up Windows games\" in Settings",
             )
+        // A game sharing the prefix runs with its own Wine choices laid over
+        // it for this launch only (docs/SPEC.md 5a); the shared prefix's
+        // saved settings are not touched.
+        withContext(Dispatchers.IO) { container.setLaunchOverrides(WineOptions.launchOverrides(context, entryId, container)) }
 
         return launchInPrefix(wineEngine, container, executable.absolutePath, workingDir, arguments)
     }
@@ -493,20 +498,29 @@ object PcContainers {
         entryId?.let { ownId(it) } == container.id
 
     /**
-     * Gives [entryId] a container of its own: a new prefix, made from the
-     * Wine build the shared environment uses and then given the shared
-     * environment's current settings, named [title]. From then on the game
-     * starts in it and its Wine settings edit it (docs/SPEC.md 5a). Returns
-     * the existing one if the game already has its own. Disk work, and a
-     * whole new prefix: never on the main thread.
+     * Gives [entryId] a container of its own, named [title], made with
+     * [settings] (the shared environment's, with the game's own choices and
+     * the Wine build it picked). Only a different Wine build needs this: a
+     * Wine build belongs to the prefix it boots, while a game's other choices
+     * are laid over the shared prefix at launch (docs/SPEC.md 5a). From then
+     * on the game starts in it and its Wine settings edit it. Returns the
+     * existing one if the game already has its own. Downloads the Wine build
+     * first when it is not on the device, then makes a whole new prefix:
+     * never on the main thread.
      */
-    fun createOwn(context: Context, entryId: String, title: String): Container {
+    suspend fun createOwn(context: Context, entryId: String, title: String, settings: ContainerData): Container {
         val manager = ContainerManager(context)
         val id = ownId(entryId)
         if (manager.hasContainer(id)) return manager.getContainerById(id)
-        val shared = forGame(context, entryId = null)
-            ?: error("There is no Windows environment yet. Set up Windows games first.")
-        val settings = ContainerUtils.toContainerData(shared)
+        // Creating a prefix copies Wine's own DLLs out of the installed build,
+        // so the build has to be on disk first (the order setup keeps too).
+        WineComponents.ensureWine(
+            context,
+            Container(id).apply {
+                containerVariant = settings.containerVariant
+                wineVersion = settings.wineVersion
+            },
+        ) {}
         val created = manager.createContainer(
             id,
             JSONObject().apply {

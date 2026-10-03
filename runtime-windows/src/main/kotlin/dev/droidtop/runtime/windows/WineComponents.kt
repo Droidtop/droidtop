@@ -20,6 +20,8 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -140,7 +142,10 @@ internal object WineComponents {
         context.resources.getStringArray(R.array.bionic_wine_entries).any { it.equals(wineVersion, ignoreCase = true) }
 
     private suspend fun manifestRequests(context: Context, container: Container): List<BestConfigService.ManifestInstallRequest> {
-        val config = Json.parseToJsonElement(container.containerJson).jsonObject
+        // The saved config, with a game's launch-time choices over it: what
+        // this launch will actually ask for.
+        val saved = Json.parseToJsonElement(container.containerJson).jsonObject
+        val config = JsonObject(saved + container.launchOverrides.mapValues { JsonPrimitive(it.value) })
         return BestConfigService.resolveMissingManifestInstallRequests(context, config, "exact_gpu_match")
             // On x86_64 the arm64 drivers are never used (X86_64Graphics).
             .filterNot { X86_64GuestLibs.isX86_64Host() && it.isDriver }

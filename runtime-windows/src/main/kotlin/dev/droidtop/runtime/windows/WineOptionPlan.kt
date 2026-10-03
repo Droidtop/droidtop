@@ -33,6 +33,37 @@ object WineOptionPlan {
         val vkd3d: String,
     )
 
+    /**
+     * The settings a game may choose for itself over the shared prefix, by
+     * name (owner, 2026-10-02): everything but the Wine build, which belongs
+     * to the prefix it boots and so needs a prefix of the game's own.
+     */
+    val GAME_KEYS = listOf("emulator", "box64", "fexcore", "driver", "driverVersion", "dxwrapper", "dxvk", "vkd3d")
+
+    /** [base] with a game's own choices ([GAME_KEYS] names) laid over it; unknown names are ignored. */
+    fun merge(base: Settings, choices: Map<String, String>): Settings = base.copy(
+        emulator = choices["emulator"] ?: base.emulator,
+        box64 = choices["box64"] ?: base.box64,
+        fexcore = choices["fexcore"] ?: base.fexcore,
+        driver = choices["driver"] ?: base.driver,
+        driverVersion = choices["driverVersion"] ?: base.driverVersion,
+        dxwrapper = choices["dxwrapper"] ?: base.dxwrapper,
+        dxvk = choices["dxvk"] ?: base.dxvk,
+        vkd3d = choices["vkd3d"] ?: base.vkd3d,
+    )
+
+    /** What a game chose that differs from [base], by [GAME_KEYS] name; the inverse of [merge]. */
+    fun diff(base: Settings, chosen: Settings): Map<String, String> = buildMap {
+        if (chosen.emulator != base.emulator) put("emulator", chosen.emulator)
+        if (chosen.box64 != base.box64) put("box64", chosen.box64)
+        if (chosen.fexcore != base.fexcore) put("fexcore", chosen.fexcore)
+        if (chosen.driver != base.driver) put("driver", chosen.driver)
+        if (chosen.driverVersion != base.driverVersion) put("driverVersion", chosen.driverVersion)
+        if (chosen.dxwrapper != base.dxwrapper) put("dxwrapper", chosen.dxwrapper)
+        if (chosen.dxvk != base.dxvk) put("dxvk", chosen.dxvk)
+        if (chosen.vkd3d != base.vkd3d) put("vkd3d", chosen.vkd3d)
+    }
+
     fun isArm64ec(wine: String): Boolean = wine.contains("arm64ec", ignoreCase = true)
 
     /** The Wine builds this CPU can run, from every build the device knows of. */

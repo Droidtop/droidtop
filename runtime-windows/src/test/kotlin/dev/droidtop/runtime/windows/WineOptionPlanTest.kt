@@ -96,4 +96,24 @@ class WineOptionPlanTest {
         assertFalse(WineOptionPlan.usesDriverVersion(x86Host = false, driver = "vortek"))
         assertFalse(WineOptionPlan.usesDriverVersion(x86Host = true, driver = "wrapper"))
     }
+
+    @Test
+    fun `a game's own choices lay over the shared settings and read back as the difference`() {
+        val shared = settings(arm64ec)
+        val chosen = shared.copy(driver = "wrapper-v2", dxvk = "2.6.1-gplasync", emulator = "Box64")
+        val choices = WineOptionPlan.diff(shared, chosen)
+        assertEquals(mapOf("driver" to "wrapper-v2", "dxvk" to "2.6.1-gplasync", "emulator" to "Box64"), choices)
+        assertEquals(chosen, WineOptionPlan.merge(shared, choices))
+        assertTrue(choices.keys.all { it in WineOptionPlan.GAME_KEYS })
+    }
+
+    @Test
+    fun `a game cannot override the Wine build, and the shared settings show through what it did not choose`() {
+        val shared = settings(arm64ec)
+        val merged = WineOptionPlan.merge(shared, mapOf("wine" to x86Wine, "dxvk" to "1.10.3"))
+        assertEquals(arm64ec, merged.wine)
+        assertEquals("1.10.3", merged.dxvk)
+        assertEquals(shared.driver, merged.driver)
+        assertTrue(WineOptionPlan.diff(shared, shared.copy(wine = x86Wine)).isEmpty())
+    }
 }

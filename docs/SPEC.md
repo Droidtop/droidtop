@@ -4057,8 +4057,8 @@ source in [vendor/gamenative](../vendor/gamenative):
   the Turnip/Qualcomm build the Wrapper drivers load), and Direct3D
   (WineD3D, DXVK, VKD3D, CNC DDraw) with the DXVK and VKD3D versions are
   all choices:
-  - **One store, the prefix.** Every option is a field of gamenative's
-    `Container` that the fork's launcher already reads, written through
+  - **Fields the launcher already reads.** Every option is a field of
+    gamenative's `Container`; a prefix's own values are written through
     `ContainerUtils.applyToContainer`, the save path gamenative's own
     dialog uses. `WineOptions` (`:runtime-windows`) reads and writes them;
     `WineOptionPlan` holds which apply to which Wine build on which CPU and
@@ -4068,20 +4068,33 @@ source in [vendor/gamenative](../vendor/gamenative):
     the launcher's refusal of one there stays as the message for a prefix
     carried over from an arm64 device, since ARM code cannot run on x86.
   - **Global default = the shared environment** (container 1), edited in
-    Settings > Windows games. **Per game = the game's own container**: the
-    game's "Wine and graphics" row (`WineOptionsCatalog`, a registered
-    catalog screen deep-linked by entry id) shows the shared values
-    read-only until "Use separate settings for this game" makes it a prefix
-    of its own (`PcContainers.createOwn`, the id `forGame` already resolves
-    first), copied from the shared settings; from then on the rows edit that
-    prefix and the game launches in it (`launchWindows` takes the entry id;
-    it used to launch every game in the shared prefix, so a game's own
-    prefix was configurable but never used). A Wine build belongs to the
-    prefix it boots, which is why per-game choice is a per-game prefix
-    rather than a per-launch override. Going back to the shared settings
-    (removing the game's prefix and the saves in it) is not built.
-    gamenative's full dialog stays reachable as "All prefix settings" for
-    everything else.
+    Settings > Windows games.
+  - **Per game = launch-time choices over the shared prefix (owner,
+    2026-10-02).** The game's "Wine and graphics" row (`WineOptionsCatalog`,
+    a registered catalog screen deep-linked by entry id) shows the same
+    rows; a change there is the game's own choice of graphics driver and
+    its build, Direct3D and the DXVK/VKD3D versions, or the emulator and its
+    FEXCore/Box64 version. Only the choices that differ from the shared
+    settings are kept, per game (`WineGameOptionsPrefs`), and they cost no
+    prefix: at launch `WineOptions.launchOverrides` lays them over the
+    shared container through the fork's `Container.setLaunchOverrides`,
+    whose getters answer with the override and whose `saveData` writes only
+    the container's own values, so extraction code that saves mid-launch
+    cannot carry one game's choice into the shared prefix. The overrides
+    travel to `WineGameActivity` with the launch intent, and
+    `WineComponents` downloads what they name. "Use the shared settings
+    again" drops them.
+  - **Only another Wine build makes a prefix.** A Wine build belongs to the
+    prefix it boots, so choosing a different one for a game makes it a
+    prefix of its own (`PcContainers.createOwn`, the id `forGame` already
+    resolves first), with that build and the game's choices baked in;
+    from then on the rows edit that prefix and the game launches in it
+    (`launchWindows` takes the entry id; it used to launch every game in
+    the shared prefix, so a game's own prefix was configurable but never
+    used). Going back from an own prefix to the shared one (removing the
+    prefix and the saves in it) is not built. gamenative's full dialog
+    stays reachable as "All prefix settings" (for a game in the shared
+    prefix, "All shared prefix settings", which apply to every game in it).
   - **Defaults are upstream's, per device.** `ContainerUtils.
     deviceDefaultContainerData` (the fork) runs GameNative's own
     `setContainerDefaults`, which droidtop never ran before: on arm64 the
@@ -4162,7 +4175,8 @@ picked it. They are now real launches, through a seam:
   game: an engine game should run in the environment the user already
   configured, and spawning multi-hundred-megabyte prefixes per title
   uninvited would be its own bug. A game gets a prefix of its own only
-  when the person asks for separate Wine settings for it (§5a).
+  when the person picks a different Wine build for it; its other Wine
+  choices are laid over the shared prefix at launch (§5a).
 - Per-game choice is exposed as a "Runs with: <backend>" chip in the game
   detail screen, backed by `LaunchStrategyOverridePrefs`. Engine games
   and store/folder games launch with what that row resolves, not with a
@@ -5811,7 +5825,8 @@ Two concrete references to build from rather than design blind:
   rows** (§5a "Options, with defaults"): Wine build, x86 emulation,
   graphics driver and Direct3D, drawn by droidtop's two-pane settings
   in Settings > Windows games (the shared environment) and in a game's
-  "Wine and graphics" sheet (that game's own prefix), from the fork's
+  "Wine and graphics" sheet (that game's own choices over the shared
+  prefix, or its own prefix once it picks another Wine build), from the fork's
   lists and component manifest, not from gamenative's Android-styled
   dialog. The dialog remains the "All prefix settings" row of both, for
   the rest (controller, drives, environment, components).

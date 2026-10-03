@@ -8,8 +8,10 @@ import app.gamenative.utils.ManifestContentTypes
 import app.gamenative.utils.ManifestEntry
 import app.gamenative.utils.X86_64GuestLibs
 import app.gamenative.utils.X86_64Graphics
+import com.winlator.container.Container
 import com.winlator.container.ContainerData
 import com.winlator.core.DefaultVersion
+import dev.droidtop.library.WineGameOptionsPrefs
 import com.winlator.core.KeyValueSet
 import com.winlator.core.StringUtils
 import kotlinx.coroutines.CoroutineScope
@@ -32,29 +34,40 @@ data class WineOptionRow(
     val summary: String,
     val current: String,
     val choices: List<WineOptionChoice>,
+    /** A game's own choice over the shared setting, rather than the shared value showing through. */
+    val ownChoice: Boolean = false,
 )
 
 /**
- * The Wine options of the prefix a game (or, with no game, every game
- * without settings of its own) runs in. [ownPrefix] says which of the two it
- * is; [missing] names what the settings need that is not on the device yet.
+ * The Wine options a game (or, with no game, every game) runs with.
+ * [ownPrefix]: the game has a prefix of its own (it chose another Wine
+ * build), and the rows edit that prefix. Otherwise a game's rows are its own
+ * choices over the shared prefix; [ownChoices] counts them. [missing] names
+ * what the settings need that is not on the device yet.
  */
 data class WineOptionsState(
     val prefixName: String,
     val ownPrefix: Boolean,
+    val ownChoices: Int,
     val rows: List<WineOptionRow>,
     val missing: List<String>,
 )
 
 /**
- * Wine build, x86 emulation, graphics driver and Direct3D translation, per
- * prefix (docs/SPEC.md 5a): the rows Settings > Windows games shows for the
- * shared environment and a game's Wine settings show for that game.
+ * Wine build, x86 emulation, graphics driver and Direct3D translation
+ * (docs/SPEC.md 5a): the rows Settings > Windows games shows for the shared
+ * environment and a game's Wine settings show for that game.
  *
- * The prefix is the one store: every option is a field of gamenative's
- * `Container` that its launcher already reads, written through
+ * Where a value lives (owner, 2026-10-02): the shared environment's values
+ * are fields of its gamenative `Container`, written through
  * [ContainerUtils.applyToContainer], the path gamenative's own configuration
- * dialog saves through. What is offered is read from the fork, not listed
+ * dialog saves through. A game's own choices of everything but the Wine
+ * build are kept per game ([WineGameOptionsPrefs]) and laid over the shared
+ * prefix at launch ([launchOverrides], the fork's
+ * `Container.setLaunchOverrides`), so they cost no prefix. Choosing another
+ * Wine build gives the game a prefix of its own, made with that build and
+ * the game's choices; from then on its rows edit that prefix like the shared
+ * one. What is offered is read from the fork, not listed
  * here: its bundled versions, what is installed, and upstream GameNative's
  * component list ([ManifestComponentHelper.loadComponentAvailability]); which
  * of those apply to which Wine build and CPU is [WineOptionPlan]. Anything
@@ -86,18 +99,29 @@ object WineOptions {
         lastWrite?.join()
         WindowsBackbone.awaitReady(context)
         val container = PcContainers.forGame(context, entryId) ?: return@withContext null
-        val lists = Lists.load(context)
-        val settings = read(ContainerUtils.toContainerData(container))
+        val own = entryId != null && PcContainers.isOwnPrefix(entryId, container)
+        val data = ContainerUtils.toContainerData(container)
+        val shared = read(data)
+        val choices = if (entryId != null && !own) gameChoices(context, entryId) else emptyMap()
+        val settings = WineOptionPlan.merge(shared, choices)
+        // What a launch of this game would need, its own choices included.
+        container.setLaunchOverrides(overrides(data, settings))
         WineOptionsState(
             prefixName = container.name?.takeIf { it.isNotBlank() } ?: container.id,
-            ownPrefix = entryId != null && PcContainers.isOwnPrefix(entryId, container),
-            rows = rows(context, settings, lists),
+            ownPrefix = own,
+            ownChoices = choices.size,
+            rows = rows(context, settings, Lists.load(context), choices.keys),
             missing = runCatching { WineComponents.missing(context, container) }.getOrDefault(emptyList()),
         )
     }
 
-    /** Writes one choice into the prefix [entryId] runs in. Returns at once; [state] waits for it. */
-    fun select(context: Context, entryId: String?, rowId: String, value: String) {
+    /**
+     * One choice for [entryId] (null: the shared environment). Returns at
+     * once; [state] waits for it. A game sharing the prefix stores it as its
+     * own choice, except a different Wine build, which makes the game a
+     * prefix of its own named [title].
+     */
+    fun select(context: Context, entryId: String?, title: String?, rowId: String, value: String) {
         val app = context.applicationContext
         val previous = lastWrite
         lastWrite = scope.launch {
@@ -106,29 +130,69 @@ object WineOptions {
                 WindowsBackbone.awaitReady(app)
                 val container = PcContainers.forGame(app, entryId) ?: return@runCatching
                 val data = ContainerUtils.toContainerData(container)
-                val next = apply(app, read(data), rowId, value)
-                ContainerUtils.applyToContainer(app, container, write(data, next))
+                val shared = read(data)
+                if (entryId == null || PcContainers.isOwnPrefix(entryId, container)) {
+                    ContainerUtils.applyToContainer(app, container, write(data, apply(app, shared, rowId, value)))
+                    return@runCatching
+                }
+                val current = WineOptionPlan.merge(shared, gameChoices(app, entryId))
+                val next = apply(app, current, rowId, value)
+                if (next.wine != shared.wine) {
+                    PcContainers.createOwn(app, entryId, title ?: entryId, write(data, next))
+                    WineGameOptionsPrefs.set(app, entryId, emptyMap())
+                } else {
+                    WineGameOptionsPrefs.set(app, entryId, WineOptionPlan.diff(shared, next))
+                }
             }.onFailure { android.util.Log.w(TAG, "Wine option $rowId=$value not saved", it) }
         }
     }
 
-    /** Fetches everything the prefix's settings name and the device lacks; the line to show when done. */
+    /** Drops [entryId]'s own choices, so it runs with the shared settings again. */
+    suspend fun useShared(context: Context, entryId: String): String = withContext(Dispatchers.IO) {
+        lastWrite?.join()
+        WineGameOptionsPrefs.set(context, entryId, emptyMap())
+        "This game uses the shared settings again."
+    }
+
+    /** Fetches everything [entryId]'s settings name and the device lacks; the line to show when done. */
     suspend fun download(context: Context, entryId: String?, onStatus: (String) -> Unit): String {
         lastWrite?.join()
-        val container = withContext(Dispatchers.IO) { PcContainers.forGame(context, entryId) }
-            ?: return "There is no Windows environment yet. Set up Windows games first."
+        val container = withContext(Dispatchers.IO) {
+            PcContainers.forGame(context, entryId)?.also { it.setLaunchOverrides(launchOverrides(context, entryId, it)) }
+        } ?: return "There is no Windows environment yet. Set up Windows games first."
         return runCatching { WineComponents.ensure(context, container, onStatus) }
             .fold({ "Everything these settings need is on this device." }, { "Download failed: ${it.message ?: it}" })
     }
 
-    /** Gives [entryId] a prefix of its own with the shared settings as its start. The line to show when done. */
-    suspend fun useOwnPrefix(context: Context, entryId: String, title: String, onStatus: (String) -> Unit): String =
-        withContext(Dispatchers.IO) {
-            lastWrite?.join()
-            onStatus("Making $title's own prefix…")
-            runCatching { PcContainers.createOwn(context, entryId, title) }
-                .fold({ "$title now has Wine settings of its own." }, { "Couldn't make $title's own prefix: ${it.message ?: it}" })
+    /**
+     * The launch-time values [entryId]'s own choices put over [container]
+     * (`Container.setLaunchOverrides` keys), or none when the game has no
+     * choices of its own or runs in a prefix of its own. Disk work.
+     */
+    fun launchOverrides(context: Context, entryId: String?, container: Container): Map<String, String> {
+        if (entryId == null || PcContainers.isOwnPrefix(entryId, container)) return emptyMap()
+        val choices = gameChoices(context, entryId)
+        if (choices.isEmpty()) return emptyMap()
+        val data = ContainerUtils.toContainerData(container)
+        return overrides(data, WineOptionPlan.merge(read(data), choices))
+    }
+
+    private fun gameChoices(context: Context, entryId: String): Map<String, String> =
+        WineGameOptionsPrefs.get(context, entryId).filterKeys { it in WineOptionPlan.GAME_KEYS }
+
+    /** The container fields [settings] changes from [data], by the container's own JSON keys. */
+    private fun overrides(data: ContainerData, settings: WineOptionPlan.Settings): Map<String, String> {
+        val next = write(data, settings)
+        return buildMap {
+            if (next.graphicsDriver != data.graphicsDriver) put("graphicsDriver", next.graphicsDriver)
+            if (next.graphicsDriverConfig != data.graphicsDriverConfig) put("graphicsDriverConfig", next.graphicsDriverConfig)
+            if (next.dxwrapper != data.dxwrapper) put("dxwrapper", next.dxwrapper)
+            if (next.dxwrapperConfig != data.dxwrapperConfig) put("dxwrapperConfig", next.dxwrapperConfig)
+            if (next.emulator != data.emulator) put("emulator", next.emulator)
+            if (next.box64Version != data.box64Version) put("box64Version", next.box64Version)
+            if (next.fexcoreVersion != data.fexcoreVersion) put("fexcoreVersion", next.fexcoreVersion)
         }
+    }
 
     private fun read(data: ContainerData): WineOptionPlan.Settings {
         val dx = KeyValueSet(data.dxwrapperConfig)
@@ -182,6 +246,16 @@ object WineOptions {
             else -> s
         }
     }
+
+    /** [rows], each marked when it is a game's own choice ([ownKeys], [WineOptionPlan.GAME_KEYS] names). */
+    private fun rows(context: Context, s: WineOptionPlan.Settings, lists: Lists, ownKeys: Set<String>): List<WineOptionRow> =
+        rows(context, s, lists).map { row -> if (GAME_KEY[row.id] in ownKeys) row.copy(ownChoice = true) else row }
+
+    /** Each row's [WineOptionPlan.GAME_KEYS] name; the Wine build has none. */
+    private val GAME_KEY = mapOf(
+        EMULATOR to "emulator", FEXCORE to "fexcore", BOX64 to "box64", DRIVER to "driver",
+        DRIVER_VERSION to "driverVersion", DXWRAPPER to "dxwrapper", DXVK to "dxvk", VKD3D to "vkd3d",
+    )
 
     private fun rows(context: Context, s: WineOptionPlan.Settings, lists: Lists): List<WineOptionRow> = buildList {
         val x86 = X86_64GuestLibs.isX86_64Host()

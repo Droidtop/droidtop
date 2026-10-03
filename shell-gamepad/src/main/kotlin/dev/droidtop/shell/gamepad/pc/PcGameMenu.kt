@@ -327,7 +327,7 @@ internal fun PcGameMenu(
             root = screen,
             onExit = {
                 wineScreen = null
-                // "Use separate settings" moves the game to its own prefix.
+                // Picking another Wine build moves the game to its own prefix.
                 reloadToken++
             },
         )

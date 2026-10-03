@@ -18,12 +18,13 @@ import dev.droidtop.runtime.windows.WineOptions
  * (docs/SPEC.md 5a): one builder for both places they appear.
  *
  * - Settings > Windows games: the shared environment, which every Windows
- *   game without settings of its own runs in -- the global default.
+ *   game runs in unless it chose another Wine build -- the global default.
  * - A game's Wine settings ([WineSettingsScreen], deep-linked from its page
- *   with [WineSettingsScreen.argument]): that game's own prefix once it has one; until then
- *   the shared values, read-only, and the row that gives it its own.
+ *   with [WineSettingsScreen.argument]): the same rows, where a change is
+ *   that game's own choice laid over the shared prefix at launch; choosing
+ *   another Wine build gives the game a prefix of its own.
  *
- * Every value is a field of the prefix; [WineOptions] reads and writes it.
+ * [WineOptions] decides where each value is kept.
  */
 object WineOptionsCatalog {
 
@@ -45,7 +46,7 @@ object WineOptionsCatalog {
         },
     )
 
-    /** The rows for [entryId]'s prefix, or the shared environment's when it is null. */
+    /** The rows for [entryId], or for the shared environment when it is null. */
     suspend fun groups(context: Context, entryId: String?, title: String?): List<CatalogGroup> {
         val state = WineOptions.state(context, entryId) ?: return listOf(
             CatalogGroup(
@@ -62,35 +63,43 @@ object WineOptionsCatalog {
             ),
         )
         val shared = entryId == null
-        val editable = shared || state.ownPrefix
+        // A game sharing the prefix: its rows are its own choices over it.
+        val overGame = !shared && !state.ownPrefix
         val items = buildList<CatalogItem> {
             if (!shared) {
-                if (state.ownPrefix) {
-                    add(
+                add(
+                    if (state.ownPrefix) {
                         ActionItem(
-                            id = "wine_options_own",
-                            title = "Settings of its own",
-                            subtitle = "This game runs in its own prefix; changes here apply to it alone",
+                            id = "wine_options_where",
+                            title = "Runs in its own prefix",
+                            subtitle = "This game chose its own Wine build, so it has a Windows prefix of its own; changes here apply to it alone",
                             value = state.prefixName,
                             run = {},
-                        ),
-                    )
-                } else {
-                    add(
-                        AsyncActionItem(
-                            id = "wine_options_make_own",
-                            title = "Use separate settings for this game",
-                            subtitle = "Makes a Windows prefix just for this game, starting from the shared settings. " +
-                                "A prefix takes a few hundred megabytes; this game's saves made so far stay in the shared one.",
-                            value = "Shared",
-                            confirmTitle = "Make a prefix just for ${title ?: "this game"}?",
-                            run = { ctx, onStatus -> WineOptions.useOwnPrefix(ctx, entryId!!, title ?: entryId, onStatus) },
-                        ),
-                    )
-                }
+                        )
+                    } else {
+                        ActionItem(
+                            id = "wine_options_where",
+                            title = "Runs in the shared prefix",
+                            subtitle = "Changes here are this game's own and apply when it starts; the shared settings stay as they are. " +
+                                "Choosing another Wine build makes it a prefix of its own.",
+                            value = if (state.ownChoices == 0) "Shared settings" else "${state.ownChoices} of its own",
+                            run = {},
+                        )
+                    },
+                )
             }
-            state.rows.forEach { row -> add(item(row, entryId, editable)) }
-            if (editable && state.missing.isNotEmpty()) {
+            state.rows.forEach { row -> add(item(row, entryId, title, overGame)) }
+            if (overGame && state.ownChoices > 0) {
+                add(
+                    AsyncActionItem(
+                        id = "wine_options_use_shared",
+                        title = "Use the shared settings again",
+                        subtitle = "Drops this game's own choices; nothing is downloaded or deleted",
+                        run = { ctx, _ -> WineOptions.useShared(ctx, entryId!!) },
+                    ),
+                )
+            }
+            if (state.missing.isNotEmpty()) {
                 add(
                     AsyncActionItem(
                         id = "wine_options_download",
@@ -101,16 +110,18 @@ object WineOptionsCatalog {
                     ),
                 )
             }
-            if (editable) {
-                add(
-                    ActionItem(
-                        id = "wine_options_all",
-                        title = "All prefix settings",
-                        subtitle = "GameNative's full configuration: controller, drives, environment, components and the rest",
-                        run = { ctx -> ctx.startActivity(PcContainerConfigActivity.intent(ctx, entryId, title)) },
-                    ),
-                )
-            }
+            add(
+                ActionItem(
+                    id = "wine_options_all",
+                    title = if (overGame) "All shared prefix settings" else "All prefix settings",
+                    subtitle = if (overGame) {
+                        "GameNative's full configuration of the shared prefix (controller, drives, environment, components); changes there apply to every game that shares it"
+                    } else {
+                        "GameNative's full configuration: controller, drives, environment, components and the rest"
+                    },
+                    run = { ctx -> ctx.startActivity(PcContainerConfigActivity.intent(ctx, if (overGame) null else entryId, title)) },
+                ),
+            )
             add(
                 ActionItem(
                     id = "wine_options_sources",
@@ -131,25 +142,25 @@ object WineOptionsCatalog {
         )
     }
 
-    /** A choice where the row can be changed here; its value, read-only, where it cannot. */
-    private fun item(row: WineOptionRow, entryId: String?, editable: Boolean): CatalogItem {
+    /** A choice where the build and CPU leave one; the value with its reason where they do not. */
+    private fun item(row: WineOptionRow, entryId: String?, title: String?, overGame: Boolean): CatalogItem {
         val label = row.choices.firstOrNull { it.value == row.current }?.label ?: row.current
-        if (!editable || row.choices.isEmpty()) {
-            return ActionItem(
-                id = row.id,
-                title = row.title,
-                subtitle = if (editable) row.summary else "The shared setting; change it under Settings > Windows games, or give this game its own",
-                value = label,
-                run = {},
-            )
+        val summary = when {
+            !overGame -> row.summary
+            row.id == WineOptions.WINE -> row.summary + ". Another build gives this game a prefix of its own (a few hundred megabytes); its saves so far stay in the shared one."
+            row.ownChoice -> row.summary + ". This game's own choice."
+            else -> row.summary + ". The shared setting."
+        }
+        if (row.choices.isEmpty()) {
+            return ActionItem(id = row.id, title = row.title, subtitle = summary, value = label, run = {})
         }
         return ChoiceItem(
             id = row.id,
             title = row.title,
-            subtitle = row.summary,
+            subtitle = summary,
             options = row.choices.map { ChoiceOption(it.value, it.label) },
             current = row.current,
-            onSelect = { ctx, value -> WineOptions.select(ctx, entryId, row.id, value) },
+            onSelect = { ctx, value -> WineOptions.select(ctx, entryId, title, row.id, value) },
         )
     }
 }
