@@ -1900,7 +1900,7 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "plugin_${m.id}_detail",
                         title = "Technical details",
-                        subtitle = "What the plugin reported, for its developer",
+                        subtitle = "Plugin details",
                         inline = CatalogScreen(
                             id = "plugin_${m.id}_detail_screen",
                             title = "Technical details",

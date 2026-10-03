@@ -57,7 +57,7 @@ object EmulatorsCatalog {
     fun screen(): CatalogScreen = CatalogScreen(
         id = SCREEN_EMULATORS,
         title = "Emulators",
-        subtitle = "Which emulator runs each system, and what to do when none does",
+        subtitle = "Emulator per system",
         groups = { context -> groups(context, forIndex = false) },
         // The settings search reads the default-emulator row only; the
         // per-system rows are live library state, as for Console systems.
@@ -145,8 +145,6 @@ object EmulatorsCatalog {
                             ActionItem(
                                 id = "emulators_none_installed",
                                 title = "No emulators found",
-                                subtitle = "Install an emulator, then open a system below to pick it. " +
-                                    "droidtop recognises the emulators in its platform database.",
                                 run = {},
                             ),
                         )

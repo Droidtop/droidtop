@@ -60,7 +60,7 @@ object DroidtopWideSettings {
     fun globalScreen() = CatalogScreen(
         id = SCREEN_GLOBAL,
         title = "Global settings",
-        subtitle = "The home screen, modes, and droidtop's settings as a whole",
+        subtitle = "Home screen and modes",
         groups = { context ->
             listOf(
                 CatalogGroup(

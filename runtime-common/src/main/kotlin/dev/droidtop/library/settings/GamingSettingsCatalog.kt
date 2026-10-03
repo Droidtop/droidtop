@@ -119,7 +119,7 @@ object GamingSettingsCatalog {
                 NestedScreenItem(
                     id = ID_GLOBAL_SETTINGS,
                     title = "Global settings",
-                    subtitle = "The home screen, modes, and droidtop's settings as a whole",
+                    subtitle = "Home screen and modes",
                     registryId = "global_settings",
                     icon = CatalogIcon.GLOBAL,
                 ),
@@ -567,7 +567,6 @@ object GamingSettingsCatalog {
                         ActionItem(
                             id = ID_SYSTEM_DND_GRANT,
                             title = "Do Not Disturb",
-                            subtitle = "One-time grant on the system screen this opens; afterwards this is a toggle right here",
                             value = "Needs permission",
                             run = { ctx -> ctx.startActivity(controls.dndGrantIntent()) },
                         ),

@@ -210,7 +210,7 @@ internal fun LibraryFilterSheet(
     if (naming) {
         TextEditDialog(
             title = "Save this view",
-            subtitle = "The filters, the search and the sort as they are now, as one view in this list",
+            subtitle = "Current filters and sort",
             initial = query.text.takeIf { it.isNotBlank() } ?: "",
             onCommit = { name ->
                 naming = false
@@ -580,7 +580,7 @@ internal fun LibrarySearchDialog(
                                 if (pluginId != null) {
                                     technicalDetails[pluginId]?.let { SourceNote(it) } ?: MenuRow(
                                         title = "Technical details",
-                                        subtitle = "What the plugin reported, for its developer",
+                                        subtitle = "Plugin details",
                                         onClick = {
                                             coroutineScope.launch {
                                                 val detail = withContext(Dispatchers.IO) { PluginStore.disabledDetail(context, pluginId) }
@@ -618,7 +618,6 @@ internal fun LibrarySearchDialog(
                         if (outcome.source.hasMainUi) {
                             MenuRow(
                                 title = "Open ${outcome.source.label}",
-                                subtitle = "Its own screen. Back returns here",
                                 onClick = {
                                     coroutineScope.launch {
                                         val problem = withContext(Dispatchers.IO) { outcome.source.openMainUi(context) }

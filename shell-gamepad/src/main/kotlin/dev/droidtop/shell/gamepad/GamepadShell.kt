@@ -2712,11 +2712,6 @@ private fun GamesSection(
                             verticalArrangement = Arrangement.spacedBy(Space.Lg),
                         ) {
                             Text("No games yet.", color = MenuTokens.OnSurface, style = TypeRole.body)
-                            Text(
-                                "Add the folders your games are in. droidtop looks inside them for console and PC games.",
-                                color = MenuTokens.OnSurfaceMuted,
-                                style = TypeRole.supporting,
-                            )
                             if (foldersScreen != null) {
                                 ShellChip(
                                     "Add a folder",
@@ -3487,7 +3482,7 @@ private fun AppsSection(
     if (filterOpen) {
         val usageAction = SheetAction(
             title = "Include apps opened outside droidtop",
-            subtitle = "Optional. Lets droidtop read when you last used each app, through Android's Usage access. Nothing leaves this device.",
+            subtitle = "Needs usage access",
             onClick = { runCatching { context.startActivity(AppUsageAccess.settingsIntent()) } },
         )
         LibraryFilterSheet(

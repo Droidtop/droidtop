@@ -128,7 +128,6 @@ object GitHubAccountCatalog {
     fun accountScreen() = CatalogScreen(
         id = SCREEN_ACCOUNT,
         title = "GitHub",
-        subtitle = "Used only for plugin sources on GitHub",
         onLeave = ::cancelSignIn,
         groups = { context ->
             val (credential, stored) = withContext(Dispatchers.IO) {
@@ -155,7 +154,6 @@ object GitHubAccountCatalog {
                             AsyncActionItem(
                                 id = "github_signin_public",
                                 title = "Sign in with GitHub",
-                                subtitle = "Enter a short code at github.com/login/device",
                                 run = { ctx, onStatus -> signIn(ctx, GitHubOAuth.SCOPE_PUBLIC, onStatus) },
                             ),
                         )
@@ -166,7 +164,6 @@ object GitHubAccountCatalog {
                             TextInputItem(
                                 id = "github_token_value",
                                 title = "Paste a token",
-                                subtitle = "Checked with GitHub before it is kept",
                                 // Never shows a stored value back: the field is for pasting a new one.
                                 value = "",
                                 secret = true,
@@ -227,7 +224,7 @@ object GitHubAccountCatalog {
     fun reposRow(trusted: Int): NestedScreenItem = NestedScreenItem(
         id = "plugin_repositories",
         title = "Plugin repositories",
-        subtitle = "Add a GitHub repository by name: droidtop trusts the key it publishes and keeps its plugins up to date",
+        subtitle = "Trusted GitHub sources",
         inline = reposScreen(),
         valueLabel = { if (trusted == 0) "None added" else "$trusted added" },
     )
@@ -235,7 +232,6 @@ object GitHubAccountCatalog {
     fun reposScreen() = CatalogScreen(
         id = SCREEN_REPOS,
         title = "Plugin repositories",
-        subtitle = "Plugins signed with a repository's key show its name",
         groups = { context ->
             // Stores and preferences are read once here, off the main thread; the closures below only use the results.
             val read = withContext(Dispatchers.IO) {
@@ -256,7 +252,7 @@ object GitHubAccountCatalog {
                     id = "repos_list",
                     title = "Repositories you trust",
                     items = if (repos.isEmpty()) {
-                        listOf(ActionItem(id = "repos_none", title = "None yet", subtitle = "Add one below", run = {}))
+                        listOf(ActionItem(id = "repos_none", title = "None yet", run = {}))
                     } else {
                         repos.map { entry ->
                             NestedScreenItem(
@@ -283,14 +279,12 @@ object GitHubAccountCatalog {
                         AsyncActionItem(
                             id = "repos_add_lookup",
                             title = "Look up its key",
-                            subtitle = "Trusts nothing yet",
                             run = { ctx, onStatus -> lookUp(ctx, pendingRepoName, onStatus) },
                         ),
                     ) + listOfNotNull(
                         if (!pendingNeedsPrivate) null else AsyncActionItem(
                             id = "repos_add_private",
                             title = "Allow private repositories",
-                            subtitle = "Asks GitHub for read access to private repositories, then looks again",
                             run = { ctx, onStatus ->
                                 val message = signIn(ctx, GitHubOAuth.SCOPE_PRIVATE_REPOS, onStatus)
                                 if (GitHubTokenStore.credential(ctx)?.scope == GitHubOAuth.SCOPE_PRIVATE_REPOS) {
@@ -312,14 +306,13 @@ object GitHubAccountCatalog {
                         ToggleItem(
                             id = "repos_auto",
                             title = "Update plugins from these repositories automatically",
-                            subtitle = "On the Software updates schedule, unmetered connections only",
+                            subtitle = "Unmetered only",
                             current = read.auto,
                             onToggle = { c, value -> PluginRepoUpdates.setAutoUpdate(c, value) },
                         ),
                         ToggleItem(
                             id = "repos_prereleases",
                             title = "Include pre-releases",
-                            subtitle = "Off: pre-releases are ignored",
                             current = read.prereleases,
                             onToggle = { c, value -> PluginRepoUpdates.setIncludePrereleases(c, value) },
                         ),
