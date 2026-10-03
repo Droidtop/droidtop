@@ -12854,6 +12854,16 @@ app gets it too:
   own Java activity through JNI, which a Wine process does not have), with
   the controller subsystems only, so it needs nothing beyond libc, libm
   and libdl.
+- **GnuTLS** is in the guest libraries too (2026-10-03, Droidtop/tracker#304):
+  Wine's bcrypt, crypt32 and secur32 dlopen `libgnutls` for every
+  public-key operation (certificate chains, TLS through schannel,
+  signatures), and on arm64 box64 maps that onto the aarch64 image's
+  copy. Without it the x86_64 Wine logged "failed to load libgnutls, no
+  support for encryption" and bcrypt's `key_asymmetric_create` failed
+  while a Unity game started on the BlueStacks rig. GnuTLS, Nettle and GMP are built
+  from upstream sources in portable C (no assembly or CPU-specific
+  acceleration, so one build serves every x86_64 device), and the build
+  fails when any staged library needs a name nothing provides.
 - **Pinned assets say what they checked.** Each pinned release asset
   (`PinnedReleaseAsset`: the guest libraries, the graphics drivers) logs
   the SHA-256 it computed and whether it matched the pin before
