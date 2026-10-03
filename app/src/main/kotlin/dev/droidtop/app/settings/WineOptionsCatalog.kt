@@ -82,7 +82,15 @@ object WineOptionsCatalog {
                             title = "Runs in the shared prefix",
                             subtitle = "Changes here are this game's own and apply when it starts; the shared settings stay as they are. " +
                                 "Choosing another Wine build makes it a prefix of its own.",
-                            value = if (state.ownChoices == 0) "Shared settings" else "${state.ownChoices} of its own",
+                            // A count of this game's own settings over the
+                            // shared prefix, not of prefixes: "1 of its own"
+                            // under this title read as if a prefix had been
+                            // made (rig run, Droidtop/tracker#242).
+                            value = when (state.ownChoices) {
+                                0 -> "Shared settings"
+                                1 -> "Shared, 1 setting changed for this game"
+                                else -> "Shared, ${state.ownChoices} settings changed for this game"
+                            },
                             run = {},
                         )
                     },

@@ -1298,6 +1298,19 @@ private fun row(
 }
 
 /**
+ * What the game's Wine settings hold on this device. An x86_64 device runs
+ * x86_64 Wine directly, so it has no FEXCore or Box64 choice to name (the
+ * rows themselves follow the same rule, WineOptions; the ABI test is the one
+ * X86_64GuestLibs.isX86_64Host makes, the device's first supported ABI).
+ */
+internal fun wineRowDetail(x86_64Host: Boolean): String =
+    if (x86_64Host) {
+        "Wine build, graphics driver and DXVK for this game, and all its prefix settings"
+    } else {
+        "Wine build, FEXCore or Box64, graphics driver and DXVK for this game, and all its prefix settings"
+    }
+
+/**
  * The rows that depend on HOW this game runs: enginehost's own settings
  * for a game enginehost runs, the Wine prefix for a game that takes the
  * Windows route, and nothing at all for a game whose runner is neither
@@ -1333,11 +1346,7 @@ private fun runnerRows(
         },
     )
     hasWindowsRoute -> listOfNotNull(
-        PcActionRow(
-            "Wine and graphics",
-            "Wine build, FEXCore or Box64, graphics driver and DXVK for this game, and all its prefix settings",
-            onOpenPrefix,
-        ),
+        PcActionRow("Wine and graphics", wineRowDetail(android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"), onOpenPrefix),
         // The game's own program, when an import chose one; selecting
         // it goes back to the program droidtop detects (docs/SPEC.md 7i).
         wineSettings?.executable?.let { exe ->

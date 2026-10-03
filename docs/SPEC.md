@@ -4083,7 +4083,11 @@ source in [vendor/gamenative](../vendor/gamenative):
     cannot carry one game's choice into the shared prefix. The overrides
     travel to `WineGameActivity` with the launch intent, and
     `WineComponents` downloads what they name. "Use the shared settings
-    again" drops them.
+    again" drops them. The screen's first row, "Runs in the shared
+    prefix", counts them as settings ("Shared, 1 setting changed for this
+    game"), never as prefixes; "1 of its own" read as if a prefix had
+    been made. The game menu's row describing these settings names
+    FEXCore or Box64 only on an arm64 device, where they are choices.
   - **Only another Wine build makes a prefix.** A Wine build belongs to the
     prefix it boots, so choosing a different one for a game makes it a
     prefix of its own (`PcContainers.createOwn`, the id `forGame` already
