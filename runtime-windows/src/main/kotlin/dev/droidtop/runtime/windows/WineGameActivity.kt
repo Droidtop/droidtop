@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -27,6 +28,8 @@ import com.winlator.widget.XServerViewGL
 import com.winlator.winhandler.WinHandler
 import com.winlator.winhandler.WinHandler.PreferredInputApi
 import com.winlator.xserver.Keyboard
+import com.winlator.xserver.Window
+import com.winlator.xserver.WindowManager as XWindowManager
 import com.winlator.xserver.ScreenInfo
 import com.winlator.xserver.XServer
 import java.io.File
@@ -75,6 +78,11 @@ class WineGameActivity : Activity() {
     private var keyboard: Keyboard? = null
     private var winHandler: WinHandler? = null
     private var failed = false
+    private var startedAtMs = 0L
+
+    /** Whether the guest mapped an application window of its own (not the virtual desktop). */
+    @Volatile
+    private var guestShowedWindow = false
 
     private val startupExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "droidtop-wine-start")
@@ -115,6 +123,11 @@ class WineGameActivity : Activity() {
 
         val xServer = XServer(ScreenInfo(prefix.screenSize), false)
         this.xServer = xServer
+        xServer.windowManager.addOnWindowModificationListener(object : XWindowManager.OnWindowModificationListener {
+            override fun onMapWindow(window: Window) {
+                if (window.isApplicationWindow && !window.className.contains("explorer.exe")) guestShowedWindow = true
+            }
+        })
 
         // virgl is OpenGL passthrough and has to be presented by the GL
         // view, which shares its EGL context with the VirGL component;
@@ -193,6 +206,7 @@ class WineGameActivity : Activity() {
 
         val session = WineXSession(this, prefix, target, workingDir, xServer, arguments)
         this.session = session
+        startedAtMs = SystemClock.elapsedRealtime()
         startupExecutor.execute {
             runCatching { session.start(::onGuestTerminated) }
                 .onFailure { failure ->
@@ -203,16 +217,20 @@ class WineGameActivity : Activity() {
         }
     }
 
+    /**
+     * Wine has ended. A game that ran and quit with code 0 just closes this
+     * screen; any other end is reported here, with Wine's exit code and the
+     * last lines it printed. This screen is droidtop's own, so the launch
+     * watchdog leaves it alone (LaunchDisplay): its "closed straight after it
+     * started" named droidtop and gave emulator advice for a Windows game
+     * (Droidtop/tracker#302).
+     */
     private fun onGuestTerminated(status: Int) {
-        val detail = session?.output().orEmpty()
+        val ranMs = SystemClock.elapsedRealtime() - startedAtMs
+        val report = WinePresentation.exitReport(status, ranMs, guestShowedWindow, session?.output().orEmpty())
+        Timber.i("Wine exited %d after %d ms", status, ranMs)
         runOnUiThread {
-            if (status != 0) {
-                showFailure(
-                    if (detail.isBlank()) "wine exited $status" else "wine exited $status: ${detail.takeLast(FAILURE_DETAIL_CHARS)}",
-                )
-            } else {
-                finish()
-            }
+            if (report != null) showFailure(report.detail, title = report.title) else finish()
         }
     }
 
@@ -229,7 +247,7 @@ class WineGameActivity : Activity() {
      * so it is shown here, and finishing immediately would take it away
      * before it could be read.
      */
-    private fun showFailure(message: String, cause: Throwable? = null) {
+    private fun showFailure(message: String, cause: Throwable? = null, title: String = "This Windows game did not start.") {
         if (failed) return
         failed = true
         if (cause == null) {
@@ -241,7 +259,7 @@ class WineGameActivity : Activity() {
         session = null
         setContentView(
             TextView(this).apply {
-                text = "This Windows game did not start." + "\n" + "\n" +
+                text = title + "\n" + "\n" +
                     message + "\n" + "\n" +
                     "Check that Windows games is set up in Settings, then try again." + "\n" + "\n" +
                     "Press Back to return."
@@ -325,7 +343,6 @@ class WineGameActivity : Activity() {
         private const val EXTRA_TARGET = "dev.droidtop.wine.TARGET"
         private const val EXTRA_WORKING_DIR = "dev.droidtop.wine.WORKING_DIR"
         private const val EXTRA_ARGUMENTS = "dev.droidtop.wine.ARGUMENTS"
-        private const val FAILURE_DETAIL_CHARS = 1200
         private const val FAILURE_PADDING_PX = 48
 
         /**
@@ -393,4 +410,39 @@ object WinePresentation {
      */
     fun fullscreenWMClass(target: String): String? =
         target.substringAfterLast('/').substringAfterLast('\\').takeIf { it.isNotBlank() }
+
+    /** How Wine's end is put to the person: a headline and the detail under it. */
+    data class ExitReport(val title: String, val detail: String)
+
+    /** Wine ending this soon after it started means the game did not really run. */
+    const val EXITED_AT_ONCE_MS = 10_000L
+
+    /** At most this many of Wine's last output lines are shown. */
+    const val EXIT_LINES = 12
+
+    /**
+     * What to say when Wine ends with [status] after [ranMs], given the tail
+     * of what it printed ([output]); null for a program that ran and quit with
+     * code 0, which needs no report. A code-0 exit within [EXITED_AT_ONCE_MS]
+     * is reported too when the guest never mapped a window of its own
+     * ([showedWindow]): a game that cannot create its device often quits
+     * cleanly (rig, a Unity game with no Direct3D 11 device), while a tool such
+     * as Wine configuration may well be closed again within seconds.
+     */
+    fun exitReport(status: Int, ranMs: Long, showedWindow: Boolean, output: String): ExitReport? {
+        val atOnce = ranMs < EXITED_AT_ONCE_MS
+        if (status == 0 && (!atOnce || showedWindow)) return null
+        val title = if (atOnce) "This Windows game closed straight after it started." else "This Windows game stopped with an error."
+        val seconds = (ranMs / 1000).coerceAtLeast(0)
+        val code = "Wine exited with code $status after $seconds s."
+        val lines = output.lines().map(String::trimEnd).filter(String::isNotBlank).takeLast(EXIT_LINES)
+        val detail = if (lines.isEmpty()) {
+            "$code It printed nothing."
+        } else {
+            code + "\n" + "\n" + "Last lines Wine printed:" + "\n" + lines.joinToString("\n").takeLast(EXIT_DETAIL_CHARS)
+        }
+        return ExitReport(title, detail)
+    }
+
+    private const val EXIT_DETAIL_CHARS = 1200
 }

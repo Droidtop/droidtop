@@ -289,7 +289,10 @@ object LaunchDisplay {
         packageName?.let { LaunchLedger.note(it, resolvedDisplayId) }
         // A game's launch is watched for an app that never answers or leaves at once (docs/SPEC.md
         // "The launch watchdog"); a plain app switch is not, since it has nothing to be stuck on.
-        if (packageName != null && runningGame != null) {
+        // Nor is a game screen of droidtop's own (a Windows game's WineGameActivity): it reports
+        // how its game ended itself, with Wine's exit code and output, where the watchdog could only
+        // say that droidtop closed and point at emulator setup (Droidtop/tracker#302).
+        if (packageName != null && runningGame != null && packageName != context.packageName) {
             LaunchWatchdog.start(context, packageName, launchedAtMs, intent.getStringExtra("LIBRETRO"))
         }
         parkedDisplayId = resolvedDisplayId

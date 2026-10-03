@@ -6346,6 +6346,15 @@ but its screen never handed back (task list says gone after 9 s). A black window
 app is indistinguishable from a game that is running and is never claimed, and a person returning to
 the shell on purpose while the app is open or after 10 s is not a problem.
 
+It watches other apps only. A game screen of droidtop's own, a Windows game's `WineGameActivity`, knows
+how its game ended and says so itself (Droidtop/tracker#302): the watchdog could only see droidtop's own
+package come back, so it told the person that "droidtop closed straight after it started" and pointed at
+emulator setup. `WinePresentation.exitReport` decides the screen's words: any non-zero exit, and a code-0
+exit within 10 s when the guest never mapped a window of its own (a game that finds no Direct3D device
+often quits cleanly; a tool such as Wine configuration can be closed within seconds), is shown with Wine's
+exit code, how long it ran and the last 12 lines Wine printed. A game that ran and quit with code 0 just
+returns to the shell.
+
 Considered and not built (Droidtop/tracker#270): a "taking a long time" notice for an emulator that is open
 and responsive but never draws (NetherSX2 sat black and idle for 60 s with no report). Without root nothing
 tells that apart from a healthy long-running game, so a timed notice would fire on every game. A reliable

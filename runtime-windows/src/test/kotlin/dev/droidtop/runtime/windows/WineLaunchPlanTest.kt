@@ -2,7 +2,9 @@ package dev.droidtop.runtime.windows
 
 import com.winlator.winhandler.WinHandler.PreferredInputApi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -150,5 +152,38 @@ class WineLaunchPlanTest {
         // A .desktop shortcut stores a Windows path.
         assertEquals("Game.exe", WinePresentation.fullscreenWMClass("C:\\Program Files\\Game\\Game.exe"))
         assertNull(WinePresentation.fullscreenWMClass("/storage/games/"))
+    }
+
+    @Test
+    fun `a game that ran and quit with code 0 needs no report`() {
+        assertNull(WinePresentation.exitReport(0, 120_000, showedWindow = true, output = "anything"))
+        assertNull(WinePresentation.exitReport(0, 120_000, showedWindow = false, output = ""))
+    }
+
+    @Test
+    fun `a code 0 exit at once without a window is reported with what Wine printed`() {
+        // The rig case (Droidtop/tracker#302): a Unity game with no Direct3D 11 device quit cleanly at once.
+        val report = WinePresentation.exitReport(0, 3_400, showedWindow = false, output = "line one\n\nline two\n")
+        assertNotNull(report)
+        assertEquals("This Windows game closed straight after it started.", report!!.title)
+        assertEquals("Wine exited with code 0 after 3 s.\n\nLast lines Wine printed:\nline one\nline two", report.detail)
+    }
+
+    @Test
+    fun `a tool closed quickly after showing its window is not reported`() {
+        assertNull(WinePresentation.exitReport(0, 4_000, showedWindow = true, output = ""))
+    }
+
+    @Test
+    fun `a non-zero exit is always reported, and only the last lines are kept`() {
+        val output = (1..30).joinToString("\n") { "line $it" }
+        val report = WinePresentation.exitReport(134, 60_000, showedWindow = true, output = output)!!
+        assertEquals("This Windows game stopped with an error.", report.title)
+        assertTrue(report.detail.startsWith("Wine exited with code 134 after 60 s."))
+        assertTrue(report.detail.endsWith("line 30"))
+        assertTrue("line 19" in report.detail.lines() && "line 18" !in report.detail.lines())
+        assertEquals(WinePresentation.EXIT_LINES, report.detail.lines().count { it.startsWith("line ") })
+        val silent = WinePresentation.exitReport(1, 1_000, showedWindow = false, output = "  \n")!!
+        assertEquals("Wine exited with code 1 after 1 s. It printed nothing.", silent.detail)
     }
 }
