@@ -12831,6 +12831,14 @@ app gets it too:
   kernel reports `/apex/com.android.runtime/bin/linker64`; matching only
   the first name left Wine looking for `ntdll.so` under the APEX on the
   BlueStacks rig (2026-10-03).
+- **fdsan reports, it does not kill (2026-10-03).** bionic aborts a process
+  that closes a descriptor a `DIR*` or `FILE*` still owns, and from Android
+  11 every process that is not an app starts at the fatal level. Wine and
+  the libraries it loads are glibc code where that close is a harmless bug;
+  on the BlueStacks rig one such close killed a game the moment DXVK made
+  its swapchain. `exec-redirect`, preloaded into every x86_64 guest process,
+  sets the level to report-once in its constructor, so the first violation
+  is logged and the game keeps running.
 - **SDL2** is in the guest libraries too: `libevshim`, preloaded into every
   Wine process, dlopens `libSDL2-2.0.so.0` for its virtual joysticks, and
   winebus.sys's SDL backend opens the same name; on arm64 the aarch64
