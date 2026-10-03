@@ -2245,7 +2245,6 @@ private fun GamesSection(
     onToggleFavorite: (LibraryEntry) -> Unit = {},
     onRequestRescan: () -> Unit = {},
 ) {
-    var recentOnly by remember { mutableStateOf(false) }
     // The in-gamelist options overlay (sort, scrape, import) -- see
     // GamelistOptionsMenu. sortVersion invalidates the games ordering
     // below when the overlay cycles the stored sort; scrapeVersion does
@@ -2356,34 +2355,34 @@ private fun GamesSection(
     // stored view is read once per group (an in-memory preference read) and
     // written back off the main thread.
     val retroScope = remember(selectedGroup?.label) { retroQueryScope(selectedGroup?.label.orEmpty()) }
-    var retroQuery by remember(retroScope.id) { mutableStateOf(LibraryViewPrefs.activeQuery(context, retroScope.id)) }
+    // Real ES-DE's Last Played collection opens in recency order, the one list where A to Z would defeat its
+    // purpose; the person can still pick another sort and it is remembered like any list's.
+    val retroDefault = remember(selectedGroup) {
+        if ((selectedGroup as? GameGroup.Collection)?.id == AutoCollections.LAST_PLAYED_ID) {
+            LibraryQuery(sort = dev.droidtop.shell.gamepad.query.LibrarySortKey.RECENT)
+        } else {
+            LibraryQuery()
+        }
+    }
+    var retroQuery by remember(retroScope.id) { mutableStateOf(LibraryViewPrefs.activeQuery(context, retroScope.id, retroDefault)) }
     LaunchedEffect(retroQuery, retroScope.id) {
         withContext(Dispatchers.IO) { LibraryViewPrefs.setActiveQuery(context, retroScope.id, retroQuery) }
     }
     val retroSaved = rememberSavedViews(retroScope.id)
-    val retroBase = remember(entries, selectedGroup) {
-        selectedGroup?.let { group -> entries.filter { it.gameGroup() == group } }.orEmpty()
+    val retroBase = remember(entries, selectedGroup, collectionGroupMembers) {
+        when (val group = selectedGroup) {
+            null -> emptyList()
+            // A collection's members are not a system's games: its own list, through the same model.
+            is GameGroup.Collection -> collectionGroupMembers[group].orEmpty()
+            else -> entries.filter { it.gameGroup() == group }
+        }
     }
     var retroSortOpen by remember { mutableStateOf(false) }
     var retroFilterOpen by remember { mutableStateOf(false) }
-    val systemGamesBeforeSearch = remember(selectedGroup, entries, collectionGroupMembers, sortVersion, retroQuery, retroScope, retroBase) {
-        val group = selectedGroup
-        when (group) {
-            null -> emptyList()
-            // Real ES-DE Last Played stays in real recency order -- the
-            // one real collection where alphabetizing would defeat its
-            // own purpose. Every other group (including the other two
-            // real auto-collections) keeps the same alphabetical order
-            // real ES-DE gamelists default to.
-            is GameGroup.Collection -> if (group.id == AutoCollections.LAST_PLAYED_ID) {
-                collectionGroupMembers[group].orEmpty()
-            } else {
-                collectionGroupMembers[group].orEmpty().sortedBy { it.title.lowercase() }
-            }
-            // The stored per-group sort and filter: NAME by default, which
-            // is real ES-DE's own gamelist default, and no filter.
-            else -> retroQuery.applyTo(retroBase, retroScope)
-        }
+    val systemGamesBeforeSearch = remember(selectedGroup, sortVersion, retroQuery, retroScope, retroBase) {
+        // The stored per-group sort and filter: NAME by default, which is real ES-DE's own gamelist
+        // default, and no filter. A collection is a list like any other.
+        if (selectedGroup == null) emptyList() else retroQuery.applyTo(retroBase, retroScope)
     }
     // The console gamelist's search (Select menu -> Search, the shared
     // LibrarySearchDialog, docs/SPEC.md 12a "Search fan-out"): narrows the
@@ -2429,9 +2428,8 @@ private fun GamesSection(
                 onJumpTo = { index ->
                     focusedGameIndex = index.coerceIn(0, (systemGamesForGroup.lastIndex).coerceAtLeast(0))
                 },
-                // A collection is a cross-cutting list with its own order.
-                onOpenSort = if (group == null || group is GameGroup.Collection) null else ({ retroSortOpen = true }),
-                onOpenFilter = if (group == null || group is GameGroup.Collection) null else ({ retroFilterOpen = true }),
+                onOpenSort = if (group == null) null else ({ retroSortOpen = true }),
+                onOpenFilter = if (group == null) null else ({ retroFilterOpen = true }),
             )
         }
     }
@@ -3145,13 +3143,12 @@ private fun GamesSection(
                     transition = esDeTransition,
                 )
             } else {
-                val allGames = entries.filter { it.gameGroup() == group }
-                val recentCount = allGames.count { it.lastPlayedEpochMs != null }
-                val games = if (recentOnly) allGames.filter { it.lastPlayedEpochMs != null } else allGames
+                // The group's list through the one query model, like the themed list above.
+                val games = systemGamesForGroup
                 // Same "don't request focus on an unattached FocusRequester" fix
                 // as the system-list view above -- games can be empty here too
                 // (the "recent" filter selected with zero recently-played entries).
-                LaunchedEffect(group, recentOnly) { if (games.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Game grid") }
+                LaunchedEffect(group, retroQuery) { if (games.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Game grid") }
                 // Same real per-system accent as GroupCard's own border, applied
                 // as a subtle top-down vignette behind the whole grid -- carries
                 // the "dynamic per-system," not just per-card, through into the
@@ -3169,13 +3166,13 @@ private fun GamesSection(
                         }
                     },
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        ShellChip("${allGames.size} items", on = !recentOnly, onClick = { recentOnly = false })
-                        if (recentCount > 0) {
-                            ShellChip("$recentCount recent", on = recentOnly, onClick = { recentOnly = true })
+                    // The one pill the other lists draw while something filters ("Favourites, 12 of 80"),
+                    // cleared by one press; no count line and no chip row otherwise.
+                    retroQuery.pillText(retroScope, games.size, retroQuery.totalIn(retroBase, retroScope))?.let { pill ->
+                        Row(
+                            modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
+                        ) {
+                            ShellChip(pill, on = true, onClick = { retroQuery = retroQuery.cleared })
                         }
                     }
                     val pad = rememberGridPad()

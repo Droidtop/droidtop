@@ -464,9 +464,10 @@ object LibraryViewPrefs {
         prefs.apply()
     }
 
-    fun activeQuery(context: Context, scopeId: String): LibraryQuery {
+    /** The query the list was left showing, or [default] when it has never been changed (Last played opens by recency). */
+    fun activeQuery(context: Context, scopeId: String, default: LibraryQuery = LibraryQuery()): LibraryQuery {
         val raw = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-            .getString(ACTIVE_PREFIX + scopeId, null) ?: return LibraryQuery()
+            .getString(ACTIVE_PREFIX + scopeId, null) ?: return default
         return decodeQuery(raw) ?: LibraryQuery()
     }
 

@@ -11043,6 +11043,14 @@ group's own query (favourites, completed, played, genre, developer, release
 year, Switch content, hidden; sorts name, rating, release date, last
 played). The earlier cycling "Sort:" and "Show:" rows and their separate
 stored preferences are gone: one mechanism.
+A **collection** (Favorites, Last Played, a person's own) is a list like any
+other (2026-10-03, Droidtop/tracker#273): the same two rows and sheets, its
+own remembered view under `retro:<collection>`. Name is the default, except
+Last Played, which opens by Last played, latest first (ES-DE's own order for
+that collection) until the person picks another sort. The gamelist that draws
+without a theme view shows the one pill while something filters, not its old
+"N items" and "N recent" chips (a second, private filter beside the
+Recently played facet).
 
 **The hint bar follows the focused element.** The shell draws ONE footer
 (`FocusedHintRow`). A focused element declares its hints with
