@@ -1482,7 +1482,7 @@ private fun SettingsSearchOverlay(
                     itemsIndexed(results, key = { _, result -> result.itemId }) { index, result ->
                         MenuRow(
                             title = result.itemTitle,
-                            subtitle = "In ${result.screenTitle}" + (result.itemSubtitle?.let { " -- $it" } ?: ""),
+                            subtitle = result.screenTitle,
                             icon = result.icon,
                             chevron = true,
                             selected = index == selected,

@@ -784,8 +784,7 @@ private fun pageRows(
             PageFact(
                 "Not scraped yet",
                 value = scrapeStatus ?: "Scrape",
-                subtitle = "No cover or description yet. Press A to look this game up in your PC scrape source; " +
-                    "Options has Choose match when it finds the wrong game.",
+                subtitle = "No cover or description yet",
                 onActivate = onScrape,
             ),
         )

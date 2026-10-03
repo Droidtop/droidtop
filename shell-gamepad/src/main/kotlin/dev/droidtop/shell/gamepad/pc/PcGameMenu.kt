@@ -428,9 +428,7 @@ internal fun PcGameMenu(
     if (renaming) {
         TextEditDialog(
             title = "Title",
-            subtitle = "The name this game is drawn and scraped under. droidtop reads it from the folder name " +
-                "(${folderNameOf(entry)}); your own title is kept across every rescan. " +
-                "Clear it and save to go back to the folder's.",
+            subtitle = "Blank uses the folder name (${folderNameOf(entry)})",
             initial = entry.gameName.orEmpty(),
             onCommit = { text ->
                 renaming = false
@@ -473,9 +471,9 @@ internal fun PcGameMenu(
         PcActionRow(
             "Title",
             if (entry.gameName.isNullOrBlank()) {
-                "Read from the folder name (${folderNameOf(entry)}). Select to use your own"
+                "From the folder name"
             } else {
-                "Your own title, kept across rescans. Select to change it or clear it"
+                "Your own title"
             },
             { renaming = true },
         ),
@@ -483,9 +481,9 @@ internal fun PcGameMenu(
             PcActionRow(
                 if (finishedHere) "Not finished with ${part.label}" else "Finished with ${part.label}",
                 if (finishedHere) {
-                    "Play goes back to this part"
+                    "Play returns to this part"
                 } else {
-                    "Play then continues with the next part of $gameName"
+                    "Play moves to the next part"
                 },
                 {
                     scope.launch {
@@ -499,7 +497,7 @@ internal fun PcGameMenu(
         partOf?.let { part ->
             PcActionRow(
                 "Make ${part.label} its own game",
-                "Takes it out of $gameName and lists it on its own. Clearing its title puts it back",
+                "Lists it on its own",
                 {
                     scope.launch {
                         library.renameGame(listOf(entry.id), "$gameName ${part.label}")
@@ -519,8 +517,7 @@ internal fun PcGameMenu(
         sameGameRow = names.similar.size.takeIf { it > 0 }?.let { count ->
             PcActionRow(
                 "The same game as...",
-                "$count ${if (count == 1) "game has a similar name" else "games have similar names"}; " +
-                    "picking one makes the two one game, keeping both folders",
+                "$count with a similar name",
                 { pickingSameGame = true },
             )
         },
@@ -816,7 +813,7 @@ internal fun PcGameMenu(
                         PcMenuEntry.Row(
                             PcActionRow(
                                 "Game info and links",
-                                "Where it is owned, store links, compatibility, scraping and collections",
+                                "Store links, compatibility, collections",
                             ) {
                                 page = PcMenuPage.About
                                 focusIndex = 0
@@ -971,8 +968,7 @@ private fun LibraryEntry.identityLine(update: String?): String = if (missing) "b
 }
 
 /** What the thread dialog says, on the menu and on the game page. */
-internal const val F95_THREAD_HELP = "Paste the game's thread link, or its number. droidtop checks a public index " +
-    "for the thread's newest version; no F95zone account is needed. Clear it and save to unlink."
+internal const val F95_THREAD_HELP = "Thread link or number; blank unlinks"
 
 /**
  * A person's text for the F95zone thread (a link, its number, or blank to
@@ -1127,9 +1123,9 @@ private fun rememberPcActions(
                 // place for verify, extras and remove.
                 "Manage install",
                 if (isStoreGame) {
-                    "Install, verify, update or remove it, and pick which extras come with it"
+                    "Install, verify, update, remove"
                 } else {
-                    "This game is a folder on this device; droidtop doesn't manage it"
+                    "A folder on this device"
                 },
                 if (isStoreGame) {
                     { onOpenAppScreen(PC_STORE_ACTIVITY, mapOf(EXTRA_PC_ENTRY_ID to entry.id)) }
@@ -1176,17 +1172,15 @@ private fun rememberPcActions(
                     entry.missing -> PcActionRow(
                         "Find its replacement",
                         if (replacements == 0) {
-                            "Nothing found looks like this game yet"
+                            "None found"
                         } else {
-                            "$replacements found ${if (replacements == 1) "game looks" else "games look"} " +
-                                "like it; picking one moves this game's history, favourite and collections to it"
+                            "$replacements found"
                         },
                         if (replacements == 0) null else onReplace,
                     )
                     replacements > 0 -> PcActionRow(
                         "This replaces a missing game",
-                        "$replacements missing ${if (replacements == 1) "game looks" else "games look"} like this one; " +
-                            "picking one moves its history, favourite and collections here",
+                        "$replacements missing",
                         onReplace,
                     )
                     else -> null
@@ -1305,9 +1299,9 @@ private fun row(
  */
 internal fun wineRowDetail(x86_64Host: Boolean): String =
     if (x86_64Host) {
-        "Wine build, graphics driver and DXVK for this game, and all its prefix settings"
+        "Wine build, graphics, prefix settings"
     } else {
-        "Wine build, FEXCore or Box64, graphics driver and DXVK for this game, and all its prefix settings"
+        "Wine build, FEXCore or Box64, graphics, prefix settings"
     }
 
 /**
@@ -1362,11 +1356,11 @@ private fun runnerRows(
         },
         PcActionRow(
             "Import a Lutris install script",
-            "Reads a Wine script from lutris.net into this game's settings and shows every change first; nothing in it is run",
+            "Review every change first",
             onImportLutris,
         ),
-        PcActionRow("Saves", "This game's saves live inside the Windows prefix it runs in (Wine and graphics says which)", null),
-        PcActionRow("Controls", "This game's controls are its prefix's controller tab, under Wine and graphics > All prefix settings", null),
+        PcActionRow("Saves", "Inside its Windows prefix", null),
+        PcActionRow("Controls", "In its prefix's controller tab", null),
     )
     else -> null
 }

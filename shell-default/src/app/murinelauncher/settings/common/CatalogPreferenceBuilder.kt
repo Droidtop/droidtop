@@ -685,7 +685,7 @@ private class SearchResultAdapter(
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val result = results[position]
         holder.title.text = result.itemTitle
-        holder.subtitle.text = "In ${result.screenTitle}" + (result.itemSubtitle?.let { " · $it" } ?: "")
+        holder.subtitle.text = result.screenTitle
         holder.itemView.setOnClickListener { onPick(result) }
     }
 

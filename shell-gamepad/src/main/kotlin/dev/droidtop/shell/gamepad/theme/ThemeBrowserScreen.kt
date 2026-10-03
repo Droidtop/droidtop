@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -190,12 +191,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                 .padding(horizontal = dev.droidtop.shell.gamepad.LocalShellWindow.current.edgePadding, vertical = 24.dp),
         ) {
             Text("Browse themes", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
-            Text(
-                "Themes from the ES-DE community's theme list. Select one to download it, or to update it if you have it.",
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
-            )
+            Spacer(Modifier.height(16.dp))
             // A refresh of a stale list runs under the list it already has,
             // and says so above it, with a real spinner while it runs --
             // static text alone read as "stuck" (rig,

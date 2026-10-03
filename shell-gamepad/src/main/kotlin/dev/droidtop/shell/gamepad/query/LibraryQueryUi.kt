@@ -317,11 +317,6 @@ internal fun LibrarySortSheet(
                 color = MenuTokens.OnSurface,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             )
-            Text(
-                "Pick the sort that is on again to flip its direction",
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.bodySmall,
-            )
             scope.sorts.forEachIndexed { index, key ->
                 val active = key == query.sort
                 MenuRow(
@@ -532,10 +527,10 @@ internal fun LibrarySearchDialog(
                 if (summary != null) {
                     summary
                 } else if (text.isBlank()) {
-                    "Type a name, a genre or a developer; ${totalCount} games to search"
+                    "$totalCount games"
                 } else {
                     val shown = "$matchCount ${if (matchCount == 1) "game" else "games"} match"
-                    if (matchCount == 0) "$shown. B closes; the search stays" else shown
+                    if (matchCount == 0) "No games match" else shown
                 },
                 color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodySmall,

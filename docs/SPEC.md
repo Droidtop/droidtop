@@ -11592,6 +11592,16 @@ Settings tab, the left menu's places, Console systems and Containers.
   the row selected; a deeper result is pushed onto the pane as before.
   Deep links into Settings (Browse themes) and the left menu's places are
   unchanged.
+- **Where prose may still be drawn (audit, 2026-10-03, Droidtop/tracker#273).**
+  A catalog `subtitle` (a row's or a screen's) is HintTip and Y Info text in
+  the Gaming renderer and is never drawn on the row, so catalog subtitles are
+  explanations by design and are not trimmed to labels. What a person reads on
+  a screen is labels and values: a search result says only which screen the row
+  is in (`SettingsSearchResult.screenTitle`; the row's explanation stays
+  searchable but is not drawn), a game menu row's summary is a short value
+  ("From the folder name", "2 found"), and a sheet carries no instruction line
+  (Sort by, Search). Sentences stay for failures and for confirmations of a
+  consequential or destructive action.
 
 ### Gaming motion and focus (directed 2026-10-01, Droidtop/tracker#256)
 

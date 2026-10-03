@@ -96,7 +96,7 @@ internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: St
     )
     StoreStage.PAUSED -> PcPlayState(
         "Resume",
-        "Stopped at ${download?.percent ?: 0}%. Opens the download to resume it",
+        "Stopped at ${download?.percent ?: 0}%",
         pressable = true, ready = false, store = stage, progress = download?.fraction,
     )
 }
