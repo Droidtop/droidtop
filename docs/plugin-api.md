@@ -918,9 +918,24 @@ comments.
 - **For:** letting a plugin see what is in the library (games, apps,
   systems, folders, entry metadata), so it can offer something relevant.
 - **Ops:**
-  - `systems()`, `entries(filter, page)`, `entry(id)`, `folders()`;
+  - `systems()`, built (2026-10-07): `{ready, systems: [{id, name, games,
+    choice, playerId, playerName, playerPackage, core}]}`, one row per
+    system that holds at least one game that is there, by name. `choice`
+    is where the emulator came from: `system` (chosen for that system),
+    `global` (the person's default emulator), `automatic` (the first
+    installed one) or `none` (nothing installed runs it; the player fields
+    are empty strings, never null, as in `library.default_player_changed`).
+    `playerId`/`playerName`/`playerPackage`/`core` are what a launch with no
+    per-game setting would use, so the answer and a launch agree. `ready`
+    is false, with no systems, only when no surface has published the
+    library yet and the first load did not finish within 5 s: ask again
+    later. A call over a `host.call` (native `context.call`, Python
+    `droidtop.host.call`) is made as `library.read@1` op `systems` with no
+    args. It is the whole of what this op tells a plugin: no titles, paths
+    or entry ids;
+  - `entries(filter, page)`, `entry(id)`, `folders()` (not built);
   - `history(entryId)`, which needs `library.history`: last played,
-    playtime, session count.
+    playtime, session count (not built).
 - **Events:**
   - `library.entry_added`, `library.entry_removed`,
     `library.scan_finished {counts}`;
@@ -928,9 +943,14 @@ comments.
 - **Surfaces:** none; it is data.
 - **Permission:** `library.read` (normal) and `library.history`
   (dangerous).
-- **Status:** not built, apart from the one event.
+- **Status:** `systems` and the one event are built; the other ops are not.
 - **Rules:** paged (at most 500 per page); read from the index, never a
-  disk walk. A plugin never gets a database handle (12a).
+  disk walk. `systems` reads the library's in-memory index
+  (`PluginLibraryRead`) and the emulator resolution a launch uses, on the
+  broker's binder thread, never the main thread; a call without the
+  `library.read` grant is refused by the broker like any host call
+  (declared, granted, quota, 8). A plugin never gets a database handle
+  (12a).
 
 **A2 Sources.** EP `library.sources@1`. Risk high.
 - **For:** "where can I get this": search a source, look up a known

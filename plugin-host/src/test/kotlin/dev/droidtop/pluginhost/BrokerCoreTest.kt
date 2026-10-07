@@ -379,4 +379,31 @@ class BrokerCoreTest {
         assertEquals(HostApis.MAX_TOAST, env2.toasts.single().second.length)
         assertEquals(PluginErrorCode.INVALID_ARGS, reply(core.call(request("ui.toast", "show", obj("text" to "   ")))).code)
     }
+
+    @Test
+    fun `library read systems needs the library read permission and returns the host's list`() {
+        val rows = org.json.JSONArray().put(obj("id" to "snes", "name" to "Super Nintendo", "games" to 3))
+        val undeclared = TestPlugins.record(TestPlugins.manifest(id = "acme.blind", label = "Blind"))
+        val blindEnv = FakeEnv(undeclared).also { it.systemsReply = obj("ready" to true, "systems" to rows) }
+        val refused = reply(BrokerCore("acme.blind", blindEnv).call(request("library.read", "systems", obj())))
+        assertEquals(PluginErrorCode.PERMISSION_DENIED, refused.code)
+        assertEquals("the host's library is not asked when the permission was never declared", 0, blindEnv.systemsAsked)
+
+        val reader = TestPlugins.record(
+            TestPlugins.manifest(id = "acme.reader", label = "Reader") { it.put("permissions", arr(obj("id" to "library.read"))) },
+        )
+        val env = FakeEnv(reader).also { it.systemsReply = obj("ready" to true, "systems" to rows) }
+        val core = BrokerCore("acme.reader", env)
+        val ok = reply(core.call(request("library.read", "systems", obj())))
+        assertTrue(ok.ok)
+        assertTrue(ok.data.getBoolean("ready"))
+        assertEquals("snes", ok.data.getJSONArray("systems").getJSONObject(0).getString("id"))
+        assertEquals(1, env.systemsAsked)
+
+        env.states.getOrPut("acme.reader") { mutableMapOf() }["library.read"] = GrantState.DENIED
+        val off = reply(core.call(request("library.read", "systems", obj())))
+        assertEquals(PluginErrorCode.PERMISSION_DENIED, off.code)
+        assertTrue(off.message!!.contains("turned off"))
+        assertEquals("a turned-off permission does not reach the library", 1, env.systemsAsked)
+    }
 }

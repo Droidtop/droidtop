@@ -13879,6 +13879,25 @@ take.
   Settings, Open <plugin>, App status) before approval, permissions and
   version. The debug-only "Call its status tile" row is gone (the tile is in
   the panel); the debug crash row moved under Advanced.
+- **A plugin can list the user's systems** (Droidtop/tracker#316,
+  `docs/plugin-api.md` A1). A panel that shows every system (the RetroArch
+  manager's, with the core each needs) had only the systems it heard about
+  through `library.default_player_changed`, which fires when a player is
+  chosen, so a system whose emulator was never touched was missing. The
+  broker's `library.read@1` op `systems` returns the systems that hold a
+  game that is there, each with the emulator a launch would use (the same
+  `EmulatorResolution` the Emulators screens and launches use, so they
+  cannot disagree), its package and its core. It needs the `library.read`
+  permission (normal tier), goes through the broker's declared, granted and
+  quota checks, and from Python is the same call through `droidtop.host.call`.
+  It reads the in-memory index the shells already show
+  (`PluginLibraryRead`, handed to the broker by `DroidtopApplication`
+  because the library lives in `:library-core`, below `:plugin-host`), on the
+  binder thread; only a process nobody has opened the library in yet starts
+  the ordinary first load and waits up to 5 s, then answers `ready: false`.
+  A plugin learns system ids, names, game counts and emulator facts, never
+  a title, a path or an entry id. A plugin that cannot have the permission
+  keeps working from the event-fed list.
 - **Samples** (`samples/plugin-sample-statustile` 1.1.0,
   `samples/plugin-sample-py-statustile` 1.2.0) show a panel, and the native
   sample also a game section, a Home shelf and a toast. The Python sample's

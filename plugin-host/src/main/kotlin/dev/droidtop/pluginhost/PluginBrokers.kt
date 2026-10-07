@@ -156,6 +156,8 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         }
     }
 
+    override fun librarySystems(): JSONObject = PluginBrokers.librarySystemsProvider()
+
     override fun chainServedBy(pluginId: String): List<String> = PluginBrokers.chainServedBy(pluginId)
 
     override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply {
@@ -222,6 +224,12 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 object PluginBrokers {
     /** :app sets this at start: the mode droidtop is in (`gaming`, `android`, `desktop`), for `host.info`. */
     @Volatile var modeProvider: () -> String = { "unknown" }
+
+    /**
+     * :app sets this at start: the library's systems for `library.read` `systems` (the library lives in :library-core,
+     * which depends on this module). Called on a binder thread, never the main thread.
+     */
+    @Volatile var librarySystemsProvider: () -> JSONObject = { JSONObject().put("ready", false).put("systems", JSONArray()) }
 
     private val binders = ConcurrentHashMap<String, IPluginHostBroker>()
     private var environment: AppBrokerEnvironment? = null

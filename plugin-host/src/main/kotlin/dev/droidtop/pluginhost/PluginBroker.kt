@@ -55,6 +55,12 @@ interface BrokerEnvironment {
     /** Shows [text] as a short message attributed to [pluginLabel], on whatever surface is in front; false when it could not. */
     fun toast(pluginLabel: String, text: String): Boolean
 
+    /**
+     * The systems the library holds games for, with each one's chosen emulator, for `library.read` `systems`
+     * (docs/plugin-api.md 3 A1): `{ready, systems: [...]}`, read from the in-memory index. May block briefly; never walks a folder.
+     */
+    fun librarySystems(): JSONObject
+
     /** The chain of plugins the call [pluginId] is currently serving came through (empty when it serves none). */
     fun chainServedBy(pluginId: String): List<String>
 
@@ -202,6 +208,8 @@ object HostApis {
             val text = args.optString("text").trim().takeIf { it.isNotEmpty() } ?: invalid("text is required")
             JSONObject().put("shown", env.toast(record.manifest.label, text.take(MAX_TOAST)))
         },
+        // docs/plugin-api.md 3 A1: the user's systems and each one's chosen emulator, so a panel can list every system, not only those it heard about.
+        HostOp("library.read", "systems", permission = "library.read") { env, _, _ -> env.librarySystems() },
     )
 
     /** The longest toast text droidtop shows; longer text is cut, never refused. */

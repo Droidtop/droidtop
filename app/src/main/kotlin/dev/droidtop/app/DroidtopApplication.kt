@@ -81,6 +81,13 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 else -> id
             }
         }
+        // `library.read` `systems` (docs/plugin-api.md 3 A1): the broker runs on a binder thread, which may block here;
+        // the answer comes from the library's in-memory index, never a folder walk.
+        dev.droidtop.pluginhost.PluginBrokers.librarySystemsProvider = {
+            kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                dev.droidtop.library.integrations.PluginLibraryRead.snapshot(this@DroidtopApplication, LibraryCore.library(this@DroidtopApplication))
+            }
+        }
         // The task manager asks one privileged shell to force-stop an app and to read the system's task list:
         // the Shizuku app (or Sui) or the Shizuku plugin, whichever the user picked; with none, it says what to
         // enable (docs/SPEC.md "The task manager"). Runs in every process: the binder is shared across them.

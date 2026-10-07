@@ -57,6 +57,12 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
         toasts += pluginLabel to text
         return true
     }
+    var systemsReply: JSONObject = obj("ready" to true, "systems" to org.json.JSONArray())
+    var systemsAsked = 0
+    override fun librarySystems(): JSONObject {
+        systemsAsked++
+        return systemsReply
+    }
     override fun chainServedBy(pluginId: String) = chain
     override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply {
         forwards += provider.manifest.id to call
