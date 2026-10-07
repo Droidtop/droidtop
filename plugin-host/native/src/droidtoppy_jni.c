@@ -69,6 +69,20 @@ typedef int PyGILState_STATE;
 typedef PyGILState_STATE (*PyGILState_Ensure_t)(void);
 typedef void (*PyGILState_Release_t)(PyGILState_STATE);
 typedef void *(*PyEval_SaveThread_t)(void);
+typedef void (*PyEval_RestoreThread_t)(void *);
+
+/* The public PyMethodDef layout (stable ABI): the one struct needed, to hand Python a C function. */
+typedef PyObject *(*PyCFunction)(PyObject *, PyObject *);
+typedef struct {
+    const char *ml_name;
+    PyCFunction ml_meth;
+    int ml_flags;
+    const char *ml_doc;
+} PyMethodDef;
+#define METH_VARARGS 0x0001
+typedef PyObject *(*PyCFunction_NewEx_t)(PyMethodDef *, PyObject *, PyObject *);
+typedef int (*PyObject_SetAttrString_t)(PyObject *, const char *, PyObject *);
+typedef PyObject *(*PyTuple_GetItem_t)(PyObject *, long);
 
 typedef struct {
     void *libpython;
@@ -91,6 +105,10 @@ typedef struct {
     PyGILState_Ensure_t PyGILState_Ensure;
     PyGILState_Release_t PyGILState_Release;
     PyEval_SaveThread_t PyEval_SaveThread;
+    PyEval_RestoreThread_t PyEval_RestoreThread;
+    PyCFunction_NewEx_t PyCFunction_NewEx;
+    PyObject_SetAttrString_t PyObject_SetAttrString;
+    PyTuple_GetItem_t PyTuple_GetItem;
 
     /* The bootstrap module's three helpers, resolved once after init. */
     PyObject *fn_load;
@@ -100,6 +118,82 @@ typedef struct {
 
 /* One process-wide interpreter (see file header). */
 static DroidtopPy g_py = {0};
+
+/* droidtop.host.call (docs/plugin-api.md 1.3): Python calls this with (plugin id, request
+ * JSON) and gets the broker's reply JSON back. The Java end is PythonBridge.hostCall, which
+ * routes to the calling plugin's own broker, so every permission check, quota and audit is the
+ * one a native plugin's call meets. The call can arrive on any Python thread (a job worker, a
+ * thread the plugin started), so the JVM is reached through a cached JavaVM and the thread is
+ * attached for the duration if it is not a Java thread already. The GIL is released across the
+ * Java call: a broker call can block on the user (the first-use sheet) and other plugins and
+ * jobs must keep running meanwhile. */
+static JavaVM *g_vm = NULL;
+static jclass g_bridge_class = NULL;
+static jmethodID g_host_call = NULL;
+
+static const char HOST_CALL_FAILED[] =
+    "{\"ok\":false,\"error\":{\"code\":\"FAILED\",\"message\":\"droidtop could not be reached\"}}";
+
+/* The reply as a malloc'd C string, or NULL if the JVM could not be reached. */
+static char *call_java_host(const char *plugin, const char *request) {
+    if (g_vm == NULL || g_bridge_class == NULL || g_host_call == NULL) return NULL;
+    JNIEnv *env = NULL;
+    int attached = 0;
+    jint state = (*g_vm)->GetEnv(g_vm, (void **) &env, JNI_VERSION_1_6);
+    if (state == JNI_EDETACHED) {
+        if ((*g_vm)->AttachCurrentThread(g_vm, &env, NULL) != JNI_OK) return NULL;
+        attached = 1;
+    } else if (state != JNI_OK) {
+        return NULL;
+    }
+    char *out = NULL;
+    jstring jplugin = (*env)->NewStringUTF(env, plugin);
+    jstring jrequest = (*env)->NewStringUTF(env, request);
+    if (jplugin != NULL && jrequest != NULL) {
+        jstring jreply = (jstring) (*env)->CallStaticObjectMethod(env, g_bridge_class, g_host_call, jplugin, jrequest);
+        if ((*env)->ExceptionCheck(env)) {
+            (*env)->ExceptionClear(env);
+        } else if (jreply != NULL) {
+            const char *utf8 = (*env)->GetStringUTFChars(env, jreply, NULL);
+            if (utf8 != NULL) {
+                out = strdup(utf8);
+                (*env)->ReleaseStringUTFChars(env, jreply, utf8);
+            }
+            (*env)->DeleteLocalRef(env, jreply);
+        }
+    } else {
+        (*env)->ExceptionClear(env);
+    }
+    if (jplugin != NULL) (*env)->DeleteLocalRef(env, jplugin);
+    if (jrequest != NULL) (*env)->DeleteLocalRef(env, jrequest);
+    if (attached) (*g_vm)->DetachCurrentThread(g_vm);
+    return out;
+}
+
+static PyObject *host_call(PyObject *self, PyObject *args) {
+    PyObject *plugin = g_py.PyTuple_GetItem(args, 0);
+    PyObject *request = plugin != NULL ? g_py.PyTuple_GetItem(args, 1) : NULL;
+    if (plugin == NULL || request == NULL) return NULL; /* IndexError already set */
+    const char *plugin_utf8 = g_py.PyUnicode_AsUTF8(plugin);
+    const char *request_utf8 = plugin_utf8 != NULL ? g_py.PyUnicode_AsUTF8(request) : NULL;
+    if (plugin_utf8 == NULL || request_utf8 == NULL) return NULL; /* TypeError already set */
+    /* Copies: the borrowed buffers belong to objects another thread could drop once the GIL is released. */
+    char *plugin_copy = strdup(plugin_utf8);
+    char *request_copy = strdup(request_utf8);
+    char *reply = NULL;
+    if (plugin_copy != NULL && request_copy != NULL) {
+        void *tstate = g_py.PyEval_SaveThread();
+        reply = call_java_host(plugin_copy, request_copy);
+        g_py.PyEval_RestoreThread(tstate);
+    }
+    free(plugin_copy);
+    free(request_copy);
+    PyObject *result = g_py.PyUnicode_FromString(reply != NULL ? reply : HOST_CALL_FAILED);
+    free(reply);
+    return result;
+}
+
+static PyMethodDef host_call_def = {"droidtop_host_call", host_call, METH_VARARGS, "the native end of droidtop.host.call"};
 
 /* This module is executed once via PyRun_SimpleString right after
  * Py_InitializeEx. importlib.util is stdlib (present in every official
@@ -112,15 +206,39 @@ static const char *BOOTSTRAP_SOURCE =
     "_droidtop_modules = {}\n"
     "_droidtop_jobs = {}\n"
     "_droidtop_jobs_lock = threading.Lock()\n"
+    "import types\n"
+    "def _droidtop_caller():\n"
+    "    frame = sys._getframe(1)\n"
+    "    while frame is not None:\n"
+    "        name = frame.f_globals.get('__name__')\n"
+    "        if name in _droidtop_modules:\n"
+    "            return name\n"
+    "        frame = frame.f_back\n"
+    "    raise RuntimeError('droidtop.host.call must be called from a plugin')\n"
+    "def _droidtop_host_call(api, op, args=None, version=1):\n"
+    "    request = json.dumps({'api': api, 'version': version, 'op': op, 'args': {} if args is None else args})\n"
+    "    return json.loads(_droidtop_native_call(_droidtop_caller(), request))\n"
+    "_droidtop_host = types.ModuleType('droidtop.host')\n"
+    "_droidtop_host.call = _droidtop_host_call\n"
+    "_droidtop_pkg = types.ModuleType('droidtop')\n"
+    "_droidtop_pkg.__path__ = []\n"
+    "_droidtop_pkg.host = _droidtop_host\n"
+    "sys.modules['droidtop'] = _droidtop_pkg\n"
+    "sys.modules['droidtop.host'] = _droidtop_host\n"
     "def _droidtop_load(unique_name, path, data_dir):\n"
     "    spec = importlib.util.spec_from_file_location(unique_name, path)\n"
     "    module = importlib.util.module_from_spec(spec)\n"
     "    module.__droidtop_data_dir__ = data_dir\n"
     "    sys.modules[unique_name] = module\n"
-    "    spec.loader.exec_module(module)\n"
     "    _droidtop_modules[unique_name] = module\n"
-    "    if hasattr(module, \"on_load\"):\n"
-    "        module.on_load(data_dir)\n"
+    "    try:\n"
+    "        spec.loader.exec_module(module)\n"
+    "        if hasattr(module, \"on_load\"):\n"
+    "            module.on_load(data_dir)\n"
+    "    except BaseException:\n"
+    "        _droidtop_modules.pop(unique_name, None)\n"
+    "        sys.modules.pop(unique_name, None)\n"
+    "        raise\n"
     "    return \"ok\"\n"
     "def _droidtop_call(unique_name, func_name, arg_json):\n"
     "    module = _droidtop_modules.get(unique_name)\n"
@@ -208,6 +326,18 @@ Java_dev_droidtop_pluginhost_PythonBridge_nativeInit(JNIEnv *env, jobject thiz,
                                                        jstring jPythonHome, jstring jLibpythonPath) {
     if (g_py.libpython != NULL) return JNI_TRUE; /* already initialized for this process */
 
+    /* The host-call path (host_call above) needs the JVM and PythonBridge.hostCall from any thread. */
+    jclass bridge_class = (*env)->GetObjectClass(env, thiz);
+    g_bridge_class = (jclass) (*env)->NewGlobalRef(env, bridge_class);
+    g_host_call = (*env)->GetStaticMethodID(env, bridge_class, "hostCall", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+    (*env)->DeleteLocalRef(env, bridge_class);
+    (*env)->GetJavaVM(env, &g_vm);
+    if (g_host_call == NULL) {
+        (*env)->ExceptionClear(env);
+        LOGE("PythonBridge.hostCall not found");
+        return JNI_FALSE;
+    }
+
     const char *pythonHome = (*env)->GetStringUTFChars(env, jPythonHome, NULL);
     const char *libpythonPath = (*env)->GetStringUTFChars(env, jLibpythonPath, NULL);
 
@@ -249,6 +379,10 @@ Java_dev_droidtop_pluginhost_PythonBridge_nativeInit(JNIEnv *env, jobject thiz,
     RESOLVE(PyGILState_Ensure, "PyGILState_Ensure");
     RESOLVE(PyGILState_Release, "PyGILState_Release");
     RESOLVE(PyEval_SaveThread, "PyEval_SaveThread");
+    RESOLVE(PyEval_RestoreThread, "PyEval_RestoreThread");
+    RESOLVE(PyCFunction_NewEx, "PyCFunction_NewEx");
+    RESOLVE(PyObject_SetAttrString, "PyObject_SetAttrString");
+    RESOLVE(PyTuple_GetItem, "PyTuple_GetItem");
 #undef RESOLVE
 
     g_py.libpython = handle;
@@ -256,13 +390,20 @@ Java_dev_droidtop_pluginhost_PythonBridge_nativeInit(JNIEnv *env, jobject thiz,
         g_py.Py_InitializeEx(0); /* 0: skip signal handler registration -- :pluginhost is not the main process's UI thread owner */
     }
 
-    if (g_py.PyRun_SimpleString(BOOTSTRAP_SOURCE) != 0) {
-        LOGE("bootstrap script failed to execute");
-        return JNI_FALSE;
-    }
+    /* The bootstrap runs in __main__, so the native end of droidtop.host.call goes in there first. */
     PyObject *main_module = g_py.PyImport_ImportModule("__main__");
     if (main_module == NULL) {
-        LOGE("could not import __main__ after bootstrap");
+        LOGE("could not import __main__");
+        return JNI_FALSE;
+    }
+    PyObject *host_fn = g_py.PyCFunction_NewEx(&host_call_def, NULL, NULL);
+    if (host_fn == NULL || g_py.PyObject_SetAttrString(main_module, "_droidtop_native_call", host_fn) != 0) {
+        LOGE("could not register droidtop.host.call");
+        return JNI_FALSE;
+    }
+    g_py.Py_DecRef(host_fn);
+    if (g_py.PyRun_SimpleString(BOOTSTRAP_SOURCE) != 0) {
+        LOGE("bootstrap script failed to execute");
         return JNI_FALSE;
     }
     g_py.fn_load = g_py.PyObject_GetAttrString(main_module, "_droidtop_load");

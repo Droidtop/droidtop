@@ -28,11 +28,19 @@ class PythonDroidtopPlugin(
         // Throws PythonCallException on any failure -- caught by
         // PluginRuntimeService.loadPlugin's existing catch(Throwable),
         // same as a native_bundle plugin's onLoad throwing.
-        PythonBridge.nativeLoadModule(uniqueName, scriptPath, dataDir)
+        // Registered first: a plugin may call droidtop.host.call at import time or in on_load.
+        PythonHostCalls.register(uniqueName, context)
+        try {
+            PythonBridge.nativeLoadModule(uniqueName, scriptPath, dataDir)
+        } catch (t: Throwable) {
+            PythonHostCalls.unregister(uniqueName)
+            throw t
+        }
     }
 
     override fun onUnload() {
         PythonBridge.nativeUnloadModule(uniqueName)
+        PythonHostCalls.unregister(uniqueName)
     }
 
     override fun invoke(capability: PluginCapability, args: PluginArgs): PluginResult {

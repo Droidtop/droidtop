@@ -24,6 +24,11 @@ anything beyond the standard library (json), which is all any python-kind
 plugin can rely on being present -- see PythonRuntimeManager for exactly
 what the downloaded runtime carries.
 
+handle can also call droidtop: the panel's "hello" action shows a toast through
+droidtop.host.call("ui.toast", "show", ...), which needs "overlay.toast" in the
+manifest's permissions. A refusal comes back as an ordinary error reply, never
+an exception.
+
 handle receives the contract 2 envelope (JSON text in, JSON text out)
 and must reply with {"ok": true, "data": {...}} or
 {"ok": false, "error": {"code": "UNSUPPORTED", "message": "..."}}.
@@ -32,6 +37,14 @@ import json
 import os
 import threading
 import time
+
+# The module droidtop injects into the interpreter before this file is imported
+# (docs/plugin-api.md 1.3): host.call(api, op, args=None, version=1) makes one
+# call to droidtop's broker and returns its reply, {"ok": true, "data": {...}}
+# or {"ok": false, "error": {"code": ..., "message": ...}}. It is the same call
+# a native plugin makes, so a permission the manifest does not declare is
+# refused here too.
+import droidtop.host
 
 _load_count = 0
 _settings_path = None
@@ -60,6 +73,16 @@ def _save_settings(settings):
                 json.dump(settings, f)
         except Exception:
             pass
+
+
+def _say_hello():
+    """Shows a toast through the broker and says in words what happened."""
+    greeting = _load_settings().get("greeting", "hello")
+    reply = droidtop.host.call("ui.toast", "show", {"text": "%s, from the Python sample panel" % greeting})
+    if reply.get("ok") and (reply.get("data") or {}).get("shown"):
+        return "Said hello"
+    error = reply.get("error") or {}
+    return "droidtop did not show the toast: %s" % (error.get("message") or "no reason given")
 
 
 def on_load(data_dir):
@@ -232,12 +255,21 @@ def handle(call_json):
                                         "title": "Say it",
                                         "action": {"kind": "call", "op": "greet"},
                                     },
+                                    {
+                                        "type": "button",
+                                        "id": "hello",
+                                        "title": "Say hello as a toast",
+                                        "subtitle": "Calls droidtop from Python (ui.toast)",
+                                        "action": {"kind": "call", "op": "hello"},
+                                    },
                                 ],
                             }
                         ],
                     },
                 }
             )
+        if op == "hello":
+            return json.dumps({"ok": True, "data": {"message": _say_hello()}})
         if op == "save":
             return json.dumps({"ok": True, "data": {"message": "Saved"}})
         if op == "greet":

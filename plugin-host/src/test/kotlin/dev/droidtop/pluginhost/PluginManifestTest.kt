@@ -210,6 +210,26 @@ class PluginManifestTest {
     }
 
     @Test
+    fun `a python plugin can provide a panel, game rows and Home shelves and ask to show toasts`() {
+        val json = manifestJson(kind = "python", capabilities = emptyList(), payload = listOf("plugin.py" to "a".repeat(64)), entryClass = null)
+        json.put(
+            "provides",
+            JSONArray(
+                listOf(
+                    JSONObject().put("point", "ui.panel").put("version", 1),
+                    JSONObject().put("point", "ui.game_section").put("version", 1).put("id", "saves").put("label", "Saves"),
+                    JSONObject().put("point", "gaming.rows").put("version", 1),
+                ),
+            ),
+        )
+        json.put("permissions", JSONArray(listOf(JSONObject().put("id", "overlay.toast").put("reason", "Says when a sync is done"))))
+        val m = PluginManifest.fromJson(json)!!
+        assertTrue(m.structuralProblems().isEmpty())
+        assertEquals(listOf("ui.panel", "ui.game_section", "gaming.rows"), m.v2.provides.map { it.point })
+        assertEquals(listOf("overlay.toast"), m.v2.permissions.map { it.id })
+    }
+
+    @Test
     fun `a plugin without ui main declares none`() {
         val m = withMainUi("flutter_embed", JSONObject().put("point", "ui.settings").put("target", "plugin"))
         assertNull(PluginMainUi.declared(m))

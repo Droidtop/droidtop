@@ -301,6 +301,11 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Test the sample python plugin against a fake droidtop module
+        run: |
+          cd samples/plugin-sample-py-statustile
+          python3 test_plugin.py
+
       - name: Build the sample python plugin payload (unsigned)
         run: |
           cd samples/plugin-sample-py-statustile

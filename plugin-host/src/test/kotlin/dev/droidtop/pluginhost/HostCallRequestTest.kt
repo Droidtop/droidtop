@@ -5,10 +5,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
-class FlutterHostCallRequestTest {
+class HostCallRequestTest {
     @Test
     fun `parses a broker call and preserves args as JSON`() {
-        val request = FlutterHostCallRequest.parse(
+        val request = HostCallRequest.parse(
             """{"api":"host.info","version":1,"op":"info","args":{"detail":true}}""",
         )
 
@@ -20,13 +20,13 @@ class FlutterHostCallRequestTest {
 
     @Test
     fun `rejects malformed and incomplete broker calls`() {
-        assertThrows(IllegalArgumentException::class.java) { FlutterHostCallRequest.parse(42) }
-        assertThrows(Exception::class.java) { FlutterHostCallRequest.parse("not json") }
+        assertThrows(IllegalArgumentException::class.java) { HostCallRequest.parse(42) }
+        assertThrows(Exception::class.java) { HostCallRequest.parse("not json") }
         assertThrows(IllegalArgumentException::class.java) {
-            FlutterHostCallRequest.parse("""{"api":"host.info","version":1,"op":"info"}""")
+            HostCallRequest.parse("""{"api":"host.info","version":1,"op":"info"}""")
         }
         assertThrows(IllegalArgumentException::class.java) {
-            FlutterHostCallRequest.parse("""{"api":"host.info","version":0,"op":"info","args":{}}""")
+            HostCallRequest.parse("""{"api":"host.info","version":0,"op":"info","args":{}}""")
         }
     }
 }

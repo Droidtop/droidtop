@@ -13502,6 +13502,25 @@ of what is built. The decisions, briefly:
   returns the broker's JSON reply on the main Looper; malformed requests
   receive an `INVALID_ARGS` broker-shaped reply. `onUnload` shuts the
   executor down.
+  The `python` adapter exposes `droidtop.host.call(api, op, args=None,
+  version=1)` (built 2026-10-07, Droidtop/tracker#317). The bootstrap
+  puts `droidtop` and `droidtop.host` in `sys.modules`, and `call` goes
+  through one native function `libdroidtoppy.so` registers in `__main__`
+  to `PythonBridge.hostCall`, which finds the calling plugin's own
+  `PluginContext` (`PythonHostCalls`) and makes the same `context.call`
+  a `native_bundle` plugin makes. So the declared-and-granted checks, the
+  first-use sheet, the quota and the audit are the broker's, the same for
+  both kinds, and `PluginGrants.pointRefusal` still guards the points
+  droidtop calls in. The calling plugin is found from the Python call
+  stack (the nearest frame whose module is a loaded plugin), so a worker
+  thread or a helper the plugin starts is attributed correctly; this is a
+  stability sandbox, not a security boundary (one interpreter hosts every
+  python plugin), the same stance as the rest of the python kind. The GIL
+  is released across the Java call, because a broker call can wait on the
+  user. A reply is handed to C as ASCII JSON, since JNI's modified UTF-8
+  cannot be decoded by CPython for characters outside the Basic
+  Multilingual Plane. A plugin that raises while importing or in `on_load`
+  is removed from the interpreter at once.
 - **Plugin-provided APIs.** A plugin can `export` an API and others can
   `require` it. droidtop brokers every such call, and the caller needs
   its own grant for the provider's permission, so A never reaches root
@@ -13689,8 +13708,13 @@ take.
   version. The debug-only "Call its status tile" row is gone (the tile is in
   the panel); the debug crash row moved under Advanced.
 - **Samples** (`samples/plugin-sample-statustile` 1.1.0,
-  `samples/plugin-sample-py-statustile` 1.1.0) show a panel, and the native
-  sample also a game section, a Home shelf and a toast.
+  `samples/plugin-sample-py-statustile` 1.2.0) show a panel, and the native
+  sample also a game section, a Home shelf and a toast. The Python sample's
+  panel has a "Say hello as a toast" button that calls `ui.toast` through
+  `droidtop.host.call`; `sample-plugin-python` CI runs its unit test against
+  a fake `droidtop` module. Any python plugin can provide `ui.panel`,
+  `ui.game_section` and `gaming.rows` through `handle` like a native one,
+  since the adapter serialises the envelope and nothing else.
 
 **The API surface** (`PluginCapability`, a closed set — the trust shape
 differs per capability, same reasoning §12's `IntegrationCapability`

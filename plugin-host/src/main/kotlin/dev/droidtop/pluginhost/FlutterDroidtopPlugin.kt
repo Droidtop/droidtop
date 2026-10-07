@@ -241,7 +241,7 @@ class FlutterDroidtopPlugin(
     /** Broker calls can block, so they run off the main Looper that delivers MethodChannel calls. */
     private fun handleHostCall(arguments: Any?, result: MethodChannel.Result) {
         val request = try {
-            FlutterHostCallRequest.parse(arguments)
+            HostCallRequest.parse(arguments)
         } catch (e: Exception) {
             result.success(errorReply("INVALID_ARGS", e.message ?: "malformed hostCall argument"))
             return
@@ -441,10 +441,10 @@ class FlutterDroidtopPlugin(
     }
 }
 
-/** Parsed, broker-ready fields for the JSON text accepted by Flutter's `hostCall` method. */
-internal data class FlutterHostCallRequest(val api: String, val version: Int, val op: String, val argsJson: String) {
+/** Parsed, broker-ready fields for the JSON text a Flutter hostCall or a Python droidtop.host.call hands over. */
+internal data class HostCallRequest(val api: String, val version: Int, val op: String, val argsJson: String) {
     companion object {
-        fun parse(arguments: Any?): FlutterHostCallRequest {
+        fun parse(arguments: Any?): HostCallRequest {
             require(arguments is String) { "hostCall argument must be a JSON string" }
             val json = JSONObject(arguments)
             val api = (json.opt("api") as? String)?.takeIf { it.isNotBlank() }
@@ -455,7 +455,7 @@ internal data class FlutterHostCallRequest(val api: String, val version: Int, va
                 ?: throw IllegalArgumentException("op must be a non-empty string")
             val args = json.optJSONObject("args")
                 ?: throw IllegalArgumentException("args must be a JSON object")
-            return FlutterHostCallRequest(api, version, op, args.toString())
+            return HostCallRequest(api, version, op, args.toString())
         }
     }
 }
