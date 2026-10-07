@@ -564,9 +564,9 @@ internal fun PcGameMenu(
                 PcActionRow(
                     "Engine",
                     when {
-                        engine == null -> "Not detected as an engine game; pick one if it is"
+                        engine == null -> "Not identified as an engine game; pick one if it is"
                         engineChoice.pinned -> "${engine.displayName()} - your choice"
-                        else -> "${engine.displayName()} - detected; pick another if that is wrong"
+                        else -> "${engine.displayName()} - identified; pick another if that is wrong"
                     },
                     { pickingEngine = true },
                 )
@@ -1438,11 +1438,11 @@ private sealed interface ProtonDbState {
 private suspend fun lookUpProtonDb(entry: LibraryEntry, name: String): ProtonDbState = withContext(Dispatchers.IO) {
     runCatching {
         val appId = ProtonDbClient.steamAppIdFor(entry, name)
-            ?: return@runCatching ProtonDbState.Unavailable("No Steam app id is known for $name, and ProtonDB lists only Steam games")
+            ?: return@runCatching ProtonDbState.Unavailable("No Steam ID is known for $name, and ProtonDB lists only Steam games")
         when (val lookup = ProtonDbClient.summary(appId)) {
             is ScrapeLookup.Found -> ProtonDbState.Found(lookup.value, appId)
             ScrapeLookup.NoMatch -> ProtonDbState.Unavailable("ProtonDB has no reports for this game yet")
-            is ScrapeLookup.Refused -> ProtonDbState.Unavailable("ProtonDB refused the request (HTTP ${lookup.httpStatus})")
+            is ScrapeLookup.Refused -> ProtonDbState.Unavailable("ProtonDB could not be reached (error ${lookup.httpStatus})")
         }
     }.getOrElse { ProtonDbState.Unavailable("ProtonDB could not be reached: ${it.message ?: it}") }
 }
