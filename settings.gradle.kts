@@ -122,6 +122,11 @@ include(":input-seat")
 // layer a future launcher shell (:shell-gamepad) will read from.
 include(":library-core")
 
+// The PC stores droidtop runs itself (docs/SPEC.md 7g, "Stores"): Epic, GOG,
+// Amazon Games and itch.io, lifted out of vendor/gamenative behind
+// library-core's StoreLibrary.
+include(":stores")
+
 // The plugin host (docs/SPEC.md 12a): manifest validation, install/
 // uninstall/enable/approve, and the isolated :pluginhost process that
 // runs native_bundle plugin code, reached over its own AIDL binder

@@ -256,6 +256,7 @@ dependencies {
     implementation(project(":input-seat"))
     implementation(project(":input-keyboard"))
     implementation(project(":library-core"))
+    implementation(project(":stores"))
     implementation(project(":plugin-host"))
     implementation(project(":display"))
     implementation(project(":shell-default"))

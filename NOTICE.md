@@ -9,6 +9,12 @@ This project is distributed under the GNU General Public License v3.0 (see
   https://github.com/bi0shacker001/gamenative-tux of
   https://github.com/utkarshdalal/GameNative — GPL-3.0.
   `runtime-windows` compiles the whole vendored tree (docs/SPEC.md §9).
+  The `stores` module is GameNative's Epic, GOG, Amazon Games and itch.io
+  store code (`app.gamenative.service.{epic,gog,amazon,itch}`, its store
+  models and DAOs and the helpers they use), lifted out of the fork at
+  `d6336076` into `dev.droidtop.stores.*` and reworked to run without
+  GameNative (docs/SPEC.md §7g "Stores"). GameNative's authors hold the
+  copyright in that code; it stays under GPL-3.0.
 - **Winlator** — https://github.com/brunodev85/winlator — LGPL-2.1.
   The upstream of GameNative's `com.winlator` runtime tree, and so of
   `runtime-windows`. Not vendored in this repository (the reference checkout
@@ -129,6 +135,6 @@ actually finished. droidtop makes no changes to its files.
 
 Moonlight Android (input interaction model, LAN host discovery approach),
 KDE Connect Android (remote input reference), Playnite (library/plugin
-model), distrobox (host-integration mechanism), Qubes OS (dom0/AppVM
+model, and the store library interface), Lutris (store services), distrobox (host-integration mechanism), Qubes OS (dom0/AppVM
 architectural split). See [docs/SPEC.md](docs/SPEC.md) for how each
 informed the design.

@@ -9265,6 +9265,15 @@ follows:
   install offer (Droidtop/tracker#227), in `Games/<store name>` there, one
   folder per store so an uninstall can prove what it deletes is a store
   install (`SafeDelete`, never a walk that follows a symlink).
+- **The `:stores` module** holds the stores lifted out of GameNative, each a
+  `StoreLibrary`, with droidtop's own copy of what they hold: `stores.db`
+  (`StoresDatabase`), the four tables GameNative kept in its `pluvia.db`
+  under the same names. When `stores.db` is first made, the rows `pluvia.db`
+  already has are brought across column by column (`GameNativeImport`), so
+  an update keeps every listed game and, above all, what is installed and
+  where; GameNative's play-time and app-type columns are left behind (droidtop
+  measures play itself, and nothing read the type). Sign-ins need no import:
+  each store keeps its sign-in in the same file it always did.
 - **What stays with GameNative for now**: Steam (its client is the next step
   of the plan and waits on owner decisions) and the Wine runtime the games
   run in. The `vendor/gamenative` submodule stays until both have moved.
@@ -12386,6 +12395,10 @@ input-seat             → unified input seat; depends on host-bridge, runtime-c
 library-core           → the unified library and its metadata (§7g); depends on
                           runtime-common, and on shell-default + IconLoader for the
                           launcher's own app-icon machinery
+stores                 → the PC stores droidtop runs itself (§7g "Stores": Epic, GOG,
+                          Amazon Games, itch.io, lifted out of vendor/gamenative) behind
+                          library-core's StoreLibrary; depends on library-core and
+                          runtime-common, never on the vendored tree
 display                → secondary-display behaviour for every mode, in one place (the
                           single SECONDARY_HOME activity + mode registry, §4c); depends
                           only on runtime-common
