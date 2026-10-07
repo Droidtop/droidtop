@@ -142,7 +142,11 @@ meaning, and a v1 manifest is translated into this shape by one function
   entry carries that extension point's static fields (label, surfaces,
   targets, filters). droidtop calls only the points and ops a plugin
   declared, as it does today for capabilities. A reply to an undeclared
-  op is thrown away.
+  op is thrown away. Since 2026-10-07 (Droidtop/tracker#316) this holds at
+  the boundary, not only in the surfaces that choose whom to ask: the one
+  check every host call goes through (`PluginGrants.pointRefusal`) refuses
+  a point the manifest does not declare at a version this build serves,
+  before the plugin is loaded, whatever its grants say.
 - **`permissions`** lists every host-API permission the plugin may use.
   Each entry has an optional plain-language `reason`, which is shown on
   the grant screen. `required: true` means the plugin cannot do its main

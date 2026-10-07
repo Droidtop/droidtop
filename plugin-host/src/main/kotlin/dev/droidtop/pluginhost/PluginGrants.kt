@@ -333,12 +333,16 @@ class PluginGrants(private val dir: File) {
 
         /**
          * Why a call to [point] must not be made, or null when it may be (docs/plugin-api.md 4.3, "A denied point"). The one
-         * check every host call to a plugin goes through: a point the user did not allow, or has not answered yet, is never
-         * called at all. An `api:` call to a provider is checked by the broker, not here.
+         * check every host call to a plugin goes through: a point the plugin never declared (or declared only at a version
+         * this build does not serve), and a point the user did not allow or has not answered yet, is never called at all.
+         * An `api:` call to a provider is checked by the broker, not here.
          */
         fun pointRefusal(record: PluginRecord, snapshot: Snapshot, point: String): String? {
-            if (point.startsWith("api:") || provideState(record, snapshot, point) == GrantState.GRANTED) return null
-            return "${record.manifest.label} has not been allowed to ${ExtensionPoints.find(point)?.label?.replaceFirstChar { it.lowercase() } ?: point}"
+            if (point.startsWith("api:")) return null
+            val label = ExtensionPoints.find(point)?.label?.replaceFirstChar { it.lowercase() } ?: point
+            if (!ExtensionPoints.declares(record.manifest, point)) return "${record.manifest.label} does not offer $label"
+            if (provideState(record, snapshot, point) == GrantState.GRANTED) return null
+            return "${record.manifest.label} has not been allowed to $label"
         }
 
         /** Whether the plugin's export of [api] is on: an update's new export waits for a grant. */

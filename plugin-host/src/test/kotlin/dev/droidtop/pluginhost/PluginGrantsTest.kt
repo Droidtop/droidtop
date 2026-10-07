@@ -228,4 +228,19 @@ class PluginGrantsTest {
         // A point the plugin only has because it was never answered (no entry) is not called either when it is high-risk.
         assertTrue(PluginGrants.pointRefusal(record, PluginGrants.Snapshot(), "library.sources") != null)
     }
+
+    @Test
+    fun `a point the plugin did not declare is refused even when nothing else would stop it`() {
+        val record = plugin(2, "acme.panel") {
+            it.put("provides", arr(obj("point" to "ui.panel"), obj("point" to "ui.settings", "version" to 9)))
+        }
+        val snap = grants.read("acme.panel")
+        assertNull("a declared low-risk point is called", PluginGrants.pointRefusal(record, snap, "ui.panel"))
+        // ui.quick_tile is low risk and has no grant entry: before the boundary check this went through.
+        assertTrue(PluginGrants.pointRefusal(record, snap, "ui.quick_tile")!!.contains("does not offer"))
+        assertTrue("a version this build does not serve is not a declaration", PluginGrants.pointRefusal(record, snap, "ui.settings") != null)
+        // Granting the provide permission does not make an undeclared point callable.
+        grants.set("acme.panel", "provide:gaming.rows", GrantState.GRANTED)
+        assertTrue(PluginGrants.pointRefusal(record, grants.read("acme.panel"), "gaming.rows") != null)
+    }
 }

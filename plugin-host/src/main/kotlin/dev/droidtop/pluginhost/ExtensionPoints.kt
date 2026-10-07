@@ -68,4 +68,12 @@ object ExtensionPoints {
 
     /** True when this build serves [point] at [version]. */
     fun supports(point: String, version: Int): Boolean = find(point)?.versions?.contains(version) == true
+
+    /**
+     * True when [manifest] declares [point] at a version this build serves. droidtop calls only the points a plugin
+     * declared (docs/plugin-api.md 1.2); [PluginGrants.pointRefusal] checks this on every host call, so the rule holds
+     * at the boundary and not only in the surfaces that choose which plugins to ask.
+     */
+    fun declares(manifest: PluginManifest, point: String): Boolean =
+        manifest.v2.provides.any { it.point == point && supports(point, it.version) }
 }
