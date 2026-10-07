@@ -470,9 +470,13 @@
         <activity
             android:name=".PcStoreSignInActivity"
             android:exported="false" />
+        <!-- A store's own sign-in page (docs/SPEC.md 7g "Stores"). Not
+             recreated on a turn: a sign-in page holds one-time state the
+             store made when the page opened. -->
         <activity
-            android:name=".ItchSignInActivity"
-            android:exported="false" />
+            android:name=".StoreSignInActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation" />
         <activity
             android:name=".PcContainerConfigActivity"
             android:exported="false"

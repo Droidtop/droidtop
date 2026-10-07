@@ -1,8 +1,14 @@
 package dev.droidtop.library.stores
 
 import android.content.Context
+import android.util.Log
 import dev.droidtop.library.StoreUpdate
+import dev.droidtop.library.settings.LibraryRescan
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * One game a store says the person owns: Playnite's `GameMetadata`, a row
@@ -67,6 +73,9 @@ sealed interface StoreSignIn {
     class ApiKey(val keyPage: String) : StoreSignIn
 }
 
+/** Which of the two [StoreSignIn] forms a store uses, known without starting a sign-in. */
+enum class StoreSignInKind { WEB_PAGE, API_KEY }
+
 /** What a store answers about a newer build of one installed game. */
 data class StoreUpdateCheck(val update: StoreUpdate, val latest: String? = null)
 
@@ -106,7 +115,14 @@ interface StoreLibrary {
     /** Who is signed in, where the store keeps that in the open; null otherwise. */
     fun accountName(context: Context): String? = null
 
-    /** Starts a sign-in: what to show the person. A web sign-in may make one-time state here. */
+    /** How the store signs in; a row's label and which screen opens. Starts nothing. */
+    val signInKind: StoreSignInKind
+
+    /**
+     * Starts a sign-in: what to show the person. A web sign-in may make
+     * one-time state here (a PKCE verifier), so this is called once per
+     * sign-in screen, never to draw a row ([signInKind] is for that).
+     */
     fun signIn(context: Context): StoreSignIn
 
     /**
@@ -185,4 +201,22 @@ object StoreLibraries {
 
     /** The store a library id ("gog:1207658691") belongs to, or null when no registered store owns it. */
     fun forKey(key: String?): StoreLibrary? = key?.substringBefore(':', "")?.takeIf { it.isNotEmpty() }?.let(::byId)
+}
+
+/**
+ * Says that a store's rows changed (a sign-in, a sync, a sign-out, an
+ * install, a removal): the library walks again in the background so the
+ * change shows, the same "Rescan library" every other source change runs
+ * ([LibraryRescan]). Returns at once; never on the caller's thread.
+ */
+object StoreChanges {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    fun announce(context: Context) {
+        val app = context.applicationContext
+        scope.launch {
+            runCatching { LibraryRescan.run(app) {} }
+                .onFailure { Log.w("droidtop.Stores", "Walking the library after a store change failed", it) }
+        }
+    }
 }

@@ -23,6 +23,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -87,6 +88,7 @@ import dev.droidtop.shell.gamepad.query.LibrarySortKey
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -423,16 +425,25 @@ internal fun PcGamesSection(
     // already running goes straight to the store's queue.
     val downloads by StoreDownloads.active.collectAsState()
     var storeOffer by remember { mutableStateOf<StoreInstallOffer?>(null) }
-    fun openStore(entry: LibraryEntry) {
-        openStoreScreen(context, entry)?.let {
-            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+    val storeScope = rememberCoroutineScope()
+    fun say(line: String?) {
+        line?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
+    }
+    // The install offer was taken: a store droidtop runs starts its job here,
+    // Steam opens its own screen.
+    fun proceed(entry: LibraryEntry, volumePath: String?) {
+        val own = entry.ownStore()
+        if (own == null) {
+            say(openStoreScreen(context, entry))
+        } else {
+            storeScope.launch { say(startOwnStoreInstall(context, entry, own, volumePath)) }
         }
     }
     val launch: (LibraryEntry) -> Unit = { entry ->
         when (val stage = storeStageOf(entry, entry.downloadKey()?.let { downloads[it] })) {
             StoreStage.INSTALL, StoreStage.UPDATE -> storeOffer = StoreInstallOffer(entry, stage)
             null -> onLaunch(folded?.continuing?.get(entry.id) ?: entry)
-            else -> openStore(entry)
+            else -> say(continueStoreDownload(context, entry, stage) { onOpenSection(GamingSection.DOWNLOADS) })
         }
     }
     // A on a capsule plays it, except a Windows game whose environment is not
@@ -882,6 +893,10 @@ internal fun PcGamesSection(
                 state.menuId = null
                 state.pageId = menuEntry.id
             },
+            onOpenDownloads = {
+                state.menuId = null
+                onOpenSection(GamingSection.DOWNLOADS)
+            },
         )
     }
     otherMenu?.let { entry ->
@@ -904,9 +919,9 @@ internal fun PcGamesSection(
     // (Droidtop/tracker#227).
     StoreInstallOfferSheet(
         offer = storeOffer,
-        onProceed = { o ->
+        onProceed = { o, volumePath ->
             storeOffer = null
-            openStore(o.entry)
+            proceed(o.entry, volumePath)
         },
         onDismiss = { storeOffer = null },
     )

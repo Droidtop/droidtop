@@ -3,7 +3,6 @@ package dev.droidtop.library.stores
 import android.content.Context
 import android.util.Log
 import dev.droidtop.library.StoreDownloads
-import dev.droidtop.library.settings.LibraryRescan
 import dev.droidtop.pluginhost.PluginJobsCenter
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -85,6 +84,9 @@ object StoreInstallJob {
     fun jobFor(key: String): PluginJobsCenter.Entry? =
         PluginJobsCenter.entries().value.firstOrNull { it.nativeKind == KIND && !it.done && it.resumePayload == key }
 
+    /** Resumes [key]'s paused download; false when there is none to resume. */
+    fun resume(key: String): Boolean = jobFor(key)?.takeIf { it.paused }?.let { PluginJobsCenter.resume(it.jobId) } ?: false
+
     private suspend fun execute(
         context: Context,
         args: Map<String, String>,
@@ -100,7 +102,7 @@ object StoreInstallJob {
             report(if (fraction < 0f) -1 else (fraction.coerceIn(0f, 1f) * 100f).toInt(), line, key)
         }
         // The new install is in the library on the next walk; start it now.
-        scope.launch { runCatching { LibraryRescan.run(context) {} } }
+        StoreChanges.announce(context)
         return outcome
     }
 

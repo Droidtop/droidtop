@@ -13,6 +13,7 @@ class StoreLibrariesTest {
 
     private class FakeStore(override val id: String, override val label: String) : StoreLibrary {
         override fun signedIn(context: Context) = false
+        override val signInKind = StoreSignInKind.API_KEY
         override fun signIn(context: Context): StoreSignIn = StoreSignIn.ApiKey("https://example.invalid/keys")
         override suspend fun completeSignIn(context: Context, secret: String) = Result.success<String?>(null)
         override suspend fun signOut(context: Context) = Result.success(Unit)

@@ -49,6 +49,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.timber)
+    // 7z and RAR uploads (itch.io), through the libarchive build GameNative's mods importer used.
+    implementation(libs.libarchive.android)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

@@ -44,8 +44,9 @@ import kotlinx.coroutines.withContext
  * and the free space of the volume the store installs to, named BEFORE the
  * store's own screen opens, so a 60 GB download on a 12 GB card is a
  * decision and not a 94 percent surprise. A picks a volume (the choice is
- * remembered per store, [StoreInstallVolumePrefs]) and opens the store's
- * screen; B closes with nothing opened.
+ * remembered per store, [StoreInstallVolumePrefs]) and starts the install
+ * there for a store droidtop runs itself (docs/SPEC.md 7g, "Stores"), or
+ * opens the store's screen for Steam; B closes with nothing started.
  *
  * Downloads that are already running (Downloading, Paused) do not stop
  * here: the download is in flight and the store's queue is the place for
@@ -63,13 +64,16 @@ internal data class StoreInstallOffer(val entry: LibraryEntry, val stage: StoreS
 @Composable
 internal fun StoreInstallOfferSheet(
     offer: StoreInstallOffer?,
-    onProceed: (StoreInstallOffer) -> Unit,
+    /** The offer was taken, on the volume at this path (null when no volume could be read). */
+    onProceed: (StoreInstallOffer, String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val offer = offer ?: return
     val context = LocalContext.current
     val entry = offer.entry
     val store = entry.pcInfo?.source.orEmpty()
+    // A store droidtop runs installs from here; Steam still opens its own screen.
+    val own = entry.ownStore() != null
     val volumes by produceState(emptyList<InstallVolume>(), entry.id) {
         value = withContext(Dispatchers.IO) { installVolumes(context) }
     }
@@ -97,9 +101,9 @@ internal fun StoreInstallOfferSheet(
                 if (store.isNotEmpty() && volume.path != rememberedPath) {
                     StoreInstallVolumePrefs.remember(context, store, volume.path)
                 }
-                onProceed(offer)
+                onProceed(offer, volume.path)
             }
-            volumes.isEmpty() && index == 0 -> onProceed(offer)
+            volumes.isEmpty() && index == 0 -> onProceed(offer, null)
             else -> onDismiss()
         }
     }
@@ -124,7 +128,7 @@ internal fun StoreInstallOfferSheet(
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                "A picks a volume and opens the store's screen · B cancels",
+                if (own) "A picks where it installs · B cancels" else "A picks a volume and opens the store's screen · B cancels",
                 color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
@@ -150,7 +154,7 @@ internal fun StoreInstallOfferSheet(
             }
             if (volumes.isEmpty()) {
                 volumeRow(
-                    text = "Open the store's screen",
+                    text = if (own) "Install" else "Open the store's screen",
                     selected = selected == 0,
                     action = { pick(0) },
                 )

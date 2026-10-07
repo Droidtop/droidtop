@@ -63,6 +63,8 @@ import dev.droidtop.library.WineGameSettingsPrefs
 import dev.droidtop.library.displayName
 import dev.droidtop.library.SimilarGames
 import dev.droidtop.library.scraper.PcScraper
+import dev.droidtop.library.stores.StoreChanges
+import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.library.scraper.ProtonDbClient
 import dev.droidtop.library.scraper.ProtonDbSummary
 import dev.droidtop.library.scraper.ScrapeLookup
@@ -136,6 +138,9 @@ internal fun PcGameMenu(
     // The game's own page (the list's A is Play now, so the page's route from
     // the pad is this row); null where the caller has no page to open.
     onOpenPage: (() -> Unit)? = null,
+    // The Downloads place, where a store download droidtop runs is paused,
+    // resumed or cancelled (docs/SPEC.md 7g, "Stores").
+    onOpenDownloads: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -172,6 +177,11 @@ internal fun PcGameMenu(
     // lists it opens. A sub-page's B goes back to the top, never out.
     var page by remember(entry) { mutableStateOf(PcMenuPage.Root) }
     var focusIndex by remember(entry) { mutableStateOf(0) }
+    // Uninstall is a two-step press (the design language's confirm): moving
+    // to another row disarms it.
+    var removeArmed by remember(entry) { mutableStateOf(false) }
+    LaunchedEffect(focusIndex, page) { removeArmed = false }
+    val downloads by StoreDownloads.active.collectAsState()
 
     LaunchedEffect(entry, reloadToken) {
         loaded = false
@@ -507,8 +517,62 @@ internal fun PcGameMenu(
             )
         },
     )
+    // A store droidtop runs itself manages its install from this menu
+    // (docs/SPEC.md 7g, "Stores"): verify where the store keeps a file list,
+    // uninstall, and the way to its download. Steam keeps its own screen.
+    val ownStore = entry.ownStore()
+    val ownStoreRows = ownStore?.let { store ->
+        val key = entry.pcInfo?.storeId ?: entry.id
+        val gameId = key.substringAfter(':')
+        val installed = entry.pcInfo?.installed == true
+        buildList {
+            if (downloads[key] != null) {
+                add(PcActionRow("Downloads", "Where this download is paused, resumed or cancelled", {
+                    onClose()
+                    onOpenDownloads()
+                }))
+            }
+            if (installed && store.canVerify) {
+                add(
+                    PcActionRow("Verify files", "Checks every file against ${store.label}'s list", {
+                        scope.launch {
+                            status = "Checking files…"
+                            status = store.verify(context, gameId).fold({ it }, { "Could not check: ${userFacingErrorMessage(it)}" })
+                        }
+                    }),
+                )
+            }
+            if (installed) {
+                val where = entry.pcInfo?.installPath?.let { friendlyLocation(it) }
+                add(
+                    PcActionRow(
+                        "Uninstall",
+                        if (removeArmed) "Press again: deletes ${where ?: "its files"}" else "Deletes ${where ?: "its files"}. ${store.label} still lists it",
+                        {
+                            if (!removeArmed) {
+                                removeArmed = true
+                            } else {
+                                removeArmed = false
+                                scope.launch {
+                                    status = "Removing…"
+                                    status = store.uninstall(context, gameId).fold(
+                                        onSuccess = {
+                                            StoreChanges.announce(context)
+                                            "Removed"
+                                        },
+                                        onFailure = { "Could not remove it: ${userFacingErrorMessage(it)}" },
+                                    )
+                                }
+                            }
+                        },
+                    ),
+                )
+            }
+        }
+    }
     val actions = rememberPcActions(
         titleRows = titleRows,
+        storeRows = ownStoreRows,
         group = group,
         currentId = entry.id,
         onOpenOther = onOpenOther,
@@ -618,7 +682,6 @@ internal fun PcGameMenu(
     var pageAbout: List<PcMenuEntry> = emptyList()
     val isReady = runner?.option?.state == RunnerState.READY
     val setupAction = runner?.option?.action
-    val downloads by StoreDownloads.active.collectAsState()
     val playState = if (loaded) {
         playStateOf(runner, entry, entry.downloadKey()?.let { downloads[it] }, runners.noRunnerLine)
     } else {
@@ -681,9 +744,14 @@ internal fun PcGameMenu(
                                     StoreStage.INSTALL, StoreStage.UPDATE ->
                                         storeOffer = StoreInstallOffer(entry, checkNotNull(store))
                                     // Downloading, Paused: the download is already
-                                    // in flight; the store's queue is the place for it.
+                                    // in flight; a paused one of a store droidtop runs
+                                    // resumes, a running one is in Downloads, Steam's
+                                    // is in its own queue.
                                     null -> Unit
-                                    else -> status = openStoreScreen(context, entry)
+                                    else -> status = continueStoreDownload(context, entry, store) {
+                                        onClose()
+                                        onOpenDownloads()
+                                    }
                                 }
                                 if (store == null) {
                                     if (isReady) {
@@ -919,9 +987,14 @@ internal fun PcGameMenu(
     // (Droidtop/tracker#227).
     StoreInstallOfferSheet(
         offer = storeOffer,
-        onProceed = { o ->
+        onProceed = { o, volumePath ->
             storeOffer = null
-            status = openStoreScreen(context, o.entry)
+            val own = o.entry.ownStore()
+            if (own == null) {
+                status = openStoreScreen(context, o.entry)
+            } else {
+                scope.launch { status = startOwnStoreInstall(context, o.entry, own, volumePath) }
+            }
         },
         onDismiss = { storeOffer = null },
     )
@@ -1076,6 +1149,8 @@ private data class EngineChoice(val folder: String?, val pinned: Boolean, val en
 @Composable
 private fun rememberPcActions(
     titleRows: List<PcActionRow>,
+    // A store droidtop runs itself: its own install rows instead of a store screen.
+    storeRows: List<PcActionRow>?,
     group: dev.droidtop.library.LibraryGameGroup?,
     currentId: String,
     onOpenOther: (LibraryEntry) -> Unit,
@@ -1113,11 +1188,10 @@ private fun rememberPcActions(
         // disabled, saying droidtop does not manage it.
         play = listOfNotNull(
             onOpenPage?.let { PcActionRow("Game page", "Its artwork, facts and the one Play button", it) },
+        ) + (storeRows ?: listOf(
             // One row, not three: install, verify, update, DLC and
-            // delete are one screen on the store's side, and that
-            // screen is the store's own (gamenative's AppScreen for
-            // this game's source, with its GameManagerDialog /
-            // EpicGameManagerDialog / AmazonInstallDialog).
+            // delete are one screen on Steam's side, and that screen is
+            // the vendored client's own (gamenative's AppScreen).
             PcActionRow(
                 // Install and Update are the primary row above; this is the
                 // place for verify, extras and remove.
@@ -1133,6 +1207,7 @@ private fun rememberPcActions(
                     null
                 },
             ),
+        )) + listOf(
             // The global download queue is not this game's; it is
             // under "PC setup" (UI pass 2026-09-24, M7; renamed from
             // "Stores and folders" when store accounts moved to

@@ -9274,6 +9274,30 @@ follows:
   where; GameNative's play-time and app-type columns are left behind (droidtop
   measures play itself, and nothing read the type). Sign-ins need no import:
   each store keeps its sign-in in the same file it always did.
+- **droidtop's screens, not the store's.** Sign-in is a row of the store's
+  page in the Stores place (two-pane Settings, Accounts and sources): a store
+  that signs in on its own web page opens `StoreSignInActivity`, one screen for
+  every such store, which shows the page full screen under droidtop's bar,
+  reads the code off the page the store returns to (its address, or a JSON
+  field of its body) and hands it to the store; B steps back through the
+  store's pages and closes at the first. A store that signs in with a personal
+  key (itch.io) has a key row (masked) and "Make a key", which opens the
+  store's key page; a key that does not work is never stored, and the account
+  row says why until the next try. Install and Update are the game's primary
+  action (page, menu, capsule): the install offer picks the volume and starts
+  the job; Downloading opens the Downloads place, Resume resumes the job. The
+  game menu's "Manage install" row, which opened GameNative's store screen,
+  is replaced for these stores by the rows the store can do: Downloads while a
+  download runs, Verify files where the store keeps a file list, and Uninstall
+  (a two-step press: the second press confirms, moving to another row
+  disarms; it deletes the files, the store still lists the game).
+- **itch.io** (`ItchStore`): sync is `/profile/owned-keys`; an install picks
+  the upload the game last installed, else the first Windows or Linux build
+  that is not a demo, else the first, and unpacks it (`ArchiveExtractor`, the
+  archive-bomb-guarded zip, 7z and RAR extractor GameNative's mods importer
+  used, now clearing folders through `SafeDelete`). itch.io names no version
+  and keeps no file list: no update check, no verify. A download restarts from
+  the beginning after a pause; it is one file.
 - **What stays with GameNative for now**: Steam (its client is the next step
   of the plan and waits on owner decisions) and the Wine runtime the games
   run in. The `vendor/gamenative` submodule stays until both have moved.
@@ -10629,10 +10653,11 @@ configuration dialogs, compatibility badge and folder-game scanner are
 present in the APK and need entry points, not ports (§7c's "increment 2").
 Those entry points are `:app` Activities, because the Gaming shell
 cannot depend on `:app` and these screens are Compose UI rather than
-catalog data: the store's own app screen for one game (which brings its
-install, verify, update, DLC and delete dialogs with it), the downloads
-queue, an OAuth shim per store (Steam QR/password, GOG/Epic/Amazon OAuth,
-itch.io API key), and the container-configuration dialog.
+catalog data, for a store GameNative still runs: the store's own app screen
+for one game (which brings its install, verify, update, DLC and delete
+dialogs with it), the downloads queue and its sign-in; and the
+container-configuration dialog. A store droidtop runs itself (7g "Stores")
+has no hosted screen at all.
 Which container a game's prefix row opens is droidtop's own question and
 has one answer shared with the launch path — the game's own prefix when a
 store app id keyed one, droidtop's single provisioned container otherwise
@@ -11554,14 +11579,16 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   and sources** and **PC setup** now link to Stores instead of carrying
   their own sign-in rows (the "Steam account and library" row on the Windows
   games screen, which started the Steam sign-in a second way, is gone too:
-  Stores > Steam is the one entry, 2026-10-03). Credentials are never entered by droidtop: Sign
-  in starts the store's own screen. **Open library** sets the PC Games
+  Stores > Steam is the one entry, 2026-10-03). Passwords are never entered in droidtop: a
+  store droidtop runs shows its own sign-in page or takes the key the person made on its site
+  (7g "Stores"); Steam's sign-in is still its own screen. **Open library** sets the PC Games
   tab's Store filter to that store and opens the tab (`PcGamesState.showStore`),
   so a store is a filter on the one library and not a second place to
-  browse. **Sync library** is `triggerLibrarySync` for GOG, Epic and
-  Amazon (their service pass, bypassing its throttle) and `syncLibrary` for
-  itch.io (Droidtop/tracker#225); Steam has no row because its library
-  follows its live session. The "last synced" time is droidtop's own note
+  browse. **Sync library** reads a store droidtop runs in place and says how
+  many games it holds (`StoreLibrary.sync`), and is `triggerLibrarySync` for
+  a store GameNative still runs (its service pass, bypassing its throttle;
+  Droidtop/tracker#225); Steam has no row because its library follows its
+  live session. The "last synced" time is droidtop's own note
   of when it asked: the services keep their times in memory only, so it is
   absent until the first sync from here. The store names are written once
   (`PcStoreNames`), for the code that makes them and the code that filters
@@ -11570,8 +11597,9 @@ function (`menuSectionsFor`, built on `sectionsFor`).
 - **Downloads and installs** (`plugin_jobs`, `PluginJobsScreen`): the one
   jobs list (plugin work, library scrapes, store depots, DownloadManager
   downloads, plugin updates) with progress, Pause, Resume and Cancel where
-  the job supports them (12a "Jobs"), and under it a row to the store
-  installs queue (gamenative's own downloads screen, `PcStoreActivity`).
+  the job supports them (12a "Jobs"); a store droidtop runs installs as a
+  job here (7g "Stores"), and under the jobs a row leads to Steam's installs
+  queue (gamenative's own downloads screen, `PcStoreActivity`).
   The name stays the one the rest of the app already uses. Theme downloads
   and update installs are not yet jobs in that list, and gamenative's queue
   is a separate surface; folding them in is open.

@@ -17,6 +17,10 @@ import dev.droidtop.library.RunnerAction
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.WindowsSetup
+import dev.droidtop.library.GameNaming
+import dev.droidtop.library.stores.StoreInstallJob
+import dev.droidtop.library.stores.StoreLibraries
+import dev.droidtop.library.stores.StoreLibrary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -75,30 +79,43 @@ internal fun LibraryEntry.isStoreRow(): Boolean =
 /** The store id an entry's live download is filed under, or null for a game no store owns. */
 internal fun LibraryEntry.downloadKey(): String? = pcInfo?.storeId
 
-/** The primary state of a store game, from its [stage]; no runner is needed to answer it. */
-internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: StoreDownloads.Progress?): PcPlayState = when (stage) {
-    StoreStage.INSTALL -> PcPlayState(
-        "Install",
-        (entry.pcInfo?.sizeBytes ?: 0L).takeIf { it > 0 }?.let { "Downloads ${downloadSizeLabel(it)}. Opens the store's install screen" }
-            ?: "Opens the store's install screen",
-        pressable = true, ready = false, store = stage,
-    )
-    StoreStage.UPDATE -> PcPlayState(
-        "Update",
-        GameUpdates.line(GameUpdates.forStore(entry.pcInfo) ?: entry.availableUpdate ?: GameUpdates.NEWER_BUILD) +
-            ". Opens the store's update screen",
-        pressable = true, ready = false, store = stage,
-    )
-    StoreStage.DOWNLOADING -> PcPlayState(
-        "Downloading",
-        "${download?.percent ?: 0}%. Opens the download",
-        pressable = true, ready = false, store = stage, progress = download?.fraction,
-    )
-    StoreStage.PAUSED -> PcPlayState(
-        "Resume",
-        "Stopped at ${download?.percent ?: 0}%",
-        pressable = true, ready = false, store = stage, progress = download?.fraction,
-    )
+/**
+ * The primary state of a store game, from its [stage]; no runner is needed to
+ * answer it. A store droidtop runs itself ([ownStore]) installs from here and
+ * shows its download in the Downloads place; Steam still opens its own screen.
+ */
+internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: StoreDownloads.Progress?): PcPlayState {
+    val own = entry.ownStore() != null
+    return when (stage) {
+        StoreStage.INSTALL -> {
+            val size = (entry.pcInfo?.sizeBytes ?: 0L).takeIf { it > 0 }?.let { "Downloads ${downloadSizeLabel(it)}" }
+            PcPlayState(
+                "Install",
+                when {
+                    own -> size ?: "Downloads it from ${entry.pcInfo?.source.orEmpty().ifBlank { "the store" }}"
+                    size != null -> "$size. Opens the store's install screen"
+                    else -> "Opens the store's install screen"
+                },
+                pressable = true, ready = false, store = stage,
+            )
+        }
+        StoreStage.UPDATE -> PcPlayState(
+            "Update",
+            GameUpdates.line(GameUpdates.forStore(entry.pcInfo) ?: entry.availableUpdate ?: GameUpdates.NEWER_BUILD) +
+                if (own) "" else ". Opens the store's update screen",
+            pressable = true, ready = false, store = stage,
+        )
+        StoreStage.DOWNLOADING -> PcPlayState(
+            "Downloading",
+            "${download?.percent ?: 0}%. Opens ${if (own) "Downloads" else "the download"}",
+            pressable = true, ready = false, store = stage, progress = download?.fraction,
+        )
+        StoreStage.PAUSED -> PcPlayState(
+            "Resume",
+            "Stopped at ${download?.percent ?: 0}%",
+            pressable = true, ready = false, store = stage, progress = download?.fraction,
+        )
+    }
 }
 
 /** A download size as a person reads it: whole megabytes below a gigabyte, one decimal above. Pure. */
@@ -190,11 +207,47 @@ internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, Resolve
     return state to runner
 }
 
+/** The store droidtop runs itself for this game (docs/SPEC.md 7g, "Stores"); null for Steam and for a folder. */
+internal fun LibraryEntry.ownStore(): StoreLibrary? = StoreLibraries.forKey(pcInfo?.storeId ?: id)
+
+/**
+ * Starts installing or updating [entry] from the store droidtop runs for
+ * it, as a job in the Downloads place ([StoreInstallJob]), into the store's
+ * folder on [volumePath] (the install offer's choice; null for the primary
+ * volume). The one starter, whichever surface asked. Returns the line to
+ * show.
+ */
+internal suspend fun startOwnStoreInstall(context: Context, entry: LibraryEntry, store: StoreLibrary, volumePath: String?): String {
+    val key = entry.pcInfo?.storeId ?: entry.id
+    val volume = volumePath ?: withContext(Dispatchers.IO) { context.getExternalFilesDir(null)?.path ?: context.filesDir.path }
+    return if (StoreInstallJob.start(context, key, GameNaming.displayName(entry.title), StoreInstallJob.rootFor(volume, store)) != null) {
+        "Downloading. It is listed under Downloads"
+    } else {
+        "${store.label} cannot install this game in this build"
+    }
+}
+
+/**
+ * What a press on a store game's primary action does when the game is
+ * already downloading or paused: a paused download of a store droidtop runs
+ * resumes, a running one opens the Downloads place ([onOpenDownloads]);
+ * Steam opens its own screen ([openStoreScreen]). Returns the line to show,
+ * or null.
+ */
+internal fun continueStoreDownload(context: Context, entry: LibraryEntry, stage: StoreStage, onOpenDownloads: () -> Unit): String? {
+    if (entry.ownStore() == null) return openStoreScreen(context, entry)
+    val key = entry.pcInfo?.storeId ?: entry.id
+    if (stage == StoreStage.PAUSED && StoreInstallJob.resume(key)) return null
+    onOpenDownloads()
+    return null
+}
+
 /**
  * Opens the game's own store screen (install, update, download, verify,
- * remove), the one place those happen; returns null, or what went wrong in
- * words a person can read. Started by class name because this module cannot
- * depend on :app, the same route every cross-module screen here takes.
+ * remove) for a store GameNative still runs (Steam); returns null, or what
+ * went wrong in words a person can read. Started by class name because this
+ * module cannot depend on :app, the same route every cross-module screen
+ * here takes.
  */
 internal fun openStoreScreen(context: Context, entry: LibraryEntry): String? = runCatching {
     context.startActivity(

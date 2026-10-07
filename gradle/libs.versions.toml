@@ -104,6 +104,9 @@ lifecycleRuntimeKtx = "2.8.4"
 composeBom = "2024.09.00"
 media3 = "1.4.1"
 okhttp = "4.12.0"
+# https://github.com/zhanghai/AndroidLibArchive (Apache-2.0, over libarchive, BSD-2-Clause): 7z and RAR for itch.io uploads (:stores).
+# The version vendor/gamenative pins, so the APK keeps one copy of libarchive.
+libarchive-android = "1.1.6"
 bouncycastle = "1.78.1"
 # Real ES-DE theme downloader parity -- ThemeDownloader.kt (library-core)
 # git-clones the same real per-theme repos real ES-DE itself clones
@@ -224,6 +227,7 @@ androidx-room-runtime = { group = "androidx.room", name = "room-runtime", versio
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+libarchive-android = { module = "me.zhanghai.android.libarchive:library", version.ref = "libarchive-android" }
 bouncycastle-bcpkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncycastle" }
 
 vectordrawable-animated = { module = "androidx.vectordrawable:vectordrawable-animated", version.ref = "vectordrawable-animated" }
