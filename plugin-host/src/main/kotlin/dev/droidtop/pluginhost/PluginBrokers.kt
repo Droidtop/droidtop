@@ -149,6 +149,13 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         true
     }.getOrDefault(false)
 
+    override fun toast(pluginLabel: String, text: String): Boolean {
+        // Posted, never run on the binder thread; the plugin's name leads so it is never mistaken for droidtop's own words.
+        return android.os.Handler(android.os.Looper.getMainLooper()).post {
+            android.widget.Toast.makeText(appContext, "$pluginLabel: $text", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun chainServedBy(pluginId: String): List<String> = PluginBrokers.chainServedBy(pluginId)
 
     override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply {

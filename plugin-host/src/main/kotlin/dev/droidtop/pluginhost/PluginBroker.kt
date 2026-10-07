@@ -52,6 +52,9 @@ interface BrokerEnvironment {
     fun launchApp(packageName: String): Boolean
     fun launchAppWithExtras(packageName: String, extras: Map<String, String>, action: String?): Boolean
 
+    /** Shows [text] as a short message attributed to [pluginLabel], on whatever surface is in front; false when it could not. */
+    fun toast(pluginLabel: String, text: String): Boolean
+
     /** The chain of plugins the call [pluginId] is currently serving came through (empty when it serves none). */
     fun chainServedBy(pluginId: String): List<String>
 
@@ -191,7 +194,18 @@ object HostApis {
             val action = args.optString("action").takeIf { it.isNotBlank() }
             JSONObject().put("launched", env.launchAppWithExtras(pkg, extras, action))
         },
+        // docs/plugin-api.md 3 C6a: the Decky toaster's job, drawn by droidtop and always named after the plugin.
+        HostOp(
+            "ui.toast", "show",
+            permission = "overlay.toast",
+        ) { env, record, args ->
+            val text = args.optString("text").trim().takeIf { it.isNotEmpty() } ?: invalid("text is required")
+            JSONObject().put("shown", env.toast(record.manifest.label, text.take(MAX_TOAST)))
+        },
     )
+
+    /** The longest toast text droidtop shows; longer text is cut, never refused. */
+    const val MAX_TOAST = 200
 
     fun all(): List<HostOp> = ops
 

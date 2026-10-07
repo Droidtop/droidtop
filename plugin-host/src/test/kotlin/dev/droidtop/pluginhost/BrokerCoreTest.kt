@@ -361,4 +361,22 @@ class BrokerCoreTest {
         assertTrue("a denied item is never asked about again", env.prompts.isEmpty())
         assertTrue(env.launched.isEmpty())
     }
+
+    @Test
+    fun `a toast needs overlay toast, carries the plugin's name and is cut to length`() {
+        val quiet = TestPlugins.record(TestPlugins.manifest(id = "acme.quiet", label = "Quiet"))
+        val env = FakeEnv(quiet)
+        assertEquals(PluginErrorCode.PERMISSION_DENIED, reply(BrokerCore("acme.quiet", env).call(request("ui.toast", "show", obj("text" to "hi")))).code)
+        assertTrue(env.toasts.isEmpty())
+
+        val loud = TestPlugins.record(
+            TestPlugins.manifest(id = "acme.loud", label = "Loud") { it.put("permissions", arr(obj("id" to "overlay.toast"))) },
+        )
+        val env2 = FakeEnv(loud)
+        val core = BrokerCore("acme.loud", env2)
+        assertTrue(reply(core.call(request("ui.toast", "show", obj("text" to "x".repeat(500))))).data.getBoolean("shown"))
+        assertEquals("Loud", env2.toasts.single().first)
+        assertEquals(HostApis.MAX_TOAST, env2.toasts.single().second.length)
+        assertEquals(PluginErrorCode.INVALID_ARGS, reply(core.call(request("ui.toast", "show", obj("text" to "   ")))).code)
+    }
 }

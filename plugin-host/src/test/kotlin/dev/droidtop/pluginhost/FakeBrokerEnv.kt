@@ -52,6 +52,11 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
         launched += Triple(packageName, extras, action)
         return packageName in installed
     }
+    val toasts = mutableListOf<Pair<String, String>>()
+    override fun toast(pluginLabel: String, text: String): Boolean {
+        toasts += pluginLabel to text
+        return true
+    }
     override fun chainServedBy(pluginId: String) = chain
     override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply {
         forwards += provider.manifest.id to call

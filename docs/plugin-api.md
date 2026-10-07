@@ -1260,6 +1260,16 @@ Risk low.
   - Every notification is attributed to the plugin.
   - There is no full-screen intent and no heads-up by default.
 
+**C6a Toasts.** API `ui.toast@1`. Risk low.
+- **For:** a short message in the moment, Decky's `toaster.toast`: "Synced",
+  "Tunnel up".
+- **Ops:** `show {text}` returns `{shown}`. Text is cut to 200 characters.
+- **Surfaces:** a toast over whatever is in front, in every mode, always
+  led by the plugin's name, so it is never mistaken for droidtop's own.
+- **Permission:** `overlay.toast` (normal), rate-limited like every
+  broker call (§8).
+- **Status:** built (2026-10-07).
+
 **C7 Themes and theme assets.** EP `theme.pack@1`. Risk medium.
 - **For:** ES-DE themes, icon packs, sound packs, wallpapers,
   controller-glyph sets and fonts.
