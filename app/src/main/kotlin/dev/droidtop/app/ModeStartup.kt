@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import dev.droidtop.library.settings.ModeGate
 import dev.droidtop.library.settings.ModePiece
 import dev.droidtop.library.settings.Modes
+import kotlinx.coroutines.launch
 
 /**
  * The one place that turns "which modes are enabled" into "what actually
@@ -118,6 +119,32 @@ object ModeStartup {
      */
     fun ensureGamenative(context: Context) {
         dev.droidtop.runtime.windows.WindowsBackbone.ensureStarted(context)
+        carryOverSteam(context)
+    }
+
+    private val steamCarryOverStarted = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * Once, after the backbone is up: the Steam sign-in and the Steam
+     * installs GameNative kept come across to droidtop's own Steam
+     * (docs/SPEC.md 7g, "Stores"). GameNative's preferences are only
+     * readable through the backbone, which is why this waits on it and
+     * never starts it for this alone. Off the main thread.
+     */
+    private fun carryOverSteam(context: Context) {
+        val app = context.applicationContext
+        if (!steamCarryOverStarted.compareAndSet(false, true)) return
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {
+            runCatching {
+                if (dev.droidtop.stores.steam.SteamCarryOver.done(app)) return@runCatching
+                dev.droidtop.runtime.windows.WindowsBackbone.awaitReady(app)
+                val old = dev.droidtop.runtime.windows.GameNativeSteamSignIn
+                val session = old.session()?.let {
+                    dev.droidtop.stores.steam.SteamCarryOver.Session(it.accountName, it.refreshToken, it.steamId64, it.clientId, it.cellId)
+                }
+                dev.droidtop.stores.steam.SteamCarryOver.bringAcross(app, session, old.installRoots(app))
+            }.onFailure { android.util.Log.w("droidtop.ModeStartup", "Bringing GameNative's Steam across failed", it) }
+        }
     }
 
     /**

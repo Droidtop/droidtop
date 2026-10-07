@@ -9413,6 +9413,14 @@ follows:
   family sharing, private branches and GameNative's Linux-depot switch; cloud
   saves resolve save folders inside GameNative's Wine containers and move with
   the Wine runtime.
+- **Steam carried over** (`SteamCarryOver`): the rows come with `steam.db`;
+  the sign-in GameNative kept in its preferences (the refresh token encrypted
+  with its Android Keystore key, readable only through its `PrefManager`) and
+  the folders it installed Steam games under are read once, after the Windows
+  backbone is up (`GameNativeSteamSignIn` in `:runtime-windows`, called from
+  `ModeStartup`), and each install GameNative listed is found by its folder
+  name under those folders (a finished one first) and recorded where it is.
+  Nothing is moved; new installs go to the person's game folders.
 - **What stays with GameNative for now**: the Wine runtime the games run in.
   It needs nothing of Steam from droidtop: droidtop's Wine launch has never run
   GameNative's Steam client component or Steamworks emulation, so a Steam game
