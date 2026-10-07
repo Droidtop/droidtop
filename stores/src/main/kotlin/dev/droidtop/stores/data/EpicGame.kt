@@ -53,6 +53,18 @@ data class EpicGame(
     @ColumnInfo("executable")
     val executable: String = "",
 
+    /**
+     * The program the installed build's manifest names to start
+     * (`LaunchExeString`, relative to [installPath]) and its command line
+     * (`LaunchCommand`), recorded at install; empty for an install made
+     * before droidtop recorded them.
+     */
+    @ColumnInfo(name = "launch_exe", defaultValue = "")
+    val launchExe: String = "",
+
+    @ColumnInfo(name = "launch_command", defaultValue = "")
+    val launchCommand: String = "",
+
     @ColumnInfo("install_size")
     val installSize: Long = 0,
 

@@ -30,18 +30,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Install, download, verify and store management for ONE PC game, and the
- * downloads queue for all of them -- build-plan step 5 of the PC surface
+ * Install, download, verify and store management for ONE Steam game, and
+ * Steam's downloads queue -- build-plan step 5 of the PC surface
  * (docs/SPEC.md 7i).
  *
- * Nothing here is droidtop's own UI, on purpose. `:runtime-windows`
- * compiles the whole vendored gamenative tree (7c's "increment 2"), so the
- * complete install lifecycle for all four stores is already in the APK:
- * `AppScreen` picks the right store's screen for a game and brings its
- * `GameManagerDialog` / `EpicGameManagerDialog` / `AmazonInstallDialog`,
- * depot and DLC selection, verify, update, pause and delete with it, and
- * `HomeDownloadsScreen` is the queue. droidtop supplies the entry point
- * and the palette, not a second implementation of any of it.
+ * Nothing here is droidtop's own UI, on purpose: Steam's client is still
+ * the vendored gamenative one, so its `AppScreen` (with its install, depot,
+ * DLC, verify, update and delete dialogs) and `HomeDownloadsScreen` are
+ * hosted here until Steam moves too. The other stores are droidtop's own
+ * (docs/SPEC.md 7g "Stores") and never open this screen: their installs are
+ * jobs in the Downloads place and their manage rows are in the game menu.
  *
  * **Playing is not this screen's job.** The hosted screens have play
  * buttons of their own, and droidtop resolves a runner for a game on the
@@ -77,7 +75,7 @@ class PcStoreActivity : AppCompatActivity() {
     }
 
     companion object {
-        /** droidtop's own PC entry id ("steam:440"); absent means the downloads queue. */
+        /** droidtop's own PC entry id ("steam:440"); absent means Steam's downloads queue. */
         const val EXTRA_ENTRY_ID = "dev.droidtop.app.extra.PC_ENTRY_ID"
 
         private const val CLASS_NAME = "dev.droidtop.app.PcStoreActivity"

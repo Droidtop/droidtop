@@ -38,6 +38,15 @@ internal object StoreFiles {
         return current
     }
 
+    private val ID_UNSAFE = Regex("[^a-zA-Z0-9_-]")
+
+    /**
+     * An identifier (an app name, a namespace, a catalog id) as one file name
+     * part: anything but ASCII letters, digits, '_' and '-' becomes '_'
+     * (GameNative's sanitizeForFilename, so files it named are found again).
+     */
+    fun idPart(id: String): String = ID_UNSAFE.replace(id, "_")
+
     /** One number over [files]' modification times: a store's change stamp. One stat per file. */
     fun stamp(files: List<File>): Long {
         var stamp = 17L

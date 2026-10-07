@@ -1,7 +1,6 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.data.EpicGame
 import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
 import app.gamenative.data.SteamApp
@@ -42,21 +41,16 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
- * droidtop's OWN source-agnostic view of every PC game the vendored
- * gamenative-tux backend knows about — Steam, GOG, Epic, Amazon, and
- * loose folders — behind one shape.
+ * droidtop's OWN source-agnostic view of every PC game it knows about —
+ * Steam (the vendored gamenative service), the stores droidtop runs itself
+ * (GOG, Epic, Amazon Games and itch.io, through
+ * [dev.droidtop.library.stores.StoreLibraries], docs/SPEC.md 7g "Stores"),
+ * and loose folders — behind one shape.
  *
  * The point of this class, and the audit finding that produced it
  * (docs/SPEC.md §7g): droidtop compiled 830 gamenative source files and
- * referenced eight symbols, all of them Steam. Complete GOG, Epic and
- * Amazon services and a loose-Windows-game folder scanner were built,
- * tested, and unreachable, purely because [SteamAccess] wrapped one
- * service and `PcGameProvider` read Wine container shortcuts. Nothing
- * here is new capability; it is the wiring that was missing.
- *
- * Per standing direction this consumes gamenative's SERVICES and data
- * layer only — never its UI. `LibraryViewModel`, `LibraryAppItem` and
- * friends stay entirely out of droidtop's way; droidtop renders its own.
+ * referenced eight symbols, all of them Steam. Nothing here draws a
+ * screen; droidtop renders its own.
  *
  * A user should not have to care which store a game came from. Source is
  * a fact about a game, worth showing and worth filtering on, but it is
@@ -116,7 +110,6 @@ object PcLibrary {
     @InstallIn(SingletonComponent::class)
     interface StoreDaoEntryPoint {
         fun steamAppDao(): app.gamenative.db.dao.SteamAppDao
-        fun epicGameDao(): app.gamenative.db.dao.EpicGameDao
     }
 
     private fun daos(context: Context): StoreDaoEntryPoint =
@@ -170,7 +163,6 @@ object PcLibrary {
         StoreDownloadWatch.start(context)
         return buildList {
             addAll(runCatching { dao.steamAppDao().getAllOwnedAppsAsList().map { it.toGame() } }.getOrDefault(emptyList()))
-            addAll(runCatching { dao.epicGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             // The stores droidtop runs itself (docs/SPEC.md 7g, "Stores"),
             // each read on its own for the same reason as the DAOs above.
             for (store in StoreLibraries.all()) {
@@ -408,21 +400,6 @@ object PcLibrary {
         compatibility = compatibilityFor(name),
     )
 
-    private fun EpicGame.toGame(): Game = Game(
-        // Epic's own primary key is catalogId; the integer id is a local
-        // tracking number, so the stable identity is the catalog one.
-        id = "epic:$catalogId",
-        source = Source.EPIC,
-        nativeId = catalogId,
-        title = title,
-        installed = isInstalled,
-        installPath = installPath,
-        sizeBytes = installSize,
-        artUrl = iconUrl.takeIf { it.isNotEmpty() },
-        compatibility = compatibilityFor(title),
-        installedVersion = version.takeIf { isInstalled && it.isNotBlank() },
-    )
-
     /**
      * A row of a store droidtop runs itself. Null for a store this enum
      * does not name yet: a store is a [Source] before its rows can be
@@ -646,18 +623,11 @@ object PcLibrary {
 
     /**
      * The gamenative [LibraryItem] behind one droidtop PC entry id, which
-     * is what its own store screens (install, verify, DLC, downloads) are
-     * written against — droidtop hosts those screens rather than
-     * reimplementing the install lifecycle (docs/SPEC.md 7i, build-plan
-     * step 5).
-     *
-     * Built from each store's own row, not by reversing [Game.id]: a
-     * store's numeric id for its screens is not always the id droidtop
-     * keys an entry by (Epic's stable identity is its catalog id, while
-     * its screens look a game up by the integer row id), so going back to
-     * the row is the only mapping that cannot silently point at the wrong
-     * game. The item's shape mirrors gamenative's own LibraryViewModel
-     * for each source so the screens get exactly what they expect.
+     * is what Steam's own store screen (install, verify, DLC, downloads) is
+     * written against — droidtop hosts that screen for Steam (docs/SPEC.md
+     * 7i). The stores droidtop runs itself have no such screen: their
+     * entries resolve to nothing here. Built from Steam's own row, so the
+     * item's shape is what gamenative's LibraryViewModel gives the screen.
      */
     suspend fun libraryItemFor(context: Context, entryId: String): LibraryItem? {
         DroidtopGameIdStore.install(context)
@@ -667,7 +637,6 @@ object PcLibrary {
             when (entryId.substringBefore(':')) {
                 "steam" -> dao.steamAppDao().getAllOwnedAppsAsList()
                     .firstOrNull { it.id.toString() == nativeId }?.toLibraryItem()
-                "epic" -> dao.epicGameDao().getAllAsList().firstOrNull { it.catalogId == nativeId }?.toLibraryItem()
                 // A folder game IS a LibraryItem already -- the scanner
                 // produced the id this entry carries.
                 "folder" -> CustomGameScanner.scanAsLibraryItems().firstOrNull { it.appId == nativeId }
@@ -685,20 +654,6 @@ object PcLibrary {
         heroImageUrl = runCatching { getHeroUrl() }.getOrDefault(""),
         gameSource = GameSource.STEAM,
         isInstalled = runCatching { SteamService.isAppInstalled(id) }.getOrDefault(false),
-    )
-
-    private fun EpicGame.toLibraryItem(): LibraryItem = LibraryItem(
-        // The integer row id, not the catalog id: Epic's own screens
-        // resolve a game through LibraryItem.gameId, which parses this.
-        appId = "${GameSource.EPIC.name}_$id",
-        name = title,
-        iconHash = artSquare.ifEmpty { artCover },
-        capsuleImageUrl = artCover.ifEmpty { artSquare },
-        headerImageUrl = artPortrait.ifEmpty { artSquare.ifEmpty { artCover } },
-        heroImageUrl = artPortrait.ifEmpty { artSquare.ifEmpty { artCover } },
-        gameSource = GameSource.EPIC,
-        sizeBytes = installSize,
-        isInstalled = isInstalled,
     )
 
     /**

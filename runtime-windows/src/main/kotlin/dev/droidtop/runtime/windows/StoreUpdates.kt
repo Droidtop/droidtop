@@ -149,13 +149,13 @@ internal object StoreUpdates {
 }
 
 /**
- * Publishes the downloads the vendored store services are running to
- * [StoreDownloads] (docs/SPEC.md 7i), so a capsule and the primary button
- * can say Downloading. It reads the services' own in-memory download maps
- * (no disk, no network), slowly while nothing runs and once a second while
+ * Publishes the downloads the vendored Steam service is running to its share
+ * of [StoreDownloads] (docs/SPEC.md 7i), so a capsule and the primary button
+ * can say Downloading. It reads the service's own in-memory download map (no
+ * disk, no network), slowly while nothing runs and once a second while
  * something does, and asks [StoreUpdates] again about a game whose download
- * just ended. Epic is not mapped: its download map is keyed by a row number
- * the library does not carry.
+ * just ended. The stores droidtop runs itself publish their own share from
+ * their install jobs (docs/SPEC.md 7g, "Stores").
  */
 internal object StoreDownloadWatch {
     private const val IDLE_MS = 3_000L

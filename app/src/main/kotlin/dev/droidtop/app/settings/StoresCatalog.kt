@@ -6,7 +6,6 @@ import android.net.Uri
 import android.util.Log
 import dev.droidtop.app.LauncherGamesActivity
 import dev.droidtop.app.PcStoreActivity
-import dev.droidtop.app.PcStoreSignInActivity
 import dev.droidtop.app.SteamLoginActivity
 import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.integrations.PluginJobsScreen
@@ -73,8 +72,7 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
     fun signedIn(context: Context): Boolean = runCatching {
         own?.signedIn(context) ?: when (this) {
             STEAM -> app.gamenative.utils.SteamUtils.hasStoredCredentials()
-            EPIC -> app.gamenative.service.epic.EpicService.hasStoredCredentials(context)
-            GOG, AMAZON, ITCH -> false
+            GOG, EPIC, AMAZON, ITCH -> false
         }
     }.getOrDefault(false)
 
@@ -93,8 +91,7 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
         }
         return when (this) {
             STEAM -> Intent(context, SteamLoginActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            EPIC -> PcStoreSignInActivity.intent(context, PcStoreSignInActivity.Store.EPIC)
-            GOG, AMAZON, ITCH -> null
+            GOG, EPIC, AMAZON, ITCH -> null
         }
     }
 
@@ -107,8 +104,7 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
             when (this) {
                 // The same call Steam's own screen makes; a session that is not live has only stored preferences to clear.
                 STEAM -> if (SteamAccess.isLoggedIn()) SteamAccess.logOut() else app.gamenative.PrefManager.clearSteamSessionPreferences()
-                EPIC -> app.gamenative.service.epic.EpicService.logout(context).getOrThrow()
-                GOG, AMAZON, ITCH -> Unit
+                GOG, EPIC, AMAZON, ITCH -> Unit
             }
         }
     }
@@ -136,8 +132,7 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
                 )
             } else {
                 when (this@PcStore) {
-                    EPIC -> app.gamenative.service.epic.EpicService.triggerLibrarySync(context)
-                    STEAM, GOG, AMAZON, ITCH -> Unit
+                    STEAM, GOG, EPIC, AMAZON, ITCH -> Unit
                 }
                 "Sync requested. New games appear in a moment"
             }

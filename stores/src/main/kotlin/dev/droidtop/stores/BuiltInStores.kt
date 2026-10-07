@@ -2,6 +2,7 @@ package dev.droidtop.stores
 
 import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.stores.amazon.AmazonStore
+import dev.droidtop.stores.epic.EpicStore
 import dev.droidtop.stores.gog.GOGStore
 import dev.droidtop.stores.itch.ItchStore
 
@@ -13,6 +14,7 @@ import dev.droidtop.stores.itch.ItchStore
 object BuiltInStores {
     fun register() {
         StoreLibraries.register(GOGStore())
+        StoreLibraries.register(EpicStore())
         StoreLibraries.register(AmazonStore())
         StoreLibraries.register(ItchStore())
     }

@@ -9330,6 +9330,26 @@ follows:
   data (`_gog_manifest.json`) for the launch path to run them. GOG keeps no
   version check droidtop asks and no file list it checks: no update check,
   no verify.
+- **Epic Games Store** (`EpicStore`, id = Epic's catalog id): sign-in is
+  Epic's page with a fresh state value; Epic returns to its
+  `id/api/redirect` page, whose JSON body carries the code
+  (`authorizationCode`), read off the page. Install downloads the live
+  Windows build with every owned DLC, in the device's language, with
+  redistributables in `_CommonRedist`; a resumed download hashes the files
+  already there and fetches only what is missing or wrong. droidtop records
+  the installed build and the program and command line its manifest names
+  (GameNative recorded neither and guessed the program from the folder).
+  The update check compares that build with the one Epic serves now
+  (Legendary's check: the assets entry's `buildVersion`, no manifest
+  download); verify checks every file of the live manifest by size and
+  SHA-1. A game starts with the manifest's program and command line and
+  Epic's launch arguments (an exchange code, the account, the locale, the
+  sandbox, the EOS deployment id, the extra arguments Epic's metadata names,
+  and for a game that needs one an ownership token, written under the app's
+  files and passed as a `Z:` path, the drive a Wine prefix maps to the
+  filesystem root); signed out or offline, it starts without them. Not
+  carried: GameNative's Epic overlay install into a prefix and its Epic and
+  GOG cloud saves, which belong to the Wine path.
 - **What stays with GameNative for now**: Steam (its client is the next step
   of the plan and waits on owner decisions) and the Wine runtime the games
   run in. The `vendor/gamenative` submodule stays until both have moved.
@@ -9339,9 +9359,10 @@ follows:
 Read from the vendored gamenative tree (2026-09-24), because "What is best
 for users" above promises more than the store services hold:
 
-- **Sources** are wired: `PcLibrary` reads the Steam, GOG, Epic and Amazon
-  DAOs and `CustomGameScanner` into one `PcLibrary.Game` shape, and
-  `PcGameProvider` publishes them as ordinary entries.
+- **Sources** are wired: `PcLibrary` reads the Steam DAO, every store
+  droidtop runs itself (`StoreLibraries`, "Stores" above) and
+  `CustomGameScanner` into one `PcLibrary.Game` shape, and `PcGameProvider`
+  publishes them as ordinary entries.
 - **Compatibility** is wired from `GameCompatibilityCache`, cached only: a
   scan never makes a network call or needs a signed-in account, so a game
   carries no rating until something else has filled the cache.
@@ -9356,7 +9377,9 @@ for users" above promises more than the store services hold:
   on droidtop measuring a session itself, one mechanism per launch path.
   The PC surface therefore offers no playtime sort (7i): a sort on a number
   that is 0 for every game is a control that does nothing.
-- **Cloud saves** are not reached from droidtop. **`gamefixes/`** is left
+- **Cloud saves** are not reached from droidtop (GameNative's Steam, GOG
+  and Epic save sync all resolve save folders inside its own Wine
+  containers; they move with the Wine path, not with the stores). **`gamefixes/`** is left
   out of droidtop's prefix preparation on purpose (`WinePrefixPreparation`
   lists it with the other store-specific steps it does not run).
 
