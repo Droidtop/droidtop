@@ -20,6 +20,7 @@ import dev.droidtop.library.lutris.DllOverrides
 import dev.droidtop.library.lutris.WinePrefixChanges
 import dev.droidtop.runtime.NativeLinuxGameSession
 import dev.droidtop.runtime.PrimaryContainerSession
+import dev.droidtop.runtime.SafeDelete
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
