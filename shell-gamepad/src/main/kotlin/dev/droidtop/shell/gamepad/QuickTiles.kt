@@ -102,10 +102,10 @@ object QuickTiles {
         GamingSettingsCatalog.ID_DISPLAY_REINIT,
     )
 
-    /** The sections the rail shows now: Game only while a game runs, Plugins only when a plugin offers tiles. */
-    fun visibleSections(gameRunning: Boolean, hasPluginTiles: Boolean): List<QuickSection> =
+    /** The sections the rail shows now: Game only while a game runs, Plugins only when a plugin has a panel or tiles here. */
+    fun visibleSections(gameRunning: Boolean, hasPlugins: Boolean): List<QuickSection> =
         QuickSection.entries.filter {
-            (it != QuickSection.GAME || gameRunning) && (it != QuickSection.PLUGINS || hasPluginTiles)
+            (it != QuickSection.GAME || gameRunning) && (it != QuickSection.PLUGINS || hasPlugins)
         }
 
     /**

@@ -134,4 +134,58 @@ class ExtensionProtocolsTest {
         assertEquals("action", PluginTileProtocol.pressOp(null))
         assertEquals(false, PluginTileProtocol.state(obj("on" to "off"), "x").on)
     }
+
+    @Test
+    fun `a shelf keeps only real entries, once each, in the plugin's order`() {
+        val known = setOf("a", "b", "c")
+        val shelves = PluginShelfProtocol.shelves(
+            obj("shelves" to arr(obj("id" to "short", "title" to "  Short games  ", "entries" to strings("c", "x", "a", "c")))),
+            known,
+        )
+        assertEquals(listOf(PluginShelf("short", "Short games", listOf("c", "a"))), shelves)
+    }
+
+    @Test
+    fun `shelves are capped and empty or untitled ones are dropped`() {
+        val known = (1..100).map { "e$it" }.toSet()
+        val many = strings(*(1..100).map { "e$it" }.toTypedArray())
+        val data = obj(
+            "shelves" to arr(
+                obj("id" to "none", "title" to "Nothing real", "entries" to strings("zzz")),
+                obj("id" to "untitled", "entries" to many),
+                obj("id" to "one", "title" to "One", "entries" to many),
+                obj("id" to "one", "title" to "Same id again", "entries" to many),
+                obj("id" to "two", "title" to "T".repeat(200), "entries" to many),
+                obj("id" to "three", "title" to "Three", "entries" to many),
+            ),
+        )
+        val shelves = PluginShelfProtocol.shelves(data, known)
+        assertEquals(listOf("one", "two"), shelves.map { it.id })
+        assertEquals(PluginShelfProtocol.MAX_ITEMS, shelves[0].entryIds.size)
+        assertEquals(PluginShelfProtocol.MAX_TITLE, shelves[1].title.length)
+        assertTrue(PluginShelfProtocol.shelves(obj(), known).isEmpty())
+    }
+
+    @Test
+    fun `the library is described only with library read, and play times only with history`() {
+        val candidates = listOf(ShelfCandidate("a", "Alpha", "console_rom", "snes", favorite = true, lastPlayedEpochMs = 42L))
+        assertNull(PluginShelfProtocol.libraryContext(candidates, libraryRead = false, history = true))
+        val plain = PluginShelfProtocol.libraryContext(candidates, libraryRead = true, history = false)!!.getJSONObject(0)
+        assertEquals("Alpha", plain.getString("title"))
+        assertEquals("snes", plain.getString("systemId"))
+        assertFalse(plain.has("lastPlayed"))
+        val withHistory = PluginShelfProtocol.libraryContext(candidates, libraryRead = true, history = true)!!.getJSONObject(0)
+        assertEquals(42L, withHistory.getLong("lastPlayed"))
+        val many = (1..600).map { ShelfCandidate("e$it", "E$it", "app", null, false, null) }
+        assertEquals(PluginShelfProtocol.MAX_CANDIDATES, PluginShelfProtocol.libraryContext(many, true, false)!!.length())
+    }
+
+    @Test
+    fun `a game section names its tab, and anything else is Extras`() {
+        fun section(vararg kv: Pair<String, Any>) = ProvidedPoint(point = GameSectionProtocol.POINT, extra = obj(*kv).toString())
+        assertEquals("versions", GameSectionProtocol.tab(section("tab" to "versions")))
+        assertEquals("extras", GameSectionProtocol.tab(section("tab" to "somewhere")))
+        assertEquals("extras", GameSectionProtocol.tab(section()))
+        assertTrue("a section uses the context action filter", ContextActionFilter.matches(section("systems" to strings("snes")), game))
+    }
 }

@@ -36,5 +36,14 @@ the v2 envelope) that reports progress in 10% steps over ~3 s and completes
 with a `message`. The settings view is a JSON document (info row, progress
 row, button) rendered by droidtop's own renderer (`PluginViews`).
 
+Since 1.1.0 it also shows the plugin UI points of docs/plugin-api.md 3
+(Droidtop/tracker#316): a Quick Menu panel (`ui.panel`, op `panel`, with a
+button whose `hello` call asks droidtop for a toast through the broker,
+`ui.toast` `show`, permission `overlay.toast`), rows on a game's page
+(`ui.game_section`, op `section`, which names the game only when droidtop
+handed its identity over under `library.read`) and a shelf of the person's
+favourites on Home (`gaming.rows`, op `rows`, built from the
+`context.library` droidtop sends with `library.read`).
+
 The rig item (`dq-plugins-01`, `/root/coordination/device/QUEUE.md`) uses
 the resulting `.tar.xz`.

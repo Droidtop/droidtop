@@ -56,6 +56,24 @@ internal fun homeShelves(
 ): List<PcShelf> = pcShelves(games, now, others).filter { it.id in HOME_SHELF_IDS }
 
 /**
+ * The shelves plugins asked Home for (docs/plugin-api.md 3 C11) as Home's own shelves: the real entries from
+ * [entries] in the plugin's order, titled with the plugin's name so a shelf never passes for droidtop's own. A
+ * shelf whose entries are all gone is dropped. Ids are `plugin:<plugin>/<shelf>`, apart from every built-in id.
+ * Pure: one map built over the entries, no lookup per card.
+ */
+internal fun pluginHomeShelves(
+    shelves: List<dev.droidtop.library.integrations.PluginShelves.Shelf>,
+    entries: List<LibraryEntry>,
+): List<PcShelf> {
+    if (shelves.isEmpty()) return emptyList()
+    val byId = entries.associateBy { it.id }
+    return shelves.mapNotNull { s ->
+        val rows = s.shelf.entryIds.mapNotNull { byId[it] }
+        if (rows.isEmpty()) null else PcShelf("plugin:${s.pluginId}/${s.shelf.id}", "${s.shelf.title}, from ${s.pluginLabel}", rows, rows.size)
+    }
+}
+
+/**
  * The PC library's shelves, from the folded one-card-per-game list, as a pure
  * function so a JVM test can hold it to its rules and so the tab can run
  * it off the main thread (one sort per shelf over the whole library: never

@@ -34,7 +34,9 @@ progress-shown action by design (docs/SPEC.md 12a).
 ## Contract 2 and views
 
 This sample runs on contract 2 (`manifest.template.json`). It provides
-`ui.status_tile` (`state`) and `ui.settings` (`view`/`greet`). The
+`ui.status_tile` (`state`), `ui.settings` (`view`/`greet`) and, since
+1.1.0, a Quick Menu panel `ui.panel` (`panel`/`save`/`greet`, docs/plugin-api.md
+3 C17) whose toggle writes the same `show_count` setting. The
 `handle()` function receives JSON envelopes and replies with
 `{"ok": true, "data": ...}` or `{"ok": false, "error": ...}`.
 The settings page is drawn by droidtop from the view document the plugin

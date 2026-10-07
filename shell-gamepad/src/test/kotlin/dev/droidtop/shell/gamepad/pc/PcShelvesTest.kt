@@ -254,4 +254,29 @@ class PcShelvesTest {
         assertTrue(game("/roms/pc/x", kind = LibraryEntryKind.CONSOLE_ROM).copy(systemId = PC_SYSTEM_ID).onPcGamesTab)
         assertEquals(false, game("/roms/nes/x", kind = LibraryEntryKind.CONSOLE_ROM).copy(systemId = "nes").onPcGamesTab)
     }
+
+    @Test
+    fun `a plugin's shelf holds only entries Home has, in its order, and names the plugin`() {
+        val entries = listOf(game("/a"), game("/b"), game("/c"))
+        val shelves = pluginHomeShelves(
+            listOf(
+                dev.droidtop.library.integrations.PluginShelves.Shelf(
+                    "acme.picks",
+                    "Acme Picks",
+                    dev.droidtop.pluginhost.PluginShelf("short", "Short games", listOf("/c", "/gone", "/a")),
+                ),
+                dev.droidtop.library.integrations.PluginShelves.Shelf(
+                    "acme.picks",
+                    "Acme Picks",
+                    dev.droidtop.pluginhost.PluginShelf("empty", "All gone", listOf("/gone")),
+                ),
+            ),
+            entries,
+        )
+        assertEquals(1, shelves.size)
+        assertEquals("plugin:acme.picks/short", shelves.single().id)
+        assertEquals("Short games, from Acme Picks", shelves.single().title)
+        assertEquals(listOf("/c", "/a"), shelves.single().entries.map { it.id })
+        assertTrue("no built-in shelf id starts like a plugin's", HOME_SHELF_IDS.none { it.startsWith("plugin:") })
+    }
 }

@@ -74,7 +74,8 @@ import kotlinx.coroutines.launch
  *
  * Sections: Game (only while a game runs), Running apps (the task
  * manager), Notifications, System, Performance, Audio, Display, Downloads
- * and jobs, and Plugins (only while a running plugin offers tiles). Which
+ * and jobs, and Plugins (only while a running plugin has a panel or
+ * tiles here). Which
  * are shown, where the menu opens and how L1/R1 step the rail are pure
  * rules in [QuickTiles] (QuickTilesTest). Get games is deliberately not a
  * section: it is a contextual action on the pages that need it.
@@ -104,12 +105,14 @@ import kotlinx.coroutines.launch
  * that it is what greets you, not something you have to cycle to find
  * (Droidtop/tracker#82). Its rows are resume, restart and quit to library.
  *
- * The Plugins section: one [MenuRow] per `ui.status_tile@1` or
- * `ui.quick_tile@1` a running plugin provides (docs/plugin-api.md C2, C3,
- * Droidtop/tracker#73). What tiles exist is read from manifests when the
- * sheet opens, their state is asked once per opening and never while
- * drawing, and a quick tile's A press is the only other call. A status
- * tile is read-only.
+ * The Plugins section is Decky Loader's plugin list (docs/plugin-api.md
+ * C17, Droidtop/tracker#316): one row per plugin, A opens that plugin's
+ * panel (its tiles, its own `ui.panel` view and the way to its settings),
+ * B comes back to the list, and the last row leads to the Plugins place.
+ * It is the catalog navigator over [dev.droidtop.library.integrations.PluginPanels],
+ * so a panel is drawn like every other droidtop list and the plugin draws
+ * nothing. Which plugins appear is read from manifests when the sheet
+ * opens; a panel asks its plugin when it is opened, never while drawing.
  *
  * WHERE the sheet sits follows the shape of the screen, because the
  * reason it is an edge sheet is that it must not cover the shell behind
@@ -132,6 +135,8 @@ internal fun QuickMenu(
     quitOutcome: dev.droidtop.library.QuitResult?,
     onOpenLeftMenu: () -> Unit,
     openPlace: (screenId: String) -> Boolean,
+    /** Whether [openPlace] would open this place in the current mode (Kiosk and Kid hide the device-management places). */
+    placeAvailable: (screenId: String) -> Boolean,
     onDismiss: () -> Unit,
 ) {
     val window = currentShellWindow()
@@ -150,15 +155,15 @@ internal fun QuickMenu(
         // re-resolves it when quickMenuOpen flips true).
         val context = androidx.compose.ui.platform.LocalContext.current
         // Read from manifests off the main thread; the section appears only when there is something to show.
-        val pluginTiles by androidx.compose.runtime.produceState(emptyList<dev.droidtop.library.integrations.PluginTiles.Tile>()) {
+        val hasPlugins by androidx.compose.runtime.produceState(false) {
             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                dev.droidtop.library.integrations.PluginTiles.tilesFor(context)
+                dev.droidtop.library.integrations.PluginPanels.panelsFor(context).isNotEmpty()
             }
         }
         val granted = remember { NotificationsStore.isGranted(context) }
         val gameRunning = runningEntry != null
-        val sections = remember(gameRunning, pluginTiles.isNotEmpty()) {
-            QuickTiles.visibleSections(gameRunning, pluginTiles.isNotEmpty())
+        val sections = remember(gameRunning, hasPlugins) {
+            QuickTiles.visibleSections(gameRunning, hasPlugins)
         }
         var section by remember { mutableStateOf(QuickTiles.initialSection(gameRunning, granted)) }
         LaunchedEffect(sections, section) {
@@ -230,7 +235,7 @@ internal fun QuickMenu(
                             QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close)
                         QuickSection.PERFORMANCE -> PerformanceSection(close)
                         QuickSection.DOWNLOADS -> DownloadsSection(close)
-                        QuickSection.PLUGINS -> PluginTilesTab(pluginTiles, close)
+                        QuickSection.PLUGINS -> PluginsTab(runningEntry, openPlace, placeAvailable, close)
                     }
                 }
             }
@@ -638,8 +643,8 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
  * `ui.quick_tile@1` op (`state -> {label, value, on?, icon}` plus
  * `toggle`/`action`, docs/plugin-api.md C2) hands over -- [dangerAction]
  * is this list's `danger` styling, not a fourth quick-tile kind. Only
- * droidtop's own core rows are here: plugin tiles have the Plugins
- * section ([PluginTilesTab]).
+ * droidtop's own core rows are here: plugin tiles are in their plugin's
+ * panel under the Plugins section ([PluginsTab]).
  */
 private data class GameQuickTile(
     val title: String,
@@ -652,103 +657,44 @@ private data class GameQuickTile(
 internal fun quitNeedsConfirmation(armed: Boolean): Boolean = !armed
 
 /**
- * The Plugins section: one row per status or quick tile a running plugin provides. The state is
- * refreshed once when the section opens (droidtop decides when, the plugin never runs its own loop),
- * a tile that does not answer in time keeps its last value, and only a quick tile answers to A.
+ * The Plugins section (docs/plugin-api.md C17, Droidtop/tracker#316): Decky Loader's list and panels as one catalog
+ * navigator. A on a plugin pushes its panel, B pops back to the list and from the list closes the sheet. The last
+ * row leads out to the Plugins place instead of pushing that screen into the sheet (one screen, one home). A page a
+ * quick tile's press answered with opens over the sheet, as before panels existed.
  */
 @Composable
-private fun PluginTilesTab(
-    tiles: List<dev.droidtop.library.integrations.PluginTiles.Tile>,
+private fun PluginsTab(
+    runningEntry: dev.droidtop.library.LibraryEntry?,
+    openPlace: (screenId: String) -> Boolean,
+    placeAvailable: (screenId: String) -> Boolean,
     onDismiss: () -> Unit,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var focusIndex by remember { mutableStateOf(0) }
-    val focusRequester = remember { FocusRequester() }
-    val press = rememberGamepadTouch()
-    var states by remember(tiles) {
-        mutableStateOf<Map<String, dev.droidtop.pluginhost.TileState?>>(tiles.associate { it.key to dev.droidtop.library.integrations.PluginTiles.cached(it) })
-    }
-    var message by remember { mutableStateOf<String?>(null) }
-    var tileScreen by remember { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
-
-    suspend fun refresh() {
-        states = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            dev.droidtop.library.integrations.PluginTiles.refresh(context, tiles)
+    var replyScreen by remember { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
+    val root = remember(runningEntry?.id) {
+        val game = runningEntry?.let { entry ->
+            dev.droidtop.pluginhost.ContextTarget(
+                kind = if (entry.kind == dev.droidtop.library.LibraryEntryKind.NATIVE_ANDROID_APP) "app" else "game",
+                id = entry.id,
+                title = dev.droidtop.library.GameNaming.displayName(entry.title),
+                systemId = entry.systemId,
+                packageName = if (entry.kind == dev.droidtop.library.LibraryEntryKind.NATIVE_ANDROID_APP) entry.id else null,
+            )
         }
-    }
-
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    LaunchedEffect(tiles) { refresh() }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .focusRequester(focusRequester)
-            .focusable()
-            .onPad { press ->
-                when (press.action) {
-                    GamepadAction.UP, GamepadAction.DOWN ->
-                        focusIndex = menuStep(focusIndex, tiles.size, if (press.action == GamepadAction.UP) -1 else 1)
-                    GamepadAction.B -> onDismiss()
-                    GamepadAction.A -> {
-                        val tile = tiles.getOrNull(focusIndex)
-                        if (tile != null && tile.quick) {
-                            scope.launch {
-                                val outcome = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                    dev.droidtop.library.integrations.PluginTiles.press(context, tile, states[tile.key])
-                                }
-                                message = outcome?.message
-                                tileScreen = outcome?.screen
-                                refresh()
-                            }
-                        }
-                    }
-                    else -> Unit
-                }
-                true
-            },
-    ) {
-        // Scrolls, so a selected row past the sheet's bottom is brought into
-        // view by MenuRow itself: a plain Column left those rows unreachable
-        // on screen (tracker#152).
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(androidx.compose.foundation.rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            tiles.forEachIndexed { index, tile ->
-                val state = states[tile.key]
-                MenuRow(
-                    title = state?.label ?: tile.fallbackLabel,
-                    subtitle = if (index == focusIndex) message ?: tile.pluginLabel else tile.pluginLabel,
-                    value = when (state?.on) {
-                        true -> "On"
-                        false -> "Off"
-                        null -> state?.value
-                    },
-                    selected = index == focusIndex,
-                    onClick = {
-                        focusIndex = index
-                        press(GamepadAction.A)
-                    },
-                )
-            }
-        }
-        HintRow(
-            bindings = listOf(
-                HintBinding(GamepadAction.A, "Use") { tiles.getOrNull(focusIndex)?.quick == true },
-                HintBinding(GamepadAction.B, "Close"),
-            ),
-            background = androidx.compose.ui.graphics.Color.Transparent,
-            modifier = Modifier.padding(top = 8.dp),
+        dev.droidtop.library.integrations.PluginPanels.quickMenuScreen(
+            game = game,
+            showManage = placeAvailable(PLACE_PLUGINS_SCREEN_ID),
+            onReplyScreen = { replyScreen = it },
         )
     }
-    tileScreen?.let { screen ->
-        val close = { tileScreen = null }
+    CatalogNavigator(
+        root = root,
+        onExit = onDismiss,
+        nativeActions = mapOf(dev.droidtop.library.integrations.PluginPanels.MANAGE_ROW_ID to { openPlace(PLACE_PLUGINS_SCREEN_ID); Unit }),
+    )
+    replyScreen?.let { screen ->
+        val close = { replyScreen = null }
         androidx.compose.ui.window.Dialog(onDismissRequest = close) {
-            dev.droidtop.shell.gamepad.CatalogNavigator(root = screen, onExit = close)
+            CatalogNavigator(root = screen, onExit = close)
         }
     }
 }

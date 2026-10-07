@@ -31,6 +31,7 @@ import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.PluginAppStatus
 import dev.droidtop.library.integrations.PluginCatalog
 import dev.droidtop.library.integrations.PluginCatalogScreen
+import dev.droidtop.library.integrations.PluginPanels
 import dev.droidtop.library.integrations.PluginSettingsRows
 import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.GameUpdates
@@ -1638,6 +1639,9 @@ object AppSettingsCatalogs {
         val resolution = PluginApiResolver.current(context)
         val grantStore = PluginGrants.forContext(context)
         val providerChoices = PluginProviderChoices.forContext(context).all()
+        // The catalog as last fetched, never a network call: a card says when its plugin has an update (Decky's badge);
+        // the update itself is on the plugin's page and in Updates.
+        val catalogIndex = PluginCatalog.lastGoodIndex(context)
 
         listOf(
             CatalogGroup(
@@ -1663,6 +1667,7 @@ object AppSettingsCatalogs {
                                 resolution.waiting[record.manifest.id],
                                 grants,
                                 PluginRuntimeNeeds.missing(context, record.manifest),
+                                updateAvailable = catalogIndex?.let { PluginCatalog.updateFor(it, record) } != null,
                             ),
                         )
                     }
@@ -1724,6 +1729,7 @@ object AppSettingsCatalogs {
         waiting: List<dev.droidtop.pluginhost.RequiredApi>?,
         grants: PluginGrants.Snapshot,
         runtimeNeed: RuntimeNeed?,
+        updateAvailable: Boolean = false,
     ): NestedScreenItem {
         val m = record.manifest
         val wantsNewAccess = grants.wantsNewAccess
@@ -1745,6 +1751,7 @@ object AppSettingsCatalogs {
             // Waiting is not disabled: the plugin resumes by itself when a provider returns (docs/plugin-api.md 2.3).
             waiting != null -> "Waiting"
             record.trust == PluginTrustState.APPROVED && wantsNewAccess -> "Wants new access"
+            record.trust == PluginTrustState.APPROVED && updateAvailable -> "Update available"
             record.trust == PluginTrustState.APPROVED -> "Running"
             else -> "Unknown"
         }
@@ -2008,54 +2015,39 @@ object AppSettingsCatalogs {
             }
             else -> emptySet()
         }
-        val providesGroup = buildList<CatalogItem> {
-            add(
-                ActionItem(
-                    id = "plugin_${m.id}_provides",
-                    title = pluginSummary(m, enabledPoints),
-                    run = {},
-                ),
-            )
-            if (record.runnable() && PluginCapability.STATUS_TILE in m.capabilities) {
-                add(
-                    AsyncActionItem(
-                        id = "plugin_${m.id}_call_status_tile",
-                        title = "Call its status tile",
-                        subtitle = "Runs a real call and shows the result",
-                        run = { ctx, _ ->
-                            val policy = PluginCrashPolicy(ctx.applicationContext)
-                            try {
-                                val result = policy.invoke(record, PluginCapability.STATUS_TILE, emptyMap())
-                                if (result.ok) {
-                                    result.values.entries.joinToString(", ") { (k, v) -> "$k=$v" }.ifEmpty { "OK, no values" }
-                                } else {
-                                    "Failed: ${result.error}"
-                                }
-                            } finally {
-                                policy.shutdown()
-                            }
-                        },
-                    ),
-                )
-                if (ctxIsDebuggable(context)) {
+        val providesGroup = listOf<CatalogItem>(
+            ActionItem(
+                id = "plugin_${m.id}_provides",
+                title = pluginSummary(m, enabledPoints),
+                run = {},
+            ),
+        )
+
+        // What the plugin is for, first (Decky's model, Droidtop/tracker#316): its Quick Menu panel, its settings, its
+        // own app and the app it manages. The panel is the same screen the Quick Menu's Plugins section opens, so the
+        // Standard and Desktop modes, which have no Quick Menu, reach it here.
+        val useGroup = buildList<CatalogItem> {
+            if (record.runnable()) {
+                PluginPanels.panelsFor(context).firstOrNull { it.pluginId == m.id }?.let { panel ->
                     add(
-                        AsyncActionItem(
-                            id = "plugin_${m.id}_force_crash",
-                            title = "Debug: force a crash",
-                            subtitle = "droidtop should survive and disable this plugin",
-                            confirmTitle = "Force ${m.label} to crash now?",
-                            run = { ctx, _ ->
-                                val policy = PluginCrashPolicy(ctx.applicationContext)
-                                try {
-                                    val result = policy.invoke(record, PluginCapability.STATUS_TILE, mapOf("query" to "force-crash"))
-                                    if (result.ok) "Unexpected success: ${result.values}" else "Crashed as expected: ${result.error}"
-                                } finally {
-                                    policy.shutdown()
-                                }
-                            },
+                        NestedScreenItem(
+                            id = "plugin_${m.id}_panel",
+                            title = "Panel",
+                            subtitle = "What the plugin shows in the Quick Menu",
+                            inline = PluginPanels.panelScreen(context, panel, PluginPanels.SURFACE_SETTINGS, game = null, withMore = false),
                         ),
                     )
                 }
+            }
+            if (record.runnable() && PluginCapability.SETTINGS_ROWS in m.capabilities) {
+                add(
+                    NestedScreenItem(
+                        id = "plugin_${m.id}_settings_rows",
+                        title = "Settings",
+                        subtitle = "Settings this plugin contributes",
+                        inline = PluginSettingsRows.screenFor(record),
+                    ),
+                )
             }
             // The plugin's own full-screen app (ui.main, docs/plugin-api.md 1.7), the same row in every mode.
             if (PluginMainUi.offered(record)) {
@@ -2065,16 +2057,6 @@ object AppSettingsCatalogs {
                         title = "Open ${m.label}",
                         subtitle = "Its own screen, full-screen. Back returns here",
                         run = { ctx, _ -> PluginMainUi.open(ctx, record) ?: "Opened" },
-                    ),
-                )
-            }
-            if (record.runnable() && PluginCapability.SETTINGS_ROWS in m.capabilities) {
-                add(
-                    NestedScreenItem(
-                        id = "plugin_${m.id}_settings_rows",
-                        title = "Settings",
-                        subtitle = "Settings this plugin contributes",
-                        inline = PluginSettingsRows.screenFor(record),
                     ),
                 )
             }
@@ -2127,6 +2109,27 @@ object AppSettingsCatalogs {
             ActionItem(id = "plugin_${m.id}_id", title = "Plugin id", subtitle = m.id, run = {}),
             ActionItem(id = "plugin_${m.id}_origin", title = "Origin", subtitle = m.origin, run = {}),
             ActionItem(id = "plugin_${m.id}_digest", title = "Archive digest", subtitle = record.archiveDigest, run = {}),
+        ) + listOfNotNull(
+            // A debug build's crash-containment check (docs/SPEC.md 12a). Its status tile itself is in the plugin's panel.
+            if (record.runnable() && PluginCapability.STATUS_TILE in m.capabilities && ctxIsDebuggable(context)) {
+                AsyncActionItem(
+                    id = "plugin_${m.id}_force_crash",
+                    title = "Debug: force a crash",
+                    subtitle = "droidtop should survive and disable this plugin",
+                    confirmTitle = "Force ${m.label} to crash now?",
+                    run = { ctx, _ ->
+                        val policy = PluginCrashPolicy(ctx.applicationContext)
+                        try {
+                            val result = policy.invoke(record, PluginCapability.STATUS_TILE, mapOf("query" to "force-crash"))
+                            if (result.ok) "Unexpected success: ${result.values}" else "Crashed as expected: ${result.error}"
+                        } finally {
+                            policy.shutdown()
+                        }
+                    },
+                )
+            } else {
+                null
+            },
         )
 
         // A runtime the plugin cannot run without goes straight under the status line that says so, where
@@ -2135,6 +2138,7 @@ object AppSettingsCatalogs {
         return listOfNotNull(
             CatalogGroup(id = "plugin_${m.id}_status_group", title = null, items = statusGroup),
             runtimeGroupItem.takeIf { runtimeNeed != null },
+            useGroup.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_use_group", title = null, items = it) },
         ) + newAccessGroups + consentGroups + listOfNotNull(
             approveItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_approve_group", title = null, items = it) },
             permissionsGroup,

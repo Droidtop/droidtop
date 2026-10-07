@@ -232,10 +232,10 @@ class QuickTilesTest {
 
     @Test
     fun `the rail shows Game only while a game runs and Plugins only with tiles`() {
-        val bare = QuickTiles.visibleSections(gameRunning = false, hasPluginTiles = false)
+        val bare = QuickTiles.visibleSections(gameRunning = false, hasPlugins = false)
         assertFalse(QuickSection.GAME in bare)
         assertFalse(QuickSection.PLUGINS in bare)
-        val full = QuickTiles.visibleSections(gameRunning = true, hasPluginTiles = true)
+        val full = QuickTiles.visibleSections(gameRunning = true, hasPlugins = true)
         assertEquals(QuickSection.entries, full)
         // Get games is a contextual action, never a rail section.
         assertTrue(QuickSection.entries.none { it.label.contains("Get games", ignoreCase = true) })
@@ -250,7 +250,7 @@ class QuickTilesTest {
 
     @Test
     fun `L1 and R1 step the rail and wrap at its ends`() {
-        val visible = QuickTiles.visibleSections(gameRunning = false, hasPluginTiles = false)
+        val visible = QuickTiles.visibleSections(gameRunning = false, hasPlugins = false)
         assertEquals(QuickSection.NOTIFICATIONS, QuickTiles.stepSection(visible, QuickSection.APPS, +1))
         assertEquals(QuickSection.APPS, QuickTiles.stepSection(visible, QuickSection.NOTIFICATIONS, -1))
         assertEquals(visible.first(), QuickTiles.stepSection(visible, visible.last(), +1))

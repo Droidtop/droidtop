@@ -233,8 +233,10 @@ internal fun PcGamePage(
     val parts by produceState(emptyList<PageFact>(), entry.id, siblings) {
         value = withContext(Dispatchers.Default) { partFacts(siblings) }
     }
+    // What plugins add to this game's page, under the tabs they name (docs/plugin-api.md 3 C4, C18).
+    val pluginRows = rememberPluginPageRows(entry)
     val tabs = remember { PageTab.values() }
-    val rowsByTab = remember(rows, parts) { groupRowsByTab(rows, parts) }
+    val rowsByTab = remember(rows, parts, pluginRows.facts) { groupRowsByTab(rows + pluginRows.facts, parts) }
     val strip = remember(entry, runner, folderSize, siblings) {
         factsStrip(
             entry = entry,
@@ -506,6 +508,7 @@ internal fun PcGamePage(
             }
         }
     }
+    PluginPageScreen(pluginRows)
     if (editingThread && library != null) {
         TextEditDialog(
             title = "F95zone thread",

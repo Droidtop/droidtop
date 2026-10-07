@@ -2447,10 +2447,9 @@ the `ContainerRuntime` interface that already exists (§3):
   it. Changing focus clears the confirmation so an old press cannot
   authorize a later action
   (see the next bullet). Row list, not a bespoke layout: the same shape
-  a plugin's `ui.quick_tile@1` (docs/plugin-api.md C2, tracker#73) will
-  append to once that extension point's host exists, so it extends this
-  tab instead of needing a second in-game menu built to compete with
-  it.
+  a plugin's `ui.quick_tile@1` (docs/plugin-api.md C2, tracker#73) has.
+  A plugin's tiles live in that plugin's panel under Plugins (below),
+  never in this tab.
 - **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
   Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
   navigation and the places things live. The owner's direction: "branch our quick menu out a
@@ -2487,7 +2486,15 @@ the `ContainerRuntime` interface that already exists (§3):
     "Downloads and installs") hosted in the sheet by `CatalogNavigator`, without its own heading
     (`PluginJobsScreen.screen(headed = false)`: the rail header already names it). Its empty state is
     one short row, "Nothing running", with the longer sentence as its HintTip.
-  - **Plugins**: unchanged, only while a running plugin offers tiles.
+  - **Plugins** (only while a running plugin has a panel or tiles here; Decky-style since
+    2026-10-07, Droidtop/tracker#316, 12a "Plugin UI, Decky-style"): one row per plugin, by name,
+    its value the plugin's first tile state or "Update available"; A opens that plugin's **panel**
+    (its tiles, its own `ui.panel` view, then Settings, Open <plugin> and App status rows), B comes
+    back to the list. It is the catalog navigator over `PluginPanels.quickMenuScreen`, so a panel
+    is drawn and navigated like every other droidtop list. The last row, "Get and manage plugins",
+    closes the menu and opens the Plugins place (shown only where the mode has that place), never
+    a second copy of that screen in the sheet. A page a quick tile's press answers with opens over
+    the sheet.
   Which sections show, where the menu opens (the running game; else Notifications once access is
   granted; else System) and how the shoulders step the rail are pure rules in `QuickTiles`
   (`visibleSections`, `initialSection`, `stepSection`) with unit tests. System, Audio and Display
@@ -13631,12 +13638,59 @@ of what is built. The decisions, briefly:
     not a no-op "Awaiting approval" action row. This replaces the rule that approval granted
     every listed point (cc3367c5). Details: `docs/plugin-api.md` 4.3.
 
-The catalogue has 89 entries across ten areas (library and content,
+The catalogue has 93 entries across ten areas (library and content,
 launch and runtime, UI, system and device, desktop, other apps,
 identity, data, developer, platform). The phased roadmap is 4 P0, 17 P1
 and 47 P2 items. Umbrella: Droidtop/tracker#53.
 `docs/plugin-catalog.md` (the 2026-09-25 launcher-seam scope note) is
 folded into `docs/plugin-api.md` §3 C and deleted.
+
+**Plugin UI, Decky-style (decided 2026-10-07, Droidtop/tracker#316;
+`docs/plugin-api.md` 1.8, C17, C18, C11, C6a).** The owner: "we probably
+want to use a decky loader style system for our plugins, at least from the
+UI" and "Plugins don't ONLY appear there. That's their control and
+configuration point. plugins can modify the entire UI. We're just securing it
+better than they do by forcing it through a plugin API." Decky Loader is the
+reference for the shape (a plugin list in Steam's Quick Access Menu, each
+plugin's panel, a store and per-plugin settings, plugins patching Steam's own
+pages); its mechanism (JavaScript and CSS injected into Steam's UI, React
+tree patching, root backends by a manifest flag) is what droidtop does not
+take.
+
+- **The panel is each plugin's control and configuration point.** The Quick
+  Menu's Plugins section lists plugins and opens one's panel
+  (`PluginPanels`): its tiles, the view it returns for `ui.panel@1`, and rows
+  into its settings, its own app and the app it manages. Plugins with tiles
+  but no panel get a panel of their tiles, so existing plugins appear with no
+  change. The same panel is the "Panel" row at the top of the plugin's page
+  under Settings, so Standard and Desktop reach it too.
+- **Plugins reach the rest of the shell only through declared extension
+  points, drawn by droidtop.** Built with this change: rows on a game's page
+  (`ui.game_section@1`: the PC game page draws each node as its own row under
+  the tab the section names, runs calls and jobs in place, and opens inputs
+  and sub-pages as catalog pages; the console game screen shows each section
+  as a chip; context actions are rows under Extras on the PC page too),
+  shelves on Home (`gaming.rows@1`: library entries named by id, at most two
+  shelves of 24 per plugin, only real entries, after Home's own shelves, the
+  answer kept 15 minutes so Home never waits on a plugin) and toasts
+  (`ui.toast@1` `show`, permission `overlay.toast`, led by the plugin's name).
+- **Capability enforcement at the boundary.** `PluginGrants.pointRefusal`,
+  the check every host call goes through, now also refuses a point the
+  manifest does not declare at a version this build serves, before loading
+  the plugin; before, a low-risk undeclared point was refused only by the
+  call sites. A game's identity reaches `ui.game_section` and a panel's
+  `context.game` only with `library.read`, and Home shelves get the library
+  only with `library.read` and play times only with `library.history`.
+- **Plugins management, Decky-style.** A plugin's row in the Plugins list
+  says "Update available" when the cached catalog has a newer release (the
+  update itself stays on the plugin's page and in Updates, one Updates
+  screen); the plugin's page leads with what the plugin is for (Panel,
+  Settings, Open <plugin>, App status) before approval, permissions and
+  version. The debug-only "Call its status tile" row is gone (the tile is in
+  the panel); the debug crash row moved under Advanced.
+- **Samples** (`samples/plugin-sample-statustile` 1.1.0,
+  `samples/plugin-sample-py-statustile` 1.1.0) show a panel, and the native
+  sample also a game section, a Home shelf and a toast.
 
 **The API surface** (`PluginCapability`, a closed set — the trust shape
 differs per capability, same reasoning §12's `IntegrationCapability`

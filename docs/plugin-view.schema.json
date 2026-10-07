@@ -28,6 +28,25 @@
       },
       "additionalProperties": false
     },
+    "shelvesReply": {
+      "description": "The data of a gaming.rows@1 rows reply (docs/plugin-api.md 3 C11): at most 2 shelves of 24 entry ids each; droidtop keeps only ids of real library entries and cuts titles to 60 characters.",
+      "type": "object",
+      "required": ["shelves"],
+      "properties": {
+        "shelves": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["title", "entries"],
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string", "minLength": 1 },
+              "entries": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
     "section": {
       "type": "object",
       "required": ["items"],

@@ -360,11 +360,25 @@ internal fun PcGamesSection(
         state.shelfIndex = shelf
         state.itemIndex = item
     }
+    // Shelves plugins ask for, after Home's own (docs/plugin-api.md 3 C11, Droidtop/tracker#316). Home's own are
+    // shown first with the plugin shelves it already had; the plugins' (from an answer kept for 15 minutes, so a
+    // library change rarely asks them) follow when ready. Real entries only.
+    var pluginShelfList by remember { mutableStateOf(emptyList<PcShelf>()) }
     LaunchedEffect(games, others) {
         val all = games ?: return@LaunchedEffect
-        val next = withContext(Dispatchers.Default) { withRetroHero(homeShelves(all, others)) }
+        val own = withContext(Dispatchers.Default) { withRetroHero(homeShelves(all, others)) }
+        val next = own + pluginShelfList
         if (state.home && !state.stripFocused) keepCursor(homeShelfList, next)
         homeShelfList = next
+        val home = all + others
+        val fresh = withContext(Dispatchers.IO) {
+            pluginHomeShelves(dev.droidtop.library.integrations.PluginShelves.shelvesFor(context, home), home)
+        }
+        if (fresh != pluginShelfList) {
+            pluginShelfList = fresh
+            if (state.home && !state.stripFocused) keepCursor(homeShelfList, own + fresh)
+            homeShelfList = own + fresh
+        }
     }
     LaunchedEffect(games) {
         val all = games ?: return@LaunchedEffect

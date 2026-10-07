@@ -161,3 +161,89 @@ object PluginTileProtocol {
     /** A tile with an `on` state is a toggle; one without is an action. */
     fun pressOp(state: TileState?): String = if (state?.on != null) "toggle" else "action"
 }
+
+/**
+ * Rows on a game's page (`ui.game_section@1`, docs/plugin-api.md 3 C18). Which games a section is for is the same
+ * static filter a context action has (`targets`, `systems`, `packages`: [ContextActionFilter.matches]), decided from
+ * the manifest alone; [tab] is where on the PC game page its rows go.
+ */
+object GameSectionProtocol {
+    const val POINT = "ui.game_section"
+
+    /** The PC game page's tabs a section may name; anything else, or nothing, is Extras. */
+    val TABS = listOf("overview", "versions", "extras", "details")
+
+    fun tab(entry: ProvidedPoint): String =
+        runCatching { JSONObject(entry.extra).optString("tab") }.getOrDefault("").takeIf { it in TABS } ?: "extras"
+}
+
+/** One shelf a plugin asked Home to show: its own id, its title, and library entry ids, in the plugin's order. */
+data class PluginShelf(val id: String, val title: String, val entryIds: List<String>)
+
+/** One library entry as a shelf call may describe it to a plugin (docs/plugin-api.md 3 C11). */
+data class ShelfCandidate(
+    val id: String,
+    val title: String,
+    val kind: String,
+    val systemId: String?,
+    val favorite: Boolean,
+    val lastPlayedEpochMs: Long?,
+)
+
+/**
+ * Shelves on Home (`gaming.rows@1`, docs/plugin-api.md 3 C11). A shelf is made of the person's own library entries,
+ * named by id: droidtop draws the real entries and drops every id it does not have, so a plugin cannot put a game
+ * on Home that is not in the library (A10: items that are library entries must be real entries).
+ */
+object PluginShelfProtocol {
+    const val POINT = "gaming.rows"
+    const val MAX_SHELVES = 2
+    const val MAX_ITEMS = 24
+    const val MAX_TITLE = 60
+
+    /** How many entries a call describes to the plugin at most: the most recently played and added come first. */
+    const val MAX_CANDIDATES = 500
+
+    /**
+     * `rows` answers `{shelves: [{id, title, entries: ["<entry id>", ...]}]}`. Keeps at most [MAX_SHELVES] shelves of
+     * [MAX_ITEMS] entries, only ids in [known], each id once per shelf; a shelf left empty, or with no title, is dropped.
+     */
+    fun shelves(data: JSONObject, known: Set<String>): List<PluginShelf> {
+        val array = data.optJSONArray("shelves") ?: return emptyList()
+        val out = ArrayList<PluginShelf>()
+        val seenIds = HashSet<String>()
+        for (i in 0 until array.length()) {
+            if (out.size >= MAX_SHELVES) break
+            val shelf = array.optJSONObject(i) ?: continue
+            if (shelf.isNull("title")) continue
+            val title = shelf.optString("title").trim().take(MAX_TITLE).takeIf { it.isNotEmpty() } ?: continue
+            val id = shelf.optString("id").trim().takeIf { it.isNotEmpty() } ?: "shelf$i"
+            if (!seenIds.add(id)) continue
+            val entries = shelf.optJSONArray("entries") ?: continue
+            val ids = LinkedHashSet<String>()
+            for (j in 0 until entries.length()) {
+                if (ids.size >= MAX_ITEMS) break
+                val entryId = entries.optString(j)
+                if (entryId in known) ids.add(entryId)
+            }
+            if (ids.isNotEmpty()) out.add(PluginShelf(id, title, ids.toList()))
+        }
+        return out
+    }
+
+    /**
+     * The `context.library` a call carries: nothing unless the plugin may read the library ([libraryRead]), and play
+     * times only with [history] (`library.history`). At most [MAX_CANDIDATES] entries.
+     */
+    fun libraryContext(candidates: List<ShelfCandidate>, libraryRead: Boolean, history: Boolean): org.json.JSONArray? {
+        if (!libraryRead) return null
+        val array = org.json.JSONArray()
+        candidates.take(MAX_CANDIDATES).forEach { c ->
+            val json = JSONObject().put("id", c.id).put("title", c.title).put("kind", c.kind).put("favorite", c.favorite)
+            c.systemId?.let { json.put("systemId", it) }
+            if (history) c.lastPlayedEpochMs?.let { json.put("lastPlayed", it) }
+            array.put(json)
+        }
+        return array
+    }
+}

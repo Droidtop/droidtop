@@ -783,6 +783,7 @@ private fun GamepadShellBody(
                     nav.openSection(place)
                 } != null
             },
+            placeAvailable = { screenId -> placeForScreen(screenId, menuSectionsFor(uiMode)) != null },
             onDismiss = { quickMenuOpen = false },
         )
     }
@@ -1566,10 +1567,16 @@ private fun EntryDetailScreen(
         )
     }
     var pluginActions by remember(entry) { mutableStateOf<List<dev.droidtop.library.integrations.PluginContextActions.Action>>(emptyList()) }
+    // Rows plugins add to a game's page (docs/plugin-api.md 3 C18): on this screen each section is a chip that opens
+    // it as a page, where its rows, inputs and actions work; the PC game page draws them as its own rows instead.
+    var pluginSections by remember(entry) { mutableStateOf<List<dev.droidtop.library.integrations.PluginGameSections.Section>>(emptyList()) }
     LaunchedEffect(entry) {
         pluginActions = withContext(Dispatchers.IO) {
             dev.droidtop.library.integrations.PluginContextActions.actionsFor(context, contextTarget)
                 .filter { dev.droidtop.library.integrations.PluginContextActions.enabled(context, it, contextTarget) }
+        }
+        pluginSections = withContext(Dispatchers.IO) {
+            dev.droidtop.library.integrations.PluginGameSections.sectionsFor(context, contextTarget)
         }
     }
 
@@ -1718,6 +1725,19 @@ private fun EntryDetailScreen(
                             }
                             pluginActionStatus = outcome.message
                             pluginActionScreen = outcome.screen
+                        }
+                    },
+                )
+            }
+            pluginSections.forEach { section ->
+                ShellChip(
+                    section.label,
+                    onClick = {
+                        detailScope.launch {
+                            // Built off the main thread: the page's game context reads the plugin's grants.
+                            pluginActionScreen = withContext(Dispatchers.IO) {
+                                dev.droidtop.library.integrations.PluginGameSections.screenFor(context, section, contextTarget)
+                            }
                         }
                     },
                 )

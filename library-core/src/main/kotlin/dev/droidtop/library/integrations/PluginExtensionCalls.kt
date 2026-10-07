@@ -44,6 +44,17 @@ internal fun providersOf(context: Context, point: String): List<Pair<PluginRecor
         }
 }
 
+/**
+ * The `target` a call about one game or app carries (docs/plugin-api.md 3 C4, C18): a game's identity (id, title,
+ * system) only when [record] holds `library.read`, otherwise just the kind. One rule for every point that is told
+ * which game the person is looking at.
+ */
+internal fun targetArg(context: Context, record: PluginRecord, target: ContextTarget): JSONObject {
+    val identity = target.kind != "game" ||
+        PluginGrants.stateOf(record, PluginGrants.forContext(context).read(record.manifest.id), "library.read") == GrantState.GRANTED
+    return ContextActionFilter.targetJson(target, identity)
+}
+
 internal fun newCall(point: String, op: String, surfacePlace: String, args: JSONObject, deadlineMs: Long): PluginCall =
     PluginCall(
         callId = "c-" + UUID.randomUUID().toString().take(8),
@@ -80,12 +91,8 @@ object PluginContextActions {
     fun actionsFor(context: Context, target: ContextTarget): List<Action> =
         providersOf(context, POINT).filter { (_, entry) -> ContextActionFilter.matches(entry, target) }.map { (record, entry) -> Action(record, entry) }
 
-    private fun argsFor(context: Context, action: Action, target: ContextTarget): JSONObject {
-        // A game target needs `library.read`: without it the plugin learns only the kind (docs/plugin-api.md 3 C4).
-        val identity = target.kind != "game" ||
-            PluginGrants.stateOf(action.record, PluginGrants.forContext(context).read(action.record.manifest.id), "library.read") == GrantState.GRANTED
-        return JSONObject().put("actionId", action.id).put("target", ContextActionFilter.targetJson(target, identity))
-    }
+    private fun argsFor(context: Context, action: Action, target: ContextTarget): JSONObject =
+        JSONObject().put("actionId", action.id).put("target", targetArg(context, action.record, target))
 
     /** Whether [action] is enabled for [target] right now. Anything but a clear "no" in time is yes. */
     suspend fun enabled(context: Context, action: Action, target: ContextTarget): Boolean {

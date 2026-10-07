@@ -63,6 +63,7 @@ object PluginViews {
      * [onJobDone] runs after any job this page started finishes (a source rescans).
      * [extraWhenFailed] adds rows under a load failure, for a way out the host knows.
      * [extraGroups] appends host data built from committed page values (source results).
+     * [leadGroups] puts host rows above the plugin's own (a Quick Menu panel's tiles).
      */
     fun screen(
         record: PluginRecord,
@@ -76,7 +77,72 @@ object PluginViews {
         onJobDone: suspend (Context, PluginResult) -> Unit = { _, _ -> },
         extraWhenFailed: () -> List<CatalogItem> = { emptyList() },
         extraGroups: suspend (Context, Map<String, String>) -> List<CatalogGroup> = { _, _ -> emptyList() },
-    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups).screen(id, title)
+        leadGroups: suspend (Context) -> List<CatalogGroup> = { emptyList() },
+    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups, leadGroups).screen(id, title)
+
+    /** What running one view action came to: the sentence to show, a view the reply carried, and whether the page should be fetched again. */
+    data class ActionOutcome(val message: String, val view: PluginView?, val refetch: Boolean)
+
+    /**
+     * Runs a `call` or `job` action of a view (docs/plugin-api.md 1.6, "Actions") on [point], with [values] and the
+     * host-filled [hostContext] written after the action's own args so they cannot be spoofed. The one path every
+     * surface that draws plugin rows uses: a catalog page ([PluginPage]) and the rows a plugin adds to a game's page.
+     * A `view` action is not run here: the surface opens it as a page ([screen] with the action's op).
+     */
+    suspend fun runAction(
+        context: Context,
+        record: PluginRecord,
+        point: String,
+        action: ViewAction,
+        values: Map<String, String>,
+        hostContext: JSONObject,
+        label: String,
+        onStatus: (String) -> Unit = {},
+        onJobDone: suspend (Context, PluginResult) -> Unit = { _, _ -> },
+    ): ActionOutcome {
+        val callArgs = PluginViewCall.args(action.args(), HashMap(values), hostContext)
+        return when (action.kind) {
+            ViewAction.Kind.VIEW -> ActionOutcome("", null, refetch = false)
+            ViewAction.Kind.CALL -> {
+                val reply = call(context, record, point, action.op, callArgs)
+                if (!reply.ok) return ActionOutcome("${record.manifest.label}: ${reply.message ?: "failed"}", null, refetch = false)
+                val view = PluginViewCall.replyView(reply.data)
+                ActionOutcome(PluginViewCall.replyMessage(reply.data) ?: "Done", view, refetch = view == null)
+            }
+            ViewAction.Kind.JOB -> {
+                var result = runJob(context, record, point, action.op, callArgs, action.title ?: label, onStatus)
+                if (result.ok && point == "library.sources" && action.op == "acquire") {
+                    val rawDescriptor = result.values["download"]
+                    if (rawDescriptor != null) {
+                        val descriptor = AcquireDownloadDescriptor.parse(rawDescriptor)
+                        val destination = hostContext.optString("destination").takeIf { it.isNotBlank() }
+                        result = if (descriptor == null) {
+                            PluginResult.failure("${record.manifest.label} returned an invalid download descriptor")
+                        } else if (destination == null) {
+                            PluginResult.failure("the game folder is not available")
+                        } else {
+                            DownloadJobs.run(
+                                context = context,
+                                title = action.title ?: label,
+                                post = DownloadJobs.POST_PLACE_IN_FOLDER,
+                                url = descriptor.url,
+                                name = "acquire_${System.currentTimeMillis()}_${descriptor.fileName}",
+                                sha256 = descriptor.sha256,
+                                maxBytes = descriptor.size ?: 0L,
+                                headers = descriptor.headers,
+                                extra = mapOf("destinationPath" to destination, "targetName" to descriptor.fileName),
+                                onStatus = onStatus,
+                            )
+                        }
+                    }
+                }
+                onJobDone(context, result)
+                val replaced = result.values["view"]?.let { text -> runCatching { PluginView.parse(JSONObject(text)) }.getOrNull() }
+                val message = if (result.ok) result.values["message"] ?: "Done" else "${record.manifest.label}: ${result.error ?: "failed"}"
+                ActionOutcome(message, replaced, refetch = replaced == null)
+            }
+        }
+    }
 
     /** A page drawn from a view the plugin already returned (a context action's or quick tile's reply). It has no op to fetch again; its actions may replace it. */
     fun screenFor(
@@ -152,6 +218,7 @@ private class PluginPage(
     private val onJobDone: suspend (Context, PluginResult) -> Unit,
     private val extraWhenFailed: () -> List<CatalogItem>,
     private val extraGroups: suspend (Context, Map<String, String>) -> List<CatalogGroup> = { _, _ -> emptyList() },
+    private val leadGroups: suspend (Context) -> List<CatalogGroup> = { emptyList() },
 ) {
     @Volatile private var view: PluginView? = initial
     @Volatile private var error: String? = null
@@ -173,7 +240,7 @@ private class PluginPage(
         groups = { context ->
             withContext(Dispatchers.IO) {
                 load(context)
-                groups(id) + extraGroups(context, HashMap(values))
+                leadGroups(context) + groups(id) + extraGroups(context, HashMap(values))
             }
         },
         // The settings search walks screens; it must never call a plugin to do so.
@@ -333,48 +400,10 @@ private class PluginPage(
 
     /** Runs a call or job action and returns the sentence to show; the page is fetched again afterwards unless the reply carried a view. */
     private suspend fun perform(context: Context, action: ViewAction, label: String, onStatus: (String) -> Unit): String {
-        val callArgs = PluginViewCall.args(action.args(), HashMap(values), hostContext)
-        return when (action.kind) {
-            ViewAction.Kind.VIEW -> ""
-            ViewAction.Kind.CALL -> {
-                val reply = PluginViews.call(context, record, point, action.op, callArgs)
-                if (!reply.ok) return "${record.manifest.label}: ${reply.message ?: "failed"}"
-                PluginViewCall.replyView(reply.data)?.let { show(it) } ?: run { stale = op != null }
-                PluginViewCall.replyMessage(reply.data) ?: "Done"
-            }
-            ViewAction.Kind.JOB -> {
-                var result = PluginViews.runJob(context, record, point, action.op, callArgs, action.title ?: label, onStatus)
-                if (result.ok && point == "library.sources" && action.op == "acquire") {
-                    val rawDescriptor = result.values["download"]
-                    if (rawDescriptor != null) {
-                        val descriptor = AcquireDownloadDescriptor.parse(rawDescriptor)
-                        val destination = hostContext.optString("destination").takeIf { it.isNotBlank() }
-                        result = if (descriptor == null) {
-                            PluginResult.failure("${record.manifest.label} returned an invalid download descriptor")
-                        } else if (destination == null) {
-                            PluginResult.failure("the game folder is not available")
-                        } else {
-                            DownloadJobs.run(
-                                context = context,
-                                title = action.title ?: label,
-                                post = DownloadJobs.POST_PLACE_IN_FOLDER,
-                                url = descriptor.url,
-                                name = "acquire_${System.currentTimeMillis()}_${descriptor.fileName}",
-                                sha256 = descriptor.sha256,
-                                maxBytes = descriptor.size ?: 0L,
-                                headers = descriptor.headers,
-                                extra = mapOf("destinationPath" to destination, "targetName" to descriptor.fileName),
-                                onStatus = onStatus,
-                            )
-                        }
-                    }
-                }
-                onJobDone(context, result)
-                val replaced = result.values["view"]?.let { text -> runCatching { PluginView.parse(JSONObject(text)) }.getOrNull() }
-                if (replaced != null) show(replaced) else stale = op != null
-                if (result.ok) result.values["message"] ?: "Done" else "${record.manifest.label}: ${result.error ?: "failed"}"
-            }
-        }
+        val outcome = PluginViews.runAction(context, record, point, action, HashMap(values), hostContext, label, onStatus, onJobDone)
+        val replaced = outcome.view
+        if (replaced != null) show(replaced) else if (outcome.refetch) stale = op != null
+        return outcome.message
     }
 
     private companion object {

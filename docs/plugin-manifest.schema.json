@@ -56,6 +56,7 @@
           "systems": { "type": "array", "items": { "type": "string" } },
           "packages": { "type": "array", "items": { "type": "string" } },
           "job": { "type": "boolean" },
+          "tab": { "enum": ["overview", "versions", "extras", "details"], "description": "ui.game_section only: the PC game page tab its rows go under; Extras when absent." },
           "entrypoint": { "type": "string", "minLength": 1, "description": "ui.main only (flutter_embed): the Dart function started on the hosted engine; annotate it @pragma('vm:entry-point')." },
           "library": { "type": "string", "description": "ui.main only: the library URI of entrypoint when it is not the root library." }
         },

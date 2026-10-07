@@ -31,10 +31,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * Each plugin gets exactly one short-lived [PluginCrashPolicy]
  * connection per refresh tick, torn down right after (the same
- * "no ongoing binder connection to keep warm" shape
- * `AppSettingsCatalogs.pluginsScreen`'s own status-tile test button
- * already uses) -- this widget holds no plugin process alive between
- * updates.
+ * "no ongoing binder connection to keep warm" shape the Quick Menu's
+ * plugin panels use, `PluginTiles.refresh`) -- this widget holds no
+ * plugin process alive between updates.
  */
 class PluginStatusWidgetProvider : AppWidgetProvider() {
 

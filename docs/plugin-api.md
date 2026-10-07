@@ -406,6 +406,8 @@ page for a plugin.
 | `library.sources@1` (A2) | `form`, `detail` | below |
 | `ui.context_action@1` (C4) | `run` may reply `{view}` | the view opens as a page over the screen the action ran from |
 | `ui.quick_tile@1` (C2) | `action` may reply `{view}` | the view opens over the Quick Menu |
+| `ui.panel@1` (C17) | `panel {context:{surface, game?}}` | the plugin's Quick Menu panel, under its tiles (1.8) |
+| `ui.game_section@1` (C18) | `section {context:{target, sectionId}}` | rows on a game's page; the whole section opens as a page for its inputs (1.8) |
 
 **`library.sources` with views (the Get games flow).** Every call on this
 point carries `context: {system: {id, name}, destination}`; `system.id` is
@@ -587,6 +589,51 @@ and rows through views.
 - **Process.** The main UI shares `:pluginhost`, and so its fate, with the
   plugin's headless engine: a crash of either is a crash of the plugin
   (`PluginCrashPolicy`).
+
+### 1.8 Plugin UI, Decky-style (decided 2026-10-07, Droidtop/tracker#316)
+
+*Owner: "we probably want to use a decky loader style system for our
+plugins, at least from the UI" ... "Plugins don't ONLY appear there. That's
+their control and configuration point. plugins can modify the entire UI.
+We're just securing it better than they do by forcing it through a plugin
+API."*
+
+Decky Loader puts every plugin's panel in Steam's Quick Access Menu and
+lets a plugin patch any part of Steam's UI by injecting React code. droidtop
+takes the shape and refuses the mechanism:
+
+- **Each plugin's panel is its control and configuration point.** The
+  Quick Menu's Plugins section is a list of plugins; A opens one's panel
+  and B returns to the list, as in Decky. A panel is drawn by droidtop:
+  the plugin's quick and status tiles first (C2, C3), then the view it
+  returns for `ui.panel` (C17), then rows into its settings (C1), its own
+  app (C16) and the app it manages (`apps.bridge`). A plugin that declares
+  no `ui.panel` but has tiles gets a panel of its tiles, so plugins built
+  before panels appear without a change. The last row of the list leads
+  to the Plugins place (get, update, permissions), which is Decky's store
+  and settings buttons. The same panel is a row on the plugin's own page
+  under Settings, so Standard and Desktop, which have no Quick Menu, reach
+  it too.
+- **A plugin changes the rest of the UI only through declared extension
+  points.** Each is a place droidtop draws plugin content in its own
+  components (a game page's rows, a shelf on Home, a context action, a
+  settings page, a tile): never injected code, never a plugin's own
+  widgets. The points that exist are the catalogue's C group; the ones
+  built on 2026-10-07 are C17 (panel), C18 (game page rows) and C11 (Home
+  shelves), with C6a (toasts) as the first UI host API.
+- **Everything is visible and controllable.** Every point a plugin
+  provides is an item on its approval list and on its Permissions screen
+  (4.3), and a point it does not declare is never called (1.2). Turning a
+  point off removes that plugin's content from that place only.
+- **Full screens.** A plugin's own pages are views opened as pages (a
+  `view` action), drawn from the same schema wherever they open (in the
+  Quick Menu sheet, over a game's page, in Settings). `ui.main` (1.7)
+  stays the one way to show a UI the plugin draws itself, for
+  `flutter_embed` only.
+- **Not taken from Decky:** arbitrary JavaScript and CSS into the shell
+  (`executeInTab`, `injectCssIntoTab`), React tree patching, and plugin
+  backends that run as root by a manifest flag. A plugin reaches root only
+  through a provider plugin the user approved (2.7).
 
 ---
 
@@ -1184,13 +1231,14 @@ Risk low.
   quick-settings-like surfaces: "VPN on", "Sync now", "Fan: quiet".
 - **Ops:** `state → {label, value, on?, icon}` and `toggle` or `action`.
 - **Surfaces:**
-  - G: the Quick Menu grid;
+  - G: the plugin's panel in the Quick Menu (C17), first rows;
   - A: an `android.service.quicksettings.TileService` slot that droidtop
     owns (P2);
   - D: the tray (C8).
 - **Permission:** none.
-- **Status:** not built. A `status_tile` counts as a read-only quick
-  tile (§6).
+- **Status:** built in the Quick Menu; since 2026-10-07 its rows are in
+  the plugin's panel. A `status_tile` counts as a read-only quick tile
+  (§6).
 
 **C3 Status tiles and home widgets.** EP `ui.status_tile@1`. Risk low.
 - **For:** ambient readings (network or VPN state, a sync status).
@@ -1198,11 +1246,13 @@ Risk low.
 - **Refresh:** droidtop decides when (widget update, Quick Menu open) and
   the plugin never runs its own loop.
 - **Surfaces:**
-  - G: the Quick Menu header strip and the companion screen;
+  - G: the plugin's panel in the Quick Menu (C17), and its value on the
+    plugin's row of the Plugins list; the companion screen;
   - A: `PluginStatusWidgetProvider`, a home-screen widget;
   - D: the tray.
 - **Permission:** none.
-- **Status:** built (`status_tile`: the widget and a settings test row).
+- **Status:** built (`status_tile`: the widget and the panel; the
+  settings test row is gone, 2026-10-07).
 
 **C4 Context actions.** EP `ui.context_action@1`. Risk medium.
 - **For:** "do X with this" on a game, an app, a file or folder, a
@@ -1344,7 +1394,21 @@ Risk low.
   A: —; D: —.
 - **Permission:** `provide:gaming.rows`, plus `net.domains` for the art,
   which the host fetches.
-- **Status:** not built.
+- **Status:** built for shelves of library entries (2026-10-07,
+  Droidtop/tracker#316):
+  - op `rows {context:{surface:"gaming.home", library?}}` returns
+    `{shelves:[{id, title, entries:["<entry id>"]}]}`
+    (`docs/plugin-view.schema.json` `$defs.shelvesReply`);
+  - `context.library` lists the entries Home can show (id, title, kind,
+    system, favourite; at most 500, most recent first) only when the
+    plugin holds `library.read`, and play times only with
+    `library.history`;
+  - droidtop keeps at most 2 shelves of 24 per plugin, only ids of real
+    entries, and draws them after Home's own shelves, titled
+    "<title>, from <plugin>";
+  - the answer is kept for 15 minutes, so a library change re-reads it
+    and never waits on the plugin; a plugin that fails has no shelf;
+  - items that are not entries (actions with art) are not built.
 - **Rules:**
   - Items that are library entries must be real entries (A10).
   - Other items are actions, never fake games.
@@ -1412,6 +1476,42 @@ Risk medium.
 - **Kinds:** `flutter_embed` only (1.7).
 - **Permission:** none beyond the approval of the point itself.
 - **Status:** built (2026-10-01).
+
+**C17 Quick Menu panel.** EP `ui.panel@1`. Risk low.
+- **For:** the plugin's control and configuration point (1.8): what Decky
+  calls a plugin's QAM panel.
+- **Static fields:** `label` (the row's name in the Plugins list; the
+  plugin's label when absent).
+- **Ops:** `panel {context:{surface, game?}}` returns a view (1.6); the
+  view's actions come back to this point. `surface` is
+  `gaming.quick_menu` or `settings`; `game` is the running game's
+  `target` under the `library.read` rule (C4).
+- **Surfaces:** G: the Quick Menu's Plugins section; G, S, D: a "Panel"
+  row on the plugin's page under Settings.
+- **Permission:** none beyond the approval of the point.
+- **Status:** built (2026-10-07, `PluginPanels`).
+
+**C18 Rows on a game's page.** EP `ui.game_section@1`. Risk medium.
+- **For:** facts and actions a plugin has about one game: a save-sync
+  state, a patch's status, a thread's last version.
+- **Static fields:** `id`, `label`, `tab` (`overview`, `versions`,
+  `extras`, `details`; Extras when absent) and the C4 filter (`targets`,
+  `systems`, `packages`), decided without loading the plugin.
+- **Ops:** `section {context:{target, sectionId}}` returns a view, asked
+  once when the page opens (5 s budget) and again after a row ran
+  something.
+- **Surfaces:**
+  - G: the PC game page draws every node as a row of its own under the
+    tab named (a fact takes no A; a call or job runs in place with its
+    status in the value column; a `view` node, or an input, opens the
+    section as a page). Every row's tooltip names the plugin. A section
+    that fails is one row saying so. Context actions (C4) on the same
+    game are rows under Extras there too.
+  - G: the console game screen shows each section as a chip that opens
+    it as a page.
+- **Permission:** `provide:ui.game_section`; the game's identity is in
+  `target` only with `library.read`, as for C4.
+- **Status:** built (2026-10-07, `PluginGameSections`).
 
 ### D. System and device
 
@@ -1508,11 +1608,11 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | J3 | Plugin-provided API broker | plugin → plugin | §2 | not built |
 | J4 | Host info | what this host supports | `host.info()` → {droidtopVersion, contract, supported EP/API versions, mode, device ABI, installId}; `plugins.available {api}` | not built |
 
-**The count:** ten areas (A to J) and **89 numbered entries**:
+**The count:** ten areas (A to J) and **93 numbered entries**:
 
 - A: 10
 - B: 7
-- C: 15
+- C: 19 (C1 to C18, and C6a)
 - D: 20
 - E: 10
 - F: 7
@@ -1521,7 +1621,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 - I: 4
 - J: 4
 
-E10 and J3 are the same broker seen from two areas, so there are 88
+E10 and J3 are the same broker seen from two areas, so there are 92
 distinct API groups. Groups closed on purpose (A5, A10, D12, D19, D20,
 G6) are counted, because deciding "not offered" is part of an
 exhaustive list.

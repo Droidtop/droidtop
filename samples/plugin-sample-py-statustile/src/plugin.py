@@ -200,6 +200,50 @@ def handle(call_json):
                 }
             )
 
+    # The Quick Menu panel (docs/plugin-api.md 3 C17): the plugin's own control point, a view droidtop draws.
+    if point == "ui.panel":
+        if op == "panel":
+            settings = _load_settings()
+            return json.dumps(
+                {
+                    "ok": True,
+                    "data": {
+                        "view": 1,
+                        "sections": [
+                            {
+                                "id": "main",
+                                "items": [
+                                    {
+                                        "type": "info",
+                                        "id": "loads",
+                                        "title": "Loaded",
+                                        "value": "%d time(s)" % _load_count,
+                                    },
+                                    {
+                                        "type": "toggle",
+                                        "id": "show_count",
+                                        "title": "Show the call count in the tile",
+                                        "value": settings.get("show_count", True),
+                                        "action": {"kind": "call", "op": "save"},
+                                    },
+                                    {
+                                        "type": "button",
+                                        "id": "greet",
+                                        "title": "Say it",
+                                        "action": {"kind": "call", "op": "greet"},
+                                    },
+                                ],
+                            }
+                        ],
+                    },
+                }
+            )
+        if op == "save":
+            return json.dumps({"ok": True, "data": {"message": "Saved"}})
+        if op == "greet":
+            greeting = _load_settings().get("greeting", "hello")
+            return json.dumps({"ok": True, "data": {"message": "%s, from the sample panel" % greeting}})
+
     return json.dumps(
         {
             "ok": False,
