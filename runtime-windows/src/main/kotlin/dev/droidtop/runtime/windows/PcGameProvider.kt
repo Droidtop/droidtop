@@ -129,7 +129,8 @@ class PcGameProvider(
      * sync, an install), each Wine prefix's Desktop folder (a shortcut
      * added or removed), and the folders the user gave the vendored
      * scanner outside droidtop's roots, along with droidtop's roots
-     * themselves, which decide which of those count. What it does not
+     * themselves, which decide which of those count, and each store
+     * droidtop runs itself ([dev.droidtop.library.stores.StoreLibrary.changeStamp]). What it does not
      * see: the compatibility cache and a change to the engine rules;
      * "Rescan library" is the answer there.
      *
@@ -155,6 +156,10 @@ class PcGameProvider(
             // Inside a root is the folder walk's part, and its stamp.
             if (roots.any { path.startsWith("$it/") }) continue
             stamp = 31 * (31 * stamp + path.hashCode()) + File(path).lastModified()
+        }
+        // The stores droidtop runs itself say when their rows changed.
+        for (store in dev.droidtop.library.stores.StoreLibraries.all()) {
+            stamp = 31 * (31 * stamp + store.id.hashCode()) + runCatching { store.changeStamp(context) }.getOrDefault(0L)
         }
         return if (stamp == 0L) 1L else stamp
     }

@@ -9,13 +9,26 @@ import org.junit.Test
 /** Which store rows are one library game (docs/SPEC.md 7m, "One game across stores"). */
 class StoreIdentityTest {
 
-    private fun row(id: String, title: String, installPath: String? = null, installed: Boolean = false, gameName: String? = null) =
+    private fun row(
+        id: String,
+        title: String,
+        installPath: String? = null,
+        installed: Boolean = false,
+        gameName: String? = null,
+        externalIds: Map<String, String> = emptyMap(),
+    ) =
         LibraryEntry(
             id = id,
             title = title,
             kind = LibraryEntryKind.WINE_PROFILE,
             gameName = gameName,
-            pcInfo = PcInfo(source = id.substringBefore(':'), storeId = id, installed = installed, installPath = installPath),
+            pcInfo = PcInfo(
+                source = id.substringBefore(':'),
+                storeId = id,
+                installed = installed,
+                installPath = installPath,
+                externalIds = externalIds,
+            ),
         )
 
     private fun same(a: String, b: String) = StoreIdentity.titleKey(a) == StoreIdentity.titleKey(b)
@@ -139,6 +152,56 @@ class StoreIdentityTest {
         // Play starts the installed copy, not the first store's.
         assertEquals("gog:2", cave.displayEntry.id)
         assertEquals("Cave Story+", cave.displayEntry.title)
+    }
+
+    @Test
+    fun `a store id another store's row names joins the two whatever their titles`() {
+        val merged = StoreIdentity.group(
+            listOf(
+                row("steam:200900", "Cave Story+"),
+                row("gog:1207658927", "Doukutsu Monogatari", externalIds = mapOf("steam" to "200900")),
+                row("gog:3", "Another Game"),
+            ),
+        )
+
+        assertEquals(2, merged.size)
+        assertEquals(listOf("steam:200900", "gog:1207658927"), merged.first { it.entries.size == 2 }.entries.map { it.id })
+    }
+
+    @Test
+    fun `two rows naming the same third store's id are one game though neither names the other`() {
+        val merged = StoreIdentity.group(
+            listOf(
+                row("gog:1", "Title One", externalIds = mapOf("steam" to "440")),
+                row("epic:abc", "Title Two", externalIds = mapOf("STEAM" to " 440 ")),
+            ),
+        )
+
+        assertEquals(1, merged.size)
+    }
+
+    @Test
+    fun `different named store ids keep games apart that share nothing else`() {
+        val merged = StoreIdentity.group(
+            listOf(
+                row("gog:1", "Alpha", externalIds = mapOf("steam" to "1")),
+                row("epic:2", "Beta", externalIds = mapOf("steam" to "2")),
+            ),
+        )
+
+        assertEquals(2, merged.size)
+    }
+
+    @Test
+    fun `a blank store id joins nothing`() {
+        val merged = StoreIdentity.group(
+            listOf(
+                row("gog:1", "Alpha", externalIds = mapOf("steam" to "")),
+                row("epic:2", "Beta", externalIds = mapOf("steam" to " ")),
+            ),
+        )
+
+        assertEquals(2, merged.size)
     }
 
     @Test

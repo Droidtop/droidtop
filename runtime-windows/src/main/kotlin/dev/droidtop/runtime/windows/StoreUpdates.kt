@@ -8,6 +8,7 @@ import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.gog.GOGService
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.StoreUpdate
+import dev.droidtop.library.stores.StoreLibraries
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -99,7 +100,7 @@ internal object StoreUpdates {
     fun recheck(context: Context, id: String) {
         val app = context.applicationContext
         scope.launch {
-            val answer = runCatching { ask(id) }.getOrNull() ?: return@launch
+            val answer = runCatching { ask(app, id) }.getOrNull() ?: return@launch
             val next = known.toMutableMap()
             if (answer.update == StoreUpdate.AVAILABLE || answer.update == StoreUpdate.CURRENT) next[id] = answer else next.remove(id)
             persist(app, next, checkedAt)
@@ -112,7 +113,7 @@ internal object StoreUpdates {
         for (id in installedIds) {
             // No answer (not signed in, offline, no check for this store)
             // keeps what was known; it is never turned into "current".
-            val answer = withTimeoutOrNull(ASK_TIMEOUT_MS) { runCatching { ask(id) }.getOrNull() } ?: continue
+            val answer = withTimeoutOrNull(ASK_TIMEOUT_MS) { runCatching { ask(context, id) }.getOrNull() } ?: continue
             answered++
             if (answer.update == StoreUpdate.UNKNOWN) next.remove(id) else next[id] = answer
         }
@@ -120,8 +121,12 @@ internal object StoreUpdates {
     }
 
     /** The store's answer, or null when it cannot be asked right now or has no check at all. */
-    private suspend fun ask(id: String): Result? {
+    private suspend fun ask(context: Context, id: String): Result? {
         val native = id.substringAfter(':')
+        // A store droidtop runs itself answers through its own interface.
+        StoreLibraries.forKey(id)?.let { store ->
+            return store.checkUpdate(context, native)?.let { Result(it.update, it.latest) }
+        }
         return when (id.substringBefore(':')) {
             "steam" -> {
                 val appId = native.toIntOrNull() ?: return null
@@ -163,6 +168,9 @@ internal object StoreDownloadWatch {
 
     private val started = AtomicBoolean(false)
 
+    /** This watch's share of [StoreDownloads]; the store install jobs publish their own. */
+    private const val PUBLISHER = "gamenative"
+
     fun start(context: Context) {
         if (!started.compareAndSet(false, true)) return
         val app = context.applicationContext
@@ -170,7 +178,7 @@ internal object StoreDownloadWatch {
             var before = emptySet<String>()
             while (true) {
                 val now = snapshot()
-                StoreDownloads.publish(now)
+                StoreDownloads.publish(PUBLISHER, now)
                 (before - now.keys).forEach { id -> StoreUpdates.recheck(app, id) }
                 before = now.keys
                 delay(if (now.isEmpty()) IDLE_MS else BUSY_MS)

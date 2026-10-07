@@ -9226,6 +9226,49 @@ resolves identically every scan.
   GPL-3.0 notice are in `NOTICE.md`; extending the detector means editing
   those files, not chasing an upstream checkout.
 
+### Stores: one interface, run by droidtop (decided 2026-10-07, Droidtop/tracker#313)
+
+The owner, 2026-10-07: "we integrate GAMENATIVE's other stores. The idea is
+to stop relying on gamenative in general." The shape is Playnite's and
+Lutris' (`LibraryPlugin`, `OnlineService`), which `LibraryProvider` already
+follows:
+
+- **`StoreLibrary`** (`:library-core`, `dev.droidtop.library.stores`) is the
+  one interface for a store, built in or plugged in: its id and name, its
+  sign-in (`StoreSignIn`: the store's own web page, from which droidtop reads
+  the one-time code the page hands back, or a personal key the person makes on
+  the store's site; droidtop never sees a password), sign-out, sync, the games
+  it holds (`StoreGame`), install (which is also update), discard of a
+  cancelled download, uninstall, verify where the store keeps a file list,
+  its update check, how it starts a game when its own data says, and a change
+  stamp. It draws nothing: every screen is droidtop's own.
+- **`StoreLibraries`** is the registry every reader goes through (the PC
+  library, the Stores place, the game page and menu, the install job), so no
+  store is special-cased by name. Built-in stores register at process start.
+- **Identity is (store, store game id)** (`StoreGame.key`, "gog:1207658691"),
+  exactly the entry id the PC library already used. Which rows of different
+  stores are one game stays `StoreIdentity.group` (7m "One game across
+  stores"), whose first rung is now a store id two rows share: a row may name
+  other stores' ids for its game (`StoreGame.externalIds`, carried as
+  `PcInfo.externalIds`). None of the stores droidtop reads names one today,
+  so the rung joins nothing until a store or a scrape fills it; it is there
+  so that evidence outranks a folder or a title the moment it exists.
+- **Installs are jobs** (`StoreInstallJob`, kind `store_install`) in the one
+  jobs list, the Downloads place: Pause, Resume and Cancel like every other
+  job, restored paused after a restart, one starter whichever surface asked.
+  The job's checkpoint is the row's key; the stores resume from what is on
+  disk. Cancel removes what a download that never finished left behind and
+  never touches an installed game. Progress reaches the capsule and the game
+  page through `StoreDownloads`, which now has one share per publisher (the
+  install jobs; the vendored Steam service's downloads).
+- **Where a store installs**: under the volume the person picked in the
+  install offer (Droidtop/tracker#227), in `Games/<store name>` there, one
+  folder per store so an uninstall can prove what it deletes is a store
+  install (`SafeDelete`, never a walk that follows a symlink).
+- **What stays with GameNative for now**: Steam (its client is the next step
+  of the plan and waits on owner decisions) and the Wine runtime the games
+  run in. The `vendor/gamenative` submodule stays until both have moved.
+
 ### What the store services give, and what they do not
 
 Read from the vendored gamenative tree (2026-09-24), because "What is best

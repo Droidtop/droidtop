@@ -10,13 +10,17 @@ import java.text.Normalizer
  * the title. [group] says which of those rows are one game, in this
  * order of evidence:
  *
- * 1. **An install directory two rows name.** Two stores that put a game
- *    in the same folder are, by that fact, one game. This is the only
- *    cross-reference the stores' own rows carry: none of Steam's, GOG's,
- *    Epic's, Amazon's or itch.io's rows names another store's id.
- * 2. **The user's own word**: a [LibraryEntry.gameName] the person set
+ * 1. **A store id two rows share.** A row that names another store's id
+ *    for its game ([PcInfo.externalIds], Playnite's and Lutris' identity:
+ *    the pair of store and store id) is one game with that store's row.
+ *    The strongest evidence there is, because a store said it; none of
+ *    the stores droidtop reads today names one, so until a store or a
+ *    scrape fills it this rung joins nothing.
+ * 2. **An install directory two rows name.** Two stores that put a game
+ *    in the same folder are, by that fact, one game.
+ * 3. **The user's own word**: a [LibraryEntry.gameName] the person set
  *    ("The same game as...") groups the row under that name.
- * 3. **The same title once it is spelled the same way** ([titleKey]): case,
+ * 4. **The same title once it is spelled the same way** ([titleKey]): case,
  *    punctuation, trademark symbols and a trailing edition label
  *    ("Deluxe Edition", "GOTY") do not make a different game.
  *
@@ -25,7 +29,7 @@ import java.text.Normalizer
  * apart, because a number or a year in a title says which game it is.
  * Similar names are only ever suggested to a person ([SimilarGames]).
  *
- * Linear in the number of rows: each row is looked up in two hash maps.
+ * Linear in the number of rows: each row is looked up in three hash maps.
  */
 object StoreIdentity {
 
@@ -96,6 +100,17 @@ object StoreIdentity {
     private fun List<String>.endsWithPhrase(phrase: List<String>): Boolean =
         size >= phrase.size && subList(size - phrase.size, size) == phrase
 
+    /**
+     * Every store id [entry] stands for: its own ([ownership]) and each other
+     * store's id its row names ([PcInfo.externalIds]), as "store:id".
+     */
+    internal fun storeKeys(entry: LibraryEntry): List<String> = buildList {
+        entry.ownership()?.let { add("${it.store}:${it.id}") }
+        entry.pcInfo?.externalIds?.forEach { (store, id) ->
+            if (store.isNotBlank() && id.isNotBlank()) add("${store.lowercase()}:${id.trim()}")
+        }
+    }
+
     /** The stores' order everywhere a game shows more than one ([OWNERSHIP_STORES]); anything else after. */
     private fun storeRank(entry: LibraryEntry): Int {
         val index = OWNERSHIP_STORES.indexOf(entry.ownership()?.store)
@@ -134,7 +149,9 @@ object StoreIdentity {
         // can be one shared value for the whole catalogue (docs/SPEC.md 7m).
         val installedDirs = rows.mapNotNullTo(HashSet()) { row -> row.pcInfo?.takeIf { it.installed }?.installPath?.asInstallKey() }
         val byTitle = HashMap<String, Int>()
+        val byStoreId = HashMap<String, Int>()
         rows.forEachIndexed { index, row ->
+            storeKeys(row).forEach { key -> union(index, byStoreId.getOrPut(key) { index }) }
             row.pcInfo?.installPath?.asInstallKey()?.takeIf { it in installedDirs }?.let { dir -> union(index, byDir.getOrPut(dir) { index }) }
             titleKey(row.gameName ?: row.title).takeIf { it.isNotEmpty() }
                 ?.let { key -> union(index, byTitle.getOrPut(key) { index }) }

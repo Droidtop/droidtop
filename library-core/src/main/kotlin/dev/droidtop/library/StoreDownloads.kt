@@ -9,11 +9,14 @@ import kotlinx.coroutines.flow.StateFlow
  * and is not part of what a scan indexes (docs/SPEC.md 7i, "Capsules and
  * the primary action").
  *
- * `:runtime-windows` writes it from the vendored store services' own
- * download state ([publish]); the shell reads [active] to draw a progress
- * badge on a capsule and to turn the primary button into Downloading, with
- * the same one answer for the capsule, the game page and the menu. A plain
- * in-memory map: nothing here touches a disk or the network.
+ * Two writers fill it, each with its own share ([publish]): the store
+ * install jobs ([dev.droidtop.library.stores.StoreInstallJob], every store
+ * droidtop runs itself) and `:runtime-windows`, for the Steam downloads the
+ * vendored Steam service still runs. The shell reads [active] to draw a
+ * progress badge on a capsule and to turn the primary button into
+ * Downloading, with the same one answer for the capsule, the game page and
+ * the menu. A plain in-memory map: nothing here touches a disk or the
+ * network.
  */
 object StoreDownloads {
     /** One running download: how far it is (0 to 1) and whether it is stopped part-way. */
@@ -22,13 +25,22 @@ object StoreDownloads {
         val percent: Int get() = (fraction.coerceIn(0f, 1f) * 100f).toInt()
     }
 
+    private val shares = HashMap<String, Map<String, Progress>>()
     private val state = MutableStateFlow<Map<String, Progress>>(emptyMap())
 
     /** Every download in flight, keyed by store id; empty when there is none. */
     val active: StateFlow<Map<String, Progress>> = state
 
-    /** Replaces what is running; an identical answer changes nothing, so nothing redraws. */
-    fun publish(downloads: Map<String, Progress>) {
-        if (state.value != downloads) state.value = downloads
+    /**
+     * Replaces what [publisher] says is running; the other publishers' shares
+     * stay. An identical answer changes nothing, so nothing redraws.
+     */
+    @Synchronized
+    fun publish(publisher: String, downloads: Map<String, Progress>) {
+        if (shares[publisher] == downloads) return
+        if (downloads.isEmpty()) shares.remove(publisher) else shares[publisher] = downloads
+        val merged = HashMap<String, Progress>()
+        shares.values.forEach { merged.putAll(it) }
+        if (state.value != merged) state.value = merged
     }
 }

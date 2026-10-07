@@ -27,6 +27,8 @@ import dev.droidtop.library.ScanLog
 import dev.droidtop.library.ScanSkips
 import dev.droidtop.library.StoreInstall
 import dev.droidtop.library.StoreUpdate
+import dev.droidtop.library.stores.StoreGame
+import dev.droidtop.library.stores.StoreLibraries
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
@@ -107,6 +109,8 @@ object PcLibrary {
         val compatibility: Compatibility?,
         /** The build installed, when the store words one; never made up ([PcInfo.installedVersion]). */
         val installedVersion: String? = null,
+        /** Other stores' ids the store's own row names ([PcInfo.externalIds]). */
+        val externalIds: Map<String, String> = emptyMap(),
     ) {
         val installDir: File? get() = installPath?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { it.isDirectory }
     }
@@ -176,6 +180,15 @@ object PcLibrary {
             addAll(runCatching { dao.epicGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(runCatching { dao.amazonGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(runCatching { dao.itchGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
+            // The stores droidtop runs itself (docs/SPEC.md 7g, "Stores"),
+            // each read on its own for the same reason as the DAOs above.
+            for (store in StoreLibraries.all()) {
+                addAll(
+                    runCatching { store.games(context).mapNotNull { it.toGame() } }
+                        .onFailure { android.util.Log.w(TAG, "Reading ${store.label}'s games failed", it) }
+                        .getOrDefault(emptyList()),
+                )
+            }
             addAll(
                 runCatching {
                     // Folders the user added to the vendored scanner by
@@ -454,6 +467,28 @@ object PcLibrary {
         artUrl = coverUrl.takeIf { it.isNotEmpty() },
         compatibility = compatibilityFor(title),
     )
+
+    /**
+     * A row of a store droidtop runs itself. Null for a store this enum
+     * does not name yet: a store is a [Source] before its rows can be
+     * filtered on or drawn with its name.
+     */
+    private fun StoreGame.toGame(): Game? {
+        val source = Source.entries.firstOrNull { it != Source.FOLDER && it.name.equals(store, ignoreCase = true) } ?: return null
+        return Game(
+            id = key,
+            source = source,
+            nativeId = gameId,
+            title = title,
+            installed = installed,
+            installPath = installPath,
+            sizeBytes = sizeBytes,
+            artUrl = artUrl,
+            compatibility = compatibilityFor(title),
+            installedVersion = installedVersion,
+            externalIds = externalIds,
+        )
+    }
 
     /** One top-level folder of one root, and the game folders droidtop's rule found under it. */
     private data class ScannedFolder(
@@ -850,6 +885,7 @@ fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
     sizeBytes = sizeBytes,
     installPath = installPath,
     installedVersion = installedVersion,
+    externalIds = externalIds,
     latestVersion = StoreUpdates.resultFor(id)?.latest,
     update = StoreUpdates.resultFor(id)?.update ?: StoreUpdate.UNKNOWN,
     compatibility = compatibility?.let {

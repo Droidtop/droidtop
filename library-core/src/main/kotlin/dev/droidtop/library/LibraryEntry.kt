@@ -366,6 +366,12 @@ data class PcInfo(
     val latestVersion: String? = null,
     /** Whether a newer build exists; [StoreUpdate.UNKNOWN] is the honest default, never "up to date". */
     val update: StoreUpdate = StoreUpdate.UNKNOWN,
+    /**
+     * Other stores' ids for this game that the store's own row names, keyed
+     * by store id ("steam" to "440"): the first evidence
+     * [StoreIdentity.group] reads. Empty when the store names none.
+     */
+    val externalIds: Map<String, String> = emptyMap(),
 )
 
 /**
