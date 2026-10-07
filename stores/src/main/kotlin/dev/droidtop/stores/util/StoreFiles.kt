@@ -14,6 +14,30 @@ internal object StoreFiles {
     fun folderName(title: String, fallback: String): String =
         title.replace(UNSAFE, "").trim().trimEnd('.').ifBlank { fallback }
 
+    /**
+     * [relativePath] under [baseDir] matched case-insensitively segment by
+     * segment, the way Windows reads a path a store's file list names, or
+     * null when it is not there (GameNative's FileUtils.findFileCaseInsensitive).
+     */
+    fun findCaseInsensitive(baseDir: File, relativePath: String): File? {
+        val direct = File(baseDir, relativePath.replace('\\', '/'))
+        if (direct.exists()) return direct
+        return resolveCaseInsensitive(baseDir, relativePath).takeIf { it.exists() }
+    }
+
+    /**
+     * [relativePath] under [baseDir], each segment matched against the casing
+     * on disk where one exists and kept as written where none does yet, so a
+     * new file lands beside its differently cased siblings.
+     */
+    fun resolveCaseInsensitive(baseDir: File, relativePath: String): File {
+        var current = baseDir
+        for (segment in relativePath.replace('\\', '/').split('/').filter { it.isNotEmpty() }) {
+            current = current.listFiles()?.firstOrNull { it.name.equals(segment, ignoreCase = true) } ?: File(current, segment)
+        }
+        return current
+    }
+
     /** One number over [files]' modification times: a store's change stamp. One stat per file. */
     fun stamp(files: List<File>): Long {
         var stamp = 17L

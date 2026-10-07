@@ -20,19 +20,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import app.gamenative.ui.screen.auth.EpicOAuthActivity
-import app.gamenative.ui.screen.auth.GOGOAuthActivity
 import app.gamenative.utils.PlatformOAuthHandlers
 import dev.droidtop.app.ui.DroidtopTheme
 import kotlinx.coroutines.launch
 
 /**
- * Signing in to GOG or Epic -- build-plan step 6 of the PC surface
- * (docs/SPEC.md 7i). Steam already has its own screen
- * ([SteamLoginActivity]); these two are OAuth in a web view, which is
- * gamenative's own `GOGOAuthActivity` / `EpicOAuthActivity` plus its
- * `PlatformOAuthHandlers` to exchange the returned code for a session and
- * pull the library down. A store droidtop runs itself signs in through
- * [StoreSignInActivity] instead (docs/SPEC.md 7g, "Stores").
+ * Signing in to Epic -- build-plan step 6 of the PC surface (docs/SPEC.md
+ * 7i): GameNative's own `EpicOAuthActivity` plus its `PlatformOAuthHandlers`
+ * to exchange the returned code for a session. A store droidtop runs itself
+ * signs in through [StoreSignInActivity] instead (docs/SPEC.md 7g, "Stores").
  *
  * This Activity exists because an OAuth result is an Activity result: the
  * sign-in row that starts it lives in droidtop's own settings catalog,
@@ -44,10 +40,6 @@ import kotlinx.coroutines.launch
 class PcStoreSignInActivity : AppCompatActivity() {
 
     private var status by mutableStateOf("Opening the sign-in page...")
-
-    private val gog = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        onCode(result, GOGOAuthActivity.EXTRA_AUTH_CODE, GOGOAuthActivity.EXTRA_ERROR, Store.GOG)
-    }
 
     private val epic = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         onCode(result, EpicOAuthActivity.EXTRA_AUTH_CODE, EpicOAuthActivity.EXTRA_ERROR, Store.EPIC)
@@ -70,7 +62,6 @@ class PcStoreSignInActivity : AppCompatActivity() {
         // underneath the one already running.
         if (savedInstanceState != null) return
         when (store()) {
-            Store.GOG -> gog.launch(Intent(this, GOGOAuthActivity::class.java))
             Store.EPIC -> epic.launch(Intent(this, EpicOAuthActivity::class.java))
             null -> status = "No store was named for this sign-in."
         }
@@ -89,15 +80,6 @@ class PcStoreSignInActivity : AppCompatActivity() {
         status = "Signing in to ${store.label}..."
         lifecycleScope.launch {
             when (store) {
-                Store.GOG -> PlatformOAuthHandlers.handleGogAuthentication(
-                    context = this@PcStoreSignInActivity,
-                    authCode = code,
-                    coroutineScope = lifecycleScope,
-                    onLoadingChange = {},
-                    onError = { message -> status = message ?: "Sign-in failed." },
-                    onSuccess = { status = "Signed in to GOG." },
-                    onDialogClose = {},
-                )
                 Store.EPIC -> PlatformOAuthHandlers.handleEpicAuthentication(
                     context = this@PcStoreSignInActivity,
                     authCode = code,
@@ -117,7 +99,6 @@ class PcStoreSignInActivity : AppCompatActivity() {
 
     /** The stores GameNative still signs in through a web view. Steam is its own screen. */
     enum class Store(val key: String, val label: String) {
-        GOG("gog", "GOG"),
         EPIC("epic", "Epic Games"),
     }
 

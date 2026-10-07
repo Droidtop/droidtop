@@ -8,7 +8,10 @@ import dev.droidtop.library.EnginesDatabase
 import dev.droidtop.library.GameEngineDetector
 import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.GameExecutableResolver
+import dev.droidtop.library.WindowsLaunch
 import dev.droidtop.library.WindowsLaunchResolver
+import dev.droidtop.library.WineGameSettingsPrefs
+import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.library.PcGameRuntimeRegistry
 import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.PcInfo
@@ -381,7 +384,19 @@ class PcGameProvider(
                 runtime.launchLinux(linux, gameRoot)
             }
             GameLaunchStrategy.WINE_PREFIX -> {
-                val windows = WindowsLaunchResolver.resolve(context, entry.id, gameRoot)
+                // The program the person picked for this game wins; else the
+                // one the game's store itself starts (a GOG play task, docs/SPEC.md
+                // 7g "Stores"); else the one droidtop finds in the folder.
+                val picked = withContext(Dispatchers.IO) { WineGameSettingsPrefs.get(context, entry.id) }
+                val storeLaunch = if (picked?.executable == null) {
+                    StoreLibraries.forKey(entry.id)
+                        ?.let { store -> runCatching { store.launch(context, entry.id.substringAfter(':')) }.getOrNull() }
+                        ?.takeIf { withContext(Dispatchers.IO) { it.executable.isFile } }
+                } else {
+                    null
+                }
+                val windows = storeLaunch?.let { WindowsLaunch(it.executable, it.workingDir, it.arguments) }
+                    ?: WindowsLaunchResolver.resolve(picked, gameRoot)
                     ?: error(
                         "Can't launch ${entry.title}: couldn't identify which executable to run in " +
                             "${gameRoot.absolutePath}. Pick one explicitly for this game.",

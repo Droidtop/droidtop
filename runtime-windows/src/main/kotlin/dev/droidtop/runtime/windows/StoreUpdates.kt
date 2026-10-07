@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import app.gamenative.data.DownloadInfo
 import app.gamenative.service.SteamService
-import app.gamenative.service.gog.GOGService
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.stores.StoreLibraries
@@ -193,7 +192,6 @@ internal object StoreDownloadWatch {
             }
         }
         runCatching { add("steam", SteamService.getActiveDownloads()) }
-        runCatching { add("gog", GOGService.getActiveDownloads()) }
         return out
     }
 }

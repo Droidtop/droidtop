@@ -490,9 +490,6 @@
              does reach. Not exported: they are started from inside this
              app and carry an auth code back. -->
         <activity
-            android:name="app.gamenative.ui.screen.auth.GOGOAuthActivity"
-            android:exported="false" />
-        <activity
             android:name="app.gamenative.ui.screen.auth.EpicOAuthActivity"
             android:exported="false" />
 

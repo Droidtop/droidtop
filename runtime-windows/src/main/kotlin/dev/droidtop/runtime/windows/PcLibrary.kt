@@ -2,7 +2,6 @@ package dev.droidtop.runtime.windows
 
 import android.content.Context
 import app.gamenative.data.EpicGame
-import app.gamenative.data.GOGGame
 import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
 import app.gamenative.data.SteamApp
@@ -117,7 +116,6 @@ object PcLibrary {
     @InstallIn(SingletonComponent::class)
     interface StoreDaoEntryPoint {
         fun steamAppDao(): app.gamenative.db.dao.SteamAppDao
-        fun gogGameDao(): app.gamenative.db.dao.GOGGameDao
         fun epicGameDao(): app.gamenative.db.dao.EpicGameDao
     }
 
@@ -172,7 +170,6 @@ object PcLibrary {
         StoreDownloadWatch.start(context)
         return buildList {
             addAll(runCatching { dao.steamAppDao().getAllOwnedAppsAsList().map { it.toGame() } }.getOrDefault(emptyList()))
-            addAll(runCatching { dao.gogGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(runCatching { dao.epicGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             // The stores droidtop runs itself (docs/SPEC.md 7g, "Stores"),
             // each read on its own for the same reason as the DAOs above.
@@ -409,18 +406,6 @@ object PcLibrary {
         sizeBytes = 0L,
         artUrl = clientIconUrl.takeIf { clientIconHash.isNotEmpty() },
         compatibility = compatibilityFor(name),
-    )
-
-    private fun GOGGame.toGame(): Game = Game(
-        id = "gog:$id",
-        source = Source.GOG,
-        nativeId = id,
-        title = title,
-        installed = isInstalled,
-        installPath = installPath,
-        sizeBytes = if (isInstalled) installSize else downloadSize,
-        artUrl = verticalCoverUrl.ifEmpty { imageUrl }.ifEmpty { iconUrl }.takeIf { it.isNotEmpty() },
-        compatibility = compatibilityFor(title),
     )
 
     private fun EpicGame.toGame(): Game = Game(
@@ -682,7 +667,6 @@ object PcLibrary {
             when (entryId.substringBefore(':')) {
                 "steam" -> dao.steamAppDao().getAllOwnedAppsAsList()
                     .firstOrNull { it.id.toString() == nativeId }?.toLibraryItem()
-                "gog" -> dao.gogGameDao().getAllAsList().firstOrNull { it.id == nativeId }?.toLibraryItem()
                 "epic" -> dao.epicGameDao().getAllAsList().firstOrNull { it.catalogId == nativeId }?.toLibraryItem()
                 // A folder game IS a LibraryItem already -- the scanner
                 // produced the id this entry carries.
@@ -701,18 +685,6 @@ object PcLibrary {
         heroImageUrl = runCatching { getHeroUrl() }.getOrDefault(""),
         gameSource = GameSource.STEAM,
         isInstalled = runCatching { SteamService.isAppInstalled(id) }.getOrDefault(false),
-    )
-
-    private fun GOGGame.toLibraryItem(): LibraryItem = LibraryItem(
-        appId = "${GameSource.GOG.name}_$id",
-        name = title,
-        iconHash = iconUrl.ifEmpty { imageUrl },
-        capsuleImageUrl = verticalCoverUrl.ifEmpty { iconUrl.ifEmpty { imageUrl } },
-        headerImageUrl = imageUrl.ifEmpty { iconUrl },
-        heroImageUrl = imageUrl.ifEmpty { iconUrl },
-        gameSource = GameSource.GOG,
-        sizeBytes = if (isInstalled) installSize else downloadSize,
-        isInstalled = isInstalled,
     )
 
     private fun EpicGame.toLibraryItem(): LibraryItem = LibraryItem(

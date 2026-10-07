@@ -73,9 +73,8 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
     fun signedIn(context: Context): Boolean = runCatching {
         own?.signedIn(context) ?: when (this) {
             STEAM -> app.gamenative.utils.SteamUtils.hasStoredCredentials()
-            GOG -> app.gamenative.service.gog.GOGService.hasStoredCredentials(context)
             EPIC -> app.gamenative.service.epic.EpicService.hasStoredCredentials(context)
-            AMAZON, ITCH -> false
+            GOG, AMAZON, ITCH -> false
         }
     }.getOrDefault(false)
 
@@ -94,9 +93,8 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
         }
         return when (this) {
             STEAM -> Intent(context, SteamLoginActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            GOG -> PcStoreSignInActivity.intent(context, PcStoreSignInActivity.Store.GOG)
             EPIC -> PcStoreSignInActivity.intent(context, PcStoreSignInActivity.Store.EPIC)
-            AMAZON, ITCH -> null
+            GOG, AMAZON, ITCH -> null
         }
     }
 
@@ -109,12 +107,8 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
             when (this) {
                 // The same call Steam's own screen makes; a session that is not live has only stored preferences to clear.
                 STEAM -> if (SteamAccess.isLoggedIn()) SteamAccess.logOut() else app.gamenative.PrefManager.clearSteamSessionPreferences()
-                // The service's logout needs the service running; without it the stored sign-in is cleared directly.
-                GOG -> app.gamenative.service.gog.GOGService.logout(context).getOrElse {
-                    check(app.gamenative.service.gog.GOGService.clearStoredCredentials(context)) { "GOG would not clear its sign-in" }
-                }
                 EPIC -> app.gamenative.service.epic.EpicService.logout(context).getOrThrow()
-                AMAZON, ITCH -> Unit
+                GOG, AMAZON, ITCH -> Unit
             }
         }
     }
@@ -142,9 +136,8 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
                 )
             } else {
                 when (this@PcStore) {
-                    GOG -> app.gamenative.service.gog.GOGService.triggerLibrarySync(context)
                     EPIC -> app.gamenative.service.epic.EpicService.triggerLibrarySync(context)
-                    STEAM, AMAZON, ITCH -> Unit
+                    STEAM, GOG, AMAZON, ITCH -> Unit
                 }
                 "Sync requested. New games appear in a moment"
             }

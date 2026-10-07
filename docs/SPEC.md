@@ -9312,6 +9312,24 @@ follows:
   compares the installed version id with Amazon's live one. Not carried:
   GameNative's deployment of Amazon's game SDK into a Wine prefix, which is
   the launch path's business, not the store's.
+- **GOG** (`GOGStore`): sign-in is GOG's Galaxy page with a fresh state
+  value; GOG returns to its `on_login_success` page with the code, and a
+  return with any other state is ignored. Sync reads the owned ids and
+  fetches details for the new ones only. Install downloads the newest
+  Windows build (Gen 2, else Gen 1) with its DLCs, in the device's language
+  (`StoreLanguage`: GameNative asked for a "container language"; droidtop
+  has no such setting, so the device's language answers, English when GOG
+  has no files for it), with its redistributables in `_CommonRedist`; a
+  stopped or failed download keeps its chunk cache and continues from it. A
+  game starts the way GOG's client starts it: the primary play task of its
+  `goggame-<id>.info` (program, working folder, arguments), unless the
+  person picked a program for it (`PcGameProvider`, the same rule a folder
+  game's picked program follows). Not run yet: the installer scripts and
+  support commands GOG's client runs after an install (GameNative ran them
+  in the game's Wine session at launch); the download still writes their
+  data (`_gog_manifest.json`) for the launch path to run them. GOG keeps no
+  version check droidtop asks and no file list it checks: no update check,
+  no verify.
 - **What stays with GameNative for now**: Steam (its client is the next step
   of the plan and waits on owner decisions) and the Wine runtime the games
   run in. The `vendor/gamenative` submodule stays until both have moved.
