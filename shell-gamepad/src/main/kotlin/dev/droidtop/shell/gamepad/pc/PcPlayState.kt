@@ -1,5 +1,9 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.installFolderFor
+import dev.droidtop.library.StoreInstallVolumePrefs
+import dev.droidtop.library.NO_GAME_FOLDER_LINE
+import dev.droidtop.library.GamesRoots
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
@@ -213,14 +217,25 @@ internal fun LibraryEntry.ownStore(): StoreLibrary? = StoreLibraries.forKey(pcIn
 /**
  * Starts installing or updating [entry] from the store droidtop runs for
  * it, as a job in the Downloads place ([StoreInstallJob]), into the store's
- * folder on [volumePath] (the install offer's choice; null for the primary
- * volume). The one starter, whichever surface asked. Returns the line to
- * show.
+ * subfolder of the game folder at [folderPath] (the install offer's choice;
+ * blank for the folder remembered for the store, or the first game folder).
+ * A store game goes into one of the person's game folders (Settings > Game
+ * folders), never droidtop's own Android/data folder (docs/SPEC.md 7g,
+ * "Where a store installs"). The one starter, whichever surface asked.
+ * Returns the line to show.
  */
-internal suspend fun startOwnStoreInstall(context: Context, entry: LibraryEntry, store: StoreLibrary, volumePath: String?): String {
+internal suspend fun startOwnStoreInstall(context: Context, entry: LibraryEntry, store: StoreLibrary, folderPath: String): String {
     val key = entry.pcInfo?.storeId ?: entry.id
-    val volume = volumePath ?: withContext(Dispatchers.IO) { context.getExternalFilesDir(null)?.path ?: context.filesDir.path }
-    return if (StoreInstallJob.start(context, key, GameNaming.displayName(entry.title), StoreInstallJob.rootFor(volume, store)) != null) {
+    val folder = folderPath.ifBlank {
+        withContext(Dispatchers.IO) {
+            installFolderFor(
+                StoreInstallVolumePrefs.remembered(context, entry.pcInfo?.source.orEmpty()),
+                GamesRoots.configured(context).map { it.absolutePath },
+            )
+        }.orEmpty()
+    }
+    if (folder.isBlank()) return NO_GAME_FOLDER_LINE
+    return if (StoreInstallJob.start(context, key, GameNaming.displayName(entry.title), StoreInstallJob.rootFor(folder, store)) != null) {
         "Downloading. It is listed under Downloads"
     } else {
         "${store.label} cannot install this game in this build"

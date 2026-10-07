@@ -33,15 +33,22 @@ object GamesRoots {
     private const val KEY_GAMES_ROOT_PATHS = "droidtop_games_root_paths"
 
     /** Same real fallback MainActivity's own onCreate used to apply itself: an app-private default for a fresh install that hasn't been through onboarding (or has zero roots configured) yet. */
-    fun current(context: Context): List<File> {
-        val configured = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    fun current(context: Context): List<File> =
+        configured(context).ifEmpty {
+            listOf(File(context.getExternalFilesDir(null), "games").apply { mkdirs() })
+        }
+
+    /**
+     * Only the folders the person named (Settings > Game folders), without
+     * [current]'s app-private fallback: where a store install may go
+     * (docs/SPEC.md 7g, "Stores"), since a game put in droidtop's own
+     * Android/data folder dies with the app and no other app can read it.
+     */
+    fun configured(context: Context): List<File> =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getStringSet(KEY_GAMES_ROOT_PATHS, emptySet())
             ?.map(::File)
             .orEmpty()
-        return configured.ifEmpty {
-            listOf(File(context.getExternalFilesDir(null), "games").apply { mkdirs() })
-        }
-    }
 
     private const val KEY_SCANNED_ROOTS = "droidtop_games_roots_last_scanned"
 

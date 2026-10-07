@@ -1,5 +1,7 @@
 package dev.droidtop.library
 
+import dev.droidtop.library.stores.StoreInstallJob
+import dev.droidtop.library.stores.StoreLibraries
 import java.io.File
 
 /**
@@ -13,7 +15,7 @@ import java.io.File
  * the ROM walk's add-on-directory test, the second calling the first), and
  * nothing covered a store's own tree at all.
  *
- * Four rules, each from a real failure:
+ * Five rules, each from a real failure or a rule of where games live:
  *
  *  1. **Hidden folders and filesystem bookkeeping.** A leading dot is how
  *     Syncthing, Android's own caches and every Unix tool mark "not for
@@ -62,6 +64,18 @@ import java.io.File
  *     listed gba, gbc, nds and ps2 twice (Droidtop/tracker#297, build
  *     1397). The folder is named by the same constant the media reader
  *     uses, so the two cannot drift apart.
+ *
+ *  5. **A store download that has not finished is not a game.** A store
+ *     droidtop runs installs into "<game folder>/<store>/<game>" inside
+ *     the person's own game folders (docs/SPEC.md 7g, "Where a store
+ *     installs"), so a walk meets a download half way through. While it
+ *     runs the store keeps [StoreInstallJob.IN_PROGRESS_MARKER] in the
+ *     game's folder; a folder holding it, directly inside a folder named
+ *     like a registered store's folder ([StoreInstallJob.folderName]), is
+ *     passed over. The name test comes first and is free, so the extra
+ *     stat is paid only inside a store's folder. A finished install is the
+ *     store's entry and is kept out of the folder games by the PC library
+ *     instead (it knows the store's own rows).
  *
  * What is deliberately NOT here, and why, because both were checked
  * against the real library on 2026-09-11 rather than assumed:
@@ -180,7 +194,15 @@ object ScanPrune {
         if (lower in NEVER_A_GAME_FOLDER) return "it is a filesystem or sync marker folder"
         if (lower in STORE_PAYLOAD_FOLDERS) return "it holds a store's installer payload, not a game"
         if (lower == EsDeArtwork.MEDIA_DIR) return "it holds scraped media, not games"
+        if (isStoreDownloadInProgress(dir)) return "a store is still downloading it"
         return storeManagedReason(dir)
+    }
+
+    /** Rule 5: [dir] is a game a store droidtop runs is still downloading into its folder. */
+    private fun isStoreDownloadInProgress(dir: File): Boolean {
+        val parent = dir.parentFile?.name ?: return false
+        if (StoreLibraries.all().none { StoreInstallJob.folderName(it).equals(parent, ignoreCase = true) }) return false
+        return File(dir, StoreInstallJob.IN_PROGRESS_MARKER).exists()
     }
 
     /** [skipReason]'s verdict alone. */

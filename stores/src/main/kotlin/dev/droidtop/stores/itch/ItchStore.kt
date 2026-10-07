@@ -106,7 +106,7 @@ class ItchStore : StoreLibrary {
         progress.report(-1f, "Asking itch.io for the files")
         val uploads = ItchApiClient.uploads(apiKey, gameId, game.downloadKeyId).getOrElse { throw it }
         val upload = chooseUpload(uploads, game.installedUploadId) ?: error("itch.io lists no files for ${game.title}")
-        val installPath = game.installPath.ifBlank { File(root, StoreFiles.folderName(game.title, "itch-$gameId")).absolutePath }
+        val installPath = game.installPath.ifBlank { StoreFiles.freshFolder(root, game.title, "itch-$gameId").absolutePath }
         // Recorded before the download, so a Cancel knows which folder is the unfinished one.
         if (game.installPath != installPath) withContext(Dispatchers.IO) { dao.update(game.copy(installPath = installPath)) }
         val info = newDownloadInfo()

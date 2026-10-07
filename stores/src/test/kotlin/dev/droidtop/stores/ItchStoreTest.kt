@@ -46,6 +46,20 @@ class ItchStoreTest {
     }
 
     @Test
+    fun `a new install never gets a folder that already holds files`() {
+        val root = Files.createTempDirectory("store").toFile()
+        assertEquals(File(root, "Cool Game"), StoreFiles.freshFolder(root, "Cool Game!", "x"))
+        // An empty folder of that name is taken as it is.
+        File(root, "Cool Game").mkdirs()
+        assertEquals(File(root, "Cool Game"), StoreFiles.freshFolder(root, "Cool Game", "x"))
+        // A folder with someone's files in it is passed over.
+        File(root, "Cool Game/save.dat").writeText("theirs")
+        File(root, "Cool Game (2)").apply { mkdirs() }.let { File(it, "a").writeText("a") }
+        assertEquals(File(root, "Cool Game (3)"), StoreFiles.freshFolder(root, "Cool Game", "x"))
+        root.deleteRecursively()
+    }
+
+    @Test
     fun `the change stamp moves when a file changes`() {
         val dir = Files.createTempDirectory("stamp").toFile()
         val file = File(dir, "stores.db").apply { writeText("a") }

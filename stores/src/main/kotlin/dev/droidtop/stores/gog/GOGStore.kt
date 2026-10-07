@@ -96,7 +96,7 @@ class GOGStore : StoreLibrary {
     override suspend fun install(context: Context, gameId: String, root: File, progress: StoreProgress): String {
         val dao = dao(context)
         val game = withContext(Dispatchers.IO) { dao.getById(gameId) } ?: error("GOG no longer lists this game")
-        val installDir = File(game.installPath.ifBlank { File(root, StoreFiles.folderName(game.title, "gog-$gameId")).absolutePath })
+        val installDir = File(game.installPath.ifBlank { StoreFiles.freshFolder(root, game.title, "gog-$gameId").absolutePath })
         // Recorded before the download, so a Cancel knows which folder is the unfinished one.
         if (game.installPath != installDir.absolutePath) withContext(Dispatchers.IO) { dao.update(game.copy(installPath = installDir.absolutePath)) }
         val parser = GOGManifestParser()

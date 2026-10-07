@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.friendlyLocation
 import dev.droidtop.shell.gamepad.menuMove
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

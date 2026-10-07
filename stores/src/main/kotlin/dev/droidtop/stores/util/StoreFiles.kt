@@ -15,6 +15,27 @@ internal object StoreFiles {
         title.replace(UNSAFE, "").trim().trimEnd('.').ifBlank { fallback }
 
     /**
+     * The folder a NEW install of [title] goes in under its store's folder
+     * [root]: [folderName], or "Name (2)", "Name (3)" and so on when a folder
+     * of that name is already there and not empty. A store's folder sits in
+     * one of the person's own game folders (docs/SPEC.md 7g, "Where a store
+     * installs"), so a folder of the same name may be theirs, and a failed
+     * install's cleanup deletes the folder it was given: it must never be
+     * handed one it did not make. One listing per name tried; called off the
+     * main thread, from the install job.
+     */
+    fun freshFolder(root: File, title: String, fallback: String): File {
+        val name = folderName(title, fallback)
+        var candidate = File(root, name)
+        var n = 2
+        while (candidate.exists() && !(candidate.isDirectory && candidate.list().isNullOrEmpty())) {
+            candidate = File(root, "$name ($n)")
+            n++
+        }
+        return candidate
+    }
+
+    /**
      * [relativePath] under [baseDir] matched case-insensitively segment by
      * segment, the way Windows reads a path a store's file list names, or
      * null when it is not there (GameNative's FileUtils.findFileCaseInsensitive).

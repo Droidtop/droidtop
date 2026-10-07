@@ -243,7 +243,15 @@ object PcLibrary {
             var found: List<ScannedFolder> = emptyList()
             if (roots.isNotEmpty()) {
                 try {
-                    found = scanGameFolders(context, roots, skip)
+                    // A store installs into the person's game folders
+                    // (docs/SPEC.md 7g, "Where a store installs"), so the
+                    // walk meets its games too: those folders are the
+                    // store's entries, with the store's facts, and are not
+                    // listed a second time as folder games.
+                    val storeOwned = storeOwnedFolders(context)
+                    found = scanGameFolders(context, roots, skip).map { group ->
+                        if (storeOwned.isEmpty()) group else group.copy(gameFolders = group.gameFolders.filterNot { it.isUnder(storeOwned) })
+                    }
                     adoptFoundFolders(rootPaths, found)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -431,6 +439,18 @@ object PcLibrary {
         val skipped: Boolean,
         val skips: ScanSkips,
     )
+
+    /**
+     * The folders the stores droidtop runs have put games in, finished or
+     * still downloading (each store records the folder before its download
+     * starts). One read of each store's own rows; off the main thread with
+     * the walk that asks.
+     */
+    private suspend fun storeOwnedFolders(context: Context): List<String> =
+        StoreLibraries.all().flatMap { store ->
+            runCatching { store.games(context) }.getOrDefault(emptyList())
+                .mapNotNull { game -> game.installPath?.takeIf(String::isNotBlank)?.let { File(it).absolutePath } }
+        }
 
     private fun String.isUnder(folders: Collection<String>): Boolean =
         folders.any { folder -> this == folder || startsWith("$folder/") }

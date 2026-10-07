@@ -1,6 +1,7 @@
 package dev.droidtop.library.stores
 
 import android.content.Context
+import dev.droidtop.library.ScanPrune
 import dev.droidtop.library.StoreDownloads
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -53,13 +54,31 @@ class StoreLibrariesTest {
     }
 
     @Test
-    fun `each store installs into a folder of its own under the volume's Games folder`() {
-        val root = StoreInstallJob.rootFor("/storage/emulated/0/Android/data/dev.droidtop.app/files", FakeStore("amazon", "Amazon"))
-        assertEquals(File("/storage/emulated/0/Android/data/dev.droidtop.app/files/Games/Amazon"), root)
+    fun `each store installs into a folder of its own inside the game folder`() {
+        val root = StoreInstallJob.rootFor("/storage/emulated/0/Games", FakeStore("amazon", "Amazon"))
+        assertEquals(File("/storage/emulated/0/Games/Amazon"), root)
         val odd = StoreInstallJob.rootFor("/v", FakeStore("itch", "itch.io"))
-        assertEquals(File("/v/Games/itch.io"), odd)
+        assertEquals(File("/v/itch.io"), odd)
         val nothingLeft = StoreInstallJob.rootFor("/v", FakeStore("x", "???"))
-        assertEquals(File("/v/Games/x"), nothingLeft)
+        assertEquals(File("/v/x"), nothingLeft)
+    }
+
+    @Test
+    fun `a library walk passes over a store game still downloading, and only that`() {
+        StoreLibraries.register(FakeStore("prunetest", "Prune Store"))
+        val games = java.nio.file.Files.createTempDirectory("games").toFile()
+        val storeFolder = File(games, "Prune Store")
+        val downloading = File(storeFolder, "Half Game").apply { mkdirs() }
+        File(downloading, StoreInstallJob.IN_PROGRESS_MARKER).writeText("")
+        val finished = File(storeFolder, "Whole Game").apply { mkdirs() }
+        // The same marker outside a store's folder proves nothing.
+        val elsewhere = File(games, "Their Game").apply { mkdirs() }
+        File(elsewhere, StoreInstallJob.IN_PROGRESS_MARKER).writeText("")
+
+        assertEquals("a store is still downloading it", ScanPrune.skipReason(downloading))
+        assertNull(ScanPrune.skipReason(finished))
+        assertNull(ScanPrune.skipReason(elsewhere))
+        games.deleteRecursively()
     }
 
     @Test

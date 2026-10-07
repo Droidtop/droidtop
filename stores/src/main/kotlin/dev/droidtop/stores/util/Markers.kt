@@ -1,5 +1,6 @@
 package dev.droidtop.stores.util
 
+import dev.droidtop.library.stores.StoreInstallJob
 import java.io.File
 import timber.log.Timber
 
@@ -11,7 +12,7 @@ import timber.log.Timber
  */
 internal enum class Marker(val fileName: String) {
     DOWNLOAD_COMPLETE_MARKER(".download_complete"),
-    DOWNLOAD_IN_PROGRESS_MARKER(".download_in_progress"),
+    DOWNLOAD_IN_PROGRESS_MARKER(StoreInstallJob.IN_PROGRESS_MARKER),
 }
 
 internal object MarkerUtils {

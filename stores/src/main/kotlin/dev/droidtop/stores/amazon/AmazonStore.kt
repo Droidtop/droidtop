@@ -100,7 +100,7 @@ class AmazonStore : StoreLibrary {
     override suspend fun install(context: Context, gameId: String, root: File, progress: StoreProgress): String {
         val dao = dao(context)
         val game = withContext(Dispatchers.IO) { dao.getByProductId(gameId) } ?: error("Amazon no longer lists this game")
-        val installPath = game.installPath.ifBlank { File(root, StoreFiles.folderName(game.title, "amazon-${game.appId}")).absolutePath }
+        val installPath = game.installPath.ifBlank { StoreFiles.freshFolder(root, game.title, "amazon-${game.appId}").absolutePath }
         val wasInstalled = game.isInstalled
         withContext(Dispatchers.IO) {
             // Recorded before the download, so a Cancel knows which folder is the unfinished one.

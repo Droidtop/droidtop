@@ -421,7 +421,7 @@ internal fun PcGamesSection(
     // game's card launching the part to continue with, not always the first
     // (docs/SPEC.md 7n). An install or update stops on the free-space
     // offer first (Droidtop/tracker#227): the size and the room the chosen
-    // volume has are named before the store's screen opens; a download
+    // game folder has are named before anything downloads; a download
     // already running goes straight to the store's queue.
     val downloads by StoreDownloads.active.collectAsState()
     var storeOffer by remember { mutableStateOf<StoreInstallOffer?>(null) }
@@ -431,7 +431,7 @@ internal fun PcGamesSection(
     }
     // The install offer was taken: a store droidtop runs starts its job here,
     // Steam opens its own screen.
-    fun proceed(entry: LibraryEntry, volumePath: String?) {
+    fun proceed(entry: LibraryEntry, volumePath: String) {
         val own = entry.ownStore()
         if (own == null) {
             say(openStoreScreen(context, entry))

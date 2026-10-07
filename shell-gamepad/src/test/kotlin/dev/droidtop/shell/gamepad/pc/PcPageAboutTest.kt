@@ -145,14 +145,6 @@ class PcPageAboutTest {
     }
 
     @Test
-    fun aFolderIsNamedByItsPlaceNotItsPath() {
-        assertEquals("Internal storage / Games / Cool Game", friendlyLocation("/storage/emulated/0/Games/Cool Game"))
-        assertEquals("SD card / Games / Cool Game", friendlyLocation("/storage/1A2B-3C4D/Games/Cool Game"))
-        assertEquals("SD card / Games / … / B / Cool Game", friendlyLocation("/storage/1A2B-3C4D/Games/A/B/Cool Game"))
-        assertEquals("windows / Games / Cool Game", friendlyLocation("/mnt/windows/Games/Cool Game"))
-    }
-
-    @Test
     fun theThreadRowsLiveUnderVersionsAndCheckNowNeedsALink() {
         assertEquals(PageTab.VERSIONS, pageTabOf(THREAD_ROW))
         assertEquals(PageTab.VERSIONS, pageTabOf(CHECK_ROW))

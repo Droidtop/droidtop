@@ -9262,10 +9262,28 @@ follows:
   never touches an installed game. Progress reaches the capsule and the game
   page through `StoreDownloads`, which now has one share per publisher (the
   install jobs; the vendored Steam service's downloads).
-- **Where a store installs**: under the volume the person picked in the
-  install offer (Droidtop/tracker#227), in `Games/<store name>` there, one
-  folder per store so an uninstall can prove what it deletes is a store
-  install (`SafeDelete`, never a walk that follows a symlink).
+- **Where a store installs** (the owner, 2026-10-07: "The location problem
+  is solved by the game folder system"): in one of the person's own game
+  folders, the same set every library walk reads (`GamesRoots.configured`,
+  written by Settings > Game folders and onboarding; "A root is a place, not
+  a picker result" above), never droidtop's own `Android/data` folder, which
+  dies with the app and which no other app (Enginehost) can read. There is
+  no second install-location setting: adding, removing or choosing a game
+  folder is the one way to say where games live. A store's games go in
+  `<game folder>/<store name>/<game>` (`StoreInstallJob.rootFor`), one folder
+  per store so an uninstall can prove what it deletes is a store install
+  (`SafeDelete`, never a walk that follows a symlink). A new install never
+  takes a folder that already holds files (`StoreFiles.freshFolder` picks
+  "Name (2)" instead): a same-named folder in a person's game folder may be
+  theirs, and a failed install's cleanup deletes the folder it was given.
+  With no game folder named the install offer says to add one and starts
+  nothing. Because the walk now meets store installs, two rules keep them
+  listed once: a finished install is the store's entry, so the PC walk drops
+  the folders the stores' own rows name before turning folders into folder
+  games (`PcLibrary.folderGames`), and engine detection still folds a
+  store-installed engine game through `knownInstalls`; a download still
+  running carries `.download_in_progress` (`StoreInstallJob.IN_PROGRESS_MARKER`),
+  and `ScanPrune` (rule 5) passes over such a folder inside a store's folder.
 - **The `:stores` module** holds the stores lifted out of GameNative, each a
   `StoreLibrary`, with droidtop's own copy of what they hold: `stores.db`
   (`StoresDatabase`), the four tables GameNative kept in its `pluvia.db`
@@ -10402,28 +10420,32 @@ consent"): an `Install` or `Update` press does not open the store's screen
 directly. It stops on droidtop's own one-screen offer
 (`StoreInstallOfferSheet`, shell-gamepad), which names the download's size
 when the library knows it (`PcInfo.sizeBytes`) and the free space of the
-volume the install goes to (`installVolumes`, `StoreInstallVolumes.kt`
-in :library-core: the app's own directory on the internal storage and on
-every mounted SD card, read with `StatFs` on IO, the sheet's one disk
-read), warns in plain words when the download will not fit, and offers
-the other volumes. The chosen volume is remembered per store
+game folder the install goes to (`installVolumes`, `StoreInstallVolumes.kt`
+in :library-core). The places offered are the person's own game folders
+(`GamesRoots.configured`, 7g "Where a store installs"; directed 2026-10-07,
+replacing the app's own directory on each volume, which put store games
+in `Android/data`), each named as a place (`friendlyLocation`, the one
+naming the game page's Install location row uses too) with its
+partition's free space read with `StatFs` on IO, the sheet's one disk
+read. It warns in plain words when the download will not fit and offers
+the other game folders. The chosen folder is remembered per store
 (`StoreInstallVolumePrefs`, the store's own display name as the key), so
-the next install from the same store names that volume first; until one
-is chosen the primary is the store's own default. The offer's fit check
-is the library's answer, not the store's: an update's download is the
-store's delta, which the library does not carry, so an update gets the
-free space named but never a fit warning, and an install of unknown size
-is never refused on its behalf. A picks a volume and opens the store's
-screen; B closes with nothing opened. Downloads already in flight
-(`Downloading`, `Paused`) skip the offer and open the store's queue,
-where the download is looked after; the store's own screen still does
-the installing, and droidtop supplies the check before it, not a second
-implementation of it. The remembered choice is droidtop's answer to
-"which volume"; making the store service itself install there (the fork's
-install roots are one global external/internal switch, not one per
-store), and the Storage view — bytes per store and per game, sorted by
-size, free space per volume, an uninstall per row — are the rest of
-Droidtop/tracker#227.
+the next install from the same store names that folder first while it is
+still one of the person's game folders; otherwise the first is offered
+(`installFolderFor`). With no game folder named the sheet says "No game
+folder yet. Add one under Settings > Game folders" and offers only Not now.
+The offer's fit check is the library's answer, not the store's: an
+update's download is the store's delta, which the library does not carry,
+so an update gets the free space named but never a fit warning, and an
+install of unknown size is never refused on its behalf. For a store
+droidtop runs itself A picks a game folder and starts the install job
+there (`startOwnStoreInstall`); for Steam, which keeps its own install
+location on its current path, the sheet names the size only and A opens
+its screen. B closes with nothing started. Downloads already in flight
+(`Downloading`, `Paused`) skip the offer and go to the Downloads place
+(Steam: its own queue). The Storage view (bytes per store and per game,
+sorted by size, free space per folder, an uninstall per row) is the rest
+of Droidtop/tracker#227.
 
 **Live downloads.** `StoreDownloads` (`:library-core`) is an in-memory map
 by store id with one share per writer: the store install jobs

@@ -9,7 +9,7 @@ import org.junit.Test
 /**
  * The free-space answer a store install or update is asked with
  * (Droidtop/tracker#227): the fit check and the consent sheet's own
- * wording. The volume list and the StatFs read behind [installVolumes]
+ * wording. The game-folder list and the StatFs read behind [installVolumes]
  * need a device; what is tested here is the decision and the sentence,
  * both pure.
  */
@@ -17,8 +17,9 @@ class StoreInstallVolumesTest {
 
     private val format: (Long) -> String = { "$it GB" }
 
-    private val card = InstallVolume("SD card", "/storage/ABCD-1234/Android/data/x/files", 95L, 128L)
-    private val phone = InstallVolume("Internal storage", "/storage/emulated/0/Android/data/x/files", 12L, 32L)
+    // Game folders the person named (Settings > Game folders), never droidtop's Android/data folder.
+    private val card = InstallVolume("SD card", "/storage/ABCD-1234", 95L, 128L)
+    private val phone = InstallVolume("Internal storage", "/storage/emulated/0", 12L, 32L)
 
     @Test
     fun `a download that fits passes, one past the edge does not`() {
@@ -102,5 +103,29 @@ class StoreInstallVolumesTest {
             ),
             storeInstallOfferLines(true, 60L, phone, format),
         )
+    }
+
+    @Test
+    fun `steam picks its own location, so its offer names the size and no room`() {
+        assertEquals(listOf("Downloads 60 GB."), storeInstallOfferLines(false, 60L, null, format))
+    }
+
+    @Test
+    fun `a store installs to its remembered game folder while it is still one, else the first`() {
+        val folders = listOf("/storage/emulated/0/Games", "/storage/ABCD-1234/Games")
+        assertEquals("/storage/emulated/0/Games", installFolderFor("/storage/emulated/0/Games", folders))
+        assertEquals("/storage/ABCD-1234/Games", installFolderFor(null, folders))
+        // A folder the person took off the list is not installed to.
+        assertEquals("/storage/ABCD-1234/Games", installFolderFor("/storage/emulated/0/Android/data/dev.droidtop.app/files", folders))
+        assertNull(installFolderFor("/storage/emulated/0/Games", emptyList()))
+    }
+
+    @Test
+    fun `a folder is named by its place, not its path`() {
+        assertEquals("Internal storage / Games / Cool Game", friendlyLocation("/storage/emulated/0/Games/Cool Game"))
+        assertEquals("SD card / Games / Cool Game", friendlyLocation("/storage/1A2B-3C4D/Games/Cool Game"))
+        assertEquals("SD card / Games / … / B / Cool Game", friendlyLocation("/storage/1A2B-3C4D/Games/A/B/Cool Game"))
+        assertEquals("windows / Games / Cool Game", friendlyLocation("/mnt/windows/Games/Cool Game"))
+        assertEquals("Internal storage", friendlyLocation("/storage/emulated/0"))
     }
 }

@@ -26,6 +26,7 @@ import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.InstallVolume
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.NO_GAME_FOLDER_LINE
 import dev.droidtop.library.StoreInstallVolumePrefs
 import dev.droidtop.library.installVolumes
 import dev.droidtop.library.storeInstallOfferLines
@@ -41,18 +42,25 @@ import kotlinx.coroutines.withContext
 /**
  * The offer droidtop stops on before a store install or update
  * (Droidtop/tracker#227): the download's size, when the library knows it,
- * and the free space of the volume the store installs to, named BEFORE the
- * store's own screen opens, so a 60 GB download on a 12 GB card is a
- * decision and not a 94 percent surprise. A picks a volume (the choice is
- * remembered per store, [StoreInstallVolumePrefs]) and starts the install
- * there for a store droidtop runs itself (docs/SPEC.md 7g, "Stores"), or
- * opens the store's screen for Steam; B closes with nothing started.
+ * and the free space of the game folder the store installs to, named BEFORE
+ * anything downloads, so a 60 GB download on a 12 GB card is a decision and
+ * not a 94 percent surprise.
+ *
+ * For a store droidtop runs itself (docs/SPEC.md 7g, "Stores") the places
+ * offered are the person's own game folders (Settings > Game folders,
+ * [installVolumes]), the folders every library walk reads, never droidtop's
+ * Android/data folder: A picks one (remembered per store,
+ * [StoreInstallVolumePrefs]) and the install starts in that folder's store
+ * subfolder. With no game folder named yet the offer says where to add one
+ * and starts nothing. Steam keeps its own install location, so for Steam
+ * the offer names the size and opens the store's screen; B closes with
+ * nothing started.
  *
  * Downloads that are already running (Downloading, Paused) do not stop
  * here: the download is in flight and the store's queue is the place for
  * it, so the caller opens the store's screen directly.
  *
- * The one disk read of the sheet is the volume list's StatFs, off the
+ * The one disk read of the sheet is the folder list's StatFs, off the
  * main thread on IO (Droidtop/tracker#227: no disk work while drawing);
  * everything else is already on the [LibraryEntry]. The pad comes through
  * the one pipeline, the same registered-hook shape
@@ -64,46 +72,49 @@ internal data class StoreInstallOffer(val entry: LibraryEntry, val stage: StoreS
 @Composable
 internal fun StoreInstallOfferSheet(
     offer: StoreInstallOffer?,
-    /** The offer was taken, on the volume at this path (null when no volume could be read). */
-    onProceed: (StoreInstallOffer, String?) -> Unit,
+    /** The offer was taken; for a store droidtop runs, into the game folder at this path (empty for Steam, which picks its own). */
+    onProceed: (StoreInstallOffer, String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val offer = offer ?: return
     val context = LocalContext.current
     val entry = offer.entry
     val store = entry.pcInfo?.source.orEmpty()
-    // A store droidtop runs installs from here; Steam still opens its own screen.
+    // A store droidtop runs installs into a game folder; Steam still opens its own screen.
     val own = entry.ownStore() != null
-    val volumes by produceState(emptyList<InstallVolume>(), entry.id) {
-        value = withContext(Dispatchers.IO) { installVolumes(context) }
+    // null until the folders are read, so "no game folder yet" is never
+    // drawn for the frame before the list arrives.
+    val read by produceState<List<InstallVolume>?>(null, entry.id) {
+        value = if (own) withContext(Dispatchers.IO) { installVolumes(context) } else emptyList()
     }
+    val places = read.orEmpty()
     val rememberedPath = if (store.isNotEmpty()) StoreInstallVolumePrefs.remembered(context, store) else null
-    // The volume the install would go to now: the remembered one when it
-    // is still among the volumes, otherwise the store's own default, the
-    // primary.
-    val current = volumes.indexOfFirst { it.path == rememberedPath }.takeIf { it >= 0 } ?: 0
+    // The folder the install would go to now: the remembered one when it
+    // is still one of the person's game folders, otherwise the first.
+    val current = places.indexOfFirst { it.path == rememberedPath }.takeIf { it >= 0 } ?: 0
     val formatSize: (Long) -> String = { Formatter.formatShortFileSize(context, it) }
     val window = LocalShellWindow.current
     var selected by remember(offer) { mutableIntStateOf(0) }
-    // A volume row each, "Open the store's screen" when no volume could be
-    // read, and "Not now" last: every A press is progress.
-    val rows = (if (volumes.isEmpty()) 1 else volumes.size) + 1
+    // A folder row each (Steam: one "Open the store's screen" row; no game
+    // folder: none), and "Not now" last: every A press is progress.
+    val choices = if (own) places.size else 1
+    val rows = choices + 1
     LaunchedEffect(rows) { selected = selected.coerceIn(0, rows - 1) }
-    // The cursor starts on the volume the install would go to, whatever
-    // the remembered choice is; once the volumes are read it is the
+    // The cursor starts on the folder the install would go to, whatever
+    // the remembered choice is; once the folders are read it is the
     // person's to move.
-    LaunchedEffect(volumes) { if (volumes.isNotEmpty()) selected = current }
+    LaunchedEffect(places) { if (places.isNotEmpty()) selected = current }
 
     fun pick(index: Int) {
         when {
-            index < volumes.size -> {
-                val volume = volumes[index]
-                if (store.isNotEmpty() && volume.path != rememberedPath) {
-                    StoreInstallVolumePrefs.remember(context, store, volume.path)
+            !own && index == 0 -> onProceed(offer, "")
+            own && index < places.size -> {
+                val place = places[index]
+                if (store.isNotEmpty() && place.path != rememberedPath) {
+                    StoreInstallVolumePrefs.remember(context, store, place.path)
                 }
-                onProceed(offer, volume.path)
+                onProceed(offer, place.path)
             }
-            volumes.isEmpty() && index == 0 -> onProceed(offer, null)
             else -> onDismiss()
         }
     }
@@ -128,21 +139,27 @@ internal fun StoreInstallOfferSheet(
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                if (own) "A picks where it installs · B cancels" else "A picks a volume and opens the store's screen · B cancels",
+                if (own) "A picks the game folder it installs to · B cancels" else "A opens the store's screen · B cancels",
                 color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
             )
-            val volume = volumes.getOrNull(current)
-            val body = if (volume != null) {
-                storeInstallOfferLines(
+            val place = places.getOrNull(current)
+            val body = when {
+                !own -> storeInstallOfferLines(
                     update = offer.stage == StoreStage.UPDATE,
                     sizeBytes = entry.pcInfo?.sizeBytes ?: 0L,
-                    volume = volume,
+                    volume = null,
                     formatSize = formatSize,
                 )
-            } else {
-                listOf("The free space could not be read; the store will check it as the download starts.")
+                read == null -> emptyList()
+                place == null -> listOf(NO_GAME_FOLDER_LINE)
+                else -> storeInstallOfferLines(
+                    update = offer.stage == StoreStage.UPDATE,
+                    sizeBytes = entry.pcInfo?.sizeBytes ?: 0L,
+                    volume = place,
+                    formatSize = formatSize,
+                )
             }
             body.forEach { line ->
                 Text(
@@ -152,17 +169,17 @@ internal fun StoreInstallOfferSheet(
                     modifier = Modifier.padding(bottom = 12.dp),
                 )
             }
-            if (volumes.isEmpty()) {
+            if (!own) {
                 volumeRow(
-                    text = if (own) "Install" else "Open the store's screen",
+                    text = "Open the store's screen",
                     selected = selected == 0,
                     action = { pick(0) },
                 )
             } else {
-                volumes.forEachIndexed { index, volume ->
+                places.forEachIndexed { index, folder ->
                     val marker = if (index == current) " · current" else ""
                     volumeRow(
-                        text = "${volume.name} · ${formatSize(volume.freeBytes)} free$marker",
+                        text = "${folder.name} · ${formatSize(folder.freeBytes)} free$marker",
                         selected = selected == index,
                         action = { pick(index) },
                     )

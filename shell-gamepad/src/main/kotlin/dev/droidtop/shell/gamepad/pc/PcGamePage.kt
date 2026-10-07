@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.friendlyLocation
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -850,26 +851,6 @@ private fun pageRows(
         aboutFacts(entry).forEach { (label, value) -> add(PageFact(label, value)) }
         entry.players?.takeIf { it.isNotBlank() }?.let { add(PageFact("Players", it)) }
     }
-}
-
-/**
- * A folder's path as a person names its place: "SD card / Games / Folder"
- * instead of "/storage/1234-ABCD/Games/Folder". The storage root becomes its
- * name (internal storage, SD card), a path of more than three steps keeps the
- * first and the last two with a gap between, and a path under no known root
- * keeps its last three steps. The full path is the row's tooltip. Pure.
- */
-internal fun friendlyLocation(path: String): String {
-    val parts = path.split('/').filter { it.isNotEmpty() }
-    val (root, rest) = when {
-        parts.size >= 3 && parts[0] == "storage" && parts[1] == "emulated" -> "Internal storage" to parts.drop(3)
-        parts.size >= 2 && parts[0] == "storage" && parts[1] != "self" -> "SD card" to parts.drop(2)
-        parts.size >= 3 && parts[0] == "mnt" && parts[1] == "media_rw" -> "SD card" to parts.drop(3)
-        parts.isNotEmpty() && (parts[0] == "sdcard") -> "Internal storage" to parts.drop(1)
-        else -> null to parts.takeLast(3)
-    }
-    val steps = if (rest.size > 3) listOf(rest.first(), "…") + rest.takeLast(2) else rest
-    return (listOfNotNull(root) + steps).joinToString(" / ").ifEmpty { path }
 }
 
 private data class FolderSizeStamp(val path: String, val modified: Long, val length: Long)

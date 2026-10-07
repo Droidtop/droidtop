@@ -37,11 +37,25 @@ object StoreInstallJob {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /**
-     * The folder a store's games go in on a volume the person picked
-     * ([dev.droidtop.library.InstallVolume.path]): one folder per store, so
-     * an uninstall can prove the folder it deletes is a store install.
+     * The folder a store's games go in inside one of the person's game
+     * folders (Settings > Game folders, [dev.droidtop.library.GamesRoots]):
+     * "<game folder>/<store>", one folder per store, so an uninstall can
+     * prove the folder it deletes is a store install and a library walk
+     * knows a store's tree by its name (docs/SPEC.md 7g, "Where a store
+     * installs"). Never droidtop's own Android/data folder.
      */
-    fun rootFor(volumePath: String, store: StoreLibrary): File = File(File(volumePath, "Games"), store.label.replace(Regex("[^A-Za-z0-9 ._-]"), "").ifBlank { store.id })
+    fun rootFor(gamesFolder: String, store: StoreLibrary): File = File(gamesFolder, folderName(store))
+
+    /** The name of [store]'s folder inside a game folder: its label with what a card's filesystem refuses dropped, or its id. */
+    fun folderName(store: StoreLibrary): String = store.label.replace(Regex("[^A-Za-z0-9 ._-]"), "").ifBlank { store.id }
+
+    /**
+     * The file a store keeps in a game's folder while its download runs
+     * (GameNative's name, so its installs read the same). A library walk
+     * passes over a folder that holds it ([dev.droidtop.library.ScanPrune]):
+     * half a download is not a game.
+     */
+    const val IN_PROGRESS_MARKER = ".download_in_progress"
 
     /** Registers the runner and starts publishing running installs. Called once at process start. */
     fun register(context: Context) {

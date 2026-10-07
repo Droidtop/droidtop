@@ -113,7 +113,7 @@ class EpicStore : StoreLibrary {
         val dao = dao(context)
         val manager = manager(context)
         val game = row(context, gameId) ?: error("Epic no longer lists this game")
-        val installPath = game.installPath.ifBlank { File(root, StoreFiles.folderName(game.title, "epic-${game.id}")).absolutePath }
+        val installPath = game.installPath.ifBlank { StoreFiles.freshFolder(root, game.title, "epic-${game.id}").absolutePath }
         // Recorded before the download, so a Cancel knows which folder is the unfinished one.
         val recorded = game.copy(installPath = installPath)
         if (game.installPath != installPath) withContext(Dispatchers.IO) { dao.update(recorded) }

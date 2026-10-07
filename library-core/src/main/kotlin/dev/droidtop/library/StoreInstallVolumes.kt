@@ -2,12 +2,13 @@ package dev.droidtop.library
 
 import android.content.Context
 import android.os.StatFs
+import java.io.File
 
 /**
- * One place a store install can go, and the room it has there
- * (Droidtop/tracker#227): the volume's name as a person reads it, an
- * app-owned directory on it (stable, and the one [StatFs] needs to read
- * the partition's free space from), and that space now.
+ * One place a store install can go, and the room it has there: a game
+ * folder the person named (Settings > Game folders, [GamesRoots]), its name
+ * as a person reads it ([friendlyLocation]), and the free space of the
+ * partition it sits on.
  */
 data class InstallVolume(
     val name: String,
@@ -17,39 +18,55 @@ data class InstallVolume(
 )
 
 /**
- * The volumes a store install can go to, primary storage first: the
- * device's internal storage plus every mounted SD card, each reported as
- * the free space of the partition its app-owned directory sits on.
+ * The places a store install can go: the person's own game folders
+ * ([GamesRoots.configured]), the same folders every library walk reads
+ * (docs/SPEC.md 7g, "A root is a place, not a picker result"), so a store
+ * game lands where the person keeps games, other apps (Enginehost) can read
+ * it, and uninstalling droidtop leaves it there. One mechanism for where
+ * games live: there is no second install-location setting. droidtop's own
+ * Android/data folder is never offered (the owner, 2026-10-07: "The location
+ * problem is solved by the game folder system").
  *
- * [Context.getExternalFilesDirs] rather than `StorageManager`'s
- * deprecated `getStorageVolumes` or a `MANAGE_EXTERNAL_STORAGE` walk of
- * `/storage`: the app's own directory on each volume is all a free-space
- * read needs, it is the scoped-storage half of the "Game folders" model,
- * and it needs no permission at all (docs/SPEC.md 7i, Droidtop/tracker#227).
- *
- * The one disk read of a consent sheet is this [StatFs], and it must run
- * off the main thread: callers wrap it in `withContext(Dispatchers.IO)`.
- * A volume whose stats cannot be read is dropped rather than drawn with
- * a zero, so the sheet can never say "0 GB free" for a full-but-readable
- * card.
+ * Each is reported with the free space of its partition, read with [StatFs]
+ * on the nearest folder that exists. The one disk read of the install offer,
+ * so callers run it off the main thread. A folder whose stats cannot be read
+ * is dropped rather than drawn with a zero. Empty when the person has named
+ * no game folder yet.
  */
 fun installVolumes(context: Context): List<InstallVolume> =
-    context.getExternalFilesDirs(null).filterNotNull().mapIndexedNotNull { index, dir ->
+    GamesRoots.configured(context).sortedBy { it.absolutePath }.mapNotNull { root ->
         runCatching {
-            val stats = StatFs(dir.path)
+            var existing: File? = root
+            while (existing != null && !existing.exists()) existing = existing.parentFile
+            val stats = StatFs(checkNotNull(existing).path)
             InstallVolume(
-                name = when (index) {
-                    0 -> "Internal storage"
-                    // Two SD slots at once is a phone story, not a handheld's,
-                    // but the second card still gets its own name.
-                    else -> "SD card${if (index > 2) " ${index - 1}" else ""}"
-                },
-                path = dir.path,
+                name = friendlyLocation(root.absolutePath),
+                path = root.absolutePath,
                 freeBytes = stats.availableBytes,
                 totalBytes = stats.totalBytes,
             )
         }.getOrNull()
     }
+
+/**
+ * A folder's path as a person names its place: "SD card / Games / Folder"
+ * instead of "/storage/1234-ABCD/Games/Folder". The storage root becomes its
+ * name (internal storage, SD card), a path of more than three steps keeps the
+ * first and the last two with a gap between, and a path under no known root
+ * keeps its last three steps. The full path belongs in a tooltip. Pure.
+ */
+fun friendlyLocation(path: String): String {
+    val parts = path.split('/').filter { it.isNotEmpty() }
+    val (root, rest) = when {
+        parts.size >= 3 && parts[0] == "storage" && parts[1] == "emulated" -> "Internal storage" to parts.drop(3)
+        parts.size >= 2 && parts[0] == "storage" && parts[1] != "self" -> "SD card" to parts.drop(2)
+        parts.size >= 3 && parts[0] == "mnt" && parts[1] == "media_rw" -> "SD card" to parts.drop(3)
+        parts.isNotEmpty() && (parts[0] == "sdcard") -> "Internal storage" to parts.drop(1)
+        else -> null to parts.takeLast(3)
+    }
+    val steps = if (rest.size > 3) listOf(rest.first(), "…") + rest.takeLast(2) else rest
+    return (listOfNotNull(root) + steps).joinToString(" / ").ifEmpty { path }
+}
 
 /**
  * Whether a [downloadBytes] download fits on a volume with [freeBytes] to
@@ -73,8 +90,9 @@ fun notEnoughRoomLine(downloadBytes: Long, volume: InstallVolume, formatSize: (L
 
 /**
  * The consent sheet's body lines, in sheet order: what the install or
- * update takes, the room the chosen volume has, and the warning when
- * there is not enough of it.
+ * update takes, the room the chosen game folder has, and the warning when
+ * there is not enough of it. [volume] is null for a store that picks its
+ * own location (Steam): the size is named, the room is the store's to check.
  *
  * [update] is an update of a game that is already installed: the download
  * is the store's delta, which the library does not carry ([PcInfo.sizeBytes]
@@ -85,7 +103,7 @@ fun notEnoughRoomLine(downloadBytes: Long, volume: InstallVolume, formatSize: (L
 fun storeInstallOfferLines(
     update: Boolean,
     sizeBytes: Long,
-    volume: InstallVolume,
+    volume: InstallVolume?,
     formatSize: (Long) -> String,
 ): List<String> = buildList {
     add(
@@ -95,21 +113,33 @@ fun storeInstallOfferLines(
             else -> "The store does not name a size yet."
         },
     )
+    if (volume == null) return@buildList
     add("${freeSpaceLine(volume, formatSize)} on ${volume.name}.")
     if (!update) notEnoughRoomLine(sizeBytes, volume, formatSize)?.let { add(it) }
 }
 
 /**
- * Which volume a store installs to, remembered per store
- * (Droidtop/tracker#227): the consent sheet's choice outlives the sheet,
- * so the next install from the same store names the same volume first,
- * "Internal storage" (the store's own default) until one is chosen.
- *
- * The key is the store's own display name ([PcStoreNames]): the choice is
- * the person's, per store, exactly the granularity the sheet offers. The
- * remembered value is the volume's app-owned directory, which is stable
- * for the life of the install and dies with it on uninstall, so a stale
- * path can never point at another app's files.
+ * What a store install says when the person has named no game folder: a
+ * store game goes into one of their game folders, never droidtop's own
+ * Android/data folder, so there is nowhere to put it until one is added.
+ */
+const val NO_GAME_FOLDER_LINE = "No game folder yet. Add one under Settings > Game folders and store games install there."
+
+/**
+ * The game folder a store install goes to when no offer picked one: the
+ * folder remembered for the store while it is still one of [configured],
+ * else the first of [configured] in path order, else null (no game folder
+ * named). Pure.
+ */
+fun installFolderFor(remembered: String?, configured: List<String>): String? =
+    remembered?.takeIf { it in configured } ?: configured.sorted().firstOrNull()
+
+/**
+ * Which game folder a store installs to, remembered per store: the install
+ * offer's choice outlives the offer, so the next install from the same store
+ * names the same folder first. A remembered folder that is no longer one of
+ * the person's game folders is not offered (the offer falls back to the
+ * first). The key is the store's own display name ([PcStoreNames]).
  */
 object StoreInstallVolumePrefs {
     private const val PREFS_NAME = "droidtop_store_install_volume"
