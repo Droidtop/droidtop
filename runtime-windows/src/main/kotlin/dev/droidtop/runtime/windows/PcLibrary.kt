@@ -1,7 +1,6 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.data.AmazonGame
 import app.gamenative.data.EpicGame
 import app.gamenative.data.GOGGame
 import app.gamenative.data.GameSource
@@ -120,7 +119,6 @@ object PcLibrary {
         fun steamAppDao(): app.gamenative.db.dao.SteamAppDao
         fun gogGameDao(): app.gamenative.db.dao.GOGGameDao
         fun epicGameDao(): app.gamenative.db.dao.EpicGameDao
-        fun amazonGameDao(): app.gamenative.db.dao.AmazonGameDao
     }
 
     private fun daos(context: Context): StoreDaoEntryPoint =
@@ -176,7 +174,6 @@ object PcLibrary {
             addAll(runCatching { dao.steamAppDao().getAllOwnedAppsAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(runCatching { dao.gogGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(runCatching { dao.epicGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
-            addAll(runCatching { dao.amazonGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             // The stores droidtop runs itself (docs/SPEC.md 7g, "Stores"),
             // each read on its own for the same reason as the DAOs above.
             for (store in StoreLibraries.all()) {
@@ -441,18 +438,6 @@ object PcLibrary {
         installedVersion = version.takeIf { isInstalled && it.isNotBlank() },
     )
 
-    private fun AmazonGame.toGame(): Game = Game(
-        id = "amazon:$productId",
-        source = Source.AMAZON,
-        nativeId = productId,
-        title = title,
-        installed = isInstalled,
-        installPath = installPath,
-        sizeBytes = if (isInstalled) installSize else downloadSize,
-        artUrl = artUrl.takeIf { it.isNotEmpty() },
-        compatibility = compatibilityFor(title),
-    )
-
     /**
      * A row of a store droidtop runs itself. Null for a store this enum
      * does not name yet: a store is a [Source] before its rows can be
@@ -699,7 +684,6 @@ object PcLibrary {
                     .firstOrNull { it.id.toString() == nativeId }?.toLibraryItem()
                 "gog" -> dao.gogGameDao().getAllAsList().firstOrNull { it.id == nativeId }?.toLibraryItem()
                 "epic" -> dao.epicGameDao().getAllAsList().firstOrNull { it.catalogId == nativeId }?.toLibraryItem()
-                "amazon" -> dao.amazonGameDao().getAllAsList().firstOrNull { it.productId == nativeId }?.toLibraryItem()
                 // A folder game IS a LibraryItem already -- the scanner
                 // produced the id this entry carries.
                 "folder" -> CustomGameScanner.scanAsLibraryItems().firstOrNull { it.appId == nativeId }
@@ -742,18 +726,6 @@ object PcLibrary {
         heroImageUrl = artPortrait.ifEmpty { artSquare.ifEmpty { artCover } },
         gameSource = GameSource.EPIC,
         sizeBytes = installSize,
-        isInstalled = isInstalled,
-    )
-
-    private fun AmazonGame.toLibraryItem(): LibraryItem = LibraryItem(
-        appId = "${GameSource.AMAZON.name}_$appId",
-        name = title,
-        iconHash = artUrl,
-        capsuleImageUrl = artUrl,
-        headerImageUrl = heroUrl.ifEmpty { artUrl },
-        heroImageUrl = heroUrl.ifEmpty { artUrl },
-        gameSource = GameSource.AMAZON,
-        sizeBytes = if (isInstalled) installSize else downloadSize,
         isInstalled = isInstalled,
     )
 

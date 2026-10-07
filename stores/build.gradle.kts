@@ -51,6 +51,8 @@ dependencies {
     implementation(libs.timber)
     // 7z and RAR uploads (itch.io), through the libarchive build GameNative's mods importer used.
     implementation(libs.libarchive.android)
+    // LZMA and XZ, which Amazon's manifests are compressed with.
+    implementation(libs.xz)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

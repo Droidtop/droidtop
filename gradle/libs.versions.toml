@@ -103,7 +103,8 @@ collection-ktx = "1.6.0-beta01"
 lifecycleRuntimeKtx = "2.8.4"
 composeBom = "2024.09.00"
 media3 = "1.4.1"
-okhttp = "4.12.0"
+# The okhttp the APK already ran through vendor/gamenative; :stores compiles against it.
+okhttp = "5.1.0"
 # https://github.com/zhanghai/AndroidLibArchive (Apache-2.0, over libarchive, BSD-2-Clause): 7z and RAR for itch.io uploads (:stores).
 # The version vendor/gamenative pins, so the APK keeps one copy of libarchive.
 libarchive-android = "1.1.6"

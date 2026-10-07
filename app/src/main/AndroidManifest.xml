@@ -495,9 +495,6 @@
         <activity
             android:name="app.gamenative.ui.screen.auth.EpicOAuthActivity"
             android:exported="false" />
-        <activity
-            android:name="app.gamenative.ui.screen.auth.AmazonOAuthActivity"
-            android:exported="false" />
 
         <provider
             android:name="dev.droidtop.library.consoles.DroidtopFileProvider"

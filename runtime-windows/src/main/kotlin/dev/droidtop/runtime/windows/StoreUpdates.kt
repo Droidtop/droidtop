@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import app.gamenative.data.DownloadInfo
 import app.gamenative.service.SteamService
-import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.gog.GOGService
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.StoreUpdate
@@ -24,12 +23,12 @@ import org.json.JSONObject
  * 7g, "Where an update comes from"), kept as a small file so a library scan
  * can read it without a network call and without a session.
  *
- * Only two vendored services can answer: Steam (a manifest comparison,
- * [SteamService.isUpdatePending]) and Amazon (a live version id,
- * [AmazonService.isUpdatePending]). GOG, Epic and itch.io have no update
- * check in the vendored services, so they stay [StoreUpdate.UNKNOWN] and
- * the game page says so; nothing here ever claims "up to date" for a store
- * that was not asked. A check runs off the main thread, at most every few
+ * Steam answers through the vendored service (a manifest comparison,
+ * [SteamService.isUpdatePending]); a store droidtop runs itself answers
+ * through its own [dev.droidtop.library.stores.StoreLibrary.checkUpdate]
+ * (Amazon compares the installed version id with the live one). A store with
+ * no check stays [StoreUpdate.UNKNOWN] and the game page says so; nothing
+ * here ever claims "up to date" for a store that was not asked. A check runs off the main thread, at most every few
  * hours, never inside a scan, and only for a store that is signed in; its
  * answer reaches the library on the next walk because the file is part of
  * the store part's change stamp ([PcGameProvider]).
@@ -133,9 +132,6 @@ internal object StoreUpdates {
                 if (!SteamService.isConnected || !SteamService.isLoggedIn) return null
                 Result(if (SteamService.isUpdatePending(appId)) StoreUpdate.AVAILABLE else StoreUpdate.CURRENT, null)
             }
-            // Amazon answers false both for "current" and for "could not
-            // ask", so a false is dropped to unknown rather than trusted.
-            "amazon" -> Result(if (AmazonService.isUpdatePending(native)) StoreUpdate.AVAILABLE else StoreUpdate.UNKNOWN, null)
             else -> null
         }
     }
@@ -197,7 +193,6 @@ internal object StoreDownloadWatch {
             }
         }
         runCatching { add("steam", SteamService.getActiveDownloads()) }
-        runCatching { add("amazon", AmazonService.getActiveDownloads()) }
         runCatching { add("gog", GOGService.getActiveDownloads()) }
         return out
     }

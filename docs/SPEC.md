@@ -8463,14 +8463,15 @@ STORE game's update comes from its store (next paragraphs).
 **A store game's update (2026-10-02, Droidtop/tracker#222).** `PcInfo` carries
 `installedVersion` (the build the store words, null when it gives none),
 `latestVersion` (null unless the store names one) and `update`, a
-three-valued `StoreUpdate`: `UNKNOWN`, `CURRENT`, `AVAILABLE`. Only two
-vendored store services can answer: Steam (`SteamService.isUpdatePending`,
-a manifest comparison, so it says "newer", not which version) and Amazon
-(`AmazonService.isUpdatePending`, a live version id; a `false` from it is
-also what a missing session returns, so it is read as `UNKNOWN`, never as
-current). GOG, Epic and itch.io have no update check in the vendored
-services, so they stay `UNKNOWN`, and their game page says "<store> does
-not tell droidtop whether a newer build exists"; nothing ever shows a store
+three-valued `StoreUpdate`: `UNKNOWN`, `CURRENT`, `AVAILABLE`. Steam
+answers through the vendored service (`SteamService.isUpdatePending`, a
+manifest comparison, so it says "newer", not which version); a store
+droidtop runs itself answers through `StoreLibrary.checkUpdate` (7g
+"Stores"): Amazon compares the installed version id with the live one and
+says `CURRENT` or `AVAILABLE`, and a request that could not be made is no
+answer at all, never `CURRENT`. A store with no check stays `UNKNOWN`, and
+its game page says "<store> does not tell droidtop whether a newer build
+exists"; nothing ever shows a store
 game as up to date unless its store said so. The answers are asked in the
 background by `StoreUpdates` (`:runtime-windows`), for installed games of a
 signed-in store, at most every six hours and once more for a game whose
@@ -9298,6 +9299,19 @@ follows:
   used, now clearing folders through `SafeDelete`). itch.io names no version
   and keeps no file list: no update check, no verify. A download restarts from
   the beginning after a pause; it is one file.
+- **Amazon Games** (`AmazonStore`): sign-in is Amazon's own page with a
+  fresh PKCE session per sign-in (nile's device registration, through
+  GameNative's `AmazonAuthManager`); the code comes back on the address
+  Amazon returns to. Sync is the entitlements call; an empty answer is also
+  what a failed request gives, so it is reported as a failure and the rows
+  already read stay. Install fetches the manifest and downloads its files in
+  parallel batches, skipping files already complete, so a paused or failed
+  download continues where it stopped; the manifest is kept, and Verify
+  checks every file's size and SHA-256 against it. A first install that fails
+  is removed; a failed update keeps the game it had. The update check
+  compares the installed version id with Amazon's live one. Not carried:
+  GameNative's deployment of Amazon's game SDK into a Wine prefix, which is
+  the launch path's business, not the store's.
 - **What stays with GameNative for now**: Steam (its client is the next step
   of the plan and waits on owner decisions) and the Wine runtime the games
   run in. The `vendor/gamenative` submodule stays until both have moved.
@@ -10371,9 +10385,11 @@ size, free space per volume, an uninstall per row — are the rest of
 Droidtop/tracker#227.
 
 **Live downloads.** `StoreDownloads` (`:library-core`) is an in-memory map
-by store id, written by `StoreDownloadWatch` (`:runtime-windows`) from the
-Steam, Amazon and GOG services' own download maps once a second while one
-runs and every few seconds when none does; the shell collects it. A
+by store id with one share per writer: the store install jobs
+(`StoreInstallJob`, every store droidtop runs itself) and
+`StoreDownloadWatch` (`:runtime-windows`), which reads the vendored
+services' own download maps once a second while one runs and every few
+seconds when none does; the shell collects it. A
 download that reaches 100 percent leaves the map and its game is asked
 about again.
 

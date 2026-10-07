@@ -75,8 +75,7 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
             STEAM -> app.gamenative.utils.SteamUtils.hasStoredCredentials()
             GOG -> app.gamenative.service.gog.GOGService.hasStoredCredentials(context)
             EPIC -> app.gamenative.service.epic.EpicService.hasStoredCredentials(context)
-            AMAZON -> app.gamenative.service.amazon.AmazonService.hasStoredCredentials(context)
-            ITCH -> false
+            AMAZON, ITCH -> false
         }
     }.getOrDefault(false)
 
@@ -97,8 +96,7 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
             STEAM -> Intent(context, SteamLoginActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             GOG -> PcStoreSignInActivity.intent(context, PcStoreSignInActivity.Store.GOG)
             EPIC -> PcStoreSignInActivity.intent(context, PcStoreSignInActivity.Store.EPIC)
-            AMAZON -> PcStoreSignInActivity.intent(context, PcStoreSignInActivity.Store.AMAZON)
-            ITCH -> null
+            AMAZON, ITCH -> null
         }
     }
 
@@ -116,8 +114,7 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
                     check(app.gamenative.service.gog.GOGService.clearStoredCredentials(context)) { "GOG would not clear its sign-in" }
                 }
                 EPIC -> app.gamenative.service.epic.EpicService.logout(context).getOrThrow()
-                AMAZON -> app.gamenative.service.amazon.AmazonService.logout(context).getOrThrow()
-                ITCH -> Unit
+                AMAZON, ITCH -> Unit
             }
         }
     }
@@ -147,8 +144,7 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
                 when (this@PcStore) {
                     GOG -> app.gamenative.service.gog.GOGService.triggerLibrarySync(context)
                     EPIC -> app.gamenative.service.epic.EpicService.triggerLibrarySync(context)
-                    AMAZON -> app.gamenative.service.amazon.AmazonService.triggerLibrarySync(context)
-                    STEAM, ITCH -> Unit
+                    STEAM, AMAZON, ITCH -> Unit
                 }
                 "Sync requested. New games appear in a moment"
             }

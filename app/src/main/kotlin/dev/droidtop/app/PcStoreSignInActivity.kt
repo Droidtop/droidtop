@@ -19,7 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
-import app.gamenative.ui.screen.auth.AmazonOAuthActivity
 import app.gamenative.ui.screen.auth.EpicOAuthActivity
 import app.gamenative.ui.screen.auth.GOGOAuthActivity
 import app.gamenative.utils.PlatformOAuthHandlers
@@ -27,12 +26,13 @@ import dev.droidtop.app.ui.DroidtopTheme
 import kotlinx.coroutines.launch
 
 /**
- * Signing in to GOG, Epic or Amazon -- build-plan step 6 of the PC surface
+ * Signing in to GOG or Epic -- build-plan step 6 of the PC surface
  * (docs/SPEC.md 7i). Steam already has its own screen
- * ([SteamLoginActivity]); these three are OAuth in a web view, which is
- * gamenative's own `GOGOAuthActivity` / `EpicOAuthActivity` /
- * `AmazonOAuthActivity` plus its `PlatformOAuthHandlers` to exchange the
- * returned code for a session and pull the library down.
+ * ([SteamLoginActivity]); these two are OAuth in a web view, which is
+ * gamenative's own `GOGOAuthActivity` / `EpicOAuthActivity` plus its
+ * `PlatformOAuthHandlers` to exchange the returned code for a session and
+ * pull the library down. A store droidtop runs itself signs in through
+ * [StoreSignInActivity] instead (docs/SPEC.md 7g, "Stores").
  *
  * This Activity exists because an OAuth result is an Activity result: the
  * sign-in row that starts it lives in droidtop's own settings catalog,
@@ -51,10 +51,6 @@ class PcStoreSignInActivity : AppCompatActivity() {
 
     private val epic = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         onCode(result, EpicOAuthActivity.EXTRA_AUTH_CODE, EpicOAuthActivity.EXTRA_ERROR, Store.EPIC)
-    }
-
-    private val amazon = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        onCode(result, AmazonOAuthActivity.EXTRA_AUTH_CODE, AmazonOAuthActivity.EXTRA_ERROR, Store.AMAZON)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,7 +72,6 @@ class PcStoreSignInActivity : AppCompatActivity() {
         when (store()) {
             Store.GOG -> gog.launch(Intent(this, GOGOAuthActivity::class.java))
             Store.EPIC -> epic.launch(Intent(this, EpicOAuthActivity::class.java))
-            Store.AMAZON -> amazon.launch(Intent(this, AmazonOAuthActivity::class.java))
             null -> status = "No store was named for this sign-in."
         }
     }
@@ -112,15 +107,6 @@ class PcStoreSignInActivity : AppCompatActivity() {
                     onSuccess = { status = "Signed in to Epic." },
                     onDialogClose = {},
                 )
-                Store.AMAZON -> PlatformOAuthHandlers.handleAmazonAuthentication(
-                    context = this@PcStoreSignInActivity,
-                    authCode = code,
-                    coroutineScope = lifecycleScope,
-                    onLoadingChange = {},
-                    onError = { message -> status = message ?: "Sign-in failed." },
-                    onSuccess = { status = "Signed in to Amazon." },
-                    onDialogClose = {},
-                )
             }
             // The store's own handler owns the rest of the flow (token
             // exchange, then its library sync in its own scope), so this
@@ -129,11 +115,10 @@ class PcStoreSignInActivity : AppCompatActivity() {
         }
     }
 
-    /** The three stores that sign in through a web view. Steam is its own screen. */
+    /** The stores GameNative still signs in through a web view. Steam is its own screen. */
     enum class Store(val key: String, val label: String) {
         GOG("gog", "GOG"),
         EPIC("epic", "Epic Games"),
-        AMAZON("amazon", "Amazon Games"),
     }
 
     companion object {
