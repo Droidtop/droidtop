@@ -429,12 +429,11 @@ internal fun PcGamesSection(
     fun say(line: String?) {
         line?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
     }
-    // The install offer was taken: a store droidtop runs starts its job here,
-    // Steam opens its own screen.
+    // The install offer was taken: the game's store starts its job here.
     fun proceed(entry: LibraryEntry, volumePath: String) {
         val own = entry.ownStore()
         if (own == null) {
-            say(openStoreScreen(context, entry))
+            say(NO_STORE_LINE)
         } else {
             storeScope.launch { say(startOwnStoreInstall(context, entry, own, volumePath)) }
         }

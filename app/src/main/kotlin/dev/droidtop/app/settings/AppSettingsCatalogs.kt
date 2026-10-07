@@ -180,7 +180,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(AcquireContentSources.chooseSystemScreen())
         SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(pluginKeysScreen())
-        SettingsScreenRegistry.register(PluginJobsScreen.screen(extraGroups = { _ -> pcInstallsGroups() }))
+        SettingsScreenRegistry.register(PluginJobsScreen.screen())
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(WineOptionsCatalog.gameScreen())
         SettingsScreenRegistry.register(pcStoresScreen())
@@ -1357,27 +1357,6 @@ object AppSettingsCatalogs {
             ),
         )
     }
-
-    /**
-     * Steam's installs queue, under the jobs list in "Downloads and installs": a Steam install is
-     * still gamenative's own download service, so its progress, pause and cancel are on its own
-     * screen (PcStoreActivity); this is the way there from the one place downloads are looked for.
-     * Every other store's installs are jobs in the list above (docs/SPEC.md 7g "Stores").
-     */
-    private fun pcInstallsGroups(): List<CatalogGroup> = listOf(
-        CatalogGroup(
-            id = "jobs_pc_installs",
-            title = "Steam",
-            items = listOf(
-                ActionItem(
-                    id = "jobs_pc_installs_queue",
-                    title = "Steam downloads",
-                    subtitle = "Installs and updates from Steam: progress, pause and cancel",
-                    run = { ctx -> ctx.startActivity(dev.droidtop.app.PcStoreActivity.intent(ctx, entryId = null)) },
-                ),
-            ),
-        ),
-    )
 
     /**
      * The ONE settings area for every account and source droidtop has --

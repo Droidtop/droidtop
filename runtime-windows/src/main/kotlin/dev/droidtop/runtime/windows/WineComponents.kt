@@ -3,7 +3,6 @@ package dev.droidtop.runtime.windows
 import android.content.Context
 import app.gamenative.R
 import app.gamenative.data.GameSource
-import app.gamenative.service.SteamService
 import app.gamenative.utils.BestConfigService
 import app.gamenative.utils.LaunchDependencies
 import app.gamenative.utils.ManifestContentTypes
@@ -86,9 +85,8 @@ internal object WineComponents {
 
     /**
      * The Wine build itself. The two Proton 9 builds (`bionic_wine_entries`)
-     * come from gamenative's own launch dependency, fetched with the
-     * instance-free downloader because its own download path needs a running
-     * SteamService, which droidtop never starts. A manifest build (arm64ec
+     * come from gamenative's own launch dependency, fetched from its download
+     * host ([GameNativeDownloads]). A manifest build (arm64ec
      * Proton 10 and later) is a `.wcp` the manifest installer puts into the
      * contents store.
      */
@@ -98,7 +96,7 @@ internal object WineComponents {
             val archive = File(context.filesDir, "$wine.txz")
             if (!wineBinary(context, wine).isFile && !(archive.isFile && archive.length() > 0)) {
                 onStatus("Downloading Wine…")
-                SteamService.fetchFileWithFallback(archive.name, archive, context) { onStatus("Downloading Wine… ${percent(it)}") }
+                GameNativeDownloads.fetch(archive.name, archive) { onStatus("Downloading Wine… ${percent(it)}") }
             }
             LaunchDependencies().ensureLaunchDependencies(
                 context = context,

@@ -1,15 +1,15 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    // Room's annotation processor for the store tables (StoresDatabase).
+    // Room's annotation processor for the store tables (StoresDatabase, SteamDatabase).
     alias(libs.plugins.google.ksp)
-    // The list columns' converter encodes List<String> as JSON (StringListConverter).
+    // The list columns' converters encode lists and Steam's product info as JSON.
     alias(libs.plugins.kotlin.serialization)
 }
 
 /*
- * The PC stores droidtop runs itself (docs/SPEC.md 7g, "Stores"): Epic,
- * GOG, Amazon Games and itch.io, lifted out of vendor/gamenative into
+ * The PC stores droidtop runs itself (docs/SPEC.md 7g, "Stores"): Steam,
+ * Epic, GOG, Amazon Games and itch.io, lifted out of vendor/gamenative into
  * droidtop's own module behind library-core's StoreLibrary. GameNative is
  * GPL-3.0 like droidtop; NOTICE.md credits it. Nothing here depends on the
  * vendored tree: a store that still needed a GameNative type would be the
@@ -53,6 +53,13 @@ dependencies {
     implementation(libs.libarchive.android)
     // LZMA and XZ, which Amazon's manifests are compressed with.
     implementation(libs.xz)
+    // Steam (dev.droidtop.stores.steam): JavaSteam for the connection, the
+    // sign-in and product info, its depot downloader for installs, and the
+    // full protobuf runtime its messages are built on (a kept licence is
+    // rebuilt from its protobuf). Snapshots: re-resolved like :runtime-windows'.
+    implementation(libs.javasteam) { isChanging = true }
+    implementation(libs.javasteam.depotdownloader) { isChanging = true }
+    implementation(libs.protobuf.java)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

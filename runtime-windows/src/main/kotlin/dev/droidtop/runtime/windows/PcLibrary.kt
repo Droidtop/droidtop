@@ -3,14 +3,8 @@ package dev.droidtop.runtime.windows
 import android.content.Context
 import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
-import app.gamenative.data.SteamApp
-import app.gamenative.service.SteamService
 import app.gamenative.utils.CustomGameScanner
 import app.gamenative.utils.GameCompatibilityCache
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
-import dagger.hilt.android.EntryPointAccessors
-import dagger.hilt.components.SingletonComponent
 import dev.droidtop.library.EngineVerdictStore
 import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.PcCompatibility
@@ -42,10 +36,9 @@ import kotlinx.coroutines.withContext
 
 /**
  * droidtop's OWN source-agnostic view of every PC game it knows about —
- * Steam (the vendored gamenative service), the stores droidtop runs itself
- * (GOG, Epic, Amazon Games and itch.io, through
- * [dev.droidtop.library.stores.StoreLibraries], docs/SPEC.md 7g "Stores"),
- * and loose folders — behind one shape.
+ * the stores droidtop runs itself (Steam, GOG, Epic, Amazon Games and
+ * itch.io, through [dev.droidtop.library.stores.StoreLibraries],
+ * docs/SPEC.md 7g "Stores"), and loose folders — behind one shape.
  *
  * The point of this class, and the audit finding that produced it
  * (docs/SPEC.md §7g): droidtop compiled 830 gamenative source files and
@@ -106,20 +99,11 @@ object PcLibrary {
         val installDir: File? get() = installPath?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { it.isDirectory }
     }
 
-    @EntryPoint
-    @InstallIn(SingletonComponent::class)
-    interface StoreDaoEntryPoint {
-        fun steamAppDao(): app.gamenative.db.dao.SteamAppDao
-    }
-
-    private fun daos(context: Context): StoreDaoEntryPoint =
-        EntryPointAccessors.fromApplication(context.applicationContext, StoreDaoEntryPoint::class.java)
-
     /**
      * Every PC game from every source, owned and installed alike.
      *
      * A store the user never signed into simply contributes nothing — its
-     * Room tables exist and are empty — so this needs no "is GOG enabled"
+     * tables exist and are empty — so this needs no "is GOG enabled"
      * configuration and grows a source the moment somebody signs in.
      * Each source is read independently: one store's failure (a corrupt
      * row, a schema drift after a vendor sync) costs that store's games,
@@ -156,15 +140,14 @@ object PcLibrary {
      */
     suspend fun storeGames(context: Context): List<Game> {
         DroidtopGameIdStore.install(context)
-        val dao = daos(context)
-        // What the stores last said about newer builds, and the downloads
-        // they are running: files and memory only, no network here.
+        // What the stores last said about newer builds, and a recheck when a
+        // download ends: files and memory only, no network here.
         StoreUpdates.load(context)
         StoreDownloadWatch.start(context)
         return buildList {
-            addAll(runCatching { dao.steamAppDao().getAllOwnedAppsAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             // The stores droidtop runs itself (docs/SPEC.md 7g, "Stores"),
-            // each read on its own for the same reason as the DAOs above.
+            // each read on its own: one store's failure (a corrupt row, a
+            // schema drift) costs that store's games, not the whole library.
             for (store in StoreLibraries.all()) {
                 addAll(
                     runCatching { store.games(context).mapNotNull { it.toGame() } }
@@ -192,8 +175,8 @@ object PcLibrary {
                         .distinctBy { it.appId }
                         // The scanner recognizes a Steam install sitting in a
                         // scanned folder and returns it as a STEAM item; that
-                        // game already came from the Steam DAO above, so taking
-                        // both would list it twice.
+                        // game is the Steam store's, so taking both would
+                        // list it twice.
                         .filter { it.gameSource == GameSource.CUSTOM_GAME }
                         .map { it to it.scannerFolder() }
                         .filterNot { (_, path) ->
@@ -283,8 +266,8 @@ object PcLibrary {
                     .distinctBy { it.appId }
                     // The scanner recognizes a Steam install sitting in a
                     // scanned folder and returns it as a STEAM item; that
-                    // game already came from the Steam DAO, so taking both
-                    // would list it twice.
+                    // game is the Steam store's, so taking both would list
+                    // it twice.
                     .filter { it.gameSource == GameSource.CUSTOM_GAME }
                     .map { it.toGame(context, group.root) }
                     .sortedBy { it.title.lowercase() }
@@ -327,8 +310,7 @@ object PcLibrary {
      * own launch command.
      */
     /**
-     * Install roots discovered by the most recent [allGames] call, plus
-     * Steam's own paths (which the service can answer synchronously).
+     * Install roots discovered by the most recent [allGames] call.
      *
      * Synchronous because engine detection's `extraRoots` hook is, and
      * must not block a scan thread on four Room queries. The store half
@@ -336,20 +318,15 @@ object PcLibrary {
      * Ren'Py game is detected on the second scan, not the first — which
      * is the right trade against stalling every scan.
      */
-    fun knownInstallRoots(): List<File> {
-        val steam = runCatching { SteamService.allInstallPaths }.getOrDefault(emptyList()).map(::File)
+    fun knownInstallRoots(): List<File> =
         // The PARENT of each game's install directory, not the directory
         // itself. Engine detection reads a root's children as candidate
         // game folders (see `GameEngineDetector.scan`), so handing it a
         // game's own folder points it one level too deep and it finds
-        // nothing there. Steam's own paths already arrive as library
-        // roots, which is why a Steam-installed Ren'Py game was detected
-        // and a GOG one would not have been even once this was populated.
-        val storeRoots = storeInstalls.mapNotNull { it.installDir.parentFile }
-        return (steam + storeRoots)
+        // nothing there.
+        storeInstalls.mapNotNull { it.installDir.parentFile }
             .filter { it.isDirectory }
             .distinctBy { it.absolutePath }
-    }
 
     /**
      * The installs behind [knownInstallRoots], with the store's own facts
@@ -392,21 +369,6 @@ object PcLibrary {
                 reportedNotWorking = response.isNotWorking,
             )
         }
-
-    private fun SteamApp.toGame(): Game = Game(
-        id = "steam:$id",
-        source = Source.STEAM,
-        nativeId = id.toString(),
-        title = name,
-        installed = runCatching { SteamService.isAppInstalled(id) }.getOrDefault(false),
-        // Steam's own row carries no install path; the service resolves it.
-        installPath = runCatching { SteamService.getAppDirPath(id) }.getOrNull(),
-        // SteamApp models no size on disk, and walking the install tree on
-        // every scan would cost more than the number is worth.
-        sizeBytes = 0L,
-        artUrl = clientIconUrl.takeIf { clientIconHash.isNotEmpty() },
-        compatibility = compatibilityFor(name),
-    )
 
     /**
      * A row of a store droidtop runs itself. Null for a store this enum
@@ -640,41 +602,6 @@ object PcLibrary {
     }
 
     private const val TAG = "droidtop.PcLibrary"
-
-    /**
-     * The gamenative [LibraryItem] behind one droidtop PC entry id, which
-     * is what Steam's own store screen (install, verify, DLC, downloads) is
-     * written against — droidtop hosts that screen for Steam (docs/SPEC.md
-     * 7i). The stores droidtop runs itself have no such screen: their
-     * entries resolve to nothing here. Built from Steam's own row, so the
-     * item's shape is what gamenative's LibraryViewModel gives the screen.
-     */
-    suspend fun libraryItemFor(context: Context, entryId: String): LibraryItem? {
-        DroidtopGameIdStore.install(context)
-        val nativeId = entryId.substringAfter(':')
-        val dao = daos(context)
-        return runCatching {
-            when (entryId.substringBefore(':')) {
-                "steam" -> dao.steamAppDao().getAllOwnedAppsAsList()
-                    .firstOrNull { it.id.toString() == nativeId }?.toLibraryItem()
-                // A folder game IS a LibraryItem already -- the scanner
-                // produced the id this entry carries.
-                "folder" -> CustomGameScanner.scanAsLibraryItems().firstOrNull { it.appId == nativeId }
-                else -> null
-            }
-        }.getOrNull()
-    }
-
-    private fun SteamApp.toLibraryItem(): LibraryItem = LibraryItem(
-        appId = "${GameSource.STEAM.name}_$id",
-        name = name,
-        iconHash = clientIconHash,
-        capsuleImageUrl = runCatching { getCapsuleUrl() }.getOrDefault(""),
-        headerImageUrl = headerUrl,
-        heroImageUrl = runCatching { getHeroUrl() }.getOrDefault(""),
-        gameSource = GameSource.STEAM,
-        isInstalled = runCatching { SteamService.isAppInstalled(id) }.getOrDefault(false),
-    )
 
     /**
      * The folder a scanner item names, or null. The scanner's appId is

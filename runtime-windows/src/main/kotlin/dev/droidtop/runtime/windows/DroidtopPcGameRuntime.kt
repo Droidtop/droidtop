@@ -1,7 +1,6 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.service.SteamService
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.X86_64GuestLibs
 import com.winlator.container.Container
@@ -205,8 +204,8 @@ class DroidtopPcGameRuntime(
         // The installer only EXTRACTS the base-system archive -- from the
         // bundled assets (where it has never shipped, upstream included)
         // or from a file already sitting in the files dir. Upstream puts
-        // it there in its own pre-launch phase through SteamService,
-        // which droidtop does not fork -- so it is downloaded here, and
+        // it there in its own pre-launch phase, which droidtop does not
+        // fork -- so it is downloaded here ([GameNativeDownloads]), and
         // only when the installer's own condition says it would actually
         // install (valid + current + same variant means it will skip).
         val imageFs = ImageFs.find(context)
@@ -220,15 +219,14 @@ class DroidtopPcGameRuntime(
                 "imagefs_bionic.txz"
             }
             onStatus("Downloading the Windows base system…")
-            // gamenative's own downloader, now that the whole tree is
-            // compiled in -- the same primary-plus-R2-mirror pair its
-            // pre-launch phase uses, writing to the same place
+            // gamenative's own download host -- the same primary-plus-R2-
+            // mirror pair its pre-launch phase uses, writing to the same place
             // ImageFsInstaller looks (ImageFs.getFilesDir() is the
             // imagefs root's parent, i.e. the app files dir).
             val dest = File(context.filesDir, archiveName)
             if (!(dest.isFile && dest.length() > 0)) {
                 val downloaded = runCatching {
-                    SteamService.fetchFileWithFallback(archiveName, dest, context) { fraction ->
+                    GameNativeDownloads.fetch(archiveName, dest) { fraction ->
                         onStatus("Downloading the Windows base system… ${(fraction * 100).toInt()}%")
                     }
                 }

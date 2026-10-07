@@ -8,6 +8,7 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -49,10 +50,11 @@ data class StoreGame(
 }
 
 /**
- * How a store signs a person in. droidtop never sees a password: either the
- * store's own page is shown and droidtop reads the one-time code the store
- * hands back on the page it returns to, or the person makes a key on the
- * store's site and pastes it.
+ * How a store signs a person in: the store's own page is shown and droidtop
+ * reads the one-time code the store hands back on the page it returns to, or
+ * the person makes a key on the store's site and pastes it, or (Steam)
+ * droidtop's own screen walks the store's sign-in step by step. droidtop
+ * keeps no password in any of them.
  */
 sealed interface StoreSignIn {
     /**
@@ -71,10 +73,70 @@ sealed interface StoreSignIn {
 
     /** A personal key the person makes at [keyPage] and pastes into droidtop. */
     class ApiKey(val keyPage: String) : StoreSignIn
+
+    /**
+     * A sign-in droidtop's own screen walks through with the store, step by
+     * step ([StoreAccountSignIn]): Steam, whose client signs in over its own
+     * connection, by a QR code the store's phone app approves or by account
+     * name and password with a Steam Guard code. The password goes from the
+     * screen to the store's connection and is never kept.
+     */
+    class Account(val session: StoreAccountSignIn) : StoreSignIn
 }
 
-/** Which of the two [StoreSignIn] forms a store uses, known without starting a sign-in. */
-enum class StoreSignInKind { WEB_PAGE, API_KEY }
+/** Which of the [StoreSignIn] forms a store uses, known without starting a sign-in. */
+enum class StoreSignInKind { WEB_PAGE, API_KEY, ACCOUNT }
+
+/** Where a step-by-step sign-in ([StoreAccountSignIn]) stands; the screen draws exactly this. */
+sealed interface AccountSignInStep {
+    /** Reaching the store. */
+    data object Connecting : AccountSignInStep
+
+    /** Connected: QR code, or account name and password. [failure] says why the last try did not work. */
+    data class Choose(val failure: String? = null) : AccountSignInStep
+
+    /** A QR code of [url] for the store's phone app to approve; the store may replace it while it waits. */
+    data class QrCode(val url: String) : AccountSignInStep
+
+    /** A code from the store's phone app, or sent by e-mail; [wrongBefore] when the last one was refused. */
+    data class Code(val sentByEmail: Boolean, val wrongBefore: Boolean) : AccountSignInStep
+
+    /** The store asked its phone app to approve this sign-in; nothing to type. */
+    data object ApproveOnPhone : AccountSignInStep
+
+    /** The store is checking what was given. */
+    data object Working : AccountSignInStep
+
+    /** Signed in as [account]. */
+    data class Done(val account: String?) : AccountSignInStep
+}
+
+/**
+ * One step-by-step sign-in ([StoreSignIn.Account]), made fresh for each
+ * sign-in screen. Every call returns at once; what follows is reported
+ * through [step]. None of the work runs on the caller's thread.
+ */
+interface StoreAccountSignIn {
+    val step: StateFlow<AccountSignInStep>
+
+    /** Connects to the store; [step] moves from [AccountSignInStep.Connecting] to [AccountSignInStep.Choose]. */
+    fun start()
+
+    /** Asks the store for a QR code to approve. */
+    fun showQrCode()
+
+    /** Signs in with what the person typed; the password is handed to the store and not kept. */
+    fun signInWithPassword(account: String, password: String)
+
+    /** Answers [AccountSignInStep.Code]. */
+    fun submitCode(code: String)
+
+    /** Back to [AccountSignInStep.Choose], dropping a QR code or a code request under way. */
+    fun backToChoices()
+
+    /** The screen is closing: stops whatever is under way. */
+    fun close()
+}
 
 /** What a store answers about a newer build of one installed game. */
 data class StoreUpdateCheck(val update: StoreUpdate, val latest: String? = null)

@@ -2,8 +2,6 @@ package dev.droidtop.runtime.windows
 
 import android.content.Context
 import android.util.Log
-import app.gamenative.data.DownloadInfo
-import app.gamenative.service.SteamService
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.stores.StoreLibraries
@@ -12,7 +10,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
@@ -22,10 +19,10 @@ import org.json.JSONObject
  * 7g, "Where an update comes from"), kept as a small file so a library scan
  * can read it without a network call and without a session.
  *
- * Steam answers through the vendored service (a manifest comparison,
- * [SteamService.isUpdatePending]); a store droidtop runs itself answers
- * through its own [dev.droidtop.library.stores.StoreLibrary.checkUpdate]
- * (Amazon compares the installed version id with the live one). A store with
+ * Every store answers through its own
+ * [dev.droidtop.library.stores.StoreLibrary.checkUpdate] (Steam compares
+ * each installed depot's build with the one it serves now, Amazon the
+ * installed version id with the live one). A store with
  * no check stays [StoreUpdate.UNKNOWN] and the game page says so; nothing
  * here ever claims "up to date" for a store that was not asked. A check runs off the main thread, at most every few
  * hours, never inside a scan, and only for a store that is signed in; its
@@ -120,19 +117,8 @@ internal object StoreUpdates {
 
     /** The store's answer, or null when it cannot be asked right now or has no check at all. */
     private suspend fun ask(context: Context, id: String): Result? {
-        val native = id.substringAfter(':')
-        // A store droidtop runs itself answers through its own interface.
-        StoreLibraries.forKey(id)?.let { store ->
-            return store.checkUpdate(context, native)?.let { Result(it.update, it.latest) }
-        }
-        return when (id.substringBefore(':')) {
-            "steam" -> {
-                val appId = native.toIntOrNull() ?: return null
-                if (!SteamService.isConnected || !SteamService.isLoggedIn) return null
-                Result(if (SteamService.isUpdatePending(appId)) StoreUpdate.AVAILABLE else StoreUpdate.CURRENT, null)
-            }
-            else -> null
-        }
+        val store = StoreLibraries.forKey(id) ?: return null
+        return store.checkUpdate(context, id.substringAfter(':'))?.let { Result(it.update, it.latest) }
     }
 
     private fun persist(context: Context, next: Map<String, Result>, at: Long) {
@@ -149,49 +135,24 @@ internal object StoreUpdates {
 }
 
 /**
- * Publishes the downloads the vendored Steam service is running to its share
- * of [StoreDownloads] (docs/SPEC.md 7i), so a capsule and the primary button
- * can say Downloading. It reads the service's own in-memory download map (no
- * disk, no network), slowly while nothing runs and once a second while
- * something does, and asks [StoreUpdates] again about a game whose download
- * just ended. The stores droidtop runs itself publish their own share from
- * their install jobs (docs/SPEC.md 7g, "Stores").
+ * Asks [StoreUpdates] again about a game whose download just ended, so an
+ * update that finished stops being offered (docs/SPEC.md 7i). It follows
+ * [StoreDownloads], which the store install jobs publish (docs/SPEC.md 7g,
+ * "Stores"): a key that leaves it is a download that ended. Memory only; the
+ * answer is asked off the main thread.
  */
 internal object StoreDownloadWatch {
-    private const val IDLE_MS = 3_000L
-    private const val BUSY_MS = 1_000L
-
     private val started = AtomicBoolean(false)
-
-    /** This watch's share of [StoreDownloads]; the store install jobs publish their own. */
-    private const val PUBLISHER = "gamenative"
 
     fun start(context: Context) {
         if (!started.compareAndSet(false, true)) return
         val app = context.applicationContext
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             var before = emptySet<String>()
-            while (true) {
-                val now = snapshot()
-                StoreDownloads.publish(PUBLISHER, now)
+            StoreDownloads.active.collect { now ->
                 (before - now.keys).forEach { id -> StoreUpdates.recheck(app, id) }
                 before = now.keys
-                delay(if (now.isEmpty()) IDLE_MS else BUSY_MS)
             }
         }
-    }
-
-    private fun snapshot(): Map<String, StoreDownloads.Progress> {
-        val out = HashMap<String, StoreDownloads.Progress>()
-
-        fun add(store: String, downloads: Map<*, DownloadInfo>) {
-            downloads.forEach { (key, info) ->
-                val fraction = info.getProgress()
-                // A finished job can linger in the service's map at 100 percent.
-                if (fraction < 1f) out["$store:$key"] = StoreDownloads.Progress(fraction, paused = !info.isActive())
-            }
-        }
-        runCatching { add("steam", SteamService.getActiveDownloads()) }
-        return out
     }
 }

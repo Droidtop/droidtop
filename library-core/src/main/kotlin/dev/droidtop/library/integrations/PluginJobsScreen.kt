@@ -1,6 +1,5 @@
 package dev.droidtop.library.integrations
 
-import android.content.Context
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -34,16 +33,15 @@ object PluginJobsScreen {
     const val ID = "plugin_jobs"
 
     /**
-     * [extraGroups] are rows the owner of some other queue adds below the jobs (`:app` adds the
-     * store installs queue, which lives in gamenative's own screen), so this stays the one place
-     * the list of "what is running" is reached. [headed] false is for a host that already
-     * names the screen in its own header (the Quick Menu's panel), so the heading is not said twice.
+     * The one place the list of "what is running" is reached; every store's installs are jobs in
+     * it. [headed] false is for a host that already names the screen in its own header (the Quick
+     * Menu's panel), so the heading is not said twice.
      */
-    fun screen(headed: Boolean = true, extraGroups: suspend (Context) -> List<CatalogGroup> = { emptyList() }): CatalogScreen = CatalogScreen(
+    fun screen(headed: Boolean = true): CatalogScreen = CatalogScreen(
         id = ID,
         title = "Downloads and installs",
         subtitle = "Plugin downloads, library scrapes and other long-running actions, wherever they were started from".takeIf { headed },
-        groups = { context ->
+        groups = { _ ->
             val snapshot = PluginJobsCenter.entries().value
             listOf(
                 CatalogGroup(
@@ -56,7 +54,7 @@ object PluginJobsScreen {
                         snapshot.flatMap { entry -> jobItems(entry) }
                     },
                 ),
-            ) + extraGroups(context)
+            )
         },
     )
 

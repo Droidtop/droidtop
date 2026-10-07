@@ -9,16 +9,18 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Brings the store rows GameNative's database already holds into droidtop's
- * own ([StoresDatabase]), once, when that database is first created, so an
- * update keeps every game a store had listed and, above all, what is
- * installed and where (docs/SPEC.md 7g, "Stores").
+ * own ([StoresDatabase], and Steam's [dev.droidtop.stores.steam.SteamDatabase]),
+ * once, when that database is first created, so an update keeps every game a
+ * store had listed and, above all, what is installed and where
+ * (docs/SPEC.md 7g, "Stores").
  *
  * The tables and columns have the same names on both sides, so a row is
  * copied column by column for the columns both tables have; a column only
  * GameNative had (its play-time counters, its app type) is left behind, and a
  * column only droidtop has takes its default. Read-only on GameNative's side.
- * The sign-ins need nothing: each store keeps its sign-in in the same file it
- * always did.
+ * GOG's, Epic's, Amazon's and itch.io's sign-ins need nothing: each keeps its
+ * sign-in in the same file it always did. Steam's sign-in was in GameNative's
+ * preferences and comes across separately (SteamCarryOver).
  */
 internal object GameNativeImport {
     private const val TAG = "droidtop.StoresImport"
@@ -26,9 +28,8 @@ internal object GameNativeImport {
     /** GameNative's database file name (app.gamenative.db.DATABASE_NAME). */
     private const val GAMENATIVE_DATABASE = "pluvia.db"
 
-    private val TABLES = listOf("gog_games", "epic_games", "amazon_games", "itch_games")
-
-    fun run(context: Context, into: SupportSQLiteDatabase) {
+    /** Copies [tables] (in this order) from GameNative's database into [into], which was just made. */
+    fun run(context: Context, into: SupportSQLiteDatabase, tables: List<String>) {
         val source = context.getDatabasePath(GAMENATIVE_DATABASE)
         if (!source.isFile) return
         val old = try {
@@ -38,7 +39,7 @@ internal object GameNativeImport {
             return
         }
         old.use { gamenative ->
-            for (table in TABLES) {
+            for (table in tables) {
                 try {
                     val copied = copyTable(gamenative, into, table)
                     if (copied > 0) Log.i(TAG, "Brought $copied rows of $table across from GameNative")

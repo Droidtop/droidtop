@@ -5,7 +5,6 @@ import dev.droidtop.library.StoreInstallVolumePrefs
 import dev.droidtop.library.NO_GAME_FOLDER_LINE
 import dev.droidtop.library.GamesRoots
 import android.content.Context
-import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -211,7 +210,7 @@ internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, Resolve
     return state to runner
 }
 
-/** The store droidtop runs itself for this game (docs/SPEC.md 7g, "Stores"); null for Steam and for a folder. */
+/** The store this game is from (docs/SPEC.md 7g, "Stores"); null for a folder game. */
 internal fun LibraryEntry.ownStore(): StoreLibrary? = StoreLibraries.forKey(pcInfo?.storeId ?: id)
 
 /**
@@ -244,35 +243,20 @@ internal suspend fun startOwnStoreInstall(context: Context, entry: LibraryEntry,
 
 /**
  * What a press on a store game's primary action does when the game is
- * already downloading or paused: a paused download of a store droidtop runs
- * resumes, a running one opens the Downloads place ([onOpenDownloads]);
- * Steam opens its own screen ([openStoreScreen]). Returns the line to show,
+ * already downloading or paused: a paused download resumes, a running one
+ * opens the Downloads place ([onOpenDownloads]). Returns the line to show,
  * or null.
  */
 internal fun continueStoreDownload(context: Context, entry: LibraryEntry, stage: StoreStage, onOpenDownloads: () -> Unit): String? {
-    if (entry.ownStore() == null) return openStoreScreen(context, entry)
+    if (entry.ownStore() == null) return NO_STORE_LINE
     val key = entry.pcInfo?.storeId ?: entry.id
     if (stage == StoreStage.PAUSED && StoreInstallJob.resume(key)) return null
     onOpenDownloads()
     return null
 }
 
-/**
- * Opens the game's own store screen (install, update, download, verify,
- * remove) for a store GameNative still runs (Steam); returns null, or what
- * went wrong in words a person can read. Started by class name because this
- * module cannot depend on :app, the same route every cross-module screen
- * here takes.
- */
-internal fun openStoreScreen(context: Context, entry: LibraryEntry): String? = runCatching {
-    context.startActivity(
-        Intent()
-            .setClassName(context.packageName, PC_STORE_ACTIVITY)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .putExtra(EXTRA_PC_ENTRY_ID, entry.pcInfo?.storeId ?: entry.id),
-    )
-    null
-}.getOrElse { "droidtop couldn't open that screen: ${it.message}" }
+/** What a store action says for a game whose store this build does not have. */
+internal const val NO_STORE_LINE = "No store in this build installs this game"
 
 /**
  * What the disabled button says under itself: where this game was. The

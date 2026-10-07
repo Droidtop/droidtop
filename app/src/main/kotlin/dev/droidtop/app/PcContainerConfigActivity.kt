@@ -135,3 +135,9 @@ private fun ContainerConfig(entryId: String?, gameTitle: String?, onClose: () ->
         PreparingWindowsSupport()
     }
 }
+
+/** The backbone is still waking up (Droidtop/tracker#41). */
+@Composable
+private fun PreparingWindowsSupport() {
+    Text("Preparing Windows support…", modifier = Modifier.padding(24.dp))
+}

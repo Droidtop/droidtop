@@ -30,8 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import app.gamenative.ui.screen.login.QrCodeImage
 import dev.droidtop.app.ui.DroidtopTheme
+import dev.droidtop.app.ui.QrCode
 import dev.droidtop.library.scraper.ScraperKeyCheck
 import dev.droidtop.library.scraper.ScraperKeyService
 import dev.droidtop.library.scraper.ScraperKeyState
@@ -100,7 +100,7 @@ private fun SetupScreen(service: ScraperKeyService) {
     service.steps.forEachIndexed { index, step ->
         Text("${index + 1}  $step", style = MaterialTheme.typography.bodyLarge)
     }
-    QrCodeImage(content = service.url, size = 220.dp)
+    QrCode(content = service.url, size = 220.dp)
     Button(onClick = {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(service.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }) { Text("Open") }

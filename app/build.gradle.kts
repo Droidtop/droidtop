@@ -286,6 +286,8 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.activity.compose)
+    // The QR codes of Steam's sign-in and the scraper key setup (ui/QrCode.kt).
+    implementation(libs.zxing.core)
     // Installs the baseline profiles that Compose and the other AndroidX
     // libraries ship inside their AARs, so their hot paths are compiled at
     // install time instead of interpreted on first use. Release builds only

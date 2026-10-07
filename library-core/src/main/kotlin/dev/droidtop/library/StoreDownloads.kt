@@ -9,10 +9,9 @@ import kotlinx.coroutines.flow.StateFlow
  * and is not part of what a scan indexes (docs/SPEC.md 7i, "Capsules and
  * the primary action").
  *
- * Two writers fill it, each with its own share ([publish]): the store
- * install jobs ([dev.droidtop.library.stores.StoreInstallJob], every store
- * droidtop runs itself) and `:runtime-windows`, for the Steam downloads the
- * vendored Steam service still runs. The shell reads [active] to draw a
+ * The store install jobs fill it ([dev.droidtop.library.stores.StoreInstallJob],
+ * every store, Steam included), through a share of their own ([publish]; a
+ * second publisher would get its own share). The shell reads [active] to draw a
  * progress badge on a capsule and to turn the primary button into
  * Downloading, with the same one answer for the capsule, the game page and
  * the menu. A plain in-memory map: nothing here touches a disk or the

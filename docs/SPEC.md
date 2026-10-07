@@ -1184,9 +1184,7 @@ re-enabling the mode means granting notification or accessibility access
 again.
 
 A piece a mode STARTED is stopped by the same switch: `ModeStartup.apply`
-stops every running piece whose owning modes are all off, the vendored
-`SteamService` included (started by the Windows backbone for Gaming's PC
-surface and Desktop's containers, it must not outlive both), so "runs no
+stops every running piece whose owning modes are all off, so "runs no
 code" holds mid-session and not only at the next process start.
 
 Deliberately not component-gated, with reasons: a device-admin receiver
@@ -8463,11 +8461,11 @@ STORE game's update comes from its store (next paragraphs).
 **A store game's update (2026-10-02, Droidtop/tracker#222).** `PcInfo` carries
 `installedVersion` (the build the store words, null when it gives none),
 `latestVersion` (null unless the store names one) and `update`, a
-three-valued `StoreUpdate`: `UNKNOWN`, `CURRENT`, `AVAILABLE`. Steam
-answers through the vendored service (`SteamService.isUpdatePending`, a
-manifest comparison, so it says "newer", not which version); a store
-droidtop runs itself answers through `StoreLibrary.checkUpdate` (7g
-"Stores"): Amazon compares the installed version id with the live one and
+three-valued `StoreUpdate`: `UNKNOWN`, `CURRENT`, `AVAILABLE`. Every
+store answers through `StoreLibrary.checkUpdate` (7g "Stores"): Steam
+compares the build of each depot installed (read off the depot manifests
+the download keeps in the game's folder) with the one Steam serves on the
+branch now and names the build ("build 1234567"); Amazon compares the installed version id with the live one and
 says `CURRENT` or `AVAILABLE`, and a request that could not be made is no
 answer at all, never `CURRENT`. A store with no check stays `UNKNOWN`, and
 its game page says "<store> does not tell droidtop whether a newer build
@@ -9235,10 +9233,10 @@ Lutris' (`LibraryPlugin`, `OnlineService`), which `LibraryProvider` already
 follows:
 
 - **`StoreLibrary`** (`:library-core`, `dev.droidtop.library.stores`) is the
-  one interface for a store, built in or plugged in: its id and name, its
-  sign-in (`StoreSignIn`: the store's own web page, from which droidtop reads
-  the one-time code the page hands back, or a personal key the person makes on
-  the store's site; droidtop never sees a password), sign-out, sync, the games
+  one interface for a store, built in or plugged in: its id and name, its sign-in (`StoreSignIn`: the store's own web page, from which droidtop reads
+  the one-time code the page hands back; a personal key the person makes on the
+  store's site; or, for Steam, droidtop's own step-by-step screen over the store's
+  connection, `StoreAccountSignIn`; droidtop keeps no password), sign-out, sync, the games
   it holds (`StoreGame`), install (which is also update), discard of a
   cancelled download, uninstall, verify where the store keeps a file list,
   its update check, how it starts a game when its own data says, and a change
@@ -9260,8 +9258,7 @@ follows:
   The job's checkpoint is the row's key; the stores resume from what is on
   disk. Cancel removes what a download that never finished left behind and
   never touches an installed game. Progress reaches the capsule and the game
-  page through `StoreDownloads`, which now has one share per publisher (the
-  install jobs; the vendored Steam service's downloads).
+  page through `StoreDownloads`, which the install jobs publish.
 - **Where a store installs** (the owner, 2026-10-07: "The location problem
   is solved by the game folder system"): in one of the person's own game
   folders, the same set every library walk reads (`GamesRoots.configured`,
@@ -9287,19 +9284,23 @@ follows:
 - **The `:stores` module** holds the stores lifted out of GameNative, each a
   `StoreLibrary`, with droidtop's own copy of what they hold: `stores.db`
   (`StoresDatabase`), the four tables GameNative kept in its `pluvia.db`
-  under the same names. When `stores.db` is first made, the rows `pluvia.db`
+  under the same names, and Steam's own `steam.db` (below). When `stores.db` is first made, the rows `pluvia.db`
   already has are brought across column by column (`GameNativeImport`), so
   an update keeps every listed game and, above all, what is installed and
   where; GameNative's play-time and app-type columns are left behind (droidtop
   measures play itself, and nothing read the type). Sign-ins need no import:
   each store keeps its sign-in in the same file it always did.
 - **droidtop's screens, not the store's.** Sign-in is a row of the store's
-  page in the Stores place (two-pane Settings, Accounts and sources): a store
-  that signs in on its own web page opens `StoreSignInActivity`, one screen for
-  every such store, which shows the page full screen under droidtop's bar,
-  reads the code off the page the store returns to (its address, or a JSON
-  field of its body) and hands it to the store; B steps back through the
-  store's pages and closes at the first. A store that signs in with a personal
+  page in the Stores place (two-pane Settings, Accounts and sources), and
+  opens `StoreSignInActivity`, one screen for every store that signs in on a
+  screen. For a store that signs in on its own web page it shows the page
+  full screen under droidtop's bar, reads the code off the page the store
+  returns to (its address, or a JSON field of its body) and hands it to the
+  store; B steps back through the store's pages and closes at the first. For
+  Steam it draws the steps of `StoreAccountSignIn` (QR code first, selected
+  on open; account name and password; a Steam Guard code; approve in the
+  phone app) under a hint row; B goes back to the choices and closes from
+  there. A store that signs in with a personal
   key (itch.io) has a key row (masked) and "Make a key", which opens the
   store's key page; a key that does not work is never stored, and the account
   row says why until the next try. Install and Update are the game's primary
@@ -9368,18 +9369,69 @@ follows:
   filesystem root); signed out or offline, it starts without them. Not
   carried: GameNative's Epic overlay install into a prefix and its Epic and
   GOG cloud saves, which belong to the Wine path.
-- **What stays with GameNative for now**: Steam (its client is the next step
-  of the plan and waits on owner decisions) and the Wine runtime the games
-  run in. The `vendor/gamenative` submodule stays until both have moved.
+- **Steam** (`SteamStore`, `dev.droidtop.stores.steam`; decided 2026-10-07,
+  the owner: droidtop's own Steam client is the default, the JavaSteam client
+  taken out of GameNative and moved in like the other stores; "let the user
+  choose, and try to stay as close to not changing upstream stuff as
+  possible"; Valve's own Linux client as an option is later and separate).
+  What GameNative's `SteamService` did, run by droidtop: one connection
+  (`SteamSession`, JavaSteam over a web socket with a kept server list),
+  opened by whoever needs Steam (the sign-in screen, a sync, an install job,
+  an update check), held while they work and closed three minutes after the
+  last lets go; no Android service, no notification, no standing watcher.
+  Sign-in is droidtop's own screen (`StoreSignIn.Account`): a QR code the
+  Steam phone app approves (or "Open in the Steam app" on this device), or the
+  account name and password, then a Steam Guard code (phone app or e-mail) or
+  an approval in the phone app. Steam hands back an account name and a refresh
+  token; droidtop keeps those in its files (`steam/credentials.json`, like the
+  other stores' sign-ins) and logs on with them; the password is never kept.
+  A log-on Steam refuses as no longer valid forgets the sign-in and says to
+  sign in again. Sync reads the licences, each licence's package (its apps and
+  depots; when an app is in several packages, the account's own unexpired one
+  wins) and the product info of every app that changed (`SteamLibrarySync`),
+  into `steam.db` (`SteamDatabase`: GameNative's `steam_app`, `steam_license`,
+  `cached_license` and `app_info` tables, same names and encodings, so its rows
+  come across when `steam.db` is first made; a separate file so Steam's bulk
+  rewrites do not move the other stores' change stamp). The library lists the
+  owned games, demos and applications with an unexpired licence, their own or
+  a DLC's (GameNative's ownership rule), and every installed game whatever
+  its licence. Install is a job like every store's: fresh product info, then
+  the depots `SteamDepots.plan` picks (GameNative's rules: Windows, 64-bit over
+  32-bit, the plain build over the Steam Deck one, the device's language else
+  English, granted by the account's packages, not Steam China) with every DLC
+  the account owns (no DLC picker, as for the other stores), downloaded by
+  JavaSteam's depot downloader into `<game folder>/Steam/<install folder>`,
+  chunks put together in the app's cache. A stopped download continues; an
+  update fetches only what changed. Verify checks every file of the installed
+  depots' manifests (which the download keeps in the game's
+  `.DepotDownloader` folder) by size and SHA-1, with no network. The update
+  check compares each installed depot's build, read off those manifest names,
+  with the one Steam serves now. A game starts with the program GameNative
+  chose (the developer's launch entry unless it is a stub, else the
+  best-scoring program the manifests flag), its working folder and its launch
+  arguments. Not carried: Steam Cloud saves, achievements, Workshop, friends,
+  family sharing, private branches and GameNative's Linux-depot switch; cloud
+  saves resolve save folders inside GameNative's Wine containers and move with
+  the Wine runtime.
+- **What stays with GameNative for now**: the Wine runtime the games run in.
+  It needs nothing of Steam from droidtop: droidtop's Wine launch has never run
+  GameNative's Steam client component or Steamworks emulation, so a Steam game
+  starts like any Windows game (its program, folder and arguments from
+  `SteamStore.launch`), and a game that needs Steam running does not start, as
+  before. Its prefix keeps GameNative's container id for a Steam game
+  (`STEAM_<app id>`, `PcContainers`), a plain name. Its component downloads
+  moved out of GameNative's Steam service (`GameNativeDownloads`, still
+  GameNative's host). GameNative's `SteamService` is still compiled (the whole
+  tree is) but no longer declared or started. The `vendor/gamenative`
+  submodule stays until the Wine runtime moves.
 
 ### What the store services give, and what they do not
 
 Read from the vendored gamenative tree (2026-09-24), because "What is best
 for users" above promises more than the store services hold:
 
-- **Sources** are wired: `PcLibrary` reads the Steam DAO, every store
-  droidtop runs itself (`StoreLibraries`, "Stores" above) and
-  `CustomGameScanner` into one `PcLibrary.Game` shape, and `PcGameProvider`
+- **Sources** are wired: `PcLibrary` reads every store (`StoreLibraries`,
+  "Stores" above) and `CustomGameScanner` into one `PcLibrary.Game` shape, and `PcGameProvider`
   publishes them as ordinary entries.
 - **Compatibility** is wired from `GameCompatibilityCache`, cached only: a
   scan never makes a network call or needs a signed-in account, so a game
@@ -10406,13 +10458,12 @@ button reads Install (with the download size), Update ("A newer build is
 available"), Downloading (percent) or Resume; the capsule badge, the page's
 big button, the menu's first row and the hint pill all read that one
 answer, and `capsuleStatusOf` is built on the same stage. A on a capsule,
-the page button and the menu's first row for such a game go to the game's
-own store screen (`openStoreScreen`, `PcStoreActivity`), the one place
-install, update, pause, verify, extras and remove happen; "Manage install"
-stays in the menu for the rest, and an installed game with an update also
-gets "Play without updating". Epic downloads are not mapped yet (its
-service keys a download by a row number the library does not carry), so an
-Epic game shows Install or Update but not Downloading.
+the page button and the menu's first row for such a game go to the install
+offer and then the store's install job (7g "Stores"); the menu's store
+rows (Downloads, Verify files, Uninstall) are where the rest happens, and
+an installed game with an update also gets "Play without updating". Every
+store's download is a job keyed by the store row, so every store game shows
+Downloading.
 
 **The free-space offer before an install or update** (decided 2026-10-02,
 Droidtop/tracker#227, superseding #223's "the store's own dialog is the
@@ -10437,24 +10488,19 @@ folder yet. Add one under Settings > Game folders" and offers only Not now.
 The offer's fit check is the library's answer, not the store's: an
 update's download is the store's delta, which the library does not carry,
 so an update gets the free space named but never a fit warning, and an
-install of unknown size is never refused on its behalf. For a store
-droidtop runs itself A picks a game folder and starts the install job
-there (`startOwnStoreInstall`); for Steam, which keeps its own install
-location on its current path, the sheet names the size only and A opens
-its screen. B closes with nothing started. Downloads already in flight
-(`Downloading`, `Paused`) skip the offer and go to the Downloads place
-(Steam: its own queue). The Storage view (bytes per store and per game,
+install of unknown size is never refused on its behalf. A picks a game
+folder and starts the store's install job there (`startOwnStoreInstall`),
+Steam's included. B closes with nothing started. Downloads already in
+flight (`Downloading`, `Paused`) skip the offer and go to the Downloads
+place. The Storage view (bytes per store and per game,
 sorted by size, free space per folder, an uninstall per row) is the rest
 of Droidtop/tracker#227.
 
 **Live downloads.** `StoreDownloads` (`:library-core`) is an in-memory map
-by store id with one share per writer: the store install jobs
-(`StoreInstallJob`, every store droidtop runs itself) and
-`StoreDownloadWatch` (`:runtime-windows`), which reads the vendored
-services' own download maps once a second while one runs and every few
-seconds when none does; the shell collects it. A
-download that reaches 100 percent leaves the map and its game is asked
-about again.
+by store id, one share per writer; its one writer is the store install
+jobs (`StoreInstallJob`, every store, Steam included), and the shell
+collects it. A download that ends leaves the map and `StoreDownloadWatch`
+(`:runtime-windows`) asks its store about the game again.
 
 **The strip's counts.** `pcViewCounts` counts each built-in view with the
 view's own query, once per library change, off the main thread; the chip
@@ -10631,7 +10677,7 @@ games", and the offer then appears over the page, which stays open.
 **One state, one way to start it (owner ask, Droidtop/tracker#299).**
 `WindowsSetup` (library-core) is the only code that provisions the Windows
 environment and the only source of its state: Settings' "Set up Windows
-games" row, the Steam screen's button, A on a game and the game menu's row all
+games" row, A on a game and the game menu's row all
 call `WindowsSetup.provision`, and every surface reads `WindowsSetup.State`
 (Not set up, Installing N%, Ready, Failed: reason) beside `isProvisioned`,
 which launch reads. Settings' row carries that state as its value and asks
@@ -11658,30 +11704,28 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   and sources** and **PC setup** now link to Stores instead of carrying
   their own sign-in rows (the "Steam account and library" row on the Windows
   games screen, which started the Steam sign-in a second way, is gone too:
-  Stores > Steam is the one entry, 2026-10-03). Passwords are never entered in droidtop: a
-  store droidtop runs shows its own sign-in page or takes the key the person made on its site
-  (7g "Stores"); Steam's sign-in is still its own screen. **Open library** sets the PC Games
+  Stores > Steam is the one entry, 2026-10-03). droidtop keeps no password: a store
+  shows its own sign-in page or takes the key the person made on its site, and Steam signs in
+  on droidtop's own screen by QR code, or by a password Steam checks and droidtop does not
+  keep (7g "Stores"). **Open library** sets the PC Games
   tab's Store filter to that store and opens the tab (`PcGamesState.showStore`),
   so a store is a filter on the one library and not a second place to
-  browse. **Sync library** reads a store droidtop runs in place and says how
-  many games it holds (`StoreLibrary.sync`), and is `triggerLibrarySync` for
-  a store GameNative still runs (its service pass, bypassing its throttle;
-  Droidtop/tracker#225); Steam has no row because its library follows its
-  live session. The "last synced" time is droidtop's own note
-  of when it asked: the services keep their times in memory only, so it is
-  absent until the first sync from here. The store names are written once
+  browse. **Sync library** reads the store in place and says how
+  many games it holds (`StoreLibrary.sync`, Droidtop/tracker#225), Steam's
+  included: droidtop's Steam keeps no standing session, so its library is
+  read when asked, after a sign-in and before an install. The "last synced"
+  time is droidtop's own note of when it asked, absent until the first sync
+  from here. The store names are written once
   (`PcStoreNames`), for the code that makes them and the code that filters
   by them. Per-store settings do not exist yet: nothing in the backend is
   configurable per store, and no row is shown for it.
 - **Downloads and installs** (`plugin_jobs`, `PluginJobsScreen`): the one
   jobs list (plugin work, library scrapes, store depots, DownloadManager
   downloads, plugin updates) with progress, Pause, Resume and Cancel where
-  the job supports them (12a "Jobs"); a store droidtop runs installs as a
-  job here (7g "Stores"), and under the jobs a row leads to Steam's installs
-  queue (gamenative's own downloads screen, `PcStoreActivity`).
+  the job supports them (12a "Jobs"); every store installs as a
+  job here (7g "Stores"), Steam included.
   The name stays the one the rest of the app already uses. Theme downloads
-  and update installs are not yet jobs in that list, and gamenative's queue
-  is a separate surface; folding them in is open.
+  and update installs are not yet jobs in that list; folding them in is open.
 - **Updates** (`updates`): the "Available" group lists what has a newer
   version from data that exists today: droidtop's own newer build as the
   last check saw it, installed plugins against the cached catalog (with
@@ -12502,8 +12546,8 @@ input-seat             → unified input seat; depends on host-bridge, runtime-c
 library-core           → the unified library and its metadata (§7g); depends on
                           runtime-common, and on shell-default + IconLoader for the
                           launcher's own app-icon machinery
-stores                 → the PC stores droidtop runs itself (§7g "Stores": Epic, GOG,
-                          Amazon Games, itch.io, lifted out of vendor/gamenative) behind
+stores                 → the PC stores droidtop runs itself (§7g "Stores": Steam, Epic,
+                          GOG, Amazon Games, itch.io, lifted out of vendor/gamenative) behind
                           library-core's StoreLibrary; depends on library-core and
                           runtime-common, never on the vendored tree
 display                → secondary-display behaviour for every mode, in one place (the

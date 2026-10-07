@@ -37,6 +37,9 @@ abstract class StoresDatabase : RoomDatabase() {
     companion object {
         const val NAME = "stores.db"
 
+        /** GameNative's tables of these four stores, brought across when this database is first made. */
+        private val GAMENATIVE_TABLES = listOf("gog_games", "epic_games", "amazon_games", "itch_games")
+
         @Volatile
         private var instance: StoresDatabase? = null
 
@@ -47,7 +50,7 @@ abstract class StoresDatabase : RoomDatabase() {
                         object : RoomDatabase.Callback() {
                             // Once, as the database is first made: what GameNative's database holds.
                             override fun onCreate(db: SupportSQLiteDatabase) {
-                                GameNativeImport.run(context.applicationContext, db)
+                                GameNativeImport.run(context.applicationContext, db, GAMENATIVE_TABLES)
                             }
                         },
                     )

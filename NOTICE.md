@@ -13,8 +13,22 @@ This project is distributed under the GNU General Public License v3.0 (see
   store code (`app.gamenative.service.{epic,gog,amazon,itch}`, its store
   models and DAOs and the helpers they use), lifted out of the fork at
   `d6336076` into `dev.droidtop.stores.*` and reworked to run without
-  GameNative (docs/SPEC.md §7g "Stores"). GameNative's authors hold the
-  copyright in that code; it stays under GPL-3.0.
+  GameNative (docs/SPEC.md §7g "Stores"). Its Steam client is lifted the
+  same way into `dev.droidtop.stores.steam`, from the fork at `0f08762e`:
+  `SteamService`'s connection, sign-in (QR code, password and Steam Guard),
+  licence and product-info reads and depot downloads, its Steam models,
+  converters and DAOs, `KeyValueUtils.generateSteamApp`, `LicenseSerializer`
+  and `CaseInsensitiveFileSystem`. GameNative's authors hold the copyright in
+  that code; it stays under GPL-3.0.
+- **JavaSteam** — https://github.com/Longi94/JavaSteam — MIT, as GameNative
+  builds it (https://github.com/joshuatam/JavaSteam, branch
+  `gamenative-latest`, the `io.github.joshuatam:javasteam` and
+  `javasteam-depotdownloader` artifacts): the Steam protocol, sign-in and
+  depot downloader under droidtop's own Steam client (`:stores`). A Maven
+  dependency, not vendored.
+- **ZXing** — https://github.com/zxing/zxing — Apache-2.0. Its `core`
+  artifact draws droidtop's QR codes (Steam's sign-in, the scraper key
+  setup). A Maven dependency, not vendored.
 - **Winlator** — https://github.com/brunodev85/winlator — LGPL-2.1.
   The upstream of GameNative's `com.winlator` runtime tree, and so of
   `runtime-windows`. Not vendored in this repository (the reference checkout

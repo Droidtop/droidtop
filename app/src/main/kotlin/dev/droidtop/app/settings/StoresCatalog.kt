@@ -5,8 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import dev.droidtop.app.LauncherGamesActivity
-import dev.droidtop.app.PcStoreActivity
-import dev.droidtop.app.SteamLoginActivity
 import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.settings.ActionItem
@@ -24,7 +22,6 @@ import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.runtime.windows.PcLibrary
-import dev.droidtop.runtime.windows.SteamAccess
 import dev.droidtop.runtime.windows.displayName
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
@@ -38,11 +35,11 @@ import kotlinx.coroutines.withContext
  * [AppSettingsCatalogs] and each sign-in launch twice; the Stores place
  * and the accounts screen now both read this.
  *
- * A store droidtop runs itself ([own], docs/SPEC.md 7g "Stores") answers
- * every question through its [StoreLibrary]; the stores GameNative still
- * runs keep their vendored calls until they move. droidtop never sees a
- * password: a web sign-in shows the store's own page, a key sign-in takes
- * the key the person made on the store's site.
+ * Every store answers through its [StoreLibrary] ([own], docs/SPEC.md 7g
+ * "Stores"); all five are droidtop's own. droidtop keeps no password: a web
+ * sign-in shows the store's own page, a key sign-in takes the key the person
+ * made on the store's site, and Steam signs in step by step on droidtop's
+ * own screen (a QR code, or a password Steam checks and droidtop does not keep).
  */
 internal enum class PcStore(val key: String, val label: String, val source: PcLibrary.Source) {
     STEAM("steam", "Steam", PcLibrary.Source.STEAM),
@@ -52,90 +49,58 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
     ITCH("itch", "itch.io", PcLibrary.Source.ITCH),
     ;
 
-    /** The store when droidtop runs it itself, or null while GameNative still does. */
+    /** The store, or null when this build has none of that id. */
     val own: StoreLibrary? get() = StoreLibraries.byId(key)
 
     /** The name this store's games carry in the library (the Store filter's value). */
     val libraryName: String get() = source.displayName()
 
-    /** Steam keeps its library current through its live session; the others are read on request. */
-    val syncsOnRequest: Boolean get() = this != STEAM
-
     /** How the store's own sign-in screen describes itself, for the row's tooltip. */
     val signInNote: String
         get() = when (own?.signInKind) {
             StoreSignInKind.API_KEY -> "Paste the API key you make on $label's site"
-            StoreSignInKind.WEB_PAGE -> "Signs in on $label's own page"
-            null -> if (this == STEAM) "Sign in with a QR code or a password, then download your games" else "Signs in on $label's own page"
+            StoreSignInKind.WEB_PAGE, null -> "Signs in on $label's own page"
+            StoreSignInKind.ACCOUNT -> "Sign in with a QR code or a password, then download your games"
         }
 
-    fun signedIn(context: Context): Boolean = runCatching {
-        own?.signedIn(context) ?: when (this) {
-            STEAM -> app.gamenative.utils.SteamUtils.hasStoredCredentials()
-            GOG, EPIC, AMAZON, ITCH -> false
-        }
-    }.getOrDefault(false)
+    fun signedIn(context: Context): Boolean = runCatching { own?.signedIn(context) == true }.getOrDefault(false)
 
     /** Who is signed in, where the store keeps it in the open, else null. */
-    fun accountName(context: Context): String? = runCatching {
-        own?.accountName(context) ?: if (this == STEAM) app.gamenative.PrefManager.username.takeIf { it.isNotBlank() } else null
-    }.getOrNull()
+    fun accountName(context: Context): String? = runCatching { own?.accountName(context) }.getOrNull()
 
     /** The sign-in screen for a store that has one; null for a key sign-in, which is a row of the store's page. */
     fun signInIntent(context: Context): Intent? {
-        own?.let { store ->
-            return when (store.signInKind) {
-                StoreSignInKind.WEB_PAGE -> dev.droidtop.app.StoreSignInActivity.intent(context, store.id)
-                StoreSignInKind.API_KEY -> null
-            }
-        }
-        return when (this) {
-            STEAM -> Intent(context, SteamLoginActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            GOG, EPIC, AMAZON, ITCH -> null
+        val store = own ?: return null
+        return when (store.signInKind) {
+            StoreSignInKind.WEB_PAGE, StoreSignInKind.ACCOUNT -> dev.droidtop.app.StoreSignInActivity.intent(context, store.id)
+            StoreSignInKind.API_KEY -> null
         }
     }
 
     /** The store's own sign-out; a failure carries the reason. */
     suspend fun signOut(context: Context): Result<Unit> {
-        own?.let { store ->
-            return store.signOut(context).onSuccess { StoreChanges.announce(context) }
-        }
-        return runCatching {
-            when (this) {
-                // The same call Steam's own screen makes; a session that is not live has only stored preferences to clear.
-                STEAM -> if (SteamAccess.isLoggedIn()) SteamAccess.logOut() else app.gamenative.PrefManager.clearSteamSessionPreferences()
-                GOG, EPIC, AMAZON, ITCH -> Unit
-            }
-        }
+        val store = own ?: return Result.failure(IllegalStateException("This build has no $label store"))
+        return store.signOut(context).onSuccess { StoreChanges.announce(context) }
     }
 
     /**
-     * Asks the store to re-read its library (docs/SPEC.md 7i, Droidtop/tracker#225). A store
-     * droidtop runs reads it here and says how many games it holds; the GameNative services run
-     * their own pass, bypassing its throttle. The time is droidtop's own note of when it asked.
-     * Returns the outcome line.
+     * Asks the store to re-read its library (docs/SPEC.md 7i, Droidtop/tracker#225) and says
+     * how many games it holds. The time is droidtop's own note of when it asked. Returns the
+     * outcome line.
      */
     suspend fun requestSync(context: Context): String {
-        if (!syncsOnRequest) return "Steam keeps its library current while you are signed in"
+        val own = own ?: return "This build has no $label store"
         return withContext(Dispatchers.IO) {
-            val own = own
-            val line = if (own != null) {
-                own.sync(context).fold(
-                    onSuccess = { count ->
-                        StoreChanges.announce(context)
-                        "$count ${if (count == 1) "game" else "games"}"
-                    },
-                    onFailure = { exc ->
-                        Log.w("droidtop.stores", "Sync failed for $label", exc)
-                        return@withContext userFacingErrorMessage(exc)
-                    },
-                )
-            } else {
-                when (this@PcStore) {
-                    STEAM, GOG, EPIC, AMAZON, ITCH -> Unit
-                }
-                "Sync requested. New games appear in a moment"
-            }
+            val line = own.sync(context).fold(
+                onSuccess = { count ->
+                    StoreChanges.announce(context)
+                    "$count ${if (count == 1) "game" else "games"}"
+                },
+                onFailure = { exc ->
+                    Log.w("droidtop.stores", "Sync failed for $label", exc)
+                    return@withContext userFacingErrorMessage(exc)
+                },
+            )
             context.getSharedPreferences(SYNC_PREFS, Context.MODE_PRIVATE).edit().putLong(key, System.currentTimeMillis()).apply()
             line
         }
@@ -267,11 +232,7 @@ internal object StoresCatalog {
                 ActionItem(
                     id = "store_${store.key}_library",
                     title = "Library",
-                    subtitle = if (store.syncsOnRequest) {
-                        syncedAgo(System.currentTimeMillis(), store.lastSyncRequested(context))
-                    } else {
-                        "Steam keeps its library current while you are signed in"
-                    },
+                    subtitle = syncedAgo(System.currentTimeMillis(), store.lastSyncRequested(context)),
                     value = countsLine(counts, signedIn),
                     run = {},
                 ),
@@ -294,7 +255,7 @@ internal object StoresCatalog {
                     ),
                 )
             }
-            if (signedIn && store.syncsOnRequest) {
+            if (signedIn) {
                 add(
                     AsyncActionItem(
                         id = "store_${store.key}_sync",
@@ -313,22 +274,13 @@ internal object StoresCatalog {
                 id = "store_${store.key}_downloads_group",
                 title = "Downloads",
                 items = listOf(
-                    if (store.own != null) {
-                        // A store droidtop runs installs through the one jobs list: the Downloads place.
-                        NestedScreenItem(
-                            id = "store_${store.key}_downloads",
-                            title = "Downloads",
-                            subtitle = "What is downloading or waiting, with Pause, Resume and Cancel",
-                            registryId = PluginJobsScreen.ID,
-                        )
-                    } else {
-                        ActionItem(
-                            id = "store_${store.key}_downloads",
-                            title = "Downloads",
-                            subtitle = "What is downloading or waiting from this store",
-                            run = { ctx -> ctx.startActivity(PcStoreActivity.intent(ctx, entryId = null)) },
-                        )
-                    },
+                    // Every store installs through the one jobs list: the Downloads place.
+                    NestedScreenItem(
+                        id = "store_${store.key}_downloads",
+                        title = "Downloads",
+                        subtitle = "What is downloading or waiting, with Pause, Resume and Cancel",
+                        registryId = PluginJobsScreen.ID,
+                    ),
                 ),
             ),
         )

@@ -444,30 +444,15 @@
           scope rather than external-path's narrower primary-volume-only
           coverage.
         -->
-        <!-- droidtop's own Steam sign-in + library surface over the
-             vendored gamenative Steam service (its UI is deliberately
-             not wired; see runtime-windows/src/main/AndroidManifest.xml). -->
-        <activity
-            android:name=".SteamLoginActivity"
-            android:exported="false" />
-
         <!-- The guided key setup for IGDB and SteamGridDB, opened from their rows under Accounts and sources. -->
         <activity
             android:name=".ScraperKeySetupActivity"
             android:exported="false" />
 
-        <!-- Steam's store screen and downloads queue and the container
-             configuration dialog, hosted from the vendored gamenative tree
-             (docs/SPEC.md 7i); the other stores are droidtop's own (7g
-             "Stores"). Started by explicit class name from the Gaming
-             shell, which cannot depend on :app. -->
-        <activity
-            android:name=".PcStoreActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
-        <!-- A store's own sign-in page (docs/SPEC.md 7g "Stores"). Not
-             recreated on a turn: a sign-in page holds one-time state the
-             store made when the page opened. -->
+        <!-- Signing in to a store (docs/SPEC.md 7g "Stores"): a store's own
+             sign-in page, or Steam's steps on droidtop's own screen. Not
+             recreated on a turn: a sign-in holds one-time state the store
+             made when it started. -->
         <activity
             android:name=".StoreSignInActivity"
             android:exported="false"

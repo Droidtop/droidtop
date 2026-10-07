@@ -518,9 +518,9 @@ internal fun PcGameMenu(
             )
         },
     )
-    // A store droidtop runs itself manages its install from this menu
-    // (docs/SPEC.md 7g, "Stores"): verify where the store keeps a file list,
-    // uninstall, and the way to its download. Steam keeps its own screen.
+    // A store game's install is managed from this menu (docs/SPEC.md 7g,
+    // "Stores"): verify where the store keeps a file list, uninstall, and the
+    // way to its download. Every store is droidtop's own, Steam included.
     val ownStore = entry.ownStore()
     val ownStoreRows = ownStore?.let { store ->
         val key = entry.pcInfo?.storeId ?: entry.id
@@ -643,22 +643,6 @@ internal fun PcGameMenu(
                 null
             }.getOrElse { "Enginehost didn't take that: ${it.message}" }
         },
-        // The store page: UI :runtime-windows already compiles from the
-        // vendored gamenative tree, hosted by an :app Activity (build-plan
-        // step 5). Started by explicit class name because this module
-        // cannot depend on :app -- the same route every other cross-module
-        // screen here takes.
-        onOpenAppScreen = { className, extras ->
-            status = runCatching {
-                context.startActivity(
-                    android.content.Intent()
-                        .setClassName(context.packageName, className)
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        .apply { extras.forEach { (key, value) -> putExtra(key, value) } },
-                )
-                null
-            }.getOrElse { "droidtop couldn't open that screen: ${it.message}" }
-        },
         hasWindowsRoute = hasWindowsRoute,
         // The registered settings screen :app builds (WineOptionsCatalog),
         // by id and deep-linked to this game, in a sheet over the menu.
@@ -745,9 +729,8 @@ internal fun PcGameMenu(
                                     StoreStage.INSTALL, StoreStage.UPDATE ->
                                         storeOffer = StoreInstallOffer(entry, checkNotNull(store))
                                     // Downloading, Paused: the download is already
-                                    // in flight; a paused one of a store droidtop runs
-                                    // resumes, a running one is in Downloads, Steam's
-                                    // is in its own queue.
+                                    // in flight; a paused one resumes, a running one
+                                    // is in Downloads.
                                     null -> Unit
                                     else -> status = continueStoreDownload(context, entry, store) {
                                         onClose()
@@ -992,7 +975,7 @@ internal fun PcGameMenu(
             storeOffer = null
             val own = o.entry.ownStore()
             if (own == null) {
-                status = openStoreScreen(context, o.entry)
+                status = NO_STORE_LINE
             } else {
                 scope.launch { status = startOwnStoreInstall(context, o.entry, own, volumePath) }
             }
@@ -1150,7 +1133,7 @@ private data class EngineChoice(val folder: String?, val pinned: Boolean, val en
 @Composable
 private fun rememberPcActions(
     titleRows: List<PcActionRow>,
-    // A store droidtop runs itself: its own install rows instead of a store screen.
+    // A store game: its store's install rows. Null for a game no store owns.
     storeRows: List<PcActionRow>?,
     group: dev.droidtop.library.LibraryGameGroup?,
     currentId: String,
@@ -1171,7 +1154,6 @@ private fun rememberPcActions(
     onOpenPage: (() -> Unit)?,
     engineRow: PcActionRow?,
     onEnginehost: (android.content.Intent) -> Unit,
-    onOpenAppScreen: (className: String, extras: Map<String, String>) -> Unit,
     hasWindowsRoute: Boolean,
     onOpenWineSettings: () -> Unit,
     wineSettings: WineGameSettings?,
@@ -1180,7 +1162,6 @@ private fun rememberPcActions(
 ): PcMenuSections {
     val isEngineGame = entry.kind != LibraryEntryKind.WINE_PROFILE
     val runsOnEnginehost = runner?.option?.strategy == GameLaunchStrategy.ENGINEHOST
-    val isStoreGame = entry.pcInfo?.storeId != null || entry.id.substringBefore(':') in STORE_PREFIXES
 
     return PcMenuSections(
         // Play: getting this game onto the device and running it. The
@@ -1190,24 +1171,8 @@ private fun rememberPcActions(
         play = listOfNotNull(
             onOpenPage?.let { PcActionRow("Game page", "Its artwork, facts and the one Play button", it) },
         ) + (storeRows ?: listOf(
-            // One row, not three: install, verify, update, DLC and
-            // delete are one screen on Steam's side, and that screen is
-            // the vendored client's own (gamenative's AppScreen).
-            PcActionRow(
-                // Install and Update are the primary row above; this is the
-                // place for verify, extras and remove.
-                "Manage install",
-                if (isStoreGame) {
-                    "Install, verify, update, remove"
-                } else {
-                    "A folder on this device"
-                },
-                if (isStoreGame) {
-                    { onOpenAppScreen(PC_STORE_ACTIVITY, mapOf(EXTRA_PC_ENTRY_ID to entry.id)) }
-                } else {
-                    null
-                },
-            ),
+            // A game no store owns: droidtop does not manage its files.
+            PcActionRow("Manage install", "A folder on this device", null),
         )) + listOf(
             // The global download queue is not this game's; it is
             // under "PC setup" (UI pass 2026-09-24, M7; renamed from
@@ -1486,13 +1451,6 @@ private fun replacementCandidatesFor(
         among = siblings.filter { it.missing != entry.missing },
     )
 
-private val STORE_PREFIXES = setOf("steam", "gog", "epic", "amazon")
-
-// :app's hosts for the gamenative screens droidtop adopts, by name
-// because this module cannot depend on :app. Kept together so the two
-// sides are one edit apart if a class ever moves.
-internal const val PC_STORE_ACTIVITY = "dev.droidtop.app.PcStoreActivity"
-internal const val EXTRA_PC_ENTRY_ID = "dev.droidtop.app.extra.PC_ENTRY_ID"
 
 
 /** The ProtonDB row's states: nothing is fetched until the person asks. */
