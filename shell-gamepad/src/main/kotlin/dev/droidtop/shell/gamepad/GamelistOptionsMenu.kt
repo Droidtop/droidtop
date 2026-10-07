@@ -449,7 +449,7 @@ internal fun GamelistOptionsMenu(
     }
 
     // The same search dialog the PC library opens (LibraryQueryUi), so the
-    // "Get more" fan-out to source plugins is one component, not a copy.
+    // one search over the library and the download sources is one component, not a copy.
     // Downloads land in this system's own folder.
     if (searchOpen && onSearchTextChange != null) {
         var searchFolder by remember { mutableStateOf<java.io.File?>(null) }

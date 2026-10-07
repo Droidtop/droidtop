@@ -3,16 +3,14 @@ package dev.droidtop.library.integrations
 import android.content.Context
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
 import dev.droidtop.pluginhost.RuntimeNeed
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * One source's search result, tagged with the [GameSourceProvider] it
- * came from -- what a "Get more" row needs to show its source's label
- * next to a normal game row (docs/SPEC.md 12a "Search fan-out").
+ * came from -- what a result row needs to show its source's label
+ * next to a normal game row (docs/SPEC.md 12a "One search").
  */
 data class SourceHit(val source: GameSourceProvider, val result: AcquireContentResult)
 
@@ -21,7 +19,7 @@ data class SourceHit(val source: GameSourceProvider, val result: AcquireContentR
  * which is a real answer), or the [failure] sentence when it could not
  * answer (not loaded, timed out, the plugin's own error). [runtimeNeed] is
  * set when the reason is a missing runtime, so a surface can offer the
- * download right there. A "Get more" group shows one of these per source
+ * download right there. The search list reports one of these per source
  * instead of folding every failure into "nothing found" (docs/SPEC.md 12a
  * "Search fan-out": "a source's outcome is always shown").
  */
@@ -38,17 +36,15 @@ data class SourceOutcome(
 fun List<SourceOutcome>.hits(): List<SourceHit> = flatMap { it.hits }
 
 /**
- * The ONE generic mechanism every existing game-search surface (the
- * shared LibraryQuery search behind the PC library and any console list
- * that adopts it, the launcher drawer/QSB search) asks to fan a query out
- * to every [GameSourceProvider] (today: every approved+enabled
+ * The per-source half of the one search ([UnifiedSearch] is the other
+ * half): how one query is put to every [GameSourceProvider] (today: every approved+enabled
  * acquire_content plugin, via [GameSources.plugins]; later: built-in
  * store adapters too, same interface), off the main thread, bounded so
  * one slow or hung source can't hold up the rest -- built once here
  * instead of each surface hand-rolling its own source loop (SPEC 12a
  * "Search fan-out", owner directive: "Add ONE generic mechanism").
  *
- * [fanOut] is the pure-ish core: it takes the concurrency/timeout/merge
+ * [fanOutOutcomes] is the pure-ish core: it takes the concurrency/timeout/merge
  * shape as a plain suspend fetcher per source, so
  * PluginSearchAggregatorTest can drive it with fake [GameSourceProvider]s
  * under `kotlinx-coroutines-test`'s virtual clock instead of a real
@@ -68,28 +64,8 @@ object PluginSearchAggregator {
      */
     const val PER_SOURCE_TIMEOUT_MS = 16_000L
 
-    /**
-     * Every source's own [GameSourceProvider.search] outcome for [query], fanned out in parallel, one per
-     * source in the order given. Blank [query] or no sources returns no outcomes -- the empty-query "Get more"
-     * behavior is [GetMoreComposer.composeEmpty], not this. Runs on the IO dispatcher: building a plugin's
-     * call reads the disk, and a caller on the main thread must never wait on it.
-     */
-    suspend fun searchAll(
-        context: Context,
-        sources: List<GameSourceProvider>,
-        query: String,
-        platform: String?,
-    ): List<SourceOutcome> {
-        if (query.isBlank() || sources.isEmpty()) return emptyList()
-        return withContext(Dispatchers.IO) {
-            fanOutOutcomes(sources, fetch = { source -> source.search(context, query, platform) }).map { outcome ->
-                if (outcome.failure == null) outcome else outcome.copy(runtimeNeed = runtimeNeedOf(context, outcome.source))
-            }
-        }
-    }
-
     /** The runtime a failed plugin source lacks, so its row can offer the download; null for any other source or when it has what it needs. */
-    private fun runtimeNeedOf(context: Context, source: GameSourceProvider): RuntimeNeed? =
+    internal fun runtimeNeedOf(context: Context, source: GameSourceProvider): RuntimeNeed? =
         (source as? PluginGameSource)?.let { PluginRuntimeNeeds.missing(context, it.source.record.manifest) }
 
     /** A failure sentence a person can read: what the source said, bounded, never a stack trace or an empty string. */

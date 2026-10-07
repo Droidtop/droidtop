@@ -17,8 +17,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  * Standard mode's one search (docs/SPEC.md 12a "Launcher search"). The
  * drawer's search field and a hardware key typed in the drawer do not
  * filter the drawer in place any more: they open droidtop's search screen,
- * the shared library search with plugin "Get more" results and
- * Recommendations, which the `:app` module draws
+ * the shared library search (one list over apps, games and the
+ * download sources) with Recommendations, which the `:app` module draws
  * (`dev.droidtop.app.LauncherSearchActivity`). `:shell-default` cannot
  * depend on `:app`, so the screen is named by an action, and this object
  * is the launcher's half of the seam: opening it, and answering it for the

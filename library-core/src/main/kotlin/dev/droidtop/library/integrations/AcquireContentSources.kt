@@ -39,10 +39,9 @@ import org.json.JSONArray
  * [systemScreen] is the per-system "Get games" entry point both :app and
  * :shell-gamepad's gamelist options menu still offer. As of the "Search
  * fan-out" change (SPEC 12a), [search] is also the backing call for the
- * generic mechanism in `dev.droidtop.library.integrations.PluginSearchAggregator`,
- * which every existing game-search surface (the shared LibraryQuery
- * search, the launcher drawer/QSB search) asks in parallel and folds into
- * a "Get more" group -- so a plugin never needs a second, dedicated
+ * search in `dev.droidtop.library.integrations.UnifiedSearch`, which asks
+ * every source in parallel and ranks the answers in the one result list
+ * with the device's own rows -- so a plugin never needs a second, dedicated
  * screen to be found; droidtop's own search already asks it.
  *
  * **The wire contract for a plugin's `acquire_content` calls**:

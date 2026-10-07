@@ -843,7 +843,7 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Smartspace/clock widget | HAVE | `widget/smartspace/{MurineClockView,SmartspaceMode}.kt` |
 | Configurable QSB with web search providers | HAVE | `widget/search/{SearchProvider,MurineSearchBarView}.kt` (8 providers + custom) |
 | Gestures: double-tap and swipe-down, each assignable to any of nothing/lock screen/open notifications/open app drawer/open recent apps (**built 2026-09-26**, was two fixed on/off gestures) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), `LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION`/`GESTURE_SWIPE_DOWN_ACTION`, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows (`DOUBLE_TAP_ACTION`, `SWIPE_DOWN_ACTION`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt`; an existing install's old two-boolean prefs are carried over once by `GestureActionMigration` |
-| Drawer search over apps, droidtop's own library and plugin "Get more" results | **built (Droidtop/tracker#12)** | the drawer's search field opens `LauncherSearchActivity` on the shared `LibrarySearchDialog`; see "Launcher search" below |
+| Drawer search over apps, droidtop's own library and the download sources, in one ranked list | **built (Droidtop/tracker#12)** | the drawer's search field opens `LauncherSearchActivity` on the shared `LibrarySearchDialog`; see "Launcher search" below |
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
@@ -956,11 +956,11 @@ activity that draws the shared `LibrarySearchDialog` (`shell-gamepad`
 open, see 12a "Search surfaces wired") through `LauncherSearchScreen`. Its
 local results are the installed apps that match, then the library's games
 (`matchesSearchText`, the one text rule of every list, over the library's
-already-scanned in-RAM list: no per-game disk lookups while typing), then the
-dialog's own "Get more" group from the source plugins and, while the field is
-empty, droidtop's Recommendations. A tap on an app opens it, a tap on a game
-plays it through `GameLaunchActivity.dispatch`, a tap on a "Get more" result
-starts the download job as everywhere else.
+already-scanned in-RAM list: no per-game disk lookups while typing), all ranked
+together with the source plugins' answers in the one list (12a "One search")
+and, while the field is empty, droidtop's Recommendations. A tap on an app opens
+it, a tap on a game plays it through `GameLaunchActivity.dispatch`, a tap on a
+source's result opens its detail.
 
 `:shell-default` cannot depend on `:app` or `:library-core`, so the seam is an
 action, `LauncherSearch.ACTION_SEARCH` (`dev.droidtop.shell.standard.
@@ -975,7 +975,7 @@ deleted: `LibrarySearch`/`LibrarySearchEntry` in `:runtime-common`,
 `DefaultAppSearchAlgorithm` and `AllAppsSearchBarController` (the in-place
 filter). Known differences from the stock drawer search: the private-space
 "unlock" row that a search for its name used to offer is gone with the in-place
-list, and "Get more" from here has no download destination (the list has no
+list, and a source's result from here has no download destination (the list has no
 system, as in the PC library), so a pick says where to download it from instead
 of starting a job; a per-title system guess is the follow-up if the owner wants
 downloads started from the drawer.
@@ -14882,59 +14882,88 @@ interface GameSourceProvider {
   directive below, so this is not planned unless that direction changes).
   Tracked on Droidtop/tracker (see the Recommendations issue below).
 
-**2. `PluginSearchAggregator` (`library-core`) — the ONE generic search
-fan-out mechanism** every existing game-search surface asks instead of
-hand-rolling its own plugin loop: `searchAll(context, sources, query,
-platform)` runs every `GameSourceProvider.search` concurrently
-(`kotlinx.coroutines.async`), each individually bounded by
+**2. `PluginSearchAggregator` (`library-core`) — the per-source half of the
+one search.** `fanOutOutcomes` runs every `GameSourceProvider.search`
+concurrently (`kotlinx.coroutines.async`), each individually bounded by
 `PER_SOURCE_TIMEOUT_MS` and individually failure-isolated (a source that
-throws or times out contributes nothing and never delays or fails
-another source's results); `merge` keeps each source's own result order
-and the sources' own encounter order, no cross-source resorting, so a
-source's own relevance ranking survives into the UI's "Get more" group.
-Unit-tested (`PluginSearchAggregatorTest`) against fake
-`GameSourceProvider`s under real (not virtual-clock) short delays: merge
-order, a throwing source not affecting others, a source slower than the
-timeout being dropped while a fast one still returns, and parallel (not
-sequential) execution.
+throws or times out is reported with why and never delays or fails another
+source's results). It no longer merges or ranks: `UnifiedSearch` (below)
+does, as results arrive. Unit-tested (`PluginSearchAggregatorTest`) against
+fake `GameSourceProvider`s under real (not virtual-clock) short delays: a
+throwing source not affecting others, a source slower than the timeout being
+dropped while a fast one still returns, and parallel (not sequential)
+execution.
 
-**Search surfaces wired (2026-09-28).** The shared `LibraryQuery` search
-(`LibrarySearchDialog`, `shell-gamepad/query/LibraryQueryUi.kt` — the
-component the "one shared filter/sort/search component reusable by
-console lists" commit built, today consumed by the PC Games tab,
-`PcGamesSection.kt`, which IS "the PC view's search dialog": one and the
-same component) now debounces the typed query (350ms) and fans it out via
-`PluginSearchAggregator.searchAll` to `GameSources.plugins(context)`,
-rendering a "Get more" group below the local match count using the
-existing `MenuRow` row component, labelled by each hit's source. Picking
-a result with more than one `AcquireContentOption` opens a droidtop sheet
-(`SourceOptionsDialog`) to choose one; picking a single-option (or
-option-less) result, or confirming a choice, calls
-`GameSourceProvider.acquire` directly — progress and completion surface
-through the EXISTING jobs mechanism (`PluginJobsCenter`/the Jobs screen),
-not a new progress UI in this dialog, which only shows one
-acknowledgement line. A cross-system list (the PC library) has no natural
-download destination; `LibrarySearchDialog` takes an optional
-`systemFolder: File?`/`systemId: String?` — null means Get More still
-shows results, but picking one explains there's nowhere configured to
-download to here, rather than silently sending an invalid path to
-`startJob`. **Console gamelist search (built 2026-09-29).** A console
-system's (or collection's) Select menu has a "Search" row that opens the
-SAME `LibrarySearchDialog`, with that system's id and its games folder as
-the download destination, so "Get more" works there and a picked download
-lands in the system's own folder. The typed text narrows the gamelist
-through `matchesSearchText`, the one text rule `LibraryQuery.matches` also
-uses (title, genre or developer); the row reads "Search: <text>" while a
-search is on, and clearing the text in the dialog clears it. The search
-lasts as long as the gamelist stays open. The PC Games tab keeps its own
-query (7i). **The launcher's drawer search is the same dialog too** (built
-2026-09-29, Droidtop/tracker#12): the drawer's search field opens
-`LauncherSearchActivity`, which draws `LibrarySearchDialog` with the installed
-apps and the library's games as local results, and gets the "Get more" group and
-the Recommendations from the dialog itself. `LibrarySearchDialog` gained two
-optional parameters for it, a `summary` line and a `results` slot for the local
-rows, and its column scrolls; the console and PC callers pass neither. See the
-Launcher mode section, "Launcher search", for the seam and what was deleted.
+**One search (decided 2026-10-07, Droidtop/tracker#315; owner: "We don't want to
+separate plugin searches from regular searches, that's kinda broken").** There
+is one search box and one ranked result list. The bug was the screen, not the
+API: the Sources API was already one interface, but the dialog drew the
+device's rows, then a separate "Get more" group that appeared only after every
+plugin had answered, then a row per plugin to open its own screen. The
+search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
+(`shell-gamepad/query/LibraryQueryUi.kt`):
+
+- **One list.** The device's rows (installed apps, library games; the caller
+  matches them over lists it already holds in memory, no disk lookups per
+  keystroke) and every `GameSourceProvider` (built-in or plugin) are rows of
+  the same list, ranked by `SearchRank` (exact, prefix, word start, contains,
+  other: lower first), then device before source, then the row's own order
+  (alphabetical for the device, the source's own relevance for a source;
+  sources tie in the order they were asked, at most ten rows per source). A
+  row says what it is in its detail line ("App", "Game", the source's name
+  with its columns, system and size), never by sitting under a heading. No
+  "Get more" group and no plugin mode exist.
+- **Streaming, off the main thread.** The device's rows are emitted at once.
+  The sources are asked only after the text has rested 350 ms, concurrently,
+  each bounded by `PER_SOURCE_TIMEOUT_MS`, and a source's rows join the list
+  the moment it answers; the list ends in "Searching" until every source has
+  answered or timed out. The previous query's source rows stay (while they
+  still contain the text) until their source answers, so the list does not
+  blink. A new keystroke cancels the previous query (a `LaunchedEffect` keyed
+  on the text collects the flow), so nothing runs for text that is gone. The
+  plugin store is read once per settled query, on the IO dispatcher.
+- **A source that could not answer is a line, not a mode.** After the rows:
+  an installed plugin waiting for approval or turned off, a source's failure
+  with its technical details, its settings and the runtime it lacks (a
+  press installs it and searches again). The "Get games" entry (browsing a
+  source's own catalogue, `GetGamesEntry`) stays as the last row; it is
+  where a source's own filters live (`SourceScreens`), reached from the list
+  and never a second search. A plugin's own full screen (`ui.main`) is opened
+  from its page in Settings, Plugins, not from search results
+  (`GameSourceProvider.hasMainUi`/`openMainUi` are deleted).
+- **Where it is opened.** The PC library's search (`PcGamesSection`), a
+  console gamelist's Select menu, Search (`GamelistOptionsMenu`, with that
+  system's id and games folder as the download destination) and the
+  launcher's drawer (`LauncherSearchActivity`, which passes the apps and games
+  as `local`). The first two have their list on screen under the dialog and
+  narrow it live through `matchesSearchText`, so they pass no `local` and show
+  the match count above the sources' rows (the Select row reads "Search: <text>"
+  while a search is on, and the search lasts as long as the gamelist stays open;
+  the PC Games tab keeps its own query, 7i); the launcher has no list under it,
+  so the device's rows are in the one list. Settings has its own search over
+  settings rows (`SettingsSearchIndex`, 7k), which is a different thing being
+  searched, not a plugin mode.
+- **Picking.** A device row opens the app or plays the game. A source row opens
+  its detail (`GameSourceProvider.detailScreen`) with the system's download
+  folder; a list with no folder says "No download folder for this list".
+- **The field and the keyboard.** The field asks for the soft keyboard
+  explicitly when it opens (`SoftwareKeyboardController.show`; Compose's own
+  request on focus is implicit, and Android drops an implicit request while a
+  hardware keyboard counts as attached, which a handheld's pad can), Search on
+  the keyboard hides it and moves the selection to the first row, and the
+  panel is `imePadding()` so the keyboard does not cover the rows. It logs the
+  display, window focus and IME state once (`droidtop.search`) so the add-on
+  display case can be read from logcat (Droidtop/tracker#314).
+- **Download destination.** A cross-system list (the PC library, the
+  launcher) has no natural download folder: `LibrarySearchDialog` takes an
+  optional `systemFolder: File?`/`systemId: String?`. The result is still
+  listed; picking it without a folder says so rather than sending an invalid
+  path to `startJob`.
+- **Unit tests** (`UnifiedSearchTest`): the rank order, device before source on
+  a tie, a source's own order and cap, the device's rows before any source,
+  each source joining as it answers, a failing or hung source not stopping the
+  rest, a blank query asking nothing, carried rows, and cancellation stopping
+  a slow source. `GetMoreComposer.composeSearch` (no caller) is deleted.
 
 **3. The Recommendations API (`dev.droidtop.library.integrations.RecommendationProvider`,
 `library-core`) — droidtop's OWN feature, never plugin-fed, never
@@ -15010,8 +15039,8 @@ composition so neither API needs to know about the other:
 - *"search results = library + Sources.search"* — `GetMoreComposer.
   composeSearch` is exactly `PluginSearchAggregator.searchAll`, unchanged
   from point 2 above; the local library match and the Sources fan-out are
-  two separate lists the UI already renders separately (the existing
-  local list, then "Get more" below it).
+  two separate lists until 2026-10-07; the search UI now renders them as the
+  one ranked list ("One search", above).
 - *"'Get more' with no query = Recommendations.recommend ∩ Sources.lookup"*
   — `GetMoreComposer.composeEmpty(context, sources, recommendations,
   scope, limit)` asks the Recommendations API for `scope`'s ranked
@@ -15034,7 +15063,7 @@ composition so neither API needs to know about the other:
   rather than "plugins" specifically: `GameSources.plugins(context)` is
   today's only real source of that list, and a store adapter is a second
   `GameSourceProvider` added to the same list, not a UI change.
-- **Get more's empty-query state**: `LibrarySearchDialog` shows the
+- **The empty-query state**: `LibrarySearchDialog` shows the
   library recommendations above directly. `GetMoreComposer.composeEmpty`
   (recommendations paired with `lookup` results) is not called by a
   surface yet; it is for the catalog pool, whose games are not owned and
@@ -15163,12 +15192,11 @@ without its runtime said "Running". Decisions:
   `PluginSearchAggregator.searchAll` returns one `SourceOutcome` per
   source (its results, or the failure sentence, plus the `RuntimeNeed`
   when the reason is a missing runtime), not a flattened list that drops
-  failures. "Get more" in `LibrarySearchDialog` shows, under its header:
-  "No download source is installed" with a row that opens Plugins; for an
-  installed plugin that cannot answer, why ("is waiting for your
-  approval", "is disabled: ..."); per source "<label>: <reason>" for a
-  failure or a timeout, "<label>: no match" for an empty answer; then the
-  results. A source that did not answer inside its budget is reported
+  failures. The search list (`LibrarySearchDialog`, "One search") shows the
+  results as ranked rows and, after them, for an installed plugin that
+  cannot answer, why ("is waiting for your approval", "is disabled: ...");
+  per source "<label>: <reason>" for a failure or a timeout; and the Get
+  games entry, which leads to Plugins when no source is installed. A source that did not answer inside its budget is reported
   as such, not as an empty list. `fanOut` (the lookup composition, which has
   no failure channel) stays as a wrapper over the same
   `fanOutOutcomes`. The work runs on the IO dispatcher (reading the plugin
@@ -15238,11 +15266,10 @@ without its runtime said "Running". Decisions:
   calls `getGamesScreen`; it never builds its own screen.
   **In search**, the shared search dialog (PC library, console lists, the
   launcher search) already queries every runnable source off the main
-  thread while the local results show; its "Get more" group now shows one
-  outcome line per source, then a Get games entry whose subtitle follows
-  `GetMoreState` (no source, not ready, failed, no match, found). The
-  group's own "Install a download source" and "Open Plugins" rows are
-  gone: the Get games entry is the one route to Plugins.
+  thread; the sources' rows join the one result list as they answer and a
+  failed source is one line, then a Get games entry whose value follows
+  `GetMoreState` (no source, not ready, failed, sources). The Get games entry
+  is the one route to Plugins.
 - **Failure text is plain, the detail is one press away (#167).** A
   plugin's disabled reason is the plain sentence
   (`PluginLoadErrorMessage`); the raw reason is kept in the log and in

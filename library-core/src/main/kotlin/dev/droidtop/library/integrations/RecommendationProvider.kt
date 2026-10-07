@@ -238,14 +238,6 @@ internal class SimilarityIndex(owned: List<OwnedSignal>) {
  * separate from both APIs so neither one needs to know about the other.
  */
 object GetMoreComposer {
-    /** "Get more" with a real query: [PluginSearchAggregator.searchAll] over every [sources], one outcome per source. */
-    suspend fun composeSearch(
-        context: Context,
-        sources: List<GameSourceProvider>,
-        query: String,
-        platform: String?,
-    ): List<SourceOutcome> = PluginSearchAggregator.searchAll(context, sources, query, platform)
-
     /**
      * "Get more" with no query: droidtop's own [recommendations] for
      * [scope], each one asked of every [sources] via [GameSourceProvider.lookup]

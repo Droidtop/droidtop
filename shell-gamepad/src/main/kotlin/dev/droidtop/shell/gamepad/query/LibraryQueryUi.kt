@@ -6,12 +6,15 @@ import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.menuMove
 import android.content.Context
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -27,31 +30,35 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.LibraryEntry
 import java.io.File
-import dev.droidtop.library.integrations.AcquireContentSources
-import dev.droidtop.library.integrations.GameSources
 import dev.droidtop.library.integrations.GetGamesContext
 import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.integrations.GetMoreState
 import dev.droidtop.library.integrations.PluginGameSource
-import dev.droidtop.library.integrations.PluginSearchAggregator
-import dev.droidtop.library.integrations.SourceHit
-import dev.droidtop.library.integrations.SourceOutcome
-import dev.droidtop.library.integrations.UnavailableSource
-import dev.droidtop.library.integrations.hits
+import dev.droidtop.library.integrations.LocalSearchRow
+import dev.droidtop.library.integrations.SearchRow
+import dev.droidtop.library.integrations.UnifiedSearch
+import dev.droidtop.library.integrations.UnifiedState
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
 import dev.droidtop.pluginhost.PluginStore
@@ -391,24 +398,31 @@ internal fun PersistQuery(scopeId: String, query: LibraryQuery, loaded: Boolean,
 }
 
 /**
- * Text search over one list: a field, the live count of what it matches,
- * and -- the "Search fan-out" mechanism, docs/SPEC.md 12a -- a "Get more"
- * group below it fed by every approved+enabled acquire_content source
- * plugin ([GameSources.plugins]), searched in parallel and debounced so a
- * keystroke doesn't fire a plugin round trip. This is the ONE shared
- * search surface (the commit that built this component: "console lists
- * get the same component"), so any list that opens this dialog gets
- * plugin results for free, never a second, plugin-specific search screen.
+ * THE search (docs/SPEC.md 12a "One search", Droidtop/tracker#315): a field
+ * and ONE ranked list, opened from the PC library, a console gamelist's
+ * Select menu and the launcher's drawer. The list is fed by [UnifiedSearch]:
+ * the device's own rows from [local] (installed apps and library games,
+ * matched in memory by the caller) and every download source, built-in or
+ * plugin, which join the same list as they answer. A source's result is a
+ * row like any other; there is no "Get more" group and no plugin mode.
+ * Only a source that could not answer is told apart, by a line under the
+ * rows that names it and the way to fix it.
  *
- * [systemId]/[systemFolder] scope a plugin search to one system and give
- * downloads a real destination -- both null for a cross-system list (the
- * PC library today): results still show, but a result with no resolvable
- * destination cannot be downloaded from here and says so, rather than
- * silently failing a `startJob` call with an invalid path.
+ * A surface whose list is on screen under the dialog (the PC library, a
+ * console gamelist) passes no [local]: that list narrows live as the text
+ * changes ([onTextChange]) and the dialog shows the match count above the
+ * sources' rows.
  *
- * Typing is text entry -- the platform's own keyboard, touched or
- * attached -- and B leaves without clearing what was typed, so the chips
- * row keeps showing the search as an active, clearable filter.
+ * [systemId]/[systemFolder] scope the sources to one system and give a
+ * download its destination; both are null for a cross-system list (the PC
+ * library, the launcher), where picking a source's row says there is no
+ * folder instead of sending an invalid path to the plugin.
+ *
+ * Typing is text entry, by the platform's keyboard or an attached one. The
+ * field asks for the soft keyboard explicitly when it opens (an implicit
+ * request is dropped while a pad or keyboard counts as a hardware
+ * keyboard), Search on the keyboard hides it and moves the selection to the
+ * first row, and B leaves without clearing what was typed.
  */
 @Composable
 internal fun LibrarySearchDialog(
@@ -423,55 +437,50 @@ internal fun LibrarySearchDialog(
     // field is empty; picking one puts its title in the field. Computed by
     // the caller off the main thread, never here.
     suggestions: List<dev.droidtop.library.integrations.Recommendation> = emptyList(),
-    // The launcher's search (docs/SPEC.md 12a "Launcher search") is this
-    // same dialog with its own local results: the installed apps and the
-    // library's games that match, drawn between the count line and the
-    // "Get more" group. [summary] replaces the count line's wording, since
-    // "N games match" is wrong for a list of apps and games together.
-    summary: String? = null,
-    results: (@Composable androidx.compose.foundation.layout.ColumnScope.(String) -> Unit)? = null,
+    // The device's own rows for the text (the launcher: installed apps and
+    // library games). Runs off the main thread over lists already in memory.
+    local: (suspend (String) -> List<LocalSearchRow>)? = null,
+    // Changes when what [local] reads changed (the library finished loading): the search runs again for the same text.
+    localKey: Any? = null,
 ) {
     var text by remember { mutableStateOf(query.text) }
     val fieldFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val view = LocalView.current
     LaunchedEffect(Unit) {
         runCatching { fieldFocus.requestFocus() }
+        // Explicit, not implicit: Compose's own request on focus is dropped while a pad or keyboard is attached.
+        delay(120)
+        keyboard?.show()
+        val imm = view.context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+        android.util.Log.i(
+            "droidtop.search",
+            "search field on display ${view.display?.displayId} windowFocus=${view.hasWindowFocus()} imeActive=${imm?.isActive(view)}",
+        )
     }
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    // One outcome per source (docs/SPEC.md 12a "Search fan-out"): its results, or why it could not answer.
-    var outcomes by remember { mutableStateOf<List<SourceOutcome>>(emptyList()) }
-    // Plugins that are installed but cannot answer (waiting for approval, disabled), so "no source" is never said for them.
-    var unavailable by remember { mutableStateOf<List<UnavailableSource>>(emptyList()) }
-    var searching by remember { mutableStateOf(false) }
+    var state by remember { mutableStateOf(UnifiedState.empty()) }
     var statusLine by remember { mutableStateOf<String?>(null) }
     // Bumped to search again after the person fixed something (installed a runtime, approved a plugin).
     var searchTick by remember { mutableIntStateOf(0) }
     var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
     // What a failed source's plugin reported in its own words, shown on request under its plain sentence (Droidtop/tracker#167).
     var technicalDetails by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    val sourceHits = remember(outcomes) { outcomes.hits() }
+    val currentLocal by rememberUpdatedState(local)
 
-    // Debounced fan-out: a keystroke doesn't itself trigger a plugin round
-    // trip, only the text settling for a beat does -- the same reasoning
-    // every existing debounced search in droidtop uses.
-    LaunchedEffect(text, systemId, searchTick) {
-        val q = text.trim()
-        if (q.isBlank()) {
-            outcomes = emptyList()
-            unavailable = emptyList()
-            searching = false
-            return@LaunchedEffect
-        }
-        delay(350)
-        searching = true
-        // Reading the plugin store and calling a plugin are disk and binder work: never on the main thread.
-        val (sources, notRunnable) = withContext(Dispatchers.IO) {
-            GameSources.plugins(context) to AcquireContentSources.unavailablePlugins(context)
-        }
-        unavailable = notRunnable
-        outcomes = if (sources.isEmpty()) emptyList() else PluginSearchAggregator.searchAll(context, sources, q, systemId)
-        searching = false
+    // Restarted by every keystroke: the previous query is cancelled, the device's rows are back at once and the sources
+    // are asked only once the text rests (UnifiedSearch.SOURCE_DEBOUNCE_MS).
+    LaunchedEffect(text, systemId, searchTick, localKey) {
+        UnifiedSearch.search(
+            context = context,
+            query = text,
+            platform = systemId,
+            local = { q -> currentLocal?.invoke(q).orEmpty() },
+            carry = state.sourceHits,
+        ).collect { state = it }
     }
 
     Dialog(
@@ -497,6 +506,9 @@ internal fun LibrarySearchDialog(
                 }
                 .clip(MenuTokens.OverlayShape)
                 .background(MenuTokens.OverlaySurface)
+                // The panel stays above the soft keyboard (the dialog window is edge to edge, so the keyboard's
+                // height arrives as an inset).
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
         ) {
@@ -513,7 +525,13 @@ internal fun LibrarySearchDialog(
                     onTextChange(it)
                 },
                 singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onSearch = {
+                        keyboard?.hide()
+                        focusManager.moveFocus(FocusDirection.Down)
+                    },
+                ),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -523,20 +541,20 @@ internal fun LibrarySearchDialog(
                     .background(MenuTokens.SurfaceSelected)
                     .padding(12.dp),
             )
-            Text(
-                if (summary != null) {
-                    summary
-                } else if (text.isBlank()) {
-                    "$totalCount games"
-                } else {
-                    val shown = "$matchCount ${if (matchCount == 1) "game" else "games"} match"
-                    if (matchCount == 0) "No games match" else shown
-                },
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            if (results != null && text.isNotBlank()) results(text.trim())
+            if (local == null) {
+                Text(
+                    if (text.isBlank()) {
+                        "$totalCount games"
+                    } else if (matchCount == 0) {
+                        "No games match"
+                    } else {
+                        "$matchCount ${if (matchCount == 1) "game" else "games"} match"
+                    },
+                    color = MenuTokens.OnSurfaceMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
             if (text.isBlank() && suggestions.isNotEmpty()) {
                 MenuSectionLabel("Recommended for you")
                 suggestions.forEach { pick ->
@@ -551,98 +569,81 @@ internal fun LibrarySearchDialog(
                 }
             }
             if (text.isNotBlank()) {
-                MenuSectionLabel(
-                    when {
-                        searching -> "Get more (searching…)"
-                        outcomes.isEmpty() -> "Get more"
-                        else -> "Get more (${sourceHits.size})"
-                    },
-                )
-                if (!searching) {
-                    // No source answered because none can: say which of the two cases it is. Every state ends at the
-                    // one Get games entry below, which leads to Plugins when there is nothing to browse.
-                    val state = GetMoreState.of(outcomes, unavailable)
-                    when (state) {
-                        GetMoreState.NO_SOURCE -> SourceNote("No download source is installed.")
-                        GetMoreState.NOT_READY -> unavailable.forEach { SourceNote("${it.label} ${it.reason}") }
-                        else -> Unit
-                    }
-                    outcomes.forEach { outcome ->
-                        when {
-                            outcome.failure != null -> {
-                                SourceNote("${outcome.source.label}: ${outcome.failure}")
-                                val pluginId = (outcome.source as? PluginGameSource)?.source?.record?.manifest?.id
-                                if (pluginId != null) {
-                                    technicalDetails[pluginId]?.let { SourceNote(it) } ?: MenuRow(
-                                        title = "Technical details",
-                                        subtitle = "Plugin details",
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                val detail = withContext(Dispatchers.IO) { PluginStore.disabledDetail(context, pluginId) }
-                                                technicalDetails = technicalDetails + (pluginId to (detail ?: "The plugin reported nothing more."))
-                                            }
-                                        },
-                                    )
-                                }
-                                outcome.source.settingsScreen()?.let { settings ->
-                                    MenuRow(title = "Open ${outcome.source.label} settings", onClick = { activeCatalog = settings })
-                                }
-                                outcome.runtimeNeed?.let { need ->
-                                    MenuRow(
-                                        title = need.actionLabel,
-                                        subtitle = "Then the search runs again by itself",
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                val error = withContext(Dispatchers.IO) {
-                                                    PluginRuntimeNeeds.install(context, need) { statusLine = it }
-                                                }
-                                                if (error == null) {
-                                                    statusLine = null
-                                                    searchTick++
-                                                } else {
-                                                    statusLine = "The ${need.runtime} runtime could not be installed: $error"
-                                                }
-                                            }
-                                        },
-                                    )
-                                }
-                            }
-                            outcome.results.isEmpty() -> SourceNote("${outcome.source.label}: no match")
-                        }
-                        // A source whose plugin has a full screen of its own offers it here too (ui.main, docs/plugin-api.md 1.7).
-                        if (outcome.source.hasMainUi) {
-                            MenuRow(
-                                title = "Open ${outcome.source.label}",
-                                onClick = {
-                                    coroutineScope.launch {
-                                        val problem = withContext(Dispatchers.IO) { outcome.source.openMainUi(context) }
-                                        statusLine = problem
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    state.rows.forEach { row ->
+                        SearchResultRow(
+                            row = row,
+                            onPick = {
+                                val hit = row.hit
+                                val open = row.open
+                                when {
+                                    open != null -> {
+                                        open()
+                                        onDismiss()
                                     }
-                                },
-                            )
-                        }
+                                    hit == null -> Unit
+                                    systemFolder == null -> statusLine = "No download folder for this list"
+                                    else -> activeCatalog = hit.source.detailScreen(hit.result, systemId, null, systemFolder)
+                                }
+                            },
+                        )
                     }
-                    MenuRow(
-                        title = GetGamesEntry.LABEL,
-                        subtitle = GetGamesEntry.searchSubtitle(state),
-                        onClick = { activeCatalog = getGamesScreen(GetGamesContext.SEARCH, systemId) },
-                    )
-                }
-                sourceHits.forEach { hit ->
-                    MenuRow(
-                        title = hit.result.title,
-                        subtitle = listOfNotNull(hit.source.label, hit.result.columns.joinToString(" · ").takeIf { it.isNotBlank() }, hit.result.platform, hit.result.sizeLabel).joinToString(" · "),
-                        onClick = {
-                            if (systemFolder == null) {
-                                statusLine = "No download destination configured for this list -- open ${hit.result.title} from its own system to download it"
-                            } else {
-                                activeCatalog = hit.source.detailScreen(hit.result, systemId, null, systemFolder)
+                    when {
+                        !state.settled -> SourceNote("Searching")
+                        state.rows.isEmpty() -> SourceNote("No match")
+                    }
+                    if (state.settled) {
+                        state.unavailable.forEach { SourceNote("${it.label} ${it.reason}") }
+                        state.sources.filter { it.failure != null }.forEach { status ->
+                            val source = status.source
+                            SourceNote("${source.label}: ${status.failure}")
+                            val pluginId = (source as? PluginGameSource)?.source?.record?.manifest?.id
+                            if (pluginId != null) {
+                                technicalDetails[pluginId]?.let { SourceNote(it) } ?: MenuRow(
+                                    title = "Technical details",
+                                    subtitle = source.label,
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            val detail = withContext(Dispatchers.IO) { PluginStore.disabledDetail(context, pluginId) }
+                                            technicalDetails = technicalDetails + (pluginId to (detail ?: "The plugin reported nothing more."))
+                                        }
+                                    },
+                                )
                             }
-                        },
-                    )
-                }
-                statusLine?.let { line ->
-                    Text(line, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                            source.settingsScreen()?.let { settings ->
+                                MenuRow(title = "${source.label} settings", onClick = { activeCatalog = settings })
+                            }
+                            status.runtimeNeed?.let { need ->
+                                MenuRow(
+                                    title = need.actionLabel,
+                                    subtitle = "Searches again after",
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            val error = withContext(Dispatchers.IO) {
+                                                PluginRuntimeNeeds.install(context, need) { statusLine = it }
+                                            }
+                                            if (error == null) {
+                                                statusLine = null
+                                                searchTick++
+                                            } else {
+                                                statusLine = "The ${need.runtime} runtime could not be installed: $error"
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                        // The one way on from a search that found nothing to get: browse the sources, or install one.
+                        val getGames = GetMoreState.of(state.sources.mapNotNull { it.outcome }, state.unavailable)
+                        MenuRow(
+                            title = GetGamesEntry.LABEL,
+                            subtitle = GetGamesEntry.searchSubtitle(getGames),
+                            onClick = { activeCatalog = getGamesScreen(GetGamesContext.SEARCH, systemId) },
+                        )
+                    }
+                    statusLine?.let { line ->
+                        Text(line, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                    }
                 }
             }
             MenuHint("B keeps what is typed; delete the text to clear it")
@@ -658,7 +659,27 @@ internal fun LibrarySearchDialog(
     }
 }
 
-/** One muted line of the "Get more" group: a source's outcome when it has no rows to show. */
+/** One row of the one list: an app with its icon, a library game, or a source's result. */
+@Composable
+private fun SearchResultRow(row: SearchRow, onPick: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        row.icon?.let {
+            Image(
+                bitmap = it.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.padding(end = 8.dp).size(40.dp),
+            )
+        }
+        MenuRow(
+            title = row.title,
+            subtitle = row.detail,
+            modifier = Modifier.weight(1f),
+            onClick = onPick,
+        )
+    }
+}
+
+/** One muted line under the rows: a source's outcome when it has no rows to show. */
 @Composable
 private fun SourceNote(text: String) {
     Text(text, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp))

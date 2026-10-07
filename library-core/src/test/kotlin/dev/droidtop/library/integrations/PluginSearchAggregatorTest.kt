@@ -131,15 +131,6 @@ class PluginSearchAggregatorTest {
         assertTrue("expected parallel execution, took ${elapsedMs}ms", elapsedMs < 250)
     }
 
-    @Test
-    fun `searchAll returns nothing for a blank query without calling any source`() = runBlocking {
-        val calls = AtomicInteger(0)
-        val source = fakeSourceCounting(calls)
-        val hits = PluginSearchAggregator.searchAll(mockContext(), listOf(source), query = "  ", platform = null)
-        assertEquals(emptyList<SourceOutcome>(), hits)
-        assertEquals(0, calls.get())
-    }
-
     private fun fakeSourceCounting(calls: AtomicInteger): GameSourceProvider = object : GameSourceProvider {
         override val id = "counting"
         override val label = "Counting"

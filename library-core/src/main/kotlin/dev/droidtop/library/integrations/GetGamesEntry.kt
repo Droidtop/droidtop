@@ -28,7 +28,7 @@ enum class GetGamesContext {
     /** A list with nothing in it. */
     EMPTY_STATE,
 
-    /** The search dialog's "Get more" group. */
+    /** The search list. */
     SEARCH,
 }
 
@@ -69,12 +69,12 @@ object GetGamesEntry {
         -> null
     }
 
-    /** What the search dialog's entry says under [LABEL], by what the search found out about the sources. */
+    /** The value under [LABEL] in the search list, by what the search found out about the sources. */
     fun searchSubtitle(state: GetMoreState): String = when (state) {
-        GetMoreState.NO_SOURCE -> "No download source is installed yet. This leads to Plugins"
-        GetMoreState.NOT_READY -> "A source is waiting for approval or turned off. This leads to Plugins"
-        GetMoreState.FAILED -> "Browse a source yourself, or fix the one that failed"
-        GetMoreState.NO_MATCH, GetMoreState.FOUND -> "Browse your download sources"
+        GetMoreState.NO_SOURCE -> "No source installed"
+        GetMoreState.NOT_READY -> "A source needs approval"
+        GetMoreState.FAILED -> "A source failed"
+        GetMoreState.NO_MATCH, GetMoreState.FOUND -> "Sources"
     }
 }
 

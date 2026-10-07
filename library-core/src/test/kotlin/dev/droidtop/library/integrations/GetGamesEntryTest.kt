@@ -91,6 +91,5 @@ class GetGamesEntryTest {
         val lines = GetMoreState.entries.map { GetGamesEntry.searchSubtitle(it) }
         assertTrue(lines.all { it.isNotBlank() })
         assertNotEquals(GetGamesEntry.searchSubtitle(GetMoreState.NO_SOURCE), GetGamesEntry.searchSubtitle(GetMoreState.NOT_READY))
-        assertTrue(GetGamesEntry.searchSubtitle(GetMoreState.NO_SOURCE).contains("Plugins"))
     }
 }

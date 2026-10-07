@@ -19,9 +19,9 @@ import kotlinx.coroutines.launch
  * Standard mode's search (docs/SPEC.md 12a "Launcher search"): what the
  * launcher's drawer search field opens. It draws the shared library search
  * ([LauncherSearchScreen], the same dialog the PC library and the console
- * lists use) over the launcher, with the installed apps and the library's
- * games as its local results, and the source plugins' "Get more" and
- * droidtop's Recommendations from the shared dialog itself. A translucent
+ * lists use) over the launcher: the installed apps, the library's games and
+ * the download sources answer in its one ranked list, and droidtop's
+ * Recommendations come from the shared dialog itself. A translucent
  * window, so the drawer stays visible behind it.
  *
  * The launcher reaches it by the action [LauncherSearch.ACTION_SEARCH]
