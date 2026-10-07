@@ -126,7 +126,7 @@ class PluginCrashPolicy(
     override suspend fun startJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String): Boolean {
         if (!record.runnable() || waitingReason(record) != null) return false
         if (record.manifest.kind !in RUNNABLE_KINDS) return false
-        capabilityRefusal(record, capability)?.let { return false }
+        PluginGrants.jobRefusal(record, PluginGrants.forContext(context).read(record.manifest.id), capability, args)?.let { return false }
         gateOnVerification(record)?.let { return false }
         missingRuntime(record)?.let {
             Log.w("droidtop.plugin", "${record.manifest.id} job not started: ${it.message}")
@@ -155,7 +155,7 @@ class PluginCrashPolicy(
      * never receives an event either.
      */
     suspend fun notifyEvent(record: PluginRecord, event: dev.droidtop.pluginhost.PluginEvent, args: Map<String, String>): PluginResult? {
-        if (event.id !in record.manifest.subscribedEvents) return null
+        if (!record.manifest.subscribesTo(event)) return null
         if (!record.runnable() || waitingReason(record) != null) return null
         if (record.manifest.kind !in RUNNABLE_KINDS) return null
         gateOnVerification(record)?.let { return null }

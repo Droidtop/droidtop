@@ -24,6 +24,14 @@ object LegacyManifest {
     /** The contract 1 capability an extension point replaced, or null for a point that never had one. */
     fun capabilityForPoint(point: String): PluginCapability? = CAPABILITY_POINTS.entries.firstOrNull { it.value == point }?.key
 
+    /**
+     * The capability a contract 2 job under [point] carries to `startJob`. A point with no contract 1 capability (a
+     * panel, a game's rows) carries `settings_rows` as a label only: the plugin reads the point and op from the
+     * envelope in `args["call"]`, and the host checks the grant of that point ([PluginGrants.jobRefusal]), not of
+     * the label's.
+     */
+    fun jobCapabilityFor(point: String): PluginCapability = capabilityForPoint(point) ?: PluginCapability.SETTINGS_ROWS
+
     /** The capabilities a v2 manifest's `provides` implies, so a v2 plugin is served by the same runners until they speak the v2 envelope. */
     fun capabilitiesFor(provides: List<ProvidedPoint>): Set<PluginCapability> {
         val byPoint = CAPABILITY_POINTS.entries.associate { (cap, point) -> point to cap }

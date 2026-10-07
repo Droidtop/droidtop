@@ -345,6 +345,16 @@ class PluginGrants(private val dir: File) {
             return "${record.manifest.label} has not been allowed to $label"
         }
 
+        /**
+         * Why a job must not start, or null when it may. A contract 2 job names its point in the envelope it carries
+         * (`args["call"]`) and is checked as that point; a contract 1 job has no envelope and is checked as the point
+         * its [capability] replaced.
+         */
+        fun jobRefusal(record: PluginRecord, snapshot: Snapshot, capability: PluginCapability, args: Map<String, String>): String? {
+            val point = args["call"]?.let { PluginCall.fromJson(it)?.point } ?: LegacyManifest.CAPABILITY_POINTS[capability] ?: return null
+            return pointRefusal(record, snapshot, point)
+        }
+
         /** Whether the plugin's export of [api] is on: an update's new export waits for a grant. */
         fun exportState(snapshot: Snapshot, api: String): GrantState {
             if (snapshot.corrupt) return GrantState.ASK

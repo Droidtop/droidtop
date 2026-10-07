@@ -188,8 +188,7 @@ object PluginViews {
         title: String,
         onStatus: (String) -> Unit,
     ): PluginResult {
-        val capability = LegacyManifest.capabilityForPoint(point)
-            ?: return PluginResult.failure("This page cannot run long tasks yet")
+        val capability = LegacyManifest.jobCapabilityFor(point)
         val call = newCall(point, op, SURFACE, args, 0L)
         val done = CompletableDeferred<PluginResult>()
         PluginJobsCenter.start(

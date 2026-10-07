@@ -375,7 +375,10 @@ capability the point replaced (`library.sources` → `acquire_content`,
 `ui.settings` → `settings_rows`, `ui.context_action` → `library_action`)
 and `args` is one entry, `call`, holding the whole v2 envelope as JSON
 text, so the plugin reads a job exactly like a `handle` call. A point with
-no contract 1 capability (`ui.quick_tile`) cannot run jobs yet. Progress
+no contract 1 capability (`ui.panel`, `ui.game_section`, `ui.quick_tile`) runs
+jobs too (2026-10-07): the capability handed to `startJob` is `settings_rows`,
+a label only, and the plugin reads the point and op from the envelope. The
+host checks the grant of the envelope's point, never the label's. Progress
 and completion are the existing `jobProgress`/`jobComplete` shape; a
 completion's `values` may carry `message`.
 

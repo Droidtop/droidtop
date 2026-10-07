@@ -192,6 +192,14 @@ data class PluginManifest(
         }
     }
 
+    /**
+     * Whether this plugin asked for [event]: through `subscribedEvents` or a contract 2 `subscribes` entry, under the
+     * event's id or an older one ([PluginEvent.fromId]). Matching the bare id, as the callers once did, missed
+     * `default_player_changed`, which `library.default_player_changed` replaced.
+     */
+    fun subscribesTo(event: PluginEvent): Boolean =
+        subscribedEvents.any { PluginEvent.fromId(it) == event } || v2.subscribes.any { PluginEvent.fromId(it.event) == event }
+
     /** A contract 1 manifest gets its v2 declarations derived; a contract 2 one keeps what it declared. */
     fun withDerivedV2(): PluginManifest = if (contractVersion >= 2) this else copy(v2 = LegacyManifest.toV2(this))
 

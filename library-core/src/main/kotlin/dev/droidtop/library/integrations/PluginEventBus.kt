@@ -72,7 +72,7 @@ object PluginEventBus {
     ) {
         val args = defaultPlayerChangedArgs(systemId, systemName, playerId, playerName, playerPackage, core)
         val candidates = PluginStore.runnableFor(context, PluginCapability.APP_STATUS)
-            .filter { PluginEvent.DEFAULT_PLAYER_CHANGED.id in it.manifest.subscribedEvents }
+            .filter { it.manifest.subscribesTo(PluginEvent.DEFAULT_PLAYER_CHANGED) }
         if (candidates.isEmpty()) return
         val policy = PluginCrashPolicy(context.applicationContext)
         try {

@@ -13699,6 +13699,16 @@ take.
   call sites. A game's identity reaches `ui.game_section` and a panel's
   `context.game` only with `library.read`, and Home shelves get the library
   only with `library.read` and play times only with `library.history`.
+- **Panels run jobs and plugins hear events by either manifest field**
+  (Droidtop/tracker#316, #317). A job action on a point with no contract 1
+  capability (a panel, a game's rows) used to be refused with "This page
+  cannot run long tasks yet", which left a panel unable to start a download;
+  it now starts like any job, under `LegacyManifest.jobCapabilityFor`, and
+  `PluginGrants.jobRefusal` judges it by the point its envelope names.
+  `default_player_changed` was matched against the event's new id
+  (`library.default_player_changed`) as a bare string, so a manifest that
+  used the old id, or only the contract 2 `subscribes` list, never received
+  it; `PluginManifest.subscribesTo` matches both fields under either id.
 - **Plugins management, Decky-style.** A plugin's row in the Plugins list
   says "Update available" when the cached catalog has a newer release (the
   update itself stays on the plugin's page and in Updates, one Updates
