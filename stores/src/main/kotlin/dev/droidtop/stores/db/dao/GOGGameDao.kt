@@ -8,7 +8,6 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import dev.droidtop.stores.data.GOGGame
-import kotlinx.coroutines.flow.Flow
 
 /**
  * DAO for GOG games in the Room database
@@ -28,36 +27,14 @@ interface GOGGameDao {
     @Delete
     suspend fun delete(game: GOGGame)
 
-    @Query("DELETE FROM gog_games WHERE id = :gameId")
-    suspend fun deleteById(gameId: String)
-
     @Query("SELECT * FROM gog_games WHERE id = :gameId")
     suspend fun getById(gameId: String): GOGGame?
 
     @Query("SELECT * FROM gog_games WHERE exclude = 0 ORDER BY title ASC")
-    fun getAll(): Flow<List<GOGGame>>
-
-    @Query("SELECT * FROM gog_games WHERE exclude = 0 ORDER BY title ASC")
     suspend fun getAllAsList(): List<GOGGame>
-
-    @Query("SELECT * FROM gog_games WHERE is_installed = :isInstalled AND exclude = 0 ORDER BY title ASC")
-    fun getByInstallStatus(isInstalled: Boolean): Flow<List<GOGGame>>
-
-    /** Returns all installed GOG games, excluding excluded entries, sorted by title. */
-    @Query("SELECT * FROM gog_games WHERE is_installed = 1 AND exclude = 0 ORDER BY title ASC")
-    suspend fun getInstalledGames(): List<GOGGame>
-
-    @Query("SELECT * FROM gog_games WHERE is_installed = 0 AND exclude = 0")
-    suspend fun getNonInstalledGames(): List<GOGGame>
-
-    @Query("SELECT * FROM gog_games WHERE exclude = 0 AND title LIKE '%' || :searchQuery || '%' ORDER BY title ASC")
-    fun searchByTitle(searchQuery: String): Flow<List<GOGGame>>
 
     @Query("DELETE FROM gog_games WHERE is_installed = 0")
     suspend fun deleteAllNonInstalledGames()
-
-    @Query("SELECT COUNT(*) FROM gog_games WHERE exclude = 0")
-    fun getCount(): Flow<Int>
 
     @Query("SELECT id FROM gog_games")
     suspend fun getAllGameIdsIncludingExcluded(): List<String>

@@ -112,10 +112,4 @@ internal object StreamingAssembly {
         return queue
     }
 
-    /** The last file each chunk is part of: the chunk can go once that file is assembled. */
-    fun buildChunkLastFileMap(fileChunkIds: List<List<String>>): Map<String, Int> {
-        val map = mutableMapOf<String, Int>()
-        fileChunkIds.forEachIndexed { i, chunks -> for (id in chunks) map[id] = i }
-        return map
-    }
 }

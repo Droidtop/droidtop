@@ -41,12 +41,6 @@ internal class GOGManager(
         }
     }
 
-    suspend fun deleteAllNonInstalledGames() {
-        withContext(Dispatchers.IO) {
-            gogGameDao.deleteAllNonInstalledGames()
-        }
-    }
-
     suspend fun getAllGameIds(): Set<String> {
         return withContext(Dispatchers.IO) {
             try {
@@ -219,32 +213,6 @@ internal class GOGManager(
             isInstalled = false,
             installPath = "",
         )
-    }
-
-    fun verifyInstallation(gameId: String): Pair<Boolean, String?> {
-        val game = runBlocking { getGameFromDbById(gameId) }
-        val installPath = game?.installPath
-
-        if (game == null || installPath == null || !game.isInstalled) {
-            return Pair(false, "Game not marked as installed in database")
-        }
-
-        val installDir = File(installPath)
-        if (!installDir.exists()) {
-            return Pair(false, "Install directory not found: $installPath")
-        }
-
-        if (!installDir.isDirectory) {
-            return Pair(false, "Install path is not a directory")
-        }
-
-        val contents = installDir.listFiles()
-        if (contents == null || contents.isEmpty()) {
-            return Pair(false, "Install directory is empty")
-        }
-
-        Timber.i("Installation verified for game $gameId at $installPath")
-        return Pair(true, null)
     }
 
     /**

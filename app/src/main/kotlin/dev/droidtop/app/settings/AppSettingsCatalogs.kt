@@ -1346,11 +1346,12 @@ object AppSettingsCatalogs {
                         registryId = SCREEN_WINDOWS_GAMES,
                         icon = CatalogIcon.WINDOWS_GAMES,
                     ),
-                    ActionItem(
+                    // The one jobs list, where store installs run (docs/SPEC.md 7g "Stores").
+                    NestedScreenItem(
                         id = "pc_stores_downloads",
                         title = "Downloads",
-                        subtitle = "What is downloading or waiting, and the storage it is going into",
-                        run = { ctx -> ctx.startActivity(dev.droidtop.app.PcStoreActivity.intent(ctx, entryId = null)) },
+                        subtitle = "What is downloading or waiting, with Pause, Resume and Cancel",
+                        registryId = dev.droidtop.library.integrations.PluginJobsScreen.ID,
                     ),
                 ),
             ),
@@ -1358,19 +1359,20 @@ object AppSettingsCatalogs {
     }
 
     /**
-     * The store installs queue, under the jobs list in "Downloads and installs": a store install is
-     * gamenative's own download service, so its progress, pause and cancel are on its own screen
-     * (PcStoreActivity); this is the way there from the one place downloads are looked for.
+     * Steam's installs queue, under the jobs list in "Downloads and installs": a Steam install is
+     * still gamenative's own download service, so its progress, pause and cancel are on its own
+     * screen (PcStoreActivity); this is the way there from the one place downloads are looked for.
+     * Every other store's installs are jobs in the list above (docs/SPEC.md 7g "Stores").
      */
     private fun pcInstallsGroups(): List<CatalogGroup> = listOf(
         CatalogGroup(
             id = "jobs_pc_installs",
-            title = "Store installs",
+            title = "Steam",
             items = listOf(
                 ActionItem(
                     id = "jobs_pc_installs_queue",
-                    title = "PC game downloads",
-                    subtitle = "Installs and updates from Steam, GOG, Epic, Amazon and itch.io: progress, pause and cancel",
+                    title = "Steam downloads",
+                    subtitle = "Installs and updates from Steam: progress, pause and cancel",
                     run = { ctx -> ctx.startActivity(dev.droidtop.app.PcStoreActivity.intent(ctx, entryId = null)) },
                 ),
             ),

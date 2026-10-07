@@ -8,7 +8,6 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import dev.droidtop.stores.data.ItchGame
-import kotlinx.coroutines.flow.Flow
 
 /** DAO for itch.io games in the Room database, mirroring [GOGGameDao]'s shape. */
 @Dao
@@ -26,26 +25,14 @@ interface ItchGameDao {
     @Delete
     suspend fun delete(game: ItchGame)
 
-    @Query("DELETE FROM itch_games WHERE id = :gameId")
-    suspend fun deleteById(gameId: String)
-
     @Query("SELECT * FROM itch_games WHERE id = :gameId")
     suspend fun getById(gameId: String): ItchGame?
 
     @Query("SELECT * FROM itch_games WHERE exclude = 0 ORDER BY title ASC")
-    fun getAll(): Flow<List<ItchGame>>
-
-    @Query("SELECT * FROM itch_games WHERE exclude = 0 ORDER BY title ASC")
     suspend fun getAllAsList(): List<ItchGame>
-
-    @Query("SELECT * FROM itch_games WHERE is_installed = 1 AND exclude = 0 ORDER BY title ASC")
-    suspend fun getInstalledGames(): List<ItchGame>
 
     @Query("DELETE FROM itch_games WHERE is_installed = 0")
     suspend fun deleteAllNonInstalledGames()
-
-    @Query("SELECT id FROM itch_games")
-    suspend fun getAllGameIdsIncludingExcluded(): List<String>
 
     /**
      * Upsert itch games while preserving install status and paths -- the

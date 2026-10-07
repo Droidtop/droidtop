@@ -600,16 +600,7 @@ internal class EpicManager(
         )
     }
 
-    suspend fun deleteAllNonInstalledGames() {
-        withContext(Dispatchers.IO) {
-            epicGameDao.deleteAllNonInstalledGames()
-        }
-    }
-
-
-    /**
-     * Get a single game by ID
-     */
+    /** The games with these row ids (a base game's DLCs). */
     suspend fun getGamesById(gameIds: List<Int>): List<EpicGame> {
         return withContext(Dispatchers.IO) {
             try {
@@ -617,20 +608,6 @@ internal class EpicManager(
             } catch (e: Exception) {
                 Timber.e(e, "Failed to get Epic games by IDs: ${gameIds.size}")
                 emptyList()
-            }
-        }
-    }
-
-    /**
-     * Get a single game by ID
-     */
-    suspend fun getGameById(appId: Int): EpicGame? {
-        return withContext(Dispatchers.IO) {
-            try {
-                epicGameDao.getById(appId)
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to get Epic game by ID: $appId")
-                null
             }
         }
     }
@@ -647,70 +624,9 @@ internal class EpicManager(
         }
     }
 
-    /**
-     * Get a single game by app name (Legendary identifier)
-     */
-    suspend fun getGameByAppName(appName: String): EpicGame? {
-        return withContext(Dispatchers.IO) {
-            try {
-                epicGameDao.getByAppName(appName)
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to get Epic game by app name: $appName")
-                null
-            }
-        }
-    }
-
-    suspend fun insertGame(game: EpicGame) {
-        withContext(Dispatchers.IO) {
-            epicGameDao.insert(game)
-        }
-    }
-
     suspend fun updateGame(game: EpicGame) {
         withContext(Dispatchers.IO) {
             epicGameDao.update(game)
-        }
-    }
-
-    suspend fun uninstall(appId: Int) {
-        withContext(Dispatchers.IO) {
-            epicGameDao.uninstall(appId)
-        }
-    }
-
-    suspend fun getNonInstalledGames(): List<EpicGame> {
-        return withContext(Dispatchers.IO) {
-            epicGameDao.getNonInstalledGames()
-        }
-    }
-
-    /**
-     * Start background sync (called after login)
-     */
-    suspend fun startBackgroundSync(context: Context): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            if (!EpicAuthManager.hasStoredCredentials(context)) {
-                Timber.w("Cannot start background sync: no stored credentials")
-                return@withContext Result.failure(Exception("No stored credentials found"))
-            }
-
-            Timber.tag("Epic").i("Starting Epic library background sync...")
-
-            val result = refreshLibrary(context)
-
-            if (result.isSuccess) {
-                val count = result.getOrNull() ?: 0
-                Timber.tag("Epic").i("Background sync completed: $count games synced")
-                Result.success(Unit)
-            } else {
-                val error = result.exceptionOrNull()
-                Timber.e(error, "Background sync failed: ${error?.message}")
-                Result.failure(error ?: Exception("Background sync failed"))
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to sync Epic library in background")
-            Result.failure(e)
         }
     }
 
@@ -1065,52 +981,4 @@ internal class EpicManager(
         }
     }
 
-    /**
-     * Fetch install size for a game by downloading its manifest
-     * Manifest is small (~500KB-1MB) and contains all file metadata
-     * Returns size in bytes, or 0 if failed
-     */
-    suspend fun fetchManifestSizes(context: Context, appId: Int): ManifestSizes = withContext(Dispatchers.IO) {
-        try {
-            // Get the game info to get namespace and catalogItemId
-            val game = getGameById(appId)
-
-            if (game == null) {
-                Timber.tag("Epic").w("Game not found in database: $game.appName")
-                return@withContext ManifestSizes(installSize = 0L, downloadSize = 0L)
-            }
-
-            val appName = game.appName
-
-            // Fetch manifest using shared function
-            val manifestResult = fetchManifestFromEpic(context, game.namespace, game.catalogId, game.appName)
-            if (manifestResult.isFailure) {
-                Timber.tag("Epic").w("Failed to fetch manifest: ${manifestResult.exceptionOrNull()?.message}")
-                return@withContext ManifestSizes(installSize = 0L, downloadSize = 0L)
-            }
-
-            val manifestData = manifestResult.getOrNull()!!
-
-            // Parse with Kotlin parser
-            val manifest = dev.droidtop.stores.epic.manifest.EpicManifest.readAll(manifestData.manifestBytes)
-
-            // Required-only sizes for detail page display (download uses container language via getSizesForSelectedInstallTags elsewhere).
-            val (downloadSize, installSize) = dev.droidtop.stores.epic.manifest.ManifestUtils.getSizesForSelectedInstallTags(manifest, emptyList())
-            Timber.tag("Epic").d(
-                "Manifest stats for $appName: version=${manifest.version}, featureLevel=${manifest.meta?.featureLevel}, " +
-                    "buildVersion=${manifest.meta?.buildVersion}, buildId=${manifest.meta?.buildId}",
-            )
-            Timber.tag("Epic").d(
-                "Manifest stats for $appName: files=${manifest.fileManifestList?.count}, " +
-                    "chunks=${manifest.chunkDataList?.count}",
-            )
-            Timber.tag("Epic").d("Install size for $appName: $installSize bytes")
-            Timber.tag("Epic").d("Download size for $appName: $downloadSize bytes")
-
-            return@withContext ManifestSizes(installSize = installSize, downloadSize = downloadSize)
-        } catch (e: Exception) {
-            Timber.tag("Epic").e(e, "Exception fetching install size for appId: $appId")
-            ManifestSizes(installSize = 0L, downloadSize = 0L)
-        }
-    }
 }

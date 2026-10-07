@@ -17,12 +17,6 @@ internal enum class Marker(val fileName: String) {
 internal object MarkerUtils {
     fun hasMarker(dirPath: String, type: Marker): Boolean = File(dirPath, type.fileName).exists()
 
-    /** A folder there, without its finished marker. */
-    fun hasPartialInstall(dirPath: String): Boolean {
-        if (dirPath.isBlank()) return false
-        return File(dirPath).exists() && !hasMarker(dirPath, Marker.DOWNLOAD_COMPLETE_MARKER)
-    }
-
     fun addMarker(dirPath: String, type: Marker): Boolean {
         val dir = File(dirPath)
         val marker = File(dir, type.fileName)

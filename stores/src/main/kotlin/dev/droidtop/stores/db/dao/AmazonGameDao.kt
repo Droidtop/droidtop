@@ -6,7 +6,6 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import dev.droidtop.stores.data.AmazonGame
-import kotlinx.coroutines.flow.Flow
 
 /**
  * DAO for Amazon games in the Room database.
@@ -20,21 +19,8 @@ interface AmazonGameDao {
     @Query("SELECT * FROM amazon_games WHERE product_id = :productId")
     suspend fun getByProductId(productId: String): AmazonGame?
 
-    @Query("SELECT * FROM amazon_games WHERE app_id = :appId")
-    suspend fun getByAppId(appId: Int): AmazonGame?
-
-    /** Returns all installed Amazon games sorted by title. */
-    @Query("SELECT * FROM amazon_games WHERE is_installed = 1 ORDER BY title ASC")
-    suspend fun getInstalledGames(): List<AmazonGame>
-
-    @Query("SELECT * FROM amazon_games ORDER BY title ASC")
-    fun getAll(): Flow<List<AmazonGame>>
-
     @Query("SELECT * FROM amazon_games ORDER BY title ASC")
     suspend fun getAllAsList(): List<AmazonGame>
-
-    @Query("SELECT * FROM amazon_games WHERE is_installed = 0")
-    suspend fun getNonInstalledGames(): List<AmazonGame>
 
     @Query(
         "UPDATE amazon_games SET is_installed = 1, install_path = :path, install_size = :size, version_id = :versionId WHERE product_id = :productId",
@@ -43,9 +29,6 @@ interface AmazonGameDao {
 
     @Query("UPDATE amazon_games SET is_installed = 0, install_path = '', install_size = 0, version_id = '' WHERE product_id = :productId")
     suspend fun markAsUninstalled(productId: String)
-
-    @Query("UPDATE amazon_games SET download_size = :size WHERE product_id = :productId")
-    suspend fun updateDownloadSize(productId: String, size: Long)
 
     // Only delete non-installed games from DB — preserves any currently installed games.
     @Query("DELETE FROM amazon_games WHERE is_installed = 0")
