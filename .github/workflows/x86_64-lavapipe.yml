@@ -57,10 +57,10 @@ jobs:
         # -I takes every dependency from Termux's x86_64 repository.
         run: |
           cd "$RUNNER_TEMP/termux-packages"
-          ./scripts/run-docker.sh ./build-package.sh -I -a x86_64 mesa
+          ./scripts/run-docker.sh ./build-package.sh -I -a x86_64 mesa-xlib-gl
           ls -la output
           mkdir -p "$GITHUB_WORKSPACE/out"
-          cp output/mesa_*_x86_64.deb "$GITHUB_WORKSPACE/out/"
+          cp output/mesa-xlib-gl_*_x86_64.deb "$GITHUB_WORKSPACE/out/"
 
       - name: Upload
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -99,7 +99,7 @@ jobs:
           GUEST_LIBS: ${{ runner.temp }}/x86_64-guest-libs.tzst
           WORK: ${{ runner.temp }}/lavapipe
         run: |
-          MESA_GL_DEB=$(ls "$RUNNER_TEMP"/mesa-gl/mesa_*_x86_64.deb)
+          MESA_GL_DEB=$(ls "$RUNNER_TEMP"/mesa-gl/mesa-xlib-gl_*_x86_64.deb)
           export MESA_GL_DEB
           bash build-scripts/x86_64-lavapipe/build.sh "$GITHUB_WORKSPACE/out/x86_64-lavapipe.tzst"
           cd out && sha256sum x86_64-lavapipe.tzst | tee x86_64-lavapipe.tzst.sha256

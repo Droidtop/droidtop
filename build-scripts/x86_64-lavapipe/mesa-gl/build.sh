@@ -1,8 +1,9 @@
 # Termux package recipe for Mesa's xlib OpenGL (llvmpipe), for droidtop's x86_64
-# Wine guest. prepare.sh puts it in place of termux-packages' own packages/mesa
-# recipe, keeping that recipe's patches (all but the llvmpipe single-thread one),
-# and the Termux package builder builds it against Termux's x86_64 packages, the
-# same packages the rest of the software graphics archive comes from.
+# Wine guest. prepare.sh adds it to termux-packages as packages/mesa-xlib-gl,
+# beside Termux's own packages/mesa, with that recipe's patches (all but the
+# llvmpipe single-thread one), and the Termux package builder builds it against
+# Termux's x86_64 packages, the same packages the rest of the software graphics
+# archive comes from.
 #
 # Why xlib GLX: the app's X server has no GLX extension, so a DRI-based libGL
 # (Termux's own mesa, glvnd) cannot start there. Mesa's xlib target is a libGL
