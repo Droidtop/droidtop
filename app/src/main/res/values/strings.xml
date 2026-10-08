@@ -16,4 +16,8 @@
     <string name="widget_continue_playing_empty">No games played yet</string>
     <string name="widget_plugin_status_title">Plugin status</string>
     <string name="widget_plugin_status_empty">No status-tile plugins yet</string>
+    <!-- TypingAccessibilityService (docs/SPEC.md 4c, "Typing on the add-on display"): its name and what it does,
+         shown in Android's accessibility settings. -->
+    <string name="typing_accessibility_label">droidtop keyboard on second screen</string>
+    <string name="typing_accessibility_description">Shows droidtop\'s keyboard when you tap a text field in another app on a screen Android shows no keyboard on, and types what you press into that field. It reads only the text of the field you are typing in, to edit it, and stores nothing.</string>
 </resources>

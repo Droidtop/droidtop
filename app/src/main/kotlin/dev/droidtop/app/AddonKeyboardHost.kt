@@ -20,9 +20,11 @@ import android.widget.LinearLayout
 import androidx.compose.ui.graphics.toArgb
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
+import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
 import dev.droidtop.runtime.keyboard.AddonKeyboard
 import dev.droidtop.runtime.keyboard.AddonKeyboardRules
 import dev.droidtop.runtime.keyboard.DisplayImePolicy
+import dev.droidtop.runtime.keyboard.OverlayOwner
 import dev.droidtop.runtime.keyboard.TypingRoute
 import dev.droidtop.runtime.tasks.Fidelity
 import dev.droidtop.runtime.tasks.LaunchLedger
@@ -232,9 +234,9 @@ class ElevatedInputSink(private val displayId: () -> Int?) : KeyboardSink {
 
 /**
  * droidtop's keyboard typing into another app's focused field, by the best route there is right now
- * ([AddonKeyboardRules.route]): droidtop's input method's own connection, else the elevated `input` command on
- * [displayId]. [elevated] is read off the main thread by the caller. [onNoRoute] runs when a key has nowhere to go,
- * [onRouted] when one went somewhere.
+ * ([AddonKeyboardRules.route]): droidtop's input method's own connection, else droidtop's accessibility service's
+ * focused field ([AccessibilityTyping]), else the elevated `input` command on [displayId]. [elevated] is read off the
+ * main thread by the caller. [onNoRoute] runs when a key has nowhere to go, [onRouted] when one went somewhere.
  */
 class RoutedKeyboardSink(
     private val displayId: () -> Int?,
@@ -243,11 +245,13 @@ class RoutedKeyboardSink(
     private val onRouted: () -> Unit = {},
 ) : KeyboardSink {
     private val ime = ImeConnectionSink()
+    private val accessibility = AccessibilityTyping.FieldSink()
     private val shell = ElevatedInputSink(displayId)
 
     private fun target(): KeyboardSink? =
-        when (AddonKeyboardRules.route(SecondScreenKeyboard.androidTargetAvailable(), elevated())) {
+        when (AddonKeyboardRules.route(SecondScreenKeyboard.androidTargetAvailable(), AccessibilityKeyboard.hasEditor(), elevated())) {
             TypingRoute.DROIDTOP_IME -> ime
+            TypingRoute.ACCESSIBILITY -> accessibility
             TypingRoute.ELEVATED_INPUT -> shell
             TypingRoute.NONE -> null
         }
@@ -272,17 +276,17 @@ class RoutedKeyboardSink(
  * window, typing through the input method's connection. The overlay is not focusable, so the app keeps its focus
  * and its input session. Needs "Display over other apps"; without it nothing is drawn and the settings row says so.
  * The editor's display comes from the system's task list where the elevated helper reads it, else from the screen
- * droidtop launched the app on: `EditorInfo` names the package, not the display.
+ * droidtop launched the app on: `EditorInfo` names the package, not the display ([appDisplay]). When droidtop's
+ * accessibility service is on and this overlay may not be drawn, the service draws the same keyboard instead
+ * ([AddonKeyboardRules.overlayOwner]).
  */
 object ShowOverEditor : SecondScreenKeyboard.ShowRequests {
     private const val HIDE_DELAY_MS = 400L
     private val main = Handler(Looper.getMainLooper())
     private lateinit var app: Context
-    private var window: View? = null
-    private var windowDisplay: Int? = null
-    private var windowManager: WindowManager? = null
+    private val overlay = OverlayKeyboard()
     private var dismissedFor: String? = null
-    private val hide = Runnable { hideNow() }
+    private val hide = Runnable { overlay.hide() }
 
     fun install(context: Context) {
         app = context.applicationContext
@@ -293,13 +297,15 @@ object ShowOverEditor : SecondScreenKeyboard.ShowRequests {
         main.post {
             main.removeCallbacks(hide)
             if (editorPackage != null && editorPackage == dismissedFor) return@post
-            val display = editorDisplay(editorPackage)
-            val canDraw = Settings.canDrawOverlays(app)
-            if (AddonKeyboardRules.popOverEditor(display, AddonKeyboard.localDisplays.value, canDraw)) {
-                show(display!!, editorPackage)
-            } else {
-                hideNow()
-            }
+            val display = if (editorPackage == app.packageName) null else appDisplay(editorPackage)
+            val owner = AddonKeyboardRules.overlayOwner(
+                display,
+                AddonKeyboard.localDisplays.value,
+                droidtopImeSelected = true,
+                canDrawOverlays = Settings.canDrawOverlays(app),
+                accessibilityOn = AccessibilityKeyboard.connected,
+            )
+            if (owner == OverlayOwner.INPUT_METHOD) show(display!!, editorPackage) else overlay.hide()
         }
     }
 
@@ -311,18 +317,8 @@ object ShowOverEditor : SecondScreenKeyboard.ShowRequests {
         }
     }
 
-    private fun editorDisplay(editorPackage: String?): Int? {
-        if (editorPackage == null || editorPackage == app.packageName) return null
-        val snapshot = TaskManager.snapshot.value
-        if (snapshot != null && snapshot.fidelity == Fidelity.EXACT) {
-            snapshot.apps.firstOrNull { it.packageName == editorPackage && it.visible }?.let { return it.displayId }
-        }
-        return LaunchLedger.entries().firstOrNull { it.packageName == editorPackage }?.displayId
-    }
-
     private fun show(displayId: Int, editorPackage: String?) {
-        if (window != null && windowDisplay == displayId) return
-        hideNow()
+        if (overlay.shownOn == displayId) return
         val display = app.getSystemService(DisplayManager::class.java)?.getDisplay(displayId) ?: return
         val displayContext = app.createDisplayContext(display)
         val context = if (Build.VERSION.SDK_INT >= 30) {
@@ -330,7 +326,61 @@ object ShowOverEditor : SecondScreenKeyboard.ShowRequests {
         } else {
             displayContext
         }
-        val wm = context.getSystemService(WindowManager::class.java) ?: return
+        overlay.show(
+            context,
+            displayId,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            ImeConnectionSink(),
+            suppressImeView = true,
+            what = "keyboard over $editorPackage",
+            onHide = { dismissedFor = editorPackage },
+        )
+    }
+}
+
+/**
+ * The display [packageName]'s visible window is on: from the system's task list where the elevated helper reads it,
+ * else from the screen droidtop launched the app on. Null when droidtop cannot place the app.
+ */
+internal fun appDisplay(packageName: String?): Int? {
+    if (packageName == null) return null
+    val snapshot = TaskManager.snapshot.value
+    if (snapshot != null && snapshot.fidelity == Fidelity.EXACT) {
+        snapshot.apps.firstOrNull { it.packageName == packageName && it.visible }?.let { return it.displayId }
+    }
+    return LaunchLedger.entries().firstOrNull { it.packageName == packageName }?.displayId
+}
+
+/**
+ * droidtop's keyboard drawn over another app at the bottom of one display, in a window that never takes focus (the
+ * app keeps its focus and its input session), with a Hide key (docs/SPEC.md 4c, "Typing on the add-on display").
+ * The one overlay both owners use: the input method's ([ShowOverEditor], `TYPE_APPLICATION_OVERLAY`) and the
+ * accessibility service's ([AccessibilityTyping], `TYPE_ACCESSIBILITY_OVERLAY`). Main thread only.
+ */
+internal class OverlayKeyboard {
+    private var window: View? = null
+    private var windowManager: WindowManager? = null
+
+    /** The display the keyboard is drawn on, or null. */
+    var shownOn: Int? = null
+        private set
+
+    /**
+     * Draws the keyboard with [context] (one for [displayId], able to add a [type] window there), typing into
+     * [sink]. [onHide] runs when the user presses Hide. Returns whether the window was added.
+     */
+    fun show(
+        context: Context,
+        displayId: Int,
+        type: Int,
+        sink: KeyboardSink,
+        suppressImeView: Boolean,
+        what: String,
+        onHide: () -> Unit,
+    ): Boolean {
+        if (shownOn == displayId) return true
+        hide()
+        val wm = context.getSystemService(WindowManager::class.java) ?: return false
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(ChromeColors.DarkBackground.toArgb())
@@ -338,8 +388,8 @@ object ShowOverEditor : SecondScreenKeyboard.ShowRequests {
                 Button(context).apply {
                     text = "Hide"
                     setOnClickListener {
-                        dismissedFor = editorPackage
-                        hideNow()
+                        onHide()
+                        hide()
                     }
                 },
                 LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -347,32 +397,33 @@ object ShowOverEditor : SecondScreenKeyboard.ShowRequests {
                 },
             )
             addView(
-                KeyboardPanel(context, ImeConnectionSink(), INLINE_KEYBOARD_HEIGHT_PERCENT, suppressImeView = true),
+                KeyboardPanel(context, sink, INLINE_KEYBOARD_HEIGHT_PERCENT, suppressImeView),
                 LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT),
             )
         }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.BOTTOM }
-        runCatching { wm.addView(root, params) }
+        return runCatching { wm.addView(root, params) }
             .onSuccess {
                 window = root
-                windowDisplay = displayId
                 windowManager = wm
-                Log.i("droidtop.keyboard", "keyboard over $editorPackage on display $displayId")
+                shownOn = displayId
+                Log.i("droidtop.keyboard", "$what on display $displayId")
             }
-            .onFailure { Log.w("droidtop.keyboard", "keyboard over $editorPackage on display $displayId refused", it) }
+            .onFailure { Log.w("droidtop.keyboard", "$what on display $displayId refused", it) }
+            .isSuccess
     }
 
-    private fun hideNow() {
+    fun hide() {
         val view = window ?: return
         runCatching { windowManager?.removeView(view) }
         window = null
-        windowDisplay = null
         windowManager = null
+        shownOn = null
     }
 }

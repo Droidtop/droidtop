@@ -25,11 +25,37 @@ enum class TypingRoute {
     /** droidtop's input method is selected and bound to the editor: its input connection (no privilege needed). */
     DROIDTOP_IME,
 
+    /**
+     * droidtop's accessibility service ([AccessibilityKeyboard]) is on and holds the focused text field: the field's
+     * own accessibility actions (set text, paste, set selection, IME enter). Works whichever keyboard is selected.
+     */
+    ACCESSIBILITY,
+
     /** The elevated helper's `input -d <display>` (Shizuku or Sui). */
     ELEVATED_INPUT,
 
-    /** Neither: the surface shows what would make it work. */
+    /** None of them: the surface shows what would make it work. */
     NONE,
+}
+
+/** Which of droidtop's two overlays draws its keyboard over another app's text field, if either. */
+enum class OverlayOwner {
+    /** `ShowOverEditor`: droidtop's input method was asked for the keyboard; needs "Display over other apps". */
+    INPUT_METHOD,
+
+    /** droidtop's accessibility service: an accessibility overlay, which needs no other grant. */
+    ACCESSIBILITY,
+
+    NONE,
+}
+
+/** What typing into other apps on the second screen runs on right now: the value of the Displays row. */
+enum class AppsKeyboard(val label: String) {
+    ANDROID("Android keyboard"),
+    DROIDTOP("droidtop keyboard"),
+    ACCESSIBILITY("Accessibility"),
+    NEEDS_OVERLAY("Needs display over apps"),
+    OFF("Off"),
 }
 
 /**
@@ -47,19 +73,44 @@ object AddonKeyboardRules {
     fun ownFieldNeedsKeyboard(displayId: Int?, localDisplays: Set<Int>): Boolean =
         displayId != null && !androidDrawsKeyboard(displayId, localDisplays)
 
-    /** The route droidtop's keyboard types through into another app, best first. */
-    fun route(droidtopImeHasEditor: Boolean, elevatedShell: Boolean): TypingRoute = when {
+    /**
+     * The route droidtop's keyboard types through into another app, best first: droidtop's input method's connection,
+     * then droidtop's accessibility service's focused field, then the elevated helper's `input` command. The
+     * companion's Keys panel and both overlays use this one order.
+     */
+    fun route(droidtopImeHasEditor: Boolean, accessibilityHasEditor: Boolean, elevatedShell: Boolean): TypingRoute = when {
         droidtopImeHasEditor -> TypingRoute.DROIDTOP_IME
+        accessibilityHasEditor -> TypingRoute.ACCESSIBILITY
         elevatedShell -> TypingRoute.ELEVATED_INPUT
         else -> TypingRoute.NONE
     }
 
     /**
-     * Whether droidtop pops its keyboard over another app's editor on [editorDisplayId] after its input method was
-     * asked to show: only where Android will not draw one, and only with the overlay permission.
+     * Who draws droidtop's keyboard over another app's text field on [editorDisplayId]: nobody where Android draws
+     * one itself; the input method's overlay when droidtop's input method is the selected one and may draw over
+     * apps; else the accessibility service's overlay when that service is on. One overlay at a time, never both.
      */
-    fun popOverEditor(editorDisplayId: Int?, localDisplays: Set<Int>, canDrawOverlays: Boolean): Boolean =
-        canDrawOverlays && editorDisplayId != null && !androidDrawsKeyboard(editorDisplayId, localDisplays)
+    fun overlayOwner(
+        editorDisplayId: Int?,
+        localDisplays: Set<Int>,
+        droidtopImeSelected: Boolean,
+        canDrawOverlays: Boolean,
+        accessibilityOn: Boolean,
+    ): OverlayOwner = when {
+        editorDisplayId == null || androidDrawsKeyboard(editorDisplayId, localDisplays) -> OverlayOwner.NONE
+        droidtopImeSelected && canDrawOverlays -> OverlayOwner.INPUT_METHOD
+        accessibilityOn -> OverlayOwner.ACCESSIBILITY
+        else -> OverlayOwner.NONE
+    }
+
+    /** The Displays row's value: Android's own keyboard, else droidtop's by the overlay that would draw it. */
+    fun appsKeyboard(androidShows: Boolean, droidtopImeSelected: Boolean, canDrawOverlays: Boolean, accessibilityOn: Boolean): AppsKeyboard = when {
+        androidShows -> AppsKeyboard.ANDROID
+        droidtopImeSelected && canDrawOverlays -> AppsKeyboard.DROIDTOP
+        accessibilityOn -> AppsKeyboard.ACCESSIBILITY
+        droidtopImeSelected -> AppsKeyboard.NEEDS_OVERLAY
+        else -> AppsKeyboard.OFF
+    }
 
     /** What one pass of the policy keeper does: displays to set local, and displays to give back their old policy. */
     data class PolicyPlan(val setLocal: Set<Int>, val restore: Map<Int, DisplayImePolicy>)

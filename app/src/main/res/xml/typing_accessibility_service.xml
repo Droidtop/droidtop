@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- droidtop's keyboard for other apps on a screen Android draws no keyboard on
+     (TypingAccessibilityService, docs/SPEC.md 4c "Typing on the add-on display").
+     Only the events it needs: a view gaining focus or being tapped (a text field
+     to type into), and a window changing (the field went away). Interactive
+     windows are retrieved because a field's window names its display. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeViewFocused|typeViewClicked|typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/typing_accessibility_description"
+    android:notificationTimeout="50" />

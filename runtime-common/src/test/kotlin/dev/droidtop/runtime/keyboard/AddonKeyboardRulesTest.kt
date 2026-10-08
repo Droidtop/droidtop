@@ -24,19 +24,35 @@ class AddonKeyboardRulesTest {
     }
 
     @Test
-    fun `the input method's connection beats the elevated helper, and nothing is none`() {
-        assertEquals(TypingRoute.DROIDTOP_IME, AddonKeyboardRules.route(droidtopImeHasEditor = true, elevatedShell = true))
-        assertEquals(TypingRoute.ELEVATED_INPUT, AddonKeyboardRules.route(droidtopImeHasEditor = false, elevatedShell = true))
-        assertEquals(TypingRoute.NONE, AddonKeyboardRules.route(droidtopImeHasEditor = false, elevatedShell = false))
+    fun `typing goes through the input method, then accessibility, then the elevated helper, and nothing is none`() {
+        assertEquals(TypingRoute.DROIDTOP_IME, AddonKeyboardRules.route(true, true, true))
+        assertEquals(TypingRoute.ACCESSIBILITY, AddonKeyboardRules.route(false, true, true))
+        assertEquals(TypingRoute.ELEVATED_INPUT, AddonKeyboardRules.route(false, false, true))
+        assertEquals(TypingRoute.NONE, AddonKeyboardRules.route(false, false, false))
     }
 
     @Test
-    fun `the keyboard pops over another app only off the keyboard's screens and with the overlay grant`() {
-        assertTrue(AddonKeyboardRules.popOverEditor(15, emptySet(), canDrawOverlays = true))
-        assertFalse(AddonKeyboardRules.popOverEditor(15, emptySet(), canDrawOverlays = false))
-        assertFalse(AddonKeyboardRules.popOverEditor(15, setOf(15), canDrawOverlays = true))
-        assertFalse(AddonKeyboardRules.popOverEditor(0, emptySet(), canDrawOverlays = true))
-        assertFalse(AddonKeyboardRules.popOverEditor(null, emptySet(), canDrawOverlays = true))
+    fun `one overlay at most, only off the keyboard's screens, the input method's first when it may draw`() {
+        fun owner(display: Int?, local: Set<Int> = emptySet(), ime: Boolean = false, overlay: Boolean = false, a11y: Boolean = false) =
+            AddonKeyboardRules.overlayOwner(display, local, ime, overlay, a11y)
+        assertEquals(OverlayOwner.INPUT_METHOD, owner(15, ime = true, overlay = true, a11y = true))
+        assertEquals(OverlayOwner.ACCESSIBILITY, owner(15, ime = true, overlay = false, a11y = true))
+        assertEquals(OverlayOwner.ACCESSIBILITY, owner(15, ime = false, overlay = true, a11y = true))
+        assertEquals(OverlayOwner.NONE, owner(15, ime = true, overlay = false, a11y = false))
+        assertEquals(OverlayOwner.NONE, owner(15, ime = false, overlay = true, a11y = false))
+        assertEquals(OverlayOwner.NONE, owner(15, local = setOf(15), ime = true, overlay = true, a11y = true))
+        assertEquals(OverlayOwner.NONE, owner(0, ime = true, overlay = true, a11y = true))
+        assertEquals(OverlayOwner.NONE, owner(null, ime = true, overlay = true, a11y = true))
+    }
+
+    @Test
+    fun `the Displays row names the keyboard apps there get`() {
+        assertEquals(AppsKeyboard.ANDROID, AddonKeyboardRules.appsKeyboard(true, false, false, false))
+        assertEquals(AppsKeyboard.DROIDTOP, AddonKeyboardRules.appsKeyboard(false, true, true, true))
+        assertEquals(AppsKeyboard.ACCESSIBILITY, AddonKeyboardRules.appsKeyboard(false, true, false, true))
+        assertEquals(AppsKeyboard.ACCESSIBILITY, AddonKeyboardRules.appsKeyboard(false, false, false, true))
+        assertEquals(AppsKeyboard.NEEDS_OVERLAY, AddonKeyboardRules.appsKeyboard(false, true, false, false))
+        assertEquals(AppsKeyboard.OFF, AddonKeyboardRules.appsKeyboard(false, false, true, false))
     }
 
     @Test

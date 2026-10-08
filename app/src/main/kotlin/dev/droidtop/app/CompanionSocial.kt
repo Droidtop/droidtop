@@ -91,6 +91,8 @@ private class SocialRows(
     val anyAccount: Boolean,
     /** Notification access is off, so other apps' conversations cannot be read. */
     val needsAccess: Boolean,
+    /** Android 13+ locks that grant for a sideloaded droidtop until "Allow restricted settings" in App info. */
+    val restricted: Boolean,
 )
 
 private fun socialRows(context: Context): SocialRows {
@@ -103,6 +105,7 @@ private fun socialRows(context: Context): SocialRows {
         shown.size > 1,
         available.isNotEmpty(),
         !NotificationsStore.isGranted(context),
+        NotificationsStore.restrictedStepNeeded(context),
     )
 }
 
@@ -120,6 +123,12 @@ private fun CompanionSocialList(onOpen: (OpenConversation) -> Unit) {
     ) {
         if (current?.needsAccess == true) {
             ContactRow("Allow notification access", "") { NotificationsStore.openGrantScreen(context) }
+            if (current?.restricted == true) {
+                ContactRow(
+                    dev.droidtop.runtime.systemstatus.RestrictedSettings.TITLE,
+                    dev.droidtop.runtime.systemstatus.RestrictedSettings.VALUE,
+                ) { dev.droidtop.runtime.systemstatus.RestrictedSettings.openAppInfo(context) }
+            }
         }
         when {
             current == null -> CompanionNote("Loading")

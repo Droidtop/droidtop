@@ -26,6 +26,7 @@ import dev.droidtop.library.social.SocialProvider
 import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.runtime.systemstatus.NotificationsStore
+import dev.droidtop.runtime.systemstatus.RestrictedSettings
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
@@ -144,6 +145,15 @@ internal object SocialCatalog {
                 icon = CatalogIcon.ANDROID_SETTINGS,
                 run = { ctx -> NotificationsStore.openGrantScreen(ctx) },
             )
+            if (NotificationsStore.restrictedStepNeeded(context)) {
+                rows += ActionItem(
+                    id = "social_allow_restricted",
+                    title = RestrictedSettings.TITLE,
+                    value = RestrictedSettings.VALUE,
+                    icon = CatalogIcon.ANDROID_SETTINGS,
+                    run = { ctx -> RestrictedSettings.openAppInfo(ctx) },
+                )
+            }
         }
         val signedOut = StoreLibraries.all().filter { store -> store.social != null && store.social !in available }
         for (store in signedOut) {

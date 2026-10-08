@@ -480,6 +480,19 @@ private fun DownloadsSection(onDismiss: () -> Unit) {
 private fun NotificationsTab(onDismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val granted = remember { NotificationsStore.isGranted(context) }
+    // Android 13+ "restricted settings": then the step is App info's "Allow restricted settings" (SPEC 4c).
+    val restricted by androidx.compose.runtime.produceState(initialValue = false, granted) {
+        if (!granted) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { NotificationsStore.restrictedStepNeeded(context) }
+        }
+    }
+    val grantStep = {
+        if (restricted) {
+            dev.droidtop.runtime.systemstatus.RestrictedSettings.openAppInfo(context)
+        } else {
+            NotificationsStore.openGrantScreen(context)
+        }
+    }
     val items by NotificationsStore.items.collectAsState()
     var focusIndex by remember { mutableStateOf(0) }
     val listState = rememberLazyListState()
@@ -514,7 +527,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                     GamepadAction.B -> onDismiss()
                     GamepadAction.A -> when {
                         !granted -> {
-                            NotificationsStore.openGrantScreen(context)
+                            grantStep()
                             onDismiss()
                         }
                         current != null -> {
@@ -536,10 +549,10 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
         when {
             !granted -> MenuRow(
                 title = "Notification access",
-                value = "Needs permission",
+                value = if (restricted) dev.droidtop.runtime.systemstatus.RestrictedSettings.TITLE else "Needs permission",
                 selected = focusIndex == 0,
                 onClick = {
-                    NotificationsStore.openGrantScreen(context)
+                    grantStep()
                     onDismiss()
                 },
             )

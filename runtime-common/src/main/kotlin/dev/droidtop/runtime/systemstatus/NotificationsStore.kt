@@ -82,6 +82,7 @@ object NotificationsStore {
      * is not there.
      */
     fun openGrantScreen(context: Context) {
+        RestrictedSettings.noteAttempt(context, RestrictedGrant.NOTIFICATIONS)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val detail = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
                 .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, ComponentName(context.packageName, LISTENER_CLASS).flattenToString())
@@ -90,4 +91,12 @@ object NotificationsStore {
         }
         context.startActivity(grantIntent())
     }
+
+    /**
+     * Whether Android's "restricted settings" stands between droidtop and notification access (Android 13+); then
+     * the surface offering [openGrantScreen] also offers [RestrictedSettings.openAppInfo]. Reads an app op and
+     * droidtop's preferences: off the main thread.
+     */
+    fun restrictedStepNeeded(context: Context): Boolean =
+        RestrictedSettings.stepNeeded(context, RestrictedGrant.NOTIFICATIONS, isGranted(context))
 }

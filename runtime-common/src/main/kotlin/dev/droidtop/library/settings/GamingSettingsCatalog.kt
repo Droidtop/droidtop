@@ -98,6 +98,8 @@ object GamingSettingsCatalog {
     const val ID_DISPLAY_SWAP = "action_display_swap"
     const val ID_DISPLAY_REINIT = "action_display_reinit"
     const val ID_DISPLAY_KEYBOARD = "action_display_keyboard"
+    const val ID_DISPLAY_KEYBOARD_ACCESSIBILITY = "action_display_keyboard_accessibility"
+    const val ID_DISPLAY_KEYBOARD_RESTRICTED = "action_display_keyboard_restricted"
     const val ID_KEYBOARD_PICK = "action_keyboard_pick"
     const val ID_KEYBOARD_ENABLE = "action_keyboard_enable"
     const val ID_RESCAN_LIBRARY = "pref_gaming_rescan_library"
@@ -803,8 +805,10 @@ object GamingSettingsCatalog {
      * Typing on the add-on display (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314). With
      * the elevated helper, a switch for Android's own keyboard on the second screen (on by default, given back when
      * off); without it the switch is not drawn. Then one row whose value says how typing into other apps on that
-     * screen works right now, and whose action is the one step that would make it work: choosing droidtop's
-     * keyboard, or allowing it to draw over other apps.
+     * screen works right now ([AddonKeyboardRules.appsKeyboard]), and whose action is the one step that would make
+     * it work: choosing droidtop's keyboard, or allowing it to draw over other apps. Then the accessibility route's
+     * row (Android's accessibility settings, where the user turns droidtop's service on), and while Android 13+
+     * keeps that switch locked for a sideloaded droidtop, the one row that opens App info.
      */
     private fun secondScreenKeyboardItems(context: Context): List<CatalogItem> = buildList {
         val elevated = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
@@ -821,18 +825,15 @@ object GamingSettingsCatalog {
         val androidShows = dev.droidtop.runtime.keyboard.AddonKeyboard.localDisplays.value.isNotEmpty()
         val ownActive = Keyboards.ownKeyboardActive(context)
         val overlay = android.provider.Settings.canDrawOverlays(context)
+        val accessibility = dev.droidtop.runtime.keyboard.AccessibilityKeyboard.isEnabled(context)
+        val state = dev.droidtop.runtime.keyboard.AddonKeyboardRules.appsKeyboard(androidShows, ownActive, overlay, accessibility)
         add(
             ActionItem(
                 id = ID_DISPLAY_KEYBOARD,
                 title = "Keyboard for apps on second screen",
-                value = when {
-                    androidShows -> "Android keyboard"
-                    !ownActive -> "Needs droidtop keyboard"
-                    !overlay -> "Needs display over apps"
-                    else -> "droidtop keyboard"
-                },
+                value = state.label,
                 run = { ctx ->
-                    if (!androidShows && ownActive && !overlay) {
+                    if (state == dev.droidtop.runtime.keyboard.AppsKeyboard.NEEDS_OVERLAY) {
                         ctx.startActivity(
                             android.content.Intent(
                                 android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -845,6 +846,25 @@ object GamingSettingsCatalog {
                 },
             ),
         )
+        add(
+            ActionItem(
+                id = ID_DISPLAY_KEYBOARD_ACCESSIBILITY,
+                title = "Keyboard through accessibility",
+                value = if (accessibility) "On" else "Off",
+                run = { ctx -> dev.droidtop.runtime.keyboard.AccessibilityKeyboard.openSettings(ctx) },
+            ),
+        )
+        val restricted = dev.droidtop.runtime.systemstatus.RestrictedSettings
+        if (restricted.stepNeeded(context, dev.droidtop.runtime.systemstatus.RestrictedGrant.ACCESSIBILITY, accessibility)) {
+            add(
+                ActionItem(
+                    id = ID_DISPLAY_KEYBOARD_RESTRICTED,
+                    title = restricted.TITLE,
+                    value = restricted.VALUE,
+                    run = { ctx -> restricted.openAppInfo(ctx) },
+                ),
+            )
+        }
     }
 
     private fun displayGameLaunchTargetItem(context: Context) = ChoiceItem(

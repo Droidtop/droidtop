@@ -36,6 +36,7 @@ import dev.droidtop.library.settings.Keyboards
 import dev.droidtop.library.settings.SocialBadge
 import dev.droidtop.library.settings.UiModePrefs
 import dev.droidtop.library.social.SocialHub
+import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
 import dev.droidtop.runtime.tasks.TaskManager
 import dev.droidtop.shell.gamepad.DroidtopKeyboard
 import kotlinx.coroutines.Dispatchers
@@ -127,18 +128,23 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
 
 /**
  * The companion's Keys panel (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314): droidtop's one
- * keyboard typing into the focused field on the other screen, through droidtop's input method when it is the selected
- * one, else through the elevated helper's `input` command. With neither, a row offers the one switch that makes it
- * work. The companion stays touch-only: typing here never moves focus off the other screen.
+ * keyboard typing into the focused field on the other screen by [RoutedKeyboardSink]'s one order: droidtop's input
+ * method when it is the selected one, else droidtop's accessibility service when it is on, else the elevated
+ * helper's `input` command. With none of them, a row offers the one switch that makes it work. The companion stays
+ * touch-only: typing here never moves focus off the other screen.
  */
 @Composable
 private fun CompanionKeys() {
     val context = LocalContext.current
     val view = LocalView.current
     // Both reads ask the system (the input-method list, the helper's binder): off the main thread.
-    val access by produceState(initialValue = KeysAccess(imeActive = true, elevated = false)) {
+    val access by produceState(initialValue = KeysAccess(imeActive = true, accessibility = false, elevated = false)) {
         value = withContext(Dispatchers.IO) {
-            KeysAccess(Keyboards.ownKeyboardActive(context), runCatching { TaskManager.shell.capabilities().shellCommand }.getOrDefault(false))
+            KeysAccess(
+                Keyboards.ownKeyboardActive(context),
+                AccessibilityKeyboard.connected,
+                runCatching { TaskManager.shell.capabilities().shellCommand }.getOrDefault(false),
+            )
         }
     }
     var noRoute by remember { mutableStateOf(false) }
@@ -152,13 +158,14 @@ private fun CompanionKeys() {
         )
     }
     Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
-        if (noRoute || (!access.imeActive && !access.elevated)) {
+        val anyRoute = access.imeActive || access.accessibility || access.elevated
+        if (noRoute || !anyRoute) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CompanionNote(if (access.imeActive || access.elevated) "No text field" else "Typing")
+                CompanionNote(if (anyRoute) "No text field" else "Typing")
                 if (!access.imeActive) CompanionPill("Use droidtop keyboard") { Keyboards.showPicker(context) }
             }
         }
@@ -166,7 +173,7 @@ private fun CompanionKeys() {
     }
 }
 
-private data class KeysAccess(val imeActive: Boolean, val elevated: Boolean)
+private data class KeysAccess(val imeActive: Boolean, val accessibility: Boolean, val elevated: Boolean)
 
 /** The screen the companion types into: the shell's when it is elsewhere, else the first other display. */
 private fun otherDisplay(context: android.content.Context, own: Int?): Int? {

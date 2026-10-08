@@ -3483,8 +3483,9 @@ rig check in the commit message.
   draws) wired to a `KeyboardSink`; `DroidtopKeyboard` (`:shell-gamepad`) is its one Compose adapter.
   Every keyboard droidtop draws is that view, only the sink differs: the companion's Input tab
   (`ImeConnectionSink`, or the container), its Keys button (`RoutedKeyboardSink`), the Social draft
-  (the draft itself; its own keyboard composable is gone), droidtop's own fields (`WindowKeySink`)
-  and the keyboard over another app (`ImeConnectionSink`). `KeyMeta` is the one meta-state rule.
+  (the draft itself; its own keyboard composable is gone), droidtop's own fields and windows
+  (`WindowKeySink`) and the keyboard over another app (`ImeConnectionSink`, or the accessibility
+  service's `AccessibilityTyping.FieldSink`). `KeyMeta` is the one meta-state rule.
 - **droidtop's own text fields always type.** On a display Android draws no keyboard on
   (`AddonKeyboardRules.ownFieldNeedsKeyboard`), the shell's text fields (library search, the text
   dialog, the metadata editor, a new collection's name) draw `OwnFieldKeyboard` under the field. Its
@@ -3504,15 +3505,19 @@ rig check in the commit message.
   user grant. A Hide key closes it until that editor's session ends.
 - **The companion is a keyboard for the other screen.** A Keys pill in the companion's tab strip
   (not on the Input tab, which already is one) opens the panel under any tab; it types into the
-  focused field on the other screen by the best route there is (`AddonKeyboardRules.route`):
-  droidtop's input method's connection, else the elevated helper's `input -d <display>` (text as
-  `input text`, other keys as `keyevent`, one after another on one thread). The companion stays
-  touch-only, so typing on it never moves focus off the other screen.
+  focused field on the other screen by the best route there is (`AddonKeyboardRules.route`, one
+  order for every surface that types into another app, `RoutedKeyboardSink`): droidtop's input
+  method's connection, else droidtop's accessibility service's focused field, else the elevated
+  helper's `input -d <display>` (text as `input text`, other keys as `keyevent`, one after another
+  on one thread). The companion stays touch-only, so typing on it never moves focus off the other
+  screen.
 - **Guidance is a value, not prose.** Displays has "Keyboard for apps on second screen", whose value
-  is the state ("Android keyboard", "droidtop keyboard", "Needs droidtop keyboard", "Needs display
-  over apps") and whose action is the one missing step (Android's keyboard picker, or the overlay
-  grant). The Keys panel shows "Typing" with a "Use droidtop keyboard" chip when it has no route, and
-  "No text field" when a key found no editor.
+  is the state (`AddonKeyboardRules.appsKeyboard`: "Android keyboard", "droidtop keyboard",
+  "Accessibility", "Needs display over apps", "Off") and whose action is the one missing step (the
+  overlay grant for "Needs display over apps", else Android's keyboard picker); then "Keyboard
+  through accessibility" (On or Off), which opens Android's accessibility settings, the only place
+  the service can be turned on. The Keys panel shows "Typing" with a "Use droidtop keyboard" chip
+  when it has no route, and "No text field" when a key found no editor.
 - **Focus goes back to the app, not only the shell.** When a touch-only surface becomes the top
   activity and no shell is resumed on another screen, the system's task list is read (elevated
   helper only) and the app visible on the other screen is brought to the front through the task
@@ -3520,9 +3525,58 @@ rig check in the commit message.
   (`FocusReturn.appToRefocus`). Without that list droidtop cannot tell an app still showing from one
   the user left and moves nothing; a tap on the app does the same.
 
-**Not done:** an accessibility-service route for other apps while another keyboard (Gboard) is the
-selected one; droidtop's own non-shell activities (store sign-in, onboarding) on the add-on display
-get neither `OwnFieldKeyboard` nor the overlay.
+- **Other apps while another keyboard is selected: droidtop's accessibility service.** With Gboard
+  (or any keyboard but droidtop's) selected and no elevated access, nothing of droidtop's is bound
+  to the editor, so droidtop has its own accessibility service, `TypingAccessibilityService`, which
+  the user turns on (Displays, "Keyboard through accessibility"). It is kept minimal: the event types
+  are a view gaining focus, a view tapped and a window changing; the flags are the interactive-window
+  list (a field's window names its display, `AccessibilityWindowInfo.getDisplayId`, Android 11+;
+  earlier, the display droidtop placed the app on) and window content (to act on the field). It
+  keeps one node, the focused editable field of another app, and reads that field's text and
+  selection only to make the edit asked for; nothing is stored or sent anywhere. When such a field
+  gains focus on a display Android draws no keyboard on, the shared panel is drawn at the bottom of
+  that display in a `TYPE_ACCESSIBILITY_OVERLAY` window (the service gets an overlay token per
+  display through `createDisplayContext`, Android 11+), `FLAG_NOT_FOCUSABLE` like the other
+  overlay, so no "Display over other apps" grant is needed. One overlay at a time
+  (`AddonKeyboardRules.overlayOwner`): the input method's when droidtop's keyboard is selected and
+  may draw over apps, else the accessibility service's. Hide closes it until the field is tapped
+  again; a non-editable view taking focus on that display, or another app's window coming up there,
+  closes it.
+- **How accessibility types.** A service can only replace a field's whole text, so each key reads
+  the text and selection, splices (`TextSplice`: insert at the cursor or over the selection,
+  Backspace and Delete by code point or the selection, arrows, Home, End; a field showing its hint
+  is empty; an unknown selection is the end) and writes both back with `ACTION_SET_TEXT` and
+  `ACTION_SET_SELECTION`. A field without `ACTION_SET_TEXT` gets typed text through the clipboard
+  and `ACTION_PASTE` at its selection, and a deletion as `ACTION_CUT` of the removed range. Enter
+  is a new line in a multi-line field, else the field's own action (`ACTION_IME_ENTER`, Android
+  11+); Ctrl+A, C, X and V are select all, copy, cut and paste (`FieldKeys`). Android does not give
+  a password field's text to accessibility, so there the splice runs on what droidtop typed since
+  the field gained focus (text already in it is replaced on the first key), and a password field
+  without `ACTION_SET_TEXT` is not typed into, so a password never reaches the clipboard. The actions are
+  calls into the other app and run in order on one worker thread.
+- **droidtop's own screens outside the shell.** `InWindowKeyboard` (`:shell-gamepad`) is one helper
+  installed on every droidtop activity from the application's activity callbacks: on a display
+  Android draws no keyboard on, while the window's focused view is a text editor
+  (`View.onCheckIsTextEditor`, true for an EditText, a focused Compose text field and an editable
+  field of a web page, so the store sign-in page and onboarding are covered alike) the shared panel
+  is added at the bottom of the window and the content is padded by its height; keys go through
+  `WindowKeySink` into the window, as for the shell's fields. It decides on each frame from the
+  focused view and a flag (no allocation, no I/O) and hides a moment after focus leaves editors,
+  since focus passes through nothing between two fields. A window whose field already draws
+  `OwnFieldKeyboard` beside it (the shell's dialogs and search) counts itself and gets no second
+  one. A dialog window is not an activity and is not watched: droidtop's text dialogs draw
+  `OwnFieldKeyboard`.
+- **Android 13+ restricted settings.** For an app installed from a file, Android 13 and later lock
+  notification access and accessibility services until "Allow restricted settings" is chosen in
+  the app's App info screen. The state is the app op ACCESS_RESTRICTED_SETTINGS (MODE_ERRORED when
+  the package installer restricted the app, MODE_ALLOWED once allowed; `PackageInstallerSession`,
+  Settings' `RestrictedPreferenceHelper`, android-13.0.0_r1); Android 15 may leave it at its default
+  and decide from the install source, which no app can read, so there a grant screen droidtop opened
+  that did not end in the grant counts as the sign (`RestrictedSettingsRules`). Every place that
+  offers one of those grants (the Social settings and the companion's Social tab for notification
+  access, the Quick Menu's notifications, Displays for the accessibility service) then offers one
+  more row, "Allow restricted settings" with the value "App info", which opens droidtop's App info
+  screen (`RestrictedSettings`), and nothing else.
 
 ### G6 status: store consolidated, relocation logic still in `:app` (2026-09-25)
 

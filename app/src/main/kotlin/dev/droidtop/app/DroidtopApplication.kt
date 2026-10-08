@@ -116,6 +116,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 activity.note("resumed")
                 // Elevated access may have been granted while droidtop was away; a pass with nothing new runs no command.
                 if (!activity.isParkedSurface()) AddonKeyboardHost.resync(activity, force = false)
+                // Every droidtop text field on a screen Android draws no keyboard on gets droidtop's (SPEC 4c).
+                dev.droidtop.shell.gamepad.InWindowKeyboard.attach(activity)
                 if (!activity.isParkedSurface()) AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
             }
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit

@@ -508,6 +508,22 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+        <!-- droidtop's keyboard for other apps on a screen Android draws no
+             keyboard on, whichever keyboard is selected (docs/SPEC.md 4c
+             "Typing on the add-on display"). Binds only after the user turns
+             it on in Android's accessibility settings. -->
+        <service
+            android:name=".TypingAccessibilityService"
+            android:exported="false"
+            android:label="@string/typing_accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/typing_accessibility_service" />
+        </service>
         <!-- PackageInstaller reports the self-update verdict here. -->
         <receiver
             android:name="dev.droidtop.app.update.AppUpdateStatusReceiver"

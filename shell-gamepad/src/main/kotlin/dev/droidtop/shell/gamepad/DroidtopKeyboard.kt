@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -66,6 +67,12 @@ fun OwnFieldKeyboard(modifier: Modifier = Modifier) {
     // Read once the window is attached: a dialog's view has no display during its first composition.
     LaunchedEffect(view) { displayId = view.display?.displayId }
     if (!AddonKeyboardRules.ownFieldNeedsKeyboard(displayId, local)) return
+    // This window's field has its keyboard beside it: the window-wide one stays away.
+    DisposableEffect(view) {
+        val root = view.rootView
+        InWindowKeyboard.ownFieldShown(root, true)
+        onDispose { InWindowKeyboard.ownFieldShown(root, false) }
+    }
     val sink = remember(view) { WindowKeySink { view.rootView } }
     DroidtopKeyboard(sink, modifier.padding(top = 12.dp))
 }
