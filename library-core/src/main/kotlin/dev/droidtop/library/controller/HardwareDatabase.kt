@@ -94,6 +94,18 @@ object HardwareDatabase {
         return devices.keys().asSequence().mapNotNull { id -> parseRow(id, devices.getJSONObject(id)) }.toList()
     }
 
+    /**
+     * Whether a toggle value reports the face keys swapped against Android's
+     * positional key codes. A value's `keycodes` (the key code each button
+     * reports, by position) says it, as the right button reporting
+     * `BUTTON_A`; `keysSwapped` is the same fact for a row that lists no key
+     * codes.
+     */
+    private fun keysSwapped(value: JSONObject): Boolean {
+        val keycodes = value.optJSONObject("keycodes") ?: return value.getBoolean("keysSwapped")
+        return keycodes.optString("right") == "BUTTON_A"
+    }
+
     /** A row with no `match.model` cannot be matched to a device, so it carries nothing for this table. */
     private fun parseRow(id: String, json: JSONObject): ConsoleDef? {
         val match = json.optJSONObject("match") ?: return null
@@ -106,7 +118,7 @@ object HardwareDatabase {
                 property,
                 values.keys().asSequence().associateWith { key ->
                     val v = values.getJSONObject(key)
-                    ToggleValue(v.getBoolean("keysSwapped"), v.getString("confirmOn") == "right")
+                    ToggleValue(keysSwapped(v), v.getString("confirmOn") == "right")
                 },
             )
         }

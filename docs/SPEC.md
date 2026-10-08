@@ -6135,14 +6135,19 @@ point at a real button. Resolution order, strongest first:
 validate-before-replace mechanism as the engines and players databases: `HardwareDatabase`,
 `PlatformDatabaseIndex`). A row: `match.model` (`ro.product.model`, case-insensitive; `match.manufacturer`
 optional), `gamepad.name`/`vendorId`/`productId` (the built-in pad's identity) and `gamepad.glyphFamily`
-(`xbox`, `playstation` or `nintendo`: what is printed on the face buttons), and optionally `layoutToggle`
-`{property, values{<value>: {keysSwapped, confirmOn: bottom|right}}}` for a system setting that changes
-the layout while the device runs. A value the table does not list is unknown and is never guessed. Rows
-exist only for devices someone has read: the first is the Retroid Pocket 5 (`ro.product.model=Retroid
-Pocket 5`; `persist.sys.gamepad.type` 1 is the system toggle's "xbox" position, Xbox-style and not
-swapped, confirmed by the owner on the console on 2026-10-02 after a first reading had the two values the
-other way round; 0 is the other position, taken as the opposite swap and marked `verified: false` until the
-owner names it). The property is read live,
+(`xbox`, `playstation` or `nintendo`: what is PRINTED on the face buttons, which no toggle changes), and
+optionally `layoutToggle` `{property, values{<value>: {keysSwapped, confirmOn: bottom|right, keycodes}}}`
+for a system setting that changes the layout while the device runs. `keycodes` names the key code each
+button reports (`{bottom, right, top, left}`: `BUTTON_A`/`B`/`X`/`Y`); when a value has it, the keys are
+swapped exactly when the right button reports `BUTTON_A`, and `keysSwapped` is only for a row without it.
+A value the table does not list is unknown and is never guessed. Rows exist only for devices someone has
+read: the first is the Retroid Pocket 5 (`ro.product.model=Retroid Pocket 5`). Its buttons are printed
+Nintendo-style, A right, B bottom, X top, Y left, whatever the toggle says (owner, 2026-10-08), so its
+glyph family is `nintendo`. `persist.sys.gamepad.type` 1 is the toggle's "xbox" position: key codes by
+position, so the bottom button (printed B) reports `BUTTON_A` and confirms, and the pill says B. 0 is its
+"Retro" position: each button reports what is printed on it, the right button (printed A) confirms, and
+the pill says A (owner, on the console, 2026-10-02). The row said `xbox` until 2026-10-08, so on 0 the
+console drew Xbox letters with "B confirms" (Droidtop/tracker#258). The property is read live,
 never once: `LayoutSignals.readInProcess` (`android.os.SystemProperties` by reflection, an in-memory read);
 when SELinux hides it from the app (it reads as empty, and empty is never taken as a value) the same read
 goes through the privileged helper (`TaskManager.shell`, Shizuku or Sui) off the main thread and is cached;
