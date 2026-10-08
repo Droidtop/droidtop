@@ -65,7 +65,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.GameMediaLocator
-import dev.droidtop.library.theme.EsDeCarouselConfig
 import dev.droidtop.library.theme.EsDeCollectionKind
 import dev.droidtop.library.theme.EsDeCarouselPlacement
 import dev.droidtop.library.theme.EsDeImageTypes
@@ -80,8 +79,6 @@ import dev.droidtop.library.theme.EsDeSelectorLayer
 import dev.droidtop.library.theme.EsDeTextListConfig
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
-import dev.droidtop.library.theme.colorOrNull
-import dev.droidtop.library.theme.floatOrNull
 import dev.droidtop.library.theme.existingPathOrNull
 import dev.droidtop.library.theme.strOrNull
 import dev.droidtop.library.theme.esDeCarouselConfig
