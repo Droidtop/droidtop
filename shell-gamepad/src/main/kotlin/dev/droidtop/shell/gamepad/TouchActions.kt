@@ -27,6 +27,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -170,6 +171,9 @@ private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit)
                 label,
                 color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.labelMedium.copy(fontSize = MenuTokens.HintLabelTextSize),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
