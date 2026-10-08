@@ -10,6 +10,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import android.view.Display
 import android.view.Gravity
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
@@ -30,6 +31,7 @@ import dev.droidtop.runtime.tasks.Fidelity
 import dev.droidtop.runtime.tasks.LaunchLedger
 import dev.droidtop.runtime.tasks.TaskManager
 import dev.droidtop.shell.gamepad.ChromeColors
+import dev.droidtop.shell.gamepad.KeyboardTargets
 import dev.droidtop.shell.gamepad.INLINE_KEYBOARD_HEIGHT_PERCENT
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -133,6 +135,7 @@ object AddonKeyboardHost {
             Handler(Looper.getMainLooper()),
         )
         ShowOverEditor.install(app)
+        KeyboardTargets.internalSurface = InternalScreenKeyboard(app)
         resync(app, force = false)
     }
 
@@ -146,9 +149,10 @@ object AddonKeyboardHost {
     }
 
     private fun sync(context: Context, force: Boolean) {
+        AddonKeyboard.load(context)
         val shell = TaskManager.shell
         val elevated = runCatching { shell.capabilities().shellCommand }.getOrDefault(false)
-        val enabled = AddonKeyboard.androidKeyboardOnSecondScreen(context)
+        val enabled = AddonKeyboard.androidKeyboardOnSecondScreen(context) && AddonKeyboard.controlsKeyboard
         val second = DisplayOutputRepository(context).currentOutputsSnapshot()
             .filter { it.kind == DisplayOutputKind.SECOND_SCREEN }
             .map { it.androidDisplayId }
@@ -284,7 +288,7 @@ object ShowOverEditor : SecondScreenKeyboard.ShowRequests {
     private const val HIDE_DELAY_MS = 400L
     private val main = Handler(Looper.getMainLooper())
     private lateinit var app: Context
-    private val overlay = OverlayKeyboard()
+    private val overlay = PlacedKeyboard()
     private var dismissedFor: String? = null
     private val hide = Runnable { overlay.hide() }
 
@@ -318,20 +322,20 @@ object ShowOverEditor : SecondScreenKeyboard.ShowRequests {
     }
 
     private fun show(displayId: Int, editorPackage: String?) {
-        if (overlay.shownOn == displayId) return
-        val display = app.getSystemService(DisplayManager::class.java)?.getDisplay(displayId) ?: return
-        val displayContext = app.createDisplayContext(display)
-        val context = if (Build.VERSION.SDK_INT >= 30) {
-            displayContext.createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
-        } else {
-            displayContext
-        }
         overlay.show(
-            context,
             displayId,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            ImeConnectionSink(),
-            suppressImeView = true,
+            windowContext = {
+                app.getSystemService(DisplayManager::class.java)?.getDisplay(displayId)?.let { display ->
+                    val displayContext = app.createDisplayContext(display)
+                    if (Build.VERSION.SDK_INT >= 30) {
+                        displayContext.createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
+                    } else {
+                        displayContext
+                    }
+                }
+            },
+            type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            sink = ImeConnectionSink(),
             what = "keyboard over $editorPackage",
             onHide = { dismissedFor = editorPackage },
         )
@@ -355,7 +359,8 @@ internal fun appDisplay(packageName: String?): Int? {
  * droidtop's keyboard drawn over another app at the bottom of one display, in a window that never takes focus (the
  * app keeps its focus and its input session), with a Hide key (docs/SPEC.md 4c, "Typing on the add-on display").
  * The one overlay both owners use: the input method's ([ShowOverEditor], `TYPE_APPLICATION_OVERLAY`) and the
- * accessibility service's ([AccessibilityTyping], `TYPE_ACCESSIBILITY_OVERLAY`). Main thread only.
+ * accessibility service's ([AccessibilityTyping], `TYPE_ACCESSIBILITY_OVERLAY`), each through [PlacedKeyboard],
+ * and the internal-screen keyboard ([InternalScreenKeyboard]). Main thread only.
  */
 internal class OverlayKeyboard {
     private var window: View? = null
@@ -388,8 +393,8 @@ internal class OverlayKeyboard {
                 Button(context).apply {
                     text = "Hide"
                     setOnClickListener {
-                        onHide()
                         hide()
+                        onHide()
                     }
                 },
                 LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -420,10 +425,102 @@ internal class OverlayKeyboard {
     }
 
     fun hide() {
+        shownOn = null
         val view = window ?: return
         runCatching { windowManager?.removeView(view) }
         window = null
         windowManager = null
+    }
+}
+
+/**
+ * droidtop's keyboard for another app's field on [shownOn], wherever "Keyboard displays on" puts it
+ * ([KeyboardTargets.open]): the companion's input controller, the internal screen, an overlay on the field's own
+ * screen ([OverlayKeyboard], built from [show]'s window context only then), or nowhere when droidtop does not control
+ * the keyboard. Used by both overlay owners. Main thread only.
+ */
+internal class PlacedKeyboard {
+    private val overlay = OverlayKeyboard()
+    private var elsewhere: KeyboardTargets.Request? = null
+
+    var shownOn: Int? = null
+        private set
+
+    fun show(
+        displayId: Int,
+        windowContext: () -> Context?,
+        type: Int,
+        sink: KeyboardSink,
+        what: String,
+        onHide: () -> Unit,
+    ) {
+        if (shownOn == displayId) return
+        hide()
+        val hidden = {
+            elsewhere = null
+            shownOn = null
+            onHide()
+        }
+        when (val opened = KeyboardTargets.open(displayId, sink, hidden)) {
+            is KeyboardTargets.Opened.Elsewhere -> {
+                elsewhere = opened.request
+                shownOn = displayId
+                Log.i("droidtop.keyboard", "$what on display $displayId, keyboard on ${opened.request.target.label}")
+            }
+            KeyboardTargets.Opened.Nowhere -> Unit
+            KeyboardTargets.Opened.Here -> {
+                val context = windowContext() ?: return
+                if (overlay.show(context, displayId, type, sink, suppressImeView = true, what = what, onHide = hidden)) shownOn = displayId
+            }
+        }
+    }
+
+    fun hide() {
+        elsewhere?.let { KeyboardTargets.close(it) }
+        elsewhere = null
+        overlay.hide()
         shownOn = null
+    }
+}
+
+/**
+ * "Keyboard displays on: Internal screen": a plain keyboard at the bottom of the built-in display, whatever shows
+ * there, typing into the request's sink. Drawn as droidtop's accessibility overlay when that service is on, else as
+ * an app overlay with "Display over other apps"; with neither, droidtop cannot draw there and the keyboard stays on
+ * the field's screen.
+ */
+internal class InternalScreenKeyboard(private val app: Context) : KeyboardTargets.InternalSurface {
+    private val overlay = OverlayKeyboard()
+    private var current: KeyboardTargets.Request? = null
+
+    override fun available(): Boolean = AccessibilityKeyboard.connected || Settings.canDrawOverlays(app)
+
+    override fun show(request: KeyboardTargets.Request): Boolean {
+        hide(current ?: request)
+        val display = Display.DEFAULT_DISPLAY
+        val (context, type) = AccessibilityTyping.overlayContext(display)?.let { it to WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY }
+            ?: run {
+                if (!Settings.canDrawOverlays(app)) return false
+                val screen = app.getSystemService(DisplayManager::class.java)?.getDisplay(display) ?: return false
+                val displayContext = app.createDisplayContext(screen)
+                val window = if (Build.VERSION.SDK_INT >= 30) {
+                    displayContext.createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
+                } else {
+                    displayContext
+                }
+                window to WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            }
+        val shown = overlay.show(context, display, type, request.sink, suppressImeView = true, what = "keyboard for display ${request.fieldDisplay}") {
+            current = null
+            request.onHide()
+        }
+        if (shown) current = request
+        return shown
+    }
+
+    override fun hide(request: KeyboardTargets.Request) {
+        if (current !== request) return
+        current = null
+        overlay.hide()
     }
 }

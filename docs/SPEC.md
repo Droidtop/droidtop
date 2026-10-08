@@ -3504,7 +3504,7 @@ rig check in the commit message.
   the app on; an app droidtop cannot place gets no overlay. It needs "Display over other apps", a
   user grant. A Hide key closes it until that editor's session ends.
 - **The companion is a keyboard for the other screen.** A Keys pill in the companion's tab strip
-  (not on the Input tab, which already is one) opens the panel under any tab; it types into the
+  (not on the Input tab, which already is one) opens the Input tab; it types into the
   focused field on the other screen by the best route there is (`AddonKeyboardRules.route`, one
   order for every surface that types into another app, `RoutedKeyboardSink`): droidtop's input
   method's connection, else droidtop's accessibility service's focused field, else the elevated
@@ -3566,6 +3566,39 @@ rig check in the commit message.
   `OwnFieldKeyboard` beside it (the shell's dialogs and search) counts itself and gets no second
   one. A dialog window is not an activity and is not watched: droidtop's text dialogs draw
   `OwnFieldKeyboard`.
+- **Where droidtop's keyboard displays.** Owner, 2026-10-08: "We want to prefer the keyboard
+  launching IN the companion, when possible", then "That setting should be more extensible: Keyboard
+  displays on same screen, keyboard displays on internal screen, keyboard displays on the companion,
+  keyboard not controlled by DroidTop. We should have companion control be separate from the regular
+  setting", and "We've got a whole companion controller for desktop mode, including keyboard and
+  trackpad, so it should be as trivial as toggling to that when the controller needs to do input".
+  - One setting, Displays "Keyboard displays on", is the extensible `KeyboardPlacement`: Same screen,
+    Internal screen, Companion (the default), Not controlled by droidtop. A future target (an external
+    display) is one more entry, one branch in `AddonKeyboardRules.keyboardPlacement` and one surface in
+    `KeyboardTargets`.
+  - Every surface that would draw droidtop's keyboard for a field on a screen without Android's
+    keyboard (`InWindowKeyboard`, `OwnFieldKeyboard`, and `PlacedKeyboard` for both overlays over
+    other apps) asks `KeyboardTargets.open`, which answers draw it here, elsewhere, or nowhere. The
+    keys always go to the asker's own sink (the window's keys, the input method's connection, or
+    `RoutedKeyboardSink`), so the field keeps its focus wherever the keyboard is drawn.
+  - Companion: the companion switches to its own input controller, the Input tab
+    (`SecondScreenInputView`, the same keyboard and trackpad Desktop mode uses), whose keys go to the
+    requesting field while the request lasts, and switches back to the tab it was on when the field
+    loses focus or its Hide is pressed. It hosts only while a companion host is started on another
+    display (lifecycle ON_START to ON_STOP) and the companion's own setting allows it, so a companion
+    that is off, hidden by Kiosk or Kid, covered by a full-screen app, or absent on a single-display
+    device leaves the keyboard on the field's screen.
+  - Internal screen: a plain keyboard at the bottom of the built-in display whatever shows there
+    (`InternalScreenKeyboard`), an accessibility overlay when droidtop's service is on, else an app
+    overlay with "Display over other apps"; without either, the field's screen.
+  - Not controlled by droidtop: droidtop draws no keyboard and the policy keeper gives every display
+    its keyboard policy back, so Android decides; the Displays keyboard row reads "Not controlled by
+    droidtop".
+  - The companion's own settings (Displays, Companion) say what the companion offers, apart from
+    where the keyboard shows: "Keyboard for the other screen" (whether it may host it) and "Keys
+    button", which is only a shortcut to the Input tab where the mode has no Input tab of its own. The
+    Input tab in Gaming and Standard types by the one route order too (`RoutedKeyboardSink`), so the
+    separate Keys panel is gone.
 - **Android 13+ restricted settings.** For an app installed from a file, Android 13 and later lock
   notification access and accessibility services until "Allow restricted settings" is chosen in
   the app's App info screen. The state is the app op ACCESS_RESTRICTED_SETTINGS (MODE_ERRORED when

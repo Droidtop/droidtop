@@ -19,7 +19,9 @@ import java.util.WeakHashMap
  * view is a text editor (`View.onCheckIsTextEditor`: an EditText, a Compose text field, an editable web page field),
  * the shared keyboard ([KeyboardPanel]) is drawn at the bottom of that window and the content above it is padded by
  * its height, so the field stays visible. Keys go into the window's own key path ([WindowKeySink]): no input method,
- * no focus change, no permission. A window whose field already draws [OwnFieldKeyboard] beside it gets no second.
+ * no focus change, no permission. "Keyboard displays on" may put it elsewhere ([KeyboardTargets]: the companion's
+ * input controller, the internal screen) or nowhere; a Hide there holds until focus leaves the window's editors.
+ * A window whose field already draws [OwnFieldKeyboard] beside it gets no second.
  * One helper for every activity, installed from the application's activity callbacks; main thread only.
  */
 object InWindowKeyboard {
@@ -46,6 +48,8 @@ object InWindowKeyboard {
     /** Decides on every frame of the window, which costs a focus lookup and a flag: no allocation, no I/O. */
     private class Watcher(private val activity: Activity, private val decor: ViewGroup) : ViewTreeObserver.OnPreDrawListener {
         private var panel: KeyboardPanel? = null
+        private var elsewhere: KeyboardTargets.Request? = null
+        private var dismissed = false
         private var content: View? = null
         private var basePadding = 0
         private var hidePending = false
@@ -55,13 +59,15 @@ object InWindowKeyboard {
         }
 
         override fun onPreDraw(): Boolean {
-            if (wanted()) {
+            val editing = wanted()
+            if (!editing) dismissed = false
+            if (editing && !dismissed) {
                 if (hidePending) {
                     decor.removeCallbacks(hide)
                     hidePending = false
                 }
-                if (panel == null) show()
-            } else if (panel != null && !hidePending) {
+                if (panel == null && elsewhere == null) show()
+            } else if ((panel != null || elsewhere != null) && !hidePending) {
                 // Focus passes through nothing for a frame when it moves between fields.
                 hidePending = true
                 decor.postDelayed(hide, HIDE_DELAY_MS)
@@ -78,7 +84,21 @@ object InWindowKeyboard {
         }
 
         private fun show() {
-            val keyboard = KeyboardPanel(activity, WindowKeySink { decor }, INLINE_KEYBOARD_HEIGHT_PERCENT)
+            val sink = WindowKeySink { decor }
+            val displayId = decor.display?.displayId ?: return
+            when (val opened = KeyboardTargets.open(displayId, sink) { elsewhere = null; dismissed = true }) {
+                is KeyboardTargets.Opened.Elsewhere -> {
+                    elsewhere = opened.request
+                    return
+                }
+                // droidtop does not control the keyboard: nothing until focus leaves the editors.
+                KeyboardTargets.Opened.Nowhere -> {
+                    dismissed = true
+                    return
+                }
+                KeyboardTargets.Opened.Here -> Unit
+            }
+            val keyboard = KeyboardPanel(activity, sink, INLINE_KEYBOARD_HEIGHT_PERCENT)
             if (!keyboard.hasKeys) return
             val body = decor.findViewById<View>(android.R.id.content)
             content = body
@@ -93,6 +113,8 @@ object InWindowKeyboard {
         }
 
         private fun hideNow() {
+            elsewhere?.let { KeyboardTargets.close(it) }
+            elsewhere = null
             val keyboard = panel ?: return
             decor.removeView(keyboard)
             panel = null

@@ -74,5 +74,16 @@ fun OwnFieldKeyboard(modifier: Modifier = Modifier) {
         onDispose { InWindowKeyboard.ownFieldShown(root, false) }
     }
     val sink = remember(view) { WindowKeySink { view.rootView } }
-    DroidtopKeyboard(sink, modifier.padding(top = 12.dp))
+    // Wherever "Keyboard displays on" puts it (SPEC 4c): drawn here only when that is this screen.
+    val setting by AddonKeyboard.placement.collectAsState()
+    val hosts by AddonKeyboard.companionHostsKeyboard.collectAsState()
+    val companions by KeyboardTargets.companionsChanged.collectAsState()
+    val display = displayId ?: return
+    var opened by remember(view) { mutableStateOf<KeyboardTargets.Opened?>(null) }
+    DisposableEffect(sink, display, setting, hosts, companions) {
+        val now = KeyboardTargets.open(display, sink)
+        opened = now
+        onDispose { (now as? KeyboardTargets.Opened.Elsewhere)?.let { KeyboardTargets.close(it.request) } }
+    }
+    if (opened == KeyboardTargets.Opened.Here) DroidtopKeyboard(sink, modifier.padding(top = 12.dp))
 }

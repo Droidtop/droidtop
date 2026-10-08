@@ -68,7 +68,7 @@ internal object AccessibilityTyping {
     private const val HIDE_DELAY_MS = 400L
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "droidtop-accessibility-typing").apply { isDaemon = true } }
-    private val overlay = OverlayKeyboard()
+    private val overlay = PlacedKeyboard()
     private val hide = Runnable { overlay.hide() }
     private val overlaySink by lazy { RoutedKeyboardSink(displayId = { fieldDisplay }, elevated = { false }) }
 
@@ -171,20 +171,25 @@ internal object AccessibilityTyping {
      * built-in display can carry one.
      */
     private fun show(s: AccessibilityService, displayId: Int, pkg: String) {
-        if (overlay.shownOn == displayId) return
-        if (Build.VERSION.SDK_INT < 30 && displayId != Display.DEFAULT_DISPLAY) return
-        val display = s.getSystemService(DisplayManager::class.java)?.getDisplay(displayId) ?: return
-        val context: Context = s.createDisplayContext(display)
         val focused = field
         overlay.show(
-            context,
             displayId,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            overlaySink,
-            suppressImeView = true,
+            windowContext = { overlayContext(s, displayId) },
+            type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            sink = overlaySink,
             what = "keyboard over $pkg through accessibility",
             onHide = { dismissed = focused },
         )
+    }
+
+    /** A context that can add an accessibility overlay on [displayId], while the service is connected. */
+    fun overlayContext(displayId: Int): Context? = service?.let { overlayContext(it, displayId) }
+
+    private fun overlayContext(s: AccessibilityService, displayId: Int): Context? {
+        if (Build.VERSION.SDK_INT < 30 && displayId != Display.DEFAULT_DISPLAY) return null
+        if (displayId == Display.DEFAULT_DISPLAY) return s
+        val display = s.getSystemService(DisplayManager::class.java)?.getDisplay(displayId) ?: return null
+        return s.createDisplayContext(display)
     }
 
     /** The display [node] is on: its window says so from Android 11; before that, where droidtop placed the app. */

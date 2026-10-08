@@ -45,14 +45,45 @@ class AddonKeyboardRulesTest {
         assertEquals(OverlayOwner.NONE, owner(null, ime = true, overlay = true, a11y = true))
     }
 
+    private fun place(
+        setting: KeyboardPlacement,
+        companions: Set<Int> = setOf(0),
+        hosts: Boolean = true,
+        internal: Boolean = true,
+        field: Int = 15,
+    ) = AddonKeyboardRules.keyboardPlacement(setting, field, companions, hosts, internal)
+
+    @Test
+    fun `the companion hosts the keyboard when one is started on another screen and allowed to`() {
+        assertEquals(KeyboardPlacement.COMPANION, KeyboardPlacement.DEFAULT)
+        assertEquals(KeyboardPlacement.COMPANION, place(KeyboardPlacement.COMPANION))
+        assertEquals(KeyboardPlacement.COMPANION, place(KeyboardPlacement.COMPANION, companions = setOf(15, 0)))
+        assertEquals(KeyboardPlacement.SAME_SCREEN, place(KeyboardPlacement.COMPANION, companions = emptySet()))
+        assertEquals(KeyboardPlacement.SAME_SCREEN, place(KeyboardPlacement.COMPANION, companions = setOf(15)))
+        assertEquals(KeyboardPlacement.SAME_SCREEN, place(KeyboardPlacement.COMPANION, hosts = false))
+    }
+
+    @Test
+    fun `the other placements are the same screen, the internal screen when droidtop can draw there, and not controlled`() {
+        assertEquals(KeyboardPlacement.SAME_SCREEN, place(KeyboardPlacement.SAME_SCREEN))
+        assertEquals(KeyboardPlacement.INTERNAL_SCREEN, place(KeyboardPlacement.INTERNAL_SCREEN, companions = emptySet()))
+        assertEquals(KeyboardPlacement.SAME_SCREEN, place(KeyboardPlacement.INTERNAL_SCREEN, internal = false))
+        assertEquals(KeyboardPlacement.SAME_SCREEN, place(KeyboardPlacement.INTERNAL_SCREEN, field = 0))
+        assertEquals(KeyboardPlacement.NOT_CONTROLLED, place(KeyboardPlacement.NOT_CONTROLLED))
+        assertEquals(KeyboardPlacement.NOT_CONTROLLED, KeyboardPlacement.fromKey("android"))
+        assertEquals(KeyboardPlacement.DEFAULT, KeyboardPlacement.fromKey(null))
+        assertEquals(KeyboardPlacement.DEFAULT, KeyboardPlacement.fromKey("gone"))
+    }
+
     @Test
     fun `the Displays row names the keyboard apps there get`() {
-        assertEquals(AppsKeyboard.ANDROID, AddonKeyboardRules.appsKeyboard(true, false, false, false))
-        assertEquals(AppsKeyboard.DROIDTOP, AddonKeyboardRules.appsKeyboard(false, true, true, true))
-        assertEquals(AppsKeyboard.ACCESSIBILITY, AddonKeyboardRules.appsKeyboard(false, true, false, true))
-        assertEquals(AppsKeyboard.ACCESSIBILITY, AddonKeyboardRules.appsKeyboard(false, false, false, true))
-        assertEquals(AppsKeyboard.NEEDS_OVERLAY, AddonKeyboardRules.appsKeyboard(false, true, false, false))
-        assertEquals(AppsKeyboard.OFF, AddonKeyboardRules.appsKeyboard(false, false, true, false))
+        assertEquals(AppsKeyboard.NOT_CONTROLLED, AddonKeyboardRules.appsKeyboard(false, true, true, true, true))
+        assertEquals(AppsKeyboard.ANDROID, AddonKeyboardRules.appsKeyboard(true, true, false, false, false))
+        assertEquals(AppsKeyboard.DROIDTOP, AddonKeyboardRules.appsKeyboard(true, false, true, true, true))
+        assertEquals(AppsKeyboard.ACCESSIBILITY, AddonKeyboardRules.appsKeyboard(true, false, true, false, true))
+        assertEquals(AppsKeyboard.ACCESSIBILITY, AddonKeyboardRules.appsKeyboard(true, false, false, false, true))
+        assertEquals(AppsKeyboard.NEEDS_OVERLAY, AddonKeyboardRules.appsKeyboard(true, false, true, false, false))
+        assertEquals(AppsKeyboard.OFF, AddonKeyboardRules.appsKeyboard(true, false, false, true, false))
     }
 
     @Test

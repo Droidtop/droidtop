@@ -99,6 +99,8 @@ object GamingSettingsCatalog {
     const val ID_DISPLAY_REINIT = "action_display_reinit"
     const val ID_DISPLAY_KEYBOARD = "action_display_keyboard"
     const val ID_DISPLAY_KEYBOARD_ACCESSIBILITY = "action_display_keyboard_accessibility"
+    const val ID_DISPLAY_KEYBOARD_PLACEMENT = "pref_display_keyboard_placement"
+    const val ID_DISPLAY_COMPANION = "screen_display_companion"
     const val ID_DISPLAY_KEYBOARD_RESTRICTED = "action_display_keyboard_restricted"
     const val ID_KEYBOARD_PICK = "action_keyboard_pick"
     const val ID_KEYBOARD_ENABLE = "action_keyboard_enable"
@@ -822,11 +824,56 @@ object GamingSettingsCatalog {
                 ),
             )
         }
+        val keyboard = dev.droidtop.runtime.keyboard.AddonKeyboard
+        keyboard.load(context)
+        add(
+            ChoiceItem(
+                id = ID_DISPLAY_KEYBOARD_PLACEMENT,
+                title = "Keyboard displays on",
+                options = dev.droidtop.runtime.keyboard.KeyboardPlacement.entries.map { ChoiceOption(it.key, it.label) },
+                current = keyboard.placement.value.key,
+                onSelect = { ctx, value -> keyboard.setPlacement(ctx, dev.droidtop.runtime.keyboard.KeyboardPlacement.fromKey(value)) },
+            ),
+        )
+        // The companion's own settings: what the companion offers, apart from where the keyboard shows.
+        add(
+            NestedScreenItem(
+                id = ID_DISPLAY_COMPANION,
+                title = "Companion",
+                inline = CatalogScreen(
+                    id = ID_DISPLAY_COMPANION,
+                    title = "Companion",
+                    groups = { ctx ->
+                        keyboard.load(ctx)
+                        listOf(
+                            CatalogGroup(
+                                id = "${ID_DISPLAY_COMPANION}_keyboard",
+                                title = "Keyboard",
+                                items = listOf(
+                                    ToggleItem(
+                                        id = keyboard.KEY_COMPANION_HOSTS,
+                                        title = "Keyboard for the other screen",
+                                        current = keyboard.companionHostsKeyboard.value,
+                                        onToggle = { c, on -> keyboard.setCompanionHostsKeyboard(c, on) },
+                                    ),
+                                    ToggleItem(
+                                        id = keyboard.KEY_COMPANION_KEYS_BUTTON,
+                                        title = "Keys button",
+                                        current = keyboard.companionKeysButton.value,
+                                        onToggle = { c, on -> keyboard.setCompanionKeysButton(c, on) },
+                                    ),
+                                ),
+                            ),
+                        )
+                    },
+                ),
+            ),
+        )
         val androidShows = dev.droidtop.runtime.keyboard.AddonKeyboard.localDisplays.value.isNotEmpty()
         val ownActive = Keyboards.ownKeyboardActive(context)
         val overlay = android.provider.Settings.canDrawOverlays(context)
         val accessibility = dev.droidtop.runtime.keyboard.AccessibilityKeyboard.isEnabled(context)
-        val state = dev.droidtop.runtime.keyboard.AddonKeyboardRules.appsKeyboard(androidShows, ownActive, overlay, accessibility)
+        val state = dev.droidtop.runtime.keyboard.AddonKeyboardRules.appsKeyboard(keyboard.controlsKeyboard, androidShows, ownActive, overlay, accessibility)
         add(
             ActionItem(
                 id = ID_DISPLAY_KEYBOARD,

@@ -27,8 +27,9 @@ import dev.droidtop.input.TrackpadGestureEngine
 import dev.droidtop.input.TrackpadOutput
 import dev.droidtop.input.TrackpadView
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
 import dev.droidtop.shell.gamepad.ChromeColors
-import org.pocketworkstation.pckeyboard.ImeConnectionSink
+import dev.droidtop.shell.gamepad.KeyboardTargets
 import org.pocketworkstation.pckeyboard.KeyboardPanel
 import org.pocketworkstation.pckeyboard.KeyboardSink
 import org.pocketworkstation.pckeyboard.SecondScreenKeyboard
@@ -208,7 +209,7 @@ class SecondScreenInputView(
         // droidtop's one keyboard view (KeyboardPanel); only the destination is this surface's own. It suppresses
         // the input method's view while it is on screen, so the user never gets two keyboards.
         addView(
-            KeyboardPanel(context, keyboardSink(), suppressImeView = true),
+            KeyboardPanel(context, requestAwareSink(keyboardSink()), suppressImeView = true),
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
         )
 
@@ -236,6 +237,9 @@ class SecondScreenInputView(
         trackpad.engine = TrackpadGestureEngine(trackpadOutput())
         status.text = statusText()
         syncImePicker()
+        Thread {
+            elevated = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
+        }.apply { isDaemon = true }.start()
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
@@ -251,7 +255,8 @@ class SecondScreenInputView(
 
     private fun syncImePicker() {
         imePicker.visibility = if (
-            mode != SecondaryDisplayContent.Mode.DESKTOP && !SecondScreenKeyboard.imeRunning
+            mode != SecondaryDisplayContent.Mode.DESKTOP && !SecondScreenKeyboard.imeRunning &&
+                !AccessibilityKeyboard.connected && KeyboardTargets.companion.value == null
         ) View.VISIBLE else View.GONE
     }
 
@@ -294,8 +299,29 @@ class SecondScreenInputView(
                 }
             }
         } else {
-            ImeConnectionSink(onNoTarget = { status.text = statusText() })
+            RoutedKeyboardSink(
+                displayId = { otherDisplay(context, display?.displayId) },
+                elevated = { elevated },
+                onNoRoute = { status.text = statusText() },
+            )
         }
+
+    /**
+     * The controller's keys: into the field that asked for the companion's keyboard ([KeyboardTargets.companion],
+     * SPEC 4c) while one does, else this mode's own destination.
+     */
+    private fun requestAwareSink(own: KeyboardSink): KeyboardSink = object : KeyboardSink {
+        override val takesText: Boolean get() = own.takesText
+
+        override fun key(androidKeyCode: Int, down: Boolean) =
+            (KeyboardTargets.companion.value?.sink ?: own).key(androidKeyCode, down)
+
+        override fun text(chars: CharSequence) = (KeyboardTargets.companion.value?.sink ?: own).text(chars)
+    }
+
+    /** Whether the elevated helper can type (`input -d`), read off the main thread when the view attaches. */
+    @Volatile
+    private var elevated = false
 
     /**
      * The honest one-line description of what this surface can currently
@@ -311,14 +337,24 @@ class SecondScreenInputView(
                 "No desktop session"
             }
 
-        !SecondScreenKeyboard.imeRunning ->
+        KeyboardTargets.companion.value != null ->
+            "Typing"
+
+        !SecondScreenKeyboard.imeRunning && !AccessibilityKeyboard.connected && !elevated ->
             "Keyboard off"
 
-        !SecondScreenKeyboard.androidTargetAvailable() ->
+        !SecondScreenKeyboard.androidTargetAvailable() && !AccessibilityKeyboard.hasEditor() && !elevated ->
             "No text field"
 
         else -> "Touchpad"
     }
+}
+
+/** The screen the companion types into: the shell's when it is elsewhere, else the first other display. */
+internal fun otherDisplay(context: Context, own: Int?): Int? {
+    val shell = ForegroundShell.current()?.window?.decorView?.display?.displayId
+    if (shell != null && shell != own) return shell
+    return dev.droidtop.runtime.tasks.TaskManager.displayIds(context).firstOrNull { it != own }
 }
 
 /**

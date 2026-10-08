@@ -49,8 +49,37 @@ enum class OverlayOwner {
     NONE,
 }
 
+/**
+ * Where droidtop's keyboard for a field on a screen without Android's keyboard is drawn (Displays, "Keyboard displays
+ * on"). Both the setting's choices and the effective target: a choice that cannot be honoured right now falls back to
+ * [SAME_SCREEN] ([AddonKeyboardRules.keyboardPlacement]). A new target (an external display, say) is one more entry
+ * here, one more branch in the rule and one more surface in `KeyboardTargets`.
+ */
+enum class KeyboardPlacement(val key: String, val label: String) {
+    /** On the field's own screen: under the field, at the bottom of its window, or in an overlay there. */
+    SAME_SCREEN("same", "Same screen"),
+
+    /** A plain keyboard at the bottom of the built-in display, whatever is showing there. */
+    INTERNAL_SCREEN("internal", "Internal screen"),
+
+    /** The companion's own input controller (its keyboard and trackpad), switched to while the field wants keys. */
+    COMPANION("companion", "Companion"),
+
+    /** droidtop draws no keyboard and changes no display's keyboard policy: Android decides. */
+    NOT_CONTROLLED("android", "Not controlled by droidtop"),
+    ;
+
+    companion object {
+        /** The default: the companion, which itself falls back to the same screen when no companion can host it. */
+        val DEFAULT = COMPANION
+
+        fun fromKey(key: String?): KeyboardPlacement = entries.firstOrNull { it.key == key } ?: DEFAULT
+    }
+}
+
 /** What typing into other apps on the second screen runs on right now: the value of the Displays row. */
 enum class AppsKeyboard(val label: String) {
+    NOT_CONTROLLED("Not controlled by droidtop"),
     ANDROID("Android keyboard"),
     DROIDTOP("droidtop keyboard"),
     ACCESSIBILITY("Accessibility"),
@@ -104,12 +133,42 @@ object AddonKeyboardRules {
     }
 
     /** The Displays row's value: Android's own keyboard, else droidtop's by the overlay that would draw it. */
-    fun appsKeyboard(androidShows: Boolean, droidtopImeSelected: Boolean, canDrawOverlays: Boolean, accessibilityOn: Boolean): AppsKeyboard = when {
+    fun appsKeyboard(
+        controlled: Boolean,
+        androidShows: Boolean,
+        droidtopImeSelected: Boolean,
+        canDrawOverlays: Boolean,
+        accessibilityOn: Boolean,
+    ): AppsKeyboard = when {
+        !controlled -> AppsKeyboard.NOT_CONTROLLED
         androidShows -> AppsKeyboard.ANDROID
         droidtopImeSelected && canDrawOverlays -> AppsKeyboard.DROIDTOP
         accessibilityOn -> AppsKeyboard.ACCESSIBILITY
         droidtopImeSelected -> AppsKeyboard.NEEDS_OVERLAY
         else -> AppsKeyboard.OFF
+    }
+
+    /**
+     * Where droidtop's keyboard goes for a field on [fieldDisplay] (owner, 2026-10-08: "prefer the keyboard launching
+     * IN the companion, when possible"). [setting] is the Displays choice. The companion hosts it only when the
+     * companion's own settings allow it ([companionHostsKeyboard]) and a companion is started on another display
+     * ([companionDisplays]); one that is off, hidden (Kiosk, Kid), covered by a full-screen app, or absent on a
+     * single-display device is not. The internal screen hosts it when droidtop can draw there ([internalAvailable])
+     * and the field is not already on it. Anything that cannot be honoured falls back to the field's own screen.
+     */
+    fun keyboardPlacement(
+        setting: KeyboardPlacement,
+        fieldDisplay: Int,
+        companionDisplays: Set<Int>,
+        companionHostsKeyboard: Boolean,
+        internalAvailable: Boolean,
+    ): KeyboardPlacement = when (setting) {
+        KeyboardPlacement.NOT_CONTROLLED -> KeyboardPlacement.NOT_CONTROLLED
+        KeyboardPlacement.SAME_SCREEN -> KeyboardPlacement.SAME_SCREEN
+        KeyboardPlacement.COMPANION ->
+            if (companionHostsKeyboard && companionDisplays.any { it != fieldDisplay }) KeyboardPlacement.COMPANION else KeyboardPlacement.SAME_SCREEN
+        KeyboardPlacement.INTERNAL_SCREEN ->
+            if (internalAvailable && fieldDisplay != DEFAULT_DISPLAY) KeyboardPlacement.INTERNAL_SCREEN else KeyboardPlacement.SAME_SCREEN
     }
 
     /** What one pass of the policy keeper does: displays to set local, and displays to give back their old policy. */
@@ -180,6 +239,50 @@ object AddonKeyboard {
     /** Installed by `:app`: re-runs the policy keeper off the main thread. */
     @Volatile
     var resync: ((Context) -> Unit)? = null
+
+    private const val KEY_PLACEMENT = "keyboard_placement"
+    const val KEY_COMPANION_HOSTS = "companion_hosts_keyboard"
+    const val KEY_COMPANION_KEYS_BUTTON = "companion_keys_button"
+    private val placementFlow = MutableStateFlow(KeyboardPlacement.DEFAULT)
+    private val companionHosts = MutableStateFlow(true)
+    private val companionKeys = MutableStateFlow(true)
+
+    /** Displays, "Keyboard displays on". Mirrored here so the hot paths never read a file; loaded by [load]. */
+    val placement: StateFlow<KeyboardPlacement> = placementFlow
+
+    /** The companion's own setting: whether it may host the keyboard for the other screen. */
+    val companionHostsKeyboard: StateFlow<Boolean> = companionHosts
+
+    /** The companion's own setting: its Keys button, a shortcut to its input controller. */
+    val companionKeysButton: StateFlow<Boolean> = companionKeys
+
+    /** Reads the settings this object mirrors into flows; called by `:app` off the main thread. */
+    fun load(context: Context) {
+        val prefs = prefs(context)
+        placementFlow.value = KeyboardPlacement.fromKey(prefs.getString(KEY_PLACEMENT, null))
+        companionHosts.value = prefs.getBoolean(KEY_COMPANION_HOSTS, true)
+        companionKeys.value = prefs.getBoolean(KEY_COMPANION_KEYS_BUTTON, true)
+    }
+
+    fun setPlacement(context: Context, placement: KeyboardPlacement) {
+        placementFlow.value = placement
+        prefs(context).edit().putString(KEY_PLACEMENT, placement.key).apply()
+        // "Not controlled" also gives every display its keyboard policy back.
+        resync?.invoke(context)
+    }
+
+    fun setCompanionHostsKeyboard(context: Context, on: Boolean) {
+        companionHosts.value = on
+        prefs(context).edit().putBoolean(KEY_COMPANION_HOSTS, on).apply()
+    }
+
+    fun setCompanionKeysButton(context: Context, on: Boolean) {
+        companionKeys.value = on
+        prefs(context).edit().putBoolean(KEY_COMPANION_KEYS_BUTTON, on).apply()
+    }
+
+    /** Whether droidtop controls the keyboard at all ("Not controlled by droidtop" is the one way it does not). */
+    val controlsKeyboard: Boolean get() = placementFlow.value != KeyboardPlacement.NOT_CONTROLLED
 
     fun androidKeyboardOnSecondScreen(context: Context): Boolean =
         prefs(context).getBoolean(KEY_ANDROID_KEYBOARD, true)
