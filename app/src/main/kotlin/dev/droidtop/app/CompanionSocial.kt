@@ -3,6 +3,7 @@ package dev.droidtop.app
 import android.content.Context
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -38,12 +41,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.graphics.drawable.toBitmap
 import dev.droidtop.app.settings.SocialTime
 import dev.droidtop.library.social.SocialContact
 import dev.droidtop.library.social.SocialHub
@@ -51,6 +57,7 @@ import dev.droidtop.library.social.SocialMessage
 import dev.droidtop.library.social.SocialOrder
 import dev.droidtop.library.social.SocialPresence
 import dev.droidtop.library.userFacingErrorMessage
+import dev.droidtop.runtime.systemstatus.NotificationsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,13 +88,26 @@ internal fun CompanionSocialTab() {
 internal data class OpenConversation(val providerId: String, val friendId: String, val name: String, val service: String)
 
 /** What the list draws, worked out off the main thread from [SocialHub]. */
-private class SocialRows(val conversations: List<SocialContact>, val friends: List<SocialContact>, val badged: Boolean, val anyAccount: Boolean)
+private class SocialRows(
+    val conversations: List<SocialContact>,
+    val friends: List<SocialContact>,
+    val badged: Boolean,
+    val anyAccount: Boolean,
+    /** Notification access is off, so other apps' conversations cannot be read. */
+    val needsAccess: Boolean,
+)
 
 private fun socialRows(context: Context): SocialRows {
     val available = SocialHub.available(context)
     val shown = available.filter { it.presence(context) != SocialPresence.OFFLINE }
     val contacts = SocialOrder.contacts(shown)
-    return SocialRows(SocialOrder.conversations(contacts), contacts, shown.size > 1, available.isNotEmpty())
+    return SocialRows(
+        SocialOrder.conversations(contacts),
+        SocialOrder.friends(contacts),
+        shown.size > 1,
+        available.isNotEmpty(),
+        !NotificationsStore.isGranted(context),
+    )
 }
 
 @Composable
@@ -102,18 +122,29 @@ private fun CompanionSocialList(onOpen: (OpenConversation) -> Unit) {
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (current?.needsAccess == true) {
+            ContactRow("Allow notification access", "") { NotificationsStore.openGrantScreen(context) }
+        }
         when {
             current == null -> CompanionNote("Loading")
-            !current.anyAccount -> CompanionNote("No accounts")
-            current.friends.isEmpty() -> CompanionNote("No friends yet")
+            !current.anyAccount -> {
+                if (!current.needsAccess) CompanionNote("No accounts")
+            }
+            current.friends.isEmpty() && current.conversations.isEmpty() -> CompanionNote("No conversations yet")
             else -> {
-                fun open(contact: SocialContact) = onOpen(OpenConversation(contact.provider.id, contact.friend.id, contact.friend.name, contact.provider.label))
+                fun open(contact: SocialContact) = onOpen(
+                    OpenConversation(contact.provider.id, contact.friend.id, contact.friend.name, contact.friend.source?.label ?: contact.provider.label),
+                )
                 if (current.conversations.isNotEmpty()) {
                     SectionTitle("Conversations")
-                    current.conversations.forEach { c -> ContactRow(c.friend.name, SocialOrder.value(c, current.badged)) { open(c) } }
+                    current.conversations.forEach { c ->
+                        ContactRow(c.friend.name, SocialOrder.value(c, current.badged), c.friend.source?.packageName) { open(c) }
+                    }
                 }
-                SectionTitle("Friends")
-                current.friends.forEach { c -> ContactRow(c.friend.name, SocialOrder.value(c, current.badged)) { open(c) } }
+                if (current.friends.isNotEmpty()) {
+                    SectionTitle("Friends")
+                    current.friends.forEach { c -> ContactRow(c.friend.name, SocialOrder.value(c, current.badged)) { open(c) } }
+                }
             }
         }
     }
@@ -124,8 +155,25 @@ private fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
 }
 
+/** The icons of the apps that conversations come from, loaded once each off the main thread. */
+private val sourceIcons = java.util.concurrent.ConcurrentHashMap<String, ImageBitmap>()
+
+/** [packageName]'s launcher icon, or nothing until it is loaded (or when the app has none). */
 @Composable
-private fun ContactRow(name: String, value: String, onClick: () -> Unit) {
+private fun SourceIcon(packageName: String) {
+    val context = LocalContext.current
+    val icon by produceState(sourceIcons[packageName], packageName) {
+        if (value == null) {
+            value = withContext(Dispatchers.IO) {
+                runCatching { context.packageManager.getApplicationIcon(packageName).toBitmap(64, 64).asImageBitmap() }.getOrNull()
+            }?.also { sourceIcons[packageName] = it }
+        }
+    }
+    icon?.let { Image(bitmap = it, contentDescription = null, modifier = Modifier.size(28.dp)) }
+}
+
+@Composable
+private fun ContactRow(name: String, value: String, packageName: String? = null, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -137,6 +185,7 @@ private fun ContactRow(name: String, value: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (packageName != null) SourceIcon(packageName)
         Text(name, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -190,6 +239,10 @@ private fun CompanionConversation(chat: OpenConversation, onBack: () -> Unit) {
                 Text(chat.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(chat.service, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            // Another app's conversation opens in that app.
+            provider.sourceOf(chat.friendId)?.let { source ->
+                CompanionPill("Open in ${source.label}") { scope.launch(Dispatchers.IO) { provider.openInSource(context, chat.friendId) } }
+            }
         }
         // Newest at the bottom, the way a conversation reads; the list starts there.
         LazyColumn(
@@ -203,7 +256,9 @@ private fun CompanionConversation(chat: OpenConversation, onBack: () -> Unit) {
             items(messages.asReversed(), key = { it.key }) { message -> MessageBubble(context, message, chat.name) }
         }
         failure?.let { Text("Not sent: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Re-read when the conversation changes: its notification may have gone, and with it the reply.
+        val canSend = remember(messages) { provider.canSend(chat.friendId) }
+        if (canSend) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DraftField(
                 draft = draft,
                 modifier = Modifier.weight(1f),
@@ -215,7 +270,7 @@ private fun CompanionConversation(chat: OpenConversation, onBack: () -> Unit) {
             CompanionPill(if (sending) "Sending" else "Send", selected = SocialOrder.sendable(draft.text.trim())) { send() }
             CompanionPill(if (keyboard) "Hide" else "Keys") { keyboard = !keyboard }
         }
-        if (keyboard) {
+        if (canSend && keyboard) {
             CompanionKeyboard(
                 onKey = { code, down ->
                     val (next, submit) = draft.key(code, down, ::virtualChar)

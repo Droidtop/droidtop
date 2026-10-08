@@ -12,6 +12,10 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.library.social.AppMessages
+import dev.droidtop.library.social.AppMessagesModel
+import dev.droidtop.library.social.AppMessagesPrefs
 import dev.droidtop.library.social.SocialContact
 import dev.droidtop.library.social.SocialHub
 import dev.droidtop.library.social.SocialLink
@@ -21,6 +25,7 @@ import dev.droidtop.library.social.SocialPresence
 import dev.droidtop.library.social.SocialProvider
 import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.library.userFacingErrorMessage
+import dev.droidtop.runtime.systemstatus.NotificationsStore
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
@@ -85,8 +90,9 @@ internal object SocialCatalog {
                     ),
                 )
             }
-            if (contacts.isNotEmpty()) {
-                add(CatalogGroup(id = "social_friends", title = "Friends", items = contacts.map { contactRow(it, "social_friend_", badged) }))
+            val friends = SocialOrder.friends(contacts)
+            if (friends.isNotEmpty()) {
+                add(CatalogGroup(id = "social_friends", title = "Friends", items = friends.map { contactRow(it, "social_friend_", badged) }))
             }
             add(CatalogGroup(id = "social_accounts", title = "Accounts", items = accountRows(context, available)))
         }
@@ -113,6 +119,9 @@ internal object SocialCatalog {
                     onSelect = { ctx, value -> scope.launch { provider.setPresence(ctx, SocialPresence.from(value)) } },
                 )
             }
+            if (provider === AppMessages) {
+                rows += NestedScreenItem(id = "social_messages_apps", title = "Messages from apps", inline = appsScreen())
+            }
             val link = provider.link.value
             // Anything but a working connection says so, and pressing the row asks again.
             if (presence != SocialPresence.OFFLINE && link != SocialLink.ONLINE) {
@@ -128,6 +137,14 @@ internal object SocialCatalog {
                 )
             }
         }
+        if (!NotificationsStore.isGranted(context)) {
+            rows += ActionItem(
+                id = "social_allow_notifications",
+                title = "Allow notification access",
+                icon = CatalogIcon.ANDROID_SETTINGS,
+                run = { ctx -> NotificationsStore.openGrantScreen(ctx) },
+            )
+        }
         val signedOut = StoreLibraries.all().filter { store -> store.social != null && store.social !in available }
         for (store in signedOut) {
             rows += ActionItem(
@@ -139,6 +156,38 @@ internal object SocialCatalog {
         }
         return rows
     }
+
+    /** The apps that have posted a conversation, and the known messaging apps, each with its switch. */
+    private fun appsScreen(): CatalogScreen = CatalogScreen(
+        id = "social_messages_apps",
+        title = "Messages from apps",
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                val pm = context.packageManager
+                val rows = AppMessagesPrefs.seen(context).toMutableMap()
+                for (known in AppMessagesModel.KNOWN_APPS) {
+                    if (known !in rows && runCatching { pm.getApplicationInfo(known, 0) }.isSuccess) rows[known] = false
+                }
+                val items = rows.map { (pkg, messagingStyle) ->
+                    val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
+                    label to ToggleItem(
+                        id = "social_app_$pkg",
+                        title = label,
+                        current = AppMessagesPrefs.chosen(context, pkg) ?: AppMessagesModel.defaultIncluded(pkg, messagingStyle),
+                        onToggle = { ctx, on -> withContext(Dispatchers.IO) { AppMessages.choose(ctx, pkg, on) } },
+                    )
+                }.sortedBy { it.first.lowercase() }.map { it.second }
+                listOf(
+                    CatalogGroup(
+                        id = "social_messages_apps_list",
+                        title = null,
+                        items = items.ifEmpty { listOf(ActionItem(id = "social_apps_empty", title = "No apps yet", run = {})) },
+                    ),
+                )
+            }
+        },
+        indexGroups = { emptyList() },
+    )
 
     /** One conversation: the typing row, then the messages newest first. */
     private fun chat(provider: SocialProvider, friendId: String, friendName: String): CatalogScreen {
@@ -158,19 +207,31 @@ internal object SocialCatalog {
                             id = "chat_send_$friendId",
                             title = null,
                             items = buildList {
-                                add(
-                                    TextInputItem(
-                                        id = "chat_send",
-                                        title = "Message",
-                                        value = "",
-                                        onChange = { _, text ->
-                                            if (text.isNotBlank()) {
-                                                failure = withContext(Dispatchers.IO) { provider.send(friendId, text) }
-                                                    .exceptionOrNull()?.let(::userFacingErrorMessage)
-                                            }
-                                        },
-                                    ),
-                                )
+                                // Another app's conversation can be one that only its own app answers.
+                                if (provider.canSend(friendId)) {
+                                    add(
+                                        TextInputItem(
+                                            id = "chat_send",
+                                            title = "Message",
+                                            value = "",
+                                            onChange = { _, text ->
+                                                if (text.isNotBlank()) {
+                                                    failure = withContext(Dispatchers.IO) { provider.send(friendId, text) }
+                                                        .exceptionOrNull()?.let(::userFacingErrorMessage)
+                                                }
+                                            },
+                                        ),
+                                    )
+                                }
+                                provider.sourceOf(friendId)?.let { source ->
+                                    add(
+                                        ActionItem(
+                                            id = "chat_open_source",
+                                            title = "Open in ${source.label}",
+                                            run = { ctx -> scope.launch { provider.openInSource(ctx, friendId) } },
+                                        ),
+                                    )
+                                }
                                 failure?.let { add(ActionItem(id = "chat_failed", title = "Not sent", value = it, run = {})) }
                             },
                         ),

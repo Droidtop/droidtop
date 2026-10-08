@@ -12067,7 +12067,8 @@ and never from list drawing.
   (Steam's old "Steam messages" channel is removed); tapping it opens Gaming
   on the Social place. Whether a provider's messages notify is the
   provider's rule: Steam's "Message notifications" switch, and a plugin's
-  `notify.post` grant.
+  `notify.post` grant. Conversations taken from other apps' notifications
+  never post here (below, "messages from your apps").
 
 **The plugin API.** `social.provider@1` (docs/plugin-api.md C19) is an
 extension point of medium risk, one line on the approval list ("Friends and
@@ -12083,6 +12084,91 @@ off the binder thread. A plugin that wants to stay connected in the
 background needs `background.service`, which is not built: until then its
 friends are as fresh as its process. The sample is
 `samples/plugin-sample-py-social` (a fake service; CI tests and builds it).
+
+### Social: messages from your apps (decided 2026-10-08, Droidtop/tracker#329)
+
+Owner, 2026-10-08: "Let's also try to use android's chat and notification
+stuffs to link us through other applications using notifications. There's the
+android conversation stuff, right? Can we request some permission for that?"
+
+**One more provider.** `AppMessages` (`dev.droidtop.library.social`, id
+`messages`, label "Messages") is a built-in `SocialProvider` next to Steam. It
+reads the conversations other apps expose in their **notifications** and
+nothing else: droidtop never reads another app's screens, storage or
+accessibility tree. Each conversation is a `SocialFriend` with a `source`
+(package and app name): it is listed under Conversations, never under Friends
+(`SocialOrder.friends` drops them), and its row names the app in the value
+column ("3 new · WhatsApp", "WhatsApp"); the companion's row also draws the
+app's launcher icon. There is no cross-service identity: the same person in two
+apps is two conversations.
+
+**What counts as a conversation.** `DroidtopNotificationListener` hands every
+change of the active notifications to `AppMessages.onPosted`; a worker off the
+listener thread reads each with `AppMessageExtractor`:
+
+- `Notification.MessagingStyle` (the template extra): its messages and the
+  historic messages, each with sender, time and whether the person wrote it
+  (no sender, or the style's own user by key, else by name); the conversation
+  title (else the notification title, else the app's name); whether it is a
+  group (`EXTRA_IS_GROUP_CONVERSATION`, else a conversation title).
+- The conversation shortcut id (`Notification.getShortcutId`, Android 8+) is
+  the conversation's identity when the app set one, else its title; two
+  notifications of one app and identity are one conversation, their messages
+  merged without repeats and cut to the newest 30. A group message is shown as
+  "Sender: text".
+- A notification with the message category and no MessagingStyle is one line
+  (its title and text). Group summaries, ongoing notifications and droidtop's
+  own are skipped.
+- The unread count is what the other side wrote after the person's last
+  message (`AppMessagesModel.unreadAfterLastMine`).
+
+**Which apps.** Any app posting MessagingStyle, and the known messaging apps
+(`AppMessagesModel.KNOWN_APPS`) for the message category, are included by
+default; any other app's message-category notification is listed but off. The
+person's choice per app (`AppMessagesPrefs`: package name and a flag, nothing
+else) wins. The choice is a "Messages from apps" screen under the Social
+place's Accounts, one switch per app that has posted a conversation or is a
+known messaging app that is installed.
+
+**Permission.** It is the notification access droidtop already holds for the
+Notifications list; there is no new permission and no second listener. Until
+it is granted `AppMessages.available` is false and the Social place's Accounts
+group (and the companion's list) shows one "Allow notification access" row that
+opens the system screen: droidtop's own switch
+(`ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS`, Android 11+), else the list of
+listeners (`NotificationsStore.openGrantScreen`, also used by the Quick Menu's
+Notifications tab). Losing the access forgets every conversation at once.
+
+**Reply, read, open.** All three use what the notification itself carries.
+Reply: the typing row and the companion's draft work as for any provider;
+`send` picks the action (`AppMessagesModel.pickReply`: the action the app
+marked as the reply action, else the first with a free-form text input; one
+that only offers canned answers is not a reply) on the newest posted
+notification of the conversation, fills its `RemoteInput` result and fires its
+`PendingIntent`, exactly what the shade's reply box does. The sent text shows
+in the conversation (as the person's message) until the app's own notification
+carries it. A conversation with no reply action, or whose notification is gone,
+has no typing row (`SocialProvider.canSend`); a reply the app refuses says so
+on the "Not sent" row. Opening a conversation fires the app's mark-as-read
+action when it has one (`pickMarkRead`). "Open in <app>"
+(`SocialProvider.sourceOf`/`openInSource`, a row in the Social place's
+conversation and a pill in the companion's) fires the notification's tap
+action; once the notification is gone, the conversation's shortcut when
+droidtop may start shortcuts, else the app's launcher activity.
+
+**No double notification.** The app already notifies about its conversations,
+so `AppMessages` never calls `SocialHub.incoming` and never posts a
+notification of its own. The "Messages" channel stays for providers that have
+no notifications of their own (Steam, plugins). Unread messages still count
+toward the Quick Menu tile and the companion tab's number.
+
+**Privacy.** Conversation content is held in memory only: while its
+notification is posted, and after the app removes it (read or answered there)
+for 30 minutes and at most 20 such conversations, read-only. Nothing is written
+to disk but the per-app choices; nothing is handed to a plugin (a plugin that
+provides `social.provider` sees its own service only, and no capability for
+other apps' conversations exists); the list is emptied when notification access
+is lost.
 
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 

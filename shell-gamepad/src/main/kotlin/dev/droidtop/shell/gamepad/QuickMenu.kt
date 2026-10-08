@@ -514,7 +514,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                     GamepadAction.B -> onDismiss()
                     GamepadAction.A -> when {
                         !granted -> {
-                            context.startActivity(NotificationsStore.grantIntent())
+                            NotificationsStore.openGrantScreen(context)
                             onDismiss()
                         }
                         current != null -> {
@@ -539,7 +539,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                 value = "Needs permission",
                 selected = focusIndex == 0,
                 onClick = {
-                    context.startActivity(NotificationsStore.grantIntent())
+                    NotificationsStore.openGrantScreen(context)
                     onDismiss()
                 },
             )

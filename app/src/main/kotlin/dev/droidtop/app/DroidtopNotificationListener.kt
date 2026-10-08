@@ -2,10 +2,11 @@ package dev.droidtop.app
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import dev.droidtop.library.social.AppMessages
 import dev.droidtop.runtime.systemstatus.NotificationsStore
 
 /**
- * Feeds [NotificationsStore] — the same NotificationListenerService
+ * Feeds [NotificationsStore] and [AppMessages] (the conversations other apps expose, Social place) — the same NotificationListenerService
  * mechanism every custom launcher's notification surface uses. Binds
  * only after the user grants notification access (the Quick Menu's
  * Notifications tab offers the grant screen until then).
@@ -29,12 +30,14 @@ class DroidtopNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         NotificationsStore.controller = controller
+        AppMessages.bind(this)
         publishAll()
     }
 
     override fun onListenerDisconnected() {
         NotificationsStore.controller = null
         NotificationsStore.publish(emptyList())
+        AppMessages.unbind()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) = publishAll()
@@ -43,7 +46,10 @@ class DroidtopNotificationListener : NotificationListenerService() {
 
     private fun publishAll() {
         val pm = packageManager
-        val list = runCatching { activeNotifications?.toList() }.getOrNull().orEmpty()
+        val active = runCatching { activeNotifications?.toList() }.getOrNull().orEmpty()
+        // The conversations other apps expose are read from the same list, off this thread.
+        AppMessages.onPosted(active)
+        val list = active
             .mapNotNull { sbn ->
                 val extras = sbn.notification.extras
                 val title = extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString()

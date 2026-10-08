@@ -19,7 +19,7 @@ import timber.log.Timber
 /**
  * The one registry of social providers and the one way their friends, conversations and messages reach
  * the screens (docs/SPEC.md "Social", Droidtop/tracker#327): the stores droidtop runs that have friends
- * (Steam, `StoreLibrary.social`) and every running plugin entry that provides `social.provider@1`
+ * (Steam, `StoreLibrary.social`), the conversations other apps expose in notifications ([AppMessages]) and every running plugin entry that provides `social.provider@1`
  * ([PluginSocialProviders]). The Social place, the companion's Social tab, the Quick Menu tile and the
  * message notifications read it; none of them knows a service.
  *
@@ -31,8 +31,11 @@ object SocialHub {
 
     private val plugins = MutableStateFlow<List<SocialProvider>>(emptyList())
 
-    /** Every provider: the built-in stores first, then the plugins by name. In memory; cheap. */
-    fun providers(): List<SocialProvider> = StoreLibraries.all().mapNotNull { it.social } + plugins.value
+    /** The providers droidtop runs itself: the stores with friends, then the conversations other apps expose in notifications. */
+    private fun builtIn(): List<SocialProvider> = StoreLibraries.all().mapNotNull { it.social } + AppMessages
+
+    /** Every provider: the built-in ones first, then the plugins by name. In memory; cheap. */
+    fun providers(): List<SocialProvider> = builtIn() + plugins.value
 
     /** The provider with [id], or null when it is gone (a plugin was turned off). */
     fun provider(id: String): SocialProvider? = providers().firstOrNull { it.id == id }
@@ -60,7 +63,7 @@ object SocialHub {
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     fun changes(): Flow<Any?> = plugins.flatMapLatest { pluginList ->
-        val all = StoreLibraries.all().mapNotNull { it.social } + pluginList
+        val all = builtIn() + pluginList
         val flows = all.flatMap { p -> listOf<Flow<Any?>>(p.friends, p.link, p.me, p.unread) }
         if (flows.isEmpty()) flowOf(Unit) else combine(flows) { it.toList() }.map { it as Any? }
     }

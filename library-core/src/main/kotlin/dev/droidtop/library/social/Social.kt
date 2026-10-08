@@ -40,7 +40,14 @@ enum class SocialState(val key: String, val label: String) {
     }
 }
 
-/** One friend as the lists draw them. [activity] is the game they are in ("playing X"), when they are in one. */
+/** The app a conversation came from, when it is not a service droidtop talks to itself: the badge of its rows. */
+data class SocialSource(val packageName: String, val label: String)
+
+/**
+ * One friend as the lists draw them. [activity] is the game they are in ("playing X"), when they are in one.
+ * [source] is set for a conversation taken from another app's notification (docs/SPEC.md "Social: messages from
+ * your apps"): it is a conversation only, listed under Conversations and not under Friends.
+ */
 data class SocialFriend(
     val id: String,
     val name: String,
@@ -49,6 +56,7 @@ data class SocialFriend(
     val unread: Int,
     /** When the last message in the conversation was sent (epoch ms); 0 when there is none. */
     val lastMessageMs: Long,
+    val source: SocialSource? = null,
 )
 
 /** One message of a conversation; [key] is unique within it and orders by time. */
@@ -116,6 +124,15 @@ interface SocialProvider {
 
     /** Asks the service again, when it is not pushed to (a plugin). Called when a social screen opens, never on a timer. */
     suspend fun refresh(context: Context) {}
+
+    /** Whether a message can be sent to this conversation now. Another app's conversation can be read-only. */
+    fun canSend(friendId: String): Boolean = true
+
+    /** The app the conversation lives in, for "Open in <app>"; null for a service droidtop talks to itself. */
+    fun sourceOf(friendId: String): SocialSource? = null
+
+    /** Opens the conversation in its own app ([sourceOf]); false when that was not possible. */
+    fun openInSource(context: Context, friendId: String): Boolean = false
 }
 
 /** A friend with the provider they came from: the unit every merged list draws. */
@@ -150,6 +167,9 @@ object SocialOrder {
         providers.flatMap { provider -> provider.friends.value.map { SocialContact(provider, it) } }
             .sortedWith(compareBy(byFriend) { c: SocialContact -> c.friend }.thenBy { it.provider.label.lowercase() })
 
+    /** The contacts that are people to list: a conversation taken from another app is not a friend. */
+    fun friends(contacts: Collection<SocialContact>): List<SocialContact> = contacts.filter { it.friend.source == null }
+
     /** The contacts that have a conversation: unread ones first, then the newest. */
     fun conversations(contacts: Collection<SocialContact>): List<SocialContact> =
         contacts.filter { it.friend.unread > 0 || it.friend.lastMessageMs > 0L }
@@ -161,13 +181,23 @@ object SocialOrder {
     /** The value column of a friend's row: the unread count, else the game, else the state. */
     fun value(friend: SocialFriend): String = when {
         friend.unread > 0 -> "${friend.unread} new"
+        friend.source != null -> friend.source.label
         friend.state == SocialState.IN_GAME -> friend.activity?.takeIf { it.isNotBlank() } ?: SocialState.IN_GAME.label
         else -> friend.state.label
     }
 
-    /** [value] with the service named, for a list that holds more than one provider. */
-    fun value(contact: SocialContact, badged: Boolean): String =
-        if (badged) value(contact.friend) + " · " + contact.provider.label else value(contact.friend)
+    /**
+     * [value] with the service named, for a list that holds more than one provider. A conversation from another
+     * app always names that app, the badge of its row.
+     */
+    fun value(contact: SocialContact, badged: Boolean): String {
+        val source = contact.friend.source
+        return when {
+            source != null -> if (contact.friend.unread > 0) value(contact.friend) + " · " + source.label else source.label
+            badged -> value(contact.friend) + " · " + contact.provider.label
+            else -> value(contact.friend)
+        }
+    }
 
     /** [messages] with [added] in time order, one of each key. */
     fun merged(messages: List<SocialMessage>, added: Collection<SocialMessage>): List<SocialMessage> =

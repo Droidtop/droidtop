@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
  * Access is a special grant (notification access, given on a system
  * screen droidtop opens). Until granted the listener never binds and
  * [items] stays empty — surfaces check [isGranted] and offer
- * [grantIntent] instead of showing a silently empty list.
+ * [openGrantScreen] instead of showing a silently empty list.
  */
 object NotificationsStore {
 
@@ -71,4 +72,22 @@ object NotificationsStore {
 
     fun grantIntent(): Intent =
         Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** The listener service's class: the per-service screen Android 11 and later can open names it. */
+    private const val LISTENER_CLASS = "dev.droidtop.app.DroidtopNotificationListener"
+
+    /**
+     * Opens the system screen that grants notification access: droidtop's own switch on Android 11 and later
+     * (`ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS`), the list of all listeners otherwise or when that screen
+     * is not there.
+     */
+    fun openGrantScreen(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val detail = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+                .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, ComponentName(context.packageName, LISTENER_CLASS).flattenToString())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (runCatching { context.startActivity(detail) }.isSuccess) return
+        }
+        context.startActivity(grantIntent())
+    }
 }
