@@ -1,0 +1,67 @@
+name: Windows runtime prebuilts
+
+# Re-hosts the Windows runtime's prebuilt binaries (GameNative's arm64 native
+# libraries and its asset payloads) as a release asset of this repository, so
+# the app build reads them from here and not from the fork (docs/SPEC.md 9,
+# "The runtime's prebuilt binaries"). build-scripts/windows-runtime-prebuilt.sh
+# says what is packed and what is left out; nothing is rebuilt or changed.
+#
+# FORK_REF names the commit of droidtop's fork (Droidtop/gamenative-tux) the
+# files come from; the release tag carries it, so a new pin is a new release
+# and an existing one is never overwritten. runtime-windows/prebuilt.pin names
+# the release and SHA-256 the build uses (.github/actions/android-setup).
+
+on:
+  push:
+    paths:
+      - '.github/workflows/windows-runtime-prebuilt.yml'
+      - 'build-scripts/windows-runtime-prebuilt.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FORK_REF: 0f08762e192ef51a0bbce0f23f6e96ae896e2f37
+
+jobs:
+  rehost:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout the fork at FORK_REF
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Droidtop/gamenative-tux
+          ref: ${{ env.FORK_REF }}
+          path: fork
+          sparse-checkout: |
+            app/src/main/jniLibs
+            app/src/modern/jniLibs
+            app/src/main/assets
+            app/src/modern/assets
+          persist-credentials: false
+
+      - name: Pack
+        run: |
+          sudo apt-get install -y zstd
+          bash build-scripts/windows-runtime-prebuilt.sh "$GITHUB_WORKSPACE/fork" "$GITHUB_WORKSPACE/out/windows-runtime-prebuilt.tar.zst"
+          cd out && sha256sum windows-runtime-prebuilt.tar.zst | tee windows-runtime-prebuilt.tar.zst.sha256
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="windows-runtime-prebuilt-${FORK_REF:0:8}"
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$tag already published; a pin's release is never replaced"
+            exit 0
+          fi
+          gh release create "$tag" -R "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
+            --title "Windows runtime prebuilts (gamenative-tux ${FORK_REF:0:8})" \
+            --notes "GameNative's arm64 native libraries and asset payloads for droidtop's Windows runtime, re-hosted unmodified from Droidtop/gamenative-tux at ${FORK_REF} by build-scripts/windows-runtime-prebuilt.sh (docs/SPEC.md 9). GPL-3.0 like their source; some libraries are upstream binaries without source (see NOTICE.md)." \
+            out/windows-runtime-prebuilt.tar.zst out/windows-runtime-prebuilt.tar.zst.sha256

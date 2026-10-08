@@ -1,0 +1,106 @@
+name: x86_64 guest libraries
+
+# Builds build-scripts/x86_64-guest-libs into x86_64-guest-libs.tzst and publishes it as
+# a release asset. The app downloads it on x86_64 devices only
+# (runtime-windows/.../utils/X86_64GuestLibs.kt pins the tag and the SHA-256), the
+# same way the arm64 base system is a download rather than part of the APK.
+#
+# Moved from droidtop's GameNative fork (Droidtop/gamenative-tux) with the
+# Windows runtime (docs/SPEC.md 9). A run on main publishes a prerelease of
+# this repository (prerelease so the app's update check, which reads this
+# repository's releases, never mistakes it for a build); the pin in the code
+# moves to it after a rig check. Until then the pin names the fork's release.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'build-scripts/x86_64-guest-libs/**'
+      - '.github/workflows/x86_64-guest-libs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Droidtop/proton-wine-tux at the commit whose android_sysvshm is built in.
+  PROTON_WINE_TUX_REF: e75b52091062a02ac2c9c5d876ae00840274cf07
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout android_sysvshm from proton-wine-tux
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Droidtop/proton-wine-tux
+          ref: ${{ env.PROTON_WINE_TUX_REF }}
+          path: proton-wine-tux
+          sparse-checkout: android/android_sysvshm
+          persist-credentials: false
+
+      - name: Build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf automake libtool pkg-config python3 \
+            gperf cmake curl xz-utils zstd file m4
+
+      - name: Cache Android NDK
+        id: cache-ndk
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/ndk/android-ndk-r27d
+          key: android-ndk-r27d
+
+      - name: Android NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/ndk && cd ~/ndk
+          curl -fsSL -o ndk.zip https://dl.google.com/android/repository/android-ndk-r27d-linux.zip
+          unzip -q ndk.zip && rm ndk.zip
+
+      - name: Build
+        env:
+          NDK_ROOT: /home/runner/ndk/android-ndk-r27d
+          SYSVSHM_SRC: ${{ github.workspace }}/proton-wine-tux/android/android_sysvshm
+          WORK: ${{ runner.temp }}/guest-libs
+        run: |
+          bash build-scripts/x86_64-guest-libs/build.sh "$GITHUB_WORKSPACE/out/x86_64-guest-libs.tzst"
+          cd out && sha256sum x86_64-guest-libs.tzst | tee x86_64-guest-libs.tzst.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: x86_64-guest-libs
+          path: out/*
+          retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    # The only job that can write releases; it runs no build code.
+    permissions:
+      contents: write
+    steps:
+      - name: Download
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: x86_64-guest-libs
+          path: out
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          tag="x86_64-guest-libs-$(date -u +%Y%m%d)-${GITHUB_SHA::8}"
+          pre=--prerelease
+          gh release create "$tag" out/x86_64-guest-libs.tzst out/x86_64-guest-libs.tzst.sha256 \
+            -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" $pre \
+            --title "x86_64 guest libraries ($tag)" \
+            --notes "x86_64 bionic guest libraries for running x86_64 Wine without box64 (build-scripts/x86_64-guest-libs, built from $BRANCH at $GITHUB_SHA). SHA-256: $(cut -d' ' -f1 out/x86_64-guest-libs.tzst.sha256)"

@@ -12618,9 +12618,34 @@ Gone with it: GameNative's UI, Hilt (`DroidtopApplication` is a plain
 Application), Room's `PluviaDatabase` (`:stores` imported it), the unused
 `SteamService`, PostHog, Play feature delivery, power control (nothing
 droidtop runs started it), `BestConfigService`'s api.gamenative.app lookups,
-`GameCompatibilityCache`. Still read from `vendor/gamenative` until the next
-piece: the native sources the x86_64 CMake build compiles, the prebuilt arm64
-libraries and the asset payloads.
+`GameCompatibilityCache`, and LSFG frame generation (it needs Lossless
+Scaling's DLL from a Steam install only GameNative's Steam knew; droidtop
+never offered it).
+
+**The runtime's native code and prebuilt binaries.** The x86_64 libraries are
+built by `runtime-windows/native` from GameNative's native sources, copied
+unmodified into `native/upstream/` (winlator, extras, asurfacerenderer,
+virglrenderer, xconnectorpatch, evshim, and libadrenotools' headers), plus
+droidtop's shims. The arm64 set is GameNative's prebuilt libraries (some,
+like `libvortekrenderer` and the Adreno hook libraries, exist only as
+binaries), and the asset payloads the runtime reads with `getAssets()`
+(box64/FEXCore/WowBox64 builds, input DLLs, redirect libraries, the arm64
+PulseAudio modules, the JSON lists): **re-hosted, not committed and not
+rebuilt.** `.github/workflows/windows-runtime-prebuilt.yml` packs them
+unmodified from the fork at a pinned commit
+(`build-scripts/windows-runtime-prebuilt.sh` says what is left out: the
+on-demand dxwrapper payloads, Steam-only files, LSFG, the Quest OpenXR
+loader, SteamBootstrap, libpatchelf) and publishes them as a prerelease of
+this repository, the `build-toolchains` precedent; the build fetches that
+release by `runtime-windows/prebuilt.pin` (tag and SHA-256) into
+`runtime-windows/prebuilt/` (`build-scripts/fetch-windows-runtime-prebuilt.sh`,
+cached by `android-setup`). Both ABIs ship the same library names (Android's
+ABI picker compares names, "Fat APKs only" below). proot's talloc moved to
+`build-scripts/talloc`. The x86_64 guest-library and software-Vulkan recipes
+and their workflows moved to `build-scripts/x86_64-{guest-libs,lavapipe}` and
+`.github/workflows/`, publishing from `main` as prereleases of this
+repository; `X86_64GuestLibs`/`X86_64Graphics` keep pinning the fork's
+rig-tested releases until a droidtop-built one has passed the rig.
 
 ## 10. Build order
 
@@ -12978,7 +13003,8 @@ reports while the splits exist and becomes a failing gate
 (build of `ce75426`) 24 of the 39 arm64 libraries were missing, all
 gamenative's. `:runtime-windows` builds their x86_64 half with AGP's
 CMake, restricted to x86_64 so arm64 stays upstream's prebuilt set
-(`runtime-windows/native/CMakeLists.txt`, shims in `native/shims/`).
+(`runtime-windows/native/CMakeLists.txt`, GameNative's sources in
+`native/upstream/`, shims in `native/shims/`; the arm64 set is re-hosted, §9).
 
 **The x86_64 Windows runtime (user, 2026-09-24).** arm64 keeps upstream
 GameNative's binaries untouched. An x86_64 device runs real x86_64 Wine,
@@ -13036,8 +13062,8 @@ app gets it too:
   fork's one ABI check.
 - **The x86_64 guest libraries** (`X86_64GuestLibs`): the X11 client
   libraries winex11 opens, freetype, fontconfig and their dependencies,
-  built from upstream sources by the fork's `tools/x86_64-guest-libs` in its
-  own CI and published as a release asset; provisioning downloads it on
+  built from upstream sources by `build-scripts/x86_64-guest-libs` in CI
+  (moved from the fork, §9) and published as a release asset; provisioning downloads it on
   x86_64 only (pinned tag and SHA-256) into `files/x86_64-guest-libs`,
   beside the image. The aarch64 image stays installed for its data (fonts,
   shared files, the Windows-side extras); an x86_64 launch never puts its
@@ -13107,7 +13133,7 @@ app gets it too:
   - **Software Vulkan (`lavapipe`, the default):** the Khronos loader and
     Mesa's lavapipe ICD from Termux's x86_64 packages, packed with their
     library closure (minus what the guest libraries and Android provide) by
-    the fork's `tools/x86_64-lavapipe` in its CI, published as a release
+    `build-scripts/x86_64-lavapipe` in CI (moved from the fork, §9), published as a release
     asset (`x86_64-lavapipe-*`, about 35 MB) and downloaded when a prefix
     first uses it. At launch its directory leads `LD_LIBRARY_PATH` (its
     `libvulkan.so.1` must outrank the guest libraries' link to Android's
