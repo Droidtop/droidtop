@@ -10838,8 +10838,13 @@ own games, in droidtop's own treatment:
   its grid views shows keeps that view. The Default section setting's `pc`
   opens on Overview. Gaming opens
   on Home: the Default section setting's `home` is its default, and a cold
-  start never restores the last place (`sessionOnly` drops saved shell state
-  from an earlier process; a recreate in the same process keeps it). Home has
+  start never restores the last place. Saved shell state is restored only
+  for a configuration recreate (the Text size setting, a rotation): `sessionOnly`
+  drops state from an earlier process, and `ShellRestore.keepPlace` (set by
+  `MainActivity.onDestroy` from `isChangingConfigurations`) drops it when the
+  Activity was destroyed for any other reason with the process still alive,
+  which used to bring the shell back on the last view, the Retro games
+  (Droidtop/tracker#361). Home has
   no strip and the shoulders do nothing there; B does nothing on Home (it is
   the root). Home carries no chrome of its own: the shelves, a destination row
   and the shell footer, its first row starting under the floating status

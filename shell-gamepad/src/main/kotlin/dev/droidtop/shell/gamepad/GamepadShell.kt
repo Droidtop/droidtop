@@ -1468,11 +1468,25 @@ private fun GamepadShellBody(
  */
 private val PROCESS_MARK: Long = System.currentTimeMillis()
 
+/**
+ * Whether the Activity that was just destroyed was destroyed for a
+ * configuration change (a recreate or a rotation), the only time the shell
+ * restores its place. The host sets it in `onDestroy`
+ * (`isChangingConfigurations`). Any other destroy with the process still
+ * alive (Android freeing a backgrounded Activity) leaves it false, so the
+ * next start is a cold one and opens on Home, not on the last view
+ * (Droidtop/tracker#361). False until the host says otherwise.
+ */
+object ShellRestore {
+    @Volatile
+    var keepPlace: Boolean = false
+}
+
 private fun <T : Any> sessionOnly(inner: Saver<T, Any>): Saver<T, Any> = Saver(
     save = { value -> with(inner) { save(value) }?.let { listOf(PROCESS_MARK, it) } },
     restore = { saved ->
         val parts = saved as? List<*>
-        if (parts != null && parts.getOrNull(0) == PROCESS_MARK) parts.getOrNull(1)?.let { inner.restore(it) } else null
+        if (parts != null && parts.getOrNull(0) == PROCESS_MARK && ShellRestore.keepPlace) parts.getOrNull(1)?.let { inner.restore(it) } else null
     },
 )
 

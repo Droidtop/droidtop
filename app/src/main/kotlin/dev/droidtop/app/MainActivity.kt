@@ -39,6 +39,7 @@ import dev.droidtop.display.SecondScreenOrchestrator
 import dev.droidtop.shell.desktop.DesktopSessionMessage
 import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
+import dev.droidtop.shell.gamepad.ShellRestore
 import dev.droidtop.shell.gamepad.input.PadGate
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.OnboardingGate
@@ -776,6 +777,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     }
 
     override fun onDestroy() {
+        // Only a configuration recreate may bring the Gaming shell back on its last place.
+        ShellRestore.keepPlace = isChangingConfigurations
         // onCreate finishes early (first-run onboarding hand-off, crash-recovery
         // route) before the orchestrator is built; there is nothing to tear down then.
         if (::displayOrchestrator.isInitialized) displayOrchestrator.onActivityDestroy()
