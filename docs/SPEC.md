@@ -2975,7 +2975,10 @@ intent filters and user-facing strings all survive.
 The companion is a tabbed, touch-only second screen. One entry, `CompanionTabs` (`:app`), is drawn by
 every host that draws the companion (the registry's `Surface`, used by `SecondScreenPresentation` and
 `SecondaryDisplayActivity`, and `CompanionActivity`); the per-mode role choice (section 6c) now only
-picks the tab it opens on. Standard's own second screen keeps its launcher-style surface.
+picks the tab it opens on. Standard draws the same tabs (decided 2026-10-08, Droidtop/tracker#347): its own
+launcher-style surface used to stand in for them, so a Standard user's add-on display had no Social, Tasks,
+Performance, System or Keys, did not scroll and carried a prose line; its one unique piece, the quick-launch
+row of recent apps, became Home's Recent apps section for every mode.
 
 - **Tabs, in strip order:** Home (today's widgets and info surface, `CompanionSurface`, the host's own
   add/remove controls where it has them), Social (every provider's friends and conversations, with
@@ -3008,12 +3011,14 @@ picks the tab it opens on. Standard's own second screen keeps its launcher-style
      of description, and Play. The library carries no achievements yet, so none are shown.
   2. **Continue playing** and **Recently added**: `CompanionRail`, ten 80dp 2:3 capsules each, tap or A
      launches through the one launch path; Recently added uses the library's first-seen time, an app's install
-     time as the fallback, and leaves out rows with neither.
+     time as the fallback, and leaves out rows with neither. Then **Recent apps** (`CompanionAppsSection`):
+     up to twelve apps from the launcher's own launch history (`RecentAppsStore`, the drawer's Recent row),
+     a tap opens one on the companion's screen; nothing recorded, no section.
   3. **Downloads and updates**: the running jobs from `PluginJobsCenter` with their progress bars (at most
      four), and the number of games with an update waiting (the library's own `availableUpdate`).
   4. **Social**: unread conversations and friends in a game, from the same rows the Social tab draws; a tap
      opens that conversation on the Social tab. Not in Kiosk and Kid.
-  5. **Notifications**: the compact group (`CompanionNotifications`, also used by Standard's second screen):
+  5. **Notifications**: the compact group (`CompanionNotifications`):
      folded, its heading is the count and the newest line; open, up to twelve with Dismiss.
   6. **System**: storage free and total, and the System tab's own switches as pills (the radios where a
      `priv.shell` provider can flip them, Do Not Disturb) and a way to all controls. droidtop has no
@@ -3830,7 +3835,9 @@ above). droidtop has three modes and now three second-screen designs:
 - **Gaming**: the game companion, unchanged (CompanionSurface, section 4d) -- the focused
   game's art and metadata, play time, "Runs with", updates, and the idle rotation/status
   strip while browsing.
-- **Standard**: StandardSecondScreenSurface (:app) -- a launcher-style surface, built
+- **Standard** (superseded 2026-10-08, Droidtop/tracker#347: Standard now draws the
+  companion tabs like the other modes, see "The companion's tabs"; what follows is the
+  surface it had): StandardSecondScreenSurface (:app) -- a launcher-style surface, built
   from pieces droidtop already has rather than a new system: CompanionSystemBar and
   CompanionNotifications (the SAME droidtop-styled clock/battery/network/controls and
   notification rows Gaming's companion draws -- no second implementation), a "Quick launch"

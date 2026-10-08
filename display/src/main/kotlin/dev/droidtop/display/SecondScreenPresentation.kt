@@ -88,8 +88,7 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
         // dual screen mode for standard and gaming" -- true of this
         // class, which never branched on mode at all). Widget
         // hosting/listening is the registered content's own concern now
-        // (CompanionSurfaceHost's DisposableEffect, StandardSecondScreenSurface's
-        // own), not duplicated here.
+        // (CompanionSurfaceHost's DisposableEffect), not duplicated here.
         val mode = SecondaryDisplayContent.currentMode(context)
         val content = SecondaryDisplayContent.contentFor(mode)
         val composeView = ComposeView(context).apply {

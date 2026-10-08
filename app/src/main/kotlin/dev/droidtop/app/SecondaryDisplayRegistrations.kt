@@ -10,9 +10,9 @@ import dev.droidtop.display.SecondaryDisplayContent
  * mode's surface (docs/SPEC.md section 4c and "Modes and what each
  * contributes").
  *
- * Gaming and Desktop each draw the companion tabs (CompanionTabs), opening on
- * the input surface or on Home per the user's role choice for that mode; Standard draws its
- * own launcher-style surface (StandardSecondScreenSurface) -- shown on the
+ * Every mode draws the companion tabs (CompanionTabs), opening on the input
+ * surface or on Home per the user's role choice for that mode. Standard's
+ * registration is always there -- shown on the
  * secondary display whenever droidtop holds the HOME role, whether Home
  * itself renders Standard's own Launcher3 fork or forwards to a different
  * chosen launcher via the Alternative implementation (docs/SPEC.md section
@@ -40,11 +40,17 @@ object SecondaryDisplayRegistrations {
 
     fun setDesktop(enabled: Boolean) = set(SecondaryDisplayContent.Mode.DESKTOP, enabled)
 
-    /** Standard is the always-on default (docs/SPEC.md 2c): it is never gated behind a ModePiece the way Gaming/Desktop's second screens are. */
+    /**
+     * Standard is the always-on default (docs/SPEC.md 2c): it is never gated behind a ModePiece the way
+     * Gaming/Desktop's second screens are. It draws the same companion tabs as the other modes
+     * (Droidtop/tracker#347); its own launcher-style surface used to stand in for them, without Social,
+     * Tasks, Performance, System or Keys, and its quick-launch row is now Home's Recent apps section.
+     * No shell publishes a focused game in Standard, so Home's Now shows only a running game.
+     */
     fun registerStandard() {
         SecondaryDisplayContent.register(SecondaryDisplayContent.Mode.STANDARD) {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-                StandardSecondScreenSurface()
+                CompanionTabs(SecondaryDisplayContent.Mode.STANDARD) { CompanionSurfaceHost(null) }
             }
         }
     }

@@ -78,6 +78,7 @@ fun CompanionSurface(
             if (layout.shows(CompanionHomeSection.NOW)) CompanionNowSection(entry, layout)
             if (layout.shows(CompanionHomeSection.CONTINUE)) CompanionRecents(layout)
             if (layout.shows(CompanionHomeSection.RECENTLY_ADDED)) CompanionRecentlyAdded(layout)
+            if (layout.shows(CompanionHomeSection.APPS)) CompanionAppsSection(layout)
             if (layout.shows(CompanionHomeSection.ACTIVITY)) CompanionActivitySection(layout)
             if (layout.shows(CompanionHomeSection.SOCIAL)) CompanionSocialSection(layout)
             if (layout.shows(CompanionHomeSection.NOTIFICATIONS)) {

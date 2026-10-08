@@ -12,6 +12,7 @@ enum class CompanionHomeSection(val key: String, val label: String) {
     NOW("now", "Now"),
     CONTINUE("continue", "Continue playing"),
     RECENTLY_ADDED("recently_added", "Recently added"),
+    APPS("apps", "Recent apps"),
     ACTIVITY("activity", "Downloads and updates"),
     SOCIAL("social", "Social"),
     NOTIFICATIONS("notifications", "Notifications"),
