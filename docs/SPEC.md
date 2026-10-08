@@ -674,7 +674,13 @@ parallel array. A `LinearLayout`'s own focus search is the same mechanism
 every other droidtop screen already relies on for pad navigation, and is
 far more reliably tested across Android versions than a `ListView`'s
 internal one; the first row receives focus explicitly on open rather than
-waiting for the first Down press to "acquire" it. The row order is
+waiting for the first Down press to "acquire" it. Opened from a window in
+touch mode (the Quick Menu's tile on the console, build 1519) a plain focus
+request is refused, so the dialog showed no selection and the first A only
+brought it back: the request is made once the window is attached and falls
+back to the touch-mode one (`requestFocusFromTouch`), and an A that went
+down in the dialog with nothing focused presses the first row (2026-10-08,
+Droidtop/tracker#363). The row order is
 `ModeGate.switcherModes` (`runtime-common`, unit-tested in `ModesTest`):
 Android always, Desktop and Gaming only while enabled -- exactly what
 `BackButtonMenu` computed inline before, now a pure function the dialog
@@ -2461,9 +2467,12 @@ the `ContainerRuntime` interface that already exists (§3):
   decided for the planned Recents tab's own "launch it again" row, not
   a second resume mechanism), and **Kill** calls
   `Library.quit`, which dispatches to `LibraryProvider.quit` for the
-  entry's kind. `quit` returns a `QuitResult`, not a boolean: the row's
-  subtitle is `quitOutcome.message`, which starts as the pre-quit
-  promise "End <game>" and is replaced by the outcome when a kill runs.
+  entry's kind. Kill is not a row since 2026-10-08 (Droidtop/tracker#363
+  slice 6): it is the red **Stop pill** beside the game's name at the top of
+  the section (DroidDeck's Stop, in the theme's danger role, with the power
+  glyph); Up from the first row reaches it and Down leaves it. `quit` returns
+  a `QuitResult`, not a boolean: what a kill did (`quitOutcome.message`) is
+  the line under the game's name once it has run.
   The destructive action needs two A presses: the first names the game
   and warns that unsaved progress may be lost, and the second confirms
   it. Changing focus clears the confirmation so an old press cannot
@@ -2539,6 +2548,21 @@ the `ContainerRuntime` interface that already exists (§3):
   idle subtitles on the Game rows, the notification grant row and the Performance readouts were removed;
   only a prompt that changes what the next press does ("Press A again") stays. Portrait is still a bottom
   sheet, sliding up.
+  **Steam's look (2026-10-08, Droidtop/tracker#363 slice 6):** in landscape the panel floats, 12dp in
+  from the right edge, the top and the bottom (`SidePanelFrame(floatMargin = ...)`), with the panel
+  radius (6dp), a hairline of the text ink at 5 percent (`MenuTokens.PanelBorder`, Steam's white-5%
+  edge) and the menu shadow; it still slides in over 300 ms on the glide curve and out on the exit
+  curve. The section's name is in the heading role (22/28 bold) between its shoulder glyphs. The
+  rail's current section wears Steam's chosen-tab look: a quiet plate and the glyph in full ink (no
+  longer the accent: the accent is "you are here" on the left menu, and the cursor is in the
+  section), the others muted. Opening either side menu closes the other from every route (the
+  shell's root, either panel's Start or R2, the game page's footer pills). **One switch and one
+  slider:** the System, Audio and Display tiles show the same switch Settings' rows do
+  (`ShellSwitch`, 52 by 30, the affirmative fill, the knob gliding in the layer phase) instead of an
+  "On"/"Off" word, and their sliders are Settings' slider (`ShellSlider`: a thin track filled in the
+  accent while selected, a round thumb), so the private drawing each had is gone (DroidDeck's
+  switch and slider mechanics, `ui/SettingsWidgets.kt`). The open and close sounds are the sound
+  roles' job (plan slice 10), not wired here.
 - **Quit to Library says what it did (decided 2026-09-29, Droidtop/tracker#82)**: on the owner's
   console (Android 13) the first version of this tab did not end the game — after Quit the
   emulator's process and its Recents task both stayed alive, yet droidtop had already dropped its

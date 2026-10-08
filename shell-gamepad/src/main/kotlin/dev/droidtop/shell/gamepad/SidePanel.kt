@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -58,6 +59,12 @@ internal fun sidePanelWidth(screen: Dp, fraction: Float, min: Dp, max: Dp): Dp =
  * for another menu is not a close, so it calls its own callback straight away.
  * Controller handling stays with the caller (`onPad(preview = true)` on its
  * root), because it needs the caller's own state.
+ *
+ * [floatMargin] above zero floats a side panel that far in from its edge,
+ * the top and the bottom (Steam's floating side panels): it then takes the
+ * panel radius ([Corners.Panel]), a hairline of the text ink at 5 percent
+ * ([MenuTokens.PanelBorder]) and the menu shadow. The width [content] is
+ * given is the panel's own, inside the margins.
  */
 @Composable
 internal fun SidePanelFrame(
@@ -65,6 +72,7 @@ internal fun SidePanelFrame(
     onDismiss: () -> Unit,
     panelWidth: (screen: Dp) -> Dp = { it },
     bottomMaxHeight: Float = 0.72f,
+    floatMargin: Dp = 0.dp,
     content: @Composable (width: Dp, close: () -> Unit) -> Unit,
 ) {
     val dismiss by rememberUpdatedState(onDismiss)
@@ -96,14 +104,20 @@ internal fun SidePanelFrame(
                     .background(MenuTokens.Scrim.copy(alpha = SIDE_PANEL_SCRIM_ALPHA))
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { close() },
             )
-            val width = if (edge == PanelEdge.BOTTOM) maxWidth else panelWidth(maxWidth)
+            val floating = edge != PanelEdge.BOTTOM && floatMargin > 0.dp
+            val margin = if (floating) floatMargin else 0.dp
+            val width = if (edge == PanelEdge.BOTTOM) maxWidth else panelWidth(maxWidth) - margin * 2
             Surface(
                 // The shell's own overlay surface, not the platform's colour scheme: every token
                 // the panels draw with is defined against it (a light device state once gave a
                 // white panel with white-on-white labels).
                 color = MenuTokens.OverlaySurface,
                 tonalElevation = 0.dp,
+                shape = if (floating) Corners.Panel else androidx.compose.ui.graphics.RectangleShape,
+                border = if (floating) androidx.compose.foundation.BorderStroke(1.dp, MenuTokens.PanelBorder) else null,
+                shadowElevation = if (floating) Elevation.Menu else 0.dp,
                 modifier = Modifier
+                    .padding(margin)
                     .then(
                         if (edge == PanelEdge.BOTTOM) {
                             Modifier.fillMaxWidth().heightIn(max = maxHeight * bottomMaxHeight)
@@ -119,10 +133,12 @@ internal fun SidePanelFrame(
                         },
                     )
                     .graphicsLayer {
+                        // Out past its own margin too, so a floating panel leaves the screen whole.
                         val away = 1f - shown.value
+                        val gap = margin.toPx()
                         when (edge) {
-                            PanelEdge.LEFT -> translationX = -away * size.width
-                            PanelEdge.RIGHT -> translationX = away * size.width
+                            PanelEdge.LEFT -> translationX = -away * (size.width + gap)
+                            PanelEdge.RIGHT -> translationX = away * (size.width + gap)
                             PanelEdge.BOTTOM -> translationY = away * size.height
                         }
                     },

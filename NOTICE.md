@@ -126,7 +126,10 @@ This project is distributed under the GNU General Public License v3.0 (see
   wide-art cover, hero fill, status chip and empty-backdrop glow (`ui/FrontEndArt.kt`,
   `ui/FrontEndGames.kt`, `ui/FrontEndWidgets.kt`, `ui/FrontEndContent.kt`, in `pc/PcCapsule.kt` and
   `pc/PcBackdrop.kt`), the fading foot of a long menu (`ui/SettingsWidgets.kt`, in `MenuPanel`, `GamingMenu.kt`),
-  and the page and launch floods (`ui/PageFlood.kt`, `ui/LaunchFlood.kt`, as `PageFlood.kt`). Each ported file names
+  the page and launch floods (`ui/PageFlood.kt`, `ui/LaunchFlood.kt`, as `PageFlood.kt`), the switch and slider
+  (`ui/SettingsWidgets.kt`, as `ShellSwitch` and `ShellSlider` in `GamingMenu.kt`), the turning cog
+  (`ui/FrontEndWidgets.kt`, the game page's gear) and the Stop pill (`ui/SessionOverlay.kt`, the Quick Menu's
+  Game section). Each ported file names
   the DroidDeck file it came from. No DroidDeck artwork, logo or wordmark is used.
 
 ## Bundled themes

@@ -124,6 +124,7 @@ object BackButtonMenu {
         DialogAccessibility.paneTitle(root, "Switch mode")
 
         var dialog: AlertDialog? = null
+        var confirmDown = false
         val rows = mutableListOf<TextView>()
         fun addRow(label: String, onSelect: () -> Unit) {
             rows += TextView(activity).apply {
@@ -189,11 +190,39 @@ object BackButtonMenu {
         dialog = AlertDialog.Builder(activity, com.android.launcher3.R.style.DroidtopDialog)
             .setView(root)
             .setOnDismissListener { onDismiss?.invoke() }
+            // A press that arrives with no row focused (the window came up in touch mode) is
+            // the first row's: A selects at once instead of only bringing the focus back. Only a
+            // press that went down here counts, never the release of the press that opened it.
+            .setOnKeyListener { _, keyCode, event ->
+                val confirm = keyCode == android.view.KeyEvent.KEYCODE_BUTTON_A ||
+                    keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                    keyCode == android.view.KeyEvent.KEYCODE_ENTER
+                when {
+                    !confirm || rows.any { it.isFocused } -> false
+                    event.action == android.view.KeyEvent.ACTION_DOWN -> {
+                        if (event.repeatCount == 0) confirmDown = true
+                        true
+                    }
+                    event.action == android.view.KeyEvent.ACTION_UP && confirmDown -> {
+                        confirmDown = false
+                        rows.firstOrNull()?.performClick()
+                        true
+                    }
+                    else -> false
+                }
+            }
             .show()
         // The dialog opens with real pad focus already on the first row,
         // rather than leaving the very first Down press "acquire" focus
-        // (the visible symptom of the stuck-on-"Android" bug above).
-        rows.firstOrNull()?.requestFocus()
+        // (the visible symptom of the stuck-on-"Android" bug above). Opened
+        // from a screen in touch mode (the Quick Menu's tile, a tap), a plain
+        // requestFocus is refused and the dialog showed no selection until a
+        // key was pressed, and the first A only brought it back (console,
+        // build 1519); the touch-mode request takes it there too. Asked once
+        // the window is attached, since the dialog's window takes focus after
+        // show() returns.
+        val first = rows.firstOrNull()
+        first?.post { if (!first.requestFocus()) first.requestFocusFromTouch() }
     }
 
     private const val TITLE_COLOR = 0xFFEDEDED.toInt()

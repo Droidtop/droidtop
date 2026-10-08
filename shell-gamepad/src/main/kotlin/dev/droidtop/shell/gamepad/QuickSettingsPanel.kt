@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,7 +24,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -358,7 +356,7 @@ private fun QuickStatusHeader() {
     }
 }
 
-/** A quick-settings slider: label, value, and a real fill the D-pad moves. */
+/** A quick-settings slider: label, value, and the shell's one slider, which the D-pad moves. */
 @Composable
 private fun QuickSliderRow(item: SliderItem, focused: Boolean, onSet: (Int) -> Unit) {
     val span = (item.max - item.min).coerceAtLeast(1)
@@ -412,22 +410,8 @@ private fun QuickSliderRow(item: SliderItem, focused: Boolean, onSet: (Int) -> U
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(MenuTokens.Surface),
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth(fraction)
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(if (focused) MenuTokens.Accent else MenuTokens.Value),
-            )
-        }
+        // The one slider look, Settings' too (ShellSlider).
+        ShellSlider(fraction, focused, Modifier.fillMaxWidth().padding(top = 8.dp))
     }
 }
 
@@ -473,11 +457,8 @@ private fun QuickTileView(
             QuickGlyphIcon(glyph = tile.glyph, tint = tint, modifier = Modifier.size(24.dp))
             Spacer(Modifier.weight(1f))
             when {
-                tile.on != null -> Text(
-                    if (tile.on) "On" else "Off",
-                    color = if (lit) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
-                    style = MaterialTheme.typography.labelMedium,
-                )
+                // The one switch look, Settings' too (ShellSwitch); a flip is one A, as before.
+                tile.on != null -> ShellSwitch(tile.on)
                 tile.opens -> Text("›", color = MenuTokens.Placeholder, style = MaterialTheme.typography.bodyLarge)
             }
         }

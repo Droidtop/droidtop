@@ -502,7 +502,19 @@ private fun GamepadShellBody(
     // Which page, if any, has claimed L1/R1 for a tab strip of its own.
     val shoulderStrips = remember { ShoulderStripRegistry() }
     // The two menus, for a window of its own that answers Start and R2 itself.
-    val shellMenus = remember { ShellMenus(openLeft = { leftMenuOpen = true }, openQuick = { quickMenuOpen = true }) }
+    // The two side menus are exclusive, as Steam's are: opening one closes the other (docs/SPEC.md 7j).
+    val shellMenus = remember {
+        ShellMenus(
+            openLeft = {
+                quickMenuOpen = false
+                leftMenuOpen = true
+            },
+            openQuick = {
+                leftMenuOpen = false
+                quickMenuOpen = true
+            },
+        )
+    }
     var displayChoice by remember {
         mutableStateOf<DisplayChoiceRequest?>(null)
     }

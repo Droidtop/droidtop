@@ -405,6 +405,9 @@ object MenuTokens {
     val HintBar: Color get() = GamingTheme.palette.hintBar
     val HintPillOutline: Color get() = GamingTheme.palette.hintPillOutline
 
+    /** The hairline round a floating side panel: the text ink at 5 percent (Steam's white-5% edge, in the theme's ink). */
+    val PanelBorder: Color get() = OnSurface.copy(alpha = 0.05f)
+
     val RowShape = Corners.Crisp
     val OverlayShape = Corners.Panel
     val RowSpacing = 6.dp

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -148,6 +149,8 @@ internal fun QuickMenu(
         // About a third of the screen, the left menu's width on the other side: a side panel, not a
         // screen. The tile grids drop to one column when that leaves them little room.
         panelWidth = { screen -> sidePanelWidth(screen, 0.34f, 300.dp, 440.dp) },
+        // Steam's quick access panel floats: in from the edge, the panel radius and a hairline.
+        floatMargin = if (window.portrait) 0.dp else Space.Md,
     ) { sheetWidth, close ->
         // Game only while a game is actually running (see this
         // function's own doc comment) -- computed once per sheet
@@ -210,12 +213,17 @@ internal fun QuickMenu(
                 // L1/R1 step the rail; the glyphs beside the section's
                 // name say so instead of a "Switch tab" hint-bar pill
                 // (owner, 2026-09-25).
+                // The section's name in the heading role, as Steam's panels head
+                // theirs (it was a small label, ui-compare pair 10).
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
                     ShoulderGlyph("L1", modifier = Modifier.padding(end = 8.dp))
                     Text(
                         section.label,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = TypeRole.screenTitle,
                         color = MenuTokens.OnSurface,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     ShoulderGlyph("R1", modifier = Modifier.padding(start = 8.dp))
                 }
@@ -260,7 +268,9 @@ private const val RailWidthDp = 64
 /**
  * The icon rail: one drawn glyph per section, the current one lit. A column down the sheet's left
  * edge, or a row across the top of a bottom sheet. It scrolls if the sections outnumber the room
- * and keeps the current one in view. Not a focus target: L1/R1 step it, and a tap selects.
+ * and keeps the current one in view. Not a focus target: L1/R1 step it, and a tap selects. The
+ * current section wears Steam's chosen-tab look (a quiet plate, the glyph in full ink, not the
+ * accent: it is where you are, and the cursor is in the section), the others muted.
  */
 @Composable
 private fun QuickRail(
@@ -283,7 +293,7 @@ private fun QuickRail(
                     .bringIntoViewRequester(requester)
                     .size(target)
                     .clip(MenuTokens.RowShape)
-                    .background(if (current) MenuTokens.SurfaceSelected else Color.Transparent)
+                    .background(if (current) MenuTokens.SurfaceSelected else Color.Transparent, Corners.Crisp)
                     // Ahead of the clickable: a plain clickable is still a
                     // focus target, and the pad's focus belongs to the section.
                     .focusProperties { canFocus = false }
@@ -295,7 +305,7 @@ private fun QuickRail(
             ) {
                 QuickGlyphIcon(
                     glyph = s.glyph,
-                    tint = if (current) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
+                    tint = if (current) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                     modifier = Modifier.size(22.dp),
                 )
                 if (s in dots && !current) {
@@ -809,7 +819,17 @@ private fun GameTab(
                 )
             }
             add(ending(GameEnding.RESTART, "Restart", null, restart = true))
-            add(ending(GameEnding.KILL, "Kill", null, restart = false))
+        }
+    }
+    // The Stop pill in the header (DroidDeck's red Stop, Steam's destructive red): ending the game
+    // without restarting it, with the same second press as the rows.
+    val stop = GameQuickTile(title = "Kill", subtitle = null, dangerAction = true) {
+        if (quitNeedsConfirmation(armed == GameEnding.KILL)) {
+            armed = GameEnding.KILL
+        } else {
+            armed = null
+            lastEnding = GameEnding.KILL
+            onQuit(entry, false)
         }
     }
 
@@ -822,25 +842,49 @@ private fun GameTab(
             .focusable()
             .onPad { press ->
                 when (press.action) {
-                    GamepadAction.UP, GamepadAction.DOWN ->
-                        {
-                            armed = null
-                            focusIndex = menuStep(focusIndex, tiles.size, if (press.action == GamepadAction.UP) -1 else 1)
-                        }
+                    // The pill sits above the rows: Up from the first row reaches it, Down leaves it.
+                    GamepadAction.UP -> {
+                        armed = null
+                        focusIndex = if (focusIndex <= 0) STOP_PILL else menuStep(focusIndex, tiles.size, -1)
+                    }
+                    GamepadAction.DOWN -> {
+                        armed = null
+                        focusIndex = if (focusIndex == STOP_PILL) 0 else menuStep(focusIndex, tiles.size, 1)
+                    }
                     GamepadAction.B -> onDismiss()
-                    GamepadAction.A -> tiles.getOrNull(focusIndex)?.action?.invoke()
+                    GamepadAction.A -> if (focusIndex == STOP_PILL) stop.action() else tiles.getOrNull(focusIndex)?.action?.invoke()
                     else -> Unit
                 }
                 true
             },
     ) {
-        Text(
-            entry.title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MenuTokens.OnSurface,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            modifier = Modifier.padding(bottom = 12.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+            Text(
+                entry.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MenuTokens.OnSurface,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            StopPill(
+                label = if (armed == GameEnding.KILL) "Press A again" else stop.title,
+                selected = focusIndex == STOP_PILL,
+                onClick = {
+                    if (focusIndex != STOP_PILL) armed = null
+                    focusIndex = STOP_PILL
+                    press(GamepadAction.A)
+                },
+            )
+        }
+        if (lastEnding == GameEnding.KILL && quitOutcome != null) {
+            Text(
+                quitOutcome.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MenuTokens.OnSurfaceMuted,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
         Column(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -869,5 +913,37 @@ private fun GameTab(
     }
 }
 
-/** The two rows of the Game section that end the game, so each can wait for its own second press. */
+/** The two controls of the Game section that end the game, so each can wait for its own second press. */
 private enum class GameEnding { RESTART, KILL }
+
+/** The Game section's cursor on the header's Stop pill rather than on a row. */
+private const val STOP_PILL = -1
+
+/**
+ * The Game section's Stop: a pill in the danger colour with the power glyph (DroidDeck's Stop pill,
+ * ui/SessionOverlay.kt at 9310d19; Steam's destructive red is the theme's danger role). Under the
+ * cursor it fills faintly with that red; the window's ring marks it like any control.
+ */
+@Composable
+private fun StopPill(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier
+            .heightIn(min = 40.dp)
+            .semantics { contentDescription = label }
+            .selectionFrame(
+                selected,
+                Corners.Pill,
+                rest = Color.Transparent,
+                restOutline = MenuTokens.Danger.copy(alpha = 0.55f),
+                selectedFill = MenuTokens.Danger.copy(alpha = 0.18f),
+            )
+            .focusProperties { canFocus = false }
+            .clickable(onClick = onClick)
+            .padding(start = 12.dp, end = 14.dp),
+    ) {
+        QuickGlyphIcon(QuickGlyph.POWER, tint = MenuTokens.Danger, modifier = Modifier.size(18.dp))
+        Text(label, style = TypeRole.button, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = MenuTokens.Danger)
+    }
+}

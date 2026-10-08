@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -510,7 +509,7 @@ internal fun MenuRow(
         }
         if (sliderFraction != null) {
             Spacer(Modifier.width(16.dp))
-            RowSliderTrack(sliderFraction, selected)
+            ShellSlider(sliderFraction, selected, Modifier.width(120.dp))
         }
         if (value != null) {
             Spacer(Modifier.width(16.dp))
@@ -567,7 +566,7 @@ internal fun MenuRow(
             Box(
                 modifier = LocalValueColumnWidth.current?.let { Modifier.width(it) } ?: Modifier,
                 contentAlignment = Alignment.CenterEnd,
-            ) { RowSwitch(switchOn) }
+            ) { ShellSwitch(switchOn) }
         }
         if (chevron) {
             Spacer(Modifier.width(8.dp))
@@ -576,44 +575,63 @@ internal fun MenuRow(
     }
 }
 
-/** A toggle row's switch: a track that fills with the affirmative colour when on, its knob at that end. */
+/**
+ * The shell's one on/off switch, in Settings' rows and on the Quick Menu's tiles alike (DroidDeck's
+ * ToggleSwitch, ui/SettingsWidgets.kt at 9310d19, in the theme's roles): a 52 by 30 track that fills
+ * with the affirmative colour when on, its knob sliding to that end. The colour answers at once; the
+ * knob glides ([Motion.FocusMs]) and is moved in the layer phase, so a flip recomposes nothing.
+ */
 @Composable
-private fun RowSwitch(on: Boolean) {
+internal fun ShellSwitch(on: Boolean, modifier: Modifier = Modifier) {
+    val knob = animateFloatAsState(if (on) 1f else 0f, Motion.tw(Motion.FocusMs, easing = Motion.Glide), label = "switch knob")
     Box(
-        modifier = Modifier
-            .size(width = 44.dp, height = 24.dp)
-            .clip(RoundedCornerShape(12.dp))
+        modifier = modifier
+            .size(width = SwitchWidth, height = SwitchHeight)
+            .clip(Corners.Pill)
             .background(if (on) MenuTokens.Affirmative else MenuTokens.Placeholder)
-            .padding(3.dp),
-        contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
+            .padding(SwitchInset),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Box(
             Modifier
-                .size(18.dp)
-                .clip(RoundedCornerShape(9.dp))
+                .graphicsLayer { translationX = knob.value * (SwitchWidth - SwitchHeight).toPx() }
+                .size(SwitchHeight - SwitchInset * 2)
+                .clip(Corners.Pill)
                 .background(MenuTokens.OnSurface),
         )
     }
 }
 
-/** A slider row's position, inline: a thin track filled to [fraction]. */
+private val SwitchWidth = 52.dp
+private val SwitchHeight = 30.dp
+private val SwitchInset = 4.dp
+
+/**
+ * The shell's one slider, in Settings' rows and the Quick Menu alike (DroidDeck's ValueSlider drawing,
+ * ui/SettingsWidgets.kt at 9310d19, in the theme's roles): a thin track, filled to [fraction] in the
+ * accent while [selected] and in the value colour otherwise, with a round thumb at the fill's end.
+ * Drawn in one pass; [modifier] gives it its width.
+ */
 @Composable
-private fun RowSliderTrack(fraction: Float, selected: Boolean) {
-    Box(
-        modifier = Modifier
-            .width(120.dp)
-            .height(4.dp)
-            .clip(RoundedCornerShape(2.dp))
-            .background(MenuTokens.Placeholder),
-    ) {
-        Box(
-            Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .background(if (selected) MenuTokens.Accent else MenuTokens.Value),
-        )
+internal fun ShellSlider(fraction: Float, selected: Boolean, modifier: Modifier = Modifier) {
+    val track = MenuTokens.Placeholder
+    val fill = if (selected) MenuTokens.Accent else MenuTokens.Value
+    androidx.compose.foundation.Canvas(modifier.height(SliderHeight)) {
+        val thumb = SliderThumb.toPx()
+        val y = size.height / 2f
+        val start = androidx.compose.ui.geometry.Offset(thumb, y)
+        val end = androidx.compose.ui.geometry.Offset(size.width - thumb, y)
+        val at = androidx.compose.ui.geometry.Offset(start.x + (end.x - start.x) * fraction.coerceIn(0f, 1f), y)
+        val line = SliderTrack.toPx()
+        drawLine(track, start, end, line, androidx.compose.ui.graphics.StrokeCap.Round)
+        if (fraction > 0f) drawLine(fill, start, at, line, androidx.compose.ui.graphics.StrokeCap.Round)
+        drawCircle(fill, thumb, at)
     }
 }
+
+private val SliderHeight = 20.dp
+private val SliderTrack = 4.dp
+private val SliderThumb = 7.dp
 
 /**
  * One side of a touch-adjustable row's value: the arrow the row already
