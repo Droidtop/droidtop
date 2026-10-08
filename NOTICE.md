@@ -8,7 +8,14 @@ This project is distributed under the GNU General Public License v3.0 (see
 - **GameNative** — `vendor/gamenative`, droidtop's fork
   https://github.com/bi0shacker001/gamenative-tux of
   https://github.com/utkarshdalal/GameNative — GPL-3.0.
-  `runtime-windows` compiles the whole vendored tree (docs/SPEC.md §9).
+  `runtime-windows` carries GameNative's Windows runtime, lifted from the
+  fork at `0f08762e` (docs/SPEC.md §9): its `com.winlator` tree (Winlator's
+  runtime as GameNative ships it, package and headers unchanged) and the
+  GameNative-authored files that runtime uses (container utilities, the
+  component list and its installer, the prefix setup helpers from
+  `XServerScreen.kt`, the x86_64 guest-library and graphics pins, the
+  downloaders, the folder scanner, `TouchGestureConfig`, a cut-down
+  `PrefManager`), moved to `dev.droidtop.runtime.windows.*`.
   The `stores` module is GameNative's Epic, GOG, Amazon Games and itch.io
   store code (`app.gamenative.service.{epic,gog,amazon,itch}`, its store
   models and DAOs and the helpers they use), lifted out of the fork at
@@ -31,9 +38,8 @@ This project is distributed under the GNU General Public License v3.0 (see
   setup). A Maven dependency, not vendored.
 - **Winlator** — https://github.com/brunodev85/winlator — LGPL-2.1.
   The upstream of GameNative's `com.winlator` runtime tree, and so of
-  `runtime-windows`. Not vendored in this repository (the reference checkout
-  was removed); no Winlator source is built here except by way of
-  `vendor/gamenative`.
+  `runtime-windows/src/main/java/com/winlator`, which carries that tree as
+  GameNative ships it.
 - **Lemuroid** — https://github.com/Swordfish90/Lemuroid — GPL-3.0.
   Four detection files were forked in (unmodified logic, package lines
   changed) as `library-core/src/main/kotlin/dev/droidtop/library/romdetect/`

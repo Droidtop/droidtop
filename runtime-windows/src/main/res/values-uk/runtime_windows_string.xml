@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="cancel">Скасувати</string>
+    <string name="compatibility">Сумісність</string>
+    <string name="copy">Копіювати</string>
+    <string name="denuvo">Denuvo</string>
+    <string name="extreme">Extreme</string>
+    <string name="intermediate">Збалансований</string>
+    <string name="manifest_download_failed">Помилка завантаження: %1$s</string>
+    <string name="manifest_install_failed">Не вдалося інсталювати %1$s</string>
+    <string name="manifest_install_success">%1$s інстальовано</string>
+    <string name="ok">ОК</string>
+    <string name="performance">Продуктивність</string>
+    <string name="shooter_mode_off">Увімкнути джойстики</string>
+    <string name="shooter_mode_on">Увімкнути мишу</string>
+    <string name="stability">Стабільність</string>
+    <string name="unity">Unity</string>
+    <string name="unity_mono_bleeding_edge">Unity Mono Bleeding Edge</string>
+    <string name="untitled">Без назви</string>
+</resources>

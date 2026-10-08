@@ -86,10 +86,6 @@ window = "1.5.1"
 savedstate = "1.2.1"
 core-v116 = "1.16.0"
 vectordrawable-animated = "1.2.0"
-browser = "1.8.0"
-documentfile = "1.0.1"
-posthog-android = "3.8.0"
-jwtdecode = "2.0.2"
 json-20240303 = "20240303"
 xz = "1.9"
 # https://github.com/RikkaApps/Shizuku-API (Apache-2.0): the client the Shizuku provider plugin runs on, see plugin-host
@@ -103,8 +99,11 @@ collection-ktx = "1.6.0-beta01"
 lifecycleRuntimeKtx = "2.8.4"
 composeBom = "2024.09.00"
 media3 = "1.4.1"
-# The okhttp the APK already ran through vendor/gamenative; :stores compiles against it.
+# okhttp 5 (Apache-2.0): :stores and the Windows runtime (:runtime-windows), with its DNS-over-HTTPS module.
 okhttp = "5.1.0"
+# https://github.com/luben/zstd-jni (BSD-2-Clause): commons-compress's zstd streams, which the
+# Windows runtime's .tzst payloads are (:runtime-windows TarCompressorUtils).
+zstd-jni = "1.5.7-5"
 # https://github.com/zhanghai/AndroidLibArchive (Apache-2.0, over libarchive, BSD-2-Clause): 7z and RAR for itch.io uploads (:stores).
 # The version vendor/gamenative pins, so the APK keeps one copy of libarchive.
 libarchive-android = "1.1.6"
@@ -237,6 +236,8 @@ androidx-room-runtime = { group = "androidx.room", name = "room-runtime", versio
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+okhttp-dnsoverhttps = { group = "com.squareup.okhttp3", name = "okhttp-dnsoverhttps", version.ref = "okhttp" }
+zstd-jni = { group = "com.github.luben", name = "zstd-jni", version.ref = "zstd-jni" }
 libarchive-android = { module = "me.zhanghai.android.libarchive:library", version.ref = "libarchive-android" }
 javasteam = { group = "io.github.joshuatam", name = "javasteam", version.ref = "javasteam" }
 javasteam-depotdownloader = { group = "io.github.joshuatam", name = "javasteam-depotdownloader", version.ref = "javasteam" }
@@ -244,10 +245,6 @@ zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" 
 bouncycastle-bcpkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncycastle" }
 
 vectordrawable-animated = { module = "androidx.vectordrawable:vectordrawable-animated", version.ref = "vectordrawable-animated" }
-browser = { module = "androidx.browser:browser", version.ref = "browser" }
-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
-posthog-android = { module = "com.posthog:posthog-android", version.ref = "posthog-android" }
-jwtdecode = { module = "com.auth0.android:jwtdecode", version.ref = "jwtdecode" }
 json-v20240303 = { module = "org.json:json", version.ref = "json-20240303" }
 xz = { module = "org.tukaani:xz", version.ref = "xz" }
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }

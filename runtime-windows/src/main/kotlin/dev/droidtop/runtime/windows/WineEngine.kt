@@ -1,7 +1,7 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.utils.X86_64GuestLibs
+import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
 import com.winlator.container.Container
 import com.winlator.xenvironment.ImageFs
 import dev.droidtop.library.LaunchDisplay
@@ -78,7 +78,7 @@ sealed interface WineEngineReadiness {
  * The no-root Wine engine: gamenative's own bionic execution model,
  * which is the one that works on this target.
  *
- * `:runtime-windows` compiles the vendored tree with
+ * `:runtime-windows` builds the runtime with
  * `MODERN_ANDROID = true`, because Android refuses to `exec()` extracted
  * binaries above `targetSdk 28`. On that path gamenative runs the guest
  * with a plain `ProcessHelper` exec against the [ImageFs] root, loaded

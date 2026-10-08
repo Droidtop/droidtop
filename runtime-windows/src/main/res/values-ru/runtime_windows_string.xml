@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="cancel">Отмена</string>
+    <string name="compatibility">Совместимость</string>
+    <string name="copy">Копировать</string>
+    <string name="denuvo">Denuvo</string>
+    <string name="extreme">Экстремальный</string>
+    <string name="intermediate">Средний</string>
+    <string name="manifest_download_failed">Ошибка загрузки: %1$s</string>
+    <string name="manifest_install_failed">Ошибка установки %1$s</string>
+    <string name="manifest_install_success">%1$s установлен</string>
+    <string name="ok">ОК</string>
+    <string name="performance">Производительность</string>
+    <string name="shooter_mode_off">Включить стики</string>
+    <string name="shooter_mode_on">Включить мышь</string>
+    <string name="stability">Стабильность</string>
+    <string name="unity">Unity</string>
+    <string name="unity_mono_bleeding_edge">Unity Mono Bleeding Edge</string>
+</resources>

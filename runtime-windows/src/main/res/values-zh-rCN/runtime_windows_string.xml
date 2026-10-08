@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="cancel">取消</string>
+    <string name="compatibility">兼容性</string>
+    <string name="copy">复制</string>
+    <string name="denuvo">Denuvo</string>
+    <string name="extreme">极致</string>
+    <string name="intermediate">平衡</string>
+    <string name="manifest_download_failed">下载失败：%1$s</string>
+    <string name="manifest_install_failed">安装 %1$s 失败</string>
+    <string name="manifest_install_success">%1$s 已安装</string>
+    <string name="ok">确认</string>
+    <string name="performance">高性能</string>
+    <string name="shooter_mode_off">启用摇杆</string>
+    <string name="shooter_mode_on">启用鼠标</string>
+    <string name="stability">稳定</string>
+    <string name="unity">Unity</string>
+    <string name="unity_mono_bleeding_edge">Unity Mono Bleeding Edge</string>
+    <string name="untitled">未命名</string>
+</resources>

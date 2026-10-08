@@ -1,8 +1,8 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.utils.ContainerUtils
-import app.gamenative.utils.X86_64GuestLibs
+import dev.droidtop.runtime.windows.utils.ContainerUtils
+import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
 import com.winlator.container.Container
 import com.winlator.container.ContainerData
 import com.winlator.container.ContainerManager
@@ -31,8 +31,8 @@ import org.json.JSONObject
  * strategies from dead `error()` stubs into actual launches.
  *
  * Lives in `:runtime-windows` rather than `:app` for a concrete reason:
- * this is the module that compiles the vendored `com.winlator.*` tree
- * (see this module's own build script), so [ContainerManager] -- the real
+ * this is the module that holds the `com.winlator.*` runtime
+ * (docs/SPEC.md 9), so [ContainerManager] -- the real
  * owner of Wine-prefix state -- is only visible from here. `:app` depends
  * on this module with `implementation`, which does not re-export those
  * types, so the same code in `:app` would not compile.
@@ -205,7 +205,7 @@ class DroidtopPcGameRuntime(
         // bundled assets (where it has never shipped, upstream included)
         // or from a file already sitting in the files dir. Upstream puts
         // it there in its own pre-launch phase, which droidtop does not
-        // fork -- so it is downloaded here ([GameNativeDownloads]), and
+        // fork -- so it is downloaded here ([RuntimeDownloads]), and
         // only when the installer's own condition says it would actually
         // install (valid + current + same variant means it will skip).
         val imageFs = ImageFs.find(context)
@@ -226,7 +226,7 @@ class DroidtopPcGameRuntime(
             val dest = File(context.filesDir, archiveName)
             if (!(dest.isFile && dest.length() > 0)) {
                 val downloaded = runCatching {
-                    GameNativeDownloads.fetch(archiveName, dest) { fraction ->
+                    RuntimeDownloads.fetch(archiveName, dest) { fraction ->
                         onStatus("Downloading the Windows base system… ${(fraction * 100).toInt()}%")
                     }
                 }

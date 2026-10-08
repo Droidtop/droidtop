@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="cancel">Annullér</string>
+    <string name="compatibility">Kompatibilitet</string>
+    <string name="copy">Kopiér</string>
+    <string name="denuvo">Denuvo</string>
+    <string name="extreme">Extreme</string>
+    <string name="intermediate">Mellemtrin</string>
+    <string name="manifest_download_failed">Download mislykkedes: %1$s</string>
+    <string name="manifest_install_failed">Kunne ikke installere %1$s</string>
+    <string name="manifest_install_success">%1$s installeret</string>
+    <string name="ok">Ok</string>
+    <string name="performance">Ydelse</string>
+    <string name="shooter_mode_off">Aktiver sticks</string>
+    <string name="shooter_mode_on">Aktiver mus</string>
+    <string name="stability">Stabilitet</string>
+    <string name="unity">Unity</string>
+    <string name="unity_mono_bleeding_edge">Unity Mono Bleeding Edge</string>
+    <string name="untitled">Uden titel</string>
+</resources>

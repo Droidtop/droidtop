@@ -10,16 +10,16 @@ import okhttp3.Protocol
 import okhttp3.Request
 
 /**
- * Fetches a file of the Windows runtime's base system (the imagefs archive,
- * the two bundled Proton 9 builds) from GameNative's download host, with its
- * mirror as the fallback: GameNative's SteamService.fetchFile and
+ * The Windows runtime's one downloader: [fetchUrl] for a file at a URL (a
+ * component-list entry, a pinned release asset), [fetch] for a file of the
+ * runtime's base system (the imagefs archive, the bundled Proton 9 builds,
+ * container files, drivers) from GameNative's download host with its mirror
+ * as the fallback. GameNative's SteamService.fetchFile and
  * fetchFileWithFallback (GPL-3.0), which had nothing to do with Steam but
- * lived in its Steam service. Moved here when Steam became droidtop's own
- * (docs/SPEC.md 7g, "Stores"), so the Wine runtime no longer reaches into
- * GameNative's Steam service for its downloads. The hosts stay GameNative's
- * until the Wine runtime moves too.
+ * lived in its Steam service. The hosts are GameNative's: they serve the
+ * builds, the code that fetches them is droidtop's (docs/SPEC.md 5b).
  */
-internal object GameNativeDownloads {
+internal object RuntimeDownloads {
     private const val PRIMARY = "https://downloads.gamenative.app/"
     private const val MIRROR = "https://pub-9fcd5294bd0d4b85a9d73615bf98f3b5.r2.dev/"
 
@@ -30,6 +30,11 @@ internal object GameNativeDownloads {
             .callTimeout(0, TimeUnit.MILLISECONDS)
             .protocols(listOf(Protocol.HTTP_1_1))
             .build()
+    }
+
+    /** Downloads [url] into [dest]; [onProgress] gets 0 to 1. */
+    suspend fun fetchUrl(url: String, dest: File, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
+        fetchFrom(url, dest, onProgress)
     }
 
     /** Downloads [fileName] into [dest], from the primary host and then the mirror; [onProgress] gets 0 to 1. */

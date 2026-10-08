@@ -89,7 +89,7 @@ object ModeStartup {
         if (!on(ModePiece.DESKTOP_VPN)) dev.droidtop.app.vpn.DroidtopVpnService.stop(app)
         setComponentEnabled(app, dev.droidtop.app.vpn.DroidtopVpnService::class.java.name, on(ModePiece.DESKTOP_VPN))
 
-        if (on(ModePiece.WINDOWS_BACKBONE)) ensureGamenative(app)
+        if (on(ModePiece.WINDOWS_BACKBONE)) ensureWindowsRuntime(app)
     }
 
     /**
@@ -101,23 +101,13 @@ object ModeStartup {
     private var platformsWarmed = false
 
     /**
-     * The vendored gamenative backbone's process bootstrap: preferences,
-     * the download service, Steam prerequisites, the container migration
-     * and the container-file preload, telemetry, and a native library
-     * preload. It is the heaviest thing droidtop starts, it reaches the
-     * network, and neither Launcher mode nor a bare library scan needs any
-     * of it ([ModePiece.WINDOWS_BACKBONE]).
-     *
-     * Also reached from the PC launch path, which is shared core: a
-     * Windows game launched with both Gaming and Desktop off still needs
-     * the backbone, and gets it here rather than through a second init
-     * path. gamenative's own bootstrap returns immediately once it has
-     * run, which is what makes calling it from several places honest
-     * rather than a race. The vendored tree compiles into
-     * `:runtime-windows` and only there, hence the call through that
-     * module's own [dev.droidtop.runtime.windows.WindowsBackbone].
+     * The Windows runtime's process start (its preferences and storage
+     * paths, read once in the background; [dev.droidtop.runtime.windows.WindowsBackbone]),
+     * which neither Launcher mode nor a bare library scan needs
+     * ([ModePiece.WINDOWS_BACKBONE]). Also reached from the PC launch path,
+     * which is shared core; starting it twice is a no-op.
      */
-    fun ensureGamenative(context: Context) {
+    fun ensureWindowsRuntime(context: Context) {
         dev.droidtop.runtime.windows.WindowsBackbone.ensureStarted(context)
         carryOverSteam(context)
     }
@@ -127,9 +117,9 @@ object ModeStartup {
     /**
      * Once, after the backbone is up: the Steam sign-in and the Steam
      * installs GameNative kept come across to droidtop's own Steam
-     * (docs/SPEC.md 7g, "Stores"). GameNative's preferences are only
-     * readable through the backbone, which is why this waits on it and
-     * never starts it for this alone. Off the main thread.
+     * (docs/SPEC.md 7g, "Stores"). GameNative kept them in the preferences
+     * the Windows runtime reads, which is why this waits on it and never
+     * starts it for this alone. Off the main thread.
      */
     private fun carryOverSteam(context: Context) {
         val app = context.applicationContext

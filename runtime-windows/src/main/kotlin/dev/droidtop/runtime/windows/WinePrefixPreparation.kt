@@ -2,14 +2,14 @@ package dev.droidtop.runtime.windows
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
-import app.gamenative.ui.data.XServerState
-import app.gamenative.ui.screen.xserver.buildVkBasaltConfig
-import app.gamenative.ui.screen.xserver.changeWineAudioDriver
-import app.gamenative.ui.screen.xserver.extractArm64ecInputDLLs
-import app.gamenative.ui.screen.xserver.extractGraphicsDriverFiles
-import app.gamenative.ui.screen.xserver.extractx86_64InputDlls
-import app.gamenative.ui.screen.xserver.setImagefsContainerVariant
-import app.gamenative.ui.screen.xserver.setupWineSystemFiles
+import dev.droidtop.runtime.windows.ui.data.XServerState
+import dev.droidtop.runtime.windows.ui.screen.xserver.buildVkBasaltConfig
+import dev.droidtop.runtime.windows.ui.screen.xserver.changeWineAudioDriver
+import dev.droidtop.runtime.windows.ui.screen.xserver.extractArm64ecInputDLLs
+import dev.droidtop.runtime.windows.ui.screen.xserver.extractGraphicsDriverFiles
+import dev.droidtop.runtime.windows.ui.screen.xserver.extractx86_64InputDlls
+import dev.droidtop.runtime.windows.ui.screen.xserver.setImagefsContainerVariant
+import dev.droidtop.runtime.windows.ui.screen.xserver.setupWineSystemFiles
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
 import com.winlator.contents.ContentsManager
@@ -43,8 +43,9 @@ import timber.log.Timber
  * is only the orchestration droidtop needs and gamenative's own copy of
  * cannot be reused from: theirs is spliced through a Compose screen's
  * state, a Steam app id and a splash-text event bus. The functions it
- * calls are `internal` in the fork for exactly this reason, so there is
- * one implementation of each step rather than droidtop's and theirs.
+ * calls are GameNative's, lifted unchanged into this module
+ * (`ui/screen/xserver/PrefixSetup.kt`), so there is one implementation of
+ * each step.
  *
  * Deliberately not included, each Steam- or store-specific:
  * `extractSteamFiles`/`SteamTokenLogin` (reached from inside

@@ -149,8 +149,8 @@ class PcGameProvider(
         // are read by the next one, so their file moves the stamp.
         paths += StoreUpdates.file(context).absolutePath
         runCatching { ContainerManager(context).containers.forEach { paths += it.desktopDir.absolutePath } }
-        runCatching { paths += app.gamenative.PrefManager.customGameManualFolders }
-        runCatching { paths += app.gamenative.PrefManager.customGameScanRoots }
+        runCatching { paths += dev.droidtop.runtime.windows.PrefManager.customGameManualFolders }
+        runCatching { paths += dev.droidtop.runtime.windows.PrefManager.customGameScanRoots }
         val roots = dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath }
         var stamp = 17L
         for (root in roots) stamp = 31 * stamp + root.hashCode()

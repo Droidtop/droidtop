@@ -1,8 +1,8 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.PrefManager
-import app.gamenative.service.DownloadService
+import dev.droidtop.runtime.windows.PrefManager
+import dev.droidtop.runtime.windows.utils.StoragePaths
 import java.io.File
 
 /**
@@ -10,10 +10,9 @@ import java.io.File
  * games, read once so droidtop's own Steam can carry them over
  * (`dev.droidtop.stores.steam.SteamCarryOver`, docs/SPEC.md 7g "Stores").
  * GameNative kept the sign-in in its preferences, the refresh token
- * encrypted with its Android Keystore key, which only its own
- * [PrefManager] reads; so this one read stays here, in the module that
- * compiles GameNative, until the Wine runtime moves out too. Needs the
- * backbone up ([WindowsBackbone.awaitReady]); off the main thread.
+ * encrypted with its Android Keystore key; the runtime's [PrefManager]
+ * reads the same preferences file with the same key. Needs the runtime up
+ * ([WindowsBackbone.awaitReady]); off the main thread.
  */
 object GameNativeSteamSignIn {
     data class Session(val accountName: String, val refreshToken: String, val steamId64: Long, val clientId: Long?, val cellId: Int)
@@ -38,7 +37,7 @@ object GameNativeSteamSignIn {
         val bases = buildList {
             add(context.dataDir.path)
             runCatching { PrefManager.externalStoragePath }.getOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
-            runCatching { DownloadService.externalVolumePaths }.getOrDefault(emptyList()).filter { it.isNotBlank() }.forEach(::add)
+            StoragePaths.externalVolumePaths.filter { it.isNotBlank() }.forEach(::add)
         }
         return bases.distinct().map { File(File(File(it, "Steam"), "steamapps"), "common") }
     }

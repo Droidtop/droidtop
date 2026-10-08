@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="cancel">Anulează</string>
+    <string name="compatibility">Compatibilitate</string>
+    <string name="copy">Copiază</string>
+    <string name="denuvo">Denuvo</string>
+    <string name="extreme">Extreme</string>
+    <string name="intermediate">Intermediar</string>
+    <string name="manifest_download_failed">Descărcarea a eșuat: %1$s</string>
+    <string name="manifest_install_failed">Instalarea %1$s a eșuat</string>
+    <string name="manifest_install_success">%1$s instalat cu succes</string>
+    <string name="ok">OK</string>
+    <string name="performance">Performanță</string>
+    <string name="shooter_mode_off">Activează stick-urile</string>
+    <string name="shooter_mode_on">Activează mouse-ul</string>
+    <string name="stability">Stabilitate</string>
+    <string name="unity">Unity</string>
+    <string name="unity_mono_bleeding_edge">Unity Mono Bleeding Edge</string>
+    <string name="untitled">Fără titlu</string>
+</resources>

@@ -14,7 +14,7 @@ import android.view.WindowManager
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.TextView
-import app.gamenative.data.TouchGestureConfig
+import dev.droidtop.runtime.windows.data.TouchGestureConfig
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
 import com.winlator.inputcontrols.ControllerManager
@@ -35,7 +35,7 @@ import com.winlator.xserver.XServer
 import java.io.File
 import java.util.concurrent.Executors
 import timber.log.Timber
-import app.gamenative.PrefManager as GameNativePrefManager
+import dev.droidtop.runtime.windows.PrefManager as GameNativePrefManager
 import com.winlator.PrefManager as WinlatorPrefManager
 
 /**
@@ -91,7 +91,7 @@ class WineGameActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Both preference stores are read from deep inside the vendored
+        // Both preference stores are read from deep inside the Winlator
         // view and renderer code, and both inits are no-ops once done.
         GameNativePrefManager.init(this)
         WinlatorPrefManager.init(this)
@@ -241,11 +241,8 @@ class WineGameActivity : Activity() {
      * Shows why the game is not running, and stays up until the person
      * dismisses it.
      *
-     * Deliberately its own view rather than a toast or a snackbar: the
-     * vendored tree poisons `android.widget.Toast` outright, and its
-     * `SnackbarManager` publishes into a Compose host that this screen
-     * does not have -- a message sent there would be dropped silently,
-     * which is the one thing a failure report must not do. A launch that
+     * Deliberately its own view rather than a toast: a toast goes away by
+     * itself, which is the one thing a failure report must not do. A launch that
      * fails after the shell has already handed off is only visible here,
      * so it is shown here, and finishing immediately would take it away
      * before it could be read.

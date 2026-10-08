@@ -1,9 +1,8 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.data.GameSource
-import app.gamenative.data.LibraryItem
-import app.gamenative.utils.CustomGameScanner
+import dev.droidtop.runtime.windows.utils.CustomGameScanner
+import dev.droidtop.runtime.windows.utils.ScannedGame
 import dev.droidtop.library.EngineVerdictStore
 import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.PcFolderScan
@@ -152,11 +151,6 @@ object PcLibrary {
                     val ourRoots = dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath }
                     CustomGameScanner.scanAsLibraryItems()
                         .distinctBy { it.appId }
-                        // The scanner recognizes a Steam install sitting in a
-                        // scanned folder and returns it as a STEAM item; that
-                        // game is the Steam store's, so taking both would
-                        // list it twice.
-                        .filter { it.gameSource == GameSource.CUSTOM_GAME }
                         .map { it to it.scannerFolder() }
                         .filterNot { (_, path) ->
                             path != null && ourRoots.any { root -> path == root || path.startsWith(root + "/") }
@@ -243,11 +237,6 @@ object PcLibrary {
                 val games = group.gameFolders
                     .mapNotNull { folder -> runCatching { CustomGameScanner.createLibraryItemFromFolder(folder) }.getOrNull() }
                     .distinctBy { it.appId }
-                    // The scanner recognizes a Steam install sitting in a
-                    // scanned folder and returns it as a STEAM item; that
-                    // game is the Steam store's, so taking both would list
-                    // it twice.
-                    .filter { it.gameSource == GameSource.CUSTOM_GAME }
                     .map { it.toGame(context, group.root) }
                     .sortedBy { it.title.lowercase() }
                 val folderGroup = FolderGroup(
@@ -444,10 +433,10 @@ object PcLibrary {
     ): List<ScannedFolder> = coroutineScope {
         val rootPaths = roots.map { it.absolutePath }
         runCatching {
-            val currentRoots = app.gamenative.PrefManager.customGameScanRoots
+            val currentRoots = dev.droidtop.runtime.windows.PrefManager.customGameScanRoots
             val keptRoots = currentRoots.filterNot { it in rootPaths }.toSet()
             if (keptRoots.size != currentRoots.size) {
-                app.gamenative.PrefManager.customGameScanRoots = keptRoots
+                dev.droidtop.runtime.windows.PrefManager.customGameScanRoots = keptRoots
             }
         }.onFailure { android.util.Log.w(TAG, "Could not take droidtop's roots out of the folder scanner", it) }
         val startedAt = android.os.SystemClock.elapsedRealtime()
@@ -549,7 +538,7 @@ object PcLibrary {
     private fun adoptFoundFolders(rootPaths: List<String>, scanned: List<ScannedFolder>) {
         val found = scanned.flatMap { it.gameFolders }.toSet()
         runCatching {
-            val current = app.gamenative.PrefManager.customGameManualFolders
+            val current = dev.droidtop.runtime.windows.PrefManager.customGameManualFolders
             // A folder this walk skipped keeps the games the last walk
             // named under it; everything else under the roots is this
             // walk's answer.
@@ -558,7 +547,7 @@ object PcLibrary {
                 rootPaths.any { manual.startsWith(it + "/") } && !manual.isUnder(unwalked)
             }
             val wanted = (theirs + found).toSet()
-            if (wanted != current) app.gamenative.PrefManager.customGameManualFolders = wanted
+            if (wanted != current) dev.droidtop.runtime.windows.PrefManager.customGameManualFolders = wanted
         }.onFailure { android.util.Log.w(TAG, "Could not tell the folder scanner which folders are games", it) }
     }
 
@@ -569,7 +558,7 @@ object PcLibrary {
      * "CUSTOM_GAME_<numeric id>"; the numeric half is what resolves back to
      * a folder.
      */
-    private fun LibraryItem.scannerFolder(): String? =
+    private fun ScannedGame.scannerFolder(): String? =
         appId.substringAfterLast('_').toIntOrNull()
             ?.let { id -> runCatching { CustomGameScanner.findCustomGameById(id) }.getOrNull() }
 
@@ -606,7 +595,7 @@ object PcLibrary {
      * offline installer's output, an itch download, a portable game.
      * These are "installed" by definition: the files are already there.
      */
-    private fun LibraryItem.toGame(context: Context, root: String? = null, folderPath: String? = scannerFolder()): Game {
+    private fun ScannedGame.toGame(context: Context, root: String? = null, folderPath: String? = scannerFolder()): Game {
         // A custom game has no store CDN behind it, so its art is whatever
         // image sits in the folder rather than a remote URL.
         val localArt = folderPath?.let { path ->
@@ -629,7 +618,8 @@ object PcLibrary {
             title = title,
             installed = true,
             installPath = folderPath,
-            sizeBytes = sizeBytes,
+            // The scanner never measured a folder (GameNative left it 0 too).
+            sizeBytes = 0L,
             artUrl = localArt,
         )
     }

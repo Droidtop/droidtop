@@ -1149,11 +1149,11 @@ program a first-class window rather than a game launch.
   draws (§4c).
 - **Quick Menu reaches Desktop.** Gaming's Quick Menu offers Desktop's
   containers rather than carrying a container implementation of its own.
-- **The Windows backbone has two owners.** The vendored gamenative
-  bootstrap serves Gaming's PC surface and Desktop's containers, and the
-  shared PC launch path; it is one idempotent entry point
-  (`WindowsBackbone.ensureStarted`, `:runtime-windows`), never a second
-  init path.
+- **The Windows runtime's start has two owners.** It serves Gaming's PC
+  surface and Desktop's containers, and the shared PC launch path; it is one
+  idempotent entry point (`WindowsBackbone.ensureStarted`, `:runtime-windows`:
+  the runtime's preferences and storage paths, read once off the main
+  thread), never a second init path.
 
 ### How the rule is enforced
 
@@ -4149,12 +4149,17 @@ source in [vendor/gamenative](../vendor/gamenative):
   - **Components arrive on demand, never in an image.** One step,
     `WineComponents.ensure`, runs at setup, before every launch and from the
     settings' "Download what these settings need" row: the two Proton 9
-    builds through gamenative's launch dependency, everything else through
-    upstream GameNative's component list (`ManifestRepository`, hosted on
+    builds as archives from GameNative's download host (`RuntimeDownloads`),
+    unpacked into the shared Proton store, everything else through upstream
+    GameNative's component list (`ManifestRepository`, hosted on
     downloads.gamenative.app and the hosts it names) by
-    `BestConfigService.resolveMissingManifestInstallRequests` and
-    `ManifestInstaller`, the same pair GameNative's own pre-launch runs. The
-    x86_64 pieces are the fork's own release assets (§10b).
+    `ComponentRequests.resolveMissing` (GameNative's
+    `BestConfigService.resolveMissingManifestInstallRequests`, its one part
+    droidtop uses) and `ManifestInstaller`, the pair GameNative's own
+    pre-launch runs. The builds are other projects' (GameNative's, upstream
+    DXVK/VKD3D/FEX/Box64/Turnip, droidtop's own `Droidtop/proton-wine-tux`):
+    droidtop fetches them, it does not build them into the APK. The x86_64
+    pieces are release assets of droidtop's fork (§10b).
 - **Prefer a native Linux build over Wine+translation when one exists
   and can run.** Some games ship a genuine Linux build alongside (or
   instead of) Windows. Running it as a normal process inside a Linux
@@ -9420,10 +9425,9 @@ follows:
   `SteamStore.launch`), and a game that needs Steam running does not start, as
   before. Its prefix keeps GameNative's container id for a Steam game
   (`STEAM_<app id>`, `PcContainers`), a plain name. Its component downloads
-  moved out of GameNative's Steam service (`GameNativeDownloads`, still
-  GameNative's host). GameNative's `SteamService` is still compiled (the whole
-  tree is) but no longer declared or started. The `vendor/gamenative`
-  submodule stays until the Wine runtime moves.
+  moved out of GameNative's Steam service (`RuntimeDownloads`, still
+  GameNative's host). Since the runtime lift (2026-10-08, §9) GameNative's
+  `SteamService` is not compiled at all.
 
 ### What the store services give, and what they do not
 
@@ -10773,17 +10777,9 @@ reimplements an engine's input model.
 
 ### Reuse, not reimplementation
 
-`:runtime-windows` already compiles the whole vendored gamenative tree
-(§9), so the store logins, install and download flows, container
-configuration dialogs, compatibility badge and folder-game scanner are
-present in the APK and need entry points, not ports (§7c's "increment 2").
-Those entry points are `:app` Activities, because the Gaming shell
-cannot depend on `:app` and these screens are Compose UI rather than
-catalog data, for a store GameNative still runs: the store's own app screen
-for one game (which brings its install, verify, update, DLC and delete
-dialogs with it), the downloads queue and its sign-in; and the
-container-configuration dialog. A store droidtop runs itself (7g "Stores")
-has no hosted screen at all.
+Every store is droidtop's own (§7g "Stores") and the Windows runtime is
+droidtop's own module (§9), so no GameNative screen is hosted any more: store
+sign-in, installs and the prefix settings (§7c) are droidtop's screens.
 Which container a game's prefix row opens is droidtop's own question and
 has one answer shared with the launch path — the game's own prefix when a
 store app id keyed one, droidtop's single provisioned container otherwise
@@ -12534,8 +12530,9 @@ host-bridge            → native Wayland client + JNI: frame passthrough, input
 runtime-common         → shared types and interfaces (ContainerRuntime, ContainerLayout,
                           DisplayOutput, RootfsImage, modes, settings catalogs), loose
                           version ordering and SHA-256 hex encoding; depends on nothing
-runtime-windows        → Wine/Box64, compiling the whole vendored gamenative tree
-                          (vendor/gamenative, see below); no display code of its own;
+runtime-windows        → the Windows runtime: Winlator's runtime as GameNative ships it
+                          (com.winlator) and the GameNative pieces it uses, lifted
+                          (see below); presents through its own X server view;
                           depends on runtime-common and library-core (it supplies the
                           "pc" library entries)
 runtime-linux-root     → DroidSpaces (vendor/droidspaces), namespaces/cgroups, needs root;
@@ -12583,31 +12580,47 @@ reference/             → screenshots used as visual references
 
 `RomDatabase.rom_entries` and `scan_metadata` (the persistent ROM-scan cache) are deleted; the index (`RoomLibraryIndexStore`, backed by `library-index.db`) and the per-game JSON records (`files/library/games/`) replace them as the single sources. `Library.scanAll()` and `Library.scanKinds()` are deleted (the index-backed `LibraryProgressive` and `Library.find()` already cover what they did); `ConsoleRomProvider.scan()` now walks fresh folders without the cache filter. The `game_metadata`, `collections` and `collection_members` user-data tables stay in `RomDatabase` and survive a non-destructive migration (`MIGRATION_10_11` drops the two pure-cache tables). No AI attribution.
 
-### `:runtime-windows` consumes ALL of gamenative (decided 2026-08-31)
+### `:runtime-windows` is droidtop's own (decided 2026-10-08, Droidtop/tracker#313)
 
-Previously the module compiled only the vendored `com.winlator.*` subtree
-plus hand-written shims for the `app.gamenative.*` symbols it touched.
-Reviewing all 40 local files against the vendor tree showed every one was
-either a shim or a stale snapshot of a file the fork had since evolved --
-and each shim was a place droidtop re-learned something gamenative
-already does (an always-null downloader stub was the direct reason Wine
-container creation could never work). Direction: **compile the entire
-vendored tree.**
+The module used to compile the whole vendored GameNative tree (from
+2026-08-31) and carry its Hilt graph, Room database, JavaSteam, PostHog and
+UI. Owner, 2026-10-08: move GameNative's Windows runtime into droidtop's own
+module the way the stores moved, then delete the submodule ("zero dependency
+on GameNative"; stay as close to upstream as possible). So the module holds:
 
-Mechanics worth keeping straight: gamenative's own version catalog is
-registered as a second Gradle catalog (`gn`) so dependency versions track
-the fork through vendor sync; BuildConfig is AGP-generated with
-`MODERN_ANDROID=true` and the W^X bionic preload (droidtop targets SDK
-34, where the legacy exec() path has been blocked since 28 -- the old
-shim's `false` could never work); Play Integrity's client library is
-deliberately not declared, making the fork's ripout structural; PostHog
-compiles with an empty key (inert) pending a proper strip in the fork.
+- `src/main/java/com/winlator/**`: Winlator's runtime as GameNative ships it
+  (X server, renderers, audio, xconnector, SysV shm, input, containers,
+  contents, the program launchers), package and headers unchanged. Edits only
+  where a dropped GameNative piece was named, each marked `droidtop:`: the
+  in-prefix Steam client (lsteamclient bridge, `SteamBootstrap`,
+  `extractSteamFiles`) and the Epic overlay are not carried, since droidtop's
+  stores are `:stores`.
+- `src/main/kotlin/dev/droidtop/runtime/windows/{utils,data,ui,powercontrol}`:
+  the GameNative-authored files that runtime reaches, under the same
+  sub-packages (`app.gamenative.X` became `dev.droidtop.runtime.windows.X`):
+  `ContainerUtils` (device defaults, ContainerData in and out),
+  the component list (`Manifest*`, `ComponentRequests`), the x86_64 path
+  (`X86_64GuestLibs`, `X86_64Graphics`, `PinnedReleaseAsset`), the prefix
+  helpers from the end of GameNative's `XServerScreen.kt`
+  (`ui/screen/xserver/PrefixSetup.kt`), the downloaders, `LsfgVkManager`,
+  `TouchGestureConfig`, the PC folder scanner (`CustomGameScanner`, its ids in
+  `DroidtopGameIdStore`). Which files: a class-level closure from droidtop's
+  own call sites, then everything unreached deleted.
+- `PrefManager`: the runtime's keys only, in GameNative's own DataStore file
+  ("PluviaPreferences") under the same keys, so nothing a device already has
+  moves; `WindowsBackbone` replaces `PluviaApp.bootstrap` (preferences,
+  storage paths, a Timber tree).
+- `src/main/res`: only the resources that code reaches (collected by script).
+- namespace `dev.droidtop.runtime.windows`; `BuildConfig` carries the three
+  switches the code reads (`MODERN_ANDROID`, `PRELOAD_BIONIC_SO`, `XR_BUILD`).
 
-The Hilt graph lives on `DroidtopApplication` (`@HiltAndroidApp`) so
-gamenative's `@AndroidEntryPoint` activities run as droidtop's own `:app`
-hosts; the vendor manifest's components are curated into the module
-manifest rather than merged wholesale; and the entry points into the
-container-configuration UI are the two §7c names.
+Gone with it: GameNative's UI, Hilt (`DroidtopApplication` is a plain
+Application), Room's `PluviaDatabase` (`:stores` imported it), the unused
+`SteamService`, PostHog, Play feature delivery, power control (nothing
+droidtop runs started it), `BestConfigService`'s api.gamenative.app lookups,
+`GameCompatibilityCache`. Still read from `vendor/gamenative` until the next
+piece: the native sources the x86_64 CMake build compiles, the prebuilt arm64
+libraries and the asset payloads.
 
 ## 10. Build order
 
@@ -12625,10 +12638,10 @@ The order work lands in, where one piece depends on another:
    `wlr-screencopy` capture and virtual-input injection were the one piece
    no prior art proved; they are shown working against sway on the stock
    emulator (§3). Whether they hold up on the handheld is §11's first risk.
-4. **Windows games through gamenative's own presentation** (§5b):
-   `:runtime-windows` compiles the whole vendored gamenative tree and
-   presents a Wine guest in gamenative's X server view, so Wine for games
-   does not wait on anything in the container stack.
+4. **Windows games through Winlator's own presentation** (§5b):
+   `:runtime-windows` carries Winlator's runtime as GameNative ships it and
+   presents a Wine guest in its X server view, so Wine for games does not
+   wait on anything in the container stack.
 
 ## 10a. Build environment
 

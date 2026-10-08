@@ -12,8 +12,8 @@ import okhttp3.internal.platform.PlatformRegistry
  * androidx.startup component, and the launcher's manifest
  * (shell-default/src/main/AndroidManifest.xml) removes androidx.startup's
  * InitializationProvider for the whole app, so it never ran: every
- * DNS-over-HTTPS lookup the vendored gamenative tree makes
- * (app.gamenative.utils.Net) failed with "Unable to load
+ * DNS-over-HTTPS lookup the Windows runtime makes
+ * (dev.droidtop.runtime.windows.utils.Net) failed with "Unable to load
  * PublicSuffixDatabase.list resource" and fell back to system DNS
  * (BlueStacks rig, Droidtop/tracker#242). Setting the context is exactly what
  * PlatformInitializer.create does; nothing else is started.
