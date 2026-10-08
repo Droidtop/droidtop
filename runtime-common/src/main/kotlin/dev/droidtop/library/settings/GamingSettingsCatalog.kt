@@ -865,7 +865,22 @@ object GamingSettingsCatalog {
                     title = "Companion",
                     groups = { ctx ->
                         keyboard.load(ctx)
+                        CompanionHomePrefs.load(ctx)
+                        val home = CompanionHomePrefs.layout.value
                         listOf(
+                            // Which sections the companion's Home shows; folding one is done on Home itself.
+                            CatalogGroup(
+                                id = "${ID_DISPLAY_COMPANION}_home",
+                                title = "Home",
+                                items = CompanionHomeSection.entries.map { section ->
+                                    ToggleItem(
+                                        id = CompanionHomePrefs.itemId(section),
+                                        title = section.label,
+                                        current = home.shows(section),
+                                        onToggle = { c, on -> CompanionHomePrefs.setShown(c, section, on) },
+                                    )
+                                },
+                            ),
                             CatalogGroup(
                                 id = "${ID_DISPLAY_COMPANION}_keyboard",
                                 title = "Keyboard",

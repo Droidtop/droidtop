@@ -1,7 +1,6 @@
 package dev.droidtop.app
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.Lifecycle
@@ -49,8 +49,9 @@ import dev.droidtop.library.social.SocialHub
  * [CompanionSocialTab], Droidtop/tracker#327; not in Kiosk and Kid), Tasks, Performance, System and,
  * in Desktop mode or when the user chose it as this mode's second-screen role, the keyboard and
  * trackpad Input surface (section 6c).
- * Touch only: every host denies focus to this whole tree (`focusProperties { canFocus = false }`), so
- * nothing here ever takes a controller or a key from the shell on the other screen (#186, #265).
+ * Touch first: a key reaches the companion only while no shell is in front to take it (TouchOnlySurfaceFocus,
+ * #186, #265), and then the D-pad moves between the companion's controls ([CompanionTile]). The
+ * second-screen host still denies focus to its whole tree.
  */
 internal enum class CompanionTab(val label: String) {
     HOME("Home"),
@@ -93,6 +94,15 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
     var selected by remember(mode, role) { mutableStateOf(defaultCompanionTab(role)) }
     // The tab to go back to when the input controller was opened for a field or by the Keys button.
     var before by remember { mutableStateOf<CompanionTab?>(null) }
+    // A conversation Home's Social section opened; the Social tab starts there.
+    var socialStart by remember { mutableStateOf<OpenConversation?>(null) }
+    // Keyed like [selected], whose state it writes.
+    val nav = remember(mode, role) {
+        CompanionNav(
+            openTab = { tab -> socialStart = null; selected = tab },
+            openConversation = { conversation -> socialStart = conversation; selected = CompanionTab.SOCIAL },
+        )
+    }
     val keysButton by AddonKeyboard.companionKeysButton.collectAsState()
     // While started, this companion is where droidtop's keyboard for a field on the other screen opens (SPEC 4c).
     val view = LocalView.current
@@ -138,7 +148,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         ) {
             tabs.forEach { tab ->
                 val label = if (tab == CompanionTab.SOCIAL && unread > 0) "${tab.label} $unread" else tab.label
-                CompanionPill(label, selected = tab == selected) { selected = tab }
+                CompanionPill(label, selected = tab == selected) { socialStart = null; selected = tab }
             }
             // A keyboard over any tab, typing into whatever has focus on the other screen (tracker#314). The Input
             // tab already is one.
@@ -159,8 +169,8 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         }
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (selected) {
-                CompanionTab.HOME -> home()
-                CompanionTab.SOCIAL -> CompanionSocialTab()
+                CompanionTab.HOME -> CompositionLocalProvider(LocalCompanionNav provides nav) { home() }
+                CompanionTab.SOCIAL -> CompanionSocialTab(socialStart)
                 CompanionTab.TASKS -> CompanionTasksTab()
                 CompanionTab.PERFORMANCE -> CompanionPerformanceTab()
                 CompanionTab.SYSTEM -> CompanionSystemTab()
@@ -186,16 +196,16 @@ private fun CompanionTasksTab() {
 @Composable
 internal fun CompanionPill(label: String, selected: Boolean = false, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (selected) colors.primary else colors.surfaceVariant)
-            .clickable(onClick = onClick)
-            .heightIn(min = 40.dp)
-            .padding(horizontal = 16.dp),
-    ) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = if (selected) colors.onPrimary else colors.onSurface)
+    CompanionTile(onClick = onClick, shape = RoundedCornerShape(50)) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .background(if (selected) colors.primary else colors.surfaceVariant)
+                .heightIn(min = 40.dp)
+                .padding(horizontal = 16.dp),
+        ) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = if (selected) colors.onPrimary else colors.onSurface)
+        }
     }
 }
 

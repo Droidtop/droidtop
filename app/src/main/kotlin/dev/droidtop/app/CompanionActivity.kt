@@ -24,7 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
@@ -60,7 +59,9 @@ class CompanionActivity : AppCompatActivity() {
         widgetIds = CompanionWidgetPrefs.widgetIds(this)
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-                Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) {
+                // No focus denial here: keys reach this window only while no shell is in front to take them
+                // (TouchOnlySurfaceFocus), and then the D-pad moves between the companion's own controls.
+                Box(Modifier.fillMaxSize()) {
                     // The same tab host every other second-screen host draws: with the
                     // shell relocated to the addon, THIS activity is what the remaining panel
                     // shows, and in Desktop mode its default tab is the input surface
@@ -163,8 +164,19 @@ class CompanionActivity : AppCompatActivity() {
         dev.droidtop.display.TouchOnlySurfaceFocus.onTopResumedChanged(this, isTopResumedActivity, displayIdCompat())
     }
 
-    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
-        dev.droidtop.display.TouchOnlySurfaceFocus.consumesKey(event) || super.dispatchKeyEvent(event)
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (dev.droidtop.display.TouchOnlySurfaceFocus.consumesKey(event, ownsPad = true)) return true
+        // A pad's A selects, as D-pad centre does: Compose clicks on centre and Enter, not on the A button.
+        val key = if (event.keyCode == android.view.KeyEvent.KEYCODE_BUTTON_A) {
+            android.view.KeyEvent(
+                event.downTime, event.eventTime, event.action, android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                event.repeatCount, event.metaState, event.deviceId, event.scanCode, event.flags, event.source,
+            )
+        } else {
+            event
+        }
+        return super.dispatchKeyEvent(key)
+    }
 
     override fun onPause() {
         // Paused with something in front of it (an app launched onto this screen,
@@ -243,36 +255,27 @@ object CompanionWidgetPrefs {
  */
 @androidx.compose.runtime.Composable
 internal fun CompanionNotifications() {
+    var open by androidx.compose.runtime.remember { mutableStateOf(false) }
+    CompanionNotifications(open) { open = !open }
+}
+
+/**
+ * One compact group: folded, its heading is the count and the newest notification's own line, so a busy
+ * device never pushes the sections around it out of view (tracker#285). Opened, every notification is a row
+ * in the page's own flow and the page scrolls. Home keeps [open] with its other sections' folds.
+ */
+@androidx.compose.runtime.Composable
+internal fun CompanionNotifications(open: Boolean, onToggle: () -> Unit) {
     val items by dev.droidtop.runtime.systemstatus.NotificationsStore.items.collectAsState()
     if (items.isEmpty()) return
-    // One compact group, closed until tapped: its header is the count and the newest notification's own
-    // line, so a busy device never pushes the sections around it out of view (tracker#285). Opened, every
-    // notification is a row in the page's own flow and the page scrolls.
-    var open by androidx.compose.runtime.remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        androidx.compose.foundation.layout.Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .clickable { open = !open },
-        ) {
-            Text("Notifications", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.labelLarge)
-            androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 6.dp))
-            Text(items.size.toString(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-            if (!open) {
-                androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 6.dp))
-                val newest = items.first()
-                Text(
-                    listOfNotNull(newest.appLabel, newest.title).joinToString(": "),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+        val newest = items.first()
+        CompanionSectionHeader(
+            label = "Notifications",
+            open = open,
+            summary = if (open) items.size.toString() else items.size.toString() + "   " + listOfNotNull(newest.appLabel, newest.title).joinToString(": "),
+            onToggle = onToggle,
+        )
         if (open) {
             items.take(MAX_LISTED_NOTIFICATIONS).forEach { item ->
                 androidx.compose.foundation.layout.Row(

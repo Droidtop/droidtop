@@ -1,39 +1,18 @@
 package dev.droidtop.app
 
-import android.content.Context
-import android.view.Display
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LifecycleOwner
 import androidx.savedstate.SavedStateRegistryOwner
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import coil3.compose.AsyncImage
-import androidx.compose.runtime.remember
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.library.consoles.PlatformsDatabase
-import dev.droidtop.library.consoles.resolvePlayer
-import dev.droidtop.library.displayName
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
@@ -99,6 +78,10 @@ object CompanionState {
     @Volatile
     var onLaunchEntry: ((LibraryEntry) -> Unit)? = null
 
+    /** Quit for the running game (the Now card), installed by MainActivity beside [onLaunchEntry]: `Library.quitRunning`. */
+    @Volatile
+    var onQuitEntry: ((LibraryEntry) -> Unit)? = null
+
     /**
      * Why the last rail launch failed, shown under the rail. The shell's
      * own error line is on the other screen, and a log line alone left a
@@ -150,7 +133,7 @@ private const val FOCUS_SETTLE_MS = 350L
  * The companion Home's ground: the idle art rotation while nothing is focused on the other screen
  * (docs/SPEC.md section 4d, from iiSU's "Show Hero on Idle Bottom Screen"; it used to paint a "droidtop"
  * wordmark, the one thing a glanceable surface must never do), else the plain ground. The focused game's
- * facts are not drawn here: they are a section of the scrolling Home ([CompanionFocusedInfo]), so no text
+ * facts are not drawn here: they are a section of the scrolling Home (the Now card, [CompanionNowSection]), so no text
  * is ever drawn under another block (rig, p1-dt-companion-text-overlap).
  */
 @Composable
@@ -163,153 +146,3 @@ internal fun CompanionContent(entry: LibraryEntry?) {
     }
 }
 
-/**
- * The game focused on the other screen, as an in-flow section of the scrolling Home (docs/SPEC.md 4d,
- * 2026-09-25 owner review: "a bunch of images and some white text"): a thumbnail and the facts beside it.
- */
-@Composable
-internal fun CompanionFocusedInfo(entry: LibraryEntry) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            val thumbnailUri = entry.artworkUri ?: entry.heroUri
-            if (!thumbnailUri.isNullOrBlank()) {
-                AsyncImage(
-                    model = thumbnailUri,
-                    contentDescription = entry.title,
-                    modifier = Modifier
-                        .width(120.dp)
-                        .height(160.dp)
-                        .clip(RoundedCornerShape(10.dp)),
-                    contentScale = ContentScale.Crop,
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(entry.title, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleLarge)
-                // Real system name (Nintendo 64, PlayStation 2) when this
-                // is a console ROM; the shared kind grouping name otherwise.
-                val systemName = entry.systemId
-                    ?.let { id -> PlatformsDatabase.displayNameOrNull(id) }
-                    ?: entry.kind.displayName()
-                Text(systemName, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
-                // The publisher is named only when it is not the developer,
-                // which for most PC and engine games it is.
-                val detailLine = listOfNotNull(
-                    entry.developer,
-                    entry.publisher?.takeIf { it != entry.developer },
-                    entry.releaseDate?.take(4),
-                    entry.genre,
-                ).joinToString("  ·  ")
-                if (detailLine.isNotEmpty()) {
-                    Text(detailLine, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
-                }
-                entry.series?.let { series ->
-                    Text("Series: $series", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
-                }
-                entry.rating?.let { rating ->
-                    Text(
-                        "★".repeat((rating * 5).toInt().coerceIn(0, 5)) + "☆".repeat(5 - (rating * 5).toInt().coerceIn(0, 5)),
-                        color = MaterialTheme.colorScheme.tertiary,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-                entry.description?.let { description ->
-                    Text(
-                        description,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                if (entry.playtimeSeconds > 0) {
-                    Text("Played ${entry.playtimeSeconds / 60} min", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
-                }
-                // Real DateUtils relative formatting ("3 days ago"), the
-                // standard Android phrasing -- never a raw epoch or a
-                // hand-rolled "N days" that drifts from what the OS
-                // itself would say for the same instant.
-                entry.lastPlayedEpochMs?.let { lastPlayed ->
-                    val context = LocalContext.current
-                    Text(
-                        "Last played " + android.text.format.DateUtils.getRelativeTimeSpanString(
-                            lastPlayed,
-                            System.currentTimeMillis(),
-                            android.text.format.DateUtils.MINUTE_IN_MILLIS,
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
-                // Real, existing update tracking (docs/SPEC.md 7g) --
-                // never a second "is this current" check invented here.
-                entry.availableUpdate?.let { latest ->
-                    Text(
-                        "Update available: $latest",
-                        color = MaterialTheme.colorScheme.tertiary,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
-                // Which player will actually run this game, for console
-                // ROMs -- the same resolution Library.launch itself uses
-                // (ConsoleRomProvider.resolvePlayer: the game's own
-                // altEmulator, then the system's override, then the
-                // first installed candidate), read here rather than
-                // duplicated, so this line can never say something
-                // launch would not actually do. PC entries already carry
-                // their own source line below; engine games are named by
-                // the system line above (their engine IS the "system").
-                if (entry.systemId != null) {
-                    val context = LocalContext.current
-                    val system = remember(entry.systemId) {
-                        PlatformsDatabase.builtInsOrEmpty().firstOrNull { it.id == entry.systemId }
-                    }
-                    val player = remember(system, entry.altEmulator) {
-                        system?.let { resolvePlayer(context, it, entry.altEmulator) }
-                    }
-                    if (player != null) {
-                        Text(
-                            "Runs with " + player.name,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    }
-                }
-                // PC entries carry facts a ROM does not: which store it
-                // came from, how much disk it holds, and what other
-                // people's machines made of it. The compatibility line is
-                // REFERENCE, never a verdict (docs/SPEC.md section 7g) --
-                // it is phrased as counts so the user judges it.
-                entry.pcInfo?.let { pc ->
-                    val facts = buildList {
-                        add(pc.source)
-                        if (!pc.installed) add("Not installed")
-                        if (pc.sizeBytes > 0) add(formatSize(pc.sizeBytes))
-                    }
-                    Text(
-                        facts.joinToString("  ·  "),
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    pc.compatibility?.let { compat ->
-                        Text(
-                            compat.summary(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** Human-readable install size; GB once it passes a gigabyte, MB below. */
-private fun formatSize(bytes: Long): String = when {
-    bytes >= 1_000_000_000L -> String.format("%.1f GB", bytes / 1_000_000_000.0)
-    else -> "${bytes / 1_000_000} MB"
-}

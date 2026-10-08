@@ -3,6 +3,7 @@ package dev.droidtop.app
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,24 +13,34 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.settings.CompanionHomeLayout
+import dev.droidtop.library.settings.CompanionHomePrefs
+import dev.droidtop.library.settings.CompanionHomeSection
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
- * The companion Home, in one place: ONE scrolling column over the ground ([CompanionContent]'s idle art),
- * so nothing is laid over anything else and whatever does not fit is a swipe away (tracker#285). Before
- * this, a measured top block (status bar, notifications, Continue playing) was stacked over a second
- * column of widgets with an "Add widgets" line pinned to the bottom of the box: a busy notification
- * block pushed the rail off screen, the pinned line was drawn across the rail, and nothing could scroll.
+ * The companion Home (docs/SPEC.md "The companion's tabs", Droidtop/tracker#285, #328): the second screen's
+ * dashboard for whatever the main screen is doing, as ONE vertically scrolling page over the ground
+ * ([CompanionContent]'s idle art). Nothing is laid over anything else; the rails scroll sideways inside it.
  *
- * Order: the status line, Continue playing, Recently added, the notification group (compact, see
- * [CompanionNotifications]), the game focused on the other screen, the user's widgets, then the host's own
- * add/remove controls as ordinary in-flow tiles. Both companion hosts draw this one composable (the
- * second-screen host and [CompanionActivity]).
+ * Order, by relevance: the status line (and the last launch or quit error), Now (the running game, else the
+ * game focused in the shell), Continue playing, Recently added, Downloads and updates, Social, the notification
+ * group, System, then the user's widgets with the host's own add/remove controls. Each section after the status
+ * line folds from its heading and can be turned off in Displays > Companion ([CompanionHomePrefs]); a section
+ * with nothing to show draws nothing. Both companion hosts draw this one composable (the second-screen host
+ * and [CompanionActivity]).
  */
 @Composable
 fun CompanionSurface(
@@ -46,48 +57,95 @@ fun CompanionSurface(
      */
     controls: (@Composable () -> Unit)? = null,
 ) {
+    val context = LocalContext.current
+    // The section choices are read once off the main thread; until then the defaults (everything shown) draw.
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { CompanionHomePrefs.load(context.applicationContext) } }
+    val layout by CompanionHomePrefs.layout.collectAsState()
     Box(modifier = modifier.fillMaxSize()) {
         // droidtop's own idle art stays the BACKGROUND layer; the page composites above it.
         CompanionContent(entry)
-        val density = LocalDensity.current
         Column(
             modifier = Modifier.fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 // A scrim, not raw text over the backdrop art: live Android notifications read as
                 // unstyled system clutter laid over it (rig, p1-dt-companion-text-overlap).
                 .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            // Status bar, always the first row (the controls live on the System tab).
+            // Status line, always the first row (the controls live in the System section and tab).
             CompanionSystemBar(showControls = false)
-            // Continue-playing rail: tap a recent game to launch it,
-            // through the one real launch path -- see CompanionRecents.
-            CompanionRecents()
-            CompanionRecentlyAdded()
-            // The Quick Menu's device-management surface, mirrored to the always-on screen: one compact group,
-            // tap-to-open with per-item dismiss, no controller needed.
-            CompanionNotifications()
-            if (entry != null) CompanionFocusedInfo(entry)
-            widgetIds.forEach { widgetId ->
-                val info = widgetManager.getAppWidgetInfo(widgetId)
-                if (info != null) {
-                    // minHeight is real PIXELS (AppWidgetProviderInfo),
-                    // converted properly rather than reinterpreted as dp.
-                    val widgetHeight = with(density) { maxOf(info.minHeight, 200).toDp() }
-                    AndroidView(
-                        factory = { context ->
-                            widgetHost.createView(context.applicationContext, widgetId, info).apply {
-                                setAppWidget(widgetId, info)
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = widgetHeight)
-                            .padding(vertical = 4.dp),
-                    )
+            LaunchErrorLine()
+            if (layout.shows(CompanionHomeSection.NOW)) CompanionNowSection(entry, layout)
+            if (layout.shows(CompanionHomeSection.CONTINUE)) CompanionRecents(layout)
+            if (layout.shows(CompanionHomeSection.RECENTLY_ADDED)) CompanionRecentlyAdded(layout)
+            if (layout.shows(CompanionHomeSection.ACTIVITY)) CompanionActivitySection(layout)
+            if (layout.shows(CompanionHomeSection.SOCIAL)) CompanionSocialSection(layout)
+            if (layout.shows(CompanionHomeSection.NOTIFICATIONS)) {
+                val open = layout.isOpen(CompanionHomeSection.NOTIFICATIONS)
+                CompanionNotifications(open = open) {
+                    CompanionHomePrefs.setOpen(context, CompanionHomeSection.NOTIFICATIONS, !open)
                 }
             }
-            controls?.invoke()
+            if (layout.shows(CompanionHomeSection.SYSTEM)) CompanionSystemSection(layout)
+            if (layout.shows(CompanionHomeSection.WIDGETS)) {
+                CompanionWidgetsSection(layout, widgetIds, widgetManager, widgetHost, controls)
+            }
         }
+    }
+}
+
+/**
+ * Why the last launch or quit made from the companion failed. The shell's own error line is on the other
+ * screen, and a log line alone left a tap here looking like it did nothing. Tap to dismiss; the next launch
+ * clears it too.
+ */
+@Composable
+private fun LaunchErrorLine() {
+    val launchError by CompanionState.launchError.collectAsState()
+    val message = launchError ?: return
+    Text(
+        message,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.error,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable { CompanionState.launchError.value = null }
+            .padding(top = 8.dp),
+    )
+}
+
+/** The user's Android widgets, then the host's add/remove controls as ordinary rows. */
+@Composable
+private fun CompanionWidgetsSection(
+    layout: CompanionHomeLayout,
+    widgetIds: List<Int>,
+    widgetManager: AppWidgetManager,
+    widgetHost: AppWidgetHost,
+    controls: (@Composable () -> Unit)?,
+) {
+    if (widgetIds.isEmpty() && controls == null) return
+    val density = LocalDensity.current
+    CompanionHomeSectionFrame(CompanionHomeSection.WIDGETS, layout, summary = widgetIds.size.takeIf { it > 0 }?.toString()) {
+        widgetIds.forEach { widgetId ->
+            val info = widgetManager.getAppWidgetInfo(widgetId)
+            if (info != null) {
+                // minHeight is real PIXELS (AppWidgetProviderInfo),
+                // converted properly rather than reinterpreted as dp.
+                val widgetHeight = with(density) { maxOf(info.minHeight, 200).toDp() }
+                AndroidView(
+                    factory = { context ->
+                        widgetHost.createView(context.applicationContext, widgetId, info).apply {
+                            setAppWidget(widgetId, info)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = widgetHeight)
+                        .padding(vertical = 4.dp),
+                )
+            }
+        }
+        controls?.invoke()
     }
 }

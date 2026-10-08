@@ -1,13 +1,9 @@
 package dev.droidtop.app
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -20,12 +16,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.settings.CompanionHomeLayout
+import dev.droidtop.library.settings.CompanionHomeSection
 
 /**
  * The companion Home's two game rails, one mechanism ([CompanionRail]): Continue playing (the games last
@@ -40,17 +35,17 @@ import dev.droidtop.library.LibraryEntry
  * chooser included), not a second launch mechanism.
  */
 @Composable
-internal fun CompanionRecents() {
+internal fun CompanionRecents(layout: CompanionHomeLayout) {
     val entries by CompanionState.libraryEntries.collectAsState()
     val recents = remember(entries) { companionRecents(entries) }
-    CompanionRail("Continue playing", recents, showLaunchError = true)
+    CompanionRail(CompanionHomeSection.CONTINUE, layout, recents)
 }
 
 @Composable
-internal fun CompanionRecentlyAdded() {
+internal fun CompanionRecentlyAdded(layout: CompanionHomeLayout) {
     val entries by CompanionState.libraryEntries.collectAsState()
     val added = remember(entries) { companionRecentlyAdded(entries) }
-    CompanionRail("Recently added", added, showLaunchError = false)
+    CompanionRail(CompanionHomeSection.RECENTLY_ADDED, layout, added)
 }
 
 /** The games last played, newest first, one card per game, at most [MAX_RECENTS]. Pure. */
@@ -82,85 +77,45 @@ private fun addedEpochMs(entry: LibraryEntry): Long =
 private fun List<LibraryEntry>.distinctGames(): List<LibraryEntry> =
     distinctBy { it.id }.distinctBy { it.title.trim().lowercase() to it.systemId }
 
+/**
+ * One rail: the section heading over a row of capsules that scrolls sideways inside the page's one vertical
+ * scroll. Capsules are small (80dp, 2:3) so a rail and the heading of the next section share the first
+ * screen. Every capsule is reachable by a sideways swipe or the D-pad (a focused capsule scrolls into view).
+ */
 @Composable
-private fun CompanionRail(title: String, recents: List<LibraryEntry>, showLaunchError: Boolean) {
-    if (recents.isEmpty()) return
-
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(
-            title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp),
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(recents, key = { it.id }) { entry ->
-                RecentCard(entry)
+private fun CompanionRail(section: CompanionHomeSection, layout: CompanionHomeLayout, games: List<LibraryEntry>) {
+    if (games.isEmpty()) return
+    CompanionHomeSectionFrame(section, layout, summary = games.first().title) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(games, key = { it.id }) { entry ->
+                RailCapsule(entry)
             }
         }
-        if (!showLaunchError) return@Column
-        val launchError by CompanionState.launchError.collectAsState()
-        launchError?.let { message ->
-            // Tap to dismiss; the next launch from the rail clears it too.
+    }
+}
+
+@Composable
+private fun RailCapsule(entry: LibraryEntry) {
+    CompanionTile(onClick = { CompanionState.onLaunchEntry?.invoke(entry) }, shape = RoundedCornerShape(8.dp)) {
+        Column(modifier = Modifier.width(RAIL_CAPSULE_WIDTH)) {
+            CompanionCapsuleArt(entry, RAIL_CAPSULE_WIDTH)
             Text(
-                message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .clickable { CompanionState.launchError.value = null }
-                    .padding(top = 8.dp),
+                entry.title,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
             )
         }
     }
 }
 
-@Composable
-private fun RecentCard(entry: LibraryEntry) {
-    Column(
-        modifier = Modifier
-            .width(120.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .clickable { CompanionState.onLaunchEntry?.invoke(entry) }
-            .padding(6.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                 .heightIn(min = 150.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            if (!entry.artworkUri.isNullOrBlank()) {
-                AsyncImage(
-                    model = entry.artworkUri,
-                    contentDescription = entry.title,
-                    modifier = Modifier.fillMaxWidth().height(150.dp),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                // No art scraped: the title carries the card, centred in
-                // the same frame -- never an empty rectangle.
-                Text(
-                    entry.title,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(8.dp).align(androidx.compose.ui.Alignment.Center),
-                )
-            }
-        }
-        Text(
-            entry.title,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
-}
+private val RAIL_CAPSULE_WIDTH = 80.dp
 
 // One rail row: enough for "what was I playing this week", few enough
 // to stay glanceable next to the widgets below it.

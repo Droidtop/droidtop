@@ -70,8 +70,9 @@ import kotlinx.coroutines.withContext
  * and never takes the pad from the shell (SPEC 4c, "a Presentation takes no focus").
  */
 @Composable
-internal fun CompanionSocialTab() {
-    var open by remember { mutableStateOf<OpenConversation?>(null) }
+internal fun CompanionSocialTab(start: OpenConversation? = null) {
+    // [start]: a conversation opened from Home's Social section; B or the back pill returns to the list.
+    var open by remember(start) { mutableStateOf(start) }
     val chat = open
     if (chat == null) {
         CompanionSocialList(onOpen = { open = it })
@@ -83,8 +84,8 @@ internal fun CompanionSocialTab() {
 /** Which conversation the tab shows: the provider and friend, and the names to head it with. */
 internal data class OpenConversation(val providerId: String, val friendId: String, val name: String, val service: String)
 
-/** What the list draws, worked out off the main thread from [SocialHub]. */
-private class SocialRows(
+/** What the list draws, worked out off the main thread from [SocialHub]; Home's Social section reads the same rows. */
+internal class SocialRows(
     val conversations: List<SocialContact>,
     val friends: List<SocialContact>,
     val badged: Boolean,
@@ -95,7 +96,12 @@ private class SocialRows(
     val restricted: Boolean,
 )
 
-private fun socialRows(context: Context): SocialRows {
+/** The conversation a contact's row opens. */
+internal fun openConversation(contact: SocialContact): OpenConversation =
+    OpenConversation(contact.provider.id, contact.friend.id, contact.friend.name, contact.friend.source?.label ?: contact.provider.label)
+
+/** Reads every provider (some ask the system), so callers run it on [Dispatchers.IO]. */
+internal fun socialRows(context: Context): SocialRows {
     val available = SocialHub.available(context)
     val shown = available.filter { it.presence(context) != SocialPresence.OFFLINE }
     val contacts = SocialOrder.contacts(shown)
@@ -137,9 +143,7 @@ private fun CompanionSocialList(onOpen: (OpenConversation) -> Unit) {
             }
             current.friends.isEmpty() && current.conversations.isEmpty() -> CompanionNote("No conversations yet")
             else -> {
-                fun open(contact: SocialContact) = onOpen(
-                    OpenConversation(contact.provider.id, contact.friend.id, contact.friend.name, contact.friend.source?.label ?: contact.provider.label),
-                )
+                fun open(contact: SocialContact) = onOpen(openConversation(contact))
                 if (current.conversations.isNotEmpty()) {
                     SectionTitle("Conversations")
                     current.conversations.forEach { c ->

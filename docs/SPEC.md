@@ -2939,7 +2939,7 @@ surfaces stack their content vertically; this includes the widget and controls h
 live `SecondScreenPresentation`, the idle `SecondaryDisplayActivity`, and Desktop's
 second-screen input surface, where the keyboard sits above a trackpad that takes the
 remaining height. Layout follows the external display's size, never the handheld's
-orientation. Companion interaction stays touch-only: no focus and no gamepad handling.
+orientation. Companion interaction is touch first; the pad reaches it only as "The companion's tabs" says.
 
 Each mode owns a `Screen orientation` choice in its own settings. Gaming offers Follow
 device (default), Landscape, and Landscape (flipped). Standard and Desktop offer Follow
@@ -2969,23 +2969,52 @@ picks the tab it opens on. Standard's own second screen keeps its launcher-style
   Performance, System and Input. Input (the keyboard and
   trackpad surface) is offered in Desktop mode and wherever a mode's role is set to Input. Desktop opens on
   Input (section 6c, unchanged); every other mode opens on Home. Only the selected tab is composed.
-- **Touch only, screens independent.** No tab takes focus: each host already denies focus to the whole tree
-  (tracker#186, #265), and the tab strip is plain touch targets. Nothing here moves an app the user opened
+- **Touch first, screens independent.** The companion never takes the pad from the shell (tracker#186, #265):
+  its window is focusable only while Android makes it the top activity, and then every key goes to the shell
+  if one is in front on another screen (`TouchOnlySurfaceFocus`). Only when there is no shell to hand it to
+  (a game owns the other screen and the person touched the companion) does `CompanionActivity` keep the
+  D-pad, Enter and A (as D-pad centre) for its own controls, which are all `CompanionTile`s with a ring in the
+  theme accent while focused (touch never shows a ring); B, Back and the rest of the pad are still swallowed.
+  The second-screen host (`SecondaryDisplayActivity`, the Presentation) still denies focus to its whole tree. Nothing here moves an app the user opened
   (#243); Tasks' switch tap launches on the app's own screen and its arrow pair is an explicit request.
   The strip scrolls sideways and the Performance and System pages lay out in one column in portrait and two on
   a wide window, from the window's own bounds (#213).
-- **Home is one scrolling column (Droidtop/tracker#285).** `CompanionSurface` draws a single vertically
-  scrolling page over the idle art; nothing is stacked over anything else, and whatever does not fit is a swipe
-  away. Order: status line, Continue playing, Recently added (both are `CompanionRail`: ten cards, tap
-  launches through the one launch path; Recently added uses the library's first-seen time, an app's install
-  time as the fallback, and leaves out rows with neither), the notification group, the game focused on the
-  other screen (an in-flow section, no longer a background panel), the user's widgets, then the host's own
-  add/remove widget pills as ordinary rows. The notification group (`CompanionNotifications`, also used by
-  Standard's second screen) is one compact row, "Notifications" and a count with the newest line, closed
-  until tapped; opened it lists up to twelve with Dismiss, so notifications never push the rails out of
-  view. A host that cannot bind widgets shows no add line at all. Every tab scrolls with the same
-  vertical scroll (`CompanionPanels` for Performance and System, the Tasks page, this Home); Input is the
-  one fixed surface because a trackpad must not scroll.
+- **Home is the second screen's dashboard, one scrolling column (Droidtop/tracker#285, #328).**
+  `CompanionSurface` draws a single vertically scrolling page over the idle art; nothing is stacked over
+  anything else, the rails scroll sideways inside it, and a focused item scrolls itself into view. Order, by
+  relevance: the status line (clock, network, battery) and the last launch or quit error, then the sections:
+  1. **Now**: the running game (`LaunchDisplay.running`, the same parked launch the Quick Menu's Game section
+     uses, now an observable flow carrying when the session started): art, name, this session's time, Resume
+     (a relaunch of the entry, the Quick Menu's resume), Quit (`Library.quitRunning`, the one quit path both
+     surfaces call, which clears the running state only on a confirmed end) and Controls (the System tab).
+     While it shows a running game, Home checks the package's force-stop flag every five seconds, the one
+     liveness signal Android gives, as the open Quick Menu does. With nothing running it is the game focused
+     in the shell: system, title, developer, publisher, year, genre, playtime, last played, the player that
+     will run it (`resolvePlayer`, read off the main thread), PC store facts, an available update, three lines
+     of description, and Play. The library carries no achievements yet, so none are shown.
+  2. **Continue playing** and **Recently added**: `CompanionRail`, ten 80dp 2:3 capsules each, tap or A
+     launches through the one launch path; Recently added uses the library's first-seen time, an app's install
+     time as the fallback, and leaves out rows with neither.
+  3. **Downloads and updates**: the running jobs from `PluginJobsCenter` with their progress bars (at most
+     four), and the number of games with an update waiting (the library's own `availableUpdate`).
+  4. **Social**: unread conversations and friends in a game, from the same rows the Social tab draws; a tap
+     opens that conversation on the Social tab. Not in Kiosk and Kid.
+  5. **Notifications**: the compact group (`CompanionNotifications`, also used by Standard's second screen):
+     folded, its heading is the count and the newest line; open, up to twelve with Dismiss.
+  6. **System**: storage free and total, and the System tab's own switches as pills (the radios where a
+     `priv.shell` provider can flip them, Do Not Disturb) and a way to all controls. droidtop has no
+     performance profile, so there is none here.
+  7. **Widgets**: the user's Android widgets, then the host's own add/remove widget pills as ordinary rows.
+  Each section's heading folds it (tap or A; the fold is remembered), a section with nothing to show draws
+  nothing, and Displays > Companion > Home turns any section off (`CompanionHomePrefs`). Defaults: every
+  section shown, Notifications folded, the rest open. Every tab scrolls with the same vertical scroll
+  (`CompanionPanels` for Performance and System, the Tasks page, this Home); Input is the one fixed surface
+  because a trackpad must not scroll.
+  The 1512 report that Home "is not vertically scrollable" did not reproduce on the console from adb:
+  a drag on the built-in screen scrolled the page and the rails, so the scroll itself was sound. What the
+  person saw was a first screen filled by two 200dp rails with nothing hinting at more below, and no way to
+  move it from the pad at all (the whole tree was denied focus). The capsules are now smaller and every section
+  starts with a heading, so the next section always shows below the one in view.
 - **Tasks** is `CompanionTasks`, the task manager's row (switch, ask for the other screen, close, Clear
   all apps with an inline confirm) using `SharedRunningAppsList`; see "The task manager".
 - **Performance** (`CompanionPerformanceTab`) reads `PerformanceMonitor` in `:runtime-common`, the one shared
@@ -3601,7 +3630,8 @@ rig check in the commit message.
     its keyboard policy back, so Android decides; the Displays keyboard row reads "Not controlled by
     droidtop".
   - The companion's own settings (Displays, Companion) say what the companion offers, apart from
-    where the keyboard shows: "Keyboard for the other screen" (whether it may host it) and "Keys
+    where the keyboard shows: a Home group with one switch per Home section (see "The companion's
+    tabs"), "Keyboard for the other screen" (whether it may host it) and "Keys
     button", which is only a shortcut to the Input tab where the mode has no Input tab of its own. The
     Input tab in Gaming and Standard types by the one route order too (`RoutedKeyboardSink`), so the
     separate Keys panel is gone.

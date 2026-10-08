@@ -154,21 +154,46 @@ internal fun DndPill() {
     }
 }
 
+/** The radios a privileged shell can flip and their states, shared by the System tab's rows and Home's pills. */
+private class RadioSwitches(
+    val available: Boolean,
+    val states: Map<SystemControls.Radio, Boolean?>,
+    val failed: String?,
+    val flip: (SystemControls.Radio, Boolean) -> Unit,
+)
+
 /**
- * One row per radio with its state and a switch, shown only while a `priv.shell` provider (Shizuku) can
- * flip it for real; without one the rows are not drawn at all (docs/SPEC.md "Copy: labels and values").
+ * Whether a `priv.shell` provider (Shizuku) can flip the radios for real, each radio's state, and the flip
+ * (the shell's own command, [SystemControls.radioCommand]). Without a provider nothing is drawn at all
+ * (docs/SPEC.md "Copy: labels and values").
  */
 @Composable
-private fun RadioRows() {
+private fun rememberRadioSwitches(): RadioSwitches {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var tick by remember { mutableIntStateOf(0) }
     var shell by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { shell = withContext(Dispatchers.IO) { TaskManager.shell.capabilities().shellCommand } }
-    if (!shell) return
-    SystemControls.Radio.entries.forEach { radio ->
-        val on = remember(tick) { SystemControls.radioOn(context, radio) }
+    val states = remember(tick, shell) {
+        if (shell) SystemControls.Radio.entries.associateWith { SystemControls.radioOn(context, it) } else emptyMap()
+    }
+    return RadioSwitches(shell, states, failed) { radio, on ->
+        scope.launch {
+            val out = withContext(Dispatchers.IO) { TaskManager.shell.exec(SystemControls.radioCommand(radio, on)) }
+            failed = if (out != null && out.exit == 0) null else "${radio.label}: failed"
+            delay(RADIO_SETTLE_MS)
+            tick++
+        }
+    }
+}
+
+/** One row per radio with its state and a switch. */
+@Composable
+private fun RadioRows() {
+    val radios = rememberRadioSwitches()
+    if (!radios.available) return
+    radios.states.forEach { (radio, on) ->
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -180,24 +205,29 @@ private fun RadioRows() {
                 color = MaterialTheme.colorScheme.onSurface,
             )
             if (on != null) {
-                CompanionPill(if (on) "Turn off" else "Turn on") {
-                    scope.launch {
-                        val out = withContext(Dispatchers.IO) { TaskManager.shell.exec(SystemControls.radioCommand(radio, !on)) }
-                        failed = if (out != null && out.exit == 0) null else "${radio.label}: failed"
-                        delay(RADIO_SETTLE_MS)
-                        tick++
-                    }
-                }
+                CompanionPill(if (on) "Turn off" else "Turn on") { radios.flip(radio, !on) }
             }
         }
     }
-    failed?.let { CompanionNote(it) }
+    radios.failed?.let { CompanionNote(it) }
+}
+
+/** The same switches as pills, lit while on, for Home's System section. */
+@Composable
+internal fun RadioPills() {
+    val radios = rememberRadioSwitches()
+    if (!radios.available) return
+    radios.states.forEach { (radio, on) ->
+        if (on != null) CompanionPill(radio.label, selected = on) { radios.flip(radio, !on) }
+    }
+    radios.failed?.let { CompanionNote(it) }
 }
 
 private const val RADIO_SETTLE_MS = 1_200L
 
+/** Internal storage free and total, read off the main thread, with its bar. */
 @Composable
-private fun StorageLine() {
+internal fun StorageLine() {
     val storage by produceState<Pair<Long, Long>?>(null) {
         value = withContext(Dispatchers.IO) {
             runCatching {
@@ -208,7 +238,12 @@ private fun StorageLine() {
     }
     val (free, total) = storage ?: run { CompanionNote("Reading…"); return }
     Text(storageText(free, total), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-    val used = if (total > 0) ((total - free).toFloat() / total).coerceIn(0f, 1f) else 0f
+    CompanionBar(if (total > 0) (total - free).toFloat() / total else 0f)
+}
+
+/** A thin filled bar, [fraction] of the way: storage used, a download's progress. */
+@Composable
+internal fun CompanionBar(fraction: Float) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -218,7 +253,7 @@ private fun StorageLine() {
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(used)
+                .fillMaxWidth(fraction.coerceIn(0f, 1f))
                 .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.primary),
         )
