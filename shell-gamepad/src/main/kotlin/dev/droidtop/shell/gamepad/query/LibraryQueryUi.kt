@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.TextRange
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -232,6 +233,7 @@ internal fun LibraryFilterSheet(
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Filter",
+            title = openFacet?.label ?: "Filter",
             hints = listOf(
                 HintBinding(GamepadAction.A, "Select"),
                 HintBinding(GamepadAction.X, "Clear") { !query.isEmpty },
@@ -254,12 +256,6 @@ internal fun LibraryFilterSheet(
                 true
             },
         ) {
-            Text(
-                openFacet?.label ?: "Filter",
-                style = MaterialTheme.typography.titleLarge,
-                color = MenuTokens.OnSurface,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-            )
             counts?.let {
                 Text(
                     queryCountLine(it.shown, it.total, !query.isEmpty, scope),
@@ -304,6 +300,7 @@ internal fun LibrarySortSheet(
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Sort by",
+            title = "Sort by",
             hints = listOf(HintBinding(GamepadAction.A, "Sort"), HintBinding(GamepadAction.B, "Close")),
             onPad = { press ->
                 when (press.action) {
@@ -318,12 +315,6 @@ internal fun LibrarySortSheet(
                 true
             },
         ) {
-            Text(
-                "Sort by",
-                style = MaterialTheme.typography.titleLarge,
-                color = MenuTokens.OnSurface,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-            )
             scope.sorts.forEachIndexed { index, key ->
                 val active = key == query.sort
                 MenuRow(
@@ -443,13 +434,21 @@ internal fun LibrarySearchDialog(
     // Changes when what [local] reads changed (the library finished loading): the search runs again for the same text.
     localKey: Any? = null,
 ) {
-    var text by remember { mutableStateOf(query.text) }
+    // The field reopens with what was typed and the caret at its END, so Backspace deletes the last letter
+    // (Droidtop/tracker#376: a plain String field put the caret at the start).
+    var field by remember {
+        mutableStateOf(TextFieldValue(query.text, selection = TextRange(query.text.length)))
+    }
+    val text = field.text
     val fieldFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val view = LocalView.current
     LaunchedEffect(Unit) {
-        runCatching { fieldFocus.requestFocus() }
+        // The field lives in the dialog's own composition, which attaches a frame or more after this
+        // effect starts: one early request failed silently on a reopen and left the field unfocused
+        // until A (Droidtop/tracker#376). Ask until it is attached.
+        dev.droidtop.shell.gamepad.requestFocusWhenAttached(fieldFocus, "Search field")
         // Explicit, not implicit: Compose's own request on focus is dropped while a pad or keyboard is attached.
         delay(120)
         keyboard?.show()
@@ -519,10 +518,11 @@ internal fun LibrarySearchDialog(
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             )
             BasicTextField(
-                value = text,
+                value = field,
                 onValueChange = {
-                    text = it
-                    onTextChange(it)
+                    val changed = it.text != field.text
+                    field = it
+                    if (changed) onTextChange(it.text)
                 },
                 singleLine = true,
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Search),
@@ -537,7 +537,7 @@ internal fun LibrarySearchDialog(
                     .fillMaxWidth()
                     .padding(top = 12.dp)
                     .focusRequester(fieldFocus)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(dev.droidtop.shell.gamepad.Corners.Crisp)
                     .background(MenuTokens.SurfaceSelected)
                     .padding(12.dp),
             )
@@ -564,7 +564,7 @@ internal fun LibrarySearchDialog(
                         title = pick.title,
                         subtitle = pick.reason,
                         onClick = {
-                            text = pick.title
+                            field = TextFieldValue(pick.title, selection = TextRange(pick.title.length))
                             onTextChange(pick.title)
                         },
                     )

@@ -116,6 +116,16 @@ class PcShelvesTest {
     }
 
     @Test
+    fun `capsules take Steam's width for the window's tier`() {
+        assertEquals(110f, capsuleWidthFor(411f).value, 0.001f)
+        assertEquals(110f, capsuleWidthFor(768f).value, 0.001f)
+        assertEquals(110f, capsuleWidthFor(853f).value, 0.001f)
+        assertEquals(134f, capsuleWidthFor(854f).value, 0.001f)
+        assertEquals(134f, capsuleWidthFor(1279f).value, 0.001f)
+        assertEquals(172f, capsuleWidthFor(1280f).value, 0.001f)
+    }
+
+    @Test
     fun `only art noticeably wider than tall is shown whole in a portrait capsule`() {
         assertTrue(isWideArt(640f, 480f))
         assertFalse(isWideArt(600f, 900f))

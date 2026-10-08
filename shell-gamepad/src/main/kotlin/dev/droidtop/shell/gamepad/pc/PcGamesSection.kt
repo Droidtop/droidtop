@@ -700,12 +700,15 @@ internal fun PcGamesSection(
                             Text("No games match this view", color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
                         }
                     } else {
+                        // Whole capsules at the tier width, 12dp apart, the
+                        // row centred in what is left (Steam's library grid);
+                        // a cell is never stretched past the capsule.
                         val width = capsuleWidth()
                         LazyVerticalGrid(
                             state = gridState,
-                            columns = GridCells.Adaptive(minSize = width),
+                            columns = GridCells.FixedSize(width),
                             contentPadding = PaddingValues(start = window.edgePadding, end = window.edgePadding, top = Space.Sm, bottom = Space.Lg),
-                            horizontalArrangement = Arrangement.spacedBy(Space.Md),
+                            horizontalArrangement = Arrangement.spacedBy(Space.Md, Alignment.CenterHorizontally),
                             verticalArrangement = Arrangement.spacedBy(Space.Md),
                             modifier = Modifier.fillMaxSize(),
                         ) {

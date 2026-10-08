@@ -171,7 +171,10 @@ fun Modifier.selectionFrame(
  * its own ink, Steam's inversion); a filled one keeps its fill and gains
  * the ring, a shadow that deepens when selected and a one-shot sheen as the cursor arrives. [large] is the page's Play: the
  * theme's launch colour, 48dp tall and 160dp wide at least, crisp corners
- * and a slower stripe.
+ * and a slower stripe. [tab] is a tab or view pill on a strip (Steam's
+ * tabs): the label small, bold and uppercase, padded 6 by 16; the chosen
+ * one ([on]) sits on a quiet plate instead of the accent, and the one under
+ * the cursor turns solid, as every quiet chip does.
  *
  * This replaces three private copies (the detail screen's action chip,
  * the recent filter and the PC surface's filter chip), each of which drew
@@ -185,6 +188,8 @@ internal fun ShellChip(
     primary: Boolean = false,
     // The one big button of a page (the PC game page's Play).
     large: Boolean = false,
+    // A tab or view pill on a strip (the PC Games view strip, a page's tabs).
+    tab: Boolean = false,
     // A primary action that cannot be pressed right now is still drawn,
     // faded, so the page says what it would do and why not (design
     // language: "a disabled button that says why").
@@ -199,7 +204,8 @@ internal fun ShellChip(
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = if (large) Corners.Crisp else Corners.Pill
-    val filled = on || primary
+    // A chosen tab is a place on the strip, not a filter in effect: it keeps the quiet look.
+    val filled = (on && !tab) || primary
     val isSelected = selected ?: focused
     val ring = isSelected && PadModality.showsFocus
     val labelColor = when {
@@ -210,10 +216,18 @@ internal fun ShellChip(
         else -> MenuTokens.OnSurface
     }
     Text(
-        if (on) "\u2713 $label" else label,
+        when {
+            tab -> label.uppercase()
+            on -> "\u2713 $label"
+            else -> label
+        },
         color = labelColor,
-        style = if (large) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
-        fontWeight = if (large) FontWeight.Bold else FontWeight.SemiBold,
+        style = when {
+            large -> MaterialTheme.typography.titleMedium
+            tab -> TypeRole.tabLabel
+            else -> MaterialTheme.typography.labelLarge
+        },
+        fontWeight = if (large || tab) FontWeight.Bold else FontWeight.SemiBold,
         maxLines = 1,
         textAlign = TextAlign.Center,
         modifier = modifier
@@ -255,12 +269,28 @@ internal fun ShellChip(
                         .shine(ring && enabled, play = large)
                         .focusRing(ring, shape)
                 } else {
-                    Modifier.selectionFrame(isSelected, shape, selectedFill = MenuTokens.Selected)
+                    Modifier.selectionFrame(
+                        isSelected,
+                        shape,
+                        rest = when {
+                            !tab -> MenuTokens.Surface
+                            on -> MenuTokens.SurfaceSelected
+                            else -> Color.Transparent
+                        },
+                        selectedFill = MenuTokens.Selected,
+                    )
                 },
             )
             .focusMarquee(isSelected)
             .then(if (large) Modifier.heightIn(min = 48.dp).widthIn(min = 160.dp) else Modifier)
-            .padding(horizontal = if (large) 24.dp else 16.dp, vertical = if (large) 14.dp else 8.dp),
+            .padding(
+                horizontal = if (large) 24.dp else 16.dp,
+                vertical = when {
+                    large -> 14.dp
+                    tab -> 6.dp
+                    else -> 8.dp
+                },
+            ),
     )
 }
 
@@ -637,19 +667,33 @@ private val PANEL_HINTS = listOf(HintBinding(GamepadAction.A, "Select"), HintBin
  * The panel is a layer on the footer's hint bar ([DeclareLayerHints]): while
  * it is open the bar shows [hints], not the screen's underneath. A panel
  * that draws a hint row of its own passes an empty list so the two never show.
+ *
+ * The look and motion are Steam's modal panel (docs/SPEC.md 7k, "Sheets"):
+ * [title] in the heading role at the top, the page behind dimmed to the
+ * theme's scrim strength (its window's own dim, so nothing is painted
+ * outside the panel), the panel gliding in from a touch smaller and
+ * transparent over [Motion.PanelInMs], and, while rows remain below the
+ * fold, its last [MoreFadeDp] fading out over a down arrow (DroidDeck's
+ * AnchoredMenu, ui/SettingsWidgets.kt at 9310d19), so a long sheet says it
+ * goes on. The fade is a layer only while there is more to scroll to.
  */
 @Composable
 internal fun MenuPanel(
     modifier: Modifier = Modifier,
     focusLabel: String = "Menu",
     hints: List<HintBinding> = PANEL_HINTS,
+    title: String? = null,
     onPad: (PadPress) -> Boolean,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     GatePadInThisDialog()
     DeclareLayerHints(hints)
+    ModalScrim()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, focusLabel) }
+    val shown = remember { androidx.compose.animation.core.Animatable(if (Motion.enabled) 0f else 1f) }
+    LaunchedEffect(Unit) { shown.animateTo(1f, Motion.panelIn()) }
+    val scroll = androidx.compose.foundation.rememberScrollState()
     // A dialog window does not bound its content to the screen: without
     // an explicit cap a long menu is centred and clipped at both edges
     // (title and last row cut, Droidtop/tracker#295) and its scroll never
@@ -659,22 +703,109 @@ internal fun MenuPanel(
     FocusGlideHost(
         modifier
             .heightIn(max = maxOf(120.dp, window.heightDp.dp - window.edgePadding * 2))
+            .graphicsLayer {
+                val p = shown.value
+                alpha = p
+                scaleX = PANEL_OPEN_SCALE + (1f - PANEL_OPEN_SCALE) * p
+                scaleY = scaleX
+            }
             .clip(MenuTokens.OverlayShape)
             .background(MenuTokens.OverlaySurface),
     ) {
-        Column(
-            modifier = Modifier
-                .focusRequester(focus)
-                .focusable()
-                .onPad(preview = true, handler = onPad)
-                // A panel whose content can outgrow the screen must scroll:
-                // the jump-to-letter list reaches 27 rows on a library that
-                // spans the alphabet, which is taller than the display.
-                .verticalScroll(androidx.compose.foundation.rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
-            content = content,
-        )
+        Box {
+            Column(
+                modifier = Modifier
+                    .focusRequester(focus)
+                    .focusable()
+                    .onPad(preview = true, handler = onPad)
+                    .fadeWhileMoreBelow(scroll)
+                    // A panel whose content can outgrow the screen must scroll:
+                    // the jump-to-letter list reaches 27 rows on a library that
+                    // spans the alphabet, which is taller than the display.
+                    .verticalScroll(scroll)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
+            ) {
+                title?.let { MenuPanelTitle(it) }
+                content()
+            }
+            if (scroll.canScrollForward) MoreBelowArrow(Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp))
+        }
+    }
+}
+
+/** How small a sheet starts as it glides in: 96 percent of its size. */
+private const val PANEL_OPEN_SCALE = 0.96f
+
+/** How tall the fade at the foot of a long sheet is, in dp. */
+internal const val MoreFadeDp = 36
+
+/** A sheet's own name at its top: one heading style for every sheet. */
+@Composable
+internal fun MenuPanelTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleLarge,
+        color = MenuTokens.OnSurface,
+        fontWeight = FontWeight.SemiBold,
+    )
+}
+
+/**
+ * Dims everything behind the dialog this is drawn in to the theme's scrim
+ * strength (Steam's modal scrim is 80 percent; the scrim role carries the
+ * same): the window's own dim, so a panel that wraps its content paints
+ * nothing outside itself. Outside a dialog it does nothing.
+ */
+@Composable
+internal fun ModalScrim() {
+    val dialogWindow = (androidx.compose.ui.platform.LocalView.current.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+    val strength = MenuTokens.Scrim.alpha
+    androidx.compose.runtime.SideEffect { dialogWindow?.setDimAmount(strength) }
+}
+
+/**
+ * The foot of a scrolling column fading out while it can still scroll down,
+ * so a cut row reads as "more below" rather than as the end. Drawn in the
+ * draw phase; the column is composited offscreen only while the fade shows.
+ */
+internal fun Modifier.fadeWhileMoreBelow(scroll: androidx.compose.foundation.ScrollState): Modifier =
+    this
+        .graphicsLayer {
+            compositingStrategy = if (scroll.canScrollForward) {
+                androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+            } else {
+                androidx.compose.ui.graphics.CompositingStrategy.Auto
+            }
+        }
+        .drawWithContent {
+            drawContent()
+            if (scroll.canScrollForward) {
+                val fade = MoreFadeDp.dp.toPx().coerceAtMost(size.height / 3f)
+                drawRect(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(Color.Black, Color.Transparent),
+                        startY = size.height - fade,
+                        endY = size.height,
+                    ),
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - fade),
+                    size = androidx.compose.ui.geometry.Size(size.width, fade),
+                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                )
+            }
+        }
+
+/** The small down chevron under a sheet that goes on below the fold. */
+@Composable
+private fun MoreBelowArrow(modifier: Modifier = Modifier) {
+    val ink = MenuTokens.OnSurfaceMuted
+    androidx.compose.foundation.Canvas(modifier.size(20.dp)) {
+        val w = 2.dp.toPx()
+        val cx = size.width / 2f
+        val y0 = size.height * 0.35f
+        val y1 = size.height * 0.65f
+        drawLine(ink, androidx.compose.ui.geometry.Offset(cx - size.width * 0.3f, y0), androidx.compose.ui.geometry.Offset(cx, y1), w, androidx.compose.ui.graphics.StrokeCap.Round)
+        drawLine(ink, androidx.compose.ui.geometry.Offset(cx + size.width * 0.3f, y0), androidx.compose.ui.geometry.Offset(cx, y1), w, androidx.compose.ui.graphics.StrokeCap.Round)
     }
 }
 

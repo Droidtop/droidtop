@@ -15,9 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * The one strip above a library grid (docs/SPEC.md 7i and 7j): a chip per
- * view with L1 and R1 at its ends, and the active filter as ONE pill at its
- * end. PC Games and Apps both draw it; the page owns the shoulders
+ * The one strip above a library grid (docs/SPEC.md 7i and 7j): a tab pill
+ * per view (Steam's tabs: small bold capitals with the view's count, the
+ * shown one on a quiet plate) with L1 and R1 at its ends, and the active
+ * filter as ONE pill at its end. PC Games and Apps both draw it; the page owns the shoulders
  * ([OwnShoulders]) and the strip only draws the glyphs.
  *
  * [active] is the view the list shows (-1 when none, e.g. on the shelves);
@@ -59,6 +60,7 @@ internal fun ViewStrip(
                 ShellChip(
                     labels[index],
                     on = active == index,
+                    tab = true,
                     selected = focused == index,
                     onClick = { onSelect(index) },
                 )

@@ -82,16 +82,26 @@ internal const val HERO_ASPECT = CAPSULE_ASPECT * HERO_CAPSULES_WIDE
 internal fun heroWidth(capsuleWidth: Dp): Dp = capsuleWidth * (HERO_ASPECT / CAPSULE_ASPECT)
 
 /**
- * How wide a capsule is: the window's usable width shared out so about five
- * and a half show across (the half says there is more, as Steam's rows do),
- * clamped so a phone held upright still gets whole, readable capsules.
+ * How wide a capsule is, on every shelf and in every grid: Steam's three
+ * window tiers (measured, docs/SPEC.md 7i), so a window up to 853dp wide
+ * shows 110dp capsules (about six across on the console's 768dp window, a
+ * phone held upright three), a mid window 134dp and a wide one 172dp. The
+ * grid packs whole capsules of this width with the shelf's own gap; it never
+ * stretches them.
  */
 @Composable
-internal fun capsuleWidth(): Dp {
-    val window = LocalShellWindow.current
-    val usable = window.widthDp.dp - window.edgePadding * 2
-    return ((usable - Space.Md * 5) / 5.5f).coerceIn(104.dp, 220.dp)
+internal fun capsuleWidth(): Dp = capsuleWidthFor(LocalShellWindow.current.widthDp.toFloat())
+
+/** [capsuleWidth] for a window [widthDp] wide. Pure. */
+internal fun capsuleWidthFor(widthDp: Float): Dp = when {
+    widthDp <= CAPSULE_TIER_NARROW_MAX_DP -> 110.dp
+    widthDp < CAPSULE_TIER_WIDE_MIN_DP -> 134.dp
+    else -> 172.dp
 }
+
+/** The window widths where Steam's capsule tiers change. */
+internal const val CAPSULE_TIER_NARROW_MAX_DP = 853f
+internal const val CAPSULE_TIER_WIDE_MIN_DP = 1280f
 
 /**
  * The one fact a capsule's top-left corner carries, from state already on
