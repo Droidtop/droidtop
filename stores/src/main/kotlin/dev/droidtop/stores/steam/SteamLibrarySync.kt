@@ -135,10 +135,11 @@ internal object SteamLibrarySync {
     }
 
     /**
-     * Fresh product info for one app (an install, an update check), stored
-     * over the old row; the stored row when Steam does not answer.
+     * Fresh product info for one app (an install, an update check, a save
+     * sync), stored over the old row; the stored row when Steam does not
+     * answer. [onUfs] gets the app's Auto-Cloud save locations from the same answer.
      */
-    suspend fun refreshApp(db: SteamDatabase, apps: SteamApps, appId: Int): SteamApp? {
+    suspend fun refreshApp(db: SteamDatabase, apps: SteamApps, appId: Int, onUfs: (SteamUfs) -> Unit = {}): SteamApp? {
         val known = db.apps().find(appId)
         val token = runCatching { apps.picsGetAccessTokens(appIds = listOf(appId), packageIds = emptyList()).await().appTokens[appId] }
             .getOrNull() ?: 0L
@@ -153,6 +154,8 @@ internal object SteamLibrarySync {
             lastChangeNumber = info.changeNumber,
         )
         db.apps().insert(fresh)
+        // Where the game keeps its cloud saves is read from the same answer, for the save sync.
+        runCatching { onUfs(SteamUfsParser.parse(info.keyValues)) }.onFailure { Timber.tag(TAG).w(it, "Could not read the save locations of app $appId") }
         return fresh
     }
 }

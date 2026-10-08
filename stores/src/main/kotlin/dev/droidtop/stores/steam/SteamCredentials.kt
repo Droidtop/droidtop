@@ -52,6 +52,18 @@ internal data class SteamCredentials(
             }
         }
 
+        /**
+         * The client id Steam Cloud knows this device by: the sign-in session's,
+         * else one made here and kept, so the next call names the same device.
+         */
+        fun clientId(context: Context): Long {
+            val credentials = load(context)
+            credentials?.clientId?.let { return it }
+            val made = java.security.SecureRandom().nextLong() and Long.MAX_VALUE
+            if (credentials != null) save(context, credentials.copy(clientId = made))
+            return made
+        }
+
         fun clear(context: Context) {
             file(context).delete()
         }

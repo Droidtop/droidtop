@@ -9434,6 +9434,49 @@ follows:
   reads the branch's real manifests with `picsGetPrivateBeta`
   (`SteamBranches.resolve`) so its sizes and depots are known before the
   download, and the install and the update check follow the chosen branch.
+- **Steam Cloud saves** (`StoreLibrary.syncSaves`, `StoreSaves` in `:library-core`,
+  `SteamCloudSync` in `:stores`; owner, 2026-10-08, Droidtop/tracker#313: "Steam
+  Cloud saves: yes"). A game that has cloud saves syncs them into its Wine prefix
+  before it starts and back after it ends, the way Steam's own client does:
+  `PcGameProvider` calls `StoreSaves.beforeLaunch` (at most 45 s, then the game
+  starts on its local files), `WineGameActivity` calls `StoreSaves.afterExit`
+  when the game's screen finishes, which runs the upload as a job in the
+  Downloads place ("Saves: <game>", so it survives the screen closing), and the
+  game menu has "Sync cloud saves" for a sync on demand. **The prefix comes
+  through an interface**, `WinePrefixLocator` (`StoreSaves.locator`): the store
+  gets a folder (the one that holds `drive_c`) and a Windows user name, never a
+  runtime class, so the Wine runtime can move out of GameNative without the store
+  noticing; `DroidtopWinePrefixLocator` (`:runtime-windows`) answers it with the
+  prefix `PcContainers.forGame` launches the game in, and a prefix with no
+  `drive_c` yet is not made for a sync. **Where the saves are** is the game's
+  `ufs` section of product info (`SteamUfsParser`: `savefiles`, and the Windows
+  `rootoverrides` that move a root, with the cloud name kept by Steam's root),
+  kept per game beside the Steam files (`steam/ufs/<app id>.json`, written when
+  the sync reads fresh product info). The roots map to the prefix as Wine lays it
+  out (`SaveLayout.windowsDirs`): `GameInstall` is the game's folder,
+  `WinMyDocuments` `users/<user>/Documents`, `WinAppDataLocal/LocalLow/Roaming`
+  `users/<user>/AppData/...`, `WinSavedGames`, `WinProgramData`, `Root` the
+  user's folder, and `SteamUserData` the `remote` folder of Steam's userdata
+  (where the files the Steam API writes go, as GameNative laid it out). Roots of
+  other systems in the cloud list are left alone. **The decision is Steam's
+  client rule, kept whole-game** (`SteamCloudPlan.decide`): from the files as
+  they were at the last sync (`steam/cloud/<app id>.json`, name to SHA-1, size
+  and time, which also saves re-hashing a file whose size and time did not
+  change), if only this device changed the files go up (and a file deleted here is
+  deleted there), if only the cloud changed they come down, if both changed and
+  still differ it is a conflict. A first sync with files on both sides that
+  differ is a conflict. **A conflict is the person's** (`SaveConflictResolver`,
+  filled by `SaveConflictHost` while the Gaming shell is composed): "Cloud saves
+  differ" shows each side's last change, file count and which is newer; picking
+  a side replaces the other (two-step confirm), B decides later and changes
+  nothing. With no shell to ask (another mode launched the game) both sides are
+  left as they are and the game starts on its local files. Files are written
+  beside their target and replace it only when their SHA-1 matches the one Steam
+  lists; a file that failed keeps its old entry, so the next sync sees it as
+  still to do and not as a change made here. Steam is told the game starts (the
+  launch intent, ignoring other devices' pending operations) and ends (the exit
+  sync's result) with the calls its client makes. Not carried: GameNative's
+  achievement sync and Goldberg save migration.
 - **Steam carried over** (`SteamCarryOver`): the rows come with `steam.db`;
   the sign-in GameNative kept in its preferences (the refresh token encrypted
   with its Android Keystore key, readable only through its `PrefManager`) and
@@ -9476,9 +9519,10 @@ for users" above promises more than the store services hold:
   on droidtop measuring a session itself, one mechanism per launch path.
   The PC surface therefore offers no playtime sort (7i): a sort on a number
   that is 0 for every game is a control that does nothing.
-- **Cloud saves** are not reached from droidtop (GameNative's Steam, GOG
-  and Epic save sync all resolve save folders inside its own Wine
-  containers; they move with the Wine path, not with the stores). **`gamefixes/`** is left
+- **Cloud saves** are reached for Steam (the "Steam Cloud saves" bullet of
+  "Stores" above); GameNative's GOG and Epic save sync resolve save folders
+  inside its own Wine containers and are not reached from droidtop.
+  **`gamefixes/`** is left
   out of droidtop's prefix preparation on purpose (`WinePrefixPreparation`
   lists it with the other store-specific steps it does not run).
 

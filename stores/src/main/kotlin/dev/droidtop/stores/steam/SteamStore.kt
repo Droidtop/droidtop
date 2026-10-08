@@ -3,6 +3,9 @@ package dev.droidtop.stores.steam
 import android.content.Context
 import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreUpdate
+import dev.droidtop.library.stores.SaveConflictResolver
+import dev.droidtop.library.stores.SaveSyncPhase
+import dev.droidtop.library.stores.SaveSyncResult
 import dev.droidtop.library.stores.StoreContentChoice
 import dev.droidtop.library.stores.StoreContentOptions
 import dev.droidtop.library.stores.StoreGame
@@ -12,13 +15,16 @@ import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreUpdateCheck
+import dev.droidtop.library.stores.WinePrefixLocation
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.epic.EpicGameLauncher
 import dev.droidtop.stores.util.StoreFiles
 import dev.droidtop.stores.util.StoreLanguage
+import `in`.dragonbra.javasteam.enums.EOSType
 import `in`.dragonbra.javasteam.types.DepotManifest
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
@@ -121,6 +127,76 @@ class SteamStore : StoreLibrary {
             SteamDownload.run(context, app, root, progress, choice)
         }
     }
+
+    override val hasCloudSaves = true
+
+    /**
+     * Steam Cloud saves of [gameId], synced into the game's Wine prefix
+     * (docs/SPEC.md 7g, "Stores"). Needs the sign-in and the game's folder;
+     * null when either is missing or the prefix has no `drive_c` yet (a prefix
+     * that Wine has not made is not made here). Steam is told the game starts
+     * or ends the way its own client tells it.
+     */
+    override suspend fun syncSaves(
+        context: Context,
+        gameId: String,
+        phase: SaveSyncPhase,
+        prefix: WinePrefixLocation,
+        title: String,
+        onConflict: SaveConflictResolver?,
+    ): SaveSyncResult? {
+        val appId = gameId.toIntOrNull() ?: return null
+        if (!signedIn(context)) return null
+        val found = withContext(Dispatchers.IO) {
+            if (!File(prefix.prefixDir, "drive_c").isDirectory) null else runCatching { installOf(context, gameId) }.getOrNull()
+        } ?: return null
+        val (install, dir) = found
+        return runCatching {
+            SteamSession.use(context) {
+                SteamSession.logOn(context).getOrThrow()
+                val apps = SteamSession.apps ?: error("Steam is not connected")
+                val cloud = SteamSession.cloud ?: error("Steam is not connected")
+                val http = SteamSession.httpClient ?: error("Steam is not connected")
+                val db = db(context)
+                var fresh: SteamUfs? = null
+                val app = withContext(Dispatchers.IO) {
+                    SteamLibrarySync.refreshApp(db, apps, appId) { fresh = it; SteamUfsCache.save(context, appId, it) }
+                } ?: error("Steam no longer lists this game")
+                val ufs = fresh ?: withContext(Dispatchers.IO) { SteamUfsCache.load(context, appId) } ?: SteamUfs()
+                val accountId = (SteamSession.accountId ?: 0).toLong() and 0xFFFFFFFFL
+                val steamId64 = SteamCredentials.load(context)?.steamId64 ?: 0L
+                val layout = SaveLayout(SaveLayout.windowsDirs(prefix.prefixDir, prefix.user, dir, accountId, appId), steamId64, accountId, ufs)
+                val clientId = SteamCredentials.clientId(context)
+                val outcome = SteamCloudSync.run(
+                    filesDir = context.filesDir,
+                    http = http,
+                    cloud = cloud,
+                    app = app,
+                    layout = layout,
+                    clientId = clientId,
+                    machineName = SteamSession.machineName(context),
+                    buildId = app.branches[install.branch.ifBlank { SteamDownload.BRANCH }]?.buildId ?: 0L,
+                    title = title,
+                    onConflict = onConflict,
+                    progress = {},
+                )
+                // Steam's own client tells Steam a game starts after the sync and ends after the sync.
+                when (phase) {
+                    SaveSyncPhase.BEFORE_LAUNCH -> if (outcome.settled) {
+                        runCatching { cloud.signalAppLaunchIntent(appId, clientId, SteamSession.machineName(context), true, EOSType.WinUnknown).await() }
+                    }
+                    SaveSyncPhase.AFTER_EXIT -> runCatching { cloud.signalAppExitSyncDone(appId, clientId, outcome.uploadsCompleted, outcome.uploadsRequired) }
+                    SaveSyncPhase.MANUAL -> Unit
+                }
+                outcome.result
+            }
+        }.getOrElse {
+            Timber.tag(TAG).w(it, "Steam Cloud sync failed for $appId")
+            SaveSyncResult("Cloud saves: ${userFacing(it)}", failed = true)
+        }
+    }
+
+    private fun userFacing(error: Throwable): String = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
 
     override suspend fun contentOptions(context: Context, gameId: String): StoreContentOptions? = withContext(Dispatchers.IO) {
         val appId = gameId.toIntOrNull() ?: return@withContext null

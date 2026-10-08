@@ -69,6 +69,8 @@ object LibraryCore {
                         ?.let { PrimaryContainerSession(it.runtime, it.container) }
                 },
             )
+        // Where a store game's Wine prefix is, for its cloud saves (docs/SPEC.md 7g, "Stores").
+        dev.droidtop.library.stores.StoreSaves.locator = dev.droidtop.runtime.windows.DroidtopWinePrefixLocator
         return Library(
             listOf(
                 NativeAppProvider(app),

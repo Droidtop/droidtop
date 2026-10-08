@@ -11,6 +11,7 @@ import `in`.dragonbra.javasteam.steam.discovery.ServerQuality
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.License
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.SteamApps
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.callback.LicenseListCallback
+import `in`.dragonbra.javasteam.steam.handlers.steamcloud.SteamCloud
 import `in`.dragonbra.javasteam.steam.handlers.steamgameserver.SteamGameServer
 import `in`.dragonbra.javasteam.steam.handlers.steammasterserver.SteamMasterServer
 import `in`.dragonbra.javasteam.steam.handlers.steamscreenshots.SteamScreenshots
@@ -90,6 +91,14 @@ internal object SteamSession {
     @Volatile
     var apps: SteamApps? = null
         private set
+
+    /** Steam Cloud's handler on the current connection (the save sync), or null while there is none. */
+    @Volatile
+    var cloud: SteamCloud? = null
+        private set
+
+    /** The HTTP client the connection was configured with: Steam Cloud's file transfers go through it. */
+    val httpClient: OkHttpClient? get() = client?.configuration?.httpClient as? OkHttpClient
 
     @Volatile private var connected = CompletableDeferred<Boolean>()
     @Volatile private var logOnAnswer: CompletableDeferred<EResult>? = null
@@ -245,6 +254,7 @@ internal object SteamSession {
         val manager = CallbackManager(steam)
         user = steam.getHandler(SteamUser::class.java)
         apps = steam.getHandler(SteamApps::class.java)
+        cloud = steam.getHandler(SteamCloud::class.java)
         subscriptions += manager.subscribe(ConnectedCallback::class.java) { connected.complete(true) }
         subscriptions += manager.subscribe(DisconnectedCallback::class.java) {
             Timber.tag(TAG).i("Disconnected from Steam (asked: ${it.isUserInitiated})")
@@ -290,6 +300,7 @@ internal object SteamSession {
         client = null
         user = null
         apps = null
+        cloud = null
         connected = CompletableDeferred()
         logOnAnswer?.complete(EResult.NoConnection)
         logOnAnswer = null

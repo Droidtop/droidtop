@@ -37,6 +37,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // a job each (docs/SPEC.md 7g, "Stores").
         dev.droidtop.stores.BuiltInStores.register()
         dev.droidtop.library.stores.StoreInstallJob.register(appContext)
+        // A store game's cloud saves, uploaded when the game ends, a job each (7g, "Stores").
+        dev.droidtop.library.stores.StoreSaves.register(appContext)
         // The one single-file download runner and the post step of the plugin catalog's bundles; a
         // download that finished while the process was dead is re-attached and finished by these.
         dev.droidtop.pluginhost.DownloadJobs.register(appContext)

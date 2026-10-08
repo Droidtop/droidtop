@@ -84,6 +84,9 @@ class WineGameActivity : Activity() {
     @Volatile
     private var guestShowedWindow = false
 
+    /** The library game this screen runs, when it is one (its cloud saves are synced when the screen ends). */
+    private var entryId: String? = null
+
     private val startupExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "droidtop-wine-start")
     }
@@ -110,6 +113,7 @@ class WineGameActivity : Activity() {
         val containerId = intent.getStringExtra(EXTRA_CONTAINER_ID)
         val workingDir = intent.getStringExtra(EXTRA_WORKING_DIR)?.let(::File)
         val arguments = intent.getStringArrayListExtra(EXTRA_ARGUMENTS).orEmpty()
+        entryId = intent.getStringExtra(EXTRA_ENTRY_ID)
         val prefix = containerId?.let { id ->
             runCatching { ContainerManager(this).getContainerById(id) }.getOrNull()
         }
@@ -315,6 +319,8 @@ class WineGameActivity : Activity() {
     }
 
     override fun onDestroy() {
+        // The game is over for good (not a rotation): its cloud saves go up.
+        if (isFinishing) entryId?.let { dev.droidtop.library.stores.StoreSaves.afterExit(applicationContext, it) }
         session?.stop()
         session = null
         startupExecutor.shutdownNow()
@@ -343,6 +349,7 @@ class WineGameActivity : Activity() {
         private const val EXTRA_TARGET = "dev.droidtop.wine.TARGET"
         private const val EXTRA_WORKING_DIR = "dev.droidtop.wine.WORKING_DIR"
         private const val EXTRA_ARGUMENTS = "dev.droidtop.wine.ARGUMENTS"
+        private const val EXTRA_ENTRY_ID = "dev.droidtop.wine.ENTRY_ID"
         private const val FAILURE_PADDING_PX = 48
 
         /**
@@ -357,6 +364,7 @@ class WineGameActivity : Activity() {
             target: String,
             workingDir: File,
             arguments: List<String> = emptyList(),
+            entryId: String? = null,
         ): Intent =
             Intent(context, WineGameActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -364,6 +372,7 @@ class WineGameActivity : Activity() {
                 putExtra(EXTRA_TARGET, target)
                 putExtra(EXTRA_WORKING_DIR, workingDir.absolutePath)
                 putStringArrayListExtra(EXTRA_ARGUMENTS, ArrayList(arguments))
+                entryId?.let { putExtra(EXTRA_ENTRY_ID, it) }
                 // A game's own Wine choices over a shared prefix are this
                 // launch's, not the prefix's (docs/SPEC.md 5a), so they
                 // travel with the launch rather than being saved into it.

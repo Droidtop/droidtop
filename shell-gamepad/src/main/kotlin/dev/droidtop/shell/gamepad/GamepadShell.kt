@@ -805,6 +805,8 @@ private fun GamepadShellBody(
             onDismiss = { leftMenuOpen = false },
         )
     }
+    // A store's cloud-save sync asks here when a game's saves differ (docs/SPEC.md 7g, "Stores").
+    SaveConflictHost()
     // Anchor for [requestFocusWhenAttached] below -- attached to the
     // invisible Spacer in the content Box, never to the tab bar (owner,
     // 2026-09-27: the top bar must never be a D-pad focus target).

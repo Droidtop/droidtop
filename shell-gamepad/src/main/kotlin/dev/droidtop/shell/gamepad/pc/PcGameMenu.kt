@@ -542,6 +542,18 @@ internal fun PcGameMenu(
                     onOpenDownloads()
                 }))
             }
+            if (installed && store.hasCloudSaves) {
+                add(
+                    PcActionRow("Sync cloud saves", "Brings this game's saves and ${store.label}'s cloud to the same state", {
+                        scope.launch {
+                            status = "Syncing saves…"
+                            status = dev.droidtop.library.stores.StoreSaves
+                                .sync(context, key, GameNaming.displayName(entry.title), dev.droidtop.library.stores.SaveSyncPhase.MANUAL)
+                                ?.line ?: "No cloud saves for this game"
+                        }
+                    }),
+                )
+            }
             if (installed && store.canVerify) {
                 add(
                     PcActionRow("Verify files", "Checks every file against ${store.label}'s list", {

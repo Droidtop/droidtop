@@ -430,7 +430,7 @@ class DroidtopPcGameRuntime(
         // saved settings are not touched.
         withContext(Dispatchers.IO) { container.setLaunchOverrides(WineOptions.launchOverrides(context, entryId, container)) }
 
-        return launchInPrefix(wineEngine, container, executable.absolutePath, workingDir, arguments)
+        return launchInPrefix(wineEngine, container, executable.absolutePath, workingDir, arguments, entryId)
     }
 
     override fun prefixState(entryId: String?): PcPrefixState? {
@@ -625,6 +625,7 @@ internal suspend fun launchInPrefix(
     target: String,
     workingDir: File,
     arguments: List<String> = emptyList(),
+    entryId: String? = null,
 ): PcLaunchResult {
     val prefixHostPath = File(container.rootDir, ".wine")
     if (!prefixHostPath.isDirectory) {
@@ -633,8 +634,21 @@ internal suspend fun launchInPrefix(
             "container \"${container.name}\" has no Wine prefix at ${prefixHostPath.absolutePath}",
         )
     }
-    return runCatching { engine.launch(container, target, workingDir, arguments) }
+    return runCatching { engine.launch(container, target, workingDir, arguments, entryId) }
         .getOrElse { PcLaunchResult(false, it.message ?: it.toString()) }
+}
+
+/**
+ * Where a library game's Wine prefix is, for the store cloud-save sync
+ * (docs/SPEC.md 7g, "Stores"; [dev.droidtop.library.stores.StoreSaves]). The
+ * same prefix [PcContainers.forGame] launches the game in; the store sees
+ * only a folder and a user name, never a container class.
+ */
+object DroidtopWinePrefixLocator : dev.droidtop.library.stores.WinePrefixLocator {
+    override fun locate(context: Context, entryId: String): dev.droidtop.library.stores.WinePrefixLocation? {
+        val container = PcContainers.forGame(context, entryId) ?: return null
+        return dev.droidtop.library.stores.WinePrefixLocation(File(container.rootDir, ".wine"), ImageFs.USER)
+    }
 }
 
 /**

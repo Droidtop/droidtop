@@ -251,6 +251,26 @@ interface StoreLibrary {
     suspend fun unlockBranch(context: Context, gameId: String, branchId: String, password: String): Result<Unit> =
         Result.failure(UnsupportedOperationException("$label has no locked branches"))
 
+    /** Whether the store keeps its games' saves in a cloud of its own that [syncSaves] reaches (Steam Cloud). */
+    val hasCloudSaves: Boolean get() = false
+
+    /**
+     * Brings [gameId]'s saves in the Wine prefix at [prefix] and the store's
+     * cloud to the same state, the way the store's own client does: this
+     * device's newer files go up, the cloud's newer files come down, and when
+     * both changed [onConflict] asks the person (null: leave both as they are).
+     * Null when the store keeps no cloud saves for the game. Network and disk
+     * work; the caller dispatches off the main thread.
+     */
+    suspend fun syncSaves(
+        context: Context,
+        gameId: String,
+        phase: SaveSyncPhase,
+        prefix: WinePrefixLocation,
+        title: String,
+        onConflict: SaveConflictResolver?,
+    ): SaveSyncResult? = null
+
     /**
      * A number that changes whenever [games] would answer differently: the
      * PC library's store part is walked again only when it moves

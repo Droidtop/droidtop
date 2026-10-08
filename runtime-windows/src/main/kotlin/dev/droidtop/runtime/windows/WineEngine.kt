@@ -65,7 +65,14 @@ sealed interface WineEngine {
      * the Activity that presents it, the same way every other droidtop
      * launch works.
      */
-    suspend fun launch(prefix: Container, target: String, workingDir: File, arguments: List<String> = emptyList()): PcLaunchResult
+    suspend fun launch(
+        prefix: Container,
+        target: String,
+        workingDir: File,
+        arguments: List<String> = emptyList(),
+        /** The library game this launch is, when it is one: its cloud saves are synced when the game ends. */
+        entryId: String? = null,
+    ): PcLaunchResult
 }
 
 /** Either ready, or the specific missing piece a user can act on. */
@@ -125,6 +132,7 @@ class BionicWineEngine(private val context: Context) : WineEngine {
         target: String,
         workingDir: File,
         arguments: List<String>,
+        entryId: String?,
     ): PcLaunchResult {
         // Whatever this prefix's settings name and the device lacks (a Wine
         // build, a DXVK or FEXCore version, a graphics driver chosen in its
@@ -142,7 +150,7 @@ class BionicWineEngine(private val context: Context) : WineEngine {
         // screen a launch lands on, and it is the same call for all of
         // them.
         return runCatching {
-            LaunchDisplay.start(context, WineGameActivity.intent(context, prefix, target, workingDir, arguments))
+            LaunchDisplay.start(context, WineGameActivity.intent(context, prefix, target, workingDir, arguments, entryId))
         }.fold(
             onSuccess = { PcLaunchResult(true, "ok") },
             onFailure = { PcLaunchResult(false, it.message ?: "couldn't start the Windows game screen") },

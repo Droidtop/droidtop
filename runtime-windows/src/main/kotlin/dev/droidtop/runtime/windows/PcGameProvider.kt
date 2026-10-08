@@ -1,12 +1,14 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
+import android.util.Log
 import com.winlator.container.ContainerManager
 import com.winlator.container.Shortcut
 import dev.droidtop.library.EngineOverridePrefs
 import dev.droidtop.library.EnginesDatabase
 import dev.droidtop.library.GameEngineDetector
 import dev.droidtop.library.GameLaunchStrategy
+import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameExecutableResolver
 import dev.droidtop.library.WindowsLaunch
 import dev.droidtop.library.WindowsLaunchResolver
@@ -400,6 +402,9 @@ class PcGameProvider(
                         "Can't launch ${entry.title}: couldn't identify which executable to run in " +
                             "${gameRoot.absolutePath}. Pick one explicitly for this game.",
                     )
+                // A store's cloud saves are brought up to date first (Steam Cloud); it never holds the game back for long.
+                dev.droidtop.library.stores.StoreSaves.beforeLaunch(context, entry.id, GameNaming.displayName(entry.title))
+                    ?.let { Log.i("droidtop.PcGameProvider", it) }
                 runtime.launchWindows(windows.executable, gameRoot, windows.workingDir, windows.arguments, entry.id)
             }
             // An engine this provider does not own (see
