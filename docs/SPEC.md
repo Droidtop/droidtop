@@ -145,6 +145,12 @@ Instead, mirror Qubes OS's dom0/AppVM split:
   virtual display), and injecting normalized input events back in via
   `wlr-virtual-pointer-v1`/`virtual-keyboard-v1`. It implements no window
   management, no compositing, no protocol server logic.
+  host-bridge's Wayland client must not assume it is the sole screencopy or
+  virtual-input consumer; windowcast attaches as a second client of the same
+  compositor, not through droidtop code. Its one capture session
+  (host-bridge/native/src/wayland_client.cpp:1456) and one virtual pointer
+  and keyboard per connection (wayland_client.cpp:1316-1319) are
+  per-connection state, so a second compositor client leaves them untouched.
 - **Everything else is a sibling container** — a Linux distro (Ubuntu,
   Debian, Alpine, whatever the user picks) or a Wine prefix, each bind-
   mounting the primary container's `WAYLAND_DISPLAY` and PulseAudio socket
