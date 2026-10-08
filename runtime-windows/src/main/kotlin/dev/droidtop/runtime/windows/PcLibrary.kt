@@ -73,6 +73,8 @@ object PcLibrary {
         val installedVersion: String? = null,
         /** Other stores' ids the store's own row names ([PcInfo.externalIds]). */
         val externalIds: Map<String, String> = emptyMap(),
+        /** Another account's game, lent through the store's family ([StoreGame.familyShared]). */
+        val familyShared: Boolean = false,
     ) {
         val installDir: File? get() = installPath?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { it.isDirectory }
     }
@@ -420,6 +422,7 @@ object PcLibrary {
             artUrl = artUrl,
             installedVersion = installedVersion,
             externalIds = externalIds,
+            familyShared = familyShared,
         )
     }
 
@@ -728,7 +731,8 @@ fun PcLibrary.Game.toStoreInstall(): StoreInstall? = installDir?.let { dir ->
  * merged entry to disagree with the one it replaced.
  */
 fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
-    source = source.displayName(),
+    // A lent game is listed under its own store name, so it has its own tab and badge.
+    source = source.displayName().let { if (familyShared) PcStoreNames.family(it) else it },
     storeId = id,
     installed = installed,
     sizeBytes = sizeBytes,

@@ -41,6 +41,11 @@ data class StoreGame(
      * today.
      */
     val externalIds: Map<String, String> = emptyMap(),
+    /**
+     * Playable through another account's licence (Steam Families), not owned:
+     * listed apart, as the store's family ([PcStoreNames.family]).
+     */
+    val familyShared: Boolean = false,
 ) {
     /** The id the library knows this row by: `"gog:1207658691"`. */
     val key: String get() = "$store:$gameId"

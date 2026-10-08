@@ -116,16 +116,19 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
 }
 
 /** One store's games as the library has them. */
-internal data class StoreCounts(val total: Int, val installed: Int)
+internal data class StoreCounts(val total: Int, val installed: Int, val family: Int = 0)
 
+/** The account's own games of [source]; another account's (a Steam Family's) are counted apart. */
 internal fun storeCounts(games: List<PcLibrary.Game>, source: PcLibrary.Source): StoreCounts {
-    val mine = games.filter { it.source == source }
-    return StoreCounts(mine.size, mine.count { it.installed })
+    val all = games.filter { it.source == source }
+    val mine = all.filterNot { it.familyShared }
+    return StoreCounts(mine.size, mine.count { it.installed }, all.size - mine.size)
 }
 
 /** The library row's value: what is known, in words ("12 games, 3 installed"). */
 internal fun countsLine(counts: StoreCounts, signedIn: Boolean): String = when {
-    counts.total > 0 -> "${counts.total} ${if (counts.total == 1) "game" else "games"}, ${counts.installed} installed"
+    counts.total > 0 -> "${counts.total} ${if (counts.total == 1) "game" else "games"}, ${counts.installed} installed" +
+        if (counts.family > 0) ", ${counts.family} more from your family" else ""
     signedIn -> "No games read from this store yet"
     else -> "Sign in to read this store's library"
 }

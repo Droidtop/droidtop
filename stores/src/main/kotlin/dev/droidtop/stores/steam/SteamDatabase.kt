@@ -167,8 +167,8 @@ class SteamConverters {
  * app with a package, a known type, not Spacewar, and a licence that has not
  * expired, either its own package's or one of its DLC's (a free-to-start game
  * whose purchase is a DLC). Bit 8 of the licence flags is Expired.
- * [OWNED_BY_LICENCE] is the same without the known type, for the sync's
- * summary, which counts the apps whose product info never came.
+ * Which of these the account itself owns, and which it borrows, is
+ * [SteamOwnership]'s answer, read from the licences.
  */
 private const val OWNED_APPS_WHERE = "WHERE app.type != 0 AND "
 
@@ -183,8 +183,8 @@ private const val OWNED_BY_LICENCE =
         "  )" +
         ") "
 
-/** One line of [SteamAppDao.ownedCounts]: [type] is an [AppType] code. */
-data class SteamAppCount(val type: Int, val namesBaseGame: Boolean, val count: Int)
+/** An app's id, its [AppType] code and the base game it names ([SteamIds.INVALID_APP_ID] for none): [SteamAppDao.kinds]. */
+data class SteamAppKind(val id: Int, val type: Int, val base: Int)
 
 @Dao
 interface SteamAppDao {
@@ -204,12 +204,13 @@ interface SteamAppDao {
     @Query("SELECT * FROM steam_app AS app " + OWNED_APPS_WHERE + OWNED_BY_LICENCE + "AND app.type IN (:types) AND app.dlc_for_app_id = ${SteamIds.INVALID_APP_ID} ORDER BY LOWER(app.name)")
     suspend fun owned(types: List<Int>): List<SteamApp>
 
-    /** How many owned apps there are of each type, with and without a base game (`dlcforappid`); the sync's summary. */
-    @Query(
-        "SELECT app.type AS type, (app.dlc_for_app_id != ${SteamIds.INVALID_APP_ID}) AS namesBaseGame, COUNT(*) AS count " +
-            "FROM steam_app AS app WHERE " + OWNED_BY_LICENCE + "GROUP BY app.type, namesBaseGame",
-    )
-    suspend fun ownedCounts(): List<SteamAppCount>
+    /** Every stored app's id, type and base game, without its product info: three numbers a row. */
+    @Query("SELECT id, type, dlc_for_app_id AS base FROM steam_app")
+    suspend fun kinds(): List<SteamAppKind>
+
+    /** The DLC rows only, by the base game they name: what [SteamOwnership.statusOf] needs. */
+    @Query("SELECT id, type, dlc_for_app_id AS base FROM steam_app WHERE dlc_for_app_id != ${SteamIds.INVALID_APP_ID}")
+    suspend fun dlcKinds(): List<SteamAppKind>
 
     /** DLC apps of [appId] with depots of their own that a licence grants (GameNative's findDownloadableDLCApps). */
     @Query(

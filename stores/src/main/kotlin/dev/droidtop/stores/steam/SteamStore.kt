@@ -102,7 +102,18 @@ class SteamStore : StoreLibrary {
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
         val db = db(context)
         val installs = db.installs().all().filter { it.isDownloaded && it.installPath.isNotBlank() }.associateBy { it.id }
-        val owned = db.apps().owned(SteamLibrarySync.PLAYABLE_TYPES)
+        // Whose licence grants each game (SteamOwnership): the account's own, a
+        // family member's (listed, marked), or only the free sub or an ended
+        // licence (not listed).
+        val accountId = SteamCredentials.load(context)?.steamId64?.takeIf { it != 0L }?.let { (it and 0xFFFFFFFFL).toInt() }
+        val ownership = SteamOwnership.of(db.licenses().all(), accountId)
+        val dlcByBase = db.apps().dlcKinds().groupBy({ it.base }, { it.id })
+        val status = HashMap<Int, SteamOwnership.Status>()
+        val owned = db.apps().owned(SteamLibrarySync.PLAYABLE_TYPES).filter { app ->
+            val standing = ownership.statusOf(app.id, dlcByBase[app.id].orEmpty())
+            status[app.id] = standing
+            standing != SteamOwnership.Status.NONE
+        }
         val ownedIds = owned.mapTo(HashSet()) { it.id }
         // Installed and no longer owned (signed out, a licence gone) still shows, with its files.
         val installedOnly = installs.keys.filter { it !in ownedIds }
@@ -120,6 +131,7 @@ class SteamStore : StoreLibrary {
                 installPath = install?.installPath,
                 sizeBytes = baseSize(app, language),
                 artUrl = app.coverUrl,
+                familyShared = status[app.id] == SteamOwnership.Status.FAMILY,
             )
         }
     }

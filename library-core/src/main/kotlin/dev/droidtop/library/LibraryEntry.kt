@@ -313,6 +313,9 @@ object PcStoreNames {
 
     /** The catalog item id prefix of a store page's "Open library" row; the label follows. */
     const val LIBRARY_ITEM_PREFIX = "store_library:"
+
+    /** Where the games another account lends through [store] are listed: "Steam Family". */
+    fun family(store: String): String = "$store Family"
 }
 
 /**

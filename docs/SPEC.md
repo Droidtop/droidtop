@@ -9837,10 +9837,25 @@ follows:
   rows brought across from GameNative keep its reading until their product
   info changes, so `steam.db` version 2 (and every import) rewrites 0 to the
   invalid id; before that only 725 of the owner's 1,245 games were listed.
+  Whose licence grants a game decides whether it is listed (`SteamOwnership`,
+  Droidtop/tracker#377): the account's own live licences own it; a licence
+  another account holds (Steam Families: the licence list carries the
+  lender's account id) lends it, and a lent game is listed apart, under
+  "Steam Family" (its own PC Games tab and badge; the store page counts it
+  separately); an expired or cancelled licence grants nothing; and package 0,
+  the free sub every account holds, which names every free app on Steam,
+  grants nothing either, as in Steam's own owned-games answer
+  (`include_free_sub` is off unless asked). A free game the person added has
+  a licence of its own. Until 2026-10-08 every unexpired licence counted, the
+  free sub and family members' included: the owner's library listed 3,281
+  games and 2,636 DLC where his Steam profile shows 1,245 and 782.
   Each Steam sync writes one line to scan.log (`SteamLibrarySync.summary`):
-  the licences by type, expired and another account's; the owned apps by
-  product-info type; how many have no product info; the library games; and
-  what the rule left out, by type, to set against Steam's own profile counts. Install is a job like every store's: fresh product info, then
+  the licences by payment method and by flag, how many are another account's,
+  whether the free sub is held and how many apps it names, the packages by
+  billing type (Steam's EBillingType number), the apps by product-info type
+  that own licences grant, that only a family member's grant, and that only
+  the free sub or an ended licence names, and the library games, own and
+  family, to set against Steam's own profile counts. Install is a job like every store's: fresh product info, then
   the depots `SteamDepots.plan` picks (GameNative's rules: Windows, 64-bit over
   32-bit, the plain build over the Steam Deck one, the device's language else
   English, granted by the account's packages, not Steam China) with the DLC the
