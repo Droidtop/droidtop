@@ -95,6 +95,15 @@ object WineOptions {
     private const val LSFG_KEY = "lsfg"
     private const val LSFG_OFF = "off"
 
+    /** Whether a Steam game that uses Steamworks starts through the shim in its prefix (docs/SPEC.md 5b); a game's own choice, on unless turned off. */
+    const val STEAMWORKS = "wine_steamworks"
+    private const val STEAMWORKS_KEY = "steamworks"
+    private const val STEAMWORKS_ON = "on"
+    private const val STEAMWORKS_OFF = "off"
+
+    /** A game's choices that are not prefix settings: kept when its Wine choices change or are dropped. */
+    private val OWN_KEYS = setOf(LSFG_KEY, STEAMWORKS_KEY)
+
     private const val NOT_HERE = "downloads when used"
 
     // Settings rows choose synchronously on the main thread; the write is
@@ -119,7 +128,7 @@ object WineOptions {
             ownPrefix = own,
             ownChoices = choices.size,
             rows = rows(context, settings, Lists.load(context), choices.keys) +
-                listOfNotNull(entryId?.let { lsfgRow(context, it) }),
+                listOfNotNull(entryId?.let { lsfgRow(context, it) }, entryId?.let { steamworksRow(context, it) }),
             missing = runCatching { WineComponents.missing(context, container) }.getOrDefault(emptyList()),
         )
     }
@@ -140,6 +149,11 @@ object WineOptions {
                 if (rowId == LSFG && entryId != null) {
                     val stored = WineGameOptionsPrefs.get(app, entryId) - LSFG_KEY
                     WineGameOptionsPrefs.set(app, entryId, if (value == LSFG_OFF) stored else stored + (LSFG_KEY to value))
+                    return@runCatching
+                }
+                if (rowId == STEAMWORKS && entryId != null) {
+                    val stored = WineGameOptionsPrefs.get(app, entryId) - STEAMWORKS_KEY
+                    WineGameOptionsPrefs.set(app, entryId, if (value == STEAMWORKS_OFF) stored + (STEAMWORKS_KEY to value) else stored)
                     return@runCatching
                 }
                 val container = PcContainers.forGame(app, entryId) ?: return@runCatching
@@ -178,10 +192,28 @@ object WineOptions {
             .fold({ "Everything these settings need is on this device." }, { "Download failed: ${it.message ?: it}" })
     }
 
-    /** Stores [wine] as [entryId]'s Wine choices, leaving its frame generation choice as it is. */
+    /** Stores [wine] as [entryId]'s Wine choices, leaving its own non-prefix choices (frame generation, Steamworks) as they are. */
     private fun setWineChoices(context: Context, entryId: String, wine: Map<String, String>) {
-        val lsfg = WineGameOptionsPrefs.get(context, entryId)[LSFG_KEY]
-        WineGameOptionsPrefs.set(context, entryId, if (lsfg == null) wine else wine + (LSFG_KEY to lsfg))
+        val own = WineGameOptionsPrefs.get(context, entryId).filterKeys { it in OWN_KEYS }
+        WineGameOptionsPrefs.set(context, entryId, wine + own)
+    }
+
+    /** Whether [entryId] starts through the Steamworks shim when it needs it: on unless the game turned it off. Preferences read. */
+    fun steamworksOn(context: Context, entryId: String?): Boolean =
+        entryId == null || WineGameOptionsPrefs.get(context, entryId)[STEAMWORKS_KEY] != STEAMWORKS_OFF
+
+    /** The Steamworks row of [entryId] (docs/SPEC.md 5b, "Steamworks in the prefix"). */
+    private fun steamworksRow(context: Context, entryId: String): WineOptionRow {
+        val on = steamworksOn(context, entryId)
+        return WineOptionRow(
+            STEAMWORKS, "Steamworks",
+            "For a Steam game that uses Steamworks: it starts as your droidtop Steam account through a stand-in for the Steam client " +
+                "in its prefix (gbe_fork), so it does not stop waiting for Steam. Achievements and multiplayer stay on this device. " +
+                "Nothing in the game's folder changes. Other games ignore it.",
+            if (on) STEAMWORKS_ON else STEAMWORKS_OFF,
+            listOf(WineOptionChoice(STEAMWORKS_ON, "On"), WineOptionChoice(STEAMWORKS_OFF, "Off")),
+            ownChoice = !on,
+        )
     }
 
     /**

@@ -13525,6 +13525,48 @@ app gets it too:
     `libvirglrenderer` droidtop already builds). Each becomes a value of the
     same option, fetched the same way, when its component is built.
 
+**Steamworks in the prefix (2026-10-08, Droidtop/tracker#310).** A Windows
+Steam game's own `steam_api(64).dll` starts only when it finds a running
+Steam and loads that Steam's `steamclient(64).dll`; droidtop's Steam is its
+own store (`:stores`) and runs no client in the prefix, so a game that needs
+Steamworks stopped at `SteamAPI_Init() failed` (a Unity game on the x86_64
+rig never left its first frames). Such a game now starts through gbe_fork's
+ColdClientLoader (github.com/Detanup01/gbe_fork, LGPL-3.0), whose steamclient
+answers steam_api inside the prefix: no Steam client, no sign-in beyond
+droidtop's own, and nothing in the game's folder changes (the shim, its
+settings and the loader's ini live in the prefix's `C:\Program Files
+(x86)\Steam`). `build-scripts/steamworks-shim` packs upstream's release
+unmodified (SHA-256 checked in the build, licence and readme beside it) and
+`steamworks-shim.yml` publishes it as a pinned prerelease
+(`SteamworksShim`, `:runtime-windows`), downloaded at the first such launch.
+- **Which games:** every Steam game whose app id is known: droidtop's Steam
+  (`steam:<appid>`), a Steam library's `appmanifest_*.acf` whose `installdir`
+  is the game's folder (a Steam library on a games drive), or the game's own
+  `steam_appid.txt`. Not limited to folders where a `steam_api` file was
+  found (Unity keeps it three folders down, Unreal six; walking the tree on
+  every launch costs more than the loader costs a game that never calls
+  Steam). A game's Wine and graphics screen has a **Steamworks** row, on by
+  default, that turns it off for that game.
+- **Who plays:** droidtop's Steam sign-in (`StoreLibrary.player`: SteamID,
+  account name, the DLC droidtop installed with the game), else the DLC a
+  Steam library's manifest lists as installed; a local profile when nobody is
+  signed in. Only that DLC is reported (`unlock_all=0`), never every DLC. The
+  language is the device's, as Steam's API code.
+- **Saves:** gbe_fork's save path is `Steam/userdata/<account id>/` beside
+  the steamclient, so Steam Cloud files land in
+  `userdata/<account>/<app>/remote`, where droidtop's Steam Cloud sync reads
+  and writes them around each play.
+- **Launch:** the loader matching the game's PE bitness starts instead of the
+  game, with the game's arguments; its ini names the game by its path inside
+  the prefix (the mapped games drive, else `Z:`). `PROTON_DISABLE_LSTEAMCLIENT=1`
+  (the shim's one environment variable, carried by the launch-only
+  `Container.LAUNCH_ENV` override) keeps Proton's Wine from sending
+  steamclient loads to its lsteamclient bridge, which needs a Linux Steam
+  client this device does not have.
+- **What it is not:** a running Steam. Achievements, stats and multiplayer
+  stay on the device (gbe_fork's own); nothing is reported to Steam. The
+  real client below remains the way to get those when it is built.
+
 **Steam on x86_64 is the Linux client in proot (user, 2026-09-24).**
 (Since the runtime lift, 2026-10-08, §9, the arm64 in-prefix Steam client
 described next is not carried at all: droidtop's Steam is `:stores` and

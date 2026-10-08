@@ -184,8 +184,8 @@ object WineOptionsCatalog {
     private fun item(row: WineOptionRow, entryId: String?, title: String?, overGame: Boolean): CatalogItem {
         val label = row.choices.firstOrNull { it.value == row.current }?.label ?: row.current
         val summary = when {
-            // Frame generation is always a game's own choice, in any prefix.
-            !overGame || row.id == WineOptions.LSFG -> row.summary
+            // Frame generation and Steamworks are always a game's own choice, in any prefix.
+            !overGame || row.id == WineOptions.LSFG || row.id == WineOptions.STEAMWORKS -> row.summary
             row.id == WineOptions.WINE -> row.summary + ". Another build gives this game a prefix of its own (a few hundred megabytes); its saves so far stay in the shared one."
             row.ownChoice -> row.summary + ". This game's own choice."
             else -> row.summary + ". The shared setting."

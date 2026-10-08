@@ -2,6 +2,7 @@ package dev.droidtop.runtime.windows
 
 import android.content.Context
 import dev.droidtop.runtime.windows.utils.ContainerUtils
+import dev.droidtop.runtime.windows.utils.SteamworksShim
 import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
 import com.winlator.container.Container
 import com.winlator.container.ContainerData
@@ -428,8 +429,25 @@ class DroidtopPcGameRuntime(
         // A game sharing the prefix runs with its own Wine choices laid over
         // it for this launch only (docs/SPEC.md 5a); the shared prefix's
         // saved settings are not touched.
-        withContext(Dispatchers.IO) { container.setLaunchOverrides(WineOptions.launchOverrides(context, entryId, container)) }
+        val overrides = withContext(Dispatchers.IO) { WineOptions.launchOverrides(context, entryId, container) }
 
+        // A Steam game that uses Steamworks starts through the shim in the
+        // prefix (docs/SPEC.md 5b, "Steamworks in the prefix"), unless the
+        // game turned it off; the game's own files are left as they are.
+        val shim = withContext(Dispatchers.IO) {
+            if (WineOptions.steamworksOn(context, entryId)) SteamworksShim.plan(entryId, gameRoot) else null
+        }
+        if (shim != null) {
+            val launch = runCatching {
+                SteamworksShim.prepare(context, container, shim, entryId, executable, gameRoot, workingDir, arguments)
+            }.getOrElse {
+                return PcLaunchResult(false, "couldn't set up Steamworks for this game: ${it.message ?: it}")
+            }
+            val env = launch.env.entries.joinToString(" ") { (name, value) -> "$name=$value" }
+            container.setLaunchOverrides(overrides + (Container.LAUNCH_ENV to env))
+            return launchInPrefix(wineEngine, container, launch.target.absolutePath, launch.workingDir, launch.arguments, entryId)
+        }
+        container.setLaunchOverrides(overrides)
         return launchInPrefix(wineEngine, container, executable.absolutePath, workingDir, arguments, entryId)
     }
 
