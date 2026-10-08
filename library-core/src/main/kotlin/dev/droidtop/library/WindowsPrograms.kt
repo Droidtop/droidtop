@@ -103,7 +103,9 @@ object WindowsPrograms {
             choices.programs.forEach { program ->
                 add(
                     AsyncActionItem(
-                        id = "program:${program.path}",
+                        // The id names the row's state too, so the line a pick
+                        // leaves on its row goes when the row's state changes.
+                        id = "program:${program.path}" + if (program.path == choices.current) ":runs" else "",
                         title = program.path,
                         subtitle = when {
                             program.path == choices.chosen -> "Your choice"
@@ -114,7 +116,7 @@ object WindowsPrograms {
                         value = if (program.path == choices.current) "Runs" else null,
                         run = { ctx, _ ->
                             choose(ctx, entryId, program.path)
-                            "Play runs ${program.path.substringAfterLast('/')}"
+                            "Runs"
                         },
                     ),
                 )
@@ -128,7 +130,7 @@ object WindowsPrograms {
                             ?: "It can't tell which program is the game here",
                         run = { ctx, _ ->
                             choose(ctx, entryId, null)
-                            "droidtop picks the program again"
+                            "droidtop picks"
                         },
                     ),
                 )

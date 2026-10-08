@@ -17,7 +17,7 @@ TERMUX_PKG_MAINTAINER="droidtop"
 TERMUX_PKG_VERSION="26.2.4"
 TERMUX_PKG_SRCURL="https://archive.mesa3d.org/mesa-${TERMUX_PKG_VERSION}.tar.xz"
 TERMUX_PKG_SHA256=bce5f7fbebb934373b86c999a064d52fb5065878dc57f287f95346648ec832e9
-TERMUX_PKG_DEPENDS="libandroid-shmem, libc++, libllvm (<< $TERMUX_LLVM_NEXT_MAJOR_VERSION), libx11, libxcb, libxext, libxshmfence, ncurses, zlib, zstd"
+TERMUX_PKG_DEPENDS="libandroid-shmem, libc++, libllvm (<< $TERMUX_LLVM_NEXT_MAJOR_VERSION), libx11, libxcb, libxext, libxfixes, libxrandr, libxshmfence, libxxf86vm, ncurses, zlib, zstd"
 TERMUX_PKG_BUILD_DEPENDS="llvm, xorgproto"
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
