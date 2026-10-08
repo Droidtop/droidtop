@@ -35,6 +35,9 @@
 -keep class dev.droidtop.pluginhost.** { *; }
 -keep class dev.droidtop.app.vpn.TunnelNative { *; }
 -keep class org.pocketworkstation.pckeyboard.** { *; }
+# Started by name through the elevated helper (app_process), never called from
+# droidtop's own code (AddonKeyboardHost, docs/SPEC.md 4c).
+-keep class dev.droidtop.app.ImePolicyTool { public static void main(java.lang.String[]); }
 
 # The plugin API. Plugin bundles are dex loaded at run time against these
 # types (docs/plugin-api.md), so they are the contract and nothing in them may

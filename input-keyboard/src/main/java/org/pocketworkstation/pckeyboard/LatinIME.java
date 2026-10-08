@@ -769,6 +769,11 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onStartInputView(EditorInfo attribute, boolean restarting) {
+        // droidtop patch: an editor asked for the keyboard. Android may place
+        // this IME's window on another screen or nowhere (the display IME
+        // policy, docs/SPEC.md 4c), so droidtop is told and can draw the
+        // same keyboard on the editor's own screen itself.
+        SecondScreenKeyboard.onShowRequested(attribute.packageName);
         sKeyboardSettings.editorPackageName = attribute.packageName;
         sKeyboardSettings.editorFieldName = attribute.fieldName;
         sKeyboardSettings.editorFieldId = attribute.fieldId;
@@ -975,6 +980,7 @@ public class LatinIME extends InputMethodService implements
     @Override
     public void onFinishInputView(boolean finishingInput) {
         super.onFinishInputView(finishingInput);
+        SecondScreenKeyboard.onShowEnded();
         // Remove penging messages related to update suggestions
         mHandler.removeMessages(MSG_UPDATE_SUGGESTIONS);
         mHandler.removeMessages(MSG_UPDATE_OLD_SUGGESTIONS);

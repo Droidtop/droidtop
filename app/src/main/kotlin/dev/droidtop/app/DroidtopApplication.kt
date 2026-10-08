@@ -61,7 +61,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         ScreenOrientationPrefs.install(this)
         // A second-screen surface that becomes the top activity hands the pad back to the
         // shell instead of leaving keys without a window (SPEC 4c, console build 1386 ANR).
-        ForegroundShell.installPadReturn()
+        ForegroundShell.installPadReturn(this)
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)
         // What `host.info` tells a plugin about the mode droidtop is in (docs/plugin-api.md 3 J4).
@@ -87,6 +87,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // the Shizuku app (or Sui) or the Shizuku plugin, whichever the user picked; with none, it says what to
         // enable (docs/SPEC.md "The task manager"). Runs in every process: the binder is shared across them.
         dev.droidtop.pluginhost.ElevatedAccessHost.install(this)
+        // Typing on the add-on display (SPEC 4c, tracker#314): with elevated access Android's own keyboard is set to
+        // show on each second display; without it droidtop draws its own keyboard over an app there. Main process only.
+        AddonKeyboardHost.install(this)
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).
         LibraryCore.followGamesRoots(this)
@@ -111,6 +114,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
             }
             override fun onActivityResumed(activity: Activity) {
                 activity.note("resumed")
+                // Elevated access may have been granted while droidtop was away; a pass with nothing new runs no command.
+                if (!activity.isParkedSurface()) AddonKeyboardHost.resync(activity, force = false)
                 if (!activity.isParkedSurface()) AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
             }
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit

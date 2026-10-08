@@ -3424,6 +3424,106 @@ had not moved.
 
 Verification: rig steps are in the commit message.
 
+### Typing on the add-on display (2026-10-08, Droidtop/tracker#314)
+
+Owner, 2026-10-07: "ANY keyboard input is broken when stuff is on the addon display", and, for
+other apps there, "pop keyboards on the display the app is on when nothing else is an option",
+"maybe put a keyboard button on the companion". Diagnosed from the code and the AOSP sources
+(android-14.0.0_r1 unless named); no console was reachable, so every device claim below is the
+rig check in the commit message.
+
+**Why nothing types there.**
+
+- **Android's keyboard window is placed by a per-display policy.** The input method service puts
+  the keyboard for an editor on display D where `InputMethodManagerService.computeImeDisplayIdForTarget`
+  says: D itself only when `WindowManagerService.getDisplayImePolicy(D)` is LOCAL, the built-in
+  display for FALLBACK_DISPLAY, nowhere for HIDE. `DisplayContent.getImePolicy` returns
+  FALLBACK_DISPLAY for an untrusted display, and `DisplayWindowSettings.getImePolicyLocked` returns
+  FALLBACK_DISPLAY for every non-default display that has no stored policy (LOCAL only under the
+  developer option "force desktop mode", `forceDesktopMode()`). So an editor on the add-on display
+  gets its keyboard window on the built-in screen, where the console showed none drawn at all
+  ("shown on display 0", above): typing on the add-on display was broken for droidtop's own fields
+  and for every app alike.
+- **The policy can be changed, but not by an app, and not by a shell command.**
+  `IWindowManager.setDisplayImePolicy` (Android 12+; `setShouldShowIme` on 10 and 11) checks
+  INTERNAL_SYSTEM_WINDOW, a permission the shell user holds (`packages/Shell/AndroidManifest.xml`).
+  `WindowManagerShellCommand` has no command for it on any release from 10 to 15 and main, so
+  `wm set-display-ime-policy` does not exist. Android stores the policy per display (by its unique
+  id) in `display_settings.xml`, so it survives a restart.
+- **Keys go to one display.** A hardware key goes to the focused window of the top-focused display;
+  handhelds leave `config_perDisplayFocusEnabled` off, so only one display has a focused window at
+  a time. Touching a focusable window moves the top-focused display, a `FLAG_NOT_FOCUSABLE` one does
+  not (`WindowManagerService.onPointerDownOutsideFocusLocked` returns early when the touched window
+  cannot receive focus, "don't move the display it's on to the top"). droidtop's companion surfaces are touch-only for exactly this reason (sections
+  above). The input method's connection follows the same focus: `onStartInput` hands droidtop's
+  input method the editor of the focused window, wherever its keyboard window would be drawn.
+- **A companion that becomes the top activity took the keys from an app on the other screen.**
+  When a touch-only companion activity becomes the top one it turns focusable (so a key never waits
+  five seconds for a window, the ANR above) and hands the pad back to the shell. It could only hand
+  it to the shell: with an app in front on the add-on display (the shell under it, paused, so not
+  `ForegroundShell.current`), the keys stopped at the companion and the app got none.
+
+**Decisions.**
+
+- **With elevated access, Android's own keyboard shows on the add-on display.** `AddonKeyboardHost`
+  (`:app`) runs `ImePolicyTool` through the one `PrivilegedShell` (`env CLASSPATH=<droidtop's APK>
+  app_process /system/bin dev.droidtop.app.ImePolicyTool set <display> 0`): a process app_process
+  starts as the shell user, with no hidden-API restriction, that calls `setDisplayImePolicy` (or
+  `setShouldShowIme`) by reflection and prints the policy it reads back. droidtop itself still never
+  holds a privilege and never calls `su`. It runs at start, when a display comes or goes, when a
+  droidtop activity resumes (access may have been granted meanwhile; a pass with nothing new runs no
+  command) and when the setting changes. Each display's previous policy is recorded the first time;
+  turning the setting "Android keyboard on second screen" (Displays; drawn only with elevated access;
+  on by default) off gives every recorded display its previous policy back. Uninstalling cannot be
+  hooked; the policy then stays LOCAL, which shows a keyboard where Android showed none. A display
+  counts as local only when the read-back says so (`AddonKeyboard.localDisplays`); an untrusted
+  display is refused by Android and keeps droidtop's own keyboard.
+- **One keyboard component.** `KeyboardPanel` (`:input-keyboard`) is the embedded Hacker's Keyboard
+  grid (`SecondScreenKeyboard.createView`, the same view, layouts and themes droidtop's input method
+  draws) wired to a `KeyboardSink`; `DroidtopKeyboard` (`:shell-gamepad`) is its one Compose adapter.
+  Every keyboard droidtop draws is that view, only the sink differs: the companion's Input tab
+  (`ImeConnectionSink`, or the container), its Keys button (`RoutedKeyboardSink`), the Social draft
+  (the draft itself; its own keyboard composable is gone), droidtop's own fields (`WindowKeySink`)
+  and the keyboard over another app (`ImeConnectionSink`). `KeyMeta` is the one meta-state rule.
+- **droidtop's own text fields always type.** On a display Android draws no keyboard on
+  (`AddonKeyboardRules.ownFieldNeedsKeyboard`), the shell's text fields (library search, the text
+  dialog, the metadata editor, a new collection's name) draw `OwnFieldKeyboard` under the field. Its
+  keys are dispatched into the field's own window as keys of Android's virtual keyboard device, the
+  path an attached keyboard takes: no input method, no window focus, no permission. The panel is
+  never a focus target, so a tap on a key leaves focus on the field.
+- **Other apps on the add-on display: droidtop's input method, drawn where the app is.** droidtop's
+  keyboard is already a selectable input method; its connection to the focused editor exists even
+  where Android draws no keyboard window. When an editor asks it for the keyboard
+  (`LatinIME.onStartInputView`, `SecondScreenKeyboard.ShowRequests`) and that editor's app is on a
+  second display Android draws no keyboard on, `ShowOverEditor` draws the same panel at the bottom of
+  that display in a `TYPE_APPLICATION_OVERLAY` window that is `FLAG_NOT_FOCUSABLE` (the app keeps its
+  focus and its input session) and types through the connection; the input method's own view is
+  suppressed meanwhile. `EditorInfo` names the package, not the display, so the display comes from
+  the system's task list where the elevated helper reads it, else from the screen droidtop launched
+  the app on; an app droidtop cannot place gets no overlay. It needs "Display over other apps", a
+  user grant. A Hide key closes it until that editor's session ends.
+- **The companion is a keyboard for the other screen.** A Keys pill in the companion's tab strip
+  (not on the Input tab, which already is one) opens the panel under any tab; it types into the
+  focused field on the other screen by the best route there is (`AddonKeyboardRules.route`):
+  droidtop's input method's connection, else the elevated helper's `input -d <display>` (text as
+  `input text`, other keys as `keyevent`, one after another on one thread). The companion stays
+  touch-only, so typing on it never moves focus off the other screen.
+- **Guidance is a value, not prose.** Displays has "Keyboard for apps on second screen", whose value
+  is the state ("Android keyboard", "droidtop keyboard", "Needs droidtop keyboard", "Needs display
+  over apps") and whose action is the one missing step (Android's keyboard picker, or the overlay
+  grant). The Keys panel shows "Typing" with a "Use droidtop keyboard" chip when it has no route, and
+  "No text field" when a key found no editor.
+- **Focus goes back to the app, not only the shell.** When a touch-only surface becomes the top
+  activity and no shell is resumed on another screen, the system's task list is read (elevated
+  helper only) and the app visible on the other screen is brought to the front through the task
+  manager's one switch (`TaskActions.bringTo`), so its display holds the focus again
+  (`FocusReturn.appToRefocus`). Without that list droidtop cannot tell an app still showing from one
+  the user left and moves nothing; a tap on the app does the same.
+
+**Not done:** an accessibility-service route for other apps while another keyboard (Gboard) is the
+selected one; droidtop's own non-shell activities (store sign-in, onboarding) on the add-on display
+get neither `OwnFieldKeyboard` nor the overlay.
+
 ### G6 status: store consolidated, relocation logic still in `:app` (2026-09-25)
 
 The "one persisted answer" decision above (`MainScreen`, 2026-09-24)
@@ -4908,6 +5008,9 @@ shown when an editor asks and hidden when none does.
 So a persistent second-screen keyboard **cannot be an IME window**, and
 building one as though it could would ship something that silently does
 nothing.
+(With elevated access droidtop does change that policy for the add-on
+display, and droidtop draws its own keyboard over other apps there; see 4c,
+"Typing on the add-on display".)
 
 What it is instead: an ordinary droidtop window on the second screen
 containing a real `LatinKeyboardView` — the fork's own key grid, themes

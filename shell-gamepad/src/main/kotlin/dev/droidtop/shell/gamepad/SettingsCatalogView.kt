@@ -1344,6 +1344,8 @@ internal fun TextEditDialog(
                     .background(MenuTokens.SurfaceSelected)
                     .padding(12.dp),
             )
+            // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).
+            OwnFieldKeyboard()
             val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = {

@@ -19,12 +19,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -130,108 +132,114 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
         Text("Edit metadata", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
         Text(entry.title, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
 
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            // The hint bar's own room (MenuTokens.HintBarRoom).
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
-        ) {
-            item { SectionLabel("Scraped fields") }
-            item {
-                MetadataTextRow("Description", current.description ?: "", multiline = true) {
-                    loaded = current.copy(description = it.ifBlank { null })
-                }
-            }
-            item {
-                MetadataTextRow("Developer", current.developer ?: "") { loaded = current.copy(developer = it.ifBlank { null }) }
-            }
-            item {
-                MetadataTextRow("Publisher", current.publisher ?: "") { loaded = current.copy(publisher = it.ifBlank { null }) }
-            }
-            item {
-                MetadataTextRow("Genre", current.genre ?: "") { loaded = current.copy(genre = it.ifBlank { null }) }
-            }
-            item {
-                MetadataTextRow("Players", current.players ?: "") { loaded = current.copy(players = it.ifBlank { null }) }
-            }
-            item {
-                // Real ES-DE MD_DATE raw format: "YYYYMMDDT000000".
-                MetadataTextRow("Release date (YYYYMMDDT000000)", current.releaseDate ?: "") {
-                    loaded = current.copy(releaseDate = it.ifBlank { null })
-                }
-            }
-            item {
-                // Real ES-DE MD_RATING convention: 0.0-1.0.
-                MetadataTextRow("Rating (0.0-1.0)", current.rating?.toString() ?: "", keyboardType = KeyboardType.Decimal) {
-                    loaded = current.copy(rating = it.toFloatOrNull()?.coerceIn(0f, 1f))
-                }
-            }
-
-            item { SectionLabel("Badges") }
-            item { MetadataToggleRow("Favorite", current.favorite) { loaded = current.copy(favorite = it) } }
-            item { MetadataToggleRow("Completed", current.completed) { loaded = current.copy(completed = it) } }
-            item { MetadataToggleRow("Kid game", current.kidGame) { loaded = current.copy(kidGame = it) } }
-            item { MetadataToggleRow("Broken / not working", current.broken) { loaded = current.copy(broken = it) } }
-            item {
-                MetadataPickerRow("Controller", EsDeControllers.byShortName(current.controllerShortName).displayName) {
-                    pickingController = true
-                }
-            }
-            if (entry.systemId != null) {
+        val editing = remember { mutableStateOf(false) }
+        CompositionLocalProvider(LocalMetadataEditing provides editing) {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                // The hint bar's own room (MenuTokens.HintBarRoom).
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
+            ) {
+                item { SectionLabel("Scraped fields") }
                 item {
-                    MetadataPickerRow("Emulator", gameEmulatorSummary(emulators, current.altEmulator)) {
-                        if (emulators != null) pickingEmulator = true
+                    MetadataTextRow("Description", current.description ?: "", multiline = true) {
+                        loaded = current.copy(description = it.ifBlank { null })
                     }
                 }
-            }
-            item {
-                Text(
-                    if (entry.manualUri != null) "Manual: found (${entry.manualUri})" else "Manual: none found",
-                    color = MenuTokens.OnSurfaceMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
-            }
+                item {
+                    MetadataTextRow("Developer", current.developer ?: "") { loaded = current.copy(developer = it.ifBlank { null }) }
+                }
+                item {
+                    MetadataTextRow("Publisher", current.publisher ?: "") { loaded = current.copy(publisher = it.ifBlank { null }) }
+                }
+                item {
+                    MetadataTextRow("Genre", current.genre ?: "") { loaded = current.copy(genre = it.ifBlank { null }) }
+                }
+                item {
+                    MetadataTextRow("Players", current.players ?: "") { loaded = current.copy(players = it.ifBlank { null }) }
+                }
+                item {
+                    // Real ES-DE MD_DATE raw format: "YYYYMMDDT000000".
+                    MetadataTextRow("Release date (YYYYMMDDT000000)", current.releaseDate ?: "") {
+                        loaded = current.copy(releaseDate = it.ifBlank { null })
+                    }
+                }
+                item {
+                    // Real ES-DE MD_RATING convention: 0.0-1.0.
+                    MetadataTextRow("Rating (0.0-1.0)", current.rating?.toString() ?: "", keyboardType = KeyboardType.Decimal) {
+                        loaded = current.copy(rating = it.toFloatOrNull()?.coerceIn(0f, 1f))
+                    }
+                }
 
-            item { SectionLabel("Library management") }
-            item {
-                // Which screen this game launches on (docs/SPEC.md
-                // section 4c: per-game override, clearable). This is
-                // droidtop's own launcher preference, not gamelist
-                // metadata, so it writes immediately rather than waiting
-                // for Save -- Cancel must not silently revert a display
-                // choice, and "Delete preferred Screen" (here, cycling
-                // back to Ask) is a first-class action.
-                val context = androidx.compose.ui.platform.LocalContext.current
-                var launchScreen by remember(entry.id) {
-                    mutableStateOf(dev.droidtop.library.LaunchScreenMemory.gameChoice(context, entry.id))
-                }
-                MetadataPickerRow(
-                    "Launch screen",
-                    launchScreen?.label ?: "Ask every time",
-                ) {
-                    val next = when (launchScreen) {
-                        null -> dev.droidtop.library.LaunchScreen.BUILT_IN
-                        dev.droidtop.library.LaunchScreen.BUILT_IN -> dev.droidtop.library.LaunchScreen.SECOND
-                        dev.droidtop.library.LaunchScreen.SECOND -> null
+                item { SectionLabel("Badges") }
+                item { MetadataToggleRow("Favorite", current.favorite) { loaded = current.copy(favorite = it) } }
+                item { MetadataToggleRow("Completed", current.completed) { loaded = current.copy(completed = it) } }
+                item { MetadataToggleRow("Kid game", current.kidGame) { loaded = current.copy(kidGame = it) } }
+                item { MetadataToggleRow("Broken / not working", current.broken) { loaded = current.copy(broken = it) } }
+                item {
+                    MetadataPickerRow("Controller", EsDeControllers.byShortName(current.controllerShortName).displayName) {
+                        pickingController = true
                     }
-                    launchScreen = next
-                    dev.droidtop.library.LaunchScreenMemory.setGameChoice(context, entry.id, next)
                 }
-            }
-            item { MetadataToggleRow("Hidden", current.hidden) { loaded = current.copy(hidden = it) } }
-            item { MetadataToggleRow("Exclude from game counter", current.noGameCount) { loaded = current.copy(noGameCount = it) } }
-            item { MetadataToggleRow("Exclude from multi-scrape", current.noMultiScrape) { loaded = current.copy(noMultiScrape = it) } }
-            item { MetadataToggleRow("Hide metadata fields", current.hideMetadata) { loaded = current.copy(hideMetadata = it) } }
-            item {
-                MetadataTextRow("Sort name", current.sortName ?: "") { loaded = current.copy(sortName = it.ifBlank { null }) }
-            }
-            item {
-                MetadataTextRow("Custom collections sort name", current.collectionSortName ?: "") {
-                    loaded = current.copy(collectionSortName = it.ifBlank { null })
+                if (entry.systemId != null) {
+                    item {
+                        MetadataPickerRow("Emulator", gameEmulatorSummary(emulators, current.altEmulator)) {
+                            if (emulators != null) pickingEmulator = true
+                        }
+                    }
+                }
+                item {
+                    Text(
+                        if (entry.manualUri != null) "Manual: found (${entry.manualUri})" else "Manual: none found",
+                        color = MenuTokens.OnSurfaceMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
+
+                item { SectionLabel("Library management") }
+                item {
+                    // Which screen this game launches on (docs/SPEC.md
+                    // section 4c: per-game override, clearable). This is
+                    // droidtop's own launcher preference, not gamelist
+                    // metadata, so it writes immediately rather than waiting
+                    // for Save -- Cancel must not silently revert a display
+                    // choice, and "Delete preferred Screen" (here, cycling
+                    // back to Ask) is a first-class action.
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    var launchScreen by remember(entry.id) {
+                        mutableStateOf(dev.droidtop.library.LaunchScreenMemory.gameChoice(context, entry.id))
+                    }
+                    MetadataPickerRow(
+                        "Launch screen",
+                        launchScreen?.label ?: "Ask every time",
+                    ) {
+                        val next = when (launchScreen) {
+                            null -> dev.droidtop.library.LaunchScreen.BUILT_IN
+                            dev.droidtop.library.LaunchScreen.BUILT_IN -> dev.droidtop.library.LaunchScreen.SECOND
+                            dev.droidtop.library.LaunchScreen.SECOND -> null
+                        }
+                        launchScreen = next
+                        dev.droidtop.library.LaunchScreenMemory.setGameChoice(context, entry.id, next)
+                    }
+                }
+                item { MetadataToggleRow("Hidden", current.hidden) { loaded = current.copy(hidden = it) } }
+                item { MetadataToggleRow("Exclude from game counter", current.noGameCount) { loaded = current.copy(noGameCount = it) } }
+                item { MetadataToggleRow("Exclude from multi-scrape", current.noMultiScrape) { loaded = current.copy(noMultiScrape = it) } }
+                item { MetadataToggleRow("Hide metadata fields", current.hideMetadata) { loaded = current.copy(hideMetadata = it) } }
+                item {
+                    MetadataTextRow("Sort name", current.sortName ?: "") { loaded = current.copy(sortName = it.ifBlank { null }) }
+                }
+                item {
+                    MetadataTextRow("Custom collections sort name", current.collectionSortName ?: "") {
+                        loaded = current.copy(collectionSortName = it.ifBlank { null })
+                    }
                 }
             }
         }
+        // On a screen Android draws no keyboard on (the add-on display), droidtop's own once a field is edited
+        // (docs/SPEC.md 4c, tracker#314).
+        if (editing.value) OwnFieldKeyboard()
 
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             ShellChip("Save", primary = true, onClick = {
@@ -263,6 +271,7 @@ private fun MetadataTextRow(
     keyboardType: KeyboardType = KeyboardType.Text,
     onValueChange: (String) -> Unit,
 ) {
+    val editing = LocalMetadataEditing.current
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -275,9 +284,12 @@ private fun MetadataTextRow(
             focusedLabelColor = MenuTokens.OnSurface,
             unfocusedLabelColor = MenuTokens.OnSurfaceMuted,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) editing.value = true },
     )
 }
+
+/** Whether a text row of the editor has been edited: droidtop's own keyboard shows under the list from then on. */
+private val LocalMetadataEditing = staticCompositionLocalOf { mutableStateOf(false) }
 
 @Composable
 private fun MetadataToggleRow(label: String, value: Boolean, onToggle: (Boolean) -> Unit) {

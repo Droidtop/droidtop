@@ -541,6 +541,8 @@ internal fun LibrarySearchDialog(
                     .background(MenuTokens.SurfaceSelected)
                     .padding(12.dp),
             )
+            // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).
+            dev.droidtop.shell.gamepad.OwnFieldKeyboard()
             if (local == null) {
                 Text(
                     if (text.isBlank()) {

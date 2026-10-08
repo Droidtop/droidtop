@@ -28,12 +28,12 @@ import dev.droidtop.input.TrackpadOutput
 import dev.droidtop.input.TrackpadView
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.shell.gamepad.ChromeColors
-import org.pocketworkstation.pckeyboard.AndroidCharKeyResolver
-
-import org.pocketworkstation.pckeyboard.LatinKeyboardView
+import org.pocketworkstation.pckeyboard.ImeConnectionSink
+import org.pocketworkstation.pckeyboard.KeyboardPanel
+import org.pocketworkstation.pckeyboard.KeyboardSink
 import org.pocketworkstation.pckeyboard.SecondScreenKeyboard
-import org.pocketworkstation.pckeyboard.SecondScreenKeyboardListener
 import java.lang.ref.WeakReference
+import kotlinx.coroutines.launch
 
 /**
  * What the second screen is for, per mode.
@@ -95,19 +95,51 @@ object ForegroundShell {
      * Moving a task needs REORDER_TASKS (a normal permission); the caller is the top activity, so
      * the background-start rules allow it.
      */
-    fun installPadReturn() {
+    fun installPadReturn(context: Context) {
+        appContext = context.applicationContext
         dev.droidtop.display.TouchOnlySurfaceFocus.returnPadToShell = returnPad@{ fromDisplayId ->
-            val shell = current()?.takeIf { !it.isFinishing && !it.isDestroyed } ?: return@returnPad false
-            if (displayIdOf(shell) == fromDisplayId) return@returnPad false
-            val activityManager = shell.getSystemService(android.app.ActivityManager::class.java)
-                ?: return@returnPad false
-            activityManager.moveTaskToFront(shell.taskId, 0)
-            true
+            val shell = current()?.takeIf { !it.isFinishing && !it.isDestroyed }
+            if (shell != null && displayIdOf(shell) != fromDisplayId) {
+                val activityManager = shell.getSystemService(android.app.ActivityManager::class.java)
+                    ?: return@returnPad false
+                activityManager.moveTaskToFront(shell.taskId, 0)
+                return@returnPad true
+            }
+            returnFocusToApp(fromDisplayId)
         }
         dev.droidtop.display.TouchOnlySurfaceFocus.forwardKeyToShell = { event ->
             current()?.takeIf { !it.isFinishing && !it.isDestroyed }?.dispatchKeyEvent(event) ?: false
         }
     }
+
+    /**
+     * No shell in front on another screen, but the user may be in an app there (an app launched onto the add-on
+     * display covers the shell, which then is not [current]). When the system's own task list (the elevated helper)
+     * shows an app visible on another screen, it is brought back to the front through the task manager's one switch
+     * ([dev.droidtop.library.tasks.TaskActions.bringTo], its launcher intent on its own screen), so its screen holds
+     * the system's focus again and its keys and keyboard reach it (Droidtop/tracker#314). Without that list droidtop
+     * cannot tell an app still showing from one the user left, so it moves nothing; a tap on the app does the same.
+     */
+    private fun returnFocusToApp(fromDisplayId: Int?): Boolean {
+        val context = appContext ?: return false
+        // The list is read fresh (it is only polled while a task list is on screen), off the main thread; the
+        // switch itself is an activity start, back on the main thread. Until it lands, keys stay here.
+        refocusScope.launch {
+            if (!dev.droidtop.runtime.tasks.TaskManager.privileges().listTasks) return@launch
+            dev.droidtop.runtime.tasks.TaskManager.refresh(context)
+            val snapshot = dev.droidtop.runtime.tasks.TaskManager.snapshot.value ?: return@launch
+            val app = dev.droidtop.runtime.keyboard.FocusReturn.appToRefocus(snapshot, fromDisplayId, context.packageName)
+                ?: return@launch
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                dev.droidtop.library.tasks.TaskActions.bringTo(context, app.packageName, app.displayId)
+            }
+        }
+        return false
+    }
+
+    private var appContext: Context? = null
+
+    private val refocusScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
 
     private fun displayIdOf(activity: Activity): Int? =
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -168,34 +200,17 @@ class SecondScreenInputView(
     private val trackpad = TrackpadView(context)
     private val status = TextView(context)
     private val imePicker = Button(context)
-    private var keyboardView: LatinKeyboardView? = null
-    private var keyboardListener: SecondScreenKeyboardListener? = null
-    private var functionLayer = false
-
-    /**
-     * Modifier state as the far side will see it.
-     *
-     * `InputConnection.sendKeyEvent` does not have the framework's own
-     * meta tracking behind it, so a Shift press followed by a letter is
-     * only reliably a capital when the letter's event carries
-     * META_SHIFT_ON as well. Tracked here rather than inside the listener
-     * because it is a property of THIS delivery route -- the container
-     * route needs nothing of the sort, since the compositor tracks
-     * modifiers from the key stream itself.
-     */
-    private var metaState = 0
 
     init {
         orientation = VERTICAL
         setBackgroundColor(ChromeColors.DarkBackground.toArgb())
 
-        val listener = buildKeyboardListener()
-        keyboardListener = listener
-        val view = runCatching { SecondScreenKeyboard.createView(context, listener) }.getOrNull()
-        keyboardView = view
-        if (view != null) {
-            addView(view, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-        }
+        // droidtop's one keyboard view (KeyboardPanel); only the destination is this surface's own. It suppresses
+        // the input method's view while it is on screen, so the user never gets two keyboards.
+        addView(
+            KeyboardPanel(context, keyboardSink(), suppressImeView = true),
+            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
+        )
 
         status.setTextColor(ChromeColors.DarkOnSurfaceVariant.toArgb())
         status.textSize = 13f
@@ -221,13 +236,11 @@ class SecondScreenInputView(
         trackpad.engine = TrackpadGestureEngine(trackpadOutput())
         status.text = statusText()
         syncImePicker()
-        syncImeSuppression()
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
         syncImePicker()
-        syncImeSuppression()
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
@@ -242,31 +255,7 @@ class SecondScreenInputView(
         ) View.VISIBLE else View.GONE
     }
 
-    private var countedForIme = false
-
-    /**
-     * Tells the IME to stop putting a keyboard over the primary display
-     * (see LatinIME.onEvaluateInputViewShown) for exactly as long as this
-     * surface is ON SCREEN. Attached is not on screen: a stopped Activity's
-     * views stay attached, so the idle SECONDARY_HOME cover left underneath
-     * an app launched onto the same display kept the IME suppressed for
-     * that app's own text fields (Droidtop/tracker#156). Window visibility
-     * goes to GONE when the Activity stops, which is the signal used here.
-     */
-    private fun syncImeSuppression() {
-        val shouldCount = isAttachedToWindow && windowVisibility == View.VISIBLE
-        if (shouldCount == countedForIme) return
-        countedForIme = shouldCount
-        SecondScreenKeyboard.setAttached(shouldCount)
-    }
-
     override fun onDetachedFromWindow() {
-        if (countedForIme) {
-            countedForIme = false
-            SecondScreenKeyboard.setAttached(false)
-        }
-        keyboardListener?.releaseEverything()
-        metaState = 0
         trackpad.engine = null
         super.onDetachedFromWindow()
     }
@@ -285,52 +274,28 @@ class SecondScreenInputView(
         return FocusNavTrackpadSink(emit = ForegroundShell::send)
     }
 
-    private fun buildKeyboardListener(): SecondScreenKeyboardListener =
+    private fun keyboardSink(): KeyboardSink =
         if (mode == SecondaryDisplayContent.Mode.DESKTOP) {
             // Routed through DesktopInputRouter rather than at the seat
             // directly: it owns the Android-keycode-to-evdev step and the
             // held-key bookkeeping, and a second path beside it is exactly
             // the duplication :input-seat exists to prevent.
             val router = DesktopInputRouter()
-            SecondScreenKeyboardListener(
-                send = { keyCode, down ->
+            object : KeyboardSink {
+                // No text channel: a compositor takes keys, not strings.
+                override val takesText: Boolean = false
+
+                override fun key(androidKeyCode: Int, down: Boolean) {
                     router.seat = (DesktopSessionService.state.value as? DesktopSessionState.Connected)
                         ?.let { InputSeats.of(it.hostBridge) }
                     val now = SystemClock.uptimeMillis()
                     val action = if (down) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP
-                    router.onKeyEvent(KeyEvent(now, now, action, keyCode, 0))
-                },
-                resolver = AndroidCharKeyResolver(),
-                // No text channel: a compositor takes keys, not strings.
-                commit = null,
-                onLayoutToggle = ::toggleLayout,
-            )
+                    router.onKeyEvent(KeyEvent(now, now, action, androidKeyCode, 0))
+                }
+            }
         } else {
-            SecondScreenKeyboardListener(
-                send = { keyCode, down ->
-                    metaState = updatedMetaState(metaState, keyCode, down)
-                    val connection = SecondScreenKeyboard.androidTarget
-                    if (connection == null) {
-                        status.text = statusText()
-                    } else {
-                        val now = SystemClock.uptimeMillis()
-                        val action = if (down) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP
-                        connection.sendKeyEvent(
-                            KeyEvent(now, now, action, keyCode, 0, metaState),
-                        )
-                    }
-                },
-                resolver = AndroidCharKeyResolver(),
-                commit = { text -> SecondScreenKeyboard.androidTarget?.commitText(text, 1) },
-                onLayoutToggle = ::toggleLayout,
-            )
+            ImeConnectionSink(onNoTarget = { status.text = statusText() })
         }
-
-    private fun toggleLayout() {
-        val view = keyboardView ?: return
-        functionLayer = !functionLayer
-        SecondScreenKeyboard.applyLayout(view, context, functionLayer)
-    }
 
     /**
      * The honest one-line description of what this surface can currently
@@ -353,24 +318,6 @@ class SecondScreenInputView(
             "No text field"
 
         else -> "Touchpad"
-    }
-
-    private companion object {
-        /**
-         * Which meta bit a modifier keycode contributes. Not a mapping
-         * table so much as the pairing Android itself defines between
-         * `KEYCODE_*_LEFT/RIGHT` and `META_*_ON`.
-         */
-        fun updatedMetaState(current: Int, keyCode: Int, down: Boolean): Int {
-            val bit = when (keyCode) {
-                KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> KeyEvent.META_SHIFT_ON
-                KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT -> KeyEvent.META_CTRL_ON
-                KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT -> KeyEvent.META_ALT_ON
-                KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_META_RIGHT -> KeyEvent.META_META_ON
-                else -> return current
-            }
-            return if (down) current or bit else current and bit.inv()
-        }
     }
 }
 

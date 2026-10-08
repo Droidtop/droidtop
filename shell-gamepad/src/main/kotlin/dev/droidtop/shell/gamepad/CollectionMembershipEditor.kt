@@ -118,6 +118,8 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
                                 ),
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                            // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).
+                            OwnFieldKeyboard()
                             Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 ShellChip("Create", primary = true, onClick = {
                                     val name = newName.trim()

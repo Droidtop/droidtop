@@ -97,6 +97,7 @@ object GamingSettingsCatalog {
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
     const val ID_DISPLAY_SWAP = "action_display_swap"
     const val ID_DISPLAY_REINIT = "action_display_reinit"
+    const val ID_DISPLAY_KEYBOARD = "action_display_keyboard"
     const val ID_KEYBOARD_PICK = "action_keyboard_pick"
     const val ID_KEYBOARD_ENABLE = "action_keyboard_enable"
     const val ID_RESCAN_LIBRARY = "pref_gaming_rescan_library"
@@ -319,6 +320,7 @@ object GamingSettingsCatalog {
                 add(displayGameLaunchTargetItem(context))
                 add(secondScreenRoleItem(context, MODE_GAMING))
                 add(secondScreenRoleItem(context, MODE_DESKTOP))
+                addAll(secondScreenKeyboardItems(context))
             },
         ),
         CatalogGroup(
@@ -796,6 +798,54 @@ object GamingSettingsCatalog {
                 ?.let { dev.droidtop.runtime.MainScreen.set(ctx, it) }
         },
     )
+
+    /**
+     * Typing on the add-on display (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314). With
+     * the elevated helper, a switch for Android's own keyboard on the second screen (on by default, given back when
+     * off); without it the switch is not drawn. Then one row whose value says how typing into other apps on that
+     * screen works right now, and whose action is the one step that would make it work: choosing droidtop's
+     * keyboard, or allowing it to draw over other apps.
+     */
+    private fun secondScreenKeyboardItems(context: Context): List<CatalogItem> = buildList {
+        val elevated = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
+        if (elevated) {
+            add(
+                ToggleItem(
+                    id = dev.droidtop.runtime.keyboard.AddonKeyboard.KEY_ANDROID_KEYBOARD,
+                    title = "Android keyboard on second screen",
+                    current = dev.droidtop.runtime.keyboard.AddonKeyboard.androidKeyboardOnSecondScreen(context),
+                    onToggle = { ctx, value -> dev.droidtop.runtime.keyboard.AddonKeyboard.setAndroidKeyboardOnSecondScreen(ctx, value) },
+                ),
+            )
+        }
+        val androidShows = dev.droidtop.runtime.keyboard.AddonKeyboard.localDisplays.value.isNotEmpty()
+        val ownActive = Keyboards.ownKeyboardActive(context)
+        val overlay = android.provider.Settings.canDrawOverlays(context)
+        add(
+            ActionItem(
+                id = ID_DISPLAY_KEYBOARD,
+                title = "Keyboard for apps on second screen",
+                value = when {
+                    androidShows -> "Android keyboard"
+                    !ownActive -> "Needs droidtop keyboard"
+                    !overlay -> "Needs display over apps"
+                    else -> "droidtop keyboard"
+                },
+                run = { ctx ->
+                    if (!androidShows && ownActive && !overlay) {
+                        ctx.startActivity(
+                            android.content.Intent(
+                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                android.net.Uri.parse("package:${ctx.packageName}"),
+                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    } else {
+                        Keyboards.showPicker(ctx)
+                    }
+                },
+            ),
+        )
+    }
 
     private fun displayGameLaunchTargetItem(context: Context) = ChoiceItem(
         id = ID_DISPLAY_GAME_LAUNCH_TARGET,

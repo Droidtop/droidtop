@@ -23,17 +23,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import dev.droidtop.display.SecondaryDisplayContent
+import dev.droidtop.library.settings.Keyboards
 import dev.droidtop.library.settings.SocialBadge
 import dev.droidtop.library.settings.UiModePrefs
 import dev.droidtop.library.social.SocialHub
 import dev.droidtop.runtime.tasks.TaskManager
+import dev.droidtop.shell.gamepad.DroidtopKeyboard
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * The companion's tabs (docs/SPEC.md "The companion's tabs", Droidtop/tracker#247): Home (the widgets
@@ -83,6 +89,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
     val social = remember { !UiModePrefs.get(context).hidesSettings }
     val tabs = companionTabs(mode, role, social)
     var selected by remember(mode, role) { mutableStateOf(defaultCompanionTab(role)) }
+    var keys by remember { mutableStateOf(false) }
     // The Social tab's unread count over every provider, read when something changes, never polled.
     val unread by produceState(initialValue = SocialBadge.unread, social) {
         if (social) SocialHub.changes().collect { value = SocialHub.unread() }
@@ -100,6 +107,9 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                 val label = if (tab == CompanionTab.SOCIAL && unread > 0) "${tab.label} $unread" else tab.label
                 CompanionPill(label, selected = tab == selected) { selected = tab }
             }
+            // A keyboard over any tab, typing into whatever has focus on the other screen (tracker#314). The Input
+            // tab already is one.
+            if (selected != CompanionTab.INPUT) CompanionPill("Keys", selected = keys) { keys = !keys }
         }
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (selected) {
@@ -111,7 +121,58 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                 CompanionTab.INPUT -> SecondScreenInputSurface(mode)
             }
         }
+        if (keys && selected != CompanionTab.INPUT) CompanionKeys()
     }
+}
+
+/**
+ * The companion's Keys panel (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314): droidtop's one
+ * keyboard typing into the focused field on the other screen, through droidtop's input method when it is the selected
+ * one, else through the elevated helper's `input` command. With neither, a row offers the one switch that makes it
+ * work. The companion stays touch-only: typing here never moves focus off the other screen.
+ */
+@Composable
+private fun CompanionKeys() {
+    val context = LocalContext.current
+    val view = LocalView.current
+    // Both reads ask the system (the input-method list, the helper's binder): off the main thread.
+    val access by produceState(initialValue = KeysAccess(imeActive = true, elevated = false)) {
+        value = withContext(Dispatchers.IO) {
+            KeysAccess(Keyboards.ownKeyboardActive(context), runCatching { TaskManager.shell.capabilities().shellCommand }.getOrDefault(false))
+        }
+    }
+    var noRoute by remember { mutableStateOf(false) }
+    val currentAccess by rememberUpdatedState(access)
+    val sink = remember(view) {
+        RoutedKeyboardSink(
+            displayId = { otherDisplay(context, view.display?.displayId) },
+            elevated = { currentAccess.elevated },
+            onNoRoute = { noRoute = true },
+            onRouted = { noRoute = false },
+        )
+    }
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        if (noRoute || (!access.imeActive && !access.elevated)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CompanionNote(if (access.imeActive || access.elevated) "No text field" else "Typing")
+                if (!access.imeActive) CompanionPill("Use droidtop keyboard") { Keyboards.showPicker(context) }
+            }
+        }
+        DroidtopKeyboard(sink, suppressImeView = true)
+    }
+}
+
+private data class KeysAccess(val imeActive: Boolean, val elevated: Boolean)
+
+/** The screen the companion types into: the shell's when it is elsewhere, else the first other display. */
+private fun otherDisplay(context: android.content.Context, own: Int?): Int? {
+    val shell = ForegroundShell.current()?.window?.decorView?.display?.displayId
+    if (shell != null && shell != own) return shell
+    return TaskManager.displayIds(context).firstOrNull { it != own }
 }
 
 /** The task manager's own row (reused from the first slice, not rebuilt) in a scrolling page, with a line for nothing running. */

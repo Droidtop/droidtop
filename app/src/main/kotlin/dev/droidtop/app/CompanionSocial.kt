@@ -34,7 +34,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,9 +47,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.drawable.toBitmap
 import dev.droidtop.app.settings.SocialTime
+import dev.droidtop.shell.gamepad.DroidtopKeyboard
+import org.pocketworkstation.pckeyboard.KeyboardSink
 import dev.droidtop.library.social.SocialContact
 import dev.droidtop.library.social.SocialHub
 import dev.droidtop.library.social.SocialMessage
@@ -61,10 +61,6 @@ import dev.droidtop.runtime.systemstatus.NotificationsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.pocketworkstation.pckeyboard.AndroidCharKeyResolver
-import org.pocketworkstation.pckeyboard.LatinKeyboardView
-import org.pocketworkstation.pckeyboard.SecondScreenKeyboard
-import org.pocketworkstation.pckeyboard.SecondScreenKeyboardListener
 
 /**
  * The companion's Social tab (docs/SPEC.md "Social" and "The companion's tabs", Droidtop/tracker#327): the
@@ -191,9 +187,6 @@ private fun ContactRow(name: String, value: String, packageName: String? = null,
     }
 }
 
-/** The share of the companion's height the keyboard takes: a usable grid with the conversation still above it. */
-private const val KEYBOARD_HEIGHT_PERCENT = 35f
-
 @Composable
 private fun CompanionConversation(chat: OpenConversation, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -271,13 +264,20 @@ private fun CompanionConversation(chat: OpenConversation, onBack: () -> Unit) {
             CompanionPill(if (keyboard) "Hide" else "Keys") { keyboard = !keyboard }
         }
         if (canSend && keyboard) {
-            CompanionKeyboard(
-                onKey = { code, down ->
-                    val (next, submit) = draft.key(code, down, ::virtualChar)
-                    draft = next
-                    if (submit) send()
+            // droidtop's one keyboard (KeyboardPanel); here its keys edit the draft directly, so no input method
+            // and no window focus are involved (docs/SPEC.md 4c).
+            DroidtopKeyboard(
+                sink = object : KeyboardSink {
+                    override fun key(androidKeyCode: Int, down: Boolean) {
+                        val (next, submit) = draft.key(androidKeyCode, down, ::virtualChar)
+                        draft = next
+                        if (submit) send()
+                    }
+
+                    override fun text(chars: CharSequence) {
+                        draft = draft.insert(chars)
+                    }
                 },
-                onText = { text -> draft = draft.insert(text) },
             )
         }
     }
@@ -343,40 +343,6 @@ private fun DraftField(draft: CompanionDraft, modifier: Modifier, onTap: (Int) -
             },
         )
     }
-}
-
-/**
- * droidtop's own keyboard (the forked Hacker's Keyboard view, `SecondScreenKeyboard`) inside the companion window.
- * Its keys come through the same hardware-style listener the Input tab uses; here they edit the draft instead of
- * going to another app, so no input method and no window focus are involved.
- */
-@Composable
-private fun CompanionKeyboard(onKey: (Int, Boolean) -> Unit, onText: (CharSequence) -> Unit) {
-    val keyNow by rememberUpdatedState(onKey)
-    val textNow by rememberUpdatedState(onText)
-    // The listener the view was built with, so whatever a key still holds is let go when the keyboard goes.
-    val built = remember { arrayOfNulls<SecondScreenKeyboardListener>(1) }
-    DisposableEffect(Unit) { onDispose { built[0]?.releaseEverything() } }
-    AndroidView(
-        modifier = Modifier.fillMaxWidth(),
-        factory = { ctx ->
-            var view: LatinKeyboardView? = null
-            var functionLayer = false
-            val l = SecondScreenKeyboardListener(
-                send = { code, down -> keyNow(code, down) },
-                resolver = AndroidCharKeyResolver(),
-                commit = { chars -> textNow(chars) },
-                onLayoutToggle = {
-                    functionLayer = !functionLayer
-                    view?.let { SecondScreenKeyboard.applyLayout(it, ctx, functionLayer, KEYBOARD_HEIGHT_PERCENT) }
-                },
-            )
-            built[0] = l
-            runCatching { SecondScreenKeyboard.createView(ctx, l, KEYBOARD_HEIGHT_PERCENT) }.getOrNull()
-                ?.also { view = it }
-                ?: android.view.View(ctx)
-        },
-    )
 }
 
 private val virtualKeys: KeyCharacterMap by lazy { KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD) }

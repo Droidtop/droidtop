@@ -79,6 +79,33 @@ object SecondScreenKeyboard {
     @JvmStatic
     fun onFinishInput() {
         activeInputConnection = null
+        onShowEnded()
+    }
+
+    /**
+     * Told when an editor asks droidtop's input method for its keyboard and when that ends, so `:app` can draw
+     * the keyboard itself on a screen where Android places no keyboard window (docs/SPEC.md 4c, "Typing on the
+     * add-on display"). [ShowRequests.requested] names the editor's package; `EditorInfo` carries no display.
+     */
+    interface ShowRequests {
+        fun requested(editorPackage: String?)
+
+        fun ended()
+    }
+
+    @Volatile
+    var showRequests: ShowRequests? = null
+
+    /** LatinIME.onStartInputView: an editor asked for the keyboard. */
+    @JvmStatic
+    fun onShowRequested(editorPackage: String?) {
+        runCatching { showRequests?.requested(editorPackage) }
+    }
+
+    /** LatinIME.onFinishInputView and onFinishInput: the keyboard is no longer wanted. */
+    @JvmStatic
+    fun onShowEnded() {
+        runCatching { showRequests?.ended() }
     }
 
     /**

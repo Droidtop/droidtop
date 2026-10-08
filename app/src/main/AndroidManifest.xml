@@ -34,6 +34,11 @@
          shell (ForegroundShell.installPadReturn, docs/SPEC.md 4c). A normal
          permission: nothing to grant. -->
     <uses-permission android:name="android.permission.REORDER_TASKS" />
+    <!-- Display over other apps, granted by the user in Android's settings:
+         droidtop draws its own keyboard over an app on a screen where Android
+         draws none (ShowOverEditor, docs/SPEC.md 4c "Typing on the add-on
+         display"). Without it that keyboard is simply not drawn. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- Real wifi/cellular connectivity check for Gaming's own
          systemstatus theme element (EsDeThemeRenderer.kt). -->
