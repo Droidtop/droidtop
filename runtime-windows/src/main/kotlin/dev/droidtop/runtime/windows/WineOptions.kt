@@ -89,6 +89,13 @@ object WineOptions {
 
     private const val NOT_HERE = " (downloads when used)"
 
+    /**
+     * Whether driver builds can be fetched from the projects that publish them
+     * ([dev.droidtop.runtime.windows.utils.DriverReleases]): Turnip is Adreno's,
+     * so on an arm64 device only.
+     */
+    val driverDownloads: Boolean get() = !X86_64GuestLibs.isX86_64Host()
+
     // Settings rows choose synchronously on the main thread; the write is
     // disk work, so it runs here, and the next read waits for it.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

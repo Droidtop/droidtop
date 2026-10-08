@@ -4159,6 +4159,15 @@ source (now `:runtime-windows`, §9):
     DXVK/VKD3D/FEX/Box64/Turnip, droidtop's own `Droidtop/proton-wine-tux`):
     droidtop fetches them, it does not build them into the APK. The x86_64
     pieces are release assets of droidtop's fork (§10b).
+  - **More driver builds** (arm64, 2026-10-08, Droidtop/tracker#313): a
+    screen under Wine and graphics lists Turnip builds straight from the
+    projects that publish them (Banners-Turnip, WinNative's Drivers), the
+    model of DroidDeck's `TurnipReleases` (GPL-3.0): checked only when the
+    person asks, newest release per variant, Android builds only (their
+    Linux builds are for a glibc Wine), and only assets GitHub publishes a
+    SHA-256 for, which the download is checked against. An installed one is
+    a driver package like any other (`AdrenotoolsManager.installDriver`) and
+    is chosen in the same "Driver build" row; defaults are unchanged.
 - **Prefer a native Linux build over Wine+translation when one exists
   and can run.** Some games ship a genuine Linux build alongside (or
   instead of) Windows. Running it as a normal process inside a Linux
