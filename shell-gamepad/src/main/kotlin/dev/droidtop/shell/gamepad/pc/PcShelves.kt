@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.displayName
 import dev.droidtop.shell.gamepad.query.FAVOURITES_YES
 import dev.droidtop.shell.gamepad.query.INSTALLED_YES
@@ -166,16 +167,40 @@ internal fun pcShelves(
 internal fun LibraryEntry.addedEpochMs(): Long =
     firstSeenEpochMs.takeIf { it > 0L } ?: appFacts?.firstInstalledEpochMs ?: 0L
 
+/** What a game is, in the one word a badge leads with. */
+internal enum class BadgeKind(val word: String) { PC("PC"), ENGINE("Engine"), RETRO("Retro"), APP("App") }
+
 /**
- * The small badge a Home card carries to say where it is from (docs/SPEC.md
- * 7i, "Home art"): "PC" for a PC or engine game, "App" for a launcher app,
- * and a Retro game's system name from [systemNames] (system id to display
- * name, loaded once). A map read, never a lookup per card. Pure.
+ * The kind badge every card and result row of a mixed list carries
+ * (docs/SPEC.md 7i, "Kind badges"; Droidtop/tracker#362): [kind] in one word,
+ * then [detail], the store of a PC or engine game or the system of a Retro
+ * game. [text] is the same line for a row of words.
  */
-internal fun homeSourceLabel(entry: LibraryEntry, systemNames: Map<String, String>): String = when {
-    entry.appFacts != null -> "App"
-    entry.inPcFold -> "PC"
-    else -> entry.systemId?.let { systemNames[it] ?: it } ?: "Retro"
+internal data class KindBadge(val kind: BadgeKind, val detail: String?) {
+    val text: String get() = if (detail == null) kind.word else "${kind.word} · $detail"
+}
+
+/** The kinds that are neither a Windows or Linux program, a remote PC, an app nor a console ROM: an engine game. */
+private val NON_ENGINE_KINDS = setOf(
+    LibraryEntryKind.NATIVE_ANDROID_APP,
+    LibraryEntryKind.WINE_PROFILE,
+    LibraryEntryKind.LINUX_CONTAINER_APP,
+    LibraryEntryKind.REMOTE_STREAM,
+    LibraryEntryKind.CONSOLE_ROM,
+)
+
+/**
+ * The [KindBadge] of [entry], from fields the entry already carries and
+ * [systemNames] (system id to display name, loaded once): a map read, never a
+ * lookup per card. Pure.
+ */
+internal fun kindBadgeOf(entry: LibraryEntry, systemNames: Map<String, String>): KindBadge = when {
+    entry.appFacts != null || entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP -> KindBadge(BadgeKind.APP, null)
+    entry.inPcFold -> {
+        val store = entry.pcInfo?.source?.takeIf { entry.isStoreRow() }
+        KindBadge(if (entry.kind in NON_ENGINE_KINDS) BadgeKind.PC else BadgeKind.ENGINE, store)
+    }
+    else -> KindBadge(BadgeKind.RETRO, entry.systemId?.let { systemNames[it] ?: it })
 }
 
 /**

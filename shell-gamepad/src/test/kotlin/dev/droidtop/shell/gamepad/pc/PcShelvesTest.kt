@@ -80,15 +80,19 @@ class PcShelvesTest {
     }
 
     @Test
-    fun `a home badge names pc, app or the system`() {
+    fun `a kind badge names pc, engine, app or retro with its store or system`() {
         val names = mapOf("snes" to "Super Nintendo")
         val rom = game("/rom", kind = LibraryEntryKind.CONSOLE_ROM).copy(systemId = "snes")
         val app = game("com.example.game", kind = LibraryEntryKind.NATIVE_ANDROID_APP).copy(appFacts = InstalledAppFacts())
+        val engine = game("/vn", kind = LibraryEntryKind.RENPY)
 
-        assertEquals("PC", homeSourceLabel(game("/pc"), names))
-        assertEquals("App", homeSourceLabel(app, names))
-        assertEquals("Super Nintendo", homeSourceLabel(rom, names))
-        assertEquals("gba", homeSourceLabel(rom.copy(systemId = "gba"), names))
+        assertEquals(KindBadge(BadgeKind.PC, null), kindBadgeOf(game("/pc", kind = LibraryEntryKind.WINE_PROFILE), names))
+        assertEquals(KindBadge(BadgeKind.APP, null), kindBadgeOf(app, names))
+        assertEquals(KindBadge(BadgeKind.ENGINE, null), kindBadgeOf(engine, names))
+        assertEquals("Retro · Super Nintendo", kindBadgeOf(rom, names).text)
+        assertEquals("Retro · gba", kindBadgeOf(rom.copy(systemId = "gba"), names).text)
+        val steam = game("/steam", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(source = "Steam", storeId = "steam:1", installed = true))
+        assertEquals("PC · Steam", kindBadgeOf(steam, names).text)
     }
 
     @Test

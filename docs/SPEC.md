@@ -10868,14 +10868,27 @@ own games, in droidtop's own treatment:
   `addedEpochMs`). Every other shelf stays the PC fold's own. The entries
   already carry play history and added time, so this reads no disk per card;
   the one lookup (the system names) is made once, off the main thread. Each
-  card on these two shelves has a small badge at its bottom-left, in words:
-  "PC", "App", or the Retro system's name (`homeSourceLabel`). A launches
+  card carries the kind badge (below). A launches
   through the shell's one launch path, the same as the game's own tab; Select
   (or a long press) opens a PC game's menu, and for a Retro game or an app a
   small options menu (details, favourite). Retro cards use their scraped art
   (`artworkUri`, the same media the Retro list shows); the hero card of a
   Retro game takes its fanart, else its screenshot, and without either is
   drawn as portrait art beside the title, the PC rule (`withRetroHero`).
+- **Kind badges** (owner, 2026-10-08, Droidtop/tracker#362: "there aren't PC
+  and Retro game indicators"). Wherever games of different kinds share a list,
+  each card or row says what it is: one word, then its store or system, quieter
+  (`KindBadge`, `kindBadgeOf`, pure, over fields the entry already carries and
+  the system-name map loaded once off the main thread, so no lookup per card):
+  "PC · Steam" (a PC game, its store), "Engine" (a detected engine game, with
+  its store when it has one), "Retro · Super Nintendo" (an emulated game, its
+  system), "App" (an Android app). It sits at the capsule's bottom-left on a
+  dark plate, the Deck's small corner mark, in place of the old store letter,
+  on every Home shelf and PC Games' Overview shelves; the PC grid, which is
+  all PC, keeps the store letter. The launcher's search rows use the same text
+  as the row's detail instead of "Game". Social friends are not library
+  entries (a friend's game is a name from the service, not a card), so they
+  carry no badge; the service is already named on the row.
 - **Art that does not load is no art** (console, build 1386: three empty
   frames on Recently added). A card whose art fails to load (`AsyncImage`
   `onError`) draws the plate with the name, the same as a card with no art.

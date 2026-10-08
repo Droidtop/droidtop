@@ -929,7 +929,7 @@ internal fun PcGamesSection(
 /**
  * The shelves, one horizontal row of capsules each, with the cursor's shelf
  * heading drawn brighter: Home's and PC Games' Overview alike. [mixed] is
- * Home, whose recent shelves carry a source badge per card.
+ * Home, which also has the destination row; every card carries a kind badge.
  */
 @Composable
 private fun PcShelvesHome(
@@ -1005,8 +1005,8 @@ private fun PcShelvesHome(
                             download = entry.downloadKey()?.let { downloads[it] },
                             parts = partsOf(entry),
                             hero = hero,
-                            // Home's two shelves that mix sources say where each is from.
-                            badge = if (mixed && (shelf.id == SHELF_CONTINUE || shelf.id == SHELF_RECENTLY_ADDED)) homeSourceLabel(entry, systemNames) else null,
+                            // Every shelf says what each game is (PC, Retro, App, Engine) and where it is from.
+                            badge = kindBadgeOf(entry, systemNames),
                         )
                     }
                 }

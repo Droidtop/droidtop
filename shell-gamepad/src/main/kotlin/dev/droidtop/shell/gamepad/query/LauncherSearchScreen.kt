@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.integrations.LocalSearchRow
 import dev.droidtop.library.integrations.LocalSimilarityRecommendations
 import dev.droidtop.library.integrations.Recommendation
@@ -16,6 +17,9 @@ import dev.droidtop.library.integrations.RecommendationScope
 import dev.droidtop.library.integrations.SearchRowKind
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.currentShellWindow
+import dev.droidtop.shell.gamepad.pc.kindBadgeOf
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * One installed app in the launcher's search results. The launcher owns the
@@ -59,6 +63,12 @@ fun LauncherSearchScreen(
             value = LocalSimilarityRecommendations({ playable })
                 .recommend(context, RecommendationScope.Overall, 5)
         }
+        // System names for the Retro badge, read once off the main thread; the rows use a map, never a lookup each.
+        val systemNames by produceState(emptyMap<String, String>()) {
+            value = withContext(Dispatchers.IO) {
+                ConsoleSystemsRepository.allSystems(context).associate { it.id to it.displayName }
+            }
+        }
         LibrarySearchDialog(
             query = LibraryQuery(text = initialText),
             matchCount = 0,
@@ -66,13 +76,13 @@ fun LauncherSearchScreen(
             onTextChange = {},
             onDismiss = onDismiss,
             suggestions = suggestions,
-            localKey = playable,
+            localKey = playable to systemNames,
             local = { text ->
                 val apps = findApps(text).map { app ->
                     LocalSearchRow(app.key, SearchRowKind.APP, app.title, APP_DETAIL, app.icon, app.open)
                 }
                 val matching = playable.filter { matchesSearchText(it, text) }.take(MAX_GAME_ROWS).map { game ->
-                    LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), GAME_DETAIL) { onPlay(game) }
+                    LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), kindBadgeOf(game, systemNames).text) { onPlay(game) }
                 }
                 apps + matching
             },
@@ -82,4 +92,3 @@ fun LauncherSearchScreen(
 
 private const val MAX_GAME_ROWS = 20
 private const val APP_DETAIL = "App"
-private const val GAME_DETAIL = "Game"

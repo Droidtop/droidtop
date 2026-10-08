@@ -27,7 +27,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -118,8 +122,9 @@ internal fun capsuleStatusOf(entry: LibraryEntry, download: StoreDownloads.Progr
  * the touch route to Y (the game's page), the convention every card in
  * this shell follows.
  *
- * [badge], set on Home's mixed shelves, names where the game is from in
- * words at the bottom-left (it replaces the store letter).
+ * [badge], set on the shelves, says what the game is (PC, Retro, App,
+ * Engine) and its store or system in words at the bottom-left (it replaces
+ * the store letter).
  *
  * [hero] draws the game as a landscape card (docs/SPEC.md 7i, "Home art"):
  * its hero art, or, when only portrait art exists, that art beside the
@@ -137,7 +142,7 @@ internal fun PcCapsule(
     download: StoreDownloads.Progress? = null,
     parts: Int = 1,
     hero: Boolean = false,
-    badge: String? = null,
+    badge: KindBadge? = null,
 ) {
     val shape = RoundedCornerShape(8.dp)
     val ring = selected && PadModality.showsFocus
@@ -285,11 +290,10 @@ internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: StoreDow
  * than one, and a thin bar while a download runs.
  */
 @Composable
-private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownloads.Progress?, parts: Int, badge: String?) {
+private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownloads.Progress?, parts: Int, badge: KindBadge?) {
     val source = entry.pcInfo?.source?.firstOrNull()?.uppercaseChar()
     if (badge != null) {
-        // Home's mixed shelves name the source in words (PC, a system, App).
-        CornerMark(badge, Modifier.align(Alignment.BottomStart))
+        KindMark(badge, Modifier.align(Alignment.BottomStart))
     } else if (entry.isStoreRow() && source != null) {
         CornerMark(source.toString(), Modifier.align(Alignment.BottomStart))
     }
@@ -304,6 +308,28 @@ private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownload
             )
         }
     }
+}
+
+/** The kind badge on its dark plate: the kind in bold, then its store or system quieter. */
+@Composable
+private fun KindMark(badge: KindBadge, modifier: Modifier) {
+    val muted = MenuTokens.OnSurfaceMuted
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(badge.kind.word) }
+            badge.detail?.let { detail ->
+                withStyle(SpanStyle(color = muted)) { append(" · $detail") }
+            }
+        },
+        color = MenuTokens.OnSurface,
+        style = MaterialTheme.typography.labelSmall,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+            .padding(Space.Sm)
+            .background(MenuTokens.Scrim, RoundedCornerShape(50))
+            .padding(horizontal = Space.Sm, vertical = Space.Hair),
+    )
 }
 
 @Composable
