@@ -501,4 +501,27 @@ class PcFolderScanTest {
         file("Compiled/Start.exe", "MZ")
         assertEquals(GameEngine.RENPY, GameEngineDetector.engineHere(File(temp.root, "Compiled"), defs))
     }
+
+    @Test
+    fun `an old Unity player with no UnityPlayer dll is a PC game beside a newer Unity one`() {
+        // Droidtop/tracker#312, the store folder's shape with placeholder names: a 32-bit
+        // Unity 5.6 player links the engine into its own exe (no UnityPlayer.dll) and keeps
+        // Mono under its _Data folder; its sibling is a Unity 2019 player.
+        file("Humble/.gamenative")
+        game("Humble/old_windows", "Old.exe")
+        file("Humble/old_windows/.gamenative")
+        file("Humble/old_windows/Old_Data/Managed/UnityEngine.dll")
+        file("Humble/old_windows/Old_Data/Mono/mono.dll")
+        file("Humble/old_windows/Old_Data/globalgamemanagers")
+        file("Humble/old_windows/Old_Data/level0")
+        game("Humble/new_windows", "New.exe")
+        file("Humble/new_windows/UnityPlayer.dll")
+        file("Humble/new_windows/UnityCrashHandler64.exe", "MZ")
+        file("Humble/new_windows/New_Data/globalgamemanagers")
+        dir("Humble/new_windows/MonoBleedingEdge")
+        assertEquals(listOf("Humble/new_windows", "Humble/old_windows"), found())
+        // The old player is the PC library's: no engine rule claims it.
+        assertFalse(GameEngineDetector.engineOwnsInstall(File(temp.root, "Humble/old_windows"), defs))
+        assertEquals("Old.exe", GameExecutableResolver.windowsExecutable(File(temp.root, "Humble/old_windows"))?.name)
+    }
 }
