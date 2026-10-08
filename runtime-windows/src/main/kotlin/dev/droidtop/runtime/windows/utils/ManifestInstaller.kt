@@ -25,7 +25,8 @@ data class ManifestInstallResult(
  * adrenotools, a raw DXVK/VKD3D archive into the dxwrapper cache, anything
  * else (.wcp) into the contents store, a Wine/Proton build after
  * [WineBuilds.prepare]. Every download is checked against the item's
- * SHA-256. Adapted from GameNative's ManifestInstaller (GPL-3.0).
+ * SHA-256, tried at each of its locations in turn. Adapted from
+ * GameNative's ManifestInstaller (GPL-3.0).
  */
 object ManifestInstaller {
     suspend fun downloadAndInstallDriver(
@@ -36,7 +37,7 @@ object ManifestInstaller {
         var destFile: File? = null
         try {
             destFile = File(context.cacheDir, entry.url.substringAfterLast("/"))
-            RuntimeDownloads.fetchUrl(entry.url, destFile, entry.sha256, onProgress)
+            RuntimeDownloads.fetchUrls(entry.downloadUrls(), destFile, entry.sha256, onProgress)
             val uri = Uri.fromFile(destFile)
             val name = AdrenotoolsManager(context).installDriver(uri)
             if (name.isEmpty()) {
@@ -100,7 +101,7 @@ object ManifestInstaller {
             val cacheDir = File(context.filesDir, "assets/dxwrapper")
             cacheDir.mkdirs()
             val dest = File(cacheDir, entry.url.substringAfterLast("/"))
-            RuntimeDownloads.fetchUrl(entry.url, dest, entry.sha256, onProgress)
+            RuntimeDownloads.fetchUrls(entry.downloadUrls(), dest, entry.sha256, onProgress)
             if (!dest.exists() || dest.length() == 0L) {
                 dest.delete()
                 return@withContext ManifestInstallResult(
@@ -133,7 +134,7 @@ object ManifestInstaller {
         var destFile: File? = null
         try {
             destFile = File(context.cacheDir, entry.url.substringAfterLast("/"))
-            RuntimeDownloads.fetchUrl(entry.url, destFile, entry.sha256, onProgress)
+            RuntimeDownloads.fetchUrls(entry.downloadUrls(), destFile, entry.sha256, onProgress)
             val mgr = ContentsManager(context)
 
             var (profile, _) = extract(mgr, Uri.fromFile(destFile))

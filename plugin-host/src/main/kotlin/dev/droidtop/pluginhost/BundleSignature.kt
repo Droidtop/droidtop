@@ -1,10 +1,10 @@
 package dev.droidtop.pluginhost
 
-import java.security.KeyFactory
+import dev.droidtop.runtime.util.EcP256
+import dev.droidtop.runtime.util.MasterKey
 import dev.droidtop.runtime.util.Sha256
+import java.security.KeyFactory
 import java.security.PublicKey
-import java.security.Signature
-import java.security.interfaces.ECPublicKey
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
@@ -52,24 +52,20 @@ object PluginOriginKeys {
             "wdSuKyoGcp7kCNXoy0sYhOaOdFUTpV4tnkKsICv/EY8q+zM5Dw==",
     )
 
-    /**
-     * The plugin master's SubjectPublicKeyInfo, base64, P-256. The key is
-     * derived from the owner's offline master seed, so only the owner can
-     * produce this value (`plugin-key-provision master-public`, docs/SPEC.md
-     * 12a); until it is pinned here every certified bundle is refused with a
-     * reason that says so, and official bundles verify through the legacy key
-     * alone.
-     */
-    private val MASTER: String? = null
-
     /** The legacy official origin key's SPKI, base64 -- the shape [UserOriginKeys] stores and the "Keys you trust" screen shows a fingerprint of. */
     fun officialKeyBase64(): String = overrides[OFFICIAL_ORIGIN] ?: PINNED.getValue(OFFICIAL_ORIGIN)
 
-    /** The plugin master's SPKI, base64, or null while none is pinned. */
-    fun masterKeyBase64(): String? = masterOverride ?: MASTER
+    /**
+     * The plugin master's SPKI, base64, or null while none is pinned. It is
+     * droidtop's one master ([MasterKey], pinned in `:runtime-common`, which
+     * also certifies the component catalog's key); until it is pinned every
+     * certified bundle is refused with a reason that says so, and official
+     * bundles verify through the legacy key alone.
+     */
+    fun masterKeyBase64(): String? = MasterKey.base64()
 
     /** The plugin master key, or null while none is pinned. */
-    fun master(): PublicKey? = masterKeyBase64()?.let(::parseSpki)
+    fun master(): PublicKey? = MasterKey.key()
 
     /** True when [origin] is the official one certified inside droidtop's own binary -- the row the "Keys you trust" screen labels "Official" and never offers to remove. */
     fun isOfficial(origin: String): Boolean = origin == OFFICIAL_ORIGIN
@@ -106,18 +102,9 @@ object PluginOriginKeys {
     }
 
     /** Test hook -- pins a throwaway master key for the duration of [block]. */
-    fun withMaster(publicKeyBase64: String, block: () -> Unit) {
-        val previous = masterOverride
-        masterOverride = publicKeyBase64
-        try {
-            block()
-        } finally {
-            masterOverride = previous
-        }
-    }
+    fun withMaster(publicKeyBase64: String, block: () -> Unit) = MasterKey.withPinned(publicKeyBase64, block)
 
     private val overrides = mutableMapOf<String, String>()
-    @Volatile private var masterOverride: String? = null
 
     /**
      * The ONE resolution path for an origin's own verification key
@@ -147,16 +134,7 @@ object PluginOriginKeys {
      * it) and [PluginCertificates], so "a valid plugin key" has one
      * definition.
      */
-    fun parseSpki(keyBase64: String): PublicKey? {
-        val bytes = runCatching { Base64.getMimeDecoder().decode(keyBase64) }.getOrNull() ?: return null
-        val key = runCatching {
-            KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(bytes))
-        }.getOrNull() as? ECPublicKey ?: return null
-        // P-256 exactly: a P-384/P-521 SPKI parses fine as "EC", so the
-        // curve's own field size is the check that pins the algorithm.
-        if (key.params?.curve?.field?.fieldSize != 256) return null
-        return key
-    }
+    fun parseSpki(keyBase64: String): PublicKey? = EcP256.parseSpki(keyBase64)
 }
 
 /** What [BundleSignature.verifyBundle] decided. */
@@ -236,13 +214,6 @@ object BundleSignature {
     }
 
     /** ECDSA P-256/SHA-256 of [data] by [key]; [signatureBase64] is the DER signature, base64. */
-    fun verifyWith(key: PublicKey, data: ByteArray, signatureBase64: String): Boolean {
-        val signatureBytes = runCatching { Base64.getMimeDecoder().decode(signatureBase64.trim()) }.getOrNull() ?: return false
-        return runCatching {
-            Signature.getInstance("SHA256withECDSA").apply {
-                initVerify(key)
-                update(data)
-            }.verify(signatureBytes)
-        }.getOrDefault(false)
-    }
+    fun verifyWith(key: PublicKey, data: ByteArray, signatureBase64: String): Boolean =
+        EcP256.verify(key, data, signatureBase64)
 }

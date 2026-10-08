@@ -4182,7 +4182,9 @@ source (now `:runtime-windows`, §9):
       nothing to migrate but GameNative's list cache, dropped once. A
       base-system path maps to a release by its folder (`container_files/x`
       is `container-files/x`, a bare name is in `base`), so files are found
-      even before the first catalog fetch.
+      even before the first catalog fetch. What it may re-host is §9 "What
+      droidtop-components may re-host": nine files whose terms forbid it are
+      link-only, offered from their maker's URL with the recorded SHA-256.
     - **Release feeds** (`sources/feeds.json`) are linked where their makers
       publish them, never re-hosted, and only with GitHub's SHA-256 for the
       asset. droidtop's own Wine builds are found by name (every Droidtop
@@ -4190,10 +4192,13 @@ source (now `:runtime-windows`, §9):
       release appears by itself. A `.wcp` is read once in CI for its
       profile and its wine binary's ELF header, a driver zip for its
       `meta.json` name, so each item carries the id the runtime installs it as.
-    - Every download is checked against the catalog's SHA-256; the catalog
-      itself comes over TLS from GitHub and carries a Sigstore build
-      provenance (`gh attestation verify`), which the app does not check: no
-      signing key exists anywhere to pin.
+    - Every item and file lists its download locations (`urls`: droidtop's
+      copy, then its makers' copies of the same bytes) and one SHA-256;
+      `RuntimeDownloads.fetchUrls` tries them in order and keeps the first
+      download that matches. The catalog comes over TLS from GitHub with a
+      Sigstore build provenance (`gh attestation verify`, not checked by the
+      app) and, once the owner provisions a catalog key, a signature the app
+      checks against its pinned master key (§9).
   - **Sources are options with defaults.** "Wine builds and sources" under
     Wine and graphics turns each source on or off. On by default:
     droidtop's mirror, droidtop's Wine builds, Banners-Turnip and WinNative
@@ -12978,6 +12983,82 @@ and their workflows moved to `build-scripts/x86_64-{guest-libs,lavapipe}` and
 repository; `X86_64GuestLibs`/`X86_64Graphics` pin droidtop's own releases
 (since 2026-10-08), so nothing the app downloads comes from the fork.
 
+### What droidtop-components may re-host, and the catalog's signature (decided 2026-10-08, Droidtop/tracker#319, #313)
+
+Owner: "If we legally CAN keep rehosting them, that's fine. Include official
+sources as a mirror", then: "if it is not explicitly prohibited, then we
+continue hosting it. If we get a C&D, then we take them down." So a file the
+component catalog (§5a) offers is re-hosted in Droidtop/droidtop-components
+unless its own terms explicitly forbid redistribution; "no licence found" is
+not a reason to stop. Audit of the 211 mirrored files (archives listed,
+binaries' version resources and fonts' name tables read, Microsoft's own
+redistributables downloaded to read their terms):
+
+| Files | Licence and evidence | Hosting |
+|---|---|---|
+| Wine/Proton builds (`wine/*.wcp`, `base/proton-9.0-*.txz`), the Proton 9 and GameNative prefix templates (Wine builtin DLLs only) | LGPL-2.1-or-later (Wine COPYING.LIB; section 4: binaries go with the source or "equivalent access to copy the source code from the same place") | re-hosted |
+| DXVK (Arihany `.wcp`, GameNative `dxwrapper` archives, d8vk, Sarek, async, gplasync) | Zlib (doitsujin/dxvk LICENSE) | re-hosted |
+| VKD3D-Proton (`dxwrapper/vkd3d-*`, `vkd3d-proton-3.0.1.wcp`) | LGPL-2.1 (HansKristian-Work/vkd3d-proton LICENSE) | re-hosted |
+| Box64, WowBox64, FEXCore | MIT (ptitSeb/box64, FEX-Emu/FEX LICENSE) | re-hosted |
+| Turnip zips (incl. `Turnio_v26.2.0_R4`, whose meta.json says Mesa), Mesa Zink/VirGL/opengl32 (`opengl.tzst` is byte-identical to `zink_dlls.tzst`), `extra_libs`, Vulkan wrappers | MIT (Mesa); libadrenotools BSD-2-Clause | re-hosted |
+| `wincomponents/ddraw` (cnc-ddraw 6.6.0.0), `wincomponents/openal` (OpenAL Soft 1.25.1) | MIT; LGPL-2.0-or-later | re-hosted |
+| `container_files/extras` (7-Zip, Steamless, wine-mono 11.0.0, small test tools) | LGPL-2.1 with the unRAR restriction (a use restriction); CC BY-NC-ND 4.0 (unmodified, non-commercial: allowed); MIT/mixed; no stated licence | re-hosted |
+| `imagefs_bionic`, `imagefs_gamenative` | Termux-built packages: GPL (coreutils), LGPL (FFmpeg, PulseAudio), MIT/BSD... | re-hosted |
+| Qualcomm Adreno drivers (`core-drivers`, `qcom-*`, `8E-*`, `adrenotools-v762/v805`, ...), Vortek | proprietary; no licence accompanies them (the libraries say "Qualcomm Confidential and Proprietary", meta.json says they were extracted from another app); Vortek ships without terms or source | re-hosted: no clause forbids it, highest takedown risk |
+| `wincomponents/direct3d` (d3dx9_43.dll byte-identical to Microsoft's June 2010 redistributable), `xaudio` (DXSDK_JUN10), `directmusic`, `directplay` (5.3.1.904) | DirectX End User Runtime terms (dsetup32.dll of directx_Jun2010_redist.exe), 2. Scope of licence: "You may not ... publish the software for others to copy" | link only |
+| `wincomponents/directshow`, `directsound`, `wmdecoder` (Windows 7 / 7 SP1 system files by FileVersion) | Windows 7 terms, 8. Scope of licence: the same clause | link only |
+| `wincomponents/vcrun2010` | Visual C++ 2010 runtime terms (eula.rtf in Microsoft's vcredist_x86.exe), 2. Scope of licence: the same clause | link only |
+| `container_files/container_pattern_common_20260821` | its fonts: Monotype's "You may not copy or distribute this software." (Arial, Times, Verdana...), "Microsoft supplied font ... Any other use is prohibited." (msyh.ttc, SimHei.ttf) | link only |
+| Steam Runtime images | Valve's | linked to Valve, as before |
+
+- **Link only** (`hosting: "link"` in `sources/mirror.json`, `prohibitedBy`
+  quoting the clause): the mirror job removes droidtop's copy, and the
+  catalog lists only the maker's copy of the same bytes (today GameNative's
+  host, the only place those exact files are published) with the SHA-256
+  recorded at the audit. Nothing changes for a device: it fetches the same
+  file. The nine copies taken off the release are kept off-line by the
+  coordination workspace, not deleted.
+- **Official sources as mirrors.** Every file lists its makers' download
+  locations after droidtop's copy: `from`, plus `official` where the same
+  bytes are published elsewhere (found by GitHub's asset digests:
+  Arihany/WinlatorWCPHub, GameNative/proton-wine,
+  MrPurple666/purple-turnip, The412Banner/winlator-contents). The catalog
+  carries them as `urls`; `RuntimeDownloads.fetchUrls` tries them in order
+  against the one SHA-256 (§5a).
+- **Corresponding source.** LGPL/GPL files carry a `source` pointer (repo,
+  ref, exact or not) in mirror.json and as `sourceCode` in the catalog, and
+  each release's notes list licence and source per file. Where the exact
+  ref is known the source archive is re-hosted in the same release (Proton
+  11.0-1: GameNative/proton-wine `build-p11-20260502-1-sdk35`, the release
+  that publishes the identical file; VKD3D-Proton by the tag or commit in
+  each name; OpenAL Soft 1.25.1). Open: GameNative names no commit for the
+  Proton 10.0, 10.0-4 and 9.0 builds (their binaries say only "wine-10.0" /
+  "wine-9.0"), nor its imagefs build; those point at the branch
+  (`proton_10.0`, `proton_9.0`) and termux/termux-packages.
+- **Takedown.** Set `hosting: "link"` and `prohibitedBy` on the entry (or
+  every entry of the group) and push: the next run removes the copy and
+  points the catalog at the maker. README.md of droidtop-components says
+  the same.
+- **The catalog's signature.** The same model as plugin certificates
+  (12a): droidtop's one master key (`MasterKey`, `:runtime-common`, moved
+  there from `PluginOriginKeys` so plugins and the catalog share one pin)
+  certifies a catalog key in `catalog.cert` (the plugin certificate's JSON
+  with `catalogs` for `pluginIds`, over its own bytes
+  `droidtop-catalog-cert-v1\nid:..\ncatalogs:..\nkey:..\nnotBefore:..\nnotAfter:..\n`,
+  so neither kind of certificate can stand in for the other), and the
+  catalog key signs the exact bytes of `catalog.json` as `catalog.json.sig`.
+  The workflow signs when the `CATALOG_SIGNING_KEY` and
+  `CATALOG_SIGNING_CERT` secrets exist and names the files in the catalog's
+  `signature` field. `ComponentCatalog.refresh` (`CatalogSignature.verify`)
+  accepts an unsigned catalog while no master is pinned; once one is, it
+  requires both files whatever the catalog says, refuses a catalog that
+  fails, and does not trust a copy kept from before the pin. Owner steps:
+  derive the catalog key from the master seed (HKDF as in 12a, info
+  `droidtop/catalog-signing/v1\0droidtop/droidtop-components[\0generation=N]`),
+  issue `catalog.cert` with certId `Droidtop/droidtop-components#<N>`, set
+  the two secrets; pin the master in `MasterKey.PINNED` (the same value
+  12a's plugin step pins).
+
 ## 10. Build order
 
 The order work lands in, where one piece depends on another:
@@ -14686,8 +14767,9 @@ that repository's OWN key, never one shared key, so no repository needs
 access to another's secrets or write access to the organisation.
 
 - **The chain.** droidtop pins one plugin MASTER public key in the binary
-  (`PluginOriginKeys.MASTER`, P-256). The master signs only certificates
-  and revocation lists, never a bundle. A certificate
+  (`MasterKey.PINNED` in `:runtime-common`, P-256; the same master
+  certifies the component catalog's key, §9). The master signs only
+  certificates and revocation lists, never a bundle. A certificate
   (`PluginCertificates`) binds one repository's public key to the plugin
   ids it may sign (exact ids, or a namespace written `droidtop.<name>.*`),
   with a `certId` (`<owner>/<repo>#<generation>`) and a validity window

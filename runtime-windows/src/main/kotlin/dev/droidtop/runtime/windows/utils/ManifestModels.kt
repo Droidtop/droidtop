@@ -5,7 +5,9 @@ import kotlinx.serialization.Serializable
 /**
  * One component the catalog offers ([ComponentCatalog]). [id] is what a
  * prefix names (and what the runtime installs it as), [url] where it is
- * downloaded from, [sha256] what the download is checked against. [source]
+ * downloaded from and [urls] every place that serves the same bytes, in the
+ * order to try them ([downloadUrls]), [sha256] what the download is checked
+ * against. [source]
  * is the catalog source it came from, [engine] what can run it: `bionic`
  * (droidtop's Windows runtime) or `linux-glibc` (a glibc userland droidtop
  * does not run Wine in yet). Upstream GameNative's manifest entries had only
@@ -22,7 +24,11 @@ data class ManifestEntry(
     val size: Long = 0,
     val source: String = ComponentCatalog.SOURCE_MIRROR,
     val engine: String = ComponentCatalog.ENGINE_BIONIC,
-)
+    val urls: List<String> = emptyList(),
+) {
+    /** Where to fetch it, first choice first: the catalog's list, else the one [url]. */
+    fun downloadUrls(): List<String> = urls.ifEmpty { listOf(url) }
+}
 
 /** A catalog source, as droidtop-components' sources/feeds.json describes it. */
 @Serializable
@@ -36,9 +42,19 @@ data class CatalogSource(
     val homepage: String? = null,
 )
 
-/** A base-system file the runtime fetches by path (`imagefs_bionic.txz`, `dxwrapper/dxvk-2.7.1.tzst`). */
+/**
+ * A base-system file the runtime fetches by path (`imagefs_bionic.txz`,
+ * `dxwrapper/dxvk-2.7.1.tzst`); [urls] as in [ManifestEntry].
+ */
 @Serializable
-data class CatalogFile(val url: String, val sha256: String? = null, val size: Long = 0)
+data class CatalogFile(
+    val url: String,
+    val sha256: String? = null,
+    val size: Long = 0,
+    val urls: List<String> = emptyList(),
+) {
+    fun downloadUrls(): List<String> = urls.ifEmpty { listOf(url) }
+}
 
 @Serializable
 data class ManifestData(
