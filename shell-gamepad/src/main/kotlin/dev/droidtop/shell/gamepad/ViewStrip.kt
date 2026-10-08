@@ -52,7 +52,7 @@ internal fun ViewStrip(
             state = state,
             contentPadding = PaddingValues(vertical = Space.Xs),
             horizontalArrangement = Arrangement.spacedBy(Space.Sm),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f, fill = false),
         ) {
             items(count = labels.size, key = { "chip:$it" }) { index ->
                 ShellChip(
