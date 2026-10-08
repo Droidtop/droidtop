@@ -51,6 +51,9 @@ gl_depends=$(sed -n 's/^Depends: //p' "$WORK/unpack/mesa-gl/control")
 gl_version=$(sed -n 's/^Version: //p' "$WORK/unpack/mesa-gl/control")
 find "$WORK/unpack/mesa-gl/data/data/com.termux/files/usr/lib" -maxdepth 1 \( -type f -o -type l \) -name 'libGL.so*' \
     -exec cp -a {} "$WORK/stage/usr/lib/" \;
+# Termux drops version suffixes (its libGL's SONAME is libGL.so), while Wine
+# opens libGL.so.1 by that name.
+[[ -e "$WORK/stage/usr/lib/libGL.so.1" ]] || ln -s libGL.so "$WORK/stage/usr/lib/libGL.so.1"
 printf 'mesa-xlib-gl %s https://www.mesa3d.org\n' "$gl_version" >> "$WORK/stage/usr/share/doc/x86_64-lavapipe/PACKAGES"
 
 # The package closure, by the index's own Depends; prints "name version filename sha256".
