@@ -127,13 +127,15 @@ class PcGameProvider(
 
     /**
      * The store part's change stamp: one number over what the store
-     * part reads. That is gamenative's store database (its file and its
-     * write-ahead log, which move on every write: a sign-in, a library
-     * sync, an install), each Wine prefix's Desktop folder (a shortcut
-     * added or removed), and the folders the user gave the vendored
-     * scanner outside droidtop's roots, along with droidtop's roots
-     * themselves, which decide which of those count, and each store
-     * droidtop runs itself ([dev.droidtop.library.stores.StoreLibrary.changeStamp]). What it does not
+     * part reads. That is each store
+     * ([dev.droidtop.library.stores.StoreLibrary.changeStamp]: its own
+     * database and sign-in files, which move on every sign-in, sync and
+     * install), the stores' update answers, each Wine prefix's Desktop
+     * folder (a shortcut added or removed), and the folders the user gave
+     * the vendored scanner outside droidtop's roots, along with droidtop's
+     * roots themselves, which decide which of those count. GameNative's
+     * own database is not among them: since Steam moved to droidtop's own
+     * store, nothing the store part reads comes from it. What it does not
      * see: the compatibility cache and a change to the engine rules;
      * "Rescan library" is the answer there.
      *
@@ -143,9 +145,6 @@ class PcGameProvider(
      */
     private fun storeStamp(): Long {
         val paths = sortedSetOf<String>()
-        val database = context.getDatabasePath(app.gamenative.db.DATABASE_NAME)
-        paths += database.absolutePath
-        paths += database.absolutePath + "-wal"
         // The stores' update answers (StoreUpdates) arrive after a walk and
         // are read by the next one, so their file moves the stamp.
         paths += StoreUpdates.file(context).absolutePath
