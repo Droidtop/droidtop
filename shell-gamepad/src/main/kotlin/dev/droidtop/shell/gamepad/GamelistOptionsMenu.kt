@@ -37,7 +37,7 @@ import kotlinx.coroutines.withContext
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /** The one label for the PC/engine scrape action, shared by the list that offers it and the handler that runs it. */
-private const val SCRAPE_PC_GAMES = "Scrape PC & engine games"
+private const val SCRAPE_PC_GAMES = "Get artwork and details"
 // Renamed from "Stores and folders" (uisources agent, 2026-09-28): the
 // settings screen it opens now holds only Game folders, Windows games
 // and Downloads -- store accounts moved to the "Accounts and sources"
@@ -159,10 +159,10 @@ internal fun GamelistOptionsMenu(
             // import a gamelist.xml from or a Console systems page to open,
             // and its scrape is the PC one below (Droidtop/tracker#175).
             if (systemId != null && systemId != PC_SYSTEM_ID) {
-                add("Launch screen: " + (systemLaunchScreen?.label ?: "Ask which display"))
+                add("Open games on: " + (systemLaunchScreen?.label ?: "Ask each time"))
                 add(SYSTEM_SETTINGS)
-                add("Scrape this system")
-                add("Import game list (gamelist.xml)")
+                add("Get artwork and details")
+                add("Import from ES-DE")
             }
             // Wherever games are listed, not only one console system: All games and the PC list ask
             // which system to download for (rig, 2026-09-30: the entry was unreachable from the Games tab).
@@ -172,7 +172,8 @@ internal fun GamelistOptionsMenu(
             // at" placement every other action here uses. Those groups
             // have no console systemId, so the action above never
             // covered them and there was no way to scrape them at all.
-            if (games.any { it.isPcOrEngineGame }) add(SCRAPE_PC_GAMES)
+            // A console system's own row above carries the same label, so it is not added twice.
+            if (games.any { it.isPcOrEngineGame } && (systemId == null || systemId == PC_SYSTEM_ID)) add(SCRAPE_PC_GAMES)
             // Only on the PC Games tab itself, whose games this whole list
             // is -- not a collection that merely happens to contain a PC
             // entry, which is not where a game folder belongs.
@@ -281,7 +282,7 @@ internal fun GamelistOptionsMenu(
                 onDismiss()
                 onOpenFilter?.invoke()
             }
-            "Launch screen: " + (systemLaunchScreen?.label ?: "Ask which display") -> {
+            "Open games on: " + (systemLaunchScreen?.label ?: "Ask each time") -> {
                 val next = when (systemLaunchScreen) {
                     null -> dev.droidtop.library.LaunchScreen.BUILT_IN
                     dev.droidtop.library.LaunchScreen.BUILT_IN -> dev.droidtop.library.LaunchScreen.SECOND
@@ -301,7 +302,7 @@ internal fun GamelistOptionsMenu(
                     onDismiss()
                 }
             }
-            "Scrape this system" -> {
+            "Get artwork and details" -> {
                 startScrapeJob(title = "Scrape $groupLabel", systemId = systemId)
             }
             SCRAPE_PC_GAMES -> {
@@ -318,7 +319,7 @@ internal fun GamelistOptionsMenu(
                     onScraped()
                 }
             }
-            "Import game list (gamelist.xml)" -> {
+            "Import from ES-DE" -> {
                 if (busy) return
                 busy = true
                 scope.launch {

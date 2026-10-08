@@ -10840,9 +10840,9 @@ the pipeline applies it.
   pill (§7k) is live on this tab exactly while a game is under the cursor.
   With no game under the cursor (the strip, an empty list) Select opens the
   list's options (`GamelistOptionsMenu` with the `pc` system id: Jump to
-  letter, Random game, Get games, Scrape PC & engine games, PC setup,
-  Close -- the console-only rows Launch screen, System settings, Scrape this
-  system and Import gamelist.xml are not offered for it,
+  letter, Random game, Get games, Get artwork and details, PC setup,
+  Close -- the console-only rows Open games on, System settings, Get artwork
+  and details (per system) and Import from ES-DE are not offered for it,
   Droidtop/tracker#175), which is also the Filter sheet's last row, "List
   options", so it stays reachable from an empty library.
   **B** goes back one level: from a grid view to Overview, from PC setup to
