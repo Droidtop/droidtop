@@ -4183,8 +4183,8 @@ source (now `:runtime-windows`, §9):
       base-system path maps to a release by its folder (`container_files/x`
       is `container-files/x`, a bare name is in `base`), so files are found
       even before the first catalog fetch. What it may re-host is §9 "What
-      droidtop-components may re-host": nine files whose terms forbid it are
-      link-only, offered from their maker's URL with the recorded SHA-256.
+      droidtop-components may re-host": everything, including the
+      Microsoft files whose terms forbid it (owner's decision).
     - **Release feeds** (`sources/feeds.json`) are linked where their makers
       publish them, never re-hosted, and only with GitHub's SHA-256 for the
       asset. droidtop's own Wine builds are found by name (every Droidtop
@@ -12987,10 +12987,15 @@ repository; `X86_64GuestLibs`/`X86_64Graphics` pin droidtop's own releases
 
 Owner: "If we legally CAN keep rehosting them, that's fine. Include official
 sources as a mirror", then: "if it is not explicitly prohibited, then we
-continue hosting it. If we get a C&D, then we take them down." So a file the
+continue hosting it. If we get a C&D, then we take them down." And, for
+the Microsoft files: "we host it anyway. The terms have been unenforced for
+long enough that I'm certain they're unenforceable, since there's too much
+precedent for nonenforcement." So a file the
 component catalog (§5a) offers is re-hosted in Droidtop/droidtop-components
-unless its own terms explicitly forbid redistribution; "no licence found" is
-not a reason to stop. Audit of the 211 mirrored files (archives listed,
+unless its own terms explicitly forbid redistribution, and the Microsoft
+files (with the prefix template carrying Monotype and Microsoft fonts) are
+re-hosted anyway; "no licence found" is not a reason to stop, and a file is
+taken down only on an actual takedown request. Audit of the 211 mirrored files (archives listed,
 binaries' version resources and fonts' name tables read, Microsoft's own
 redistributables downloaded to read their terms):
 
@@ -13005,19 +13010,17 @@ redistributables downloaded to read their terms):
 | `container_files/extras` (7-Zip, Steamless, wine-mono 11.0.0, small test tools) | LGPL-2.1 with the unRAR restriction (a use restriction); CC BY-NC-ND 4.0 (unmodified, non-commercial: allowed); MIT/mixed; no stated licence | re-hosted |
 | `imagefs_bionic`, `imagefs_gamenative` | Termux-built packages: GPL (coreutils), LGPL (FFmpeg, PulseAudio), MIT/BSD... | re-hosted |
 | Qualcomm Adreno drivers (`core-drivers`, `qcom-*`, `8E-*`, `adrenotools-v762/v805`, ...), Vortek | proprietary; no licence accompanies them (the libraries say "Qualcomm Confidential and Proprietary", meta.json says they were extracted from another app); Vortek ships without terms or source | re-hosted: no clause forbids it, highest takedown risk |
-| `wincomponents/direct3d` (d3dx9_43.dll byte-identical to Microsoft's June 2010 redistributable), `xaudio` (DXSDK_JUN10), `directmusic`, `directplay` (5.3.1.904) | DirectX End User Runtime terms (dsetup32.dll of directx_Jun2010_redist.exe), 2. Scope of licence: "You may not ... publish the software for others to copy" | link only |
-| `wincomponents/directshow`, `directsound`, `wmdecoder` (Windows 7 / 7 SP1 system files by FileVersion) | Windows 7 terms, 8. Scope of licence: the same clause | link only |
-| `wincomponents/vcrun2010` | Visual C++ 2010 runtime terms (eula.rtf in Microsoft's vcredist_x86.exe), 2. Scope of licence: the same clause | link only |
-| `container_files/container_pattern_common_20260821` | its fonts: Monotype's "You may not copy or distribute this software." (Arial, Times, Verdana...), "Microsoft supplied font ... Any other use is prohibited." (msyh.ttc, SimHei.ttf) | link only |
+| `wincomponents/direct3d` (d3dx9_43.dll byte-identical to Microsoft's June 2010 redistributable), `xaudio` (DXSDK_JUN10), `directmusic`, `directplay` (5.3.1.904) | DirectX End User Runtime terms (dsetup32.dll of directx_Jun2010_redist.exe), 2. Scope of licence: "You may not ... publish the software for others to copy" | re-hosted by owner decision |
+| `wincomponents/directshow`, `directsound`, `wmdecoder` (Windows 7 / 7 SP1 system files by FileVersion) | Windows 7 terms, 8. Scope of licence: the same clause | re-hosted by owner decision |
+| `wincomponents/vcrun2010` | Visual C++ 2010 runtime terms (eula.rtf in Microsoft's vcredist_x86.exe), 2. Scope of licence: the same clause | re-hosted by owner decision |
+| `container_files/container_pattern_common_20260821` | its fonts: Monotype's "You may not copy or distribute this software." (Arial, Times, Verdana...), "Microsoft supplied font ... Any other use is prohibited." (msyh.ttc, SimHei.ttf) | re-hosted by owner decision |
 | Steam Runtime images | Valve's | linked to Valve, as before |
 
-- **Link only** (`hosting: "link"` in `sources/mirror.json`, `prohibitedBy`
-  quoting the clause): the mirror job removes droidtop's copy, and the
-  catalog lists only the maker's copy of the same bytes (today GameNative's
-  host, the only place those exact files are published) with the SHA-256
-  recorded at the audit. Nothing changes for a device: it fetches the same
-  file. The nine copies taken off the release are kept off-line by the
-  coordination workspace, not deleted.
+- **Re-hosted against their terms, by owner decision** (2026-10-08): the
+  nine files in the "re-hosted by owner decision" rows keep the forbidding
+  clause in `licenceNote` in `sources/mirror.json`, for the record. Briefly
+  link-only the same day (`hosting: "link"`), they were restored from the
+  copies kept at the audit.
 - **Official sources as mirrors.** Every file lists its makers' download
   locations after droidtop's copy: `from`, plus `official` where the same
   bytes are published elsewhere (found by GitHub's asset digests:
