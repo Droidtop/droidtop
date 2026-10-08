@@ -206,15 +206,19 @@ fun GamepadShell(
     // The whole Gaming shell, its overlays and its dialogs draw in the
     // active ES-DE theme (docs/SPEC.md "Gaming theming").
     GamingTheme {
-        GamepadShellBody(
-            library = library,
-            onFocusedEntryChanged = onFocusedEntryChanged,
-            onEntriesChanged = onEntriesChanged,
-            deepLinkToken = deepLinkToken,
-            startSectionName = startSectionName,
-            triggerRescan = triggerRescan,
-            triggerBrowseThemes = triggerBrowseThemes,
-        )
+        // The shell window's one sliding focus ring (FocusGlide.kt); each
+        // panel, menu and page that is a window of its own hosts its own.
+        FocusGlideHost(Modifier.fillMaxSize()) {
+            GamepadShellBody(
+                library = library,
+                onFocusedEntryChanged = onFocusedEntryChanged,
+                onEntriesChanged = onEntriesChanged,
+                deepLinkToken = deepLinkToken,
+                startSectionName = startSectionName,
+                triggerRescan = triggerRescan,
+                triggerBrowseThemes = triggerBrowseThemes,
+            )
+        }
     }
 }
 

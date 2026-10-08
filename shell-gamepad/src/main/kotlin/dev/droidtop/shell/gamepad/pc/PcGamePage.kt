@@ -76,6 +76,7 @@ import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.LocalValueColumnWidth
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.FocusGlideHost
 import dev.droidtop.shell.gamepad.Motion
 import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.ShoulderGlyph
@@ -351,181 +352,184 @@ internal fun PcGamePage(
         GatePadInThisDialog()
         HideSystemBarsInThisDialog()
         DeclareLayerHints(hints, menusReachable = true)
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                // Clear of the shell's footer, which stays visible under the page.
-                .padding(bottom = window.frameBarHeight)
-                // B from the outermost node; the cursor's own presses
-                // nearer the focus target, so they are answered first.
-                .ownPadButtons(onBack = onClose)
-                .onPad { press ->
-                    heldStep = press.repeat
-                    when (press.action) {
-                        GamepadAction.UP -> when (zone) {
-                            PageZone.ACTIONS -> Unit
-                            // A zone is crossed by a fresh press only: a held
-                            // direction stops at the edge instead of running
-                            // through the whole page.
-                            PageZone.TABS -> if (!press.repeat) {
-                                EsDeNavigationSounds.play("scroll")
-                                zone = PageZone.ACTIONS
-                            }
-                            PageZone.CONTENT -> if (row > 0) {
-                                EsDeNavigationSounds.play("scroll")
-                                row -= 1
-                            } else if (!press.repeat) {
-                                EsDeNavigationSounds.play("scroll")
-                                zone = PageZone.TABS
-                            }
-                        }
-                        GamepadAction.DOWN -> when (zone) {
-                            PageZone.ACTIONS -> if (!press.repeat) {
-                                EsDeNavigationSounds.play("scroll")
-                                zone = PageZone.TABS
-                            }
-                            PageZone.TABS -> if (!press.repeat && current.isNotEmpty()) {
-                                EsDeNavigationSounds.play("scroll")
-                                zone = PageZone.CONTENT
-                                row = 0
-                            }
-                            PageZone.CONTENT -> {
-                                val next = menuStep(row, current.size, +1)
-                                if (next != row) EsDeNavigationSounds.play("scroll")
-                                row = next
-                            }
-                        }
-                        GamepadAction.LEFT, GamepadAction.RIGHT -> {
-                            val step = if (press.action == GamepadAction.LEFT) -1 else 1
-                            when (zone) {
-                                PageZone.ACTIONS -> {
-                                    val next = menuStep(button, buttons, step)
-                                    if (next != button) EsDeNavigationSounds.play("scroll")
-                                    button = next
+        // The page is a window of its own: it hosts its own sliding ring.
+        FocusGlideHost(Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Clear of the shell's footer, which stays visible under the page.
+                    .padding(bottom = window.frameBarHeight)
+                    // B from the outermost node; the cursor's own presses
+                    // nearer the focus target, so they are answered first.
+                    .ownPadButtons(onBack = onClose)
+                    .onPad { press ->
+                        heldStep = press.repeat
+                        when (press.action) {
+                            GamepadAction.UP -> when (zone) {
+                                PageZone.ACTIONS -> Unit
+                                // A zone is crossed by a fresh press only: a held
+                                // direction stops at the edge instead of running
+                                // through the whole page.
+                                PageZone.TABS -> if (!press.repeat) {
+                                    EsDeNavigationSounds.play("scroll")
+                                    zone = PageZone.ACTIONS
                                 }
-                                PageZone.TABS -> selectTab(tab + step)
-                                PageZone.CONTENT -> return@onPad false
+                                PageZone.CONTENT -> if (row > 0) {
+                                    EsDeNavigationSounds.play("scroll")
+                                    row -= 1
+                                } else if (!press.repeat) {
+                                    EsDeNavigationSounds.play("scroll")
+                                    zone = PageZone.TABS
+                                }
                             }
-                        }
-                        // The shoulders step the tab strip from anywhere on the
-                        // page, and the strip owns them even at its end.
-                        GamepadAction.L -> selectTab(tab - 1)
-                        GamepadAction.R -> selectTab(tab + 1)
-                        // This window never reaches the shell's root handler, so
-                        // the two menu pills on the footer are answered here.
-                        GamepadAction.START -> shellMenus?.openLeft?.invoke()
-                        GamepadAction.R2 -> shellMenus?.openQuick?.invoke()
-                        GamepadAction.A -> when (zone) {
-                            PageZone.ACTIONS -> pressButton(button)
-                            PageZone.TABS -> if (current.isNotEmpty()) {
-                                zone = PageZone.CONTENT
-                                row = 0
+                            GamepadAction.DOWN -> when (zone) {
+                                PageZone.ACTIONS -> if (!press.repeat) {
+                                    EsDeNavigationSounds.play("scroll")
+                                    zone = PageZone.TABS
+                                }
+                                PageZone.TABS -> if (!press.repeat && current.isNotEmpty()) {
+                                    EsDeNavigationSounds.play("scroll")
+                                    zone = PageZone.CONTENT
+                                    row = 0
+                                }
+                                PageZone.CONTENT -> {
+                                    val next = menuStep(row, current.size, +1)
+                                    if (next != row) EsDeNavigationSounds.play("scroll")
+                                    row = next
+                                }
                             }
-                            PageZone.CONTENT -> current.getOrNull(row)?.onActivate?.invoke()
+                            GamepadAction.LEFT, GamepadAction.RIGHT -> {
+                                val step = if (press.action == GamepadAction.LEFT) -1 else 1
+                                when (zone) {
+                                    PageZone.ACTIONS -> {
+                                        val next = menuStep(button, buttons, step)
+                                        if (next != button) EsDeNavigationSounds.play("scroll")
+                                        button = next
+                                    }
+                                    PageZone.TABS -> selectTab(tab + step)
+                                    PageZone.CONTENT -> return@onPad false
+                                }
+                            }
+                            // The shoulders step the tab strip from anywhere on the
+                            // page, and the strip owns them even at its end.
+                            GamepadAction.L -> selectTab(tab - 1)
+                            GamepadAction.R -> selectTab(tab + 1)
+                            // This window never reaches the shell's root handler, so
+                            // the two menu pills on the footer are answered here.
+                            GamepadAction.START -> shellMenus?.openLeft?.invoke()
+                            GamepadAction.R2 -> shellMenus?.openQuick?.invoke()
+                            GamepadAction.A -> when (zone) {
+                                PageZone.ACTIONS -> pressButton(button)
+                                PageZone.TABS -> if (current.isNotEmpty()) {
+                                    zone = PageZone.CONTENT
+                                    row = 0
+                                }
+                                PageZone.CONTENT -> current.getOrNull(row)?.onActivate?.invoke()
+                            }
+                            GamepadAction.X -> onToggleFavorite()
+                            GamepadAction.L2 -> onOpenOptions()
+                            else -> return@onPad false
                         }
-                        GamepadAction.X -> onToggleFavorite()
-                        GamepadAction.L2 -> onOpenOptions()
-                        else -> return@onPad false
+                        true
                     }
-                    true
-                }
-                .focusRequester(focus)
-                .focusable()
-                .groundBackground(),
-        ) {
-            if (heroHeight > 0.dp) PageHero(entry, heroHeight)
-            Column(modifier = Modifier.padding(horizontal = window.edgePadding)) {
-                // While the cursor is in the rows the hero and this band
-                // are gone and the tab strip is the top edge, as on
-                // Steam's scrolled page.
-                if (!compact) {
-                    PageActionBand(
-                        play = play,
-                        favourite = entry.favorite,
-                        selectedButton = if (zone == PageZone.ACTIONS) button else null,
-                        strip = strip,
-                        portrait = window.portrait,
-                        onPress = { index ->
-                            zone = PageZone.ACTIONS
-                            button = index
-                            pressButton(index)
+                    .focusRequester(focus)
+                    .focusable()
+                    .groundBackground(),
+            ) {
+                if (heroHeight > 0.dp) PageHero(entry, heroHeight)
+                Column(modifier = Modifier.padding(horizontal = window.edgePadding)) {
+                    // While the cursor is in the rows the hero and this band
+                    // are gone and the tab strip is the top edge, as on
+                    // Steam's scrolled page.
+                    if (!compact) {
+                        PageActionBand(
+                            play = play,
+                            favourite = entry.favorite,
+                            selectedButton = if (zone == PageZone.ACTIONS) button else null,
+                            strip = strip,
+                            portrait = window.portrait,
+                            onPress = { index ->
+                                zone = PageZone.ACTIONS
+                                button = index
+                                pressButton(index)
+                            },
+                        )
+                    }
+                    PageTabStrip(
+                        tabs = tabs,
+                        tab = tab,
+                        cursorOnTabs = zone == PageZone.TABS,
+                        state = tabState,
+                        shoulderGlyphs = shoulderGlyphs,
+                        onSelect = { index ->
+                            zone = PageZone.TABS
+                            selectTab(index)
                         },
                     )
                 }
-                PageTabStrip(
-                    tabs = tabs,
-                    tab = tab,
-                    cursorOnTabs = zone == PageZone.TABS,
-                    state = tabState,
-                    shoulderGlyphs = shoulderGlyphs,
-                    onSelect = { index ->
-                        zone = PageZone.TABS
-                        selectTab(index)
-                    },
-                )
-            }
-            Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                if (current.isEmpty()) {
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text(tabs[tab].emptyLine, color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
-                    }
-                } else {
-                    // One value column for the tab, content-sized to its
-                    // widest value (docs/SPEC.md 7k), as the Settings catalog does.
-                    val measurer = rememberTextMeasurer()
-                    val valueStyle = MaterialTheme.typography.bodyMedium
-                    val density = LocalDensity.current
-                    val valueColumnWidth = remember(current, valueStyle, density.fontScale) {
-                        val widest = current.mapNotNull { it.value }
-                            .maxOfOrNull { measurer.measure(it, valueStyle, maxLines = 1, softWrap = false).size.width } ?: 0
-                        with(density) { widest.toDp() }.coerceIn(MenuTokens.ValueColumnMinWidth, MenuTokens.ValueColumnMaxWidth)
-                    }
-                    CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
-                            contentPadding = PaddingValues(
-                                start = window.edgePadding,
-                                end = window.edgePadding,
-                                top = Space.Xs,
-                                bottom = Space.Lg,
-                            ),
-                        ) {
-                            itemsIndexed(current, key = { index, fact -> "$index:${fact.title}" }) { index, fact ->
-                                HintTip(fact.tip, modifier = Modifier.fillMaxWidth()) {
-                                    MenuRow(
-                                        title = fact.title,
-                                        subtitle = fact.subtitle,
-                                        value = fact.value,
-                                        chevron = fact.onActivate != null,
-                                        selected = zone == PageZone.CONTENT && row == index,
-                                        uniformHeight = true,
-                                        ownScrollKeeping = true,
-                                        onClick = {
-                                            zone = PageZone.CONTENT
-                                            row = index
-                                            fact.onActivate?.invoke()
-                                        },
-                                    )
+                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    if (current.isEmpty()) {
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text(tabs[tab].emptyLine, color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
+                        }
+                    } else {
+                        // One value column for the tab, content-sized to its
+                        // widest value (docs/SPEC.md 7k), as the Settings catalog does.
+                        val measurer = rememberTextMeasurer()
+                        val valueStyle = MaterialTheme.typography.bodyMedium
+                        val density = LocalDensity.current
+                        val valueColumnWidth = remember(current, valueStyle, density.fontScale) {
+                            val widest = current.mapNotNull { it.value }
+                                .maxOfOrNull { measurer.measure(it, valueStyle, maxLines = 1, softWrap = false).size.width } ?: 0
+                            with(density) { widest.toDp() }.coerceIn(MenuTokens.ValueColumnMinWidth, MenuTokens.ValueColumnMaxWidth)
+                        }
+                        CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
+                                contentPadding = PaddingValues(
+                                    start = window.edgePadding,
+                                    end = window.edgePadding,
+                                    top = Space.Xs,
+                                    bottom = Space.Lg,
+                                ),
+                            ) {
+                                itemsIndexed(current, key = { index, fact -> "$index:${fact.title}" }) { index, fact ->
+                                    HintTip(fact.tip, modifier = Modifier.fillMaxWidth()) {
+                                        MenuRow(
+                                            title = fact.title,
+                                            subtitle = fact.subtitle,
+                                            value = fact.value,
+                                            chevron = fact.onActivate != null,
+                                            selected = zone == PageZone.CONTENT && row == index,
+                                            uniformHeight = true,
+                                            ownScrollKeeping = true,
+                                            onClick = {
+                                                zone = PageZone.CONTENT
+                                                row = index
+                                                fact.onActivate?.invoke()
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                    // The selected row in full, so no row has to grow to be
-                    // read: the whole description, a long value, where the
-                    // facts came from. Only while the cursor is down here,
-                    // when the band above has made the room.
-                    if (compact) {
-                        val selected = current.getOrNull(row)
-                        CatalogDetailStrip(
-                            selected?.let { fact ->
-                                listOfNotNull(
-                                    fact.value?.takeIf { it.length > 14 },
-                                    fact.subtitle,
-                                ).joinToString("\n")
-                            }.orEmpty(),
-                        )
+                        // The selected row in full, so no row has to grow to be
+                        // read: the whole description, a long value, where the
+                        // facts came from. Only while the cursor is down here,
+                        // when the band above has made the room.
+                        if (compact) {
+                            val selected = current.getOrNull(row)
+                            CatalogDetailStrip(
+                                selected?.let { fact ->
+                                    listOfNotNull(
+                                        fact.value?.takeIf { it.length > 14 },
+                                        fact.subtitle,
+                                    ).joinToString("\n")
+                                }.orEmpty(),
+                            )
+                        }
                     }
                 }
             }

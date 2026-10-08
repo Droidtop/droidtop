@@ -3,7 +3,6 @@ package dev.droidtop.shell.gamepad
 import android.text.format.DateFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -446,7 +445,7 @@ private fun QuickTileView(
     onClick: () -> Unit,
 ) {
     val lit = tile.on == true
-    val shape = RoundedCornerShape(16.dp)
+    val shape = Corners.Plate
     // The selection is drawn only while a pad drives (docs/SPEC.md 6e).
     val ring = focused && dev.droidtop.shell.gamepad.input.PadModality.showsFocus
     val background = when {
@@ -466,7 +465,7 @@ private fun QuickTileView(
             .heightIn(min = 104.dp)
             .clip(shape)
             .background(background)
-            .border(MenuTokens.FocusRingWidth, if (ring) MenuTokens.Accent else Color.Transparent, shape)
+            .focusRing(ring, shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {

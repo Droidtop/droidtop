@@ -11964,9 +11964,10 @@ it is drawn on, not only the menu overlay.
 **One anatomy per thing.** One row (optional leading category icon, title, optional supporting
 line cut to one line, optional value, optional chevron; a chevron means "this opens", a value
 means "this is set to", and neither stands in for the other). One selectable choice row. One
-tile. One section label. One empty state. One selection idiom — an accent ring over a raised
-fill (`Modifier.selectionFrame`, ring width `MenuTokens.FocusRingWidth`) — on every
-droidtop-drawn focusable: rows, chips, tabs, buttons, cards and tiles alike; a focus rectangle
+tile. One section label. One empty state. One selection idiom — a raised fill under the
+window's one sliding accent ring (`Modifier.selectionFrame`, which claims the ring from the
+window's `FocusGlideHost`; ring width `MenuTokens.FocusRingWidth`, section "Gaming motion and
+focus") — on every droidtop-drawn focusable: rows, chips, tabs, buttons, cards and tiles alike; a focus rectangle
 in one place and a card in another is two answers to one question, and a brightened card alone
 is too faint to find at arm's length (UI pass 2026-09-24, M1). The ring means "the pad is here"
 and nothing else: a current tab keeps only the raised fill, and a filter that is on is filled
@@ -11980,8 +11981,10 @@ status; the row itself keeps one line, so every row with a supporting line is th
 console: "the pills are also too big").** `TouchHintBar`/`TouchHint` (`:shell-gamepad`,
 `TouchActions.kt`) draw every hint chip at one compact size regardless of `touchFirst` --
 `MenuTokens.HintChipMinHeight` (28dp), `HintGlyphTextSize`/`HintLabelTextSize` (12sp/13sp),
-tight glyph-badge padding (`HintGlyphPaddingHorizontal`/`Vertical`, 6dp/1dp) and a 14dp chip
-corner radius, inside a bar whose own vertical padding is `HintBarVerticalPadding` (6dp) and
+the button glyph drawn as the shell's one `Keycap` (24dp, round for a letter and a pill for a
+word, the muted ink lettered in the ground colour, as Steam's footer glyphs read quieter than
+their labels; the L1/R1 beside a strip are the same keycap, at half strength at a strip's end)
+and pill-shaped chips, inside a bar whose own vertical padding is `HintBarVerticalPadding` (6dp) and
 whose reserved room (`HintBarRoom`, the CONTENT padding every scrolling screen leaves for it)
 is 56dp, down from 72dp. The chip a finger taps and the chip that draws are two different
 sizes: on a touch-first window the chip sits centred inside an invisible `Box` sized to
@@ -12711,6 +12714,23 @@ theme's roles (section 7k2).
   construction: no blur, every animated value read in the layer or draw phase so a focus move
   recomposes nothing. Because of that there is no low-performance mode to switch it off; a blur or
   backdrop effect added later must come with one.
+- **One ring per window, and it slides.** Each window the shell draws hosts ONE focus ring
+  (`FocusGlideHost`, ported from DroidDeck's `ui/FocusGlide.kt` and re-keyed to the shell's one
+  cursor): the shell itself, each side panel (`SidePanelFrame`), each `MenuPanel` and a game's page.
+  A selected control claims it (`selectionFrame`, `focusRing`) only while a pad drives. When the
+  cursor moves, the edge on the side it heads springs ahead and the trailing edge follows 30 ms
+  later, so the ring stretches and snaps onto the new control's shape; a held direction (moves
+  under 180 ms apart) runs it as one piece; a single move further than 360dp carries it across as a
+  drop. Its look is Steam's: 2dp in the theme's accent at 60 percent, landing from 12dp outside the
+  control over 400 ms when it appears, then breathing to 24 percent and back every 1.2 s, twenty
+  times, before it rests; a capsule carries it 2dp outside its edge. It draws in an overlay of its
+  own, so a moving or breathing ring redraws nothing under it, and it re-measures its control every
+  frame only for 450 ms after a change. A window with no host (a one-off dialog) draws a still ring
+  on the control. With motion off the ring jumps. The per-control landing outline it replaces is
+  gone. Buttons follow Steam in the theme's colours: a quiet chip turns solid (`Selected`) under
+  the cursor; a filled one keeps its fill and gains an accent-tinted shadow that deepens (4 to
+  14dp) and a one-shot sheen; the page's Play is the theme's launch colour, at least 48 by 160dp,
+  with a 2 s stripe.
 - **Pages assemble, they do not pop.** A page's blocks fade up from 8dp below over 500 ms, each
   60 ms after the one before, capped at six steps (`Modifier.rise`); the capsule that takes the
   cursor gets a one-shot diagonal sheen over 1 s, and the Play button a slower 2 s stripe

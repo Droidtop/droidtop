@@ -2,7 +2,6 @@ package dev.droidtop.shell.gamepad
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
@@ -42,7 +41,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.inset
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -54,6 +52,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
@@ -111,17 +112,20 @@ internal val MenuListContentPadding: PaddingValues
     )
 
 /**
- * The shell's ONE selection idiom: an accent ring over a raised fill.
+ * The shell's ONE selection idiom: a raised fill under the window's one
+ * focus ring.
  *
  * Every focusable piece of chrome draws selection through this -- menu
  * rows, chips, tabs, buttons, cards, Quick Menu tiles -- so "what am I
- * on" has one answer across the shell. Settings rows used to show focus
- * only as a slightly lighter card (about #2e on #121212), which the UI
- * pass of 2026-09-24 (M1) found hard to see at arm's length on a 5.5"
- * screen, while the cards and the Quick Menu already drew the ring.
+ * on" has one answer across the shell. The fill changes at once; the ring
+ * is not drawn here but claimed: each window has ONE ring (FocusGlide.kt,
+ * [FocusGlideHost]) that slides from the last selected thing to this one,
+ * lands and breathes (docs/SPEC.md "Gaming motion and focus").
  *
- * [rest] is the fill while not selected; [restOutline] is an optional
- * hairline kept while not selected (the cards keep [MenuTokens.CardOutline]).
+ * [rest] is the fill while not selected and [selectedFill] while selected;
+ * [restOutline] is an optional hairline kept while not selected (the cards
+ * keep [MenuTokens.CardOutline]); [ringOutset] puts the ring that far
+ * outside the edge (capsules, whose art keeps its edge clear).
  *
  * Drawn only while a pad or keyboard is driving ([PadModality], docs/
  * SPEC.md 6e): on touch the selection is still there -- a tap moves it --
@@ -132,50 +136,44 @@ fun Modifier.selectionFrame(
     shape: Shape,
     rest: Color = MenuTokens.Surface,
     restOutline: Color = Color.Transparent,
+    selectedFill: Color = MenuTokens.SurfaceSelected,
+    ringOutset: Dp = 0.dp,
 ): Modifier = composed {
     val shown = selected && PadModality.showsFocus
-    val fill = if (shown) MenuTokens.SurfaceSelected else rest
-    val ringColor = MenuTokens.Accent
-    // The fill snaps and the outline lands (docs/SPEC.md "Gaming motion and
-    // focus"): it starts thicker and transparent and thins to its width as
-    // it fades in. Read in the draw phase only, so a focus move recomposes
-    // nothing.
-    val landed = animateFloatAsState(
-        targetValue = if (shown) 1f else 0f,
-        animationSpec = if (shown) Motion.tw<Float>(Motion.RingLandMs, easing = Motion.Glide) else Motion.tw<Float>(Motion.ColourMs),
-        label = "focus ring",
-    )
     Modifier
-        .background(fill, shape)
-        .drawWithContent {
-            drawContent()
+        .background(if (shown) selectedFill else rest, shape)
+        .then(
             // Never a 0.dp stroke: it would draw as a 1px line, so "no
             // outline" is a transparent colour and nothing is drawn.
             if (restOutline.alpha > 0f) {
-                val w = 1.dp.toPx()
-                inset(w / 2f) { drawOutline(shape.createOutline(this.size, layoutDirection, this), restOutline, style = Stroke(w)) }
-            }
-            val p = landed.value
-            if (p > 0f) {
-                val w = MenuTokens.FocusRingWidth.toPx() * (1f + (1f - p))
-                inset(w / 2f) {
-                    drawOutline(
-                        shape.createOutline(this.size, layoutDirection, this),
-                        ringColor.copy(alpha = ringColor.alpha * p),
-                        style = Stroke(w),
-                    )
+                Modifier.drawWithContent {
+                    drawContent()
+                    val w = 1.dp.toPx()
+                    inset(w / 2f) { drawOutline(shape.createOutline(this.size, layoutDirection, this), restOutline, style = Stroke(w)) }
                 }
-            }
-        }
+            } else {
+                Modifier
+            },
+        )
+        .focusRing(shown, shape, ringOutset)
 }
 
 /**
- * The shell's one chip: a pill that is focusable for the pad and
- * clickable for touch. [on] is a filter or toggle in effect: it is filled
- * with the accent and carries a check, so which filters are on reads
+ * The shell's one chip and button: a pill that is focusable for the pad
+ * and clickable for touch. [on] is a filter or toggle in effect: it is
+ * filled with the accent and carries a check, so which filters are on reads
  * without moving onto them (UI pass 2026-09-24, L3). [primary] is the one
- * action a row of chips leads with (Launch, Save). Focus is the
- * [selectionFrame] ring, as on every other piece of chrome.
+ * action a row of chips leads with (Launch, Save). Focus is the window's
+ * one ring, as on every other piece of chrome.
+ *
+ * The look is Steam's buttons in the theme's colours (docs/SPEC.md 7k): a
+ * quiet chip at rest turns solid when selected ([MenuTokens.Selected] with
+ * its own ink, Steam's inversion); a filled one keeps its fill and gains
+ * the ring, a shadow tinted with the accent that deepens when selected
+ * (DroidDeck's primary button, ui/FrontEndWidgets.kt at 9310d19) and a
+ * one-shot sheen as the cursor arrives. [large] is the page's Play: the
+ * theme's launch colour, 48dp tall and 160dp wide at least, crisp corners
+ * and a slower stripe.
  *
  * This replaces three private copies (the detail screen's action chip,
  * the recent filter and the PC surface's filter chip), each of which drew
@@ -202,19 +200,24 @@ internal fun ShellChip(
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(50)
+    val shape = if (large) Corners.Crisp else Corners.Pill
     val filled = on || primary
     val isSelected = selected ?: focused
+    val ring = isSelected && PadModality.showsFocus
     val labelColor = when {
         !enabled -> MenuTokens.OnSurfaceDisabled
-        filled -> MenuTokens.OnSelected
+        // The launch fill is held to contrast against the text ink (GamingThemeMapping).
+        large && filled -> MenuTokens.OnSurface
+        filled || ring -> MenuTokens.OnSelected
         else -> MenuTokens.OnSurface
     }
     Text(
         if (on) "\u2713 $label" else label,
         color = labelColor,
         style = if (large) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
+        fontWeight = if (large) FontWeight.Bold else FontWeight.SemiBold,
         maxLines = 1,
+        textAlign = TextAlign.Center,
         modifier = modifier
             .then(
                 if (selected == null) {
@@ -242,22 +245,47 @@ internal fun ShellChip(
             )
             .then(
                 if (filled) {
-                    val ring = isSelected && PadModality.showsFocus
                     val fill = when {
                         !enabled -> MenuTokens.LaunchDisabled
+                        large -> if (ring) MenuTokens.LaunchFocused else MenuTokens.Launch
                         ring -> MenuTokens.Selected
                         else -> MenuTokens.Accent
                     }
                     Modifier
+                        .primaryLift(ring && enabled, shape)
                         .background(fill, shape)
-                        .border(MenuTokens.FocusRingWidth, if (ring) MenuTokens.Accent else Color.Transparent, shape)
+                        .shine(ring && enabled, play = large)
+                        .focusRing(ring, shape)
                 } else {
-                    Modifier.selectionFrame(isSelected, shape)
+                    Modifier.selectionFrame(isSelected, shape, selectedFill = MenuTokens.Selected)
                 },
             )
             .focusMarquee(isSelected)
-            .padding(horizontal = if (large) 28.dp else 16.dp, vertical = if (large) 14.dp else 8.dp),
+            .then(if (large) Modifier.heightIn(min = 48.dp).widthIn(min = 160.dp) else Modifier)
+            .padding(horizontal = if (large) 24.dp else 16.dp, vertical = if (large) 14.dp else 8.dp),
     )
+}
+
+/**
+ * The primary action's lift: a shadow that takes the theme's accent and
+ * deepens while the cursor is on it ([Elevation]), read in the layer phase
+ * only. DroidDeck's primary button (ui/FrontEndWidgets.kt at 9310d19).
+ */
+private fun Modifier.primaryLift(selected: Boolean, shape: Shape): Modifier = composed {
+    val p = animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = if (selected) Motion.lift<Float>() else Motion.release<Float>(),
+        label = "primary lift",
+    )
+    val accent = MenuTokens.Accent
+    graphicsLayer {
+        val rest = Elevation.PrimaryRest.toPx()
+        shadowElevation = rest + (Elevation.PrimaryFocused.toPx() - rest) * p.value
+        ambientShadowColor = accent
+        spotShadowColor = accent
+        this.shape = shape
+        clip = false
+    }
 }
 
 /** A screen-level menu header: name first, explanation second, both quiet. */
@@ -633,22 +661,27 @@ internal fun MenuPanel(
     // (title and last row cut, Droidtop/tracker#295) and its scroll never
     // starts. The cap is the screen less the edge margin each side.
     val window = LocalShellWindow.current
-    Column(
-        modifier = modifier
+    // A panel is a window of its own (a Dialog), so it hosts its own sliding ring.
+    FocusGlideHost(
+        modifier
             .heightIn(max = maxOf(120.dp, window.heightDp.dp - window.edgePadding * 2))
             .clip(MenuTokens.OverlayShape)
-            .background(MenuTokens.OverlaySurface)
-            .focusRequester(focus)
-            .focusable()
-            .onPad(preview = true, handler = onPad)
-            // A panel whose content can outgrow the screen must scroll:
-            // the jump-to-letter list reaches 27 rows on a library that
-            // spans the alphabet, which is taller than the display.
-            .verticalScroll(androidx.compose.foundation.rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
-        content = content,
-    )
+            .background(MenuTokens.OverlaySurface),
+    ) {
+        Column(
+            modifier = Modifier
+                .focusRequester(focus)
+                .focusable()
+                .onPad(preview = true, handler = onPad)
+                // A panel whose content can outgrow the screen must scroll:
+                // the jump-to-letter list reaches 27 rows on a library that
+                // spans the alphabet, which is taller than the display.
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
+            content = content,
+        )
+    }
 }
 
 /**

@@ -515,10 +515,11 @@ object MenuTokens {
      */
     val HintTouchTarget = 48.dp
 
-    /** A hint chip's glyph badge ("A", "B", ...): font size and padding. */
+    /** A button glyph ([Keycap], "A", "Start", "L1"): its text size, side padding and two heights. */
     val HintGlyphTextSize = 12.sp
     val HintGlyphPaddingHorizontal = 6.dp
-    val HintGlyphPaddingVertical = 1.dp
+    val KeycapHeight = 24.dp
+    val KeycapHeightSmall = 20.dp
 
     /** A hint chip's action label ("Select", "Back", ...): font size. */
     val HintLabelTextSize = 13.sp

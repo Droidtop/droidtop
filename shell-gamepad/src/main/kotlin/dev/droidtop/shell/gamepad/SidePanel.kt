@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -34,10 +33,6 @@ import kotlinx.coroutines.launch
 
 /** The edge a [SidePanelFrame] slides in from. */
 internal enum class PanelEdge { LEFT, RIGHT, BOTTOM }
-
-// How long the panel takes to slide in or out and the page behind it to dim or clear.
-// Local until the shared motion tokens land (Droidtop/tracker#256).
-private const val SIDE_PANEL_SLIDE_MS = 160
 
 // How dark the page behind goes. A plain scrim, not a blur: a real blur
 // of a themed canvas with video and animation on it is a per-frame cost
@@ -80,12 +75,12 @@ internal fun SidePanelFrame(
         if (!closing) {
             closing = true
             scope.launch {
-                shown.animateTo(0f, tween(SIDE_PANEL_SLIDE_MS))
+                shown.animateTo(0f, Motion.panelOut())
                 dismiss()
             }
         }
     }
-    LaunchedEffect(Unit) { shown.animateTo(1f, tween(SIDE_PANEL_SLIDE_MS)) }
+    LaunchedEffect(Unit) { shown.animateTo(1f, Motion.panelIn()) }
     Dialog(
         onDismissRequest = close,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -132,7 +127,8 @@ internal fun SidePanelFrame(
                         }
                     },
             ) {
-                content(width, close)
+                // The panel's own sliding focus ring, inside the surface so it travels with it.
+                FocusGlideHost { content(width, close) }
             }
         }
     }

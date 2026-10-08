@@ -47,7 +47,8 @@ internal fun ViewStrip(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth().padding(start = window.edgePadding, end = end),
     ) {
-        if (shoulderGlyphs) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = Space.Sm))
+        // A shoulder with nowhere to go at this end is drawn at half strength (Steam's strip ends).
+        if (shoulderGlyphs) ShoulderGlyph("L1", badge = true, dimmed = active <= 0, modifier = Modifier.padding(end = Space.Sm))
         LazyRow(
             state = state,
             contentPadding = PaddingValues(vertical = Space.Xs),
@@ -74,6 +75,8 @@ internal fun ViewStrip(
                 onClick = onClearPill,
             )
         }
-        if (shoulderGlyphs) ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = Space.Sm))
+        if (shoulderGlyphs) {
+            ShoulderGlyph("R1", badge = true, dimmed = active >= labels.size - 1, modifier = Modifier.padding(start = Space.Sm))
+        }
     }
 }
