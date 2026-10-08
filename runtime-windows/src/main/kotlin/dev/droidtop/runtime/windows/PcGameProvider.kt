@@ -28,6 +28,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Raise it when a store's rule for what is a library entry changes; see [PcGameProvider.storeStamp]. */
+private const val STORE_LIST_RULES = 2L
+
 /**
  * Real "PC" games -- ES-DE's own `"pc"` system id (per direction: "PC", not
  * ES-DE's separate `"windows"` system, which is Linux `.desktop`-shortcut
@@ -155,7 +158,10 @@ class PcGameProvider(
         runCatching { paths += dev.droidtop.runtime.windows.PrefManager.customGameManualFolders }
         runCatching { paths += dev.droidtop.runtime.windows.PrefManager.customGameScanRoots }
         val roots = dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath }
-        var stamp = 17L
+        // Which rows a store lists is a rule in code (games only, no DLC): a
+        // change to it moves the stamp, so rows an older rule listed leave
+        // the index on the next slow pass without a rescan.
+        var stamp = 17L * 31 + STORE_LIST_RULES
         for (root in roots) stamp = 31 * stamp + root.hashCode()
         for (path in paths) {
             // Inside a root is the folder walk's part, and its stamp.

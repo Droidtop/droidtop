@@ -193,8 +193,8 @@ interface SteamAppDao {
     @Query("SELECT * FROM steam_app WHERE id = :appId")
     suspend fun find(appId: Int): SteamApp?
 
-    /** Every app the account owns whose type is one a person plays ([SteamLibraryRules.PLAYABLE_TYPES] codes). */
-    @Query("SELECT * FROM steam_app AS app " + OWNED_APPS_WHERE + "AND app.type IN (:types) ORDER BY LOWER(app.name)")
+    /** Every app the account owns whose type is one a person plays ([SteamLibrarySync.PLAYABLE_TYPES] codes) and that is not DLC of another app. */
+    @Query("SELECT * FROM steam_app AS app " + OWNED_APPS_WHERE + "AND app.type IN (:types) AND app.dlc_for_app_id = ${SteamIds.INVALID_APP_ID} ORDER BY LOWER(app.name)")
     suspend fun owned(types: List<Int>): List<SteamApp>
 
     /** DLC apps of [appId] with depots of their own that a licence grants (GameNative's findDownloadableDLCApps). */

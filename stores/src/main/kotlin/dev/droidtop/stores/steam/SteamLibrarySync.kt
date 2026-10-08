@@ -24,8 +24,28 @@ internal object SteamLibrarySync {
     /** Steam answers at most this many product-info requests at once (GameNative's MAX_PICS_BUFFER). */
     private const val PICS_CHUNK = 256
 
-    /** The app types a person plays, which the library lists: games, demos and applications. */
-    val PLAYABLE_TYPES = listOf(AppType.game.code, AppType.demo.code, AppType.application.code)
+    /**
+     * The only app type the library lists: games (docs/SPEC.md 7g, "Stores").
+     * DLC belongs to its base game ("DLC and versions"); tools, soundtracks,
+     * demos, betas and the rest are not library entries.
+     */
+    val PLAYABLE_TYPES = listOf(AppType.game.code)
+
+    /**
+     * Whether a stored app may be a library entry. [SteamAppDao.owned] applies
+     * the same rule in SQL; this is for rows read another way (installed
+     * ones). An app whose product info names a base game (`dlcforappid`) is
+     * DLC whatever its type says, and a row never read from product info
+     * (type invalid) is kept only when it is not DLC, as a game installed
+     * before its product info came.
+     */
+    fun isLibraryGame(app: SteamApp, keepInstalledKinds: Boolean = false): Boolean {
+        if (app.dlcForAppId != SteamIds.INVALID_APP_ID) return false
+        if (app.type.code in PLAYABLE_TYPES) return true
+        if (app.type == AppType.invalid) return true
+        // A demo or application the person installed stays listed with its files.
+        return keepInstalledKinds && (app.type == AppType.demo || app.type == AppType.application)
+    }
 
     /** Reads the account's library; logged on already. Returns how many games it holds. */
     suspend fun run(context: Context, apps: SteamApps, licences: List<License>): Int {

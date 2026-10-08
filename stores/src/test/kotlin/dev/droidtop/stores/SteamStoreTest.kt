@@ -1,5 +1,6 @@
 package dev.droidtop.stores
 
+import dev.droidtop.stores.amazon.AmazonStore
 import dev.droidtop.stores.steam.AppType
 import dev.droidtop.stores.steam.ConfigInfo
 import dev.droidtop.stores.steam.DepotInfo
@@ -12,6 +13,7 @@ import dev.droidtop.stores.steam.SteamConverters
 import dev.droidtop.stores.steam.SteamDepots
 import dev.droidtop.stores.steam.SteamExecutables
 import dev.droidtop.stores.steam.SteamIds
+import dev.droidtop.stores.steam.SteamLibrarySync
 import dev.droidtop.stores.steam.SteamInstalls
 import java.io.File
 import java.util.EnumSet
@@ -207,5 +209,28 @@ class SteamStoreTest {
         assertEquals(emptyList<Int>(), converters.toIntList(""))
         assertEquals(listOf(1, 2), converters.toIntList(converters.fromIntList(listOf(1, 2))))
         assertFalse(SteamApp(id = 1).receivedPICS)
+    }
+
+    @Test
+    fun `only games are library entries, never DLC, tools, music or demos`() {
+        fun app(type: AppType, dlcFor: Int = SteamIds.INVALID_APP_ID) = SteamApp(id = 7, type = type, dlcForAppId = dlcFor)
+        assertTrue(SteamLibrarySync.isLibraryGame(app(AppType.game)))
+        assertEquals(listOf(AppType.game.code), SteamLibrarySync.PLAYABLE_TYPES)
+        for (type in listOf(AppType.dlc, AppType.tool, AppType.music, AppType.demo, AppType.application, AppType.beta, AppType.config)) {
+            assertFalse("$type", SteamLibrarySync.isLibraryGame(app(type)))
+        }
+        // A DLC whose product info types it as a game is still DLC when it names a base game.
+        assertFalse(SteamLibrarySync.isLibraryGame(app(AppType.game, dlcFor = 220)))
+        assertFalse(SteamLibrarySync.isLibraryGame(app(AppType.invalid, dlcFor = 220), keepInstalledKinds = true))
+        // An installed demo or application stays listed with its files; installed tools and music do not.
+        assertTrue(SteamLibrarySync.isLibraryGame(app(AppType.demo), keepInstalledKinds = true))
+        assertFalse(SteamLibrarySync.isLibraryGame(app(AppType.music), keepInstalledKinds = true))
+    }
+
+    @Test
+    fun `an Amazon entitlement is a game unless its product line names an entitlement`() {
+        assertTrue(AmazonStore.isGame("""{"id":"a","productLine":"Twitch:FuelGame"}"""))
+        assertTrue(AmazonStore.isGame("""{"id":"a"}"""))
+        assertFalse(AmazonStore.isGame("""{"id":"a","productLine":"Twitch:FuelEntitlement"}"""))
     }
 }

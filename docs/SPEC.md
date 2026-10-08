@@ -9805,9 +9805,17 @@ follows:
   `cached_license` and `app_info` tables, same names and encodings, so its rows
   come across when `steam.db` is first made; a separate file so Steam's bulk
   rewrites do not move the other stores' change stamp). The library lists the
-  owned games, demos and applications with an unexpired licence, their own or
-  a DLC's (GameNative's ownership rule), and every installed game whatever
-  its licence. Install is a job like every store's: fresh product info, then
+  owned games (product-info type `game`, and not an app that names a base game
+  in `dlcforappid`) with an unexpired licence, their own or a DLC's
+  (GameNative's ownership rule), and every installed game whatever its
+  licence. DLC, tools, soundtracks, demos, betas and applications are not
+  library entries (owner, 2026-10-08, Droidtop/tracker#360); DLC belongs to its
+  base game and is reached from "DLC and versions". The one rule for every
+  store: a store lists only games. Epic, GOG and itch.io already drop their DLC
+  and excluded rows in their queries; Amazon drops entitlements whose product
+  line names an entitlement. The rule is applied when the rows are read, and
+  `PcGameProvider.STORE_LIST_RULES` is part of the store stamp, so rows an older
+  rule listed leave the index on the next slow pass without a rescan. Install is a job like every store's: fresh product info, then
   the depots `SteamDepots.plan` picks (GameNative's rules: Windows, 64-bit over
   32-bit, the plain build over the Steam Deck one, the device's language else
   English, granted by the account's packages, not Steam China) with the DLC the

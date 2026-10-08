@@ -84,7 +84,8 @@ class AmazonStore : StoreLibrary {
     }
 
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
-        dao(context).getAllAsList().map { game ->
+        // An entitlement that is not a game (DLC, in-game items) is not a library entry; an installed row stays.
+        dao(context).getAllAsList().filter { it.isInstalled || isGame(it.productJson) }.map { game ->
             StoreGame(
                 store = id,
                 gameId = game.productId,
@@ -205,6 +206,17 @@ class AmazonStore : StoreLibrary {
 
     internal companion object {
         private const val TAG = "AmazonStore"
+
+        /**
+         * Whether an entitlement's product is a game: Amazon marks DLC and
+         * in-game items with a product line naming an entitlement
+         * ("Twitch:FuelEntitlement"), games with "Twitch:FuelGame". A product
+         * that names no line is taken for a game.
+         */
+        fun isGame(productJson: String): Boolean {
+            val line = runCatching { org.json.JSONObject(productJson).optString("productLine", "") }.getOrDefault("")
+            return !line.contains("Entitlement", ignoreCase = true)
+        }
 
         /** What a verify found, in one line. */
         fun verifyLine(total: Int, missing: Int, changed: Int): String = when {

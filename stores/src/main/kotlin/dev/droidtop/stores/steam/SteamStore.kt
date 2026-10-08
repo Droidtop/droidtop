@@ -108,7 +108,7 @@ class SteamStore : StoreLibrary {
         val installedOnly = installs.keys.filter { it !in ownedIds }
             .mapNotNull { db.apps().find(it) }
             // A DLC's own install row is not a game of its own.
-            .filter { it.type.code in SteamLibrarySync.PLAYABLE_TYPES || (it.type == AppType.invalid && it.dlcForAppId == SteamIds.INVALID_APP_ID) }
+            .filter { SteamLibrarySync.isLibraryGame(it, keepInstalledKinds = true) }
         val language = StoreLanguage.current()
         (owned + installedOnly).filter { it.name.isNotBlank() }.map { app ->
             val install = installs[app.id]
