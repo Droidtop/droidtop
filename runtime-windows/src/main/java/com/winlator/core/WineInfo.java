@@ -19,7 +19,9 @@ import dev.droidtop.runtime.windows.R;
 
 public class WineInfo implements Parcelable {
     public static final WineInfo MAIN_WINE_VERSION = new WineInfo("wine", "9.2", "x86_64");
-    private static final Pattern pattern = Pattern.compile("^(wine|proton|Proton)\\-([0-9\\.]+)(?:\\-([0-9\\.]+))?\\-(x86|x86_64|arm64ec)(?:\\-([0-9]+))?$");
+    // droidtop: one optional flavour word before the arch ("proton-11.0-7-ge-arm64ec"), so any
+    // Wine build can be installed under a name of its own (WineBuildRules); groups unchanged.
+    private static final Pattern pattern = Pattern.compile("^(wine|proton|Proton)\\-([0-9\\.]+)(?:\\-([0-9\\.]+))?(?:\\-[a-z][a-z0-9\\.]*)?\\-(x86|x86_64|arm64ec)(?:\\-([0-9]+))?$");
     public final String version;
     public final String type;
     public String subversion;

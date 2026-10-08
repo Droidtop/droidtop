@@ -75,7 +75,7 @@ object GraphicsDriverDownloader {
         destFile.parentFile?.mkdirs()
 
         try {
-            RuntimeDownloads.fetch(
+            RuntimeDownloads.fetch(context, 
                 fileName = "graphics_driver/${component.name}",
                 dest = destFile,
                 onProgress = onProgress

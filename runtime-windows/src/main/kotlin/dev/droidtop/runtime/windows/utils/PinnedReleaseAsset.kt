@@ -42,7 +42,7 @@ class PinnedReleaseAsset(
         val archive = File(context.filesDir, asset)
         if (!archive.isFile || sha256(archive) != sha256) {
             archive.delete()
-            RuntimeDownloads.fetchUrl(url, archive, onProgress)
+            RuntimeDownloads.fetchUrl(url, archive, onProgress = onProgress)
         }
         val actual = sha256(archive)
         if (actual != sha256) {

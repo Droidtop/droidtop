@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import dev.droidtop.runtime.windows.R
 import dev.droidtop.runtime.windows.RuntimeDownloads
+import dev.droidtop.runtime.windows.WineBuilds
 import com.winlator.contents.AdrenotoolsManager
 import com.winlator.contents.ContentProfile
 import com.winlator.contents.ContentsManager
@@ -19,6 +20,13 @@ data class ManifestInstallResult(
     val message: String,
 )
 
+/**
+ * Installs one catalog item ([ComponentCatalog]): a driver zip through
+ * adrenotools, a raw DXVK/VKD3D archive into the dxwrapper cache, anything
+ * else (.wcp) into the contents store, a Wine/Proton build after
+ * [WineBuilds.prepare]. Every download is checked against the item's
+ * SHA-256. Adapted from GameNative's ManifestInstaller (GPL-3.0).
+ */
 object ManifestInstaller {
     suspend fun downloadAndInstallDriver(
         context: Context,
@@ -28,7 +36,7 @@ object ManifestInstaller {
         var destFile: File? = null
         try {
             destFile = File(context.cacheDir, entry.url.substringAfterLast("/"))
-            RuntimeDownloads.fetchUrl(entry.url, destFile, onProgress)
+            RuntimeDownloads.fetchUrl(entry.url, destFile, entry.sha256, onProgress)
             val uri = Uri.fromFile(destFile)
             val name = AdrenotoolsManager(context).installDriver(uri)
             if (name.isEmpty()) {
@@ -37,6 +45,7 @@ object ManifestInstaller {
                     message = context.getString(R.string.manifest_install_failed, entry.name),
                 )
             }
+            if (name != entry.id) Timber.w("ManifestInstaller: driver %s installed as %s", entry.id, name)
             return@withContext ManifestInstallResult(
                 success = true,
                 message = context.getString(R.string.manifest_install_success, entry.name),
@@ -53,7 +62,7 @@ object ManifestInstaller {
     }
 
     /**
-     * Shared helper to install a single manifest entry (driver or content).
+     * Installs a single catalog entry (driver or content).
      *
      * UI layers should provide [onProgress] to update their own state and then
      * handle the returned [ManifestInstallResult] (e.g. to show a Toast or
@@ -91,7 +100,7 @@ object ManifestInstaller {
             val cacheDir = File(context.filesDir, "assets/dxwrapper")
             cacheDir.mkdirs()
             val dest = File(cacheDir, entry.url.substringAfterLast("/"))
-            RuntimeDownloads.fetchUrl(entry.url, dest, onProgress)
+            RuntimeDownloads.fetchUrl(entry.url, dest, entry.sha256, onProgress)
             if (!dest.exists() || dest.length() == 0L) {
                 dest.delete()
                 return@withContext ManifestInstallResult(
@@ -124,20 +133,21 @@ object ManifestInstaller {
         var destFile: File? = null
         try {
             destFile = File(context.cacheDir, entry.url.substringAfterLast("/"))
-            RuntimeDownloads.fetchUrl(entry.url, destFile, onProgress)
-            val uri = Uri.fromFile(destFile)
+            RuntimeDownloads.fetchUrl(entry.url, destFile, entry.sha256, onProgress)
             val mgr = ContentsManager(context)
 
-            val (profile, fail, error) = extractContent(mgr, uri)
+            var (profile, _) = extract(mgr, Uri.fromFile(destFile))
             if (profile == null) {
                 return@withContext ManifestInstallResult(
                     success = false,
                     message = context.getString(R.string.manifest_install_failed, entry.name),
                 )
             }
+            if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+                profile = WineBuilds.prepare(context, mgr, profile, entry.id)
+            }
 
-            val installed = finishInstall(mgr, profile)
-            if (!installed) {
+            if (!finish(mgr, profile)) {
                 return@withContext ManifestInstallResult(
                     success = false,
                     message = context.getString(R.string.manifest_install_failed, entry.name),
@@ -159,19 +169,18 @@ object ManifestInstaller {
         }
     }
 
-    private suspend fun extractContent(
+    /** Unpacks a content package into the contents store's staging folder: its profile, or why not. Disk. */
+    fun extract(
         mgr: ContentsManager,
         uri: Uri,
-    ): Triple<ContentProfile?, ContentsManager.InstallFailedReason?, Exception?> = withContext(Dispatchers.IO) {
+    ): Pair<ContentProfile?, ContentsManager.InstallFailedReason?> {
         var profile: ContentProfile? = null
         var failReason: ContentsManager.InstallFailedReason? = null
-        var err: Exception? = null
         val latch = CountDownLatch(1)
         try {
             mgr.extraContentFile(uri, object : ContentsManager.OnInstallFinishedCallback {
                 override fun onFailed(reason: ContentsManager.InstallFailedReason, e: Exception?) {
                     failReason = reason
-                    err = e
                     latch.countDown()
                 }
 
@@ -181,19 +190,20 @@ object ManifestInstaller {
                 }
             })
         } catch (e: Exception) {
-            err = e
+            Timber.e(e, "ManifestInstaller: extract failed")
             latch.countDown()
         }
         if (!latch.await(240, TimeUnit.SECONDS)) {
-            err = Exception("Installation timed out")
+            Timber.w("ManifestInstaller: extract timed out after 240 seconds")
         }
-        Triple(profile, failReason, err)
+        return profile to failReason
     }
 
-    private suspend fun finishInstall(
+    /** Moves an extracted package into the contents store; false when it could not (already there, no space). Disk. */
+    fun finish(
         mgr: ContentsManager,
         profile: ContentProfile,
-    ): Boolean = withContext(Dispatchers.IO) {
+    ): Boolean {
         var success = false
         val latch = CountDownLatch(1)
         try {
@@ -212,8 +222,8 @@ object ManifestInstaller {
         }
         if (!latch.await(240, TimeUnit.SECONDS)) {
             Timber.w("ManifestInstaller: finishInstall timed out after 240 seconds")
-            return@withContext false
+            return false
         }
-        return@withContext success
+        return success
     }
 }

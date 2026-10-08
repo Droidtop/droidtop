@@ -76,7 +76,7 @@ object CoreDriverDownloader {
         destFile.parentFile?.mkdirs()
 
         try {
-            RuntimeDownloads.fetch(
+            RuntimeDownloads.fetch(context, 
                 fileName = "core_drivers/$componentName",
                 dest = destFile,
                 onProgress = onProgress

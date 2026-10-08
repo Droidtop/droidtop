@@ -12,7 +12,7 @@ This project is distributed under the GNU General Public License v3.0 (see
   fork at `0f08762e` (docs/SPEC.md §9): its `com.winlator` tree (Winlator's
   runtime as GameNative ships it, package and headers unchanged) and the
   GameNative-authored files that runtime uses (container utilities, the
-  component list and its installer, the prefix setup helpers from
+  component-list model and its installer, the prefix setup helpers from
   `XServerScreen.kt`, the x86_64 guest-library and graphics pins, the
   downloaders, the folder scanner, `TouchGestureConfig`, a cut-down
   `PrefManager`), moved to `dev.droidtop.runtime.windows.*`.
@@ -163,6 +163,18 @@ actually finished. droidtop makes no changes to its files.
   work was measured against. Offered with no per-franchise character art;
   the logos and trademarks any theme's own bundled art contains remain
   copyright of their respective owners, same as the bundled themes above.
+
+## Downloaded Windows components
+
+Not shipped inside the APK: the Windows runtime downloads Wine and Proton
+builds, DXVK, VKD3D-Proton, FEXCore, Box64/WowBox64, Adreno driver builds and
+its base system on demand, from droidtop's component catalog
+(https://github.com/Droidtop/droidtop-components, docs/SPEC.md §5a). Each
+file there is re-hosted unmodified or linked where its maker publishes it,
+and keeps its own licence, named per file in that repository's
+`sources/mirror.json` or by its maker. Wine builds a person adds by link or
+file are theirs. The Turnip feed labels there follow DroidDeck's
+`gpu/TurnipReleases.kt` (https://github.com/Droid-Deck/DroidDeck, GPL-3.0).
 
 ## Design references (not vendored, no code copied)
 

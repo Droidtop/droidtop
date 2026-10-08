@@ -29,7 +29,7 @@ import timber.log.Timber
  * keeping the file and the keys is the whole migration (nothing is moved or
  * rewritten). Adapted from GameNative's app/gamenative/PrefManager.kt
  * (GPL-3.0), cut to the keys droidtop's runtime still reads: the Wine
- * registry defaults a prefix falls back to, the component-list cache, the
+ * registry defaults a prefix falls back to, the
  * folder scanner's folders, the touchpad options, power control, and the
  * Steam sign-in GameNative kept (read once by droidtop's Steam carry-over).
  */
@@ -79,16 +79,21 @@ object PrefManager {
         }
     }
 
-    /* Component list cache (ManifestRepository) */
-    private val COMPONENT_MANIFEST_JSON = stringPreferencesKey("component_manifest_json")
-    var componentManifestJson: String
-        get() = getPref(COMPONENT_MANIFEST_JSON, "")
-        set(value) = setPref(COMPONENT_MANIFEST_JSON, value)
-
-    private val COMPONENT_MANIFEST_FETCHED_AT = longPreferencesKey("component_manifest_fetched_at")
-    var componentManifestFetchedAt: Long
-        get() = getPref(COMPONENT_MANIFEST_FETCHED_AT, 0L)
-        set(value) = setPref(COMPONENT_MANIFEST_FETCHED_AT, value)
+    /**
+     * Drops GameNative's component-list cache, which droidtop's own catalog
+     * (utils.ComponentCatalog) replaced; false when the store is not open yet,
+     * so the caller asks again later.
+     */
+    fun forgetComponentManifest(): Boolean {
+        if (!::dataStore.isInitialized) return false
+        scope.launch {
+            dataStore.edit { pref ->
+                pref.remove(stringPreferencesKey("component_manifest_json"))
+                pref.remove(longPreferencesKey("component_manifest_fetched_at"))
+            }
+        }
+        return true
+    }
 
     /* Wine registry defaults a prefix falls back to (ContainerUtils.toContainerData) */
     private val RENDERER = stringPreferencesKey("renderer")

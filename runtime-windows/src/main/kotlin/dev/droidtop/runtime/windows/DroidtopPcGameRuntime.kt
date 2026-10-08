@@ -196,8 +196,8 @@ class DroidtopPcGameRuntime(
         // hits it because its system files are installed at startup and
         // its containers are created later; droidtop does both here, so
         // it has to do them in that order. WineComponents.ensureWine owns
-        // where a build comes from (gamenative's launch dependency for the
-        // two Proton 9 builds, upstream's component list for the rest).
+        // where a build comes from (droidtop's component catalog: a
+        // base-system archive for the two Proton 9 builds, an item for the rest).
         runCatching { WineComponents.ensureWine(context, wanted, onStatus) }
             .onFailure { return@withContext failed("installing Wine", it, it.message ?: "couldn't install Wine -- check the network and retry") }
 
@@ -219,14 +219,14 @@ class DroidtopPcGameRuntime(
                 "imagefs_bionic.txz"
             }
             onStatus("Downloading the Windows base system…")
-            // gamenative's own download host -- the same primary-plus-R2-
-            // mirror pair its pre-launch phase uses, writing to the same place
-            // ImageFsInstaller looks (ImageFs.getFilesDir() is the
+            // From droidtop's component catalog (the archive gamenative's
+            // pre-launch phase fetched, re-hosted unmodified), written to the
+            // same place ImageFsInstaller looks (ImageFs.getFilesDir() is the
             // imagefs root's parent, i.e. the app files dir).
             val dest = File(context.filesDir, archiveName)
             if (!(dest.isFile && dest.length() > 0)) {
                 val downloaded = runCatching {
-                    RuntimeDownloads.fetch(archiveName, dest) { fraction ->
+                    RuntimeDownloads.fetch(context, archiveName, dest) { fraction ->
                         onStatus("Downloading the Windows base system… ${(fraction * 100).toInt()}%")
                     }
                 }

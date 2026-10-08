@@ -4148,26 +4148,82 @@ source (now `:runtime-windows`, §9):
   - **Components arrive on demand, never in an image.** One step,
     `WineComponents.ensure`, runs at setup, before every launch and from the
     settings' "Download what these settings need" row: the two Proton 9
-    builds as archives from GameNative's download host (`RuntimeDownloads`),
-    unpacked into the shared Proton store, everything else through upstream
-    GameNative's component list (`ManifestRepository`, hosted on
-    downloads.gamenative.app and the hosts it names) by
+    builds as base-system archives (`RuntimeDownloads.fetch`), unpacked into
+    the shared Proton store, everything else as catalog items, by
     `ComponentRequests.resolveMissing` (GameNative's
     `BestConfigService.resolveMissingManifestInstallRequests`, its one part
     droidtop uses) and `ManifestInstaller`, the pair GameNative's own
     pre-launch runs. The builds are other projects' (GameNative's, upstream
     DXVK/VKD3D/FEX/Box64/Turnip, droidtop's own `Droidtop/proton-wine-tux`):
     droidtop fetches them, it does not build them into the APK. The x86_64
-    pieces are release assets of droidtop's fork (§10b).
-  - **More driver builds** (arm64, 2026-10-08, Droidtop/tracker#313): a
-    screen under Wine and graphics lists Turnip builds straight from the
-    projects that publish them (Banners-Turnip, WinNative's Drivers), the
-    model of DroidDeck's `TurnipReleases` (GPL-3.0): checked only when the
-    person asks, newest release per variant, Android builds only (their
-    Linux builds are for a glibc Wine), and only assets GitHub publishes a
-    SHA-256 for, which the download is checked against. An installed one is
-    a driver package like any other (`AdrenotoolsManager.installDriver`) and
-    is chosen in the same "Driver build" row; defaults are unchanged.
+    guest libraries and software Vulkan are droidtop's own CI releases (§10b).
+  - **droidtop's own component catalog (owner, 2026-10-08,
+    Droidtop/tracker#313: stop using GameNative's component list and download
+    host; host Wine/Proton, DXVK, VKD3D, FEXCore, Box64 and drivers ourselves,
+    from their upstream sources).** Everything above comes from one catalog,
+    `catalog.json` on the `catalog` release of
+    [Droidtop/droidtop-components](https://github.com/Droidtop/droidtop-components),
+    read by `ComponentCatalog` (cached, fetched again once a day, in the
+    shape GameNative's manifest had, so the option lists and
+    `ComponentRequests` read it unchanged). Its workflow runs daily:
+    - **The mirror** (`sources/mirror.json`) re-hosts files unmodified as
+      release assets, one release per group, never replacing one once it is
+      there. It was seeded with exactly what droidtop users could get through
+      GameNative's list and host on 2026-10-08 (211 files: every
+      manifest item, the imagefs archives, the Proton 9 archives, prefix
+      templates, driver packages, Windows components; Valve's Steam Runtime
+      images stay on Valve's host), under the same ids and file names, so
+      nothing a person could pick went away and every installed component,
+      cached archive and prefix setting keeps working as it was: there is
+      nothing to migrate but GameNative's list cache, dropped once. A
+      base-system path maps to a release by its folder (`container_files/x`
+      is `container-files/x`, a bare name is in `base`), so files are found
+      even before the first catalog fetch.
+    - **Release feeds** (`sources/feeds.json`) are linked where their makers
+      publish them, never re-hosted, and only with GitHub's SHA-256 for the
+      asset. droidtop's own Wine builds are found by name (every Droidtop
+      repository named for Wine or Proton, today `proton-wine-tux`), so a new
+      release appears by itself. A `.wcp` is read once in CI for its
+      profile and its wine binary's ELF header, a driver zip for its
+      `meta.json` name, so each item carries the id the runtime installs it as.
+    - Every download is checked against the catalog's SHA-256; the catalog
+      itself comes over TLS from GitHub and carries a Sigstore build
+      provenance (`gh attestation verify`), which the app does not check: no
+      signing key exists anywhere to pin.
+  - **Sources are options with defaults.** "Wine builds and sources" under
+    Wine and graphics turns each source on or off. On by default:
+    droidtop's mirror, droidtop's Wine builds, Banners-Turnip and WinNative
+    (the Turnip feeds droidtop already offered). Off until chosen: K11MCH1's
+    drivers, The412Banner's winlator-contents and Arihany's WinlatorWCPHub
+    (bionic `.wcp` feeds). Listed but not available: GE-Proton,
+    proton-cachyos, Kron4ek's builds and Steam's Proton, which are Linux
+    (glibc) builds that need a Linux engine (the DroidDeck Proton layer, a
+    separate piece); the catalog already carries them, marked
+    `linux-glibc`, so that engine needs no new source model. The rows offer
+    the enabled sources' items, each not on the device yet labelled with its
+    source and "downloads when used"; what a prefix already names is fetched
+    even after its source is turned off. The earlier "More driver builds"
+    screen is gone: those builds are ordinary choices of the Driver build row.
+  - **Any Wine build (owner, 2026-10-08: "I just wanted to make sure we
+    could use arbitrary wine versions, for compatibility reasons").** Beside
+    the catalog's, a person adds a build by link or by file ("Add a Wine
+    build"); it is installed like a catalog one and chosen in the Wine
+    build row. Every Wine/Proton build, catalog or added, passes
+    `WineBuilds.prepare` (rules in `WineBuildRules`, unit-tested, mirrored by
+    the catalog's `tools/build_catalog.py`): it must be a Winlator/GameNative
+    package (`.wcp`, tar.xz or tar.zst with `profile.json`, the contents
+    store's own checks); its wine programs' ELF header decides, never its
+    name, that it is an Android (bionic) build, not a glibc Linux one, and
+    its architecture: an aarch64 build is arm64ec and runs on ARM only; an
+    x86_64 build runs under Box64 on ARM and directly on an x86_64 device
+    only from Wine 10 on (above); a 32-bit-only build runs nowhere. A build
+    whose profile names it in a way the runtime would not read is installed
+    as `<wine|proton>-<version>[-<revision>][-<flavour>]-<arch>`, with a
+    one-digit version code (WineInfo drops two characters); WineInfo's
+    pattern takes the one flavour word (`droidtop:` edit), so a GE or
+    "custom" build keeps apart from the stock one. A `.tar.gz` or a profile-less
+    Wine tree is a Linux build and is refused with that reason. Defaults
+    per device are unchanged.
 - **Prefer a native Linux build over Wine+translation when one exists
   and can run.** Some games ship a genuine Linux build alongside (or
   instead of) Windows. Running it as a normal process inside a Linux
@@ -12790,7 +12846,8 @@ on GameNative"; stay as close to upstream as possible). So the module holds:
   the GameNative-authored files that runtime reaches, under the same
   sub-packages (`app.gamenative.X` became `dev.droidtop.runtime.windows.X`):
   `ContainerUtils` (device defaults, ContainerData in and out),
-  the component list (`Manifest*`, `ComponentRequests`), the x86_64 path
+  the component-list model and installer (`Manifest*`, `ComponentRequests`;
+  the list itself is droidtop's own catalog now, §5a), the x86_64 path
   (`X86_64GuestLibs`, `X86_64Graphics`, `PinnedReleaseAsset`), the prefix
   helpers from the end of GameNative's `XServerScreen.kt`
   (`ui/screen/xserver/PrefixSetup.kt`), the downloaders, `LsfgVkManager`,

@@ -108,9 +108,9 @@ object ContainerFilesDownloader {
 
         try {
             if (component.external) {
-                RuntimeDownloads.fetchUrl(component.url, destFile, onProgress)
+                RuntimeDownloads.fetchUrl(component.url, destFile, onProgress = onProgress)
             } else {
-                RuntimeDownloads.fetch("container_files/${component.name}", destFile, onProgress)
+                RuntimeDownloads.fetch(context, "container_files/${component.name}", destFile, onProgress)
             }
             Timber.i("Successfully downloaded container file: $componentId")
         } catch (e: Exception) {

@@ -74,7 +74,7 @@ object WinComponentDownloader {
         destFile.parentFile?.mkdirs()
 
         try {
-            RuntimeDownloads.fetch(
+            RuntimeDownloads.fetch(context, 
                 fileName = "wincomponents/$componentId.tzst",
                 dest = destFile,
                 onProgress = onProgress

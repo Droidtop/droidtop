@@ -2,6 +2,7 @@ package dev.droidtop.runtime.windows
 
 import android.content.Context
 import dev.droidtop.runtime.windows.R
+import dev.droidtop.runtime.windows.utils.ComponentCatalog
 import dev.droidtop.runtime.windows.utils.ContainerUtils
 import dev.droidtop.runtime.windows.utils.LsfgVkManager
 import dev.droidtop.runtime.windows.utils.ManifestComponentHelper
@@ -68,9 +69,10 @@ data class WineOptionsState(
  * `Container.setLaunchOverrides`), so they cost no prefix. Choosing another
  * Wine build gives the game a prefix of its own, made with that build and
  * the game's choices; from then on its rows edit that prefix like the shared
- * one. What is offered is read from the fork, not listed
- * here: its bundled versions, what is installed, and upstream GameNative's
- * component list ([ManifestComponentHelper.loadComponentAvailability]); which
+ * one. What is offered is not listed here: the runtime's bundled versions,
+ * what is installed (a Wine build a person added among it, [WineBuilds]), and
+ * droidtop's component catalog, its enabled sources only
+ * ([ManifestComponentHelper.loadComponentAvailability]); which
  * of those apply to which Wine build and CPU is [WineOptionPlan]. Anything
  * chosen that is not on the device yet is fetched by [WineComponents] before
  * the next launch, or at once from the Download row.
@@ -93,14 +95,7 @@ object WineOptions {
     private const val LSFG_KEY = "lsfg"
     private const val LSFG_OFF = "off"
 
-    private const val NOT_HERE = " (downloads when used)"
-
-    /**
-     * Whether driver builds can be fetched from the projects that publish them
-     * ([dev.droidtop.runtime.windows.utils.DriverReleases]): Turnip is Adreno's,
-     * so on an arm64 device only.
-     */
-    val driverDownloads: Boolean get() = !X86_64GuestLibs.isX86_64Host()
+    private const val NOT_HERE = "downloads when used"
 
     // Settings rows choose synchronously on the main thread; the write is
     // disk work, so it runs here, and the next read waits for it.
@@ -412,12 +407,23 @@ object WineOptions {
                 val res = context.resources
                 val availability = ManifestComponentHelper.loadComponentAvailability(context)
                 val installed = availability.installed
+                val sourceLabels = availability.manifest.sources.associate { it.id to it.label }
                 fun manifest(type: String): List<ManifestEntry> =
                     ManifestComponentHelper.filterManifestByVariant(availability.manifest.items[type].orEmpty(), "bionic")
+                // Not on the device yet: says so, and names the source when it
+                // is not droidtop's own mirror ("Banners-Turnip, downloads when used").
                 fun versions(base: List<String>, have: List<String>, type: String): List<WineOptionChoice> {
-                    val list = ManifestComponentHelper.buildVersionOptionList(base.map(::bare), have, manifest(type))
+                    val entries = manifest(type)
+                    val list = ManifestComponentHelper.buildVersionOptionList(base.map(::bare), have, entries)
                     return list.ids.indices.map { i ->
-                        WineOptionChoice(list.ids[i], list.labels[i] + if (list.muted[i]) NOT_HERE else "")
+                        val entry = entries.firstOrNull { it.id == list.ids[i] }
+                        val label = entry?.name?.takeIf { type == ManifestContentTypes.DRIVER && it != list.ids[i] }
+                            ?.let { "$it (${list.labels[i]})" } ?: list.labels[i]
+                        val note = listOfNotNull(
+                            entry?.source?.takeIf { it != ComponentCatalog.SOURCE_MIRROR }?.let { sourceLabels[it] ?: it },
+                            NOT_HERE.takeIf { list.muted[i] },
+                        )
+                        WineOptionChoice(list.ids[i], if (note.isEmpty()) label else "$label (${note.joinToString(", ")})")
                     }
                 }
                 val bundledWine = res.getStringArray(R.array.bionic_wine_entries).toList()
@@ -429,7 +435,7 @@ object WineOptions {
                         // A bundled Proton 9 build is installed by setup, not by
                         // the component list; say so only when it is not there.
                         if (choice.value in bundledWine && !WineComponents.wineBinary(context, choice.value).isFile) {
-                            choice.copy(label = choice.label + NOT_HERE)
+                            choice.copy(label = "${choice.label} ($NOT_HERE)")
                         } else {
                             choice
                         }
@@ -442,7 +448,7 @@ object WineOptions {
                     x86Drivers = X86_64Graphics.DRIVERS.map { id ->
                         WineOptionChoice(
                             id,
-                            X86_64Graphics.label(id) + if (X86_64Graphics.isInstalled(context, id)) "" else NOT_HERE,
+                            X86_64Graphics.label(id) + if (X86_64Graphics.isInstalled(context, id)) "" else " ($NOT_HERE)",
                         )
                     },
                     driverVersions = versions(

@@ -79,7 +79,7 @@ object DXWrapperDownloader {
         destFile.parentFile?.mkdirs()
 
         try {
-            RuntimeDownloads.fetch(
+            RuntimeDownloads.fetch(context, 
                 fileName = "dxwrapper/${component.name}",
                 dest = destFile,
                 onProgress = onProgress

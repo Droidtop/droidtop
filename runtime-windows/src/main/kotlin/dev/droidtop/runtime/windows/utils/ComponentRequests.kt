@@ -11,12 +11,12 @@ import org.json.JSONObject
 
 /**
  * Which components a prefix's settings name that are neither bundled nor
- * installed, and where in GameNative's component list each one is:
- * GameNative's `BestConfigService.resolveMissingManifestInstallRequests`
- * (GPL-3.0), the one part of that service droidtop uses. Its
- * api.gamenative.app config lookup and GPU-family overrides are not carried:
- * droidtop asks with a prefix's own settings, which GameNative's
- * "exact_gpu_match" left untouched.
+ * installed, and where in droidtop's component catalog each one is
+ * ([ComponentCatalog.runnable]): GameNative's
+ * `BestConfigService.resolveMissingManifestInstallRequests` (GPL-3.0), the
+ * one part of that service droidtop uses. Its online config lookup and
+ * GPU-family overrides are not carried: droidtop asks with a prefix's own
+ * settings, which GameNative's "exact_gpu_match" left untouched.
  */
 object ComponentRequests {
     data class ManifestInstallRequest(
@@ -28,7 +28,7 @@ object ComponentRequests {
     suspend fun resolveMissing(context: Context, configJson: JsonObject): List<ManifestInstallRequest> {
         val filteredJson = JSONObject(configJson.toString())
         val installed = ManifestComponentHelper.loadInstalledContentLists(context)
-        val manifest = ManifestRepository.loadManifest(context)
+        val manifest = ComponentCatalog.runnable(context)
         val installedContent = installed.installed
 
         val containerVariant = filteredJson.optString("containerVariant", "")

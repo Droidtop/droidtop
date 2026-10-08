@@ -1192,8 +1192,8 @@ object AppSettingsCatalogs {
         title = "Windows games",
         subtitle = "The Wine environment Windows games run inside, its Wine build and graphics, and the folders it can reach",
         groups = { context -> windowsGamesGroups(context) },
-        // The Wine option rows read the installed components and upstream's
-        // component list (a network fetch once a day); search does not wait
+        // The Wine option rows read the installed components and droidtop's
+        // component catalog (a network fetch once a day); search does not wait
         // on that.
         indexGroups = { context -> windowsGamesGroups(context, wineOptions = false) },
     )

@@ -5,7 +5,7 @@ import dev.droidtop.runtime.windows.R
 import dev.droidtop.runtime.windows.utils.ComponentRequests
 import dev.droidtop.runtime.windows.utils.ManifestContentTypes
 import dev.droidtop.runtime.windows.utils.ManifestInstaller
-import dev.droidtop.runtime.windows.utils.ManifestRepository
+import dev.droidtop.runtime.windows.utils.ComponentCatalog
 import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
 import dev.droidtop.runtime.windows.utils.X86_64Graphics
 import com.winlator.container.Container
@@ -29,13 +29,12 @@ import kotlinx.serialization.json.jsonObject
  * and the x86_64 graphics driver.
  *
  * One step for setup, for the Wine settings screen's "Download" row and for
- * every launch, so a choice made anywhere is fetched the same way. Nothing
- * here is droidtop's own downloader: the two Proton 9 builds come through
- * GameNative's download host ([RuntimeDownloads]), everything else
- * through upstream GameNative's component manifest, resolved by
- * [ComponentRequests.resolveMissing] and installed by
- * [ManifestInstaller] -- exactly what GameNative's own pre-launch does
- * (PluviaMain.preLaunchApp).
+ * every launch, so a choice made anywhere is fetched the same way. All of
+ * it comes from droidtop's component catalog ([ComponentCatalog]): the two
+ * Proton 9 builds as base-system files ([RuntimeDownloads.fetch]),
+ * everything else as catalog items, resolved by
+ * [ComponentRequests.resolveMissing] and installed by [ManifestInstaller]
+ * -- the steps GameNative's own pre-launch takes (PluviaMain.preLaunchApp).
  */
 internal object WineComponents {
 
@@ -84,10 +83,9 @@ internal object WineComponents {
 
     /**
      * The Wine build itself. The two Proton 9 builds (`bionic_wine_entries`)
-     * are archives on GameNative's download host ([RuntimeDownloads]),
-     * unpacked into the shared Proton store. A manifest build (arm64ec
-     * Proton 10 and later) is a `.wcp` the manifest installer puts into the
-     * contents store.
+     * are base-system archives ([RuntimeDownloads.fetch]), unpacked into the
+     * shared Proton store. Any other build is a catalog `.wcp` the installer
+     * puts into the contents store; one a person added is already there.
      */
     suspend fun ensureWine(context: Context, container: Container, onStatus: (String) -> Unit) = withContext(Dispatchers.IO) {
         val wine = container.wineVersion
@@ -95,7 +93,7 @@ internal object WineComponents {
             val archive = File(context.filesDir, "$wine.txz")
             if (!wineBinary(context, wine).isFile && !(archive.isFile && archive.length() > 0)) {
                 onStatus("Downloading Wine…")
-                RuntimeDownloads.fetch(archive.name, archive) { onStatus("Downloading Wine… ${percent(it)}") }
+                RuntimeDownloads.fetch(context, archive.name, archive) { onStatus("Downloading Wine… ${percent(it)}") }
             }
             // Into the shared Proton store, where ImageFsInstaller links
             // opt/<build> from (GameNative's BionicDefaultProtonDependency).
@@ -109,12 +107,12 @@ internal object WineComponents {
             return@withContext
         }
         if (wineBinary(context, wine).isFile) return@withContext
-        val manifest = ManifestRepository.loadManifest(context)
+        val manifest = ComponentCatalog.runnable(context)
         val (entry, type) = manifest.items[ManifestContentTypes.PROTON].orEmpty().firstOrNull { it.id == wine }
             ?.let { it to ContentProfile.ContentType.CONTENT_TYPE_PROTON }
             ?: manifest.items[ManifestContentTypes.WINE].orEmpty().firstOrNull { it.id == wine }
                 ?.let { it to ContentProfile.ContentType.CONTENT_TYPE_WINE }
-            ?: error("$wine is neither installed nor in the component list; pick another Wine build")
+            ?: error("$wine is neither installed nor in the component catalog; pick another Wine build")
         onStatus("Downloading ${entry.name}…")
         val result = ManifestInstaller.installManifestEntry(context, entry, isDriver = false, contentType = type) {
             onStatus("Downloading ${entry.name}… ${percent(it)}")

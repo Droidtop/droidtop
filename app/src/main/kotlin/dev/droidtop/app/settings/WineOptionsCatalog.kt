@@ -98,16 +98,14 @@ object WineOptionsCatalog {
                 )
             }
             state.rows.forEach { row -> add(item(row, entryId, title, overGame)) }
-            if (WineOptions.driverDownloads) {
-                add(
-                    NestedScreenItem(
-                        id = "wine_driver_releases",
-                        title = "More driver builds",
-                        subtitle = "Turnip builds from the projects that publish them",
-                        inline = DriverReleasesCatalog.screen(),
-                    ),
-                )
-            }
+            add(
+                NestedScreenItem(
+                    id = "wine_component_sources",
+                    title = "Wine builds and sources",
+                    subtitle = "Add any Wine build by link or file; choose which sources the rows above offer",
+                    inline = ComponentSourcesCatalog.screen(),
+                ),
+            )
             if (overGame && state.ownChoices > 0) {
                 add(
                     AsyncActionItem(
@@ -153,9 +151,9 @@ object WineOptionsCatalog {
                 ActionItem(
                     id = "wine_options_sources",
                     title = "Where these come from",
-                    subtitle = "Wine, DXVK, VKD3D, FEXCore, Box64 and drivers from GameNative's component list " +
-                        "(downloads.gamenative.app and the hosts it names); more Turnip builds from Banners-Turnip and WinNative; " +
-                        "software Vulkan on x86_64 from Termux's packages, packed by droidtop's CI",
+                    subtitle = "Wine, DXVK, VKD3D, FEXCore, Box64 and drivers from droidtop's component catalog " +
+                        "(github.com/Droidtop/droidtop-components): re-hosted unmodified, or linked where their makers publish them, " +
+                        "each download checked against its SHA-256; software Vulkan and the x86_64 libraries built by droidtop's CI",
                     run = {},
                 ),
             )

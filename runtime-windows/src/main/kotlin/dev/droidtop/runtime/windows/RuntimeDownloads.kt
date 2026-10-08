@@ -1,7 +1,10 @@
 package dev.droidtop.runtime.windows
 
+import android.content.Context
+import dev.droidtop.runtime.windows.utils.ComponentCatalog
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -11,17 +14,16 @@ import okhttp3.Request
 
 /**
  * The Windows runtime's one downloader: [fetchUrl] for a file at a URL (a
- * component-list entry, a pinned release asset), [fetch] for a file of the
- * runtime's base system (the imagefs archive, the bundled Proton 9 builds,
- * container files, drivers) from GameNative's download host with its mirror
- * as the fallback. GameNative's SteamService.fetchFile and
- * fetchFileWithFallback (GPL-3.0), which had nothing to do with Steam but
- * lived in its Steam service. The hosts are GameNative's: they serve the
- * builds, the code that fetches them is droidtop's (docs/SPEC.md 5b).
+ * catalog item, a pinned release asset, a Wine build a person added by
+ * link), [fetch] for a file of the runtime's base system (the imagefs
+ * archive, the bundled Proton 9 builds, prefix templates, driver packages,
+ * Windows components) by the path the runtime asks for, found through
+ * droidtop's component catalog ([ComponentCatalog.file]), and [text] for the
+ * catalog itself. Every download that has a SHA-256 is checked against it.
+ * Adapted from GameNative's SteamService.fetchFile (GPL-3.0); its download
+ * hosts are no longer used (docs/SPEC.md 5a).
  */
 internal object RuntimeDownloads {
-    private const val PRIMARY = "https://downloads.gamenative.app/"
-    private const val MIRROR = "https://pub-9fcd5294bd0d4b85a9d73615bf98f3b5.r2.dev/"
 
     private val http: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -32,53 +34,62 @@ internal object RuntimeDownloads {
             .build()
     }
 
-    /** Downloads [url] into [dest]; [onProgress] gets 0 to 1. */
-    suspend fun fetchUrl(url: String, dest: File, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
-        fetchFrom(url, dest, onProgress)
-    }
+    /** Downloads [url] into [dest], checked against [sha256] when given; [onProgress] gets 0 to 1. */
+    suspend fun fetchUrl(url: String, dest: File, sha256: String? = null, onProgress: (Float) -> Unit) =
+        withContext(Dispatchers.IO) { fetchFrom(url, dest, sha256, onProgress) }
 
-    /** Downloads [fileName] into [dest], from the primary host and then the mirror; [onProgress] gets 0 to 1. */
-    suspend fun fetch(fileName: String, dest: File, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
+    /** Downloads the base-system file [fileName] into [dest]; [onProgress] gets 0 to 1. */
+    suspend fun fetch(context: Context, fileName: String, dest: File, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
+        val file = ComponentCatalog.file(context, fileName)
         try {
-            fetchFrom(PRIMARY + fileName, dest, onProgress)
-        } catch (primary: Exception) {
-            try {
-                fetchFrom(MIRROR + fileName, dest, onProgress)
-            } catch (mirror: Exception) {
-                dest.delete()
-                throw IOException("Failed to download $fileName. Check the network connection and try again.", mirror)
-            }
+            fetchFrom(file.url, dest, file.sha256, onProgress)
+        } catch (e: Exception) {
+            dest.delete()
+            throw IOException("Failed to download $fileName. Check the network connection and try again.", e)
         }
     }
 
-    private fun fetchFrom(url: String, dest: File, onProgress: (Float) -> Unit) {
+    /** A small text file at [url] (the catalog). */
+    suspend fun text(url: String): String = withContext(Dispatchers.IO) {
+        http.newCall(Request.Builder().url(url).build()).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("HTTP ${response.code} for $url")
+            response.body?.string() ?: throw IOException("empty answer from $url")
+        }
+    }
+
+    private fun fetchFrom(url: String, dest: File, sha256: String?, onProgress: (Float) -> Unit) {
         val partial = File(dest.absolutePath + ".part")
         try {
+            val digest = MessageDigest.getInstance("SHA-256")
             http.newCall(Request.Builder().url(url).build()).execute().use { response ->
                 check(response.isSuccessful) { "HTTP ${response.code}" }
                 val body = response.body ?: error("empty body")
                 val total = body.contentLength()
                 partial.outputStream().use { out ->
                     body.byteStream().use { input ->
-                        val buffer = ByteArray(8 * 1024)
+                        val buffer = ByteArray(64 * 1024)
                         var read = 0L
                         while (true) {
                             val count = input.read(buffer)
                             if (count < 0) break
                             out.write(buffer, 0, count)
+                            digest.update(buffer, 0, count)
                             read += count
                             if (total > 0) onProgress(read.toFloat() / total)
                         }
                     }
                 }
-                if (total > 0 && partial.length() != total) {
-                    partial.delete()
-                    error("incomplete download")
+                if (total > 0 && partial.length() != total) error("incomplete download")
+            }
+            if (sha256 != null) {
+                val actual = digest.digest().joinToString("") { "%02x".format(it) }
+                if (!actual.equals(sha256, ignoreCase = true)) {
+                    throw IOException("${dest.name} did not match its published checksum")
                 }
-                if (!partial.renameTo(dest)) {
-                    partial.copyTo(dest, overwrite = true)
-                    partial.delete()
-                }
+            }
+            if (!partial.renameTo(dest)) {
+                partial.copyTo(dest, overwrite = true)
+                partial.delete()
             }
         } catch (e: Exception) {
             partial.delete()
