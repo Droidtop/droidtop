@@ -31,6 +31,8 @@ runtime-windows/src/main/jniLibs/
 runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst
 # The re-hosted Windows runtime prebuilts (build-scripts/fetch-windows-runtime-prebuilt.sh).
 runtime-windows/prebuilt/
+# The lsfg-vk layer (build-scripts/fetch-lsfg-layer.sh).
+runtime-windows/lsfg/
 
 # Signing (real release key + passwords — never commit these; CI reads
 # them from repo secrets instead, see .github/workflows/android-build.yml)

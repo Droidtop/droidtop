@@ -19,7 +19,7 @@
 # Left out, because droidtop's runtime never loads them: the dxwrapper
 # payloads (every entry in dxwrapper_download.json is fetched on demand from
 # downloads.gamenative.app), the Steam-only steampipe, steaminput and
-# steam_regions.json, LSFG's layer and assets, the Quest OpenXR loader, the
+# steam_regions.json, LSFG (its layer is built by lsfg-vk-layer.yml), the Quest OpenXR loader, the
 # SteamBootstrap program and libpatchelf (nothing calls PatchElf).
 #
 # usage: windows-runtime-prebuilt.sh <fork checkout> <out.tar.zst>

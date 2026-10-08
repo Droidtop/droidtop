@@ -217,3 +217,18 @@ runs:
       if: steps.winprebuilt-cache.outputs.cache-hit != 'true'
       shell: bash
       run: bash build-scripts/fetch-windows-runtime-prebuilt.sh
+
+    - name: Cache the lsfg-vk layer
+      id: lsfg-cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: runtime-windows/lsfg
+        key: lsfg-layer-${{ hashFiles('runtime-windows/lsfg-layer.pin') }}
+
+    - name: Fetch the lsfg-vk layer
+      # liblsfg-vk-layer.so for both ABIs, built by
+      # .github/workflows/lsfg-vk-layer.yml, checked against
+      # runtime-windows/lsfg-layer.pin.
+      if: steps.lsfg-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash build-scripts/fetch-lsfg-layer.sh
