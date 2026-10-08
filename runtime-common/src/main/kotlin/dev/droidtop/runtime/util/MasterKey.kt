@@ -27,22 +27,26 @@ object MasterKey {
     private val PINNED: String? =
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExkY++u48QalIMbG7izeEk7vPR95te22fYlgsWPvpoOI/X5DEi9w8EmCbFUjpfT6rIZSkGNF+Xp0Xp95pUsBg9A=="
 
+    @Volatile private var overridden = false
     @Volatile private var override: String? = null
 
     /** The pinned master's SPKI, base64, or null while none is pinned. */
-    fun base64(): String? = override ?: PINNED
+    fun base64(): String? = if (overridden) override else PINNED
 
     /** The pinned master key, or null while none is pinned. */
     fun key(): PublicKey? = base64()?.let(EcP256::parseSpki)
 
-    /** Test hook: pins a throwaway master for the duration of [block]. */
+    /** Test hook: pins a throwaway master (or, with null, none at all) for the duration of [block]. */
     fun <T> withPinned(publicKeyBase64: String?, block: () -> T): T {
+        val previousOverridden = overridden
         val previous = override
         override = publicKeyBase64
+        overridden = true
         try {
             return block()
         } finally {
             override = previous
+            overridden = previousOverridden
         }
     }
 }

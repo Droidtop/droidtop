@@ -164,9 +164,11 @@ class PluginCertificatesTest {
 
     @Test
     fun `without a pinned master a certified bundle is refused, saying why`() {
-        PluginOriginKeys.withOrigin(PluginOriginKeys.OFFICIAL_ORIGIN, b64(legacy.public.encoded)) {
-            val verdict = verify(pluginKey, certificate())
-            assertTrue((verdict as BundleVerdict.Refused).reason.contains("pins no plugin master key"))
+        dev.droidtop.runtime.util.MasterKey.withPinned(null) {
+            PluginOriginKeys.withOrigin(PluginOriginKeys.OFFICIAL_ORIGIN, b64(legacy.public.encoded)) {
+                val verdict = verify(pluginKey, certificate())
+                assertTrue((verdict as BundleVerdict.Refused).reason.contains("pins no plugin master key"))
+            }
         }
     }
 
