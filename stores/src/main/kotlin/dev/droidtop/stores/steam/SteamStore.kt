@@ -3,6 +3,8 @@ package dev.droidtop.stores.steam
 import android.content.Context
 import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreUpdate
+import dev.droidtop.library.stores.StoreContentChoice
+import dev.droidtop.library.stores.StoreContentOptions
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLaunch
 import dev.droidtop.library.stores.StoreLibrary
@@ -15,10 +17,7 @@ import dev.droidtop.stores.epic.EpicGameLauncher
 import dev.droidtop.stores.util.StoreFiles
 import dev.droidtop.stores.util.StoreLanguage
 import `in`.dragonbra.javasteam.types.DepotManifest
-import `in`.dragonbra.javasteam.types.FileData
 import java.io.File
-import java.security.MessageDigest
-import java.util.EnumSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -115,9 +114,75 @@ class SteamStore : StoreLibrary {
             SteamSession.logOn(context).getOrThrow()
             val apps = SteamSession.apps ?: error("Steam is not connected")
             val db = db(context)
-            val app = withContext(Dispatchers.IO) { SteamLibrarySync.refreshApp(db, apps, appId) } ?: error("Steam no longer lists this game")
-            SteamDownload.run(context, app, root, progress)
+            val fresh = withContext(Dispatchers.IO) { SteamLibrarySync.refreshApp(db, apps, appId) } ?: error("Steam no longer lists this game")
+            // The branch and the DLC the person chose for this game (DLC and versions); the default is the public branch with every owned DLC.
+            val choice = withContext(Dispatchers.IO) { SteamChoices.get(context, appId) }
+            val app = SteamBranches.resolve(apps, fresh, choice.branch, choice.password)
+            SteamDownload.run(context, app, root, progress, choice)
         }
+    }
+
+    override suspend fun contentOptions(context: Context, gameId: String): StoreContentOptions? = withContext(Dispatchers.IO) {
+        val appId = gameId.toIntOrNull() ?: return@withContext null
+        val db = db(context)
+        val app = db.apps().find(appId)?.takeIf { it.receivedPICS } ?: return@withContext null
+        val install = db.installs().find(appId)
+        val choice = SteamChoices.get(context, appId)
+        val (dlc, available) = dlcOf(db, app, choice)
+        SteamContent.options(
+            app = app,
+            dlc = dlc,
+            choice = choice,
+            installedDlc = install?.dlcDepots.orEmpty().toSet().intersect(available),
+            installed = install?.isDownloaded == true,
+        ).takeUnless { it.isEmpty }
+    }
+
+    override suspend fun chooseContent(context: Context, gameId: String, choice: StoreContentChoice): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val appId = gameId.toIntOrNull() ?: error("$gameId is not a Steam app id")
+                val db = db(context)
+                val app = db.apps().find(appId) ?: error("Steam no longer lists this game")
+                val before = SteamChoices.get(context, appId)
+                val (_, available) = dlcOf(db, app, before)
+                val after = SteamContent.choiceFrom(choice, available, before)
+                val branch = app.branches[after.branch]
+                check(branch?.pwdRequired != true || after.password != null) { "The ${after.branch} version needs its password first" }
+                SteamChoices.put(context, appId, after)
+                val install = db.installs().find(appId)
+                install?.isDownloaded == true && SteamContent.installDiffers(after, available, install.dlcDepots.toSet(), install.branch)
+            }
+        }
+
+    override suspend fun unlockBranch(context: Context, gameId: String, branchId: String, password: String): Result<Unit> =
+        runCatching {
+            val appId = gameId.toIntOrNull() ?: error("$gameId is not a Steam app id")
+            val typed = password.trim()
+            require(typed.isNotEmpty()) { "Enter the password for the $branchId version" }
+            val keys = SteamSession.use(context) {
+                SteamSession.logOn(context).getOrThrow()
+                SteamBranches.check(SteamSession.apps ?: error("Steam is not connected"), appId, typed)
+            }
+            check(SteamBranches.unlocked(keys, branchId)) { "Steam does not accept that password for $branchId" }
+            withContext(Dispatchers.IO) {
+                val before = SteamChoices.get(context, appId)
+                SteamChoices.put(context, appId, before.copy(branchPasswords = before.branchPasswords + (branchId to typed)))
+            }
+        }
+
+    /**
+     * The owned DLC of [app] with content on the branch the choice follows
+     * (the public one while a locked branch's manifests are not opened), with
+     * their names, and their ids.
+     */
+    private suspend fun dlcOf(db: SteamDatabase, app: SteamApp, choice: SteamChoice): Pair<List<SteamContent.Dlc>, Set<Int>> {
+        val branch = choice.branch.takeIf { app.branches[it]?.pwdRequired != true } ?: SteamBranches.PUBLIC
+        val everything = SteamDownload.planFor(db, app.copy(depots = SteamBranches.forBranch(app.depots, branch)), SteamChoice(branch = branch))
+        val ids = SteamContent.dlcIn(everything, branch) { "" }.map { it.appId }
+        val names = ids.associateWith { db.apps().find(it)?.name.orEmpty() }
+        val dlc = SteamContent.dlcIn(everything, branch) { names[it].orEmpty() }
+        return dlc to ids.toSet()
     }
 
     override suspend fun discardPartial(context: Context, gameId: String) {
@@ -163,10 +228,10 @@ class SteamStore : StoreLibrary {
                 if (depot !in install.downloadedDepots && install.downloadedDepots.isNotEmpty()) continue
                 val manifest = DepotManifest.loadFromFile(SteamInstalls.manifestFile(dir, depot, gid).absolutePath) ?: continue
                 for (file in manifest.files.orEmpty()) {
-                    if (isDirectory(file)) continue
+                    if (SteamManifests.isDirectory(file)) continue
                     checked++
                     val onDisk = StoreFiles.findCaseInsensitive(dir, file.fileName.replace('\\', '/'))
-                    if (onDisk == null || !onDisk.isFile || onDisk.length() != file.totalSize || !sha1Matches(onDisk, file.fileHash)) bad++
+                    if (onDisk == null || !onDisk.isFile || onDisk.length() != file.totalSize || !SteamManifests.sha1Matches(onDisk, file.fileHash)) bad++
                 }
             }
             if (bad == 0) "All $checked files match" else "$bad of $checked files are missing or changed. Update or install again to repair them"
@@ -185,8 +250,11 @@ class SteamStore : StoreLibrary {
             SteamSession.use(context) {
                 SteamSession.logOn(context).getOrThrow()
                 val apps = SteamSession.apps ?: return@use null
-                val live = withContext(Dispatchers.IO) { SteamLibrarySync.refreshApp(db(context), apps, appId) } ?: return@use null
+                val fresh = withContext(Dispatchers.IO) { SteamLibrarySync.refreshApp(db(context), apps, appId) } ?: return@use null
                 val branch = install.branch.ifBlank { SteamDownload.BRANCH }
+                // A locked branch's manifests are encrypted until its password has opened them.
+                val password = withContext(Dispatchers.IO) { SteamChoices.get(context, appId).branchPasswords[branch] }
+                val live = runCatching { SteamBranches.resolve(apps, fresh, branch, password) }.getOrDefault(fresh)
                 val behind = SteamInstalls.isBehind(builds, live.depots, branch) ?: return@use null
                 StoreUpdateCheck(
                     if (behind) StoreUpdate.AVAILABLE else StoreUpdate.CURRENT,
@@ -212,8 +280,8 @@ class SteamStore : StoreLibrary {
                 ?: return@flatMap emptyList()
             val files = manifest.files.orEmpty()
             val depotSize = files.sumOf { it.totalSize }
-            files.filterNot(::isDirectory).map { file ->
-                SteamExecutables.Candidate(file.fileName.replace('\\', '/'), isExecutable(file), file.totalSize, depotSize)
+            files.filterNot(SteamManifests::isDirectory).map { file ->
+                SteamExecutables.Candidate(file.fileName.replace('\\', '/'), SteamManifests.isExecutable(file), file.totalSize, depotSize)
             }
         }
         val chosen = SteamExecutables.choose(candidates, entries.map { it.executable }, app.folderName) ?: return@withContext null
@@ -238,34 +306,5 @@ class SteamStore : StoreLibrary {
 
     private companion object {
         const val TAG = "SteamStore"
-
-        /**
-         * Whether a depot file carries one of Steam's file flags
-         * (EDepotFileFlag), given by name and by bit, however this JavaSteam
-         * build hands the flags over (GameNative's isExecutable reads both).
-         */
-        fun hasFlag(file: FileData, names: Set<String>, bits: Int): Boolean = when (val flags: Any? = file.flags) {
-            is EnumSet<*> -> flags.any { (it as? Enum<*>)?.name in names }
-            is Number -> flags.toLong() and bits.toLong() != 0L
-            else -> false
-        }
-
-        fun isDirectory(file: FileData): Boolean = hasFlag(file, setOf("Directory"), 0x40)
-
-        fun isExecutable(file: FileData): Boolean = hasFlag(file, setOf("Executable", "CustomExecutable"), 0x20 or 0x80)
-
-        fun sha1Matches(file: File, expected: ByteArray?): Boolean {
-            if (expected == null || expected.isEmpty()) return true
-            val digest = MessageDigest.getInstance("SHA-1")
-            file.inputStream().use { input ->
-                val buffer = ByteArray(1 shl 16)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    digest.update(buffer, 0, read)
-                }
-            }
-            return digest.digest().contentEquals(expected)
-        }
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -88,6 +89,14 @@ internal fun StoreInstallOfferSheet(
         value = if (own) withContext(Dispatchers.IO) { installVolumes(context) } else emptyList()
     }
     val places = read.orEmpty()
+    // "DLC and versions" is offered when the store has anything to choose for this game (read off the main thread).
+    val contentStore = entry.ownStore()
+    val hasContent by produceState(false, entry.id) {
+        value = contentStore != null && withContext(Dispatchers.IO) {
+            runCatching { contentStore.contentOptions(context, (entry.pcInfo?.storeId ?: entry.id).substringAfter(':')) }.getOrNull()
+        } != null
+    }
+    var contentOpen by remember(offer) { mutableStateOf(false) }
     val rememberedPath = if (store.isNotEmpty()) StoreInstallVolumePrefs.remembered(context, store) else null
     // The folder the install would go to now: the remembered one when it
     // is still one of the person's game folders, otherwise the first.
@@ -98,7 +107,7 @@ internal fun StoreInstallOfferSheet(
     // A folder row each (Steam: one "Open the store's screen" row; no game
     // folder: none), and "Not now" last: every A press is progress.
     val choices = if (own) places.size else 1
-    val rows = choices + 1
+    val rows = choices + (if (hasContent) 1 else 0) + 1
     LaunchedEffect(rows) { selected = selected.coerceIn(0, rows - 1) }
     // The cursor starts on the folder the install would go to, whatever
     // the remembered choice is; once the folders are read it is the
@@ -115,10 +124,20 @@ internal fun StoreInstallOfferSheet(
                 }
                 onProceed(offer, place.path)
             }
+            hasContent && index == choices -> contentOpen = true
             else -> onDismiss()
         }
     }
 
+    if (contentOpen && contentStore != null) {
+        StoreContentSheet(
+            entry = entry,
+            store = contentStore,
+            // The choice is kept for the install this offer goes on to start.
+            onApplied = { contentOpen = false },
+            onDismiss = { contentOpen = false },
+        )
+    }
     Dialog(onDismissRequest = onDismiss) {
         MenuPanel(
             modifier = Modifier.width(window.panelWidth(400.dp)),
@@ -184,6 +203,13 @@ internal fun StoreInstallOfferSheet(
                         action = { pick(index) },
                     )
                 }
+            }
+            if (hasContent) {
+                volumeRow(
+                    text = "DLC and versions",
+                    selected = selected == choices,
+                    action = { pick(choices) },
+                )
             }
             volumeRow(
                 text = "Not now",

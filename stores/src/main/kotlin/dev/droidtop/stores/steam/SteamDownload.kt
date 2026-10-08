@@ -15,6 +15,7 @@ import `in`.dragonbra.javasteam.depotdownloader.DepotDownloader
 import `in`.dragonbra.javasteam.depotdownloader.IDownloadListener
 import `in`.dragonbra.javasteam.depotdownloader.data.AppItem
 import `in`.dragonbra.javasteam.depotdownloader.data.DownloadItem
+import `in`.dragonbra.javasteam.types.DepotManifest
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.Dispatchers
@@ -42,26 +43,31 @@ internal object SteamDownload {
      * the person's game folder. Logged on already; [app] has fresh product
      * info. Returns the outcome line; throws with the reason.
      */
-    suspend fun run(context: Context, app: SteamApp, root: File, progress: StoreProgress): String {
+    suspend fun run(context: Context, app: SteamApp, root: File, progress: StoreProgress, choice: SteamChoice = SteamChoice()): String {
         val db = SteamDatabase.get(context)
         val existing = withContext(Dispatchers.IO) { db.installs().find(app.id) }
         val installed = existing?.isDownloaded == true && existing.installPath.isNotBlank()
-        val plan = withContext(Dispatchers.IO) { planFor(db, app) }
+        val branch = choice.branch
+        val plan = withContext(Dispatchers.IO) { planFor(db, app, choice) }
         if (plan.isEmpty) error("Steam offers no Windows files of ${app.name.ifBlank { "this game" }} for this account")
 
         val installDir = withContext(Dispatchers.IO) {
             existing?.installPath?.takeIf { it.isNotBlank() }?.let(::File)
                 ?: StoreFiles.freshFolder(root, app.folderName, "steam-${app.id}")
         }
-        val totalBytes = plan.all.values.sumOf { SteamDepots.downloadBytes(it, BRANCH).coerceAtLeast(1L) }
+        val totalBytes = plan.all.values.sumOf { SteamDepots.downloadBytes(it, branch).coerceAtLeast(1L) }
         withContext(Dispatchers.IO) {
             if (!installed) {
-                StoreDiskSpace.shortfall(installDir, SteamDepots.installBytes(plan.all.values, BRANCH), context.cacheDir)?.let { error(it) }
+                StoreDiskSpace.shortfall(installDir, SteamDepots.installBytes(plan.all.values, branch), context.cacheDir)?.let { error(it) }
             }
             installDir.mkdirs()
             // Recorded before the download, so a Cancel knows which folder is the unfinished one.
             db.installs().upsert((existing ?: AppInfo(app.id)).copy(installPath = installDir.absolutePath))
             MarkerUtils.addMarker(installDir.absolutePath, Marker.DOWNLOAD_IN_PROGRESS_MARKER)
+        }
+
+        if (installed) {
+            withContext(Dispatchers.IO) { removeTurnedOffDlc(db, app, choice, existing, installDir) }
         }
 
         val licences = withContext(Dispatchers.IO) { db.cachedLicenses().all().mapNotNull { SteamLicenses.fromJson(it.licenseJson) } }
@@ -72,7 +78,7 @@ internal object SteamDownload {
         val depots = plan.all
         val info = DownloadInfo(jobCount = depots.size, gameId = app.id, downloadingAppIds = CopyOnWriteArrayList()).apply {
             setPersistencePath(installDir.absolutePath)
-            depots.values.forEachIndexed { index, depot -> setWeight(index, SteamDepots.downloadBytes(depot, BRANCH).coerceAtLeast(1L)) }
+            depots.values.forEachIndexed { index, depot -> setWeight(index, SteamDepots.downloadBytes(depot, branch).coerceAtLeast(1L)) }
             setTotalExpectedBytes(totalBytes)
             loadPersistedBytesDownloaded(installDir.absolutePath).takeIf { it > 0L }?.let { initializeBytesDownloaded(it) }
             updateStatusMessage("Preparing")
@@ -98,7 +104,7 @@ internal object SteamDownload {
                 try {
                     downloader.addListener(listener)
                     if (plan.mainDepots.isNotEmpty()) {
-                        downloader.add(AppItem(app.id, installDirectory = installDir.absolutePath, depot = plan.mainDepots.keys.sorted(), branch = BRANCH, branchPassword = null))
+                        downloader.add(AppItem(app.id, installDirectory = installDir.absolutePath, depot = plan.mainDepots.keys.sorted(), branch = branch, branchPassword = choice.password))
                     }
                     for (dlcAppId in plan.dlcAppIds) {
                         val dlcDepots = plan.dlcDepots.filterValues { it.dlcAppId == dlcAppId }.keys.sorted()
@@ -122,7 +128,7 @@ internal object SteamDownload {
                     isDownloaded = true,
                     downloadedDepots = plan.mainDepots.keys.sorted(),
                     dlcDepots = (plan.dlcAppIds + mainDlc).distinct().sorted(),
-                    branch = BRANCH,
+                    branch = branch,
                     installPath = installDir.absolutePath,
                 ),
             )
@@ -144,15 +150,34 @@ internal object SteamDownload {
         return if (installed) "Updated ${app.name}" else "Installed ${app.name}"
     }
 
-    /** The download of [app] with everything the account owns for it, in the device's language. */
-    suspend fun planFor(db: SteamDatabase, app: SteamApp): SteamDepots.Plan {
+    /** Removes the files of DLC that were installed and are turned off in [choice], and their install rows. */
+    private suspend fun removeTurnedOffDlc(db: SteamDatabase, app: SteamApp, choice: SteamChoice, existing: AppInfo?, installDir: File) {
+        val installedDlc = existing?.dlcDepots.orEmpty().toSet()
+        if (installedDlc.isEmpty()) return
+        val everything = planFor(db, app, SteamChoice(branch = choice.branch))
+        val available = SteamContent.dlcIn(everything, choice.branch) { "" }.mapTo(HashSet()) { it.appId }
+        val removed = SteamContent.removedDlc(choice, available, installedDlc)
+        if (removed.isEmpty()) return
+        val own = removed.associateWith { id -> db.installs().find(id)?.downloadedDepots.orEmpty() }
+        removeDlcFiles(installDir, SteamContent.depotsOf(removed, app.depots, own))
+        db.installs().delete(removed.toList())
+    }
+
+    /**
+     * The DLC the account owns for [app] with content to download, and the
+     * download of the base game with them all on: what the picker lists
+     * ([SteamContent.dlcIn]) and the plan [planFor] narrows by the choice.
+     */
+    suspend fun planFor(db: SteamDatabase, app: SteamApp, choice: SteamChoice = SteamChoice()): SteamDepots.Plan {
         val licences = db.licenses()
         val mainPackage = licences.find(app.packageId)
         val sharedPackage = licences.find(0)
         val dlcIdsInDepots = app.depots.values.map { it.dlcAppId }.filter { it != SteamIds.INVALID_APP_ID }.distinct()
         val dlcApps = db.apps().ownedDlcWithDepots(app.id)
         // A DLC app has a row only when a licence the account holds names it.
-        val ownedDlc = (db.apps().knownIds(dlcIdsInDepots) + dlcApps.map { it.id }).toSet()
+        // The ones the person turned off are left out here, so their depots
+        // and what their packages grant are left out of the plan with them.
+        val ownedDlc = (db.apps().knownIds(dlcIdsInDepots) + dlcApps.map { it.id }).toSet() - choice.excludedDlc
         val dlcPackages = ownedDlc.mapNotNull { dlcId ->
             db.apps().find(dlcId)?.packageId?.takeIf { it != SteamIds.INVALID_PKG_ID }?.let { licences.find(it) }?.let { dlcId to it.depotIds }
         }.toMap()
@@ -174,6 +199,32 @@ internal object SteamDownload {
             },
             alreadyDownloaded = null,
         )
+    }
+
+    /**
+     * Takes the files of DLC the person turned off out of [installDir]: the
+     * files their depots' manifests list that no depot that stays lists, and
+     * the depot downloader's record of those depots, so turning the DLC on
+     * again downloads it. The manifests are the ones the install kept in the
+     * game's folder. Blocking IO; the caller dispatches.
+     */
+    fun removeDlcFiles(installDir: File, removedDepots: Set<Int>) {
+        if (removedDepots.isEmpty()) return
+        val builds = SteamInstalls.installedBuilds(installDir)
+        fun filesOf(depots: Collection<Int>): List<String> = depots.flatMap { depot ->
+            val gid = builds[depot] ?: return@flatMap emptyList()
+            val manifest = runCatching { DepotManifest.loadFromFile(SteamInstalls.manifestFile(installDir, depot, gid).absolutePath) }.getOrNull()
+                ?: return@flatMap emptyList()
+            manifest.files.orEmpty().filterNot(SteamManifests::isDirectory).map { it.fileName }
+        }
+        val gone = SteamContent.filesToDelete(filesOf(builds.keys.filter { it in removedDepots }), filesOf(builds.keys.filter { it !in removedDepots }))
+        for (name in gone) {
+            val file = StoreFiles.findCaseInsensitive(installDir, name) ?: continue
+            file.parentFile?.let { parent -> SafeDelete.deleteWithin(parent, file) }
+        }
+        for (depot in removedDepots) builds[depot]?.let { SteamInstalls.manifestFile(installDir, depot, it).delete() }
+        val config = File(installDir, "${SteamInstalls.CONFIG_DIR}/depot.config")
+        if (config.isFile) config.writeText(SteamContent.withoutDepots(config.readText(), removedDepots))
     }
 
     /** The depot downloader's progress, into the job's [DownloadInfo] (GameNative's AppDownloadListener). */

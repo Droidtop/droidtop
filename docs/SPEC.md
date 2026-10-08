@@ -9395,8 +9395,9 @@ follows:
   its licence. Install is a job like every store's: fresh product info, then
   the depots `SteamDepots.plan` picks (GameNative's rules: Windows, 64-bit over
   32-bit, the plain build over the Steam Deck one, the device's language else
-  English, granted by the account's packages, not Steam China) with every DLC
-  the account owns (no DLC picker, as for the other stores), downloaded by
+  English, granted by the account's packages, not Steam China) with the DLC the
+  person left on (every owned DLC until they choose, "DLC and versions" below),
+  downloaded by
   JavaSteam's depot downloader into `<game folder>/Steam/<install folder>`,
   chunks put together in the app's cache. A stopped download continues; an
   update fetches only what changed. Verify checks every file of the installed
@@ -9406,10 +9407,33 @@ follows:
   with the one Steam serves now. A game starts with the program GameNative
   chose (the developer's launch entry unless it is a stub, else the
   best-scoring program the manifests flag), its working folder and its launch
-  arguments. Not carried: Steam Cloud saves, achievements, Workshop, friends,
-  family sharing, private branches and GameNative's Linux-depot switch; cloud
-  saves resolve save folders inside GameNative's Wine containers and move with
-  the Wine runtime.
+  arguments. Not carried: achievements, Workshop, family sharing and
+  GameNative's Linux-depot switch.
+- **DLC and versions** (`StoreLibrary.contentOptions`, `chooseContent`,
+  `unlockBranch`; owner, 2026-10-08, Droidtop/tracker#313: "DLC picker: yes.
+  Private beta branches: yes."). The interface is store-neutral
+  (`StoreContentOptions`: extras with sizes, branches) and a store with
+  nothing to choose answers null, so no row is drawn; Steam is the first to
+  answer. The choice is kept per game (`SteamChoices`, `steam/install_choices.json`:
+  the branch, the DLC turned off, and the passwords Steam accepted for locked
+  branches, in droidtop's private files). DLC is stored as the ones left out, so
+  a DLC bought later is on, which is what an install did before. The picker
+  (`StoreContentSheet`, "DLC and versions") is reached from the install offer
+  and the game menu: one list, A or a tap switches a DLC or picks a version,
+  the last row applies, B closes unchanged; the DLC rows show what turning each
+  on downloads (the plan made with every owned DLC on, `SteamContent.dlcIn`;
+  a DLC inside the game's depots is sized on the game's branch, a DLC app with
+  depots of its own on its public branch). Applying to an installed game
+  starts the install job for the difference: the depot downloader fetches the
+  DLC and the branch's changed files; a DLC turned off has its files removed
+  (the files its depots' manifests list that no depot that stays lists,
+  `SteamContent.filesToDelete`, and its entries in the depot downloader's
+  `depot.config`, so turning it on again downloads it). A branch that asks a
+  password (`pwdrequired`) shows "Password" until Steam accepts one
+  (`SteamApps.checkAppBetaPassword` answers the branch's key); the plan then
+  reads the branch's real manifests with `picsGetPrivateBeta`
+  (`SteamBranches.resolve`) so its sizes and depots are known before the
+  download, and the install and the update check follow the chosen branch.
 - **Steam carried over** (`SteamCarryOver`): the rows come with `steam.db`;
   the sign-in GameNative kept in its preferences (the refresh token encrypted
   with its Android Keystore key, readable only through its `PrefManager`) and

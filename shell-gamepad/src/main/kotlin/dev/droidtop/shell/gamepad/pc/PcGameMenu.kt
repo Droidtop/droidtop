@@ -171,6 +171,7 @@ internal fun PcGameMenu(
     // The free-space offer before a store install or update opens its own
     // window over the menu (Droidtop/tracker#227); null when it is closed.
     var storeOffer by remember(entry) { mutableStateOf<StoreInstallOffer?>(null) }
+    var contentOpen by remember(entry) { mutableStateOf(false) }
     var wineSettings by remember(entry) { mutableStateOf<WineGameSettings?>(null) }
     var protonDb by remember(entry) { mutableStateOf<ProtonDbState>(ProtonDbState.NotAsked) }
     // Which page of the menu is showing and which row of it the cursor is
@@ -522,11 +523,19 @@ internal fun PcGameMenu(
     // "Stores"): verify where the store keeps a file list, uninstall, and the
     // way to its download. Every store is droidtop's own, Steam included.
     val ownStore = entry.ownStore()
+    val hasContent by produceState(false, entry.id) {
+        value = ownStore != null && withContext(Dispatchers.IO) {
+            runCatching { ownStore.contentOptions(context, (entry.pcInfo?.storeId ?: entry.id).substringAfter(':')) }.getOrNull()
+        } != null
+    }
     val ownStoreRows = ownStore?.let { store ->
         val key = entry.pcInfo?.storeId ?: entry.id
         val gameId = key.substringAfter(':')
         val installed = entry.pcInfo?.installed == true
         buildList {
+            if (hasContent) {
+                add(PcActionRow("DLC and versions", "Which DLC to have and which version to follow", { contentOpen = true }))
+            }
             if (downloads[key] != null) {
                 add(PcActionRow("Downloads", "Where this download is paused, resumed or cancelled", {
                     onClose()
@@ -965,6 +974,21 @@ internal fun PcGameMenu(
             }
             dev.droidtop.shell.gamepad.MenuHint(if (page == PcMenuPage.Root) "Up/Down moves, A activates, B closes" else "Up/Down moves, A activates, B goes back")
         }
+    }
+    if (contentOpen && ownStore != null) {
+        StoreContentSheet(
+            entry = entry,
+            store = ownStore,
+            onApplied = { installNeeded ->
+                contentOpen = false
+                if (installNeeded) {
+                    scope.launch { status = startOwnStoreInstall(context, entry, ownStore, "") }
+                } else {
+                    status = "Saved"
+                }
+            },
+            onDismiss = { contentOpen = false },
+        )
     }
     // The free-space offer before a store install or update: its own
     // window over the menu, the one place the volume is chosen

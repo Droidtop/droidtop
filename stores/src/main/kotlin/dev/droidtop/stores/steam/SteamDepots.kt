@@ -9,8 +9,10 @@ package dev.droidtop.stores.steam
  * without a session.
  *
  * Left out on purpose: GameNative's "prefer Linux depots" switch (droidtop
- * runs a Steam game through Wine, the way it runs every Windows game) and
- * password-unlocked beta branches (droidtop installs the public branch).
+ * runs a Steam game through Wine, the way it runs every Windows game). The
+ * DLC and the branch a plan is made for are the person's choice
+ * ([SteamChoice]); the plan itself takes the DLC it is given and the depots
+ * of the branch [SteamBranches.resolve] hands it.
  */
 internal object SteamDepots {
 
@@ -119,10 +121,9 @@ internal object SteamDepots {
     }
 
     /**
-     * The whole download of [app] in [language], with every DLC the account
-     * owns (droidtop has no DLC picker: like the other stores, an install
-     * takes what is owned). [ownedDlcAppIds] are the DLC apps the account
-     * holds; [licensedDepotIds] what the game's own package, the shared
+     * The whole download of [app] in [language], with the DLC in
+     * [ownedDlcAppIds]: the ones the account owns and the person left on
+     * (docs/SPEC.md 7g, "Stores"); [licensedDepotIds] what the game's own package, the shared
      * package and the owned DLC packages grant; [dlcPackageDepots] each owned
      * DLC's package depots, so a depot of the game that a DLC package grants
      * is filed under that DLC (GameNative's fix for Don't Starve's DLC list).

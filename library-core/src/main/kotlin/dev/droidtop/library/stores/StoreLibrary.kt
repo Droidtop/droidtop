@@ -233,6 +233,25 @@ interface StoreLibrary {
     suspend fun launch(context: Context, gameId: String): StoreLaunch? = null
 
     /**
+     * What the person can choose about [gameId]'s content: which extras (DLC)
+     * to have and which branch to follow, with sizes; null when the store has
+     * nothing to choose (the default). Reads droidtop's own copy; no network.
+     */
+    suspend fun contentOptions(context: Context, gameId: String): StoreContentOptions? = null
+
+    /**
+     * Remembers [choice] for [gameId]; an install or update follows it from
+     * then on. Success carries whether the installed files now differ from the
+     * choice, so the caller starts the install job for the difference.
+     */
+    suspend fun chooseContent(context: Context, gameId: String, choice: StoreContentChoice): Result<Boolean> =
+        Result.failure(UnsupportedOperationException("$label has no content to choose"))
+
+    /** Checks [password] for the locked branch [branchId] of [gameId] with the store and keeps it when accepted. */
+    suspend fun unlockBranch(context: Context, gameId: String, branchId: String, password: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException("$label has no locked branches"))
+
+    /**
      * A number that changes whenever [games] would answer differently: the
      * PC library's store part is walked again only when it moves
      * (docs/SPEC.md 7g). One stat per file, never a query.
