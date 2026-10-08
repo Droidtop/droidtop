@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -12,7 +11,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalContext
@@ -30,7 +28,6 @@ import dev.droidtop.library.scraper.TheGamesDbClient
 import dev.droidtop.library.scraper.TheGamesDbPrefs
 import dev.droidtop.library.scraper.TheGamesDbSystemIds
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import android.util.Log
 import dev.droidtop.library.userFacingErrorMessage
 import kotlinx.coroutines.Dispatchers
