@@ -4,10 +4,13 @@
 # downloaded from the sample-plugin-flutter CI job's unsigned artifact)
 # into droidtop.sample-flutter-statustile.droidplugin.tar.xz.
 #
-# The ONLY script in this folder that touches the plugin origin private
-# key. Run this on droidtop-dev only, where
-# /root/coordination/keys/droidtop-plugins/droidtop-origin-private.pem
-# lives; the key is never committed to this repo and never given to CI.
+# The only script that touches the plugin origin private key. CI runs it with
+# the PLUGIN_SIGNING_KEY repo secret (written to a 600 temp file for the job and
+# deleted afterwards); locally, run it on droidtop-dev with the key under
+# /root/coordination/keys/droidtop-plugins/. The key is never committed.
+# PLUGIN_SIGNING_KEY is the PATH of the PEM. If PLUGIN_SIGNING_CERT names a
+# file (this plugin key's certificate from droidtop's plugin master key), it is
+# packaged as origin.cert next to manifest.sig.
 #
 # Unlike the other two samples' sign.sh (one payload file each), this
 # plugin's payload is a whole directory tree (two libapp.so + every file
@@ -30,6 +33,15 @@ test -d "$BUNDLE_DIR/payload/flutter_assets" || { echo "missing $BUNDLE_DIR/payl
 
 openssl dgst -sha256 -sign "$PLUGIN_SIGNING_KEY" "$BUNDLE_DIR/manifest.json" | base64 -w0 > "$BUNDLE_DIR/manifest.sig"
 
+# Optional certificate of this plugin key (signed by droidtop's plugin master).
+rm -f "$BUNDLE_DIR/origin.cert"
+CERT_FILE=
+if [ -n "${PLUGIN_SIGNING_CERT:-}" ]; then
+  test -f "$PLUGIN_SIGNING_CERT" || { echo "PLUGIN_SIGNING_CERT is not a file" >&2; exit 1; }
+  cp "$PLUGIN_SIGNING_CERT" "$BUNDLE_DIR/origin.cert"
+  CERT_FILE=origin.cert
+fi
+
 # GNU tar's repeated -C is CUMULATIVE (each one is relative to wherever
 # the previous -C left it, not to this script's own cwd) -- confirmed the
 # hard way: a second relative "-C $BUNDLE_DIR/payload" resolved as
@@ -37,7 +49,7 @@ openssl dgst -sha256 -sign "$PLUGIN_SIGNING_KEY" "$BUNDLE_DIR/manifest.json" | b
 # both -C arguments sidestep that entirely.
 BUNDLE_ABS="$(cd "$BUNDLE_DIR" && pwd)"
 tar --sort=name -cf - \
-  -C "$BUNDLE_ABS" manifest.json manifest.sig \
+  -C "$BUNDLE_ABS" manifest.json manifest.sig $CERT_FILE \
   -C "$BUNDLE_ABS/payload" lib flutter_assets \
   | xz -9e > droidtop.sample-flutter-statustile.droidplugin.tar.xz
 

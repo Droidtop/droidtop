@@ -14173,6 +14173,19 @@ the secondary path for sources that publish no key.
   paste/file path never replaces at all — a different key for an origin
   you already trust is refused with that reason; rotating by hand means
   removing the origin and adding it again, two explicit steps.
+- **Plugin bundles are signed by CI (owner, 2026-10-07).** Official plugin
+  repos and droidtop's own samples sign in their GitHub Actions jobs, not by
+  hand: the repo secret `PLUGIN_SIGNING_KEY` (that plugin's origin EC private
+  key PEM) is written to a 600 temp file inside the job, `sign.sh` produces
+  the `.droidplugin.tar.xz`, and an `always()` step deletes the file. Every
+  plugin repo has its own key derived from the master; the optional second
+  secret `PLUGIN_SIGNING_CERT` (that key's certificate from the plugin
+  master) is packaged as `origin.cert` next to `manifest.sig` when present.
+  Pull requests and forks have no secret (signing is also skipped on
+  `pull_request` events), so they upload the unsigned payload and say so in
+  the job summary; the job never fails for that. A `plugin-v*` tag attaches
+  the signed bundle to that tag's release. The `sign.sh` scripts stay for
+  local use on droidtop-dev.
 - **Signing in with GitHub (owner, 2026-10-01, Droidtop/tracker#259: "we
   don't wanna make users type API keys").** The OAuth device flow (RFC 8628)
   against droidtop's registered OAuth app. Its client id is a public identifier
@@ -14563,12 +14576,10 @@ containment via `PluginCrashPolicy`), the job shape, the `python` runner
 (`samples/plugin-sample-statustile` for `native_bundle`,
 `samples/plugin-sample-py-statustile` for `python`) each exercising
 `status_tile` end to end, including a deliberate forced crash for testing
-the disable path. Both samples' unsigned payloads are built by CI
+the disable path. Both samples are built and signed by CI
 (`sample-plugin`, `sample-plugin-python` in
-`.github/workflows/android-build.yml`); signing either into an
-installable `.droidplugin.tar.xz` still needs droidtop-dev's private key
-(`sign.sh` in each sample's own folder) and is not something CI ever
-does. The `flutter_embed` runner (`FlutterRuntimeManager`,
+`.github/workflows/android-build.yml`, using each sample's own `sign.sh`)
+into an installable `.droidplugin.tar.xz`; see "Plugin bundles are signed by CI" below. The `flutter_embed` runner (`FlutterRuntimeManager`,
 `FlutterDroidtopPlugin`, above) and its own sample
 (`samples/plugin-sample-flutter-statustile`) are built and rig-verified
 the same way (`dq-flutterembed-01` — see "The `flutter_embed` kind"
@@ -15006,7 +15017,7 @@ download" row shape the Python runtime already has
 `samples/plugin-sample-flutter-statustile`, a minimal Dart app (one
 `status_tile` handler) built by a pinned Flutter SDK in CI
 (`sample-plugin-flutter` job) and signed the same way every other sample
-is (`sign.sh`, droidtop-dev's key only).
+is (`sign.sh`, run by CI with the repo secret).
 
 **The readiness handshake (found needed 2026-09-26, part of the
 flutter_embed contract).** The acquire_content UI's own first real

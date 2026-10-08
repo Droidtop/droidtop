@@ -217,11 +217,12 @@ jobs:
     # so dq-plugins-01 (device/QUEUE.md) is no longer blocked on "nobody
     # has run build.sh". This is a real Gradle build against :plugin-host's
     # own compiled API, dexed the same way build.sh documents (kotlinc +
-    # d8), producing build/manifest.json + build/classes.jar and uploading
-    # them UNSIGNED: this job never sees the plugin origin's private key
-    # (droidtop-dev only, /root/coordination/keys/droidtop-plugins/), so
-    # signing (sample-plugin's sign.sh) happens outside CI, same as a real
-    # third-party plugin author's own release process would.
+    # d8), producing build/manifest.json + build/classes.jar and handing it to the signing step below.
+    # The job then signs the bundle with sample sign.sh when the repo secret
+    # PLUGIN_SIGNING_KEY (optionally PLUGIN_SIGNING_CERT, packaged as origin.cert)
+    # is available: the key goes to a 600 temp file inside the job and is deleted
+    # in an always() step. Pull requests and forks have no secret, so they upload
+    # the payload unsigned and say so in the job summary.
     #
     # No native code in this sample (manifest's "abis": [] -- see
     # PluginManifest.kt), so there is only one dex output; a future
@@ -265,7 +266,7 @@ jobs:
           unzip -q "$RUNNER_TEMP/kotlinc.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
 
-      - name: Build the sample plugin payload (unsigned)
+      - name: Build the sample plugin payload
         env:
           ANDROID_JAR: ${{ env.ANDROID_SDK_ROOT }}/platforms/android-36/android.jar
         run: |
@@ -273,7 +274,47 @@ jobs:
           cd samples/plugin-sample-statustile
           ./build.sh
 
-      - name: Upload unsigned plugin payload
+      - name: Sign the bundle
+        id: sign
+        working-directory: samples/plugin-sample-statustile
+        env:
+          SIGNING_KEY_PEM: ${{ secrets.PLUGIN_SIGNING_KEY }}
+          SIGNING_CERT: ${{ secrets.PLUGIN_SIGNING_CERT }}
+        run: |
+          set -eu
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] || [ -z "$SIGNING_KEY_PEM" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Unsigned bundle: signing is skipped on pull requests and whenever the PLUGIN_SIGNING_KEY secret is absent (forks). The payload is uploaded unsigned." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          umask 077
+          printf '%s' "$SIGNING_KEY_PEM" > "$RUNNER_TEMP/k.pem"
+          export PLUGIN_SIGNING_KEY="$RUNNER_TEMP/k.pem"
+          if [ -n "$SIGNING_CERT" ]; then
+            printf '%s' "$SIGNING_CERT" > "$RUNNER_TEMP/origin.cert"
+            export PLUGIN_SIGNING_CERT="$RUNNER_TEMP/origin.cert"
+          fi
+          ./sign.sh
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "Signed bundle: $(ls ./*.droidplugin.tar.xz)"
+            if [ -n "$SIGNING_CERT" ]; then echo "origin.cert included."; else echo "No PLUGIN_SIGNING_CERT secret: no origin.cert in the bundle."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the signing material
+        if: always()
+        run: rm -f -- "${RUNNER_TEMP:?}/k.pem" "${RUNNER_TEMP:?}/origin.cert"
+
+      - name: Upload signed plugin bundle
+        if: steps.sign.outputs.signed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-sample-statustile
+          path: samples/plugin-sample-statustile/*.droidplugin.tar.xz
+          if-no-files-found: error
+
+      - name: Upload unsigned plugin payload (only when signing was skipped)
+        if: steps.sign.outputs.signed != 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: plugin-sample-statustile-unsigned
@@ -287,10 +328,12 @@ jobs:
     # 12a, python kind): unlike sample-plugin above, a python-kind
     # plugin's payload IS its source (plugin.py) -- no compiler, no
     # :plugin-host classpath, no Android SDK/NDK needed at all, so this
-    # job doesn't even check out the Android toolchain. Uploads
-    # build/manifest.json + build/plugin.py UNSIGNED, same reasoning as
-    # sample-plugin: this job never sees the plugin origin's private key
-    # (droidtop-dev only), so sign.sh runs outside CI.
+    # job doesn't even check out the Android toolchain. Signs it like sample-plugin.
+    # The job then signs the bundle with sample sign.sh when the repo secret
+    # PLUGIN_SIGNING_KEY (optionally PLUGIN_SIGNING_CERT, packaged as origin.cert)
+    # is available: the key goes to a 600 temp file inside the job and is deleted
+    # in an always() step. Pull requests and forks have no secret, so they upload
+    # the payload unsigned and say so in the job summary.
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -306,12 +349,52 @@ jobs:
           cd samples/plugin-sample-py-statustile
           python3 test_plugin.py
 
-      - name: Build the sample python plugin payload (unsigned)
+      - name: Build the sample python plugin payload
         run: |
           cd samples/plugin-sample-py-statustile
           ./build.sh
 
-      - name: Upload unsigned plugin payload
+      - name: Sign the bundle
+        id: sign
+        working-directory: samples/plugin-sample-py-statustile
+        env:
+          SIGNING_KEY_PEM: ${{ secrets.PLUGIN_SIGNING_KEY }}
+          SIGNING_CERT: ${{ secrets.PLUGIN_SIGNING_CERT }}
+        run: |
+          set -eu
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] || [ -z "$SIGNING_KEY_PEM" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Unsigned bundle: signing is skipped on pull requests and whenever the PLUGIN_SIGNING_KEY secret is absent (forks). The payload is uploaded unsigned." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          umask 077
+          printf '%s' "$SIGNING_KEY_PEM" > "$RUNNER_TEMP/k.pem"
+          export PLUGIN_SIGNING_KEY="$RUNNER_TEMP/k.pem"
+          if [ -n "$SIGNING_CERT" ]; then
+            printf '%s' "$SIGNING_CERT" > "$RUNNER_TEMP/origin.cert"
+            export PLUGIN_SIGNING_CERT="$RUNNER_TEMP/origin.cert"
+          fi
+          ./sign.sh
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "Signed bundle: $(ls ./*.droidplugin.tar.xz)"
+            if [ -n "$SIGNING_CERT" ]; then echo "origin.cert included."; else echo "No PLUGIN_SIGNING_CERT secret: no origin.cert in the bundle."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the signing material
+        if: always()
+        run: rm -f -- "${RUNNER_TEMP:?}/k.pem" "${RUNNER_TEMP:?}/origin.cert"
+
+      - name: Upload signed plugin bundle
+        if: steps.sign.outputs.signed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-sample-py-statustile
+          path: samples/plugin-sample-py-statustile/*.droidplugin.tar.xz
+          if-no-files-found: error
+
+      - name: Upload unsigned plugin payload (only when signing was skipped)
+        if: steps.sign.outputs.signed != 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: plugin-sample-py-statustile-unsigned
@@ -327,11 +410,12 @@ jobs:
     # plugin-host/src/main/assets/flutter-runtimes.json and
     # plugin-host/build.gradle.kts both pin (Flutter 3.47.5, engine
     # af7e796e161ae0bb1ff0758c71a7105418bd9ded, confirmed 2026-09-26 --
-    # see build.sh's own header). Uploads build/manifest.json and
-    # build/payload/{lib,flutter_assets} UNSIGNED, same reasoning as the
-    # other two sample-plugin jobs: this job never sees the plugin
-    # origin's private key (droidtop-dev only), so sign.sh runs outside
-    # CI.
+    # see build.sh's own header). Signs it like sample-plugin.
+    # The job then signs the bundle with sample sign.sh when the repo secret
+    # PLUGIN_SIGNING_KEY (optionally PLUGIN_SIGNING_CERT, packaged as origin.cert)
+    # is available: the key goes to a 600 temp file inside the job and is deleted
+    # in an always() step. Pull requests and forks have no secret, so they upload
+    # the payload unsigned and say so in the job summary.
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -362,14 +446,54 @@ jobs:
           tar -C "$RUNNER_TEMP" -xf "$RUNNER_TEMP/flutter.tar.xz"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
 
-      - name: Build the sample flutter plugin payload (unsigned)
+      - name: Build the sample flutter plugin payload
         run: |
           export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
           flutter config --no-analytics >/dev/null
           cd samples/plugin-sample-flutter-statustile
           ./build.sh
 
-      - name: Upload unsigned plugin payload
+      - name: Sign the bundle
+        id: sign
+        working-directory: samples/plugin-sample-flutter-statustile
+        env:
+          SIGNING_KEY_PEM: ${{ secrets.PLUGIN_SIGNING_KEY }}
+          SIGNING_CERT: ${{ secrets.PLUGIN_SIGNING_CERT }}
+        run: |
+          set -eu
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] || [ -z "$SIGNING_KEY_PEM" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Unsigned bundle: signing is skipped on pull requests and whenever the PLUGIN_SIGNING_KEY secret is absent (forks). The payload is uploaded unsigned." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          umask 077
+          printf '%s' "$SIGNING_KEY_PEM" > "$RUNNER_TEMP/k.pem"
+          export PLUGIN_SIGNING_KEY="$RUNNER_TEMP/k.pem"
+          if [ -n "$SIGNING_CERT" ]; then
+            printf '%s' "$SIGNING_CERT" > "$RUNNER_TEMP/origin.cert"
+            export PLUGIN_SIGNING_CERT="$RUNNER_TEMP/origin.cert"
+          fi
+          ./sign.sh
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "Signed bundle: $(ls ./*.droidplugin.tar.xz)"
+            if [ -n "$SIGNING_CERT" ]; then echo "origin.cert included."; else echo "No PLUGIN_SIGNING_CERT secret: no origin.cert in the bundle."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the signing material
+        if: always()
+        run: rm -f -- "${RUNNER_TEMP:?}/k.pem" "${RUNNER_TEMP:?}/origin.cert"
+
+      - name: Upload signed plugin bundle
+        if: steps.sign.outputs.signed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-sample-flutter-statustile
+          path: samples/plugin-sample-flutter-statustile/*.droidplugin.tar.xz
+          if-no-files-found: error
+
+      - name: Upload unsigned plugin payload (only when signing was skipped)
+        if: steps.sign.outputs.signed != 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: plugin-sample-flutter-statustile-unsigned

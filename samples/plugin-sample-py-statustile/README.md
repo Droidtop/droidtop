@@ -21,9 +21,9 @@ DexClassLoader.
   in `.github/workflows/android-build.yml` runs exactly this.
 - `sign.sh` -- the only script here that touches the real droidtop plugin
   origin key; signs `build/manifest.json` and packages
-  `droidtop.sample-py-statustile.droidplugin.tar.xz`. Run on droidtop-dev
-  only (`/root/coordination/keys/droidtop-plugins/droidtop-origin-private.pem`);
-  never in CI, never committed to this repo.
+  `droidtop.sample-py-statustile.droidplugin.tar.xz`. CI runs it with the `PLUGIN_SIGNING_KEY` repo secret
+  (optional `PLUGIN_SIGNING_CERT` becomes `origin.cert`); locally run it on
+  droidtop-dev. The key is never committed to this repo.
 
 Installing this bundle also needs the Python runtime itself downloaded
 first (Settings -> App integrations -> Plugins -> "Download Python

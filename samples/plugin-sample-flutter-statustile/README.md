@@ -28,7 +28,8 @@ load time, not a bug). Produces `build/manifest.json` and
 
 ## Signing
 
-Only on droidtop-dev, which holds the plugin origin's private key:
+CI signs it with the `PLUGIN_SIGNING_KEY` repo secret (optional `PLUGIN_SIGNING_CERT`
+becomes `origin.cert`). Locally, on droidtop-dev, which holds the plugin origin's private key:
 
 ```
 PLUGIN_SIGNING_KEY=/root/coordination/keys/droidtop-plugins/droidtop-origin-private.pem ./sign.sh

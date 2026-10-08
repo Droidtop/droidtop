@@ -4,10 +4,8 @@
 # this script never touches the plugin origin's private key and is safe
 # to run in CI (the "sample-plugin-flutter" job in
 # .github/workflows/android-build.yml runs exactly this and uploads
-# build/manifest.json + build/lib + build/flutter_assets UNSIGNED). Only
-# droidtop-dev, which holds the private half at
-# /root/coordination/keys/droidtop-plugins/droidtop-origin-private.pem,
-# ever runs sign.sh.
+# build/manifest.json + build/lib + build/flutter_assets UNSIGNED). Signing is the separate sign.sh step: CI runs it with the
+# PLUGIN_SIGNING_KEY repo secret, droidtop-dev runs it locally with the origin key.
 #
 # Unlike the native_bundle/python samples, this one's real source
 # (pubspec.yaml, lib/main.dart) is not itself a buildable Flutter project
@@ -107,5 +105,5 @@ if [ -n "${PLUGIN_SIGNING_KEY:-}" ]; then
   PLUGIN_SIGNING_KEY="$PLUGIN_SIGNING_KEY" ./sign.sh
 else
   echo "PLUGIN_SIGNING_KEY not set -- stopping here, unsigned."
-  echo "Run ./sign.sh with PLUGIN_SIGNING_KEY set (droidtop-dev only; the key never leaves that host) to produce droidtop.sample-flutter-statustile.droidplugin.tar.xz."
+  echo "Run ./sign.sh with PLUGIN_SIGNING_KEY set (CI does this with the PLUGIN_SIGNING_KEY repo secret) to produce droidtop.sample-flutter-statustile.droidplugin.tar.xz."
 fi

@@ -1879,7 +1879,9 @@ The process boundary is **crash containment, not a security sandbox**
 
 - **Install integrity.** Signature, per-origin keys, the trust tiers,
   every payload hash, re-verification before every activation, id
-  namespacing and ABI coverage.
+  namespacing and ABI coverage. Official bundles are signed by CI
+  (repo secret `PLUGIN_SIGNING_KEY`, optional `PLUGIN_SIGNING_CERT` packaged as
+  `origin.cert`); see docs/SPEC.md, plugin trust.
 - **Consent.** Nothing runs before approval. Root needs its own tick.
   Approval binds to the digest and key.
 - **Routing.** droidtop calls only declared capabilities and delivers
