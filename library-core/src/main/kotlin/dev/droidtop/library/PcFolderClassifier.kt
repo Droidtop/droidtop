@@ -154,15 +154,28 @@ object PcFolderClassifier {
      * The one of [layer] named after the folder's title: its exact name, or
      * (for a title of three letters or more) the one name that begins with
      * it (`Game-Win64-Shipping` for `Game`). Two such names are no answer.
+     *
+     * A title's leading article is asked about second: a program is named
+     * after its game without the "The" more often than with it (`The
+     * Sample/SampleSE.exe` beside a `Maker.exe`), and the whole title still
+     * wins where a program carries it (Droidtop/tracker#308).
      */
     private fun namedAfter(layer: List<ListedFile>, folderName: String): ListedFile? {
-        val key = GameNaming.nameKey(GameTitleParser.parseName(folderName).title)
-        if (key.isEmpty()) return null
+        val title = GameTitleParser.parseName(folderName).title
+        val words = title.trim().split(WHITESPACE)
+        val withoutArticle = if (words.size > 1 && words.first().lowercase() in LEADING_ARTICLES) words.drop(1).joinToString(" ") else null
         fun base(file: ListedFile) = GameNaming.nameKey(file.name.substringBeforeLast('.'))
-        layer.filter { base(it) == key }.singleOrNull()?.let { return it }
-        if (key.length < 3) return null
-        return layer.filter { base(it).startsWith(key) }.singleOrNull()
+        for (key in listOfNotNull(title, withoutArticle).map(GameNaming::nameKey).distinct()) {
+            if (key.isEmpty()) continue
+            layer.filter { base(it) == key }.singleOrNull()?.let { return it }
+            if (key.length < 3) continue
+            layer.filter { base(it).startsWith(key) }.singleOrNull()?.let { return it }
+        }
+        return null
     }
+
+    private val LEADING_ARTICLES = setOf("the", "a", "an")
+    private val WHITESPACE = Regex("\\s+")
 
     /** [classify] over [root]'s own listing, with the engine the detector reports for it. */
     fun classify(root: File, defs: List<EngineDef>): FolderFacts =

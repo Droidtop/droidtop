@@ -106,6 +106,21 @@ class PcFolderClassifierTest {
     }
 
     @Test
+    fun `a title's leading article does not hide the program named after the rest of it`() {
+        // Droidtop/tracker#308: the folder's shape, with placeholder names.
+        val facts = classify("The Samples", "SamplesSE.exe", "Maker.exe")
+        assertEquals("SamplesSE.exe", facts.main)
+        assertEquals(listOf("Maker.exe"), facts.alternatives)
+
+        // The whole title still wins where a program carries it.
+        val whole = classify("The Samples", "TheSamples.exe", "Samples.exe")
+        assertEquals("TheSamples.exe", whole.main)
+
+        // A title that is only an article is nothing to go by.
+        assertNull(classify("The", "Alpha.exe", "Beta.exe").main)
+    }
+
+    @Test
     fun `several programs and no name to tell them apart is not guessed`() {
         val facts = classify("Zzz", "Alpha.exe", "Beta.exe")
         assertNull(facts.main)

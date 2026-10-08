@@ -6806,11 +6806,12 @@ without a prefix of its own when it is), what the script asked for that
 droidtop already does its own way, and everything not imported with why.
 Apply writes both; "This game only" writes just the game's own settings
 and leaves the prefix alone. Nothing is written on open, on search, or in
-the background. A game an import touched shows its own "Program: …" row
-in the same section, naming the import as its source and clearing back
-to detection on selection — the per-game override this section already
-promises, now with a second way to set it besides picking a file by
-hand.
+the background. A game an import touched shows the imported program in
+its "Program" row in the same section, naming the import as its source;
+the row opens the program choice (§7i, "Which program runs"), where "Let
+droidtop pick" goes back to detection — the per-game override this
+section already promises, with a second way to set it besides picking a
+program by hand.
 
 **Where the settings live.** `WineGameSettings` (`:library-core`,
 per-game, keyed like `LaunchStrategyOverridePrefs`) is read by both PC
@@ -11045,12 +11046,31 @@ sets (§7e3, built 2026-09-25).** A game taking the Windows route gets an
 "Import a Lutris install script" row in its "Runs on Windows" section,
 next to "Wine and graphics" — the same section, because setting a
 game's program from an imported script is the same kind of act as
-picking one by hand, not a separate mechanism. Once an import has set a
-game's program, that same section shows it as its own row ("Program:
-…", naming the import as its source), selectable to clear back to what
-droidtop detects on its own. This is the Daijishō default-with-override
-model this section already commits to (see "Overrides" above), reached
-by a second path.
+picking one by hand, not a separate mechanism. The same section always
+carries a "Program" row: the program the game runs (an import's choice
+names the import as its source), opening the program choice below. This
+is the Daijishō default-with-override model this section already commits
+to (see "Overrides" above), reached by a second path.
+
+**Which program runs (Droidtop/tracker#308, 2026-10-08).** A Windows
+game's program is `PcFolderClassifier`'s answer (§7n) unless the person
+chose one; the choice is the game's `WineGameSettings.executable`, read
+by every Windows launch path through `WindowsLaunchResolver`. ONE choice
+screen (`WindowsPrograms.screen`, `:library-core`) lists the programs the
+classifier weighed (never what it collapsed: installers, uninstallers,
+redistributables, crash handlers), marks the one Play runs, and offers
+"Let droidtop pick" once a choice is made. It is reached from four places
+and is the same screen in each: the game's options ("Program", under
+Fix and advanced), its page (a "Program" row on Details), its Wine and
+graphics screen (nested "Program"), and the launch failure. When detection
+cannot tell which program is the game, the launch throws
+`ProgramNotIdentified` instead of a bare error, and the failure dialog
+says "droidtop can't tell which program starts "<game>"." with a "Choose
+the program" action that opens the choice; it never names emulator setup.
+The classifier's own rule for telling programs apart by the folder's
+title also tries the title without a leading article ("The", "A", "An"),
+after the whole title: a game's program is named after it without the
+article more often than with it.
 
 ## 7j. Portrait and touch-first chrome (directed 2026-09-10)
 

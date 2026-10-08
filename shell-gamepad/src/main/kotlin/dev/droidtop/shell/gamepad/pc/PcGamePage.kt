@@ -236,8 +236,30 @@ internal fun PcGamePage(
     }
     // What plugins add to this game's page, under the tabs they name (docs/plugin-api.md 3 C4, C18).
     val pluginRows = rememberPluginPageRows(entry)
+    // Which program a Windows game runs (docs/SPEC.md 7i, "Which program
+    // runs"): the folder is read for this one open game, on IO, and again
+    // when the choice sheet closes.
+    var programScreen by remember(entry.id) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
+    val windowsRoute = runner?.option?.strategy == dev.droidtop.library.GameLaunchStrategy.WINE_PREFIX
+    val program by produceState<Pair<String, String>?>(null, entry.id, windowsRoute, programScreen) {
+        if (!windowsRoute || programScreen != null) return@produceState
+        value = withContext(Dispatchers.IO) {
+            val folder = dev.droidtop.library.PcRunnerOptions.gameFolderFor(entry) ?: return@withContext null
+            folder.absolutePath to (dev.droidtop.library.WindowsPrograms.choices(context, entry.id, folder).current ?: "")
+        }
+    }
+    val programFact = program?.let { (folder, current) ->
+        PageFact(
+            "Program",
+            current.ifEmpty { "Choose" },
+            subtitle = if (current.isEmpty()) "droidtop can't tell which program is the game" else null,
+            onActivate = { programScreen = dev.droidtop.library.WindowsPrograms.screen(entry.id, GameNaming.displayName(entry.title), folder) },
+        )
+    }
     val tabs = remember { PageTab.values() }
-    val rowsByTab = remember(rows, parts, pluginRows.facts) { groupRowsByTab(rows + pluginRows.facts, parts) }
+    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle) {
+        groupRowsByTab(rows + listOfNotNull(programFact) + pluginRows.facts, parts)
+    }
     val strip = remember(entry, runner, folderSize, siblings) {
         factsStrip(
             entry = entry,
@@ -510,6 +532,7 @@ internal fun PcGamePage(
         }
     }
     PluginPageScreen(pluginRows)
+    programScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { programScreen = null }) }
     if (editingThread && library != null) {
         TextEditDialog(
             title = "F95zone thread",

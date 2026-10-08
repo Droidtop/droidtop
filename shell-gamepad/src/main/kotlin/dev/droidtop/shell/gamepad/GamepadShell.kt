@@ -397,6 +397,10 @@ private fun GamepadShellBody(
     var missingEmulator by remember {
         mutableStateOf<dev.droidtop.library.consoles.NoEmulatorInstalled?>(null)
     }
+    // The other fixable kind: a Windows game whose program droidtop could
+    // not tell (Droidtop/tracker#308), and the program choice once opened.
+    var unknownProgram by remember { mutableStateOf<dev.droidtop.library.ProgramNotIdentified?>(null) }
+    var programScreen by remember { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     // The game being started, if any: drives the launch screen (real
     // ES-DE has one; without it the shell simply freezes mid-frame for
     // the several seconds a cold emulator start takes, which reads as a
@@ -629,6 +633,7 @@ private fun GamepadShellBody(
                     dev.droidtop.runtime.AudioHandOff.setQuiet("A pressed", false)
                     launching = null
                     missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled
+                    unknownProgram = it as? dev.droidtop.library.ProgramNotIdentified
                     launchError = LaunchFailureMessage.userMessage(entry.title, it)
                 }
             // Held briefly after the launch call returns: the call
@@ -1070,13 +1075,22 @@ private fun GamepadShellBody(
                         missingEmulator = null
                         launchError = null
                     }
+                }, unknownProgram?.let { problem ->
+                    // The game's program choice, the same screen its options open.
+                    LaunchFailureAction("Choose the program") {
+                        programScreen = dev.droidtop.library.WindowsPrograms.screen(problem.entryId, problem.title, problem.gameRoot)
+                        unknownProgram = null
+                        launchError = null
+                    }
                 }),
                 onDismiss = {
                     missingEmulator = null
+                    unknownProgram = null
                     launchError = null
                 },
             )
         }
+        programScreen?.let { screen -> CatalogSheet(root = screen, onExit = { programScreen = null }) }
         // A launch that never answered or left at once (LaunchWatchdog, docs/SPEC.md "The launch
         // watchdog"): plain words and the three ways out, where a black screen used to be.
         val watchAlert by dev.droidtop.library.LaunchWatchdog.alert.collectAsState()

@@ -45,6 +45,18 @@ class LaunchFailureMessageTest {
     }
 
     @Test
+    fun anUnidentifiedProgramSaysSoAndNamesNoEmulator() {
+        val cause = dev.droidtop.library.ProgramNotIdentified("folder:1", "Sample Game", "/games/Sample Game")
+        val sentence = LaunchFailureMessage.userMessage("Sample Game", cause)
+        assertEquals("droidtop can't tell which program starts \"Sample Game\".", sentence)
+        assertFalse(sentence.contains("mulator"))
+        assertEquals(
+            "droidtop can't tell which program starts \"Sample Game\".",
+            LaunchFailureMessage.userMessage(null, cause),
+        )
+    }
+
+    @Test
     fun aBlankGameNameFallsBackToTheGenericSentence() {
         assertEquals(
             "The game couldn't be started.",
