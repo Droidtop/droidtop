@@ -14987,8 +14987,11 @@ access to another's secrets or write access to the organisation.
   repository's secret. The owner provisions a repository with the
   coordination tree's `bin/plugin-key-provision official` (derive, certify,
   `gh secret set` both secrets from files, shred); `master-public` prints
-  the value to pin. Until it is pinned every certified bundle is refused
-  with a reason that says so.
+  the value to pin. The master is pinned (2026-10-08): `MasterKey.PINNED`
+  holds its public key, sha256 fingerprint
+  `c29e030ddd8615bb22ac706e0dcd3cfc58a248fb1adbd8e31a6fb7bf8159452f`; a
+  build that carries no pin refuses every certified bundle with a reason
+  that says so.
 - **Expiry and revocation.** Validity is checked when a bundle is installed
   or updated; an installed plugin is not stopped by its certificate
   expiring (a device with a wrong clock must not lose its plugins), only

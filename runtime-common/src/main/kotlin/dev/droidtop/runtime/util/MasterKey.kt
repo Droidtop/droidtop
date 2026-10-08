@@ -22,8 +22,10 @@ import java.util.Base64
  * component catalog is accepted unsigned.
  */
 object MasterKey {
-    /** The master's SubjectPublicKeyInfo (X.509), base64, P-256; null until the owner pins it. */
-    private val PINNED: String? = null
+    /** The master's SubjectPublicKeyInfo (X.509), base64, P-256; pinned 2026-10-08 (sha256 fingerprint
+     * c29e030ddd8615bb22ac706e0dcd3cfc58a248fb1adbd8e31a6fb7bf8159452f). */
+    private val PINNED: String? =
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExkY++u48QalIMbG7izeEk7vPR95te22fYlgsWPvpoOI/X5DEi9w8EmCbFUjpfT6rIZSkGNF+Xp0Xp95pUsBg9A=="
 
     @Volatile private var override: String? = null
 
