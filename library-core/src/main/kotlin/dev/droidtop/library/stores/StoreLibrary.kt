@@ -146,6 +146,9 @@ data class StoreUpdateCheck(val update: StoreUpdate, val latest: String? = null)
 /** How a store itself starts one of its games, when its own data says. */
 data class StoreLaunch(val executable: File, val workingDir: File, val arguments: List<String> = emptyList())
 
+/** The account a store game is played as ([StoreLibrary.player]): its 64-bit id, its name, and the DLC ids of the game it has. */
+data class StorePlayer(val steamId64: Long, val name: String, val dlc: Set<String>)
+
 /** Progress of a store job, as the Downloads place shows it. */
 fun interface StoreProgress {
     /** [fraction] 0 to 1, or a negative number while the size is not known yet. */
@@ -270,6 +273,14 @@ interface StoreLibrary {
      * store with none (the default).
      */
     fun settingsItems(context: Context): List<CatalogItem> = emptyList()
+
+    /**
+     * Who plays [gameId] when it starts inside a Wine prefix with a stand-in
+     * for the store's client (docs/SPEC.md 5b, "Steamworks in the prefix"):
+     * the signed-in account and the DLC of the game it has installed. Null
+     * when nobody is signed in or the store has no such client (the default).
+     */
+    suspend fun player(context: Context, gameId: String): StorePlayer? = null
 
     /** Whether the store keeps its games' saves in a cloud of its own that [syncSaves] reaches (Steam Cloud). */
     val hasCloudSaves: Boolean get() = false

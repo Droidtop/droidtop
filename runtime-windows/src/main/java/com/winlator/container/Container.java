@@ -247,6 +247,13 @@ public class Container {
     }
 
     /**
+     * droidtop: environment variables one launch adds on top of the
+     * container's own ({@link #getEnvVars()} is untouched), in the same
+     * "NAME=value NAME=value" form; the guest launch applies them last.
+     */
+    public static final String LAUNCH_ENV = "launchEnv";
+
+    /**
      * Launch-time values laid over this container's own for one launch: an
      * embedder that runs several games in one prefix can give one of them
      * another graphics driver, Direct3D translation or emulator version
@@ -258,7 +265,7 @@ public class Container {
      */
     public static final java.util.List<String> LAUNCH_OVERRIDE_KEYS = java.util.Arrays.asList(
         "graphicsDriver", "graphicsDriverConfig", "dxwrapper", "dxwrapperConfig", "emulator", "box64Version", "fexcoreVersion",
-        "lsfgEnabled", "lsfgMultiplier");
+        "lsfgEnabled", "lsfgMultiplier", LAUNCH_ENV);
     private final java.util.Map<String, String> launchOverrides = new java.util.HashMap<>();
 
     public void setLaunchOverrides(java.util.Map<String, String> overrides) {

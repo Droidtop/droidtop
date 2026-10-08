@@ -147,6 +147,9 @@ class WineXSession(
             // The prefix's own variables last, so a person who set one by
             // hand wins over every default above.
             putAll(prefix.envVars)
+            // Then what this one launch needs on top (Container.LAUNCH_ENV:
+            // the Steamworks shim's), which no saved setting carries.
+            prefix.launchOverrides[Container.LAUNCH_ENV]?.takeIf { it.isNotBlank() }?.let { putAll(it) }
             // Frame-rate caps belong to gamenative's own in-game limiter
             // UI, which droidtop does not present; a stale value from the
             // prefix would silently cap a game nobody asked to cap.

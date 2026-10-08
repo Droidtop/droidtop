@@ -13,6 +13,7 @@ import dev.droidtop.library.stores.StoreContentOptions
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLaunch
 import dev.droidtop.library.stores.StoreLibrary
+import dev.droidtop.library.stores.StorePlayer
 import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
@@ -53,6 +54,13 @@ class SteamStore : StoreLibrary {
     override fun signedIn(context: Context): Boolean = SteamCredentials.exists(context)
 
     override fun accountName(context: Context): String? = SteamCredentials.load(context)?.accountName
+
+    /** The signed-in account and the DLC droidtop installed with [gameId] (the Steamworks shim's player). */
+    override suspend fun player(context: Context, gameId: String): StorePlayer? = withContext(Dispatchers.IO) {
+        val credentials = SteamCredentials.load(context)?.takeIf { it.steamId64 != 0L } ?: return@withContext null
+        val dlc = gameId.toIntOrNull()?.let { db(context).installs().find(it) }?.dlcDepots.orEmpty().map(Int::toString).toSet()
+        StorePlayer(credentials.steamId64, credentials.accountName, dlc)
+    }
 
     override fun signIn(context: Context): StoreSignIn = StoreSignIn.Account(SteamSignIn(context, this))
 
