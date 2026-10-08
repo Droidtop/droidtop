@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Packs a software Vulkan driver for the x86_64 Wine guest: the Khronos Vulkan
-# loader and Mesa's lavapipe ICD, with every library they need that the x86_64
-# guest libraries (build-scripts/x86_64-guest-libs) and Android do not already provide.
+# Packs software graphics for the x86_64 Wine guest: the Khronos Vulkan loader
+# and Mesa's lavapipe ICD, and Mesa's xlib OpenGL (llvmpipe), with every library
+# they need that the x86_64 guest libraries (build-scripts/x86_64-guest-libs)
+# and Android do not already provide.
 #
 # Why this exists: DXVK needs a Vulkan driver that can present to the app's X
 # server (VK_KHR_xlib_surface / VK_KHR_xcb_surface). On an x86_64 Android device
@@ -19,11 +20,19 @@
 # GPL-3.0). usr/share/doc/x86_64-lavapipe/PACKAGES in the archive names every
 # package and version it was made from.
 #
-# Usage: GUEST_LIBS=<x86_64-guest-libs.tzst> build.sh <out.tzst>
+# OpenGL (Droidtop/tracker#309): WineD3D's default renderer is OpenGL, and the
+# x86_64 guest had none. Termux's own mesa package is a DRI GLX behind glvnd,
+# which needs a GLX extension the app's X server does not have, so the libGL here
+# is Mesa's xlib target (client-side GLX, XPutImage presentation, llvmpipe),
+# built from Termux's recipe and patches by mesa-gl/ (MESA_GL_DEB is that
+# package); its dependencies join the same closure.
+#
+# Usage: GUEST_LIBS=<x86_64-guest-libs.tzst> MESA_GL_DEB=<mesa .deb> build.sh <out.tzst>
 set -euo pipefail
 
-OUT=${1:?usage: GUEST_LIBS=<x86_64-guest-libs.tzst> build.sh <out.tzst>}
+OUT=${1:?usage: GUEST_LIBS=<x86_64-guest-libs.tzst> MESA_GL_DEB=<mesa .deb> build.sh <out.tzst>}
 GUEST_LIBS=${GUEST_LIBS:?set GUEST_LIBS to the x86_64-guest-libs.tzst this driver loads beside}
+MESA_GL_DEB=${MESA_GL_DEB:?set MESA_GL_DEB to the xlib OpenGL package mesa-gl/ built}
 WORK=${WORK:-$PWD/x86_64-lavapipe-build}
 INDEX_URL=https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-x86_64/Packages
 POOL_URL=https://packages.termux.dev/apt/termux-main
@@ -34,8 +43,18 @@ mkdir -p "$WORK/debs" "$WORK/unpack" "$WORK/guest" "$WORK/stage/usr/lib" "$WORK/
 curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$WORK/Packages" "$INDEX_URL"
 tar -C "$WORK/guest" -I zstd -xf "$GUEST_LIBS"
 
+# The xlib OpenGL package: its libraries go in as they are, and what it
+# depends on joins the closure below.
+mkdir -p "$WORK/unpack/mesa-gl"
+(cd "$WORK/unpack/mesa-gl" && ar x "$(realpath "$MESA_GL_DEB")" && tar -xf data.tar.* && tar -xf control.tar.*)
+gl_depends=$(sed -n 's/^Depends: //p' "$WORK/unpack/mesa-gl/control")
+gl_version=$(sed -n 's/^Version: //p' "$WORK/unpack/mesa-gl/control")
+find "$WORK/unpack/mesa-gl/data/data/com.termux/files/usr/lib" -maxdepth 1 \( -type f -o -type l \) -name 'libGL.so*' \
+    -exec cp -a {} "$WORK/stage/usr/lib/" \;
+printf 'mesa-xlib-gl %s https://www.mesa3d.org\n' "$gl_version" >> "$WORK/stage/usr/share/doc/x86_64-lavapipe/PACKAGES"
+
 # The package closure, by the index's own Depends; prints "name version filename sha256".
-python3 - "$WORK/Packages" > "$WORK/closure" <<'PY'
+python3 - "$WORK/Packages" "$gl_depends" > "$WORK/closure" <<'PY'
 import re, sys
 packages = {}
 for block in open(sys.argv[1], encoding="utf-8").read().split("\n\n"):
@@ -58,7 +77,7 @@ def names(depends):
             sys.exit("no package satisfies: " + group.strip())
         out.append(chosen)
     return out
-seen, queue = [], ["vulkan-loader-generic", "mesa-vulkan-icd-swrast"]
+seen, queue = [], ["vulkan-loader-generic", "mesa-vulkan-icd-swrast"] + names(sys.argv[2])
 while queue:
     name = queue.pop(0)
     if name in seen:
@@ -126,6 +145,7 @@ done < <(find "$WORK/stage/usr/lib" -type f -name '*.so*')
 [[ -f "$WORK/stage/usr/lib/libvulkan_lvp.so" ]] || { echo "no libvulkan_lvp.so in mesa-vulkan-icd-swrast" >&2; exit 1; }
 [[ -e "$WORK/stage/usr/lib/libvulkan.so.1" ]] || { echo "no libvulkan.so.1 in vulkan-loader-generic" >&2; exit 1; }
 [[ -f "$WORK/stage/usr/share/vulkan/icd.d/lvp_icd.x86_64.json" ]] || { echo "no lvp_icd.x86_64.json in mesa-vulkan-icd-swrast" >&2; exit 1; }
+[[ -e "$WORK/stage/usr/lib/libGL.so.1" ]] || { echo "no libGL.so.1 in the xlib OpenGL package" >&2; exit 1; }
 
 mkdir -p "$(dirname "$OUT")"
 tar -C "$WORK/stage" -I 'zstd -19 -T0' -cf "$OUT" usr

@@ -13489,6 +13489,22 @@ app gets it too:
     black), the first failure switches it to uploading the window's pixels
     for the rest of the session. The approach follows Bliss-Bass/GameNative-x64, which runs it on
     x86_64 tablets.
+  - **Software OpenGL in the same driver (2026-10-08, Droidtop/tracker#309).**
+    WineD3D's default renderer is OpenGL, and the x86_64 guest had no
+    `libGL.so.1`, so choosing WineD3D failed ("Failed to load libGL") and a
+    Unity game stopped at "failed to create factory". The lavapipe archive
+    now also carries Mesa's **xlib** `libGL.so.1` (llvmpipe): the app's X
+    server has no GLX extension, so Termux's own DRI/glvnd libGL cannot start
+    there, while the xlib target does GLX on the client side and presents
+    with XPutImage. It is built in the same workflow from Termux's mesa
+    recipe and patches (pinned termux-packages commit, Termux's package
+    builder, `build-scripts/x86_64-lavapipe/mesa-gl`), except the patch
+    that pins llvmpipe to one thread: upstream's threads are kept and
+    `LP_NUM_THREADS` still sets them. At launch, with that library present,
+    `WINE_X11FORCEGLX=1` (the Android patch to winex11 that skips the
+    server GLX check) and `XLIB_NO_SHM=1` (the same SysV reason as
+    `noshm` above) are set. WineD3D is then a working choice on x86_64;
+    DXVK stays the default.
   - **A window's pixels must reach the GPU (2026-10-03, Droidtop/tracker#242).**
     Mesa's X11 WSI selects Present events on the window it presents to, and
     the X server then keeps that window's content in a `GPUImage`: an
