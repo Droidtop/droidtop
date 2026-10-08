@@ -1,7 +1,7 @@
 package dev.droidtop.stores.steam
 
 import android.content.Context
-import dev.droidtop.library.stores.SocialLink
+import dev.droidtop.library.social.SocialLink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

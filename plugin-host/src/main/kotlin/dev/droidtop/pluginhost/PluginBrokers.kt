@@ -158,6 +158,8 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun librarySystems(): JSONObject = PluginBrokers.librarySystemsProvider()
 
+    override fun socialChanged(pluginId: String, change: JSONObject): Boolean = PluginBrokers.socialChanged(pluginId, change)
+
     override fun chainServedBy(pluginId: String): List<String> = PluginBrokers.chainServedBy(pluginId)
 
     override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply {
@@ -230,6 +232,12 @@ object PluginBrokers {
      * which depends on this module). Called on a binder thread, never the main thread.
      */
     @Volatile var librarySystemsProvider: () -> JSONObject = { JSONObject().put("ready", false).put("systems", JSONArray()) }
+
+    /**
+     * :app sets this at start: a social provider's `social.changed` (docs/plugin-api.md 3 C19), handed to the library's
+     * social hub, which lives in :library-core above this module. Called on a binder thread; it must not block.
+     */
+    @Volatile var socialChanged: (pluginId: String, change: JSONObject) -> Boolean = { _, _ -> false }
 
     private val binders = ConcurrentHashMap<String, IPluginHostBroker>()
     private var environment: AppBrokerEnvironment? = null

@@ -79,7 +79,7 @@ internal fun LeftMenuEntry.glyph(): ImageVector = when {
         GamingSection.GAMES -> Icons.Outlined.SportsEsports
         GamingSection.APPS -> Icons.Outlined.Apps
         GamingSection.STORES -> Icons.Outlined.Storefront
-        GamingSection.FRIENDS -> Icons.Outlined.Group
+        GamingSection.SOCIAL -> Icons.Outlined.Group
         GamingSection.DOWNLOADS -> Icons.Outlined.Download
         GamingSection.UPDATES -> Icons.Outlined.SystemUpdate
         GamingSection.PLUGINS -> Icons.Outlined.Extension

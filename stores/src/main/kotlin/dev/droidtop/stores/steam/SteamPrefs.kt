@@ -1,7 +1,7 @@
 package dev.droidtop.stores.steam
 
 import android.content.Context
-import dev.droidtop.library.stores.SocialPresence
+import dev.droidtop.library.social.SocialPresence
 
 /**
  * droidtop's own Steam settings (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313):

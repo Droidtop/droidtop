@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Hashes plugin-sample-py-social's payload (src/plugin.py) into the
+# exact shape PluginBundleInstaller.install() expects (docs/SPEC.md 12a),
+# same split as plugin-sample-py-statustile/build.sh -- this script never
+# touches the plugin origin's private key and is safe to run in CI (the
+# "sample-plugin-python-social" job in .github/workflows/android-build.yml runs
+# exactly this and uploads build/manifest.json + build/plugin.py
+# UNSIGNED). Signing is the separate sign.sh step: CI runs it with the
+# PLUGIN_SIGNING_KEY repo secret, droidtop-dev runs it locally with the origin key.
+#
+# A python-kind plugin's payload IS its source (plugin.py), so "build" is
+# just "hash the file and fill in the manifest".
+set -euo pipefail
+cd "$(dirname "$0")"
+
+rm -rf build
+mkdir -p build
+cp src/plugin.py build/plugin.py
+
+PLUGIN_SHA=$(sha256sum build/plugin.py | cut -d' ' -f1)
+
+python3 - "$PLUGIN_SHA" <<'PY'
+import json, sys
+sha = sys.argv[1]
+manifest = json.load(open("manifest.template.json"))
+manifest["payload"] = [{"path": "plugin.py", "sha256": sha}]
+json.dump(manifest, open("build/manifest.json", "w"), indent=2, sort_keys=True)
+PY
+
+echo "Built build/plugin.py and build/manifest.json (unsigned)"
+sha256sum build/plugin.py
+
+if [ -n "${PLUGIN_SIGNING_KEY:-}" ]; then
+  PLUGIN_SIGNING_KEY="$PLUGIN_SIGNING_KEY" ./sign.sh
+else
+  echo "PLUGIN_SIGNING_KEY not set -- stopping here, unsigned."
+  echo "Run ./sign.sh with PLUGIN_SIGNING_KEY set (CI does this with the PLUGIN_SIGNING_KEY repo secret) to produce droidtop.sample-py-social.droidplugin.tar.xz."
+fi

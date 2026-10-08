@@ -1,0 +1,27 @@
+{
+  "id": "droidtop.sample-py-social",
+  "origin": "droidtop",
+  "label": "Sample social provider (Python)",
+  "description": "A fake chat service that proves droidtop's social provider API end to end (docs/plugin-api.md C19); see build.sh in this folder.",
+  "version": "1.0.0",
+  "kind": "python",
+  "contractVersion": 2,
+  "permissions": [
+    {"id": "notify.post", "reason": "Shows a notification when a sample friend writes to you"}
+  ],
+  "requestsRoot": false,
+  "abis": [],
+  "provides": [
+    {
+      "point": "social.provider",
+      "version": 1,
+      "id": "default",
+      "label": "Sample chat"
+    },
+    {
+      "point": "ui.panel",
+      "version": 1,
+      "label": "Sample chat"
+    }
+  ]
+}

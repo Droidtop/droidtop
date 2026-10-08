@@ -1,6 +1,6 @@
 package dev.droidtop.stores
 
-import dev.droidtop.library.stores.SocialState
+import dev.droidtop.library.social.SocialState
 import dev.droidtop.stores.steam.SteamBackoff
 import dev.droidtop.stores.steam.SteamFriendsHub
 import `in`.dragonbra.javasteam.enums.EPersonaState

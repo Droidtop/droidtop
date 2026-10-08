@@ -1,13 +1,14 @@
 package dev.droidtop.stores.steam
 
 import android.content.Context
-import dev.droidtop.library.stores.SocialFriend
-import dev.droidtop.library.stores.SocialLink
-import dev.droidtop.library.stores.SocialMessage
-import dev.droidtop.library.stores.SocialOrder
-import dev.droidtop.library.stores.SocialPresence
-import dev.droidtop.library.stores.SocialState
-import dev.droidtop.library.stores.StoreSocial
+import dev.droidtop.library.social.SocialFriend
+import dev.droidtop.library.social.SocialHub
+import dev.droidtop.library.social.SocialLink
+import dev.droidtop.library.social.SocialMessage
+import dev.droidtop.library.social.SocialOrder
+import dev.droidtop.library.social.SocialPresence
+import dev.droidtop.library.social.SocialProvider
+import dev.droidtop.library.social.SocialState
 import `in`.dragonbra.javasteam.enums.EFriendRelationship
 import `in`.dragonbra.javasteam.enums.EPersonaState
 import `in`.dragonbra.javasteam.enums.EResult
@@ -32,8 +33,8 @@ import kotlinx.coroutines.future.await
 import timber.log.Timber
 
 /**
- * Steam's friends and 1:1 chat as droidtop's [StoreSocial] (docs/SPEC.md 7g,
- * "Stores", Droidtop/tracker#313): who is on and what they play, the unread
+ * Steam's friends and 1:1 chat as one of droidtop's social providers (docs/SPEC.md 7g,
+ * "Stores", Droidtop/tracker#313, and "Social", #327): who is on and what they play, the unread
  * messages Steam holds, the recent history of a conversation, sending, and a
  * message arriving while the connection is kept.
  *
@@ -44,7 +45,7 @@ import timber.log.Timber
  * here across reconnects so the screens keep what they show; it is cleared on
  * sign-out. Conversations are kept in memory only: Steam holds the history.
  */
-object SteamFriendsHub : StoreSocial {
+object SteamFriendsHub : SocialProvider {
     private const val TAG = "SteamFriendsHub"
     private const val CHAT_MSG = 1
     private const val HISTORY = 50
@@ -67,6 +68,11 @@ object SteamFriendsHub : StoreSocial {
     private val linkState = MutableStateFlow(SocialLink.OFF)
     private val meName = MutableStateFlow<String?>(null)
 
+    override val id: String = "steam"
+    override val label: String = "Steam"
+
+    override fun available(context: Context): Boolean = SteamCredentials.exists(context)
+
     override val friends: StateFlow<List<SocialFriend>> get() = friendList
     override val unread: StateFlow<Int> get() = unreadTotal
     override val link: StateFlow<SocialLink> get() = linkState
@@ -74,10 +80,6 @@ object SteamFriendsHub : StoreSocial {
 
     @Volatile private var messages: FriendMessages? = null
     @Volatile private var appContext: Context? = null
-
-    /** Called for a message that arrives while its conversation is not open: friend id, name, text. Set by the app, which owns notifications. */
-    @Volatile
-    var onIncoming: ((friendId: String, name: String, text: String) -> Unit)? = null
 
     fun setLink(link: SocialLink) {
         linkState.value = link
@@ -174,8 +176,7 @@ object SteamFriendsHub : StoreSocial {
         val context = appContext
         if (context != null && !SteamPrefs.notifyMessages(context)) return
         val name = synchronized(lock) { people[friend]?.name } ?: "Steam"
-        runCatching { onIncoming?.invoke(friend.toString(), name, text) }
-            .onFailure { Timber.tag(TAG).w(it, "Notifying a message failed") }
+        SocialHub.incoming(this, friend.toString(), name, text)
     }
 
     private fun acknowledge(friend: Long) {

@@ -83,7 +83,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_TIMEOUT = "pref_gaming_system_timeout"
     const val ID_SYSTEM_ANDROID_LINKS = "pref_gaming_system_android_links"
     const val ID_SYSTEM_UPDATES = "pref_gaming_system_updates"
-    const val ID_SYSTEM_FRIENDS = "pref_gaming_system_friends"
+    const val ID_SYSTEM_SOCIAL = "pref_gaming_system_social"
     const val ID_SYSTEM_AIRPLANE = "pref_gaming_system_airplane"
     const val ID_SYSTEM_POWER_MENU = "pref_gaming_system_power_menu"
     const val ID_AUDIO_OUTPUT = "pref_gaming_audio_output"
@@ -703,15 +703,15 @@ object GamingSettingsCatalog {
                         run = { ctx -> ctx.startActivity(controls.audioOutputIntent()) },
                     ),
                 )
-                // The Friends place's way in from the Quick Menu: the unread count is the tile's value, so
-                // a message shows without opening anything. Not drawn when no store has friends.
-                if (FriendsBadge.available) {
+                // The Social place's way in from the Quick Menu: the unread count over every provider is the
+                // tile's value, so a message shows without opening anything. Not drawn when nothing provides friends.
+                if (SocialBadge.available) {
                     add(
                         NestedScreenItem(
-                            id = ID_SYSTEM_FRIENDS,
-                            title = "Friends",
-                            registryId = "friends",
-                            valueLabel = { FriendsBadge.unread.takeIf { it > 0 }?.let { "$it new" } },
+                            id = ID_SYSTEM_SOCIAL,
+                            title = "Social",
+                            registryId = "social",
+                            valueLabel = { SocialBadge.unread.takeIf { it > 0 }?.let { "$it new" } },
                             icon = CatalogIcon.GLOBAL,
                         ),
                     )

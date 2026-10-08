@@ -5,7 +5,7 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.ToggleItem
-import dev.droidtop.library.stores.SocialPresence
+import dev.droidtop.library.social.SocialPresence
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

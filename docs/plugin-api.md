@@ -624,7 +624,8 @@ takes the shape and refuses the mechanism:
   settings page, a tile): never injected code, never a plugin's own
   widgets. The points that exist are the catalogue's C group; the ones
   built on 2026-10-07 are C17 (panel), C18 (game page rows) and C11 (Home
-  shelves), with C6a (toasts) as the first UI host API.
+  shelves), with C6a (toasts) as the first UI host API; on 2026-10-08 C19
+  (friends and chat, with its `social.changed` host API).
 - **Everything is visible and controllable.** Every point a plugin
   provides is an item on its approval list and on its Permissions screen
   (4.3), and a point it does not declare is never called (1.2). Turning a
@@ -1537,6 +1538,48 @@ Risk medium.
   `target` only with `library.read`, as for C4.
 - **Status:** built (2026-10-07, `PluginGameSections`).
 
+**C19 Friends and chat.** EP `social.provider@1`. Risk medium.
+- **For:** a service's friends, presence and 1:1 chat (Discord, Matrix,
+  another store) beside Steam's, in droidtop's one Social place
+  (docs/SPEC.md "Social", Droidtop/tracker#327).
+- **Static fields:** `id` (one account; `default` when absent; a plugin
+  with two accounts declares two entries) and `label` (the service's
+  name, shown as the friends' badge; the plugin's label when absent).
+- **Ops** (each a quick call, 5 s budget; a miss or an error reply keeps
+  what droidtop last had and is not a crash; every call's `args` carry
+  `service`, the entry's `id`):
+  - `account` returns `{link: online|connecting|reconnecting|offline,
+    name?, presence?: online|invisible|offline}`; no `presence` means the
+    service has no standing to set, and no status choice is drawn;
+  - `friends` returns `{friends: [{id, name, state: online|away|busy|
+    in_game|offline, activity?, unread?, lastMessageMs?}]}` (at most 2000;
+    the first of a repeated id wins; an unknown state reads as offline);
+  - `conversation {friendId, read}` returns `{messages: [{key, mine, text,
+    timeMs}]}` (the newest 200 are kept, ordered and de-duplicated by
+    droidtop); `read: true` means the person opened it, so the plugin marks
+    it read with its service;
+  - `send {friendId, text}` returns `{message?}`; an error reply's message
+    is shown on a "Not sent" row;
+  - `presence {presence}` sets the person's standing.
+- **Host API** `social.changed@1 {service?, friendId?, message?: {key,
+  text, timeMs}}` returns `{accepted}`: a plugin with a live connection
+  says a friend or a conversation changed, so droidtop never polls it.
+  Refused (PERMISSION_DENIED) unless the caller declares `social.provider`
+  and the person has not switched that point off, the same
+  `PluginGrants.pointRefusal` every host call to a plugin passes. droidtop
+  then asks `account` and `friends` again, and `conversation` when that one
+  is open. A `message` for a conversation that is not open becomes a
+  notification only when the plugin holds `notify.post`; without it the
+  unread count still moves.
+- **Surfaces:** G: the Social place (a left-menu place), the Quick Menu's
+  Social tile (the unread count over every provider); the notifications. Every row is droidtop's own: the plugin
+  never draws one.
+- **Permission:** the approval of the point ("Friends and chat"), and
+  `notify.post` for notifications. Staying connected in the background
+  needs `background.service` (E8, not built).
+- **Status:** built (2026-10-08, `PluginSocialProviders`, `SocialHub`);
+  sample `samples/plugin-sample-py-social`.
+
 ### D. System and device
 
 Every host API in this group is run by droidtop's own code with
@@ -1621,7 +1664,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | I1 | Debug surface | plugin authors and bug reports | Accounts and sources → Plugins → <plugin> → Developer (shown when developer options are on): the manifest as parsed; its grants; the last 50 calls with durations and error codes; the last 50 broker calls; the log (H5); "Call op…" with a JSON argument box (replaces today's status-tile "Call …" debug row); "Force crash" (today's `force-crash` query) | the debug row exists, status_tile only |
 | I2 | Fake host / test harness | test a plugin without a device | a JVM library `plugin-host-testing` (and a Python `droidtop_fake_host.py`) that loads a plugin, serves the host API from in-memory fakes with configurable grants, and runs the **conformance script** (§1.3) that every kind's sample must pass in CI | not built |
 | I3 | Manifest schema | validation for authors and CI | `docs/plugin-manifest.schema.json` (JSON Schema for contract 2, with v1 accepted), used by `PluginManifest` tests and by the sample CI jobs | not built |
-| I4 | Samples | a working starting point per kind | `samples/plugin-sample-statustile` (native), `-py-statustile`, `-flutter-statustile` exist; add one sample exercising `provides` + a dangerous permission + `requires` (a provider/caller pair) per kind | three built |
+| I4 | Samples | a working starting point per kind | `samples/plugin-sample-statustile` (native), `-py-statustile`, `-flutter-statustile` and `-py-social` (a C19 provider) exist; add one sample exercising `provides` + a dangerous permission + `requires` (a provider/caller pair) per kind | four built |
 
 ### J. Plugin platform (cross-cutting)
 
@@ -1632,11 +1675,11 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | J3 | Plugin-provided API broker | plugin → plugin | §2 | not built |
 | J4 | Host info | what this host supports | `host.info()` → {droidtopVersion, contract, supported EP/API versions, mode, device ABI, installId}; `plugins.available {api}` | not built |
 
-**The count:** ten areas (A to J) and **93 numbered entries**:
+**The count:** ten areas (A to J) and **94 numbered entries**:
 
 - A: 10
 - B: 7
-- C: 19 (C1 to C18, and C6a)
+- C: 20 (C1 to C19, and C6a)
 - D: 20
 - E: 10
 - F: 7
@@ -1645,7 +1688,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 - I: 4
 - J: 4
 
-E10 and J3 are the same broker seen from two areas, so there are 92
+E10 and J3 are the same broker seen from two areas, so there are 93
 distinct API groups. Groups closed on purpose (A5, A10, D12, D19, D20,
 G6) are counted, because deciding "not offered" is part of an
 exhaustive list.

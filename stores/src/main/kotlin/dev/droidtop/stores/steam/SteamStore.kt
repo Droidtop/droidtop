@@ -4,6 +4,7 @@ import android.content.Context
 import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.settings.CatalogItem
+import dev.droidtop.library.social.SocialProvider
 import dev.droidtop.library.stores.SaveConflictResolver
 import dev.droidtop.library.stores.SaveSyncPhase
 import dev.droidtop.library.stores.SaveSyncResult
@@ -13,7 +14,6 @@ import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLaunch
 import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreProgress
-import dev.droidtop.library.stores.StoreSocial
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreUpdateCheck
@@ -60,7 +60,7 @@ class SteamStore : StoreLibrary {
     override suspend fun completeSignIn(context: Context, secret: String): Result<String?> =
         Result.failure(UnsupportedOperationException("Steam signs in on its own screen"))
 
-    override val social: StoreSocial get() = SteamFriendsHub
+    override val social: SocialProvider get() = SteamFriendsHub
 
     override fun settingsItems(context: Context): List<CatalogItem> = SteamSettings.items(context)
 

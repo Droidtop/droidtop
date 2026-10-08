@@ -185,7 +185,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(WineOptionsCatalog.gameScreen())
         SettingsScreenRegistry.register(pcStoresScreen())
         SettingsScreenRegistry.register(StoresCatalog.screen())
-        SettingsScreenRegistry.register(FriendsCatalog.screen())
+        SettingsScreenRegistry.register(SocialCatalog.screen())
         SettingsScreenRegistry.register(accountsAndSourcesScreen())
         SettingsScreenRegistry.register(androidSettingsScreen())
         SettingsScreenRegistry.register(enginehostScreen())

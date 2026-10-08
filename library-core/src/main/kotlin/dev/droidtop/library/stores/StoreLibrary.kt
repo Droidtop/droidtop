@@ -5,6 +5,7 @@ import android.util.Log
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.LibraryRescan
+import dev.droidtop.library.social.SocialProvider
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -260,8 +261,8 @@ interface StoreLibrary {
     suspend fun unlockBranch(context: Context, gameId: String, branchId: String, password: String): Result<Unit> =
         Result.failure(UnsupportedOperationException("$label has no locked branches"))
 
-    /** The store's friends and chat, when it has them and stays connected while signed in (Steam); null otherwise. */
-    val social: StoreSocial? get() = null
+    /** The store's friends and chat as a social provider (docs/SPEC.md "Social"), when it has them and stays connected while signed in (Steam); null otherwise. */
+    val social: SocialProvider? get() = null
 
     /**
      * Rows the store adds to its page in the Stores place: its own settings

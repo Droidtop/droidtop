@@ -78,6 +78,11 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 dev.droidtop.library.integrations.PluginLibraryRead.snapshot(this@DroidtopApplication, LibraryCore.library(this@DroidtopApplication))
             }
         }
+        // `social.changed` (docs/plugin-api.md 3 C19): a social provider plugin says something changed, and the
+        // social hub asks it again off the binder thread (SPEC "Social").
+        dev.droidtop.pluginhost.PluginBrokers.socialChanged = { pluginId, change ->
+            dev.droidtop.library.integrations.PluginSocialProviders.changed(this, pluginId, change)
+        }
         // The task manager asks one privileged shell to force-stop an app and to read the system's task list:
         // the Shizuku app (or Sui) or the Shizuku plugin, whichever the user picked; with none, it says what to
         // enable (docs/SPEC.md "The task manager"). Runs in every process: the binder is shared across them.

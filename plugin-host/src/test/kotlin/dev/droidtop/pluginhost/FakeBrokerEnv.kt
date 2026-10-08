@@ -63,6 +63,11 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
         systemsAsked++
         return systemsReply
     }
+    val socialChanges = mutableListOf<Pair<String, JSONObject>>()
+    override fun socialChanged(pluginId: String, change: JSONObject): Boolean {
+        socialChanges += pluginId to change
+        return true
+    }
     override fun chainServedBy(pluginId: String) = chain
     override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply {
         forwards += provider.manifest.id to call

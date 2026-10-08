@@ -61,6 +61,12 @@ interface BrokerEnvironment {
      */
     fun librarySystems(): JSONObject
 
+    /**
+     * A `social.provider` plugin says its friends or a conversation changed (`social.changed`, docs/plugin-api.md 3 C19):
+     * droidtop asks it again off this thread. True when the change was taken. The broker checks the point first.
+     */
+    fun socialChanged(pluginId: String, change: JSONObject): Boolean = false
+
     /** The chain of plugins the call [pluginId] is currently serving came through (empty when it serves none). */
     fun chainServedBy(pluginId: String): List<String>
 
@@ -207,6 +213,20 @@ object HostApis {
         ) { env, record, args ->
             val text = args.optString("text").trim().takeIf { it.isNotEmpty() } ?: invalid("text is required")
             JSONObject().put("shown", env.toast(record.manifest.label, text.take(MAX_TOAST)))
+        },
+        // docs/plugin-api.md 3 C19: a social provider with a live connection says something changed, so droidtop never
+        // polls it. Only a plugin that provides social.provider, with that point still on, may say so.
+        HostOp(
+            "social", "changed",
+            target = { it.optString("friendId") },
+        ) { env, record, args ->
+            val point = "social.provider"
+            PluginGrants.pointRefusal(record, env.grants(record.manifest.id), point)?.let {
+                throw BrokerException(PluginErrorCode.PERMISSION_DENIED, it)
+            }
+            if (args.has("friendId") && args.optString("friendId").isBlank()) invalid("friendId must not be blank")
+            if (args.has("message") && args.optJSONObject("message") == null) invalid("message must be an object")
+            JSONObject().put("accepted", env.socialChanged(record.manifest.id, args))
         },
         // docs/plugin-api.md 3 A1: the user's systems and each one's chosen emulator, so a panel can list every system, not only those it heard about.
         HostOp("library.read", "systems", permission = "library.read") { env, _, _ -> env.librarySystems() },

@@ -56,6 +56,7 @@ object ExtensionPoints {
         ExtensionPoint("launcher.actions", "Launcher app drawer and home actions", PointRisk.MEDIUM, lets = "Lets it add actions to the app drawer and home screen."),
         ExtensionPoint("onboarding.step", "Setup steps", PointRisk.HIGH, officialOnly = true, lets = "Lets it add a step to droidtop's first-run setup."),
         ExtensionPoint("ui.companion", "Companion screen panels", PointRisk.LOW, lets = "Lets it add panels to the companion screen."),
+        ExtensionPoint("social.provider", "Friends and chat", PointRisk.MEDIUM, lets = "Lets it show your friends and conversations from a service, and send the messages you write there."),
         ExtensionPoint("apps.bridge", "Status and actions for another app", PointRisk.MEDIUM, lets = "Lets it show status and actions for another app you have installed."),
         ExtensionPoint("accounts.provider", "Accounts", PointRisk.LOW, lets = "Lets it hold a sign-in for a service."),
         ExtensionPoint("data.export", "Import and export", PointRisk.LOW, lets = "Lets it import and export your data."),

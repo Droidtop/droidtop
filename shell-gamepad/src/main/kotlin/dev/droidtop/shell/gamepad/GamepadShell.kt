@@ -1149,7 +1149,7 @@ private fun GamepadShellBody(
             GamingSection.APPS -> !appEntries.isNullOrEmpty()
             GamingSection.SETTINGS,
             GamingSection.STORES,
-            GamingSection.FRIENDS,
+            GamingSection.SOCIAL,
             GamingSection.DOWNLOADS,
             GamingSection.UPDATES,
             GamingSection.PLUGINS,
@@ -1356,7 +1356,7 @@ private fun GamepadShellBody(
                             // unreachable here, kept only so `when` stays exhaustive.
                             GamingSection.SETTINGS,
                             GamingSection.STORES,
-                            GamingSection.FRIENDS,
+                            GamingSection.SOCIAL,
                             GamingSection.DOWNLOADS,
                             GamingSection.UPDATES,
                             GamingSection.PLUGINS,
@@ -1917,7 +1917,7 @@ internal enum class GamingSection(val isPlace: Boolean = false) {
      * registered settings catalog screen drawn in place ([PlaceCatalogView]).
      */
     STORES(isPlace = true),
-    FRIENDS(isPlace = true),
+    SOCIAL(isPlace = true),
     DOWNLOADS(isPlace = true),
     UPDATES(isPlace = true),
     PLUGINS(isPlace = true),
@@ -1930,7 +1930,7 @@ internal enum class GamingSection(val isPlace: Boolean = false) {
     val placeScreenId: String?
         get() = when (this) {
             STORES -> PLACE_STORES_SCREEN_ID
-            FRIENDS -> PLACE_FRIENDS_SCREEN_ID
+            SOCIAL -> PLACE_SOCIAL_SCREEN_ID
             DOWNLOADS -> PLACE_DOWNLOADS_SCREEN_ID
             UPDATES -> PLACE_UPDATES_SCREEN_ID
             PLUGINS -> PLACE_PLUGINS_SCREEN_ID
@@ -1942,7 +1942,7 @@ internal enum class GamingSection(val isPlace: Boolean = false) {
 // module cannot depend on it), the same way PC_STORES_SCREEN_ID names the
 // PC setup screen.
 internal const val PLACE_STORES_SCREEN_ID = "stores"
-internal const val PLACE_FRIENDS_SCREEN_ID = "friends"
+internal const val PLACE_SOCIAL_SCREEN_ID = "social"
 internal const val PLACE_DOWNLOADS_SCREEN_ID = "plugin_jobs"
 internal const val PLACE_UPDATES_SCREEN_ID = "updates"
 internal const val PLACE_PLUGINS_SCREEN_ID = "plugins"
@@ -1999,7 +1999,7 @@ internal fun GamingSection.displayName(): String = when (this) {
     GamingSection.APPS -> "Apps"
     GamingSection.SETTINGS -> "Settings"
     GamingSection.STORES -> "Stores"
-    GamingSection.FRIENDS -> "Friends"
+    GamingSection.SOCIAL -> "Social"
     GamingSection.DOWNLOADS -> "Downloads and installs"
     GamingSection.UPDATES -> "Updates"
     GamingSection.PLUGINS -> "Plugins"

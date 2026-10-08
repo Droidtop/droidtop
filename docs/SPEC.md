@@ -9541,7 +9541,7 @@ follows:
   when the link is gone. Android needs a reason to keep the process, so the
   app runs `SteamConnectionService`, a `specialUse` foreground service with one
   ongoing notification at minimum importance (silent, collapsed: "Steam" and
-  "Connected" or the person's name, a tap opens the Friends place). It holds
+  "Connected" or the person's name, a tap opens the Social place). It holds
   nothing: the connection and its retries stay in `:stores`
   (`SteamConnectionHost` is the seam), and a refusal to start a foreground
   service from the background is not an error, the connection then lives as long
@@ -9549,27 +9549,16 @@ follows:
   Android's Doze can still suspend the network of a sleeping device; the
   connection then comes back on wake through the network callback. **The
   person's standing is one setting** (Steam's page in the Stores place, and the
-  Friends place): Online (the default) and Invisible keep the connection and set
+  Social place): Online (the default) and Invisible keep the connection and set
   the persona state, Offline closes it, stops the service and sends nothing; a
   connection opened only for a job never announces a presence. Sign-out ends
   the connection and forgets the friends.
-- **Friends and chat** (`StoreSocial` in `:library-core`, `SteamFriendsHub`
-  in `:stores`, `FriendsCatalog` in `:app`). **Where it lives (decided
-  2026-10-08):** the **Friends place** in the Gaming left menu (a place like
-  Stores and Downloads, hidden with them in Kiosk and Kid), reached from the
-  **Quick Menu's System tab** (a "Friends" tile that closes the menu and opens the
-  place, its value the unread count, `FriendsBadge`) and from a message
-  notification; it is a catalog screen, so pad, touch and the soft keyboard work
-  as they do everywhere, a message is typed in the shell's one text dialog (the
-  keyboard's Done key sends) and the screens read again when something
-  arrives (`CatalogScreen.live`, no polling). The companion screen gets no tab
-  in this first version (it is touch-only and has no text-entry surface yet).
-  The list shows each friend's name with, in the value column, "3 new", the
-  game they play, or how they are; unread conversations first, then who is in a
-  game, online, busy, away, offline (`SocialOrder.sorted`). A conversation is
-  the typing row ("Message"), then the messages newest first, "You" or the
-  friend and the time in the value column; a send that failed says why on its
-  own row. Labels and values only, no explanatory text. What Steam carries:
+- **Friends and chat** (`SteamFriendsHub` in `:stores`, Steam's
+  `SocialProvider`; the place, the tile and the notifications are every
+  provider's, see "Social" after "Places", Droidtop/tracker#327). Steam is the
+  first social provider: its friends and conversations appear in the
+  **Social place** in the Gaming left menu and the Quick Menu's Social tile
+  beside every other provider's. What Steam carries:
   the friends list and personas arrive by JavaSteam's callbacks; messages use
   the new Steam chat service (`FriendMessages` and `FriendMessagesClient`,
   `ServiceMethodNotification`): `GetActiveMessageSessions` once after each
@@ -9577,9 +9566,9 @@ follows:
   when it is opened, `SendMessage` sends plain text, an incoming message is the
   `IncomingMessage` notification, and opening a conversation tells Steam it was
   read (`AckMessage`). Typing indications and invitations are ignored. A new
-  message while its conversation is not open raises one notification per friend
-  (`SteamMessageNotifications`, only if notifications are already allowed and
-  the person has not turned them off in Steam's settings). Conversations are
+  message while its conversation is not open goes to `SocialHub.incoming` (the
+  one notification, per conversation) only if the person has not turned message
+  notifications off on Steam's page in Stores. Conversations are
   kept in memory; Steam holds the history. Not in this version: avatars,
   groups, friend requests, emoticons, images.
 - **DLC and versions** (`StoreLibrary.contentOptions`, `chooseContent`,
@@ -11922,7 +11911,7 @@ nothing else.
 ### Places: stores, friends, downloads, updates and plugins (directed 2026-10-01, Droidtop/tracker#258)
 
 The left menu is where things live. Beside the three tabs it lists five
-**places** (Friends joined on 2026-10-08, Droidtop/tracker#313), each one a registered settings screen drawn in the shell's
+**places** (Social joined on 2026-10-08 as Friends, Droidtop/tracker#313, and took every provider as Social the same day, #327), each one a registered settings screen drawn in the shell's
 content area by the same navigator Settings uses (`PlaceCatalogView`, so
 the same B, Info sheet and touch behaviour). A place is a `GamingSection`
 with `isPlace = true` (the flag only orders the left menu: the
@@ -11959,9 +11948,9 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   (`PcStoreNames`), for the code that makes them and the code that filters
   by them. Per-store settings do not exist yet: nothing in the backend is
   configurable per store, and no row is shown for it.
-- **Friends** (`friends`, `FriendsCatalog`; Droidtop/tracker#313): the friends of
-  every signed-in store that has them and the conversations with them, "Stores"
-  in 7g ("Friends and chat"). It sits after Stores in the left menu.
+- **Social** (`social`, `SocialCatalog`; Droidtop/tracker#313, #327): the friends
+  and conversations of every social provider, Steam and plugins alike, see
+  "Social" below. It sits after Stores in the left menu.
 - **Downloads and installs** (`plugin_jobs`, `PluginJobsScreen`): the one
   jobs list (plugin work, library scrapes, store depots, DownloadManager
   downloads, plugin updates) with progress, Pause, Resume and Cancel where
@@ -11993,6 +11982,80 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   carries a "Software updates" row of its own.
 - **Plugins** (`plugins`): the existing Plugins screen (installed,
   approvals, repositories, catalog), opened in place.
+
+### Social: one place for every provider (decided 2026-10-08, Droidtop/tracker#327)
+
+Owner, 2026-10-08: "Companion Friends tab: Probably add a global social tab,
+plugin api for social stuff, all that". Design note:
+coordination/design/social-2026-10-08.md.
+
+**The model.** A social **provider** is one account on one service:
+Steam, which droidtop runs itself (7g "Friends and chat"), or a running
+plugin that provides `social.provider@1` (docs/plugin-api.md C19). Every
+provider is a `SocialProvider` (`dev.droidtop.library.social`,
+`:library-core`): its id (`steam`, `plugin:<plugin id>/<entry id>`), its
+label (the service's name), whether it has an account to show, its link
+(Offline, Connecting, Connected, Reconnecting), the person's name there,
+their standing (Online, Invisible, Offline, or none when the service has
+none to set), the friends (name, state, "playing X", unread, last message
+time), and per friend a conversation of plain-text messages kept in memory
+(the service holds the history), open, close and send. A **contact** is a
+friend with its provider, keyed `<provider id>/<friend id>`, so two services
+never collide and one person on two services is two contacts: droidtop does
+not guess at cross-service identity. Invites, groups, friend requests,
+avatars, images and typing are out of this version for every provider.
+
+**One registry, one merge.** `SocialHub` holds the providers (the stores'
+`StoreLibrary.social` first, then one `PluginSocialProvider` per running
+plugin entry, by name) and is the only thing the screens read:
+`SocialOrder.contacts` merges every shown provider's friends into one list
+(unread first, then in a game, online, busy, away, offline, by name, the
+service's name last so the order is stable), `SocialOrder.conversations`
+is the contacts with messages (unread first, then newest), and the unread
+total is the sum over providers. A provider set to Offline shows no
+friends. `SocialHub.changes()` is the one flow live screens and the count
+follow; nothing polls. A store pushes (Steam's callbacks); a plugin is
+asked when a social screen opens (`SocialHub.refresh`: once per visit and
+at most every 30 s in the place) and
+when it says something changed (`social.changed`, below), never on a timer
+and never from list drawing.
+
+**Where it is drawn, all by droidtop, the same for Steam and plugins:**
+
+- **The Social place** (`SocialCatalog`, `GamingSection.SOCIAL`, registry id
+  `social`) replaces the Friends place: Conversations, Friends (the service
+  in the value column when more than one is on: "In game · Steam"), then
+  Accounts (each provider's status choice and, when it is not up, its
+  connection; pressing that row asks again; "Sign in to <store>" for a store
+  with friends that is not signed in). A conversation is the typing row
+  (the shell's one text dialog), then the messages newest first; a failed
+  send says why on a "Not sent" row. Hidden in Kiosk and Kid with the other
+  places.
+- **The Quick Menu's System tab** has a "Social" tile (`SocialBadge`) whose
+  value is the unread count over every provider; it opens the place.
+- **Notifications** (`SocialNotifications`): a message that arrives while its
+  conversation is not open is one notification per conversation (provider
+  and friend), titled with the friend's name, the service as sub-text,
+  replaced by that conversation's next message, on one "Messages" channel
+  (Steam's old "Steam messages" channel is removed); tapping it opens Gaming
+  on the Social place. Whether a provider's messages notify is the
+  provider's rule: Steam's "Message notifications" switch, and a plugin's
+  `notify.post` grant.
+
+**The plugin API.** `social.provider@1` (docs/plugin-api.md C19) is an
+extension point of medium risk, one line on the approval list ("Friends and
+chat") that the person can switch off: ops `account`, `friends`,
+`conversation {friendId, read}`, `send {friendId, text}` and
+`presence {presence}`, each a quick call with a 5 s budget whose miss keeps
+the last answer; every reply is checked and capped in one place
+(`PluginSocialProtocol`: 2000 friends, 200 messages, names and text cut).
+The plugin never draws a row. Its host API `social.changed` (a plugin with a
+live connection saying something happened) is refused unless the caller
+declares `social.provider` and that point is on; droidtop then asks it again
+off the binder thread. A plugin that wants to stay connected in the
+background needs `background.service`, which is not built: until then its
+friends are as fresh as its process. The sample is
+`samples/plugin-sample-py-social` (a fake service; CI tests and builds it).
 
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 

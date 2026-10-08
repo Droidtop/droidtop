@@ -403,6 +403,82 @@ jobs:
             samples/plugin-sample-py-statustile/build/manifest.json
           if-no-files-found: error
 
+  sample-plugin-python-social:
+    # Builds samples/plugin-sample-py-social (docs/plugin-api.md 3 C19,
+    # docs/SPEC.md "Social"): the sample social provider, a python-kind
+    # plugin with a fake chat service. Same steps as sample-plugin-python:
+    # its test against a fake droidtop module, the payload hash, and the
+    # signature when the PLUGIN_SIGNING_KEY secret is available (unsigned
+    # payload otherwise, said in the job summary).
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Test the sample social provider against a fake droidtop module
+        run: |
+          cd samples/plugin-sample-py-social
+          python3 test_plugin.py
+
+      - name: Build the sample social provider payload
+        run: |
+          cd samples/plugin-sample-py-social
+          ./build.sh
+
+      - name: Sign the bundle
+        id: sign
+        working-directory: samples/plugin-sample-py-social
+        env:
+          SIGNING_KEY_PEM: ${{ secrets.PLUGIN_SIGNING_KEY }}
+          SIGNING_CERT: ${{ secrets.PLUGIN_SIGNING_CERT }}
+        run: |
+          set -eu
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] || [ -z "$SIGNING_KEY_PEM" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Unsigned bundle: signing is skipped on pull requests and whenever the PLUGIN_SIGNING_KEY secret is absent (forks). The payload is uploaded unsigned." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          umask 077
+          printf '%s' "$SIGNING_KEY_PEM" > "$RUNNER_TEMP/k.pem"
+          export PLUGIN_SIGNING_KEY="$RUNNER_TEMP/k.pem"
+          if [ -n "$SIGNING_CERT" ]; then
+            printf '%s' "$SIGNING_CERT" > "$RUNNER_TEMP/origin.cert"
+            export PLUGIN_SIGNING_CERT="$RUNNER_TEMP/origin.cert"
+          fi
+          ./sign.sh
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "Signed bundle: $(ls ./*.droidplugin.tar.xz)"
+            if [ -n "$SIGNING_CERT" ]; then echo "origin.cert included."; else echo "No PLUGIN_SIGNING_CERT secret: no origin.cert in the bundle."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the signing material
+        if: always()
+        run: rm -f -- "${RUNNER_TEMP:?}/k.pem" "${RUNNER_TEMP:?}/origin.cert"
+
+      - name: Upload signed plugin bundle
+        if: steps.sign.outputs.signed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-sample-py-social
+          path: samples/plugin-sample-py-social/*.droidplugin.tar.xz
+          if-no-files-found: error
+
+      - name: Upload unsigned plugin payload (only when signing was skipped)
+        if: steps.sign.outputs.signed != 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-sample-py-social-unsigned
+          path: |
+            samples/plugin-sample-py-social/build/plugin.py
+            samples/plugin-sample-py-social/build/manifest.json
+          if-no-files-found: error
+
   sample-plugin-flutter:
     # Builds samples/plugin-sample-flutter-statustile's payload
     # (docs/SPEC.md 12a, flutter_embed kind): a real `flutter build apk`

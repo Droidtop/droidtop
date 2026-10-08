@@ -30,7 +30,7 @@ class LeftMenuTest {
         assertEquals(
             listOf(
                 GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS,
-                GamingSection.STORES, GamingSection.FRIENDS, GamingSection.DOWNLOADS, GamingSection.UPDATES, GamingSection.PLUGINS,
+                GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS, GamingSection.UPDATES, GamingSection.PLUGINS,
                 GamingSection.SETTINGS,
             ),
             menuSectionsFor(UiMode.FULL),
@@ -97,7 +97,7 @@ class LeftMenuTest {
     @Test
     fun `a link to a place's screen opens the place`() {
         val full = menuSectionsFor(UiMode.FULL)
-        assertEquals(GamingSection.FRIENDS, placeForScreen(PLACE_FRIENDS_SCREEN_ID, full))
+        assertEquals(GamingSection.SOCIAL, placeForScreen(PLACE_SOCIAL_SCREEN_ID, full))
         assertEquals(GamingSection.UPDATES, placeForScreen(PLACE_UPDATES_SCREEN_ID, full))
         assertEquals(GamingSection.PLUGINS, placeForScreen(PLACE_PLUGINS_SCREEN_ID, full))
     }
