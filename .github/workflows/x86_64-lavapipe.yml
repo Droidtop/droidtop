@@ -1,6 +1,7 @@
-name: x86_64 software Vulkan
+name: x86_64 software graphics
 
-# Packs build-scripts/x86_64-lavapipe into x86_64-lavapipe.tzst and publishes it as a
+# Packs build-scripts/x86_64-lavapipe into x86_64-lavapipe.tzst (software Vulkan
+# and, since Droidtop/tracker#309, software OpenGL) and publishes it as a
 # release asset. The app downloads it on x86_64 devices when a container's
 # graphics driver is lavapipe (runtime-windows/.../utils/X86_64Graphics.kt pins the
 # tag and the SHA-256), the same way the x86_64 guest libraries are a download.
@@ -27,9 +28,49 @@ env:
   # provide are left out of the archive (see build.sh).
   GUEST_LIBS_TAG: x86_64-guest-libs-20261008-8a05a54d
   GUEST_LIBS_REPO: Droidtop/droidtop
+  # termux-packages at the commit whose packages/mesa recipe and patches the
+  # xlib OpenGL build starts from (build-scripts/x86_64-lavapipe/mesa-gl).
+  TERMUX_PACKAGES_COMMIT: 2e8fa6379b106caa4829407611410025a0973e02
 
 jobs:
+  mesa-gl:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: termux-packages
+        run: |
+          git init -q "$RUNNER_TEMP/termux-packages"
+          cd "$RUNNER_TEMP/termux-packages"
+          git remote add origin https://github.com/termux/termux-packages
+          git fetch -q --depth 1 origin "$TERMUX_PACKAGES_COMMIT"
+          git checkout -q FETCH_HEAD
+
+      - name: Recipe
+        run: bash build-scripts/x86_64-lavapipe/mesa-gl/prepare.sh "$RUNNER_TEMP/termux-packages"
+
+      - name: Build
+        # Termux's own package builder image, as termux-packages' CI runs it;
+        # -I takes every dependency from Termux's x86_64 repository.
+        run: |
+          cd "$RUNNER_TEMP/termux-packages"
+          ./scripts/run-docker.sh ./build-package.sh -I -a x86_64 mesa-xlib-gl
+          ls -la output
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp output/mesa-xlib-gl_*_x86_64.deb "$GITHUB_WORKSPACE/out/"
+
+      - name: Upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: x86_64-mesa-gl
+          path: out/*.deb
+          retention-days: 30
+
   build:
+    needs: mesa-gl
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -47,11 +88,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release download "$GUEST_LIBS_TAG" -R "$GUEST_LIBS_REPO" -p x86_64-guest-libs.tzst -D "$RUNNER_TEMP"
 
+      - name: OpenGL package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: x86_64-mesa-gl
+          path: ${{ runner.temp }}/mesa-gl
+
       - name: Build
         env:
           GUEST_LIBS: ${{ runner.temp }}/x86_64-guest-libs.tzst
           WORK: ${{ runner.temp }}/lavapipe
         run: |
+          MESA_GL_DEB=$(ls "$RUNNER_TEMP"/mesa-gl/mesa-xlib-gl_*_x86_64.deb)
+          export MESA_GL_DEB
           bash build-scripts/x86_64-lavapipe/build.sh "$GITHUB_WORKSPACE/out/x86_64-lavapipe.tzst"
           cd out && sha256sum x86_64-lavapipe.tzst | tee x86_64-lavapipe.tzst.sha256
 
@@ -84,5 +133,5 @@ jobs:
           pre=--prerelease
           gh release create "$tag" out/x86_64-lavapipe.tzst out/x86_64-lavapipe.tzst.sha256 \
             -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" $pre \
-            --title "x86_64 software Vulkan ($tag)" \
-            --notes "Khronos Vulkan loader and Mesa lavapipe for the x86_64 Wine guest, from Termux's x86_64 packages (build-scripts/x86_64-lavapipe, packed from $BRANCH at $GITHUB_SHA; usr/share/doc/x86_64-lavapipe/PACKAGES lists every package and version). SHA-256: $(cut -d' ' -f1 out/x86_64-lavapipe.tzst.sha256)"
+            --title "x86_64 software graphics ($tag)" \
+            --notes "Khronos Vulkan loader and Mesa lavapipe from Termux's x86_64 packages, and Mesa's xlib OpenGL (llvmpipe) built from Termux's recipe and patches, for the x86_64 Wine guest (build-scripts/x86_64-lavapipe, packed from $BRANCH at $GITHUB_SHA; usr/share/doc/x86_64-lavapipe/PACKAGES lists every package and version). SHA-256: $(cut -d' ' -f1 out/x86_64-lavapipe.tzst.sha256)"

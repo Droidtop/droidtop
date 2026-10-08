@@ -11,10 +11,12 @@ import org.json.JSONObject
  * none of the arm64 ones (the Wrapper family, Turnip, Adreno, Vortek) exist.
  *
  * - [LAVAPIPE]: Mesa's software Vulkan driver with the Khronos loader, so DXVK
- *   and VKD3D get a device that presents to the app's X server. It renders on
- *   the CPU: slow, but it runs on every x86_64 device. Built by
- *   `tools/x86_64-lavapipe` in this repository's CI from Termux's x86_64
- *   packages and downloaded when a container first uses it.
+ *   and VKD3D get a device that presents to the app's X server, and Mesa's
+ *   xlib OpenGL (llvmpipe), so WineD3D's OpenGL renderer gets a context too
+ *   (Droidtop/tracker#309). Both render on the CPU: slow, but they run on
+ *   every x86_64 device. Built by `build-scripts/x86_64-lavapipe` in this
+ *   repository's CI from Termux's x86_64 packages and recipe and downloaded
+ *   when a container first uses it.
  * - [NONE]: no Vulkan driver in the guest. Wine still draws 2D and GDI through
  *   the X server; Direct3D has no device.
  *
@@ -35,7 +37,7 @@ object X86_64Graphics {
      */
     @JvmStatic
     fun label(id: String): String = when (id) {
-        LAVAPIPE -> "Lavapipe (software Vulkan)"
+        LAVAPIPE -> "Lavapipe (software Vulkan and OpenGL)"
         NONE -> "None (2D and GDI only)"
         else -> id
     }
@@ -45,8 +47,8 @@ object X86_64Graphics {
     val LABELS: List<String> = DRIVERS.map(::label)
 
     /** Release of Droidtop/droidtop that carries the asset; see .github/workflows/x86_64-lavapipe.yml. */
-    const val LAVAPIPE_TAG = "x86_64-lavapipe-20261008-8a05a54d"
-    const val LAVAPIPE_SHA256 = "6fc782fa7d84410e2fada8adfbc57fdc2dd6d096918a07c35ede8a1b487dad3c"
+    const val LAVAPIPE_TAG = "x86_64-lavapipe-20261008-f96d28e7"
+    const val LAVAPIPE_SHA256 = "0e5aafd768f5c488277c7bd031a50cb373066a7e99f372f6c689af962166e7c4"
     private val lavapipe = PinnedReleaseAsset(
         LAVAPIPE_TAG,
         "x86_64-lavapipe.tzst",
@@ -77,6 +79,12 @@ object X86_64Graphics {
      * The ICD manifest is rewritten to name this app's copy. Mesa's software
      * presentation is pinned to the socket copy (`sw,noshm`): this X server's
      * MIT-SHM takes SysV ids that lavapipe's libandroid-shmem does not produce.
+     *
+     * OpenGL: the same directory holds Mesa's xlib `libGL.so.1`, which does
+     * GLX on the client side, so Wine is told to use GLX although the X
+     * server has no GLX extension (`WINE_X11FORCEGLX`, the Android patch to
+     * winex11's opengl.c that [X86_64GuestLibs] otherwise clears), and the
+     * xlib winsys skips MIT-SHM for the same SysV reason (`XLIB_NO_SHM`).
      */
     @JvmStatic
     fun applyLaunchEnv(context: Context, container: Container, envVars: EnvVars) {
@@ -89,6 +97,10 @@ object X86_64Graphics {
         envVars.put("VK_ICD_FILENAMES", icd)
         envVars.put("VK_DRIVER_FILES", icd)
         envVars.put("MESA_VK_WSI_DEBUG", "sw,noshm")
+        if (File(lib, "libGL.so.1").exists()) {
+            envVars.put("WINE_X11FORCEGLX", "1")
+            envVars.put("XLIB_NO_SHM", "1")
+        }
         envVars.put("MESA_SHADER_CACHE_DIR", File(root, "cache").apply { mkdirs() }.path)
     }
 
