@@ -35,6 +35,18 @@ object DesktopSetupPrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_MICROPHONE, on).apply()
     }
 
+    /** Whether a desktop image has been chosen: without one no session can start (Droidtop/tracker#370). */
+    fun isSetUp(context: Context): Boolean = preferredPrimaryImageId(context) != null
+
+    /**
+     * The one way into Desktop setup: onboarding's DESKTOP_SETUP step on its own, which finishes when the
+     * step is answered. Settings' "Desktop setup" row and the desktop's own not-set-up and failed pages open it.
+     */
+    fun setupIntent(context: Context): android.content.Intent =
+        android.content.Intent(context, OnboardingActivity::class.java)
+            .putExtra(OnboardingActivity.EXTRA_START_STEP, "DESKTOP_SETUP")
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+
     fun preferredPrimaryImageId(context: Context): String? =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PRIMARY_IMAGE_ID, null)
 

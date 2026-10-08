@@ -1407,6 +1407,20 @@ mode's viewport, when the session was stopped, says so and has one button,
 "Start the desktop"; a failed start has "Try again" (rig dq-desk2-02: the
 only route was Containers, and the taskbar's Start is the Start menu).
 
+**A desktop with no image chosen is not started (decided 2026-10-08,
+Droidtop/tracker#370).** The session needs the image Desktop setup picks
+(`DesktopSetupPrefs`; droidtop never picks one itself). Entering Desktop
+without one used to start the session service anyway, ask for its
+notification, and end on "Desktop session failed to start" naming a
+"Settings → Desktop" that does not exist, with only "Try again". Now Desktop
+mode checks first (`DesktopSetupPrefs.isSetUp`): without an image it starts
+no session and asks nothing, and the viewport says "Set up the desktop" with
+one button, Desktop setup, which runs onboarding's Desktop setup step alone
+(`DesktopSetupPrefs.setupIntent`, the same link Settings' Desktop setup row
+uses). Coming back with an image chosen starts the session. A failed start
+(including an image the catalog has since dropped) has Desktop setup beside
+Try again.
+
 **Stopping is a stop (decided 2026-09-25, rig dq-coordinator-23 F9).**
 proot ignores SIGTERM (`src/tracee/event.c` sets every terminating signal
 but SIGQUIT and the fault signals to SIG_IGN) and sets no

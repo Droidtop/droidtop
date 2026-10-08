@@ -155,6 +155,13 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     /** Whether the desktop's notification-permission question is on screen (Desktop mode only). */
     private var askDesktopNotifications by mutableStateOf(false)
 
+    /**
+     * Whether Desktop setup has chosen a desktop image. Without one there is nothing for the session to
+     * start, so the desktop shows its setup page instead of starting a session that can only fail, and
+     * the notification question waits for a session that will run (Droidtop/tracker#370).
+     */
+    private var desktopSetUp by mutableStateOf(true)
+
     // Android's own prompt, after droidtop's reason. The desktop runs
     // either way, so the answer needs no handling here.
     private val notificationPermission =
@@ -336,7 +343,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                         // minimize affordances on it (sway ignores the zwlr request).
                         compositorCommand = connected?.compositorCommand,
                         sessionMessage = when (val state = sessionState) {
-                            is DesktopSessionState.Idle -> DesktopSessionMessage.Idle
+                            is DesktopSessionState.Idle ->
+                                if (desktopSetUp) DesktopSessionMessage.Idle else DesktopSessionMessage.NeedsSetup
                             is DesktopSessionState.Connecting -> DesktopSessionMessage.Connecting(state.detail)
                             is DesktopSessionState.Connected -> DesktopSessionMessage.Idle
                             is DesktopSessionState.Failed -> DesktopSessionMessage.Failed(state.message)
@@ -369,6 +377,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                         onDismissLaunchFailure = { DesktopSessionService.dismissLaunchFailure() },
                         onLaunchFailure = { DesktopSessionService.reportLaunchFailure(it) },
                         onStartSession = { DesktopSessionService.start(this@MainActivity) },
+                        onOpenSetup = { startActivity(DesktopSetupPrefs.setupIntent(this@MainActivity)) },
                     )
                     if (askDesktopNotifications) {
                         DesktopNotificationPermission.Dialog(
@@ -507,6 +516,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun onResume() {
         super.onResume()
         refreshModeIfUndecided()
+        // Back from Desktop setup with an image chosen: the session the setup page stood in for starts now.
+        if (mode == Mode.DESKTOP && !desktopSetUp) startDesktopSessionIfDesktop()
         // Where the second screen's trackpad sends navigation keys in
         // Gaming mode: this window, through ordinary dispatchKeyEvent.
         // See ForegroundShell for why that is the only route available.
@@ -567,6 +578,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
      */
     private fun startDesktopSessionIfDesktop() {
         if (mode != Mode.DESKTOP) return
+        desktopSetUp = DesktopSetupPrefs.isSetUp(this)
+        if (!desktopSetUp) return
         DesktopSessionService.start(this)
         // The first start asks for the notification the session shows,
         // reason first (DesktopNotificationPermission). The session does

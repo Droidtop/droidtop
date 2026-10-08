@@ -122,11 +122,13 @@ fun DesktopShell(
     onLaunchFailure: (String) -> Unit = {},
     /** Starts the desktop session: the button on the not-started and failed screens. */
     onStartSession: () -> Unit = {},
+    /** Opens Desktop setup: the button on the not-set-up and failed screens (Droidtop/tracker#370). */
+    onOpenSetup: () -> Unit = {},
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession)
+        DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup)
 
         Taskbar(
             hostBridge = hostBridge,
@@ -201,6 +203,8 @@ sealed interface DesktopSessionMessage {
     /** [detail]: the latest line the booting container reported (a first boot installs the desktop), if any. */
     data class Connecting(val detail: String? = null) : DesktopSessionMessage
     data class Failed(val reason: String) : DesktopSessionMessage
+    /** No desktop image has been chosen, so there is no session to start until Desktop setup runs. */
+    data object NeedsSetup : DesktopSessionMessage
 }
 
 @Composable
@@ -209,6 +213,7 @@ private fun BoxScope.DesktopViewport(
     primaryOutput: DisplayOutput?,
     sessionMessage: DesktopSessionMessage,
     onStartSession: () -> Unit,
+    onOpenSetup: () -> Unit,
 ) {
     if (hostBridge != null && primaryOutput != null) {
         var presentFailed by remember { mutableStateOf(false) }
@@ -325,7 +330,25 @@ private fun BoxScope.DesktopViewport(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
-                    Button(onClick = onStartSession, modifier = Modifier.padding(top = 16.dp)) { Text("Try again") }
+                    // The failure may be the setup itself (an image the catalog no longer has), so the
+                    // way to fix it sits beside the retry rather than in the sentence (Droidtop/tracker#370).
+                    Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(onClick = onStartSession) { Text("Try again") }
+                        androidx.compose.material3.OutlinedButton(onClick = onOpenSetup) { Text("Desktop setup") }
+                    }
+                }
+                is DesktopSessionMessage.NeedsSetup -> {
+                    // Nothing to start yet: the one next step is choosing the Linux system the
+                    // desktop runs, so the page offers exactly that (Droidtop/tracker#370).
+                    Text("Set up the desktop", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Choose the Linux system it runs.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    Button(onClick = onOpenSetup, modifier = Modifier.padding(top = 16.dp)) { Text("Desktop setup") }
                 }
                 is DesktopSessionMessage.Idle -> {
                     // The one thing to do here is start it, so the screen

@@ -263,13 +263,7 @@ object DroidtopWideSettings {
                             id = "pref_desktop_root_compositor_setup",
                             title = "Desktop setup",
                             subtitle = "Check what this device can run, and choose the distro and compositor",
-                            run = { ctx ->
-                                ctx.startActivity(
-                                    Intent(ctx, OnboardingActivity::class.java)
-                                        .putExtra(OnboardingActivity.EXTRA_START_STEP, "DESKTOP_SETUP")
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
-                            },
+                            run = { ctx -> ctx.startActivity(dev.droidtop.app.DesktopSetupPrefs.setupIntent(ctx)) },
                         ),
                         // The container manager is a catalog screen of its own
                         // (docs/SPEC.md 3d), opened in place by whichever

@@ -254,7 +254,7 @@ class DesktopSessionService : Service() {
         return repositories.firstOrNull { it.id == preferredId }
             ?: error(
                 if (preferredId == null) {
-                    "No desktop image chosen yet — pick one in Desktop setup (Onboarding, or Settings → Desktop)"
+                    "No desktop image chosen yet. Pick one in Desktop setup."
                 } else {
                     "The chosen desktop image ('$preferredId') is no longer in the catalog — pick one in Desktop setup"
                 }
