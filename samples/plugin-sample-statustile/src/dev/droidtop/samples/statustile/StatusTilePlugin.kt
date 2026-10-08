@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class StatusTilePlugin : DroidtopPlugin {
     private var loadCount = 0
     private val lastPercent = AtomicInteger(-1)
+    private val scheduledRuns = AtomicInteger(0)
     private val cancelledJobs = ConcurrentHashMap.newKeySet<String>()
     private var host: PluginContext? = null
 
@@ -54,7 +55,14 @@ class StatusTilePlugin : DroidtopPlugin {
             }
             // Its Quick Menu panel (docs/plugin-api.md 3 C17): a view like any other, drawn by droidtop.
             "ui.panel" -> when (call.op) {
-                "panel" -> PluginReply.ok(panelView())
+                // The same panel in every mode (docs/plugin-api.md 1.9); droidtop says where it is drawn.
+                "panel" -> PluginReply.ok(panelView(call.args.optJSONObject("context")?.optString("surface").orEmpty()))
+                "remember" -> {
+                    // A secret of this plugin's own, sealed by droidtop (G1); the panel's text box is in values.
+                    val word = call.args.optJSONObject("values")?.optString("word").orEmpty().ifBlank { "hello" }
+                    val reply = hostCall("vault", "put", JSONObject().put("key", "word").put("value", word))
+                    PluginReply.ok(JSONObject().put("message", if (reply?.optBoolean("ok") == true) "Remembered" else "droidtop did not keep it"))
+                }
                 "hello" -> {
                     // A plugin to droidtop call through the broker: droidtop shows the toast and names this plugin on it.
                     val reply = host?.call("ui.toast", 1, "show", JSONObject().put("text", "Hello from the sample panel").toString())
@@ -84,6 +92,12 @@ class StatusTilePlugin : DroidtopPlugin {
         }
         val callText = args.string("call") ?: ""
         val envelope = PluginCall.fromJson(callText)
+        if (envelope != null && envelope.point == "jobs.schedule" && envelope.op == "run") {
+            // A scheduled task (E9): droidtop starts it when it is due; it reports and ends.
+            scheduledRuns.incrementAndGet()
+            progress.complete(PluginResult.success(mapOf("message" to "Sample check ran")))
+            return
+        }
         if (envelope == null || envelope.op != "count") {
             progress.complete(PluginResult.failure("Unsupported job op: ${envelope?.op ?: "none"}"))
             return
@@ -161,8 +175,23 @@ class StatusTilePlugin : DroidtopPlugin {
         .put("view", 1)
         .put("sections", JSONArray().put(JSONObject().put("id", "main").put("items", JSONArray(items.toList()))))
 
-    private fun panelView(): JSONObject = view(
+    /** A broker call's reply as JSON, or null when there is no host. */
+    private fun hostCall(api: String, op: String, args: JSONObject): JSONObject? =
+        host?.call(api, 1, op, args.toString())?.let { runCatching { JSONObject(it) }.getOrNull() }
+
+    private fun panelView(surface: String): JSONObject = view(
+        item("info", "mode", "Drawn in") { put("value", hostCall("host", "info", JSONObject())?.optJSONObject("data")?.optString("mode") ?: "unknown") },
+        item("info", "surface", "Place") { put("value", surface.ifBlank { "unknown" }) },
         item("info", "loads", "Loaded") { put("value", "$loadCount time(s)") },
+        item("info", "ticks", "Scheduled checks run") { put("value", scheduledRuns.get().toString()) },
+        item("info", "word", "Remembered word") {
+            put("value", hostCall("vault", "get", JSONObject().put("key", "word"))?.optJSONObject("data")?.optString("value")?.takeIf { it.isNotBlank() && it != "null" } ?: "none")
+        },
+        item("text", "word", "A word to remember") { put("value", "") },
+        item("button", "remember", "Remember it") {
+            put("subtitle", "Keeps it in droidtop's vault for this plugin")
+            put("action", JSONObject().put("kind", "call").put("op", "remember"))
+        },
         item("button", "hello", "Say hello") {
             put("subtitle", "Asks droidtop to show a short message")
             put("action", JSONObject().put("kind", "call").put("op", "hello"))

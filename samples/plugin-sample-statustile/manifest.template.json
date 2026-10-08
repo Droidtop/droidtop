@@ -2,20 +2,22 @@
   "id": "droidtop.sample-statustile",
   "origin": "droidtop",
   "label": "Sample status tile",
-  "description": "Harmless sample exercising the plugin API end to end (SPEC 12a): a status tile, a Quick Menu panel, rows on a game's page and a shelf on Home; see build.sh in this folder.",
-  "version": "1.1.0",
+  "description": "Harmless sample exercising the plugin API end to end (SPEC 12a): a status tile and a panel in every mode, rows on a game's page, a shelf on Home and in the Desktop Start menu, a scheduled task and a vault value; see build.sh in this folder.",
+  "version": "1.2.0",
   "kind": "native_bundle",
   "contractVersion": 2,
   "provides": [
     {"point":"ui.status_tile","version":1,"id":"state","label":"Sample tile","surfaces":["gaming.quick_menu"]},
-    {"point":"ui.panel","version":1,"label":"Sample"},
+    {"point":"ui.panel","version":1,"label":"Sample","modes":["gaming","standard","desktop"]},
     {"point":"ui.game_section","version":1,"id":"facts","label":"Sample facts","tab":"extras","targets":["game"]},
     {"point":"gaming.rows","version":1,"id":"favourites","label":"Sample shelf"},
+    {"point":"jobs.schedule","version":1,"id":"tick","label":"Sample check","every":"6h"},
     {"point":"ui.settings","version":1,"target":"plugin"}
   ],
   "permissions": [
     {"id":"overlay.toast","reason":"Says hello when you press Say hello on its panel"},
-    {"id":"library.read","reason":"Puts your favourites on a shelf on Home and names the game on its page"}
+    {"id":"library.read","reason":"Puts your favourites on a shelf on Home and names the game on its page"},
+    {"id":"vault.own","reason":"Remembers the word you give it on its panel"}
   ],
   "requestsRoot": false,
   "abis": [],
