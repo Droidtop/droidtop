@@ -105,16 +105,16 @@ okhttp = "5.1.0"
 # Windows runtime's .tzst payloads are (:runtime-windows TarCompressorUtils).
 zstd-jni = "1.5.7-5"
 # https://github.com/zhanghai/AndroidLibArchive (Apache-2.0, over libarchive, BSD-2-Clause): 7z and RAR for itch.io uploads (:stores).
-# The version vendor/gamenative pins, so the APK keeps one copy of libarchive.
+# The version GameNative pinned, carried over with the stores.
 libarchive-android = "1.1.6"
 # JavaSteam (https://github.com/Longi94/JavaSteam, MIT) as GameNative builds it
 # (https://github.com/joshuatam/JavaSteam/tree/gamenative-latest), with its depot
 # downloader: droidtop's own Steam client in :stores. The same snapshot
-# vendor/gamenative pins, so the APK keeps one copy; published only on Sonatype's
+# GameNative pinned, carried over with the stores; published only on Sonatype's
 # snapshot repository (settings.gradle.kts).
 javasteam = "1.8.0.1-26-SNAPSHOT"
 # https://github.com/zxing/zxing (Apache-2.0): the QR codes of droidtop's sign-in
-# and key screens. The version vendor/gamenative pins, so the APK keeps one copy.
+# and key screens. The version GameNative pinned, carried over with the stores.
 zxing = "3.5.3"
 bouncycastle = "1.78.1"
 # Real ES-DE theme downloader parity -- ThemeDownloader.kt (library-core)

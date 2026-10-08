@@ -1827,8 +1827,7 @@ droidtop's normal desktop/gaming workflow to work.
 
 ## 3c. FEX-Emu — x86/x86-64 emulation for Linux software in general, not just Wine
 
-[vendor/gamenative](../vendor/gamenative) (`:runtime-windows`'s fork
-source, §5) already has real, working FEX-Emu integration alongside
+GameNative (`:runtime-windows`'s source, §5, §9) already has real, working FEX-Emu integration alongside
 Box64 — `FEXCorePresetsDialog.kt`/`Box64PresetsDialog.kt` in its settings
 UI, both selectable CPU-translation backends for the same Wine prefix.
 Once `:runtime-windows`'s `WineSession.launch()` is actually ported from
@@ -2305,10 +2304,10 @@ the `ContainerRuntime` interface that already exists (§3):
   halves are real targets, not just the Retroid + addon), the companion
   display offers a VIRTUAL controller as one of its roles, feeding the
   same GamepadKeyMap/GamepadAction layer physical pads use. Not built
-  from scratch AND not ported: vendor/gamenative's
+  from scratch AND not ported: GameNative's
   `com.winlator.inputcontrols` (a complete, real touch-controls/
-  virtual-gamepad implementation) is already vendored and compiled into
-  droidtop's build — hook those classes directly in-process (per
+  virtual-gamepad implementation) is already part of `:runtime-windows`
+  (§9) — hook those classes directly in-process (per
   direction), extending what runtime-windows compiles only if a needed
   class isn't in the set yet. User-toggleable; auto-offered only when
   no controller is present. Precisely: the virtual controller is a
@@ -4045,7 +4044,7 @@ AVF/pKVM is Pixel-only in practice and built for paravirtualized Linux
 guests, not general-purpose Windows VMs.
 
 **Conclusion: Wine + userspace x86 binary translation (`:runtime-windows`,
-which compiles [vendor/gamenative](../vendor/gamenative) in) is the only Windows
+GameNative's Windows runtime lifted into droidtop, §9) is the only Windows
 path.** Revisit hardware virtualization only if targeting Snapdragon 8
 Gen 2+/Dimensity 9000+ devices specifically, and even then only as a path
 to running a *Linux* guest, not Windows. See §5a for which translation
@@ -4053,8 +4052,8 @@ backend and for the native-Linux-build alternative to Wine entirely.
 
 ## 5a. CPU-translation backend choice, and preferring a native Linux build over Wine
 
-Two corrections to §5's "Wine + Box64" framing, both from gamenative
-source in [vendor/gamenative](../vendor/gamenative):
+Two corrections to §5's "Wine + Box64" framing, both from GameNative's
+source (now `:runtime-windows`, §9):
 
 - **Backend choice is the user's, per prefix, not fixed to Box64.** The
   backend is the prefix's own `emulator` field, and the vendored
@@ -12619,9 +12618,10 @@ archives beside extracted copies); droidtop never deletes or moves files.
 
 ## 8. Licensing
 
-`vendor/gamenative` and `vendor/droidspaces` are GPL-3.0. Winlator itself
-is LGPL-2.1 and reaches droidtop only through `vendor/gamenative`'s
-`com.winlator` tree; Lemuroid is GPL-3.0 and reaches it only through the
+GameNative's code lifted into `:runtime-windows` and `:stores` (droidtop's
+fork Droidtop/gamenative-tux, no longer a submodule) and `vendor/droidspaces`
+are GPL-3.0. Winlator itself is LGPL-2.1 and reaches droidtop only through
+GameNative's `com.winlator` tree in `:runtime-windows`; Lemuroid is GPL-3.0 and reaches it only through the
 four forked-in `romdetect` files and the bundled `libretro-db.sqlite`.
 Neither is vendored as a submodule. `vendor/sway`, `vendor/wlroots` (protocol definitions only — not
 compiled for Android, see `:host-bridge`), and `vendor/wayland`/`vendor/
@@ -12673,7 +12673,7 @@ library-core           → the unified library and its metadata (§7g); depends 
                           runtime-common, and on shell-default + IconLoader for the
                           launcher's own app-icon machinery
 stores                 → the PC stores droidtop runs itself (§7g "Stores": Steam, Epic,
-                          GOG, Amazon Games, itch.io, lifted out of vendor/gamenative) behind
+                          GOG, Amazon Games, itch.io, lifted out of GameNative) behind
                           library-core's StoreLibrary; depends on library-core and
                           runtime-common, never on the vendored tree
 display                → secondary-display behaviour for every mode, in one place (the
@@ -12864,17 +12864,10 @@ APK as arm64 under ARM translation (`app/build.gradle.kts`, `splits`).
 
 **Dependency versions.** One version source per dependency: module
 build files name catalog aliases, never inline version strings.
-droidtop's own modules read the `libs` catalog
-(`gradle/libs.versions.toml`); the trees compiled out of `vendor/` keep
-the fork's own catalog (`vendor/gamenative/gradle/libs.versions.toml`,
-registered as the second catalog `gn` in `settings.gradle.kts`) so
-their versions track the fork through the ordinary vendor sync instead
-of a hand-maintained duplicate that drifts. A deliberate divergence
-from a vendored version is a settings-level override next to that
-registration (`version("dagger-hilt", "2.57.2")`), never an edit under
-`vendor/`. The build's one SNAPSHOT dependency is
-`io.github.joshuatam:javasteam` (the vendored JavaSteam tree,
-`:runtime-windows`), and it stays one by decision (2026-09-26): the
+every module reads the one `libs` catalog (`gradle/libs.versions.toml`);
+the second catalog (`gn`, GameNative's own) went with the submodule
+(2026-10-08, §9). The build's one SNAPSHOT dependency is
+`io.github.joshuatam:javasteam` (droidtop's Steam client, `:stores`), and it stays one by decision (2026-09-26): the
 fork (github.com/joshuatam/JavaSteam, branch `gamenative-latest`) has
 published no tag and no release, and Maven Central holds nothing
 under `io.github.joshuatam`, so the artifact exists only in Sonatype's
@@ -13157,11 +13150,8 @@ gamenative's code actually calls:
 - `libvortekrenderer`: its JNI reports no context, so
   `VortekRendererComponent` never starts (how x86_64 Wine reaches a GPU
   instead is the open item under "Inside the guest" below).
-- `libsteambootstrap`: see Steam below.
-- upstream projects: lsfg-vk (`liblsfg-vk-layer`, the fork's submodule),
-  `libevshim` (the fork's source against `vendor/SDL2`'s headers; it
-  dlopens SDL at run time), the OpenXR loader (`vendor/OpenXR-SDK` at a
-  release tag), and PulseAudio 13.0 (`libpulse`, `libpulseaudio`,
+- upstream projects: `libevshim` (GameNative's source against
+  `vendor/SDL2`'s headers; it dlopens SDL at run time), and PulseAudio 13.0 (`libpulse`, `libpulseaudio`,
   `libpulsecommon-13.0`, `libpulsecore-13.0`) with libsndfile 1.0.28 and
   libltdl, built by `build-scripts/build-vendor-deps.sh` from
   `vendor/pulseaudio` and `vendor/libsndfile` with Termux's 13.0-era
@@ -13296,8 +13286,12 @@ app gets it too:
     `libvirglrenderer` droidtop already builds). Each becomes a value of the
     same option, fetched the same way, when its component is built.
 
-**Steam on x86_64 is the Linux client in proot (user, 2026-09-24).** On
-arm64, `libsteambootstrap` brings up Valve's Android arm64
+**Steam on x86_64 is the Linux client in proot (user, 2026-09-24).**
+(Since the runtime lift, 2026-10-08, §9, the arm64 in-prefix Steam client
+described next is not carried at all: droidtop's Steam is `:stores` and
+launches through the same Wine path as any store. The plan below stands for
+the day a game needs a running Steam client.) On
+arm64, GameNative's `libsteambootstrap` brought up Valve's Android arm64
 `libsteamclient.so` (`steam-androidarm64-*.tzst`, fetched by
 `BionicSteamAssetsDependency`) and Proton's `lsteamclient` bridge talks to
 it, the same shape as Proton on Linux. No x86_64 Android client is known,
@@ -13331,8 +13325,8 @@ the artifact or delays it. The gate's scope is one mechanism and one exception: 
 module droidtop writes -- `shell-default/src`, the launcher fork's own
 sources, included -- is strict, and a NewApi error there fails the build;
 the trees droidtop vendors rather than writes are covered by
-`app/lint-baseline.xml` instead -- the gamenative tree that
-`:runtime-windows` compiles from `vendor/gamenative` by `srcDir`, and
+`app/lint-baseline.xml` instead -- Winlator's runtime that
+`:runtime-windows` carries unchanged (`src/main/java/com/winlator`), and
 shell-default's vendored AOSP sub-libraries, `:WMShared`
 (`shell-default/wm_shared`), `:msdl` (`shell-default/msdllib`) and
 `:Shared` (`shell-default/shared`). A baseline rather than a source-set

@@ -9,7 +9,7 @@ plugins {
 
 /*
  * The PC stores droidtop runs itself (docs/SPEC.md 7g, "Stores"): Steam,
- * Epic, GOG, Amazon Games and itch.io, lifted out of vendor/gamenative into
+ * Epic, GOG, Amazon Games and itch.io, lifted out of GameNative into
  * droidtop's own module behind library-core's StoreLibrary. GameNative is
  * GPL-3.0 like droidtop; NOTICE.md credits it. Nothing here depends on the
  * vendored tree: a store that still needed a GameNative type would be the

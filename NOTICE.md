@@ -5,8 +5,8 @@ This project is distributed under the GNU General Public License v3.0 (see
 
 ## Vendored / forked sources
 
-- **GameNative** — `vendor/gamenative`, droidtop's fork
-  https://github.com/bi0shacker001/gamenative-tux of
+- **GameNative** — droidtop's fork https://github.com/Droidtop/gamenative-tux
+  (a standalone app project; no longer a submodule here) of
   https://github.com/utkarshdalal/GameNative — GPL-3.0.
   `runtime-windows` carries GameNative's Windows runtime, lifted from the
   fork at `0f08762e` (docs/SPEC.md §9): its `com.winlator` tree (Winlator's
@@ -81,7 +81,7 @@ This project is distributed under the GNU General Public License v3.0 (see
   `libproot.so` and its loaders, the separate
   executables `runtime-linux-noroot` runs containers through on a device
   without root. Linked with the single-file talloc (LGPL-3.0-or-later)
-  vendored at `vendor/gamenative/app/src/main/cpp/proot/talloc`.
+  in `build-scripts/talloc` (the copy GameNative's proot tree carried).
 - **hev-socks5-tunnel** — `vendor/hev-socks5-tunnel`, https://github.com/heiher/hev-socks5-tunnel — MIT,
   with its submodules hev-task-system, hev-socks5-core and yaml (MIT) and lwIP
   (BSD-3-Clause). Built into `libhev-socks5-tunnel.so`, the userspace IP
@@ -93,8 +93,6 @@ This project is distributed under the GNU General Public License v3.0 (see
   `packages/pulseaudio` at 39437706663c), kept in `build-scripts/pulseaudio-patches/`.
 - **libsndfile** — `vendor/libsndfile` (1.0.28), https://github.com/libsndfile/libsndfile — LGPL-2.1-or-later.
 - **libltdl** — GNU libtool's libltdl, from the build host's `libltdl-dev` — LGPL-2.1-or-later.
-- **OpenXR-SDK** — `vendor/OpenXR-SDK` (release-1.1.63), https://github.com/KhronosGroup/OpenXR-SDK —
-  Apache-2.0. Built into `libopenxr_loader.so` for x86_64.
 - **SDL2** — `vendor/SDL2` (release-2.32.10), https://github.com/libsdl-org/SDL — zlib.
   Headers only, for building gamenative's `libevshim.so` for x86_64.
   Also the source of the controller vendor and product ids droidtop classifies external pads by:

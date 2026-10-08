@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
-          # Vendored upstream sources (GameNative, DroidSpaces, sway,
+          # Vendored upstream sources (DroidSpaces, sway,
           # wlroots, moonlight-common-c, mbedtls, libffi, ...) are large;
           # we only ever need their current tip, not history.
           fetch-depth: 1
@@ -101,7 +101,8 @@ jobs:
         # Scope: our own modules are strict -- a NewApi error in anything
         # droidtop writes, shell-default/src (the launcher fork's own
         # sources) included, fails this step. The exceptions are the trees
-        # droidtop vendors rather than writes -- the gamenative tree and
+        # droidtop vendors rather than writes -- the Winlator runtime
+        # :runtime-windows carries unchanged (com.winlator) and
         # shell-default's vendored AOSP sub-libraries (:WMShared, :msdl,
         # :Shared) -- whose findings are recorded in app/lint-baseline.xml;
         # see the lint block in app/build.gradle.kts and SPEC 10b for why

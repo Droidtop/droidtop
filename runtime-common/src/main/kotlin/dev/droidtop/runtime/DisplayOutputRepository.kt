@@ -49,7 +49,7 @@ class DisplayOutputRepository(private val context: Context) {
     // (the plain, unfiltered property this used to read) is a real,
     // documented Android quirk -- a lot of secondary-display hardware
     // paths (confirmed for this exact "dual-screen add-on" category by
-    // vendor/gamenative's own already-working
+    // GameNative's own already-working
     // ExternalDisplaySwapController.findPresentationDisplay, ported below)
     // only reliably reports its non-default display through the
     // `DISPLAY_CATEGORY_PRESENTATION` query, and the plain `displays`

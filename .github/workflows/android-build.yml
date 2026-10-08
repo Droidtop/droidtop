@@ -72,7 +72,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
-          # Vendored upstream sources (GameNative, DroidSpaces, sway,
+          # Vendored upstream sources (DroidSpaces, sway,
           # wlroots, moonlight-common-c, mbedtls, libffi, ...) are large;
           # we only ever need their current tip, not history.
           fetch-depth: 1

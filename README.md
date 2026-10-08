@@ -81,7 +81,7 @@ These are droidtop's own modules:
 | `:host-bridge` | Native Wayland client plus JNI. It copies frames from the compositor inside the container onto Android surfaces, injects input into the container, and bridges the clipboard. It builds and links; its README says it has not been run against a live compositor. |
 | `:input-seat` | One input seat that combines touch, gamepad-as-pointer and the second-screen trackpad, and passes the input to `:host-bridge`. |
 | `:input-keyboard` | Hacker's Keyboard, forked in as a real Android IME. It is offered as an optional step in onboarding. |
-| `:runtime-windows` | Wine/Box64 compiled from the whole vendored GameNative tree (`vendor/gamenative`). It also provides the PC store library and launching PC games. |
+| `:runtime-windows` | The Windows runtime: Winlator's runtime as GameNative ships it, lifted into droidtop with the GameNative pieces it uses (docs/SPEC.md 9). It also provides the PC library and launching PC games. |
 | `:runtime-linux-root` | Rooted Linux containers. It drives the `droidspaces` binary built from `vendor/droidspaces`, and pulls OCI images with `crane`. Root is required. |
 | `:runtime-linux-noroot` | The proot container backend for devices without root (`ProotRuntime`), running Termux's proot from `vendor/proot` out of `nativeLibraryDir`. |
 
@@ -97,7 +97,6 @@ These are Git submodules under `vendor/`, as listed in `.gitmodules`:
 
 | Path | Upstream | Used for |
 |---|---|---|
-| `vendor/gamenative` | [bi0shacker001/gamenative-tux](https://github.com/bi0shacker001/gamenative-tux), a fork of [GameNative](https://github.com/utkarshdalal/GameNative) | Everything `:runtime-windows` compiles |
 | `vendor/droidspaces` | [ravindu644/Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) | The rooted container runtime |
 | `vendor/sway` | [swaywm/sway](https://github.com/swaywm/sway) | The compositor inside the container |
 | `vendor/wlroots` | [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) | Protocol XML only; the library itself is not built for Android |

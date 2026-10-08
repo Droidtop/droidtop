@@ -15,10 +15,9 @@ dependencyResolutionManagement {
         // see shell-default/README.md): chickenhook-restrictionbypass and
         // a couple of its other deps are only published there.
         maven { url = uri("https://jitpack.io") }
-        // Needed by :runtime-windows once it compiles the whole
-        // app.gamenative tree: gamenative pins a JavaSteam SNAPSHOT
-        // (io.github.joshuatam:javasteam), published only here — the
-        // same repository gamenative's own settings.gradle declares.
+        // Needed by :stores (droidtop's Steam client): GameNative's JavaSteam
+        // is a SNAPSHOT (io.github.joshuatam:javasteam), published only here,
+        // the repository GameNative's own settings.gradle declares.
         // Exclusive, both ways: that group is looked up here and nowhere
         // else, and nothing else is looked up here. A SNAPSHOT's metadata
         // is fetched from every repository listed before the one that has
@@ -47,31 +46,10 @@ dependencyResolutionManagement {
         // plugin-host/src/main/assets/flutter-runtimes.json.
         maven { url = uri("https://storage.googleapis.com/download.flutter.io") }
     }
-    // gradle/libs.versions.toml is picked up by convention — do not also
+    // gradle/libs.versions.toml is picked up by convention -- do not also
     // declare it via versionCatalogs { create("libs") { from(...) } },
     // that double-registers it and fails with "you can only call 'from' a
     // single time" (caught building against a real Gradle 8.9 install).
-    //
-    // gamenative's own catalog, registered as a SECOND catalog ("gn")
-    // rather than copied: :runtime-windows compiles the whole vendored
-    // app.gamenative tree, and its dependency versions should track the
-    // fork through the ordinary vendor sync, not a hand-maintained
-    // duplicate list that drifts.
-    versionCatalogs {
-        create("gn") {
-            from(files("vendor/gamenative/gradle/libs.versions.toml"))
-            // One deliberate divergence from the fork's toml: the fork
-            // pins Dagger 2.55, whose bundled (SHADED, under dagger.spi.
-            // internal.shaded) kotlin-metadata reader tops out at Kotlin
-            // 2.1 metadata and dies on droidtop's 2.2.21-compiled
-            // classes at :app:hiltJavaCompileDebug. No resolutionStrategy
-            // force can reach a shaded copy; the only real fix is a
-            // Dagger whose reader knows 2.2, and 2.57 is the first such
-            // release. Overridden here at the settings level so the
-            // vendored toml itself stays tracked, not hand-edited.
-            version("dagger-hilt", "2.57.2")
-        }
-    }
 }
 
 rootProject.name = "droidtop"
@@ -94,10 +72,9 @@ include(":host-bridge")
 // on this; it depends on nothing else in this repo.
 include(":runtime-common")
 
-// Windows compatibility runtime — Wine + Box64 from vendor/gamenative, stripped of
-// Winlator's own Android SurfaceView XServer. Runs as ordinary Linux processes inside
-// a container (primary or sibling), using Wine's native Wayland driver against the
-// primary container's compositor socket — same as running Wine on any Linux desktop.
+// Windows compatibility runtime (docs/SPEC.md 5b, 9): Winlator's runtime as GameNative
+// ships it, lifted into droidtop with the GameNative pieces it uses. Wine runs as the
+// app's own uid through linker64 against an ImageFs root, no root and no container.
 include(":runtime-windows")
 
 // Linux compatibility runtime, rooted path — built on DroidSpaces (vendor/droidspaces),
@@ -123,7 +100,7 @@ include(":input-seat")
 include(":library-core")
 
 // The PC stores droidtop runs itself (docs/SPEC.md 7g, "Stores"): Epic, GOG,
-// Amazon Games and itch.io, lifted out of vendor/gamenative behind
+// Amazon Games and itch.io, lifted out of GameNative behind
 // library-core's StoreLibrary.
 include(":stores")
 
