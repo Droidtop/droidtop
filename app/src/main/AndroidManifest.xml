@@ -461,6 +461,38 @@
         </service>
 
         <!--
+          Plugin background services (docs/plugin-api.md 3 E8): started only while a plugin task the
+          person switched on runs, as the reason Android keeps the process, with one silent notification.
+        -->
+        <service
+            android:name="dev.droidtop.app.PluginServicesService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Runs the plugin tasks the person switched on to keep running in the background" />
+        </service>
+
+        <!-- Plugin schedules (docs/plugin-api.md 3 E9): a periodic system job, scheduled only while one is on. -->
+        <service
+            android:name="dev.droidtop.app.PluginScheduleJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!--
+          Where plugin pages open in Standard and Desktop (docs/plugin-api.md 1.9): the Plugins list and
+          a panel from the home screen's menu or the Desktop taskbar.
+        -->
+        <activity
+            android:name="dev.droidtop.app.PluginHubActivity"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="dev.droidtop.app.action.PLUGIN_HUB" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
           Real bug this fixes: AmStartCommandToIntentConverter used to hand
           emulator apps a plain file:// URI (Uri.fromFile), which crashes
           with android.os.FileUriExposedException the moment the Intent

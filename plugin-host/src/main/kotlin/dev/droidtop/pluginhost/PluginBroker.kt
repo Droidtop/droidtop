@@ -76,6 +76,9 @@ interface BrokerEnvironment {
      */
     fun socialChanged(pluginId: String, change: JSONObject): Boolean = false
 
+    /** The per-plugin secret store behind `vault` (docs/plugin-api.md 3 G1); null where there is none (the call is UNSUPPORTED). */
+    fun vault(): PluginVault? = null
+
     /** The chain of plugins the call [pluginId] is currently serving came through (empty when it serves none). */
     fun chainServedBy(pluginId: String): List<String>
 
@@ -170,7 +173,10 @@ object HostApis {
             ExtensionPoints.all.forEach { points.put(it.id, JSONArray(it.versions.sorted())) }
             val apis = JSONObject()
             all().groupBy { it.api }.forEach { (api, list) -> apis.put(api, JSONArray(list.flatMap { it.versions }.distinct().sorted())) }
-            env.hostFacts()
+            val facts = env.hostFacts()
+            // One spelling of a mode everywhere a plugin meets one (docs/plugin-api.md 1.9): `standard`, never `android`.
+            PluginModes.canonical(facts.optString("mode"))?.let { facts.put("mode", it) }
+            facts
                 .put("contract", PLUGIN_CONTRACT_VERSION)
                 .put("points", points)
                 .put("apis", apis)
@@ -273,7 +279,35 @@ object HostApis {
         },
         // docs/plugin-api.md 3 A1: the user's systems and each one's chosen emulator, so a panel can list every system, not only those it heard about.
         HostOp("library.read", "systems", permission = "library.read") { env, _, _ -> env.librarySystems() },
+        // docs/plugin-api.md 3 G1: the caller's own secrets. The broker names the caller, so a plugin can only ever reach its own;
+        // the audit and every log carry the key's name at most, never a value.
+        HostOp("vault", "put", permission = "vault.own", target = { it.optString("key") }) { env, record, args ->
+            val key = args.optString("key")
+            val value = if (args.isNull("value")) invalid("value is required") else args.optString("value")
+            vaultOf(env).let { vault ->
+                try {
+                    vault.put(record.manifest.id, key, value)
+                } catch (e: PluginVault.Refused) {
+                    invalid(e.message.orEmpty())
+                }
+            }
+            JSONObject().put("stored", true)
+        },
+        HostOp("vault", "get", permission = "vault.own", target = { it.optString("key") }) { env, record, args ->
+            val key = args.optString("key").takeIf { PluginVault.validKey(it) } ?: invalid("key is required")
+            JSONObject().put("value", vaultOf(env).get(record.manifest.id, key) ?: JSONObject.NULL)
+        },
+        HostOp("vault", "delete", permission = "vault.own", target = { it.optString("key") }) { env, record, args ->
+            val key = args.optString("key").takeIf { PluginVault.validKey(it) } ?: invalid("key is required")
+            JSONObject().put("deleted", vaultOf(env).delete(record.manifest.id, key))
+        },
+        HostOp("vault", "keys", permission = "vault.own") { env, record, _ ->
+            JSONObject().put("keys", JSONArray(vaultOf(env).keys(record.manifest.id)))
+        },
     )
+
+    private fun vaultOf(env: BrokerEnvironment): PluginVault =
+        env.vault() ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop keeps no plugin secrets")
 
     /** The longest toast text droidtop shows; longer text is cut, never refused. */
     const val MAX_TOAST = 200

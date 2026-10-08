@@ -61,6 +61,10 @@ import dev.droidtop.runtime.DisplayOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import dev.droidtop.library.integrations.PluginHub
+import dev.droidtop.library.integrations.PluginPanels
+import dev.droidtop.library.integrations.PluginShelves
+import dev.droidtop.pluginhost.PluginModes
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -450,6 +454,7 @@ private fun BoxScope.Taskbar(
         TaskbarButton(onClick = { openSettings(context) }) {
             Text("Settings")
         }
+        PluginTaskbarItems()
         ClipboardNotice()
         SystemTray()
         Text(
@@ -785,6 +790,13 @@ private fun BoxScope.StartMenu(
     LaunchedEffect(library) {
         library.scanInBackground(START_MENU_KINDS)
     }
+    // Plugins' Home shelves, here as Start menu sections of the person's own entries (docs/plugin-api.md 1.9): the same
+    // gaming.rows answer Gaming's Home draws, asked for this surface off the main thread and kept 15 minutes.
+    var pluginShelves by remember { mutableStateOf<List<PluginShelves.Shelf>>(emptyList()) }
+    LaunchedEffect(entries) {
+        val list = entries ?: return@LaunchedEffect
+        pluginShelves = withContext(Dispatchers.IO) { PluginShelves.shelvesFor(context, list, surface = PluginModes.Surfaces.DESKTOP_START_MENU) }
+    }
     // Read again every time the menu opens: what is installed in the
     // container changes whenever the user installs something in it.
     LaunchedEffect(loadLinuxApps) {
@@ -867,6 +879,29 @@ private fun BoxScope.StartMenu(
                         }
                     }
                 }
+            }
+            val byId = currentEntries?.associateBy { it.id }.orEmpty()
+            pluginShelves.forEach { shelf ->
+                val shown = shelf.shelf.entryIds.mapNotNull { byId[it] }
+                if (shown.isEmpty()) return@forEach
+                item(key = "plugin-shelf:${shelf.pluginId}/${shelf.shelf.id}") { StartMenuHeader("${shelf.shelf.title}, from ${shelf.pluginLabel}") }
+                items(shown, key = { "plugin-shelf:${shelf.pluginId}/${shelf.shelf.id}/" + it.id }) { entry ->
+                    Text(
+                        entry.title,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                library.launchInBackground(entry.id) { result ->
+                                    if (result is LaunchResult.Refused) onLaunchFailure(result.reason)
+                                }
+                                onDismiss()
+                            }
+                            .padding(vertical = 4.dp, horizontal = 8.dp),
+                    )
+                }
+            }
+            if (loadLinuxApps != null || pluginShelves.isNotEmpty()) {
                 item(key = "library-header") { StartMenuHeader("Library") }
             }
             when {
@@ -921,4 +956,39 @@ private fun StartMenuHeader(title: String) {
         style = MaterialTheme.typography.labelMedium,
         modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 4.dp),
     )
+}
+
+/** How often the taskbar checks again whether any plugin has a panel for Desktop; also when the bar is first drawn. */
+private const val PLUGINS_RECHECK_MS = 60_000L
+
+/**
+ * "Plugins" on the taskbar (docs/plugin-api.md 1.9): Desktop's way to every plugin's panel, the same list Gaming's
+ * Quick Menu shows, drawn in droidtop's plugin window. Absent while no plugin has a panel for Desktop, so the bar shows
+ * nothing that does nothing. The check reads manifests and grants only, never a plugin.
+ */
+@Composable
+private fun PluginTaskbarItems() {
+    val context = LocalContext.current
+    var hasPanels by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            hasPanels = withContext(Dispatchers.IO) { PluginPanels.panelsFor(context, PluginModes.DESKTOP).isNotEmpty() }
+            delay(PLUGINS_RECHECK_MS)
+        }
+    }
+    if (hasPanels) {
+        TaskbarButton(
+            onClick = {
+                PluginHub.open(
+                    context,
+                    PluginPanels.quickMenuScreen(
+                        game = null,
+                        showManage = true,
+                        onReplyScreen = { screen -> PluginHub.open(context, screen) },
+                        surface = PluginModes.Surfaces.DESKTOP_TASKBAR,
+                    ),
+                )
+            },
+        ) { Text("Plugins") }
+    }
 }

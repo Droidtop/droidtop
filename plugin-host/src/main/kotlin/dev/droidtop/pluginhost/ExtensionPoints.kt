@@ -63,6 +63,9 @@ object ExtensionPoints {
         ExtensionPoint("containers.packages", "Container package sources", PointRisk.CRITICAL, lets = "Lets it supply software that droidtop installs into containers."),
         ExtensionPoint("media.source", "Act as a media player", PointRisk.MEDIUM, lets = "Lets it act as a media player."),
         ExtensionPoint("intents.in", "Be opened by other apps and links", PointRisk.HIGH, lets = "Lets other apps and links open things in it."),
+        // docs/plugin-api.md 3 E8, E9: long-running and periodic work; each entry also has its own switch on the plugin's page.
+        ExtensionPoint("jobs.service", "Keep running in the background", PointRisk.HIGH, lets = "Lets it keep a task running while you use other things, shown in droidtop's notification."),
+        ExtensionPoint("jobs.schedule", "Scheduled tasks", PointRisk.LOW, lets = "Lets it run a task on a schedule, such as a check every few hours."),
     )
 
     private val byId = all.associateBy { it.id }

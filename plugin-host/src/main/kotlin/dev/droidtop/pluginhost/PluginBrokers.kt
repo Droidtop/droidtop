@@ -125,6 +125,7 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         return JSONObject()
             .put("droidtopVersion", version ?: "unknown")
             .put("mode", PluginBrokers.modeProvider())
+            .put("modes", JSONArray(PluginBrokers.modesProvider()))
             .put("abis", JSONArray(Build.SUPPORTED_ABIS.toList()))
     }
 
@@ -157,6 +158,10 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
     }
 
     override fun librarySystems(): JSONObject = PluginBrokers.librarySystemsProvider()
+
+    private val pluginVault by lazy { PluginVault.forContext(appContext) }
+
+    override fun vault(): PluginVault = pluginVault
 
     override fun gamesRoots(): List<String> = dev.droidtop.library.settings.LibraryPaths.roots()
 
@@ -231,6 +236,9 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 object PluginBrokers {
     /** :app sets this at start: the mode droidtop is in (`gaming`, `android`, `desktop`), for `host.info`. */
     @Volatile var modeProvider: () -> String = { "unknown" }
+
+    /** :app sets this at start: the modes the person has switched on (`gaming`, `standard`, `desktop`), for `host.info` `modes`. */
+    @Volatile var modesProvider: () -> List<String> = { emptyList() }
 
     /**
      * :app sets this at start: the library's systems for `library.read` `systems` (the library lives in :library-core,

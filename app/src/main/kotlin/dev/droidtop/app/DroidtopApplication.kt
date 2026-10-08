@@ -65,12 +65,17 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)
         // What `host.info` tells a plugin about the mode droidtop is in (docs/plugin-api.md 3 J4).
-        dev.droidtop.pluginhost.PluginBrokers.modeProvider = {
-            when (val id = dev.droidtop.library.settings.Modes.lastMode(this)) {
-                "standard" -> "android"
-                else -> id
-            }
+        // One spelling for a mode wherever a plugin meets it (docs/plugin-api.md 1.9): `standard`, `gaming`, `desktop`.
+        dev.droidtop.pluginhost.PluginBrokers.modeProvider = { dev.droidtop.library.settings.Modes.lastMode(this) }
+        // Standard is always there (the Home button's screen); Gaming and Desktop when the person has them on.
+        dev.droidtop.pluginhost.PluginBrokers.modesProvider = {
+            val on = dev.droidtop.library.settings.Modes.enabled.map { it.id }.toSet() + dev.droidtop.pluginhost.PluginModes.STANDARD
+            dev.droidtop.pluginhost.PluginModes.ALL.filter { it in on }
         }
+        // Plugins in every mode (docs/plugin-api.md 1.9): "Plugins" on Standard's home-screen menu, and the plugin
+        // services and schedules the person switched on (E8, E9). Both read manifests off the main thread.
+        dev.droidtop.library.integrations.PluginStandardHooks.install(this)
+        PluginBackgroundHost.install(this)
         // `library.read` `systems` (docs/plugin-api.md 3 A1): the broker runs on a binder thread, which may block here;
         // the answer comes from the library's in-memory index, never a folder walk.
         dev.droidtop.pluginhost.PluginBrokers.librarySystemsProvider = {

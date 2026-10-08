@@ -12741,8 +12741,8 @@ The plugin never draws a row. Its host API `social.changed` (a plugin with a
 live connection saying something happened) is refused unless the caller
 declares `social.provider` and that point is on; droidtop then asks it again
 off the binder thread. A plugin that wants to stay connected in the
-background needs `background.service`, which is not built: until then its
-friends are as fresh as its process. The sample is
+background declares a `jobs.service@1` entry (12a "Plugins in every mode"):
+droidtop keeps it running while the person allows it. The sample is
 `samples/plugin-sample-py-social` (a fake service; CI tests and builds it).
 
 ### Social: messages from your apps (decided 2026-10-08, Droidtop/tracker#329)
@@ -15240,6 +15240,55 @@ take.
   a fake `droidtop` module. Any python plugin can provide `ui.panel`,
   `ui.game_section` and `gaming.rows` through `handle` like a native one,
   since the adapter serialises the envelope and nothing else.
+
+**Plugins in every mode (decided 2026-10-08, Droidtop/tracker#53;
+`docs/plugin-api.md` 1.9, E8, E9, G1, J4).** The owner: "they need to be
+able to act on all the UI modes if they want to. I feel like we've been
+focusing exclusively on gaming mode until now", then "Still focus on gaming
+mode for now, just wire it in OUT from there". So the contribution model is
+mode-neutral and Gaming's surfaces stay the reference; Standard and Desktop
+draw the same contributions where they already have a home, with Gaming's
+components, and get no surface family of their own yet.
+
+- **One declaration, every mode.** A `provides` entry may carry `modes`
+  (`gaming`, `standard`, `desktop`; `android` reads as `standard`); without
+  it the entry is in every mode its point has a place in
+  (`PluginModes.HOMES`). The plugin's Permissions screen has "Where it
+  appears", one switch per such mode (grant key `mode:<mode>`), which takes
+  the whole plugin out of that mode only. `providersOf` applies both when a
+  surface names its mode, so no surface decides it alone.
+- **Where they show.** Panels and their tiles: Gaming's Quick Menu,
+  "Plugins" on the Android home screen's long-press menu
+  (`PluginStandardHooks` answers the launcher from memory, refreshed off the
+  main thread on `PluginEpoch`), "Plugins" on the Desktop taskbar (shown
+  only while a plugin has a panel for Desktop). Both open the Quick Menu's
+  own list, drawn in droidtop's plugin window (`PluginHubActivity`, the
+  Containers screen's navigator and hint row). Home shelves (`gaming.rows`)
+  are also Start menu sections in Desktop (`context.surface`
+  `desktop.start_menu`, the answer kept 15 minutes per surface). Game page
+  rows and context actions stay Gaming's.
+- **`host.info`** says the mode as `gaming`, `standard` or `desktop` (it
+  said `android`), plus `modes`, the ones switched on.
+- **Background work is a point, not a permission.** `jobs.service@1` (high
+  risk, so its approval tick starts off) and `jobs.schedule@1` replace the
+  never-built permissions `background.service` and `schedule.jobs`: one
+  consent per thing. Each entry also has its own switch on the Permissions
+  screen. Services are plugin jobs `PluginBackground` keeps running (restart
+  after a failure at 30 s, 2, 10 and 30 min, then stopped), with
+  `PluginServicesService` as the reason Android keeps the process (one
+  silent notification, only while one runs). Schedules (`every` 15 min to 30
+  days, `charging`, `unmetered`) run from a periodic system job
+  (`PluginScheduleJobService`), scheduled only while a schedule is on.
+- **A vault per plugin** (`vault@1` `put`, `get`, `delete`, `keys`,
+  permission `vault.own`): sealed with the one at-rest cipher
+  (`KeystoreSecretCipher`) under a Keystore key per plugin, kept in
+  `noBackupFilesDir`, removed with the plugin. The broker names the caller,
+  so a plugin reaches only its own values.
+- **Later, in this order:** finish Gaming's catalogue points (launch hooks,
+  notifications, library facets, left-menu places, settings rows inside
+  droidtop screens), then Desktop taskbar items with a menu (`ui.tray`),
+  Start menu and home-screen actions (`launcher.actions`), context actions on
+  an app or a window, file associations, widget lines.
 
 **The API surface** (`PluginCapability`, a closed set — the trust shape
 differs per capability, same reasoning §12's `IntegrationCapability`

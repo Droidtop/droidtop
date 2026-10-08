@@ -10,6 +10,7 @@ import dev.droidtop.pluginhost.GrantState
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginErrorCode
 import dev.droidtop.pluginhost.PluginGrants
+import dev.droidtop.pluginhost.PluginModes
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginShelf
 import dev.droidtop.pluginhost.PluginShelfProtocol
@@ -52,7 +53,8 @@ object PluginGameSections {
 
     /** The sections whose static filter matches [target]. Reads manifests only; call it off the main thread. */
     fun sectionsFor(context: Context, target: ContextTarget): List<Section> =
-        providersOf(context, POINT)
+        // A game's page is Gaming's (docs/plugin-api.md 1.9): Standard and Desktop have no game page yet.
+        providersOf(context, POINT, PluginModes.GAMING)
             .filter { (_, entry) -> ContextActionFilter.matches(entry, target) }
             .map { (record, entry) -> Section(record, entry) }
 
@@ -178,8 +180,14 @@ object PluginShelves {
      * Every running plugin's shelves over [entries] (the entries Home can show). Off the main thread; a plugin that
      * fails, times out or is not allowed has no shelf, and is not asked again until [REFRESH_MS] has passed.
      */
-    suspend fun shelvesFor(context: Context, entries: List<LibraryEntry>, now: Long = System.currentTimeMillis()): List<Shelf> {
-        val providers = providersOf(context, POINT).distinctBy { it.first.manifest.id }
+    suspend fun shelvesFor(
+        context: Context,
+        entries: List<LibraryEntry>,
+        now: Long = System.currentTimeMillis(),
+        surface: String = PluginModes.Surfaces.GAMING_HOME,
+    ): List<Shelf> {
+        // Home in Gaming, the Start menu in Desktop (docs/plugin-api.md 1.9): the same answer shape, asked per surface.
+        val providers = providersOf(context, POINT, PluginModes.ofSurface(surface)).distinctBy { it.first.manifest.id }
         if (providers.isEmpty() || entries.isEmpty()) return emptyList()
         val known = entries.mapTo(HashSet()) { it.id }
         val candidates by lazy {
@@ -190,25 +198,26 @@ object PluginShelves {
             providers.map { (record, _) ->
                 async {
                     val id = record.manifest.id
-                    val cached = answers[id]?.takeIf { now - it.atMs < REFRESH_MS }
-                    val data = cached?.data ?: if (cached != null) null else ask(context, record, candidates).also { answers[id] = Answer(now, it) }
+                    val key = "$id@$surface"
+                    val cached = answers[key]?.takeIf { now - it.atMs < REFRESH_MS }
+                    val data = cached?.data ?: if (cached != null) null else ask(context, record, candidates, surface).also { answers[key] = Answer(now, it) }
                     data?.let { PluginShelfProtocol.shelves(it, known) }.orEmpty().map { Shelf(id, record.manifest.label, it) }
                 }
             }.awaitAll().flatten()
         }
     }
 
-    private suspend fun ask(context: Context, record: PluginRecord, candidates: List<ShelfCandidate>): JSONObject? {
+    private suspend fun ask(context: Context, record: PluginRecord, candidates: List<ShelfCandidate>, surface: String): JSONObject? {
         val grants = PluginGrants.forContext(context).read(record.manifest.id)
         val read = PluginGrants.stateOf(record, grants, "library.read") == GrantState.GRANTED
         val history = PluginGrants.stateOf(record, grants, "library.history") == GrantState.GRANTED
-        val hostContext = JSONObject().put("surface", "gaming.home")
+        val hostContext = JSONObject().put("surface", surface)
         PluginShelfProtocol.libraryContext(candidates, read, history)?.let { hostContext.put("library", it) }
         val policy = PluginCrashPolicy(context.applicationContext)
         return try {
             val reply = policy.handle(
                 record,
-                newCall(POINT, "rows", "gaming.home", JSONObject().put("context", hostContext), BUDGET_MS),
+                newCall(POINT, "rows", surface, JSONObject().put("context", hostContext), BUDGET_MS),
                 timeoutMs = BUDGET_MS,
                 crashOnTimeout = false,
                 // Home asks on its own schedule, not because the person pressed something: no permission sheet.

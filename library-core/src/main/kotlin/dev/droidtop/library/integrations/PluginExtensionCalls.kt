@@ -12,6 +12,7 @@ import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginGrants
 import dev.droidtop.pluginhost.PluginJobsCenter
+import dev.droidtop.pluginhost.PluginModes
 import dev.droidtop.pluginhost.PluginMetadataProtocol
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
@@ -33,13 +34,17 @@ data class PluginOutcome(
 )
 
 /** The plugins that are running and provide [point] at a version this build serves: manifests only, nothing is loaded or called. */
-internal fun providersOf(context: Context, point: String): List<Pair<PluginRecord, ProvidedPoint>> {
+internal fun providersOf(context: Context, point: String, mode: String? = null): List<Pair<PluginRecord, ProvidedPoint>> {
     val resolution = PluginApiResolver.current(context)
+    val grants = if (mode == null) null else PluginGrants.forContext(context)
     return PluginStore.installed(context)
         .filter { it.runnable() && !resolution.isWaiting(it.manifest.id) }
         .flatMap { record ->
+            // docs/plugin-api.md 1.9: in a mode, only the entries the plugin wants there and the person has not taken out of it.
+            val snapshot = grants?.read(record.manifest.id)
             record.manifest.v2.provides
                 .filter { it.point == point && ExtensionPoints.supports(it.point, it.version) }
+                .filter { entry -> mode == null || PluginModes.shows(snapshot!!, entry, mode) }
                 .map { record to it }
         }
 }
@@ -88,8 +93,8 @@ object PluginContextActions {
     }
 
     /** The actions whose static filter matches [target]. Reads manifests only; call it off the main thread. */
-    fun actionsFor(context: Context, target: ContextTarget): List<Action> =
-        providersOf(context, POINT).filter { (_, entry) -> ContextActionFilter.matches(entry, target) }.map { (record, entry) -> Action(record, entry) }
+    fun actionsFor(context: Context, target: ContextTarget, mode: String? = null): List<Action> =
+        providersOf(context, POINT, mode).filter { (_, entry) -> ContextActionFilter.matches(entry, target) }.map { (record, entry) -> Action(record, entry) }
 
     private fun argsFor(context: Context, action: Action, target: ContextTarget): JSONObject =
         JSONObject().put("actionId", action.id).put("target", targetArg(context, action.record, target))
@@ -218,8 +223,8 @@ object PluginTiles {
     private val lastState = ConcurrentHashMap<String, TileState>()
 
     /** The tiles for [surface], from manifests only; call it off the main thread. */
-    fun tilesFor(context: Context, surface: String = QUICK_MENU_SURFACE): List<Tile> =
-        (providersOf(context, STATUS_POINT) + providersOf(context, QUICK_POINT))
+    fun tilesFor(context: Context, surface: String = QUICK_MENU_SURFACE, mode: String? = null): List<Tile> =
+        (providersOf(context, STATUS_POINT, mode) + providersOf(context, QUICK_POINT, mode))
             .filter { (_, entry) -> PluginTileProtocol.onSurface(entry, surface) }
             .map { (record, entry) -> Tile(record, entry) }
 

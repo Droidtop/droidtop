@@ -229,6 +229,18 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
                     v.getContext().startActivity(games);
                     return true;
                 }));
+        // droidtop patch: plugins on the Android home screen (docs/plugin-api.md 1.9): their
+        // panels ("Plugins") and their launcher.actions, answered from memory by droidtop.
+        for (dev.droidtop.library.settings.PluginShellHooks.MenuEntry entry
+                : dev.droidtop.library.settings.PluginShellHooks.homeMenu(launcher)) {
+            options.add(new OptionItem(entry.getLabel(),
+                    ContextCompat.getDrawable(launcher, R.drawable.ic_widget),
+                    IGNORE,
+                    v -> {
+                        dev.droidtop.library.settings.PluginShellHooks.run(entry, v.getContext());
+                        return true;
+                    }));
+        }
         // droidtop patch: only offer the entry when something on this device can
         // actually answer ACTION_SET_WALLPAPER (a handheld firmware may ship no picker).
         if (wallpaperPickerIntent(launcher) != null) {

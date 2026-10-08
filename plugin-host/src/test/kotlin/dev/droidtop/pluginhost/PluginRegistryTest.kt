@@ -23,8 +23,8 @@ class PluginRegistryTest {
         val rows = table.lines().drop(2).takeWhile { it.startsWith("|") }.map { line ->
             line.trim().trim('|').split("|").map { it.trim() }
         }
-        assertEquals(66, rows.size)
-        assertEquals(66, PluginPermissions.all.size)
+        assertEquals(64, rows.size)
+        assertEquals(64, PluginPermissions.all.size)
         for (cells in rows) {
             val id = Regex("`([^`]+)`").find(cells[0])!!.groupValues[1]
             val entry = PluginPermissions.find(id)
@@ -52,7 +52,7 @@ class PluginRegistryTest {
     fun `the points that need consent are exactly the ones section 4_2 lists`() {
         val consent = ExtensionPoints.all.filter { it.risk.needsConsent }.map { it.id }.toSet()
         assertEquals(
-            setOf("library.sources", "saves.sync", "launch.provider", "files.handler", "onboarding.step", "intents.in", "containers.packages"),
+            setOf("library.sources", "saves.sync", "launch.provider", "files.handler", "onboarding.step", "intents.in", "containers.packages", "jobs.service"),
             consent,
         )
     }

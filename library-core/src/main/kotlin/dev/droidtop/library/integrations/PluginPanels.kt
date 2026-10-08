@@ -10,6 +10,7 @@ import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.pluginhost.ContextTarget
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginMainUi
+import dev.droidtop.pluginhost.PluginModes
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.ProvidedPoint
 import dev.droidtop.pluginhost.TileState
@@ -37,6 +38,8 @@ object PluginPanels {
     /** Where a panel is drawn, sent as the call's `context.surface`. */
     const val SURFACE_QUICK_MENU = "gaming.quick_menu"
     const val SURFACE_SETTINGS = "settings"
+    const val SURFACE_STANDARD = PluginModes.Surfaces.STANDARD_HOME
+    const val SURFACE_DESKTOP = PluginModes.Surfaces.DESKTOP_TASKBAR
 
     const val QUICK_MENU_SCREEN_ID = "plugin_panels"
 
@@ -57,9 +60,9 @@ object PluginPanels {
      * Every running plugin with something for the Quick Menu, by name (Decky sorts its list the same way). Reads
      * manifests only; call it off the main thread.
      */
-    fun panelsFor(context: Context): List<Panel> {
-        val declared = providersOf(context, POINT).distinctBy { it.first.manifest.id }.associateBy { it.first.manifest.id }
-        val tiles = PluginTiles.tilesFor(context).groupBy { it.record.manifest.id }
+    fun panelsFor(context: Context, mode: String? = null): List<Panel> {
+        val declared = providersOf(context, POINT, mode).distinctBy { it.first.manifest.id }.associateBy { it.first.manifest.id }
+        val tiles = PluginTiles.tilesFor(context, mode = mode).groupBy { it.record.manifest.id }
         return (declared.keys + tiles.keys).map { id ->
             val panel = declared[id]
             Panel(record = panel?.first ?: tiles.getValue(id).first().record, entry = panel?.second, tiles = tiles[id].orEmpty())
@@ -78,12 +81,14 @@ object PluginPanels {
         game: ContextTarget?,
         showManage: Boolean,
         onReplyScreen: (CatalogScreen) -> Unit,
+        surface: String = SURFACE_QUICK_MENU,
     ): CatalogScreen = CatalogScreen(
-        id = QUICK_MENU_SCREEN_ID,
+        // The same list is Standard's and Desktop's way to the panels (docs/plugin-api.md 1.9), named for its surface.
+        id = if (surface == SURFACE_QUICK_MENU) QUICK_MENU_SCREEN_ID else "${QUICK_MENU_SCREEN_ID}_$surface",
         title = "Plugins",
         groups = { context ->
             withContext(Dispatchers.IO) {
-                val panels = panelsFor(context)
+                val panels = panelsFor(context, PluginModes.ofSurface(surface))
                 // The catalog as last fetched, never a network call: Decky's badge on a plugin with an update.
                 val index = PluginCatalog.lastGoodIndex(context)
                 val rows: List<CatalogItem> = panels.map { panel ->
@@ -92,7 +97,7 @@ object PluginPanels {
                     NestedScreenItem(
                         id = "plugin_panel_${panel.pluginId}",
                         title = panel.label,
-                        inline = panelScreen(context, panel, SURFACE_QUICK_MENU, game, withMore = true, onReplyScreen = onReplyScreen),
+                        inline = panelScreen(context, panel, surface, game, withMore = true, onReplyScreen = onReplyScreen),
                         valueLabel = { value },
                     )
                 }

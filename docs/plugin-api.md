@@ -271,7 +271,7 @@ each plugin:
 | **Approve** | The approval screen shows, in plain language: what the plugin adds and where (grouped by mode), what it can access (normal permissions as a short list; each dangerous permission and high-risk extension point as its own line), what it needs from other plugins, and its trust badge (Official / Added by you). Every item is a tick box and **the plugin runs with the ticked subset** (decided 2026-10-01, §4.3 "Approval is a list"). Unticked dangerous permissions stay at `ask` (§4.3). | the approval screen in `AppSettingsCatalogs.pluginsScreen` |
 | **Enable** | An approved plugin is enabled by default. Disabling stops every call to it and hides its contributions everywhere, because `PluginStore.runnableFor` is the only iterator (checklist point 6). | `PluginStore.setEnabled` |
 | **Resolve** | On every install, approve, enable, disable, uninstall or crash, the `requires` graph is recomputed (§2.3). A plugin whose *required* API has no runnable provider is **Waiting**. It is not disabled, and it resumes by itself when a provider appears. | new: `PluginApiResolver` |
-| **Run** | Loading is lazy: a plugin is loaded on its first call, and after 60 s idle (proposed) it is unloaded unless it holds a job or a declared background service (§3 E7). A crash, an uncaught exception, a native crash, a timeout or process death disables that plugin with a reason, and the user re-enables it by hand (12a checklist point 6). **Kept as is:** crash containment is the one rule `PluginCrashPolicy` exists for. | `PluginCrashPolicy`, `NativePluginRunner` |
+| **Run** | Loading is lazy: a plugin is loaded on its first call, and after 60 s idle (proposed) it is unloaded unless it holds a job or a running background service (§3 E8). A crash, an uncaught exception, a native crash, a timeout or process death disables that plugin with a reason, and the user re-enables it by hand (12a checklist point 6). **Kept as is:** crash containment is the one rule `PluginCrashPolicy` exists for. | `PluginCrashPolicy`, `NativePluginRunner` |
 | **Update** | Same key: approval carries over (12a "Trust over updates"). **v2 adds a permission diff.** An update that adds any permission, extension point or `exports` entry keeps running with its *old* grants; the new items wait at `ask`, and the plugin's page asks about those items only, on the same list as at approval ("Wants new access", §4.3). An update never gains dangerous access silently. A different key, or a previously DENIED plugin, goes back to PENDING (unchanged). | `PluginStore`, `PluginRecord.approvedKeySha256` |
 | **Uninstall** | `onUnload` runs, and the payload, data directory, vault entries, grants and scheduled work are deleted. The audit log for the plugin is kept for 7 days (labelled "removed plugin") so that "what did it do" can still be answered. Dependents are re-resolved (§2.5). | `PluginStore.uninstall` |
 
@@ -645,6 +645,54 @@ takes the shape and refuses the mechanism:
   (`executeInTab`, `injectCssIntoTab`), React tree patching, and plugin
   backends that run as root by a manifest flag. A plugin reaches root only
   through a provider plugin the user approved (2.7).
+
+### 1.9 Plugins in every mode (decided 2026-10-08, Droidtop/tracker#53)
+
+*Owner: "they need to be able to act on all the UI modes if they want to. I
+feel like we've been focusing exclusively on gaming mode until now", then
+"Still focus on gaming mode for now, just wire it in OUT from there".*
+
+A droidtop device has three modes, Gaming, Standard (the Android home
+screen) and Desktop, and a plugin reaches all of them through the same
+declared points. Gaming's surfaces come first; Standard and Desktop draw the
+**same contributions** where they already have a natural home, with
+Gaming's components (the one catalog renderer, `PluginViews`), not a family
+of surfaces of their own.
+
+- **`modes` on an entry.** Any `provides` entry may say where it wants to
+  be: `"modes": ["gaming", "desktop"]` (`android` is read as `standard`).
+  An entry without `modes` is in every mode where its point has a place;
+  one that names only modes this build does not have is nowhere.
+- **The person decides too.** The plugin's Permissions screen has "Where it
+  appears": one switch per mode the plugin has a place in (grant key
+  `mode:<mode>`, on unless switched off). Off removes every contribution of
+  that plugin from that mode and nowhere else; the point switches still
+  work per point. A same-key update keeps these switches.
+- **The mode a plugin is drawn in** is `host.info().mode` (`gaming`,
+  `standard` or `desktop`; it said `android` for Standard before
+  2026-10-08), `host.info().modes` lists the modes that are on, and every
+  call's `context.surface` names the place (`gaming.quick_menu`,
+  `standard.home`, `desktop.taskbar`, `gaming.home`, `desktop.start_menu`,
+  `settings`).
+- **Where each point is drawn** (`PluginModes.HOMES`):
+
+| Point | Gaming | Standard | Desktop |
+| --- | --- | --- | --- |
+| `ui.panel` and tiles (C17, C2, C3) | Quick Menu Plugins section | home screen's long-press menu: "Plugins", the same list, in droidtop's plugin window | taskbar "Plugins", the same list |
+| `gaming.rows` (C11) | Home shelves | — (no shelf of games) | Start menu sections of the same entries |
+| `ui.game_section`, `ui.context_action` (C18, C4) | game pages | — (no game page) | — |
+| `social.provider` (C19) | Social place, Quick Menu tile, companion | Settings → Social | Settings → Social |
+| `ui.settings`, `ui.main` (C1, C16) | Settings | Settings | Settings |
+| `jobs.service`, `jobs.schedule` (E8, E9) | run in every mode, shown in Jobs | same | same |
+
+- **droidtop's plugin window** (`PluginHubActivity`, opened through
+  `PluginHub`): where a panel opened from Standard or Desktop is drawn,
+  with the same navigator, hint row and look as the Containers screen.
+- **Later, not built:** Desktop taskbar items with a menu (C8 `ui.tray`),
+  Start menu and home-screen actions (C12 `launcher.actions`), context
+  actions on an app (long-press) or a window, file associations (E4), and
+  widget lines (C10). Each is a catalogue row already; they come after
+  Gaming's surfaces are complete.
 
 ---
 
@@ -1441,7 +1489,8 @@ Risk low.
 - **Surfaces:** G: droidtop's own surfaces only (Quick Menu, a game's
   page, options menus), never inside a themed view, until the
   frame-only render declares a region for host content (§1.6, #179);
-  A: —; D: —.
+  A: —; D: the Start menu, one section per shelf, asked with
+  `context.surface` `desktop.start_menu` (1.9).
 - **Permission:** `provide:gaming.rows`, plus `net.domains` for the art,
   which the host fetches.
 - **Status:** built for shelves of library entries (2026-10-07,
@@ -1534,9 +1583,10 @@ Risk medium.
   plugin's label when absent).
 - **Ops:** `panel {context:{surface, game?}}` returns a view (1.6); the
   view's actions come back to this point. `surface` is
-  `gaming.quick_menu` or `settings`; `game` is the running game's
+  `gaming.quick_menu`, `standard.home`, `desktop.taskbar` or `settings`; `game` is the running game's
   `target` under the `library.read` rule (C4).
-- **Surfaces:** G: the Quick Menu's Plugins section; G, S, D: a "Panel"
+- **Surfaces:** G: the Quick Menu's Plugins section; A: "Plugins" on the
+  home screen's long-press menu; D: "Plugins" on the taskbar (1.9); G, S, D: a "Panel"
   row on the plugin's page under Settings.
 - **Permission:** none beyond the approval of the point.
 - **Status:** built (2026-10-07, `PluginPanels`).
@@ -1602,7 +1652,7 @@ Risk medium.
   never draws one.
 - **Permission:** the approval of the point ("Friends and chat"), and
   `notify.post` for notifications. Staying connected in the background
-  needs `background.service` (E8, not built).
+  needs `jobs.service` (E8).
 - **Status:** built (2026-10-08, `PluginSocialProviders`, `SocialHub`);
   sample `samples/plugin-sample-py-social`.
 
@@ -1645,8 +1695,8 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | E5 | Windowing (through windowcast) | list, focus, move or close app windows; know which window a game runs in | `windows.list()` → [{id, app, title}]; `windows.focus/close {id}`; events `window.opened` / `closed`. **Streaming, capture and remote display are never in droidtop**: they are windowcast's (standing rule), and this API only manages windows droidtop already knows | D: taskbar menus (C8) | `windows.read` (dangerous: window titles leak content) / `windows.control` (dangerous) | high | not built |
 | E6 | Printing bridge | print from a plugin, or add a printer (the CUPS bridge, §4b) | `print.submit {fd, mime, options}` → the host shows its own print dialog; `print.printers()` | D/A: the print dialog | `print.submit` (normal: the dialog is the consent) / `print.admin` (dangerous) | low / high | not built |
 | E7 | Container package bridge | an "app store" for containers: search and install packages (apt, pacman, Flathub-style) | EP `containers.packages@1`: `search`, `install` (**job**), `remove` (**job**), `updates`; the host runs the package manager through E2 on the provider's behalf | D: the app store or Start menu; G: the PC section's "Get apps" | `provide:containers.packages` + `containers.exec` | critical | not built |
-| E8 | Background services and daemons | a long-running plugin task (a sync daemon, a server) | manifest `services: [{id, label, restart: never\|on_failure}]`; the host starts and stops them from a user toggle, shows them in Jobs and in the Android foreground notification | A: Jobs, notification; D: tray; G: Quick Menu → Running | `background.service` (dangerous: battery and network while you are away) | high | not built; `startJob` is the only long-lived shape today |
-| E9 | Scheduled jobs | periodic work (update checks, a backup) | manifest `schedules: [{id, every: "≥15m", constraints: {charging, unmetered}}]` → a host WorkManager job → a `handle` call with `point: "schedule"` | Jobs screen | `schedule.jobs` (normal, quota) | low | not built |
+| E8 | Background services and daemons | a long-running plugin task (a sync daemon, a server) | EP `jobs.service@1` entries `{id, label, restart: never\|on_failure}` (default `on_failure`); droidtop starts each as a job (`run {serviceId}`) while the point is allowed and the entry's own switch is on, under one silent foreground notification, and restarts a failed one after 30 s, 2, 10 and 30 min, then leaves it stopped | all modes: Jobs, the notification; switches on the plugin's Permissions screen | `provide:jobs.service` (dangerous: battery and network while you are away; starts unticked) | high | built (2026-10-08, `PluginBackground`, `PluginServicesService`) |
+| E9 | Scheduled jobs | periodic work (update checks, a backup) | EP `jobs.schedule@1` entries `{id, label, every: "15m".."30d", charging?, unmetered?}`; a periodic system job (only while one is on) starts each due one as a job (`run {scheduleId}`) when its constraints hold | all modes: Jobs; switches on the plugin's Permissions screen | `provide:jobs.schedule` (normal) | low | built (2026-10-08, `PluginScheduleJobService`) |
 | E10 | Inter-plugin IPC | plugins calling each other | **§2**: plugin-provided APIs through the broker are the only channel | — | per exported permission | varies | not built |
 
 ### F. Integration with other apps
@@ -1665,7 +1715,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 
 | Id | Group | For | Ops and events | Surfaces | Permission | Risk | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| G1 | Secure vault | per-plugin secrets (API keys, refresh tokens) | `vault.put {key, value}`, `vault.get {key}`, `vault.delete`; values encrypted with an Android Keystore key per plugin; deleted on uninstall; **excluded from backups** (see #46) | — | `vault.own` (normal; own namespace only) | low | not built |
+| G1 | Secure vault | per-plugin secrets (API keys, refresh tokens) | `vault.put {key, value}` → `{stored}`, `vault.get {key}` → `{value \| null}`, `vault.delete {key}` → `{deleted}`, `vault.keys` → `{keys}`; keys 1 to 128 of `[A-Za-z0-9._-]`, values up to 16 KiB, 256 per plugin; sealed with droidtop's one at-rest cipher (`KeystoreSecretCipher`, AES-GCM) under a Keystore key per plugin; in `noBackupFilesDir`, so **never in a backup**; file and key deleted on uninstall; a value whose key is gone reads as null | — | `vault.own` (normal; own namespace only) | low | built (2026-10-08, `PluginVault`) |
 | G2 | OAuth helper | sign in to a service without the plugin handling a password | `auth.oauth {authUrl, tokenUrl, clientId, scopes, pkce: true}` → the host opens a Custom Tab, catches the redirect on its own scheme, exchanges the code and stores the tokens in G1 → returns a vault key | A/G/D: a host sign-in sheet | `auth.oauth` (normal: the user sees and does the sign-in) | medium | not built |
 | G3 | Web session | sources that need a real browser session (login cookies, a Cloudflare check, a "click to download" page, #9) | `web.session.open {startUrl, domains[]}` → a host WebView screen the user drives; the host keeps that session's cookies **per plugin**; `web.session.fetch {url}` reuses those cookies for declared domains; `web.session.clear` | the host WebView screen with the plugin's name and the URL bar visible | `web.session` (dangerous: authenticated access to your accounts on those sites) | high | not built (#9) |
 | G4 | GitHub token | higher API limits for sources on GitHub (#16) | `github.token()` → the user's token (set once in Accounts and sources), or `github.request {path}` executed by the host with it (**preferred**: the token never leaves the host) | Accounts and sources | `github.api` (normal, through the host request) / `github.token.read` (dangerous: the raw token) | medium / high | #16 in progress |
@@ -1699,7 +1749,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | J1 | Jobs | long-running work with progress and cancel | `startJob`/`cancelJob`, `PluginJobsCenter` (one registry, one Jobs screen); any EP op may be declared `job: true`; a job belongs to the plugin that started it (or to the caller, for a brokered provider job) | built |
 | J2 | Event bus | host → plugin notifications | `PluginEventBus`; events are namespaced `<area>.<name>`, each with its own version (§7); v1 `default_player_changed` is kept as an alias of `library.default_player_changed@2` | partial (registered; only default-player delivery implemented) |
 | J3 | Plugin-provided API broker | plugin → plugin | §2 | not built |
-| J4 | Host info | what this host supports | `host.info()` → {droidtopVersion, contract, supported EP/API versions, mode, device ABI, installId}; `plugins.available {api}` | not built |
+| J4 | Host info | what this host supports | `host.info()` → {droidtopVersion, contract, points, apis, mode (`gaming`/`standard`/`desktop`), modes (the ones on), abis, installId}; `plugins.available {api}` | built |
 
 **The count:** ten areas (A to J) and **94 numbered entries**:
 
@@ -1782,8 +1832,6 @@ wording the host uses, so it is identical in every mode.
 | `windows.control` | dangerous | Focus, move and close your windows | E5 |
 | `print.submit` | normal | Ask to print | E6 |
 | `print.admin` | dangerous | Add and change printers | E6 |
-| `background.service` | dangerous | Keep running in the background | E8 |
-| `schedule.jobs` | normal | Run scheduled tasks | E9 |
 | `apps.check` | normal | Check whether *listed apps* are installed | F4, F1 |
 | `apps.list` | dangerous | See all apps installed on this device | F4, C12 |
 | `apps.launch` | normal | Open other apps | F2 |
@@ -1828,6 +1876,7 @@ plugin power there. These points are:
 - `onboarding.step` (official only);
 - `intents.in`;
 - `containers.packages`;
+- `jobs.service` (keeps running while you are away);
 - every `exports` entry.
 
 Every point, high-risk or not, is listed on the approval screen under
@@ -1881,7 +1930,8 @@ When they are asked:
 - **Revocable.** Accounts and sources → Plugins → <plugin> → Permissions
   lists every declared permission with its state and when it was last
   used (from the audit log). Changing a state takes effect on the next
-  call. A revoked `background.service` stops the service.
+  call. A revoked `jobs.service` point, or a service's own switch turned
+  off, stops the service.
 - **Updates.** Every item an update adds (any permission, extension point
   or export) arrives in `ask` (§1.5), and the plugin's page asks about
   those items only, as the same list with the same defaults ("Wants new

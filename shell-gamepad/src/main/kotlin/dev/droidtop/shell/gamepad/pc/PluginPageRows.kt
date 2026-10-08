@@ -65,7 +65,7 @@ internal fun rememberPluginPageRows(entry: LibraryEntry): PluginPageRows {
             val sections = PluginGameSections.sectionsFor(context, target)
             PluginPageContent(
                 sections = if (sections.isEmpty()) emptyList() else PluginGameSections.load(context, sections, target),
-                actions = PluginContextActions.actionsFor(context, target).filter { PluginContextActions.enabled(context, it, target) },
+                actions = PluginContextActions.actionsFor(context, target, dev.droidtop.pluginhost.PluginModes.GAMING).filter { PluginContextActions.enabled(context, it, target) },
             )
         }
     }

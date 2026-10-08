@@ -70,6 +70,10 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
         filesReports += pluginId to change
         return true
     }
+    /** The real vault over a temporary folder and a stand-in cipher, so the tests see what is stored. */
+    val vaultDir: java.io.File by lazy { kotlin.io.path.createTempDirectory("vault").toFile() }
+    var vaultStore: PluginVault? = null
+    override fun vault(): PluginVault? = vaultStore
     val socialChanges = mutableListOf<Pair<String, JSONObject>>()
     override fun socialChanged(pluginId: String, change: JSONObject): Boolean {
         socialChanges += pluginId to change

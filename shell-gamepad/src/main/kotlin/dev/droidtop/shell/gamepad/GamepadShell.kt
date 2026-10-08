@@ -1606,7 +1606,7 @@ private fun EntryDetailScreen(
     var pluginSections by remember(entry) { mutableStateOf<List<dev.droidtop.library.integrations.PluginGameSections.Section>>(emptyList()) }
     LaunchedEffect(entry) {
         pluginActions = withContext(Dispatchers.IO) {
-            dev.droidtop.library.integrations.PluginContextActions.actionsFor(context, contextTarget)
+            dev.droidtop.library.integrations.PluginContextActions.actionsFor(context, contextTarget, dev.droidtop.pluginhost.PluginModes.GAMING)
                 .filter { dev.droidtop.library.integrations.PluginContextActions.enabled(context, it, contextTarget) }
         }
         pluginSections = withContext(Dispatchers.IO) {

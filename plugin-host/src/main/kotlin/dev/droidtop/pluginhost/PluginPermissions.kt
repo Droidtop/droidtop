@@ -73,8 +73,6 @@ object PluginPermissions {
         PluginPermission("windows.control", PermissionTier.DANGEROUS, "Focus, move and close your windows"),
         PluginPermission("print.submit", PermissionTier.NORMAL, "Ask to print"),
         PluginPermission("print.admin", PermissionTier.DANGEROUS, "Add and change printers"),
-        PluginPermission("background.service", PermissionTier.DANGEROUS, "Keep running in the background"),
-        PluginPermission("schedule.jobs", PermissionTier.NORMAL, "Run scheduled tasks"),
         PluginPermission("apps.check", PermissionTier.NORMAL, "Check whether listed apps are installed"),
         PluginPermission("apps.list", PermissionTier.DANGEROUS, "See all apps installed on this device"),
         PluginPermission("apps.launch", PermissionTier.NORMAL, "Open other apps"),

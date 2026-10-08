@@ -31,6 +31,7 @@ import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.PluginAppStatus
 import dev.droidtop.library.integrations.PluginCatalog
 import dev.droidtop.library.integrations.PluginCatalogScreen
+import dev.droidtop.library.integrations.PluginBackground
 import dev.droidtop.library.integrations.PluginPanels
 import dev.droidtop.library.integrations.PluginSettingsRows
 import dev.droidtop.library.integrations.PluginJobsScreen
@@ -49,6 +50,8 @@ import dev.droidtop.pluginhost.PluginApiResolver
 import dev.droidtop.pluginhost.PluginAudit
 import dev.droidtop.pluginhost.PluginGrants
 import dev.droidtop.pluginhost.PluginPermissions
+import dev.droidtop.pluginhost.PluginModes
+import dev.droidtop.pluginhost.BackgroundProtocol
 import dev.droidtop.pluginhost.PluginProviderChoices
 import dev.droidtop.pluginhost.PluginKind
 import dev.droidtop.pluginhost.PluginTrustState
@@ -1812,7 +1815,7 @@ object AppSettingsCatalogs {
                             id = "plugin_${m.id}_enabled",
                             title = "Enabled",
                             current = record.enabled,
-                            onToggle = { ctx, on -> PluginStore.setEnabled(ctx, m.id, on); PluginStatusWidgetProvider.requestUpdate(ctx) },
+                            onToggle = { ctx, on -> PluginStore.setEnabled(ctx, m.id, on); pluginsChanged(ctx) },
                         ),
                     )
                 }
@@ -1838,7 +1841,7 @@ object AppSettingsCatalogs {
             fun approve(ctx: Context, root: Boolean) {
                 PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = root, ticked = approvalTicks.toSet())
                 pendingTicks.remove(m.id)
-                PluginStatusWidgetProvider.requestUpdate(ctx)
+                pluginsChanged(ctx)
             }
             buildList {
                 add(
@@ -1869,7 +1872,7 @@ object AppSettingsCatalogs {
                         id = "plugin_${m.id}_deny",
                         title = "Deny",
                         subtitle = "Stays installed, never runs",
-                        run = { ctx -> pendingTicks.remove(m.id); PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
+                        run = { ctx -> pendingTicks.remove(m.id); PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false); pluginsChanged(ctx) },
                     ),
                 )
             }
@@ -1892,7 +1895,7 @@ object AppSettingsCatalogs {
                         run = { ctx ->
                             PluginGrants.forContext(ctx).answerNew(record, freshIds, newTicks.toSet())
                             pendingTicks.remove(newKey)
-                            PluginStatusWidgetProvider.requestUpdate(ctx)
+                            pluginsChanged(ctx)
                         },
                     ),
                 ),
@@ -2072,7 +2075,7 @@ object AppSettingsCatalogs {
                         id = "plugin_${m.id}_uninstall",
                         title = "Uninstall",
                         confirmTitle = "Remove ${m.label} and its data?",
-                        run = { ctx -> PluginStore.uninstall(ctx, m.id); PluginStatusWidgetProvider.requestUpdate(ctx) },
+                        run = { ctx -> PluginStore.uninstall(ctx, m.id); pluginsChanged(ctx) },
                     ),
                 ),
             ),
@@ -2156,6 +2159,12 @@ object AppSettingsCatalogs {
         groups = { context -> withContext(Dispatchers.IO) { pluginPermissionGroups(context, pluginId) } },
     )
 
+    /** After anything that changes which plugins run or what they may do: the status widget and background work follow. */
+    private fun pluginsChanged(context: Context) {
+        PluginStatusWidgetProvider.requestUpdate(context)
+        PluginBackground.changed(context)
+    }
+
     private fun pluginPermissionGroups(context: Context, pluginId: String): List<CatalogGroup> {
         val installed = PluginStore.installed(context)
         val record = installed.firstOrNull { it.manifest.id == pluginId }
@@ -2184,9 +2193,47 @@ object AppSettingsCatalogs {
                     dev.droidtop.library.settings.ChoiceOption(GrantState.DENIED.name, "Blocked"),
                 ),
                 current = row.state.name,
-                onSelect = { ctx, value -> GrantState.fromId(value)?.let { PluginGrants.forContext(ctx).set(pluginId, row.id, it) } },
+                onSelect = { ctx, value ->
+                    GrantState.fromId(value)?.let { PluginGrants.forContext(ctx).set(pluginId, row.id, it) }
+                    pluginsChanged(ctx)
+                },
             )
         }
+        // "Where it appears" (docs/plugin-api.md 1.9): one switch per mode the plugin has a place in; off takes every
+        // contribution of this plugin out of that mode, and nowhere else.
+        val modeLabels = mapOf(PluginModes.GAMING to "Gaming", PluginModes.STANDARD to "Android home screen", PluginModes.DESKTOP to "Desktop")
+        val modeItems = PluginModes.modesOf(record.manifest).map { mode ->
+            ToggleItem(
+                id = "plugin_${pluginId}_mode_$mode",
+                title = modeLabels[mode] ?: mode,
+                current = PluginModes.allowed(snap, mode),
+                onToggle = { ctx, on ->
+                    PluginGrants.forContext(ctx).set(pluginId, PluginModes.key(mode), if (on) GrantState.GRANTED else GrantState.DENIED)
+                    pluginsChanged(ctx)
+                },
+            )
+        }
+        // Each background service and schedule has its own switch (docs/plugin-api.md 3 E8, E9), under the point's.
+        val backgroundItems = record.manifest.v2.provides
+            .filter { it.point == BackgroundProtocol.SERVICE_POINT || it.point == BackgroundProtocol.SCHEDULE_POINT }
+            .map { entry ->
+                val service = entry.point == BackgroundProtocol.SERVICE_POINT
+                val every = BackgroundProtocol.everyMs(entry)
+                ToggleItem(
+                    id = "plugin_${pluginId}_bg_${entry.point}_${BackgroundProtocol.entryId(entry)}",
+                    title = entry.label ?: record.manifest.label,
+                    subtitle = when {
+                        service -> "Keeps running in the background"
+                        every == null -> "Cannot run: its schedule is not between 15 minutes and 30 days"
+                        else -> "Runs every ${every / 60_000} minutes"
+                    },
+                    current = BackgroundProtocol.entryOn(snap, entry),
+                    onToggle = { ctx, on ->
+                        PluginGrants.forContext(ctx).set(pluginId, BackgroundProtocol.entryKey(entry), if (on) GrantState.GRANTED else GrantState.DENIED)
+                        pluginsChanged(ctx)
+                    },
+                )
+            }
         val rest = rows
         return listOfNotNull(
             if (record.manifest.contractVersion < 2) {
@@ -2205,6 +2252,8 @@ object AppSettingsCatalogs {
             } else {
                 null
             },
+            modeItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_modes", "Where it appears", it) },
+            backgroundItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_background", "Background tasks", it) },
             rest.filter { it.tier == PermissionTier.CRITICAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_critical", "Critical", it.map(::item)) },
             rest.filter { it.tier == PermissionTier.DANGEROUS }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_dangerous", "Sensitive", it.map(::item)) },
             rest.filter { it.tier == PermissionTier.NORMAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_normal", "Can", it.map(::item)) },
@@ -2412,7 +2461,7 @@ object AppSettingsCatalogs {
                                     confirmTitle = "Stop trusting \"${entry.origin}\"?",
                                     run = { ctx, _ ->
                                         if (UserOriginKeys.remove(UserOriginKeys.storeFile(ctx), entry.origin)) {
-                                            PluginStatusWidgetProvider.requestUpdate(ctx)
+                                            pluginsChanged(ctx)
                                             "No longer trusting \"${entry.origin}\": its plugins are flagged on the Plugins screen"
                                         } else {
                                             "Nothing to remove"

@@ -160,7 +160,7 @@ internal fun QuickMenu(
         // Read from manifests off the main thread; the section appears only when there is something to show.
         val hasPlugins by androidx.compose.runtime.produceState(false) {
             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                dev.droidtop.library.integrations.PluginPanels.panelsFor(context).isNotEmpty()
+                dev.droidtop.library.integrations.PluginPanels.panelsFor(context, dev.droidtop.pluginhost.PluginModes.GAMING).isNotEmpty()
             }
         }
         val granted = remember { NotificationsStore.isGranted(context) }
