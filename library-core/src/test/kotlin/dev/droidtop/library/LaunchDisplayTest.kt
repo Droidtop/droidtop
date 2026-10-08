@@ -58,4 +58,20 @@ class LaunchDisplayTest {
         assertEquals(1, LaunchDisplay.parkedDisplayId)
         assertEquals("game-2", LaunchDisplay.runningGame?.gameId)
     }
+
+    @Test
+    fun `the running session is observable and a relaunch of the same game keeps its start`() {
+        LaunchDisplay.runningGame = LaunchContext(gameId = "game-3", systemId = "n64")
+        val first = LaunchDisplay.running.value
+        assertEquals("game-3", first?.context?.gameId)
+
+        LaunchDisplay.runningGame = LaunchContext(gameId = "game-3", systemId = "n64")
+        assertEquals(first?.sinceEpochMs, LaunchDisplay.running.value?.sinceEpochMs)
+
+        LaunchDisplay.runningGame = LaunchContext(gameId = "game-4", systemId = null)
+        assertEquals("game-4", LaunchDisplay.running.value?.context?.gameId)
+
+        LaunchDisplay.clearRunning()
+        assertNull(LaunchDisplay.running.value)
+    }
 }

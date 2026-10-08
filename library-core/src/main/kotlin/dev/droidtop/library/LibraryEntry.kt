@@ -1888,6 +1888,29 @@ class Library(
     }
 
     /**
+     * Quit for the running game, the one path every Quit control takes (the Quick Menu's Game section, the
+     * companion's Now card): the app in front is the one droidtop last started (LaunchLedger, noted at the
+     * one dispatch point), whatever kind of entry it was, and the task manager's one close path ends it
+     * (Droidtop/tracker#245); with nothing in the ledger the entry's own provider tries ([quit]). Only a
+     * confirmed end clears droidtop's running-game state (Droidtop/tracker#82): a quit that left the
+     * emulator alive must not make anything read "the game ended".
+     */
+    suspend fun quitRunning(context: android.content.Context, entry: LibraryEntry): QuitResult {
+        val outcome = runCatching {
+            val running = dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName
+            if (running != null) {
+                dev.droidtop.runtime.tasks.TaskManager.close(context, running).toQuitResult()
+            } else {
+                quit(entry)
+            }
+        }.getOrElse {
+            QuitResult.NotEnded("Quit failed: ${it.message ?: it.javaClass.simpleName}")
+        }
+        if (outcome is QuitResult.Ended) LaunchDisplay.clearRunning()
+        return outcome
+    }
+
+    /**
      * Launches the game with [id], for a caller that holds only the id (a
      * pinned icon, the Desktop's Start menu). Never throws: whatever goes
      * wrong comes back as [LaunchResult.Refused] with a reason to show.

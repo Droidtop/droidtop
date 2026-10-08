@@ -76,7 +76,6 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.settings.CatalogPrefs
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.EngineGameProvider
-import dev.droidtop.library.toQuitResult
 import dev.droidtop.library.Library
 import dev.droidtop.runtime.tasks.TaskManager
 import dev.droidtop.library.AppCategoryRules
@@ -757,27 +756,11 @@ private fun GamepadShellBody(
                 // The sheet stays open until the game really ended, so a
                 // quit that could not end it shows its reason in the row.
                 scope.launch {
-                    // The app in front is the one droidtop last started (LaunchLedger, noted at the one
-                    // dispatch point), whatever kind of entry it was; the task manager's one close path
-                    // ends it, and anything short of a confirmed close reads as such (tracker#245).
-                    val outcome = runCatching {
-                        val running = dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName
-                        if (running != null) {
-                            dev.droidtop.runtime.tasks.TaskManager.close(context, running).toQuitResult()
-                        } else {
-                            library.quit(entry)
-                        }
-                    }.getOrElse {
-                        dev.droidtop.library.QuitResult.NotEnded("Quit failed: ${it.message ?: it.javaClass.simpleName}")
-                    }
+                    // The one quit path (Library.quitRunning); it clears the running-game state only on a
+                    // confirmed end, and anything short of that is shown in the row's subtitle.
+                    val outcome = library.quitRunning(context, entry)
                     quitOutcome = outcome
-                    // Clear droidtop's own bookkeeping only when the
-                    // game's task really ended (Droidtop/tracker#82): a
-                    // quit that left the emulator alive must not make the
-                    // menu read "the game ended" when it didn't. The
-                    // outcome is shown in the row's subtitle instead.
                     if (outcome is dev.droidtop.library.QuitResult.Ended) {
-                        dev.droidtop.library.LaunchDisplay.clearRunning()
                         quickMenuOpen = false
                         // Restart (the Quick Menu's Game section): start the
                         // entry again, but only now that it really ended.

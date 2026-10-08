@@ -83,9 +83,27 @@ object LaunchDisplay {
      * to this app. Set alongside
      * [parkedDisplayId] in [startOn]; cleared with it, together, by
      * [clearRunning].
+     *
+     * Backed by [running], so a surface that shows the running game (the
+     * companion's Now card) observes it instead of polling this field.
      */
-    @Volatile
-    var runningGame: LaunchContext? = null
+    var runningGame: LaunchContext?
+        get() = runningFlow.value?.context
+        set(value) {
+            val current = runningFlow.value
+            runningFlow.value = when {
+                value == null -> null
+                // Resuming the same game (a relaunch of its entry) is the same session.
+                current != null && current.context.gameId == value.gameId -> current.copy(context = value)
+                else -> RunningSession(value, System.currentTimeMillis())
+            }
+        }
+
+    /** [runningGame] and when its session started, observable. */
+    data class RunningSession(val context: LaunchContext, val sinceEpochMs: Long)
+
+    private val runningFlow = kotlinx.coroutines.flow.MutableStateFlow<RunningSession?>(null)
+    val running: kotlinx.coroutines.flow.StateFlow<RunningSession?> = runningFlow
 
     /** Package resolved for the parked launch; used to notice Android's force-stop state. */
     @Volatile
