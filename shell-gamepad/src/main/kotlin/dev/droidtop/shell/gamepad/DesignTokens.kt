@@ -127,8 +127,7 @@ object Corners {
  * blur, no drawn glow), and only where something is lifted: a capsule
  * carries a small one at rest and a deep one when focused (FocusLook), the
  * primary action a moderate one that deepens when selected, and a floating
- * menu one deeper still. A focused thing's shadow takes the theme's accent
- * ([MenuTokens.Accent]) so the lift reads as light, not as a dark smudge.
+ * menu one deeper still. Shadows are black, as Steam's are.
  */
 object Elevation {
     val PrimaryRest: Dp = 4.dp

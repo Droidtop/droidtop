@@ -169,9 +169,7 @@ fun Modifier.selectionFrame(
  * The look is Steam's buttons in the theme's colours (docs/SPEC.md 7k): a
  * quiet chip at rest turns solid when selected ([MenuTokens.Selected] with
  * its own ink, Steam's inversion); a filled one keeps its fill and gains
- * the ring, a shadow tinted with the accent that deepens when selected
- * (DroidDeck's primary button, ui/FrontEndWidgets.kt at 9310d19) and a
- * one-shot sheen as the cursor arrives. [large] is the page's Play: the
+ * the ring, a shadow that deepens when selected and a one-shot sheen as the cursor arrives. [large] is the page's Play: the
  * theme's launch colour, 48dp tall and 160dp wide at least, crisp corners
  * and a slower stripe.
  *
@@ -267,9 +265,8 @@ internal fun ShellChip(
 }
 
 /**
- * The primary action's lift: a shadow that takes the theme's accent and
- * deepens while the cursor is on it ([Elevation]), read in the layer phase
- * only. DroidDeck's primary button (ui/FrontEndWidgets.kt at 9310d19).
+ * The primary action's lift: a black shadow that deepens while the cursor
+ * is on it ([Elevation]), read in the layer phase only.
  */
 private fun Modifier.primaryLift(selected: Boolean, shape: Shape): Modifier = composed {
     val p = animateFloatAsState(
@@ -277,12 +274,9 @@ private fun Modifier.primaryLift(selected: Boolean, shape: Shape): Modifier = co
         animationSpec = if (selected) Motion.lift<Float>() else Motion.release<Float>(),
         label = "primary lift",
     )
-    val accent = MenuTokens.Accent
     graphicsLayer {
         val rest = Elevation.PrimaryRest.toPx()
         shadowElevation = rest + (Elevation.PrimaryFocused.toPx() - rest) * p.value
-        ambientShadowColor = accent
-        spotShadowColor = accent
         this.shape = shape
         clip = false
     }

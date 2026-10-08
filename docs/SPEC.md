@@ -10898,9 +10898,10 @@ own games, in droidtop's own treatment:
   one large piece of art (`PcCapsule(hero = true)`): Steam's featured card,
   3.2 capsules wide at the capsules' own height (`heroWidth`,
   `HERO_CAPSULES_WIDE`, so landscape hero art loses a thin band top and
-  bottom) so the row keeps one baseline, under it one small uppercase label,
-  "PLAYED YESTERDAY · 2 H 5 MIN" (`heroCaption`, the eyebrow role), above the
-  name in bold (2026-10-08, Droidtop/tracker#363). That row has no heading,
+  bottom) so the row keeps one baseline, under it the name in bold and under
+  the name one small uppercase line, "PLAYED YESTERDAY · 2 H 5 MIN"
+  (`heroCaption`, the eyebrow role), as Steam's featured card does
+  (2026-10-08, Droidtop/tracker#363). That row has no heading,
   as the Deck's recent row has none: the label says what it is. Only portrait
   art: that art whole at its own shape beside a small label (the kind of
   game) over the title, over a soft, darkened copy of itself filling the card
@@ -11954,7 +11955,7 @@ The type ladder: a screen or shelf heading 22/28 bold, a title over art 26 at 1.
 (`heroTitle`), body and buttons 16/20, supporting 14/18, a tab label 12/22 bold uppercase tracked
 (`tabLabel`), a section label and a label set over a value 12/16 semibold uppercase tracked
 (`sectionLabel`, `eyebrow`). Elevation is the platform shadow only, by role (`Elevation`,
-`FocusLook`): a focused thing's shadow takes the theme's accent.
+`FocusLook`): shadows are black, as Steam's are.
 
 **Type.** droidtop's chrome has its own type scale, supplied to the theme alongside the colour
 scheme rather than inherited from the platform default, and each role has one documented job:
@@ -12709,7 +12710,7 @@ steam's UI ... We need a LOT of polish", and "as close to steam's uis (both stea
 as possible while making it still really good for our uses". The durations, curves and focus
 ratios are Steam Big Picture's, measured from its gamepad UI and restated as droidtop's own roles
 (credit to its designers; nothing of Valve's is copied); the switch, the staggered entry, the
-sheen and the tinted lift are ported from DroidDeck's Compose front end (GPL-3.0, NOTICE.md). All
+sheen and the sliding ring are ported from DroidDeck's Compose front end (GPL-3.0, NOTICE.md). All
 of it lives in `MotionTokens.kt` (`Motion`, `FocusLook`) and `MotionEffects.kt`; colours stay the
 theme's roles (section 7k2).
 
@@ -12727,7 +12728,7 @@ theme's roles (section 7k2).
 - **One focus treatment** (`selectionFrame` for the outline and fill, `focusLift` for a
   capsule): the focused capsule grows 5.3 percent from near its bottom edge (a landscape card 2.4
   percent), rises 4dp, comes up from 90 to 100 percent brightness, and its platform shadow deepens
-  from 4 to 18dp and takes the theme's accent, so the lift reads as light. It is cheap by
+  from 4 to 18dp, black as Steam's. It is cheap by
   construction: no blur, every animated value read in the layer or draw phase so a focus move
   recomposes nothing. Because of that there is no low-performance mode to switch it off; a blur or
   backdrop effect added later must come with one.
@@ -12745,7 +12746,7 @@ theme's roles (section 7k2).
   frame only for 450 ms after a change. A window with no host (a one-off dialog) draws a still ring
   on the control. With motion off the ring jumps. The per-control landing outline it replaces is
   gone. Buttons follow Steam in the theme's colours: a quiet chip turns solid (`Selected`) under
-  the cursor; a filled one keeps its fill and gains an accent-tinted shadow that deepens (4 to
+  the cursor; a filled one keeps its fill and gains a shadow that deepens (4 to
   14dp) and a one-shot sheen; the page's Play is the theme's launch colour, at least 48 by 160dp,
   with a 2 s stripe.
 - **Pages assemble, they do not pop.** A page's blocks fade up from 8dp below over 500 ms, each

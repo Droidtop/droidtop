@@ -147,8 +147,8 @@ internal fun capsuleStatusOf(entry: LibraryEntry, download: StoreDownloads.Progr
  *
  * [hero] draws the game as a landscape card (docs/SPEC.md 7i, "Home art"):
  * its hero art, or, when only portrait art exists, that art whole beside
- * the title over a soft, darkened copy of itself, and under it one small
- * label of when it was last played ([heroCaption]) above the name. The
+ * the title over a soft, darkened copy of itself, and under it the name
+ * and one small label of when it was last played ([heroCaption]). The
  * caller gives it a [heroWidth].
  */
 @Composable
@@ -283,20 +283,20 @@ internal fun PcCapsule(
         CapsuleCorners(entry, download, parts, badge)
     }
     if (hero) {
-        // Steam's featured card says when it was played under it; the small
-        // label leads, the name follows in the heading weight.
-        Text(
-            heroCaption(entry, System.currentTimeMillis()).uppercase(),
-            color = MenuTokens.OnSurfaceMuted,
-            style = TypeRole.eyebrow,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // Steam's featured card: the name in bold under the card, and under
+        // the name one small uppercase line of when it was played.
         Text(
             title,
             color = if (selected) MenuTokens.OnSurface else MenuTokens.Value,
             style = TypeRole.rowTitle,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            heroCaption(entry, System.currentTimeMillis()).uppercase(),
+            color = MenuTokens.OnSurfaceMuted,
+            style = TypeRole.eyebrow,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
