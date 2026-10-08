@@ -1,0 +1,89 @@
+name: x86_64 software Vulkan
+
+# Packs build-scripts/x86_64-lavapipe into x86_64-lavapipe.tzst and publishes it as a
+# release asset. The app downloads it on x86_64 devices when a container's
+# graphics driver is lavapipe (runtime-windows/.../utils/X86_64Graphics.kt pins the
+# tag and the SHA-256), the same way the x86_64 guest libraries are a download.
+#
+# Moved from droidtop's GameNative fork (Droidtop/gamenative-tux) with the
+# Windows runtime (docs/SPEC.md 9). A run on main publishes a prerelease of
+# this repository (prerelease so the app's update check, which reads this
+# repository's releases, never mistakes it for a build); the pin in the code
+# moves to it after a rig check. Until then the pin names the fork's release.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'build-scripts/x86_64-lavapipe/**'
+      - '.github/workflows/x86_64-lavapipe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # The guest libraries this driver is loaded beside; libraries they already
+  # provide are left out of the archive (see build.sh).
+  GUEST_LIBS_TAG: x86_64-guest-libs-20261002-12f9f4d8
+  # Where that release is: droidtop's fork until this repository publishes its own.
+  GUEST_LIBS_REPO: Droidtop/gamenative-tux
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils curl file python3 xz-utils zstd
+
+      - name: Guest libraries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release download "$GUEST_LIBS_TAG" -R "$GUEST_LIBS_REPO" -p x86_64-guest-libs.tzst -D "$RUNNER_TEMP"
+
+      - name: Build
+        env:
+          GUEST_LIBS: ${{ runner.temp }}/x86_64-guest-libs.tzst
+          WORK: ${{ runner.temp }}/lavapipe
+        run: |
+          bash build-scripts/x86_64-lavapipe/build.sh "$GITHUB_WORKSPACE/out/x86_64-lavapipe.tzst"
+          cd out && sha256sum x86_64-lavapipe.tzst | tee x86_64-lavapipe.tzst.sha256
+
+      - name: Upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: x86_64-lavapipe
+          path: out/*
+          retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    # The only job that can write releases; it runs no build code.
+    permissions:
+      contents: write
+    steps:
+      - name: Download
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: x86_64-lavapipe
+          path: out
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          tag="x86_64-lavapipe-$(date -u +%Y%m%d)-${GITHUB_SHA::8}"
+          pre=--prerelease
+          gh release create "$tag" out/x86_64-lavapipe.tzst out/x86_64-lavapipe.tzst.sha256 \
+            -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" $pre \
+            --title "x86_64 software Vulkan ($tag)" \
+            --notes "Khronos Vulkan loader and Mesa lavapipe for the x86_64 Wine guest, from Termux's x86_64 packages (build-scripts/x86_64-lavapipe, packed from $BRANCH at $GITHUB_SHA; usr/share/doc/x86_64-lavapipe/PACKAGES lists every package and version). SHA-256: $(cut -d' ' -f1 out/x86_64-lavapipe.tzst.sha256)"

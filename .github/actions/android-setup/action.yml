@@ -181,7 +181,7 @@ runs:
         # rebuilt it because the cached x86_64 modules asset predated
         # module-pipe-source (Droidtop/tracker#80): the script had gained the
         # module but the key had not moved, so releases kept the old asset.
-        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', '.git/modules/vendor/pulseaudio/HEAD', '.git/modules/vendor/libsndfile/HEAD', 'build-scripts/proot-patches/**', 'build-scripts/pulseaudio-patches/**') }}-v12
+        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', '.git/modules/vendor/pulseaudio/HEAD', '.git/modules/vendor/libsndfile/HEAD', 'build-scripts/proot-patches/**', 'build-scripts/pulseaudio-patches/**', 'build-scripts/talloc/**') }}-v12
 
     - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel, PulseAudio)
       if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -201,3 +201,19 @@ runs:
         for abi in arm64-v8a x86_64; do
           bash build-scripts/build-vendor-deps.sh "$abi"
         done
+
+    - name: Cache the Windows runtime's prebuilts
+      id: winprebuilt-cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: runtime-windows/prebuilt
+        key: windows-runtime-prebuilt-${{ hashFiles('runtime-windows/prebuilt.pin') }}
+
+    - name: Fetch the Windows runtime's prebuilts
+      # GameNative's arm64 native libraries and asset payloads, re-hosted
+      # unmodified as a release of this repository
+      # (.github/workflows/windows-runtime-prebuilt.yml, docs/SPEC.md 9),
+      # checked against runtime-windows/prebuilt.pin.
+      if: steps.winprebuilt-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash build-scripts/fetch-windows-runtime-prebuilt.sh

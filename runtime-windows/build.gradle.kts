@@ -22,19 +22,17 @@ android {
     defaultConfig {
         minSdk = 26
 
-        // GameNative's natives are prebuilt for arm64-v8a only (the
-        // jniLibs source dirs below). The x86_64 half of the fat APK
-        // (docs/SPEC.md 10b) is built here, from the fork's sources or a
-        // shim per library; native/CMakeLists.txt says which and why.
-        // arm64 stays upstream's prebuilt set, so CMake builds x86_64 only.
+        // The arm64-v8a natives are GameNative's prebuilt set, re-hosted
+        // (prebuilt/, below). The x86_64 half of the fat APK (docs/SPEC.md
+        // 10b) is built here, from GameNative's sources (native/upstream) or
+        // a shim per library; native/CMakeLists.txt says which and why.
         externalNativeBuild {
             cmake {
                 abiFilters += "x86_64"
                 targets += listOf(
-                    "virglrenderer", "patchelf", "asurface_renderer", "ahbimage", "xconnectorpatch",
+                    "virglrenderer", "asurface_renderer", "ahbimage", "xconnectorpatch",
                     "winlator", "winlator_11", "extras", "vulkan_renderer",
-                    "hook_impl", "main_hook", "kgslshim", "vortekrenderer", "steambootstrap",
-                    "lsfg-vk", "evshim", "openxr_loader",
+                    "hook_impl", "main_hook", "kgslshim", "vortekrenderer", "evshim",
                 )
                 // libc++_shared.so is in the arm64 set; the NDK's own copy
                 // for x86_64 is packaged when the STL is the shared one.
@@ -55,31 +53,17 @@ android {
 
     sourceSets {
         getByName("main") {
-            // The runtime's payloads and GameNative's prebuilt arm64 natives,
-            // still read from the fork until they are droidtop's own (the
-            // runtime lift, piece 3): common_dlls.json, gpu_cards.json,
-            // wincomponents, wine_startmenu.json, redirect.tzst, the
-            // box86_64/fexcore/wowbox64 translator payloads, and the modern
-            // flavor's libredirect-bionic-wx.so.
-            assets.srcDir("../vendor/gamenative/app/src/main/assets")
-            assets.srcDir("../vendor/gamenative/app/src/modern/assets")
-            jniLibs.srcDir("../vendor/gamenative/app/src/main/jniLibs")
-            jniLibs.srcDir("../vendor/gamenative/app/src/modern/jniLibs")
+            // GameNative's arm64 native libraries and the runtime's asset
+            // payloads (box64/FEXCore/WowBox64 builds, input DLLs, the
+            // redirect libraries, the JSON lists the runtime reads with
+            // getAssets()), re-hosted unmodified as a release of this
+            // repository and fetched by build-scripts/
+            // fetch-windows-runtime-prebuilt.sh against prebuilt.pin
+            // (docs/SPEC.md 9). What is packed and what is left out:
+            // build-scripts/windows-runtime-prebuilt.sh.
+            jniLibs.srcDir("prebuilt/jniLibs")
+            assets.srcDir("prebuilt/assets")
         }
-    }
-
-    androidResources {
-        // Excluding, not including, on purpose: if upstream adds a file
-        // this bundles it (wasteful, harmless), whereas an include list
-        // would silently drop something needed and fail at runtime.
-        //
-        //   dxwrapper       29 MB, and every entry in
-        //                   dxwrapper_download.json resolves to
-        //                   downloads.gamenative.app: fetched on demand.
-        //   steampipe /     Steam-only (steam_api.dll, region lists).
-        //   steaminput /    droidtop's Steam is :stores.
-        //   steam_regions
-        ignoreAssetsPatterns += listOf("dxwrapper", "steampipe", "steaminput", "steam_regions.json")
     }
 
     externalNativeBuild {

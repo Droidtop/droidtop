@@ -29,6 +29,8 @@ runtime-linux-noroot/src/main/jniLibs/
 app/src/main/jniLibs/
 runtime-windows/src/main/jniLibs/
 runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst
+# The re-hosted Windows runtime prebuilts (build-scripts/fetch-windows-runtime-prebuilt.sh).
+runtime-windows/prebuilt/
 
 # Signing (real release key + passwords — never commit these; CI reads
 # them from repo secrets instead, see .github/workflows/android-build.yml)

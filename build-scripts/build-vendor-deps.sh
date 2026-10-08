@@ -295,9 +295,10 @@ echo "=== proot ($ABI) ==="
 # needs (docs/SPEC.md 3).
 #
 # Built with its own GNUmakefile and the NDK clang already resolved above.
-# talloc is proot's one library dependency; the single-file copy vendored
-# with gamenative's proot tree is compiled into a static archive and
-# linked in, so the result needs nothing beyond bionic.
+# talloc is proot's one library dependency; Samba's single-file talloc
+# (build-scripts/talloc, LGPL-3.0, the copy GameNative's proot tree
+# carried) is compiled into a static archive and linked in, so the result
+# needs nothing beyond bionic.
 #
 # PROOT_UNBUNDLE_LOADER keeps the loader a separate executable instead of
 # embedding it and extracting it to disk at run time (which is again an
@@ -314,7 +315,7 @@ echo "=== proot ($ABI) ==="
     PROOT_WORK="$WORK/proot"
     rm -rf "$PROOT_WORK"
     mkdir -p "$PROOT_WORK/talloc"
-    TALLOC_SRC="$VENDOR/gamenative/app/src/main/cpp/proot/talloc"
+    TALLOC_SRC="$REPO_ROOT/build-scripts/talloc"
     "$CC" -O2 -fPIC -c "$TALLOC_SRC/talloc.c" -I"$TALLOC_SRC" -o "$PROOT_WORK/talloc/talloc.o"
     "$TOOLCHAIN_BIN/llvm-ar" rcs "$PROOT_WORK/talloc/libtalloc.a" "$PROOT_WORK/talloc/talloc.o"
     # Out-of-tree copy: the GNUmakefile writes objects and build.h beside

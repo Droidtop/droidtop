@@ -16,6 +16,21 @@ This project is distributed under the GNU General Public License v3.0 (see
   `XServerScreen.kt`, the x86_64 guest-library and graphics pins, the
   downloaders, the folder scanner, `TouchGestureConfig`, a cut-down
   `PrefManager`), moved to `dev.droidtop.runtime.windows.*`.
+  Its native sources (winlator, extras, asurfacerenderer, xconnectorpatch,
+  evshim) are copied into `runtime-windows/native/upstream/`, and its prebuilt
+  arm64 libraries and asset payloads are re-hosted unmodified as a release of
+  this repository (`build-scripts/windows-runtime-prebuilt.sh`); some of those
+  libraries (`libvortekrenderer`, `libredirect-bionic-wx`, the Adreno hook
+  libraries) are upstream binaries without published source. The x86_64
+  guest-library and software-Vulkan recipes (`build-scripts/x86_64-*`) moved
+  from the fork too.
+- **virglrenderer** — `runtime-windows/native/upstream/virglrenderer`, as
+  GameNative carries it — MIT.
+- **libadrenotools** — https://github.com/bylaws/libadrenotools (GameNative's
+  copy, Pipetto-crypto/libadrenotools) — BSD-2-Clause. Its headers only, in
+  `runtime-windows/native/upstream/extras/adrenotools/include` (LICENSE beside them).
+- **talloc** — `build-scripts/talloc`, Samba's talloc as GameNative's proot
+  tree carried it — LGPL-3.0-or-later. Linked into droidtop's proot build.
   The `stores` module is GameNative's Epic, GOG, Amazon Games and itch.io
   store code (`app.gamenative.service.{epic,gog,amazon,itch}`, its store
   models and DAOs and the helpers they use), lifted out of the fork at
