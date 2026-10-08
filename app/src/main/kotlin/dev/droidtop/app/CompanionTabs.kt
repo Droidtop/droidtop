@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import dev.droidtop.display.secondScreenScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -183,7 +183,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
 /** The task manager's own row (reused from the first slice, not rebuilt) in a scrolling page, with a line for nothing running. */
 @Composable
 private fun CompanionTasksTab() {
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp)) {
         CompanionTasks()
     }
 }
@@ -234,7 +234,7 @@ internal fun CompanionPanels(panels: List<@Composable () -> Unit>) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val columns = if (maxWidth >= 720.dp) 2 else 1
         Row(
-            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
+            modifier = Modifier.fillMaxWidth().secondScreenScroll(rememberScrollState()).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             repeat(columns) { column ->

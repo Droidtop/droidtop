@@ -227,6 +227,9 @@ androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", versi
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
+# Compose UI tests under Robolectric (the second-screen scroll test in :display).
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 # Per-service browser profiles for the in-app key page (docs/SPEC.md 7h): its sign-in cookies live in a profile that is deleted on close.
 androidx-webkit = { module = "androidx.webkit:webkit", version = "1.12.1" }

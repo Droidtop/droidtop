@@ -3010,11 +3010,21 @@ picks the tab it opens on. Standard's own second screen keeps its launcher-style
   section shown, Notifications folded, the rest open. Every tab scrolls with the same vertical scroll
   (`CompanionPanels` for Performance and System, the Tasks page, this Home); Input is the one fixed surface
   because a trackpad must not scroll.
-  The 1512 report that Home "is not vertically scrollable" did not reproduce on the console from adb:
-  a drag on the built-in screen scrolled the page and the rails, so the scroll itself was sound. What the
-  person saw was a first screen filled by two 200dp rails with nothing hinting at more below, and no way to
-  move it from the pad at all (the whole tree was denied focus). The capsules are now smaller and every section
-  starts with a heading, so the next section always shows below the one in view.
+  **A drag starting anywhere scrolls.** Every companion page scrolls through `secondScreenScroll`
+  (`:display`), never a bare `verticalScroll`: a bare one only moves when a drag reaches it unconsumed, and on
+  Home a finger lands on a rail capsule, a pill, a heading or a widget. The owner's drags did nothing (build
+  1512) while a perfectly straight injected drag scrolled, which points at the two children that can keep a
+  drag from the page: a rail `LazyRow` claims a drag once its sideways travel passes the touch slop, which a thumb's arc on
+  a handheld held level does about as soon as it goes up, and an Android widget's `AndroidView` takes the
+  whole stream from its first touch. `dragAnywhereScroll` watches each gesture in the Initial pass, before
+  any child: once the finger's whole travel is past the slop and at least as far up or down as sideways, the
+  drag is the page's, even when a rail took its first sideways movement (children see it consumed and stop or
+  cancel, a widget gets a cancel); the page follows the finger and flings on release. A drag that stays mostly
+  sideways scrolls the rail, and a tap is untouched. On the console (build 1519) an injected drag that went
+  sideways first and then up, starting on a Continue playing capsule, moved nothing, and the same drag
+  straight up scrolled the page. The
+  capsules are smaller than before and every section starts with a heading, so the next section shows
+  below the one in view.
 - **Tasks** is `CompanionTasks`, the task manager's row (switch, ask for the other screen, close, Clear
   all apps with an inline confirm) using `SharedRunningAppsList`; see "The task manager".
 - **Performance** (`CompanionPerformanceTab`) reads `PerformanceMonitor` in `:runtime-common`, the one shared

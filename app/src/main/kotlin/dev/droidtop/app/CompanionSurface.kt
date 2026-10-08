@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import dev.droidtop.display.secondScreenScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,7 +66,7 @@ fun CompanionSurface(
         CompanionContent(entry)
         Column(
             modifier = Modifier.fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .secondScreenScroll(rememberScrollState())
                 // A scrim, not raw text over the backdrop art: live Android notifications read as
                 // unstyled system clutter laid over it (rig, p1-dt-companion-text-overlap).
                 .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
