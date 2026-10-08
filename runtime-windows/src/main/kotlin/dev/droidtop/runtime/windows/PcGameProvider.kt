@@ -29,7 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Raise it when a store's rule for what is a library entry changes; see [PcGameProvider.storeStamp]. */
-private const val STORE_LIST_RULES = 2L
+private const val STORE_LIST_RULES = 3L
 
 /**
  * Real "PC" games -- ES-DE's own `"pc"` system id (per direction: "PC", not
@@ -276,7 +276,7 @@ class PcGameProvider(
         val engineDefs = runCatching { EnginesDatabase.defs(context) }.getOrDefault(emptyList())
         emitStorePart(storeStamp(), PcLibrary.folderInstallPaths(), engineDefs) { step ->
             if (step is dev.droidtop.library.ScanStep.Segment) {
-                part = PathIndexing(step.key, step.root, step.entries, under = null, folderMtime = step.folderMtime)
+                part = PathIndexing(step.key, step.root, step.entries, under = null, folderMtime = step.folderMtime, complete = step.complete)
             }
         }
         return part
@@ -288,9 +288,13 @@ class PcGameProvider(
         engineDefs: List<dev.droidtop.library.EngineDef>,
         emit: suspend (dev.droidtop.library.ScanStep) -> Unit,
     ) {
-        val storeGames = runCatching { PcLibrary.storeGames(context) }
-            .onFailure { android.util.Log.w("droidtop.PcGameProvider", "Reading the PC stores failed", it) }
-            .getOrDefault(emptyList())
+        val read = runCatching { PcLibrary.storeRead(context) }
+            .onFailure {
+                if (it is CancellationException) throw it
+                android.util.Log.w("droidtop.PcGameProvider", "Reading the PC stores failed", it)
+            }
+            .getOrDefault(PcLibrary.StoreRead(emptyList(), listOf("every store")))
+        val storeGames = read.games
         // Shortcut suppression measures against EVERY PC game's install
         // directory, engine-owned ones included: a Wine shortcut pointing
         // inside a Ren'Py game's folder is the same duplicate by another
@@ -300,8 +304,16 @@ class PcGameProvider(
             .getOrDefault(emptyList())
             .filterNot { shortcut -> installDirs.any { shortcut.path.startsWith(it) } }
             .map { it.toLibraryEntry() }
+        val bySource = storeGames.groupingBy { it.source.name.lowercase() }.eachCount().entries
+            .sortedBy { it.key }.joinToString(", ") { "${it.key} ${it.value}" }
         dev.droidtop.library.ScanLog.write(
-            "pc library: ${storeGames.size} store games, ${folderInstallDirs.size} folder games",
+            "pc library: ${storeGames.size} store games ($bySource), ${shortcutEntries.size} Wine shortcuts, " +
+                "${folderInstallDirs.size} folder games; " +
+                if (read.complete) {
+                    "rows the stores no longer list leave the index"
+                } else {
+                    "could not read ${read.failedStores.joinToString(", ")}, so rows not listed are kept, marked missing"
+                },
         )
         emit(
             dev.droidtop.library.ScanStep.Segment(
@@ -309,6 +321,10 @@ class PcGameProvider(
                 entries = (storeGames.notOwnedByAnEngine(engineDefs).map { it.toLibraryEntry() } + shortcutEntries)
                     .withEntryMetadata(),
                 folderMtime = storeStamp,
+                // The stores' rows are what they own, not files: a row no
+                // store lists any more is gone (DLC an older rule listed, a
+                // licence that ended), unless a store could not be read.
+                complete = read.complete,
             ),
         )
     }

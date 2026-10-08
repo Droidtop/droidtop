@@ -2,6 +2,7 @@ package dev.droidtop.stores.steam
 
 import android.content.Context
 import androidx.room.withTransaction
+import dev.droidtop.library.ScanLog
 import `in`.dragonbra.javasteam.enums.ELicenseFlags
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.License
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.PICSRequest
@@ -53,7 +54,38 @@ internal object SteamLibrarySync {
         storeLicences(db, licences, SteamSession.accountId)
         val appIds = readPackages(db, apps)
         readApps(db, apps, appIds)
-        return db.apps().owned(PLAYABLE_TYPES).size
+        val games = db.apps().owned(PLAYABLE_TYPES).size
+        val stored = db.licenses().all()
+        val accountId = SteamSession.accountId
+        val line = summary(
+            licenceTypes = stored.groupingBy { it.licenseType.name }.eachCount(),
+            expired = stored.count { ELicenseFlags.Expired in it.licenseFlags },
+            anotherAccounts = if (accountId == null) 0 else stored.count { accountId !in it.ownerAccountId },
+            apps = db.apps().ownedCounts(),
+            games = games,
+        )
+        ScanLog.write(line)
+        Timber.tag(TAG).i(line)
+        return games
+    }
+
+    /**
+     * One line per sync for scan.log (Droidtop/tracker#360), to set against
+     * the counts Steam's own profile shows: the licences by type, the owned
+     * apps by product-info type, how many became library games, and what the
+     * library rule ([isLibraryGame]) left out and why.
+     */
+    fun summary(licenceTypes: Map<String, Int>, expired: Int, anotherAccounts: Int, apps: List<SteamAppCount>, games: Int): String {
+        fun Map<String, Int>.words() = entries.sortedByDescending { it.value }.joinToString(", ") { "${it.key} ${it.value}" }
+        val byType = apps.groupBy { AppType.fromCode(it.type) }.mapValues { (_, rows) -> rows.sumOf { it.count } }
+        val owned = byType.filterKeys { it != AppType.invalid }.mapKeys { it.key.name }
+        val noInfo = byType[AppType.invalid] ?: 0
+        val gamesNamingBase = apps.filter { it.type == AppType.game.code && it.namesBaseGame }.sumOf { it.count }
+        val leftOut = owned.filterKeys { it != AppType.game.name }.toMutableMap()
+        if (gamesNamingBase > 0) leftOut["game naming a base game"] = gamesNamingBase
+        return "steam sync: ${licenceTypes.values.sum()} licences (${licenceTypes.words()}; $expired expired, " +
+            "$anotherAccounts another account's); owned apps by type: ${owned.words().ifEmpty { "none" }}; " +
+            "$noInfo with no product info; library games $games; left out: ${leftOut.words().ifEmpty { "nothing" }}"
     }
 
     /** The licences as GameNative kept them: each raw, for the depot downloader, and one row per package. */

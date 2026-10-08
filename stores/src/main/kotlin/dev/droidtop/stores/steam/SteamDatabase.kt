@@ -14,6 +14,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room.Update
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import dev.droidtop.stores.db.GameNativeImport
 import `in`.dragonbra.javasteam.enums.ELicenseFlags
@@ -166,11 +167,14 @@ class SteamConverters {
  * app with a package, a known type, not Spacewar, and a licence that has not
  * expired, either its own package's or one of its DLC's (a free-to-start game
  * whose purchase is a DLC). Bit 8 of the licence flags is Expired.
+ * [OWNED_BY_LICENCE] is the same without the known type, for the sync's
+ * summary, which counts the apps whose product info never came.
  */
-private const val OWNED_APPS_WHERE =
-    "WHERE app.id != ${SteamIds.SPACEWAR} " +
+private const val OWNED_APPS_WHERE = "WHERE app.type != 0 AND "
+
+private const val OWNED_BY_LICENCE =
+    "app.id != ${SteamIds.SPACEWAR} " +
         "AND app.package_id != ${SteamIds.INVALID_PKG_ID} " +
-        "AND app.type != 0 " +
         "AND (" +
         "  EXISTS (SELECT 1 FROM steam_license AS license WHERE license.packageId = app.package_id AND (license.license_flags & 8) = 0) " +
         "  OR EXISTS (" +
@@ -178,6 +182,9 @@ private const val OWNED_APPS_WHERE =
         "    WHERE dlc.dlc_for_app_id = app.id AND (license.license_flags & 8) = 0" +
         "  )" +
         ") "
+
+/** One line of [SteamAppDao.ownedCounts]: [type] is an [AppType] code. */
+data class SteamAppCount(val type: Int, val namesBaseGame: Boolean, val count: Int)
 
 @Dao
 interface SteamAppDao {
@@ -194,8 +201,15 @@ interface SteamAppDao {
     suspend fun find(appId: Int): SteamApp?
 
     /** Every app the account owns whose type is one a person plays ([SteamLibrarySync.PLAYABLE_TYPES] codes) and that is not DLC of another app. */
-    @Query("SELECT * FROM steam_app AS app " + OWNED_APPS_WHERE + "AND app.type IN (:types) AND app.dlc_for_app_id = ${SteamIds.INVALID_APP_ID} ORDER BY LOWER(app.name)")
+    @Query("SELECT * FROM steam_app AS app " + OWNED_APPS_WHERE + OWNED_BY_LICENCE + "AND app.type IN (:types) AND app.dlc_for_app_id = ${SteamIds.INVALID_APP_ID} ORDER BY LOWER(app.name)")
     suspend fun owned(types: List<Int>): List<SteamApp>
+
+    /** How many owned apps there are of each type, with and without a base game (`dlcforappid`); the sync's summary. */
+    @Query(
+        "SELECT app.type AS type, (app.dlc_for_app_id != ${SteamIds.INVALID_APP_ID}) AS namesBaseGame, COUNT(*) AS count " +
+            "FROM steam_app AS app WHERE " + OWNED_BY_LICENCE + "GROUP BY app.type, namesBaseGame",
+    )
+    suspend fun ownedCounts(): List<SteamAppCount>
 
     /** DLC apps of [appId] with depots of their own that a licence grants (GameNative's findDownloadableDLCApps). */
     @Query(
@@ -265,7 +279,7 @@ interface AppInfoDao {
 
 @Database(
     entities = [SteamApp::class, SteamLicense::class, CachedLicense::class, AppInfo::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(SteamConverters::class)
@@ -287,16 +301,37 @@ abstract class SteamDatabase : RoomDatabase() {
         /** GameNative's Steam tables, brought across when this database is first made. */
         private val GAMENATIVE_TABLES = listOf("steam_license", "cached_license", "app_info", "steam_app")
 
+        /**
+         * GameNative read a missing `dlcforappid` as 0 (KeyValueUtils'
+         * `asInteger()` default), droidtop as [SteamIds.INVALID_APP_ID]. A row
+         * brought across keeps GameNative's reading until its product info
+         * changes, so every game GameNative had read looked like DLC of app 0
+         * and the library left it out: the owner's library listed 725 games
+         * where Steam counts 1,245 (Droidtop/tracker#360). App 0 is no game,
+         * so 0 always means "none".
+         */
+        internal const val NO_BASE_GAME_FROM_GAMENATIVE =
+            "UPDATE steam_app SET dlc_for_app_id = ${SteamIds.INVALID_APP_ID} WHERE dlc_for_app_id = 0"
+
+        /** Version 2: [NO_BASE_GAME_FROM_GAMENATIVE] over the rows a version 1 database brought across. */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(NO_BASE_GAME_FROM_GAMENATIVE)
+            }
+        }
+
         @Volatile
         private var instance: SteamDatabase? = null
 
         fun get(context: Context): SteamDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(context.applicationContext, SteamDatabase::class.java, NAME)
+                    .addMigrations(MIGRATION_1_2)
                     .addCallback(
                         object : RoomDatabase.Callback() {
                             override fun onCreate(db: SupportSQLiteDatabase) {
                                 GameNativeImport.run(context.applicationContext, db, GAMENATIVE_TABLES)
+                                db.execSQL(NO_BASE_GAME_FROM_GAMENATIVE)
                             }
                         },
                     )

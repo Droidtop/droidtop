@@ -83,9 +83,19 @@ class RoomLibraryIndexStore(
         // the root is gone.
         for ((keyRoot, segment) in previousByKey) {
             if (keyRoot in keptKeys) continue
-            for (entry in segment.entries) records.delete(entry.id)
             db.dao().deleteGamesInPart(providerKey, segment.key)
             db.dao().deletePart(providerKey, segment.key)
+        }
+        // A game that left the slice altogether (its root removed, a store
+        // that no longer lists it, a missing game folded into its
+        // replacement) loses its record too: the index is rebuilt from the
+        // records, so a live record would bring it back. Only this
+        // provider's records; an id another provider now holds is its own.
+        val kept = slice.entries().mapTo(HashSet()) { it.id }
+        for (segment in previousByKey.values) {
+            for (entry in segment.entries) {
+                if (entry.id !in kept && records.get(entry.id)?.provider == providerKey) records.delete(entry.id)
+            }
         }
         for (segment in slice.segments) {
             if (previousByKey[segment.key to segment.root] == segment) continue

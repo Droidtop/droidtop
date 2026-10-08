@@ -116,20 +116,38 @@ object PcLibrary {
      * of these is under a games root droidtop walks, which is why they
      * are one group rather than per folder.
      */
-    suspend fun storeGames(context: Context): List<Game> {
+    suspend fun storeGames(context: Context): List<Game> = storeRead(context).games
+
+    /**
+     * What [storeRead] read: the games, and the stores whose read failed.
+     * A read with no failure is the stores' whole answer, so a row it no
+     * longer lists has left the store (docs/SPEC.md 7g); one with a failure
+     * is not, and the failed store's rows are kept as they were.
+     */
+    data class StoreRead(val games: List<Game>, val failedStores: List<String>) {
+        val complete: Boolean get() = failedStores.isEmpty()
+    }
+
+    /** [storeGames], saying which stores could not be read. */
+    suspend fun storeRead(context: Context): StoreRead {
         DroidtopGameIdStore.install(context)
+        val failed = mutableListOf<String>()
         // What the stores last said about newer builds, and a recheck when a
         // download ends: files and memory only, no network here.
         StoreUpdates.load(context)
         StoreDownloadWatch.start(context)
-        return buildList {
+        return buildList<Game> {
             // The stores droidtop runs itself (docs/SPEC.md 7g, "Stores"),
             // each read on its own: one store's failure (a corrupt row, a
             // schema drift) costs that store's games, not the whole library.
             for (store in StoreLibraries.all()) {
                 addAll(
                     runCatching { store.games(context).mapNotNull { it.toGame() } }
-                        .onFailure { android.util.Log.w(TAG, "Reading ${store.label}'s games failed", it) }
+                        .onFailure {
+                            if (it is CancellationException) throw it
+                            failed += store.label
+                            android.util.Log.w(TAG, "Reading ${store.label}'s games failed", it)
+                        }
                         .getOrDefault(emptyList()),
                 )
             }
@@ -156,7 +174,7 @@ object PcLibrary {
                             path != null && ourRoots.any { root -> path == root || path.startsWith(root + "/") }
                         }
                         .map { (item, path) -> item.toGame(context, folderPath = path) }
-                }.getOrDefault(emptyList()),
+                }.onFailure { failed += "folders outside the roots" }.getOrDefault(emptyList()),
             )
         }.sortedBy { it.title.lowercase() }
             .also { games ->
@@ -164,6 +182,7 @@ object PcLibrary {
                 // Asked in the background, for the next walk to read.
                 StoreUpdates.refreshInBackground(context, games.filter { it.installed }.map { it.id })
             }
+            .let { StoreRead(it, failed) }
     }
 
     /**

@@ -9815,7 +9815,27 @@ follows:
   and excluded rows in their queries; Amazon drops entitlements whose product
   line names an entitlement. The rule is applied when the rows are read, and
   `PcGameProvider.STORE_LIST_RULES` is part of the store stamp, so rows an older
-  rule listed leave the index on the next slow pass without a rescan. Install is a job like every store's: fresh product info, then
+  rule listed leave the index on the next slow pass without a rescan.
+  The store part is a complete answer (`ScanStep.Segment.complete`): a row no
+  store lists any more is dropped from the index with its per-game record (any
+  game that leaves a provider's slice loses its record, so a rebuild from the
+  records cannot bring it back), not kept as missing, because
+  a store row is what the account owns, not files on a drive that may not be
+  mounted. Only when a store's read fails (`PcLibrary.StoreRead.failedStores`)
+  are the rows it did not list kept, marked missing, as a folder's would be.
+  Until 2026-10-08 the store part was merged like a folder, so every row an
+  older rule had listed (DLC, soundtracks, tools) stayed as a missing entry:
+  the owner's Gaming tabs showed 6,612 Steam entries while the Standard
+  launcher, which hides missing entries, showed the 3,338 current ones
+  (Droidtop/tracker#360). A `dlcforappid` of 0 means "no base game": GameNative
+  read a missing value as 0 and droidtop as `SteamIds.INVALID_APP_ID`, and
+  rows brought across from GameNative keep its reading until their product
+  info changes, so `steam.db` version 2 (and every import) rewrites 0 to the
+  invalid id; before that only 725 of the owner's 1,245 games were listed.
+  Each Steam sync writes one line to scan.log (`SteamLibrarySync.summary`):
+  the licences by type, expired and another account's; the owned apps by
+  product-info type; how many have no product info; the library games; and
+  what the rule left out, by type, to set against Steam's own profile counts. Install is a job like every store's: fresh product info, then
   the depots `SteamDepots.plan` picks (GameNative's rules: Windows, 64-bit over
   32-bit, the plain build over the Steam Deck one, the device's language else
   English, granted by the account's packages, not Steam China) with the DLC the

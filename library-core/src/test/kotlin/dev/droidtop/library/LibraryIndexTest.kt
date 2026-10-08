@@ -205,6 +205,22 @@ class LibraryIndexTest {
     }
 
     @Test
+    fun `a complete store answer drops the rows it no longer lists, an incomplete one keeps them missing`() {
+        fun row(id: String) = LibraryEntry(id = id, title = id, kind = LibraryEntryKind.WINE_PROFILE)
+        // What an older rule listed (DLC, a soundtrack) and a row an earlier answer already left missing.
+        val before = LibrarySlice().merge(ScanStep.Segment(ScanStep.WHOLE, entries = listOf(row("steam:1"), row("steam:2"), row("steam:3").copy(missing = true))))
+        val failed = before.merge(ScanStep.Segment(ScanStep.WHOLE, entries = listOf(row("steam:1"))))
+        assertEquals(listOf("steam:1" to false, "steam:2" to true, "steam:3" to true), failed.entries().map { it.id to it.missing })
+        val complete = before.merge(ScanStep.Segment(ScanStep.WHOLE, entries = listOf(row("steam:1")), complete = true))
+        assertEquals(listOf("steam:1" to false), complete.entries().map { it.id to it.missing })
+        // The flag belongs to the step, not to the slice it leaves.
+        assertFalse(complete.segments.single().complete)
+        // A store re-read for a reported path is a whole part too.
+        val path = before.mergePath(PathIndexing(ScanStep.WHOLE, null, listOf(row("steam:2")), complete = true), 5L)
+        assertEquals(listOf("steam:2"), path.entries().map { it.id })
+    }
+
+    @Test
     fun `a game a walked folder no longer holds is missing, and keeps its facts`() = runBlocking {
         val gone = game("$adult/Game v0.3").copy(favorite = true, playCount = 7, description = "scraped")
         val provider = FolderProvider(LibraryEntryKind.RENPY, root, listOf(adult to emptyList()))

@@ -34,6 +34,12 @@ sealed interface ScanStep {
      * for a part that is one folder. A part that is several folders (a
      * console system) stamps itself, since no single folder's time
      * speaks for it.
+     *
+     * [complete] says the part's own source answered in full, so a game it
+     * no longer holds is gone rather than missing: a store's rows are what
+     * the store says the account owns, not files on a drive that may not be
+     * mounted (docs/SPEC.md 7g). A folder part never sets it. It is a
+     * property of the step and is not kept in the slice.
      */
     @Serializable
     data class Segment(
@@ -41,6 +47,7 @@ sealed interface ScanStep {
         val root: String? = null,
         val entries: List<LibraryEntry> = emptyList(),
         val folderMtime: Long? = null,
+        val complete: Boolean = false,
     ) : ScanStep
 
     /**
@@ -125,8 +132,10 @@ data class LibrarySlice(val segments: List<ScanStep.Segment> = emptyList()) {
     private fun mergeSegment(walked: ScanStep.Segment): LibrarySlice {
         val previous = segments.firstOrNull { it.key == walked.key && it.root == walked.root }
         val found = walked.entries.mapTo(HashSet()) { it.id }
-        val stillMissing = previous?.entries.orEmpty().filterNot { it.id in found }.map { it.asMissing() }
-        val merged = walked.copy(entries = walked.entries + stillMissing)
+        // A complete answer drops what it no longer lists, and with it the
+        // missing rows earlier answers left.
+        val stillMissing = if (walked.complete) emptyList() else previous?.entries.orEmpty().filterNot { it.id in found }.map { it.asMissing() }
+        val merged = walked.copy(entries = walked.entries + stillMissing, complete = false)
         return if (previous == null) {
             copy(segments = segments + merged)
         } else {
@@ -197,7 +206,7 @@ data class LibrarySlice(val segments: List<ScanStep.Segment> = emptyList()) {
      */
     fun mergePath(indexing: PathIndexing, folderMtime: Long): LibrarySlice {
         val under = indexing.under
-            ?: return merge(ScanStep.Segment(indexing.key, indexing.root, indexing.entries, indexing.folderMtime ?: folderMtime))
+            ?: return merge(ScanStep.Segment(indexing.key, indexing.root, indexing.entries, indexing.folderMtime ?: folderMtime, indexing.complete))
         val previous = segments.firstOrNull { it.key == indexing.key && it.root == indexing.root }
         val found = indexing.entries.mapTo(HashSet()) { it.id }
         val kept = previous?.entries.orEmpty().filter { it.id !in found }
@@ -247,6 +256,8 @@ data class PathIndexing(
     val entries: List<LibraryEntry>,
     val under: String? = null,
     val folderMtime: Long? = null,
+    /** [ScanStep.Segment.complete], for an answer that is a whole part. */
+    val complete: Boolean = false,
 )
 
 /**

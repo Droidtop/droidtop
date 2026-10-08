@@ -9,6 +9,8 @@ import dev.droidtop.stores.steam.ManifestInfo
 import dev.droidtop.stores.steam.OS
 import dev.droidtop.stores.steam.OSArch
 import dev.droidtop.stores.steam.SteamApp
+import dev.droidtop.stores.steam.SteamAppCount
+import dev.droidtop.stores.steam.SteamDatabase
 import dev.droidtop.stores.steam.SteamConverters
 import dev.droidtop.stores.steam.SteamDepots
 import dev.droidtop.stores.steam.SteamExecutables
@@ -225,6 +227,36 @@ class SteamStoreTest {
         // An installed demo or application stays listed with its files; installed tools and music do not.
         assertTrue(SteamLibrarySync.isLibraryGame(app(AppType.demo), keepInstalledKinds = true))
         assertFalse(SteamLibrarySync.isLibraryGame(app(AppType.music), keepInstalledKinds = true))
+    }
+
+    @Test
+    fun `a sync summary counts licences and owned apps by type, and what the library left out`() {
+        val line = SteamLibrarySync.summary(
+            licenceTypes = mapOf("SinglePurchase" to 1200, "Complimentary" to 40),
+            expired = 3,
+            anotherAccounts = 12,
+            apps = listOf(
+                SteamAppCount(AppType.game.code, namesBaseGame = false, count = 1245),
+                SteamAppCount(AppType.game.code, namesBaseGame = true, count = 2),
+                SteamAppCount(AppType.dlc.code, namesBaseGame = true, count = 782),
+                SteamAppCount(AppType.invalid.code, namesBaseGame = false, count = 5),
+            ),
+            games = 1245,
+        )
+        assertEquals(
+            "steam sync: 1240 licences (SinglePurchase 1200, Complimentary 40; 3 expired, 12 another account's); " +
+                "owned apps by type: game 1247, dlc 782; 5 with no product info; library games 1245; " +
+                "left out: dlc 782, game naming a base game 2",
+            line,
+        )
+    }
+
+    @Test
+    fun `GameNative's reading of a missing dlcforappid, 0, is turned into none`() {
+        assertEquals(
+            "UPDATE steam_app SET dlc_for_app_id = ${SteamIds.INVALID_APP_ID} WHERE dlc_for_app_id = 0",
+            SteamDatabase.NO_BASE_GAME_FROM_GAMENATIVE,
+        )
     }
 
     @Test
