@@ -11,22 +11,29 @@ import android.content.Intent
  * Desktop's Start menu lists them. Kiosk and Kid hide them in every mode ([visible]), because they are
  * the device's management as much as Settings is.
  */
+private const val STORES_SCREEN = "stores"
+private const val SOCIAL_SCREEN = "social"
+private const val DOWNLOADS_SCREEN = "plugin_jobs"
+private const val UPDATES_SCREEN = "updates"
+private const val PLUGINS_SCREEN = "plugins"
+
 enum class Place(val screenId: String, val title: String) {
-    STORES(ID_STORES, "Stores"),
-    SOCIAL(ID_SOCIAL, "Social"),
-    DOWNLOADS(ID_DOWNLOADS, "Downloads and installs"),
-    UPDATES(ID_UPDATES, "Updates"),
-    PLUGINS(ID_PLUGINS, "Plugins"),
+    STORES(STORES_SCREEN, "Stores"),
+    SOCIAL(SOCIAL_SCREEN, "Social"),
+    DOWNLOADS(DOWNLOADS_SCREEN, "Downloads and installs"),
+    UPDATES(UPDATES_SCREEN, "Updates"),
+    PLUGINS(PLUGINS_SCREEN, "Plugins"),
     ;
 
     companion object {
         // The registry ids, as constants so code that names one screen (the Quick Menu's
-        // "Get and manage plugins") can use them where a constant is needed.
-        const val ID_STORES = "stores"
-        const val ID_SOCIAL = "social"
-        const val ID_DOWNLOADS = "plugin_jobs"
-        const val ID_UPDATES = "updates"
-        const val ID_PLUGINS = "plugins"
+        // "Get and manage plugins") can use them where a constant is needed. The enum entries use the
+        // top-level constants because an entry cannot read its own companion while it is initialised.
+        const val ID_STORES = STORES_SCREEN
+        const val ID_SOCIAL = SOCIAL_SCREEN
+        const val ID_DOWNLOADS = DOWNLOADS_SCREEN
+        const val ID_UPDATES = UPDATES_SCREEN
+        const val ID_PLUGINS = PLUGINS_SCREEN
 
         fun byScreenId(screenId: String?): Place? = entries.firstOrNull { it.screenId == screenId }
 
