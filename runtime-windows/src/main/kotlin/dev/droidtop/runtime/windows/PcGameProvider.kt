@@ -20,6 +20,7 @@ import dev.droidtop.library.PcInfo
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.PathIndexing
 import dev.droidtop.library.RunnerState
 import dev.droidtop.library.withScrapedMetadata
 import java.io.File
@@ -212,7 +213,9 @@ class PcGameProvider(
         }
         // The store part suppresses Wine shortcuts against every folder
         // game's install directory, so it needs them all and follows them.
-        if (!storeUnchanged) emitStorePart(storeStamp, folderGroups, engineDefs, emit)
+        if (!storeUnchanged) {
+            emitStorePart(storeStamp, folderGroups.flatMap { it.games }.mapNotNull { it.installPath?.takeIf(String::isNotBlank) }, engineDefs, emit)
+        }
         if (!folderPassFinished) return
         for ((root, groups) in folderGroups.groupBy { it.root }) {
             emit(dev.droidtop.library.ScanStep.RootDone(root, groups.map { it.topFolder }))
@@ -220,9 +223,62 @@ class PcGameProvider(
         if (folderGroups.none { it.skipped } && !storeUnchanged) walkedInThisProcess = true
     }
 
+    /**
+     * What a reported path is, to the PC library (docs/SPEC.md 7g, "Targeted
+     * indexing"). A path in one of the folders droidtop's own stores install
+     * into ([dev.droidtop.library.stores.StoreInstallJob.rootFor]) changes
+     * what the stores' rows say (installed, where), so the store part is read
+     * again from the stores' own copies: database reads, no folder is walked.
+     * Any other folder is asked as the folder walk asks it
+     * ([PcLibrary.folderGamesAt]). A path that is gone also stops being a
+     * folder the vendored scanner knows. Runs before the other providers'
+     * ([indexesPathsEarly]) because the engine provider reads the installs
+     * the store part leaves in [PcLibrary.knownInstalls].
+     */
+    override suspend fun indexPath(path: File): List<PathIndexing> {
+        val results = mutableListOf<PathIndexing>()
+        val inStoreFolder = dev.droidtop.library.GamesRoots.current(context).any { root ->
+            StoreLibraries.all().any { store ->
+                val folder = dev.droidtop.library.stores.StoreInstallJob.rootFor(root.path, store).path
+                path.path == folder || path.path.startsWith("$folder/")
+            }
+        }
+        if (inStoreFolder) {
+            refreshStorePart()?.let { results += it }
+        }
+        if (!path.exists()) {
+            PcLibrary.forgetFolders(path.path)
+            return results
+        }
+        if (inStoreFolder) return results
+        val at = PcLibrary.folderGamesAt(context, path) ?: return results
+        val engineDefs = runCatching { EnginesDatabase.defs(context) }.getOrDefault(emptyList())
+        results += PathIndexing(
+            key = at.topFolder,
+            root = at.root,
+            entries = at.games.notOwnedByAnEngine(engineDefs).map { it.toLibraryEntry() }.withEntryMetadata(),
+            under = at.folder,
+        )
+        return results
+    }
+
+    override val indexesPathsEarly: Boolean get() = true
+
+    /** The store part as the walk would emit it, read now from the stores' rows; null if it emitted none. */
+    private suspend fun refreshStorePart(): PathIndexing? {
+        var part: PathIndexing? = null
+        val engineDefs = runCatching { EnginesDatabase.defs(context) }.getOrDefault(emptyList())
+        emitStorePart(storeStamp(), PcLibrary.folderInstallPaths(), engineDefs) { step ->
+            if (step is dev.droidtop.library.ScanStep.Segment) {
+                part = PathIndexing(step.key, step.root, step.entries, under = null, folderMtime = step.folderMtime)
+            }
+        }
+        return part
+    }
+
     private suspend fun emitStorePart(
         storeStamp: Long,
-        folderGroups: List<PcLibrary.FolderGroup>,
+        folderInstallDirs: List<String>,
         engineDefs: List<dev.droidtop.library.EngineDef>,
         emit: suspend (dev.droidtop.library.ScanStep) -> Unit,
     ) {
@@ -233,15 +289,13 @@ class PcGameProvider(
         // directory, engine-owned ones included: a Wine shortcut pointing
         // inside a Ren'Py game's folder is the same duplicate by another
         // route.
-        val installDirs = (storeGames + folderGroups.flatMap { it.games })
-            .mapNotNull { it.installPath?.takeIf(String::isNotBlank) }
+        val installDirs = storeGames.mapNotNull { it.installPath?.takeIf(String::isNotBlank) } + folderInstallDirs
         val shortcutEntries = runCatching { ContainerManager(context).loadShortcuts() }
             .getOrDefault(emptyList())
             .filterNot { shortcut -> installDirs.any { shortcut.path.startsWith(it) } }
             .map { it.toLibraryEntry() }
         dev.droidtop.library.ScanLog.write(
-            "pc library: ${storeGames.size} store games, " +
-                "${folderGroups.sumOf { it.games.size }} folder games in ${folderGroups.size} folders",
+            "pc library: ${storeGames.size} store games, ${folderInstallDirs.size} folder games",
         )
         emit(
             dev.droidtop.library.ScanStep.Segment(

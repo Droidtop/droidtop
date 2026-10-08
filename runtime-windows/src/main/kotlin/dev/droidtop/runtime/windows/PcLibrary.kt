@@ -266,6 +266,68 @@ object PcLibrary {
     }
 
 
+    /** The PC games under one reported folder: see [folderGamesAt]. */
+    data class FolderAt(val root: String, val topFolder: String, val folder: String, val games: List<Game>)
+
+    /**
+     * The folder games at or under ONE folder of droidtop's roots, found with
+     * the folder rule ([PcFolderScan.scanPath]) and made into games like the
+     * walk's, without walking the folder's top-level folder or the root
+     * (docs/SPEC.md 7g, "Targeted indexing"). [path] may be a file, in which
+     * case its folder is looked at. Null when the walk would not enter the
+     * folder or the look was too slow; the folders it names are told to the
+     * vendored scanner, as the walk does ([adoptFoundFolders]).
+     */
+    suspend fun folderGamesAt(context: Context, path: File): FolderAt? = withContext(Dispatchers.IO) {
+        DroidtopGameIdStore.install(context)
+        val folder = (if (path.isDirectory) path else path.parentFile) ?: return@withContext null
+        val root = dev.droidtop.library.GamesRoots.current(context)
+            .filter { folder.path.startsWith(it.path.trimEnd('/') + "/") }
+            .maxByOrNull { it.path.length } ?: return@withContext null
+        val top = File(root, folder.path.removePrefix(root.path.trimEnd('/') + "/").substringBefore('/'))
+        val defs = orDefault<List<dev.droidtop.library.EngineDef>>(emptyList()) {
+            dev.droidtop.library.EnginesDatabase.defs(context)
+        }
+        val systems = orDefault<Map<String, dev.droidtop.library.consoles.ConsoleSystemDef>>(emptyMap()) {
+            dev.droidtop.library.consoles.ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        }
+        val options = PcFolderScan.Options(
+            systemsById = systems,
+            cache = listingCache,
+            verdicts = EngineVerdictStore.forRules(context, defs),
+            folderBudgetMs = ScanBudget.DEFAULT_TOP_FOLDER_BUDGET_MS,
+        )
+        val found = try {
+            PcFolderScan.scanPath(root, folder, defs, options)
+        } finally {
+            EngineVerdictStore.save(context)
+        } ?: return@withContext null
+        val storeOwned = storeOwnedFolders(context)
+        val gameFolders = found.map { it.absolutePath }.filterNot { it.isUnder(storeOwned) }
+        runCatching {
+            val current = dev.droidtop.runtime.windows.PrefManager.customGameManualFolders
+            if (!current.containsAll(gameFolders)) dev.droidtop.runtime.windows.PrefManager.customGameManualFolders = current + gameFolders
+        }.onFailure { android.util.Log.w(TAG, "Could not tell the folder scanner which folders are games", it) }
+        val games = gameFolders
+            .mapNotNull { gameFolder -> runCatching { CustomGameScanner.createLibraryItemFromFolder(gameFolder) }.getOrNull() }
+            .distinctBy { it.appId }
+            .map { it.toGame(context, root.absolutePath) }
+            .sortedBy { it.title.lowercase() }
+        FolderAt(root.absolutePath, top.absolutePath, folder.absolutePath, games)
+    }
+
+    /** The vendored scanner is no longer told about game folders that were under [path], which is gone. */
+    fun forgetFolders(path: String) {
+        runCatching {
+            val current = dev.droidtop.runtime.windows.PrefManager.customGameManualFolders
+            val kept = current.filterNot { it == path || it.startsWith("$path/") }.toSet()
+            if (kept.size != current.size) dev.droidtop.runtime.windows.PrefManager.customGameManualFolders = kept
+        }.onFailure { android.util.Log.w(TAG, "Could not tell the folder scanner a folder is gone", it) }
+    }
+
+    /** Where the folder games of the last walk are, for the store part's Wine-shortcut suppression ([folderSourceInstalls]). */
+    fun folderInstallPaths(): List<String> = folderSourceInstalls.map { it.installDir.absolutePath }
+
     /** Only what is actually on this device — what the library grid shows. */
     suspend fun installedGames(context: Context): List<Game> = allGames(context).filter { it.installed }
 

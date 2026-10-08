@@ -5,6 +5,8 @@ import android.content.Context
 import android.net.Uri
 import java.io.File
 import java.net.URI
+import dev.droidtop.library.settings.LibraryPaths
+import dev.droidtop.library.settings.PathChange
 import dev.droidtop.runtime.util.Sha256
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
@@ -176,15 +178,15 @@ object DownloadJobs {
     /** Registers the runner with the one jobs registry. Called once at process start, before jobs are restored. */
     fun register(context: Context) {
         val appContext = context.applicationContext
-        registerPost(POST_PLACE_IN_FOLDER) { _, file, args ->
-            val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
-            withContext(Dispatchers.IO) {
-                require(destination.isDirectory || destination.mkdirs()) { "the game folder is not available" }
-                val target = File(destination, requireNotNull(args["targetName"]) { "the file name is missing" })
-                require(!target.exists()) { "a file with that name already exists" }
-                require(file.renameTo(target)) { "the download could not be placed in the game folder" }
+        registerPost(POST_PLACE_IN_FOLDER) { jobContext, file, args ->
+            val target = withContext(Dispatchers.IO) {
+                placeInFolder(file, args).also {
+                    // The file is the library's from here, said by the job and not by whatever screen started it, so
+                    // a page that was closed, or a restart, loses nothing (docs/SPEC.md 7g, "Targeted indexing").
+                    LibraryPaths.report(jobContext, PathChange.added(it))
+                }
             }
-            "Added ${args["targetName"]}"
+            "Added ${target.name}"
         }
         FlutterRuntimeManager.registerDownloadPost()
         PythonRuntimeManager.registerDownloadPost()
@@ -193,6 +195,16 @@ object DownloadJobs {
             onCancel = { args, checkpoint -> cancelDownload(appContext, args, checkpoint) },
             reattachOnRestart = true,
         ) { args, checkpoint, report -> execute(appContext, backendFactory(appContext), args, checkpoint, report) }
+    }
+
+    /** Moves [file] to `targetName` in `destinationPath`; the one place a download is placed in a game folder. Returns where it went. */
+    internal fun placeInFolder(file: File, args: Map<String, String>): File {
+        val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
+        require(destination.isDirectory || destination.mkdirs()) { "the game folder is not available" }
+        val target = File(destination, requireNotNull(args["targetName"]) { "the file name is missing" })
+        require(!target.exists()) { "a file with that name already exists" }
+        require(file.renameTo(target)) { "the download could not be placed in the game folder" }
+        return target
     }
 
     /** Names the post-processing step a job's `post` argument refers to. Registered at process start, so a restored job finds it. */
@@ -281,6 +293,7 @@ object DownloadJobs {
         }
         val request = DownloadRequest(requireNotNull(args[ARG_URL]) { "the download has no address" }, args[ARG_TITLE] ?: name, name, headers)
         val file = fileFor(context, name)
+        placedBeforeTheProcessEnded(backend, file, postName, args, checkpoint) { LibraryPaths.report(context, PathChange.added(it)) }?.let { return it }
         val id = withContext(Dispatchers.IO) {
             fetch(backend, request, file, checkpoint, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, report)
         }
@@ -301,6 +314,33 @@ object DownloadJobs {
             }
         }
         return summary
+    }
+
+    /**
+     * A restored job whose file the previous run had already placed in the game folder, when the process ended
+     * after the rename and before the job was marked done: Android still holds the finished entry but the file
+     * it points at has moved. The job is finished here, the entry released, and the placed file reported again
+     * (a report is idempotent), so the game is not lost to "the download finished but its file is missing".
+     * Null when this is not that case.
+     */
+    internal suspend fun placedBeforeTheProcessEnded(
+        backend: DownloadBackend,
+        file: File,
+        postName: String,
+        args: Map<String, String>,
+        checkpoint: String?,
+        reportPlaced: (File) -> Unit,
+    ): String? {
+        if (postName != POST_PLACE_IN_FOLDER || checkpoint == null) return null
+        return withContext(Dispatchers.IO) {
+            val id = checkpoint.toLongOrNull() ?: return@withContext null
+            val target = File(args["destinationPath"] ?: return@withContext null, args["targetName"] ?: return@withContext null)
+            val finished = backend.query(id)?.status == DownloadManager.STATUS_SUCCESSFUL
+            if (!finished || file.exists() || !target.isFile) return@withContext null
+            runCatching { backend.remove(id) }
+            reportPlaced(target)
+            "Added ${target.name}"
+        }
     }
 
     /**

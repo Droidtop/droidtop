@@ -121,7 +121,6 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         }
         return PluginViews.screen(source.record, "library.sources", "detail", "source_detail_${source.record.manifest.id}_${result.id}", result.title,
             org.json.JSONObject().put("ref", ref), context, fallback,
-            onJobDone = { ctx, outcome -> if (outcome.ok) dev.droidtop.library.settings.LibraryRescan.run(ctx) {} },
         )
     }
 

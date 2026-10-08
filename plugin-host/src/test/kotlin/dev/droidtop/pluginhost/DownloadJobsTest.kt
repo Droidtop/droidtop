@@ -204,6 +204,71 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun aDownloadIsPlacedInTheGameFolderUnderItsTargetName() {
+        val downloaded = File(dir, "downloads/acquire_1_Game.zip").also { it.parentFile.mkdirs(); it.writeText("zip") }
+        val games = File(dir, "games/snes")
+        val target = DownloadJobs.placeInFolder(downloaded, mapOf("destinationPath" to games.path, "targetName" to "Game.zip"))
+        assertEquals(File(games, "Game.zip"), target)
+        assertTrue(target.isFile)
+        assertFalse(downloaded.exists())
+
+        val again = File(dir, "downloads/acquire_2_Game.zip").also { it.writeText("zip") }
+        try {
+            DownloadJobs.placeInFolder(again, mapOf("destinationPath" to games.path, "targetName" to "Game.zip"))
+            fail("an existing file is never replaced")
+        } catch (e: IllegalArgumentException) {
+            assertEquals("a file with that name already exists", e.message)
+        }
+        assertTrue("the download stays for a retry", again.exists())
+    }
+
+    @Test
+    fun aJobWhoseFileWasPlacedBeforeTheProcessEndedIsFinishedAndReportedNotFailed() = runBlocking {
+        // The previous run renamed the file into the game folder and died before the job was marked done:
+        // Android still holds the finished entry (id 42), the downloads area no longer holds the file.
+        val backend = FakeBackend()
+        backend.existing(42L, snapshot(DownloadManager.STATUS_SUCCESSFUL, downloaded = 7, total = 7))
+        val games = File(dir, "games/snes").also { it.mkdirs() }
+        File(games, "Game.zip").writeText("zip")
+        val args = mapOf("destinationPath" to games.path, "targetName" to "Game.zip")
+        val reported = CopyOnWriteArrayList<File>()
+
+        val line = DownloadJobs.placedBeforeTheProcessEnded(
+            backend, File(dir, "downloads/acquire_1_Game.zip"), DownloadJobs.POST_PLACE_IN_FOLDER, args, "42",
+        ) { reported += it }
+
+        assertEquals("Added Game.zip", line)
+        assertEquals(listOf(File(games, "Game.zip")), reported.toList())
+        assertEquals("Android's entry is released", listOf(42L), backend.removed.toList())
+    }
+
+    @Test
+    fun aJobThatIsStillDownloadingOrWasNotPlacedIsNotTakenForPlaced() = runBlocking {
+        val games = File(dir, "games/snes").also { it.mkdirs() }
+        val args = mapOf("destinationPath" to games.path, "targetName" to "Game.zip")
+        val file = File(dir, "downloads/acquire_1_Game.zip")
+        val reported = CopyOnWriteArrayList<File>()
+        val report = { placed: File -> reported += placed; Unit }
+
+        // Nothing in the game folder yet.
+        val notPlaced = FakeBackend().also { it.existing(42L, snapshot(DownloadManager.STATUS_SUCCESSFUL)) }
+        assertNull(DownloadJobs.placedBeforeTheProcessEnded(notPlaced, file, DownloadJobs.POST_PLACE_IN_FOLDER, args, "42", report))
+
+        // The target is there, but the transfer is still running and its partial file is where it was.
+        File(games, "Game.zip").writeText("an older file")
+        file.parentFile.mkdirs()
+        file.writeText("partial")
+        val running = FakeBackend().also { it.existing(42L, snapshot(DownloadManager.STATUS_RUNNING, downloaded = 1, total = 7)) }
+        assertNull(DownloadJobs.placedBeforeTheProcessEnded(running, file, DownloadJobs.POST_PLACE_IN_FOLDER, args, "42", report))
+
+        // Another kind of job, and a job with no checkpoint, are never this.
+        assertNull(DownloadJobs.placedBeforeTheProcessEnded(running, file, DownloadJobs.POST_KEEP, args, "42", report))
+        assertNull(DownloadJobs.placedBeforeTheProcessEnded(running, file, DownloadJobs.POST_PLACE_IN_FOLDER, args, null, report))
+        assertTrue(reported.isEmpty())
+        assertTrue(running.removed.isEmpty())
+    }
+
+    @Test
     fun theSummaryCountsOnlyJobsWithNoNotificationOfTheirOwn() {
         fun entry(done: Boolean = false, paused: Boolean = false, nativeKind: String? = null) =
             PluginJobsCenter.Entry("j", "p", "P", null, "t", 0L, done = done, paused = paused, nativeKind = nativeKind)

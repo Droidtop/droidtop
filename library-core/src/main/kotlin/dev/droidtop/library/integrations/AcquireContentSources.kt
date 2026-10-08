@@ -7,7 +7,6 @@ import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
-import dev.droidtop.library.settings.LibraryRescan
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.pluginhost.PluginCapability
@@ -474,6 +473,7 @@ object AcquireContentSources {
         onProgress: (percent: Int, statusLine: String) -> Unit,
         onComplete: (AcquireDownloadOutcome) -> Unit,
     ): AcquireContentJob? {
+        val startedAt = System.currentTimeMillis()
         val trackingId = PluginJobsCenter.start(
             context = context,
             record = source.record,
@@ -487,6 +487,8 @@ object AcquireContentSources {
             title = "Downloading ${result.title}",
             onProgress = onProgress,
             onComplete = { jobResult ->
+                // Said by the job, not by the screen that waits for it: the downloaded file is looked at, nothing is walked.
+                if (jobResult.ok) AcquireIndexing.afterAcquire(context, source.record.manifest.id, startedAt, systemFolder, jobResult.values)
                 onComplete(
                     AcquireDownloadOutcome(
                         ok = jobResult.ok,
@@ -505,10 +507,9 @@ object AcquireContentSources {
      * synchronous suspend shape (report through `onStatus`, return the
      * final sentence) with a [CompletableDeferred] -- the same "wrap a
      * callback API as a suspend function" pattern this module otherwise
-     * has no need for. Rescans the library on a successful download, via
-     * [LibraryRescan] (the one shared "rescan and report a sentence"
-     * mechanism every other screen that offers a rescan already uses), so
-     * the new file shows up without a separate manual step.
+     * has no need for. The downloaded file reaches the library from the job
+     * itself ([startDownload]), not from here, so it shows up whether or not
+     * this screen is still open.
      */
     internal suspend fun runDownloadAndAwait(
         context: Context,
@@ -538,8 +539,7 @@ object AcquireContentSources {
         )
         if (job == null) return "Couldn't start the download: ${source.label} has no running job support"
         return try {
-            val ok = done.await()
-            if (ok) LibraryRescan.run(context) {}
+            done.await()
             finalMessage
         } finally {
             job.close()

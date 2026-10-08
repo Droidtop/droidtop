@@ -1,6 +1,7 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
+import dev.droidtop.library.PathIndexing
 import dev.droidtop.library.disambiguateTitles
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.EsDeArtwork
@@ -539,6 +540,35 @@ class ConsoleRomProvider(
 
 
     /**
+     * What a reported path is, to the ROM walk (docs/SPEC.md 7g, "Targeted
+     * indexing"): a ROM file inside one of the roots' system folders, or a
+     * folder inside one, whose own ROMs are looked at and no others. The
+     * system is decided exactly as the walk decides it ([SystemFolders.systemFolderFor]),
+     * the file by the same extension and add-on-folder rules
+     * ([RomScanWalk]), the entry by the same code ([romEntries]); a path
+     * that is not in a system folder, or a system folder itself (which is a
+     * walk, not a report), is not this provider's.
+     */
+    override suspend fun indexPath(path: File): List<PathIndexing> {
+        if (!path.exists()) return emptyList()
+        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        val place = SystemFolders.systemFolderFor(context, GamesRoots.current(context), path, systemsById) ?: return emptyList()
+        val (root, systemFolder, system) = place
+        if (path.path == systemFolder.path) return emptyList()
+        val files = if (path.isFile) {
+            val blocked = generateSequence(path.parentFile) { it.parentFile }
+                .takeWhile { it.path.length >= systemFolder.path.length }
+                .any { RomScanWalk.skipReason(it, systemFolder) != null }
+            listOf(path).filter { !blocked && it.extension.lowercase() in system.extensions }
+        } else {
+            RomScanWalk.walk(path, system.extensions) { ScanBudget.start(ScanBudget.DEFAULT_FOLDER_BUDGET_MS) }.files
+        }
+        val entries = romEntries(files, systemFolder, system)
+        writeRomRecords(entries, root, system.id)
+        return listOf(PathIndexing(key = system.id, root = root.absolutePath, entries = entries, under = path.path))
+    }
+
+    /**
      * One system under one root: the system, and every folder under that
      * root holding its ROMs. A list of folders rather than one, because a
      * whole-library root can hold `ps2/` beside `roms/ps2/`, and the scan
@@ -593,13 +623,6 @@ class ConsoleRomProvider(
         // pass -- see DefaultPlayers' own doc comment) -- the ROM folder
         // itself is the source of truth, not what droidtop happens to know
         // how to launch today.
-        // The games root is systemFolder's own parent (<gamesRoot>/<systemId>/...),
-        // same directory ES-DE's own `downloaded_media` sits alongside --
-        // real per-game artwork when a user's existing ES-DE (or any other
-        // scraper writing that same real layout) has already scraped it.
-        // See EsDeArtwork's own doc comment for why droidtop reads this
-        // rather than scraping itself.
-        val gamesRoot = systemFolder.parentFile ?: systemFolder
         // Not a plain walkTopDown any more: a directory of DLC, updates
         // or BIOS images carries the system's own ROM extension and used
         // to become one library entry per file (a real case on this
@@ -648,7 +671,36 @@ class ConsoleRomProvider(
         // lets Room's own executor and the filesystem overlap thousands of
         // independent lookups instead of paying their latency one at a
         // time.
-        val entries = romFiles.map { romFile ->
+        val entries = romEntries(romFiles, systemFolder, system)
+        ScanLog.write(
+            label = "rom folder ${systemFolder.absolutePath}",
+            games = entries.size,
+            skipped = ScanSkips.of(romScan.skipped),
+            durationMs = System.currentTimeMillis() - startedAt,
+            note = romScan.stoppedAt?.let { "stopped in ${it.absolutePath}" },
+        )
+        entries
+    }
+
+    /**
+     * The library entries of [romFiles], which are files of [system] under
+     * [systemFolder]: the one place a ROM file becomes an entry, for a
+     * system folder's walk and for a single reported file
+     * ([indexPath]) alike.
+     */
+    private suspend fun romEntries(
+        romFiles: List<File>,
+        systemFolder: File,
+        system: ConsoleSystemDef,
+    ): List<LibraryEntry> = coroutineScope {
+        // The games root is systemFolder's own parent (<gamesRoot>/<systemId>/...),
+        // same directory ES-DE's own `downloaded_media` sits alongside --
+        // real per-game artwork when a user's existing ES-DE (or any other
+        // scraper writing that same real layout) has already scraped it.
+        // See EsDeArtwork's own doc comment for why droidtop reads this
+        // rather than scraping itself.
+        val gamesRoot = systemFolder.parentFile ?: systemFolder
+        romFiles.map { romFile ->
             async {
                 val effectiveSystemId = detectSystemIdFromContent(romFile)
                     ?: detectSystemIdFromFilename(romFile)
@@ -680,14 +732,6 @@ class ConsoleRomProvider(
             // the same thing. See disambiguateTitles.
             .disambiguateTitles(systemFolder)
             .withMetadata()
-        ScanLog.write(
-            label = "rom folder ${systemFolder.absolutePath}",
-            games = entries.size,
-            skipped = ScanSkips.of(romScan.skipped),
-            durationMs = System.currentTimeMillis() - startedAt,
-            note = romScan.stoppedAt?.let { "stopped in ${it.absolutePath}" },
-        )
-        entries
     }
 
     /**

@@ -158,6 +158,11 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun librarySystems(): JSONObject = PluginBrokers.librarySystemsProvider()
 
+    override fun gamesRoots(): List<String> = dev.droidtop.library.settings.LibraryPaths.roots()
+
+    override fun libraryFilesChanged(pluginId: String, change: dev.droidtop.library.settings.PathChange): Boolean =
+        dev.droidtop.library.settings.LibraryPaths.report(appContext, change, source = pluginId) != null
+
     override fun socialChanged(pluginId: String, change: JSONObject): Boolean = PluginBrokers.socialChanged(pluginId, change)
 
     override fun chainServedBy(pluginId: String): List<String> = PluginBrokers.chainServedBy(pluginId)

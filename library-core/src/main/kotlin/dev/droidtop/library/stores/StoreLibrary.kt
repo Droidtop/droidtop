@@ -1,17 +1,12 @@
 package dev.droidtop.library.stores
 
 import android.content.Context
-import android.util.Log
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.LibraryRescan
 import dev.droidtop.library.social.SocialProvider
 import java.io.File
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 
 /**
  * One game a store says the person owns: Playnite's `GameMetadata`, a row
@@ -336,19 +331,13 @@ object StoreLibraries {
 }
 
 /**
- * Says that a store's rows changed (a sign-in, a sync, a sign-out, an
- * install, a removal): the library walks again in the background so the
- * change shows, the same "Rescan library" every other source change runs
- * ([LibraryRescan]). Returns at once; never on the caller's thread.
+ * Says that a store's rows changed with no file to name (a sign-in, a sync, a
+ * sign-out): the library walks again in the background so the change shows,
+ * the same "Rescan library" every other source change runs ([LibraryRescan]).
+ * Returns at once; never on the caller's thread. An install or a removal is
+ * not this: its files are known, and it reports them
+ * ([dev.droidtop.library.settings.LibraryPaths]) so nothing is walked.
  */
 object StoreChanges {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-    fun announce(context: Context) {
-        val app = context.applicationContext
-        scope.launch {
-            runCatching { LibraryRescan.run(app) {} }
-                .onFailure { Log.w("droidtop.Stores", "Walking the library after a store change failed", it) }
-        }
-    }
+    fun announce(context: Context) = LibraryRescan.requestInBackground(context)
 }

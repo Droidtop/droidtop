@@ -55,7 +55,8 @@ import dev.droidtop.library.WineGameSettingsPrefs
 import dev.droidtop.library.displayName
 import dev.droidtop.library.SimilarGames
 import dev.droidtop.library.scraper.PcScraper
-import dev.droidtop.library.stores.StoreChanges
+import dev.droidtop.library.settings.LibraryPaths
+import dev.droidtop.library.settings.PathChange
 import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.library.scraper.ProtonDbClient
 import dev.droidtop.library.scraper.ProtonDbSummary
@@ -580,9 +581,13 @@ internal fun PcGameMenu(
                                 removeArmed = false
                                 scope.launch {
                                     status = "Removing…"
+                                    val installedAt = entry.pcInfo?.installPath?.takeIf { it.isNotBlank() }
                                     status = store.uninstall(context, gameId).fold(
                                         onSuccess = {
-                                            StoreChanges.announce(context)
+                                            // The files are gone, so exactly that folder leaves the library; nothing is walked.
+                                            if (installedAt != null) {
+                                                withContext(Dispatchers.IO) { LibraryPaths.report(context, PathChange.removed(java.io.File(installedAt))) }
+                                            }
                                             "Removed"
                                         },
                                         onFailure = { "Could not remove it: ${userFacingErrorMessage(it)}" },

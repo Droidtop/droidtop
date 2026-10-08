@@ -3,6 +3,8 @@ package dev.droidtop.library.stores
 import android.content.Context
 import android.util.Log
 import dev.droidtop.library.StoreDownloads
+import dev.droidtop.library.settings.LibraryPaths
+import dev.droidtop.library.settings.PathChange
 import dev.droidtop.pluginhost.PluginJobsCenter
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -115,8 +117,13 @@ object StoreInstallJob {
         val outcome = store.install(context, key.substringAfter(':'), root) { fraction, line ->
             report(if (fraction < 0f) -1 else (fraction.coerceIn(0f, 1f) * 100f).toInt(), line, key)
         }
-        // The new install is in the library on the next walk; start it now.
-        StoreChanges.announce(context)
+        // The new install is in the library now, said as the folder it is, by the job and not by any screen: the
+        // library looks at that folder and walks nothing (docs/SPEC.md 7g, "Targeted indexing"). A store that cannot
+        // say where it put the game is the store's own folder, which holds only what stores installed.
+        withContext(Dispatchers.IO) {
+            val installed = runCatching { store.installedPath(context, key.substringAfter(':')) }.getOrNull()
+            LibraryPaths.report(context, PathChange.added(installed?.let(::File) ?: root))
+        }
         return outcome
     }
 

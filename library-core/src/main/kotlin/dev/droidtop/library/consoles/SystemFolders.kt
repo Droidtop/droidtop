@@ -74,6 +74,42 @@ object SystemFolders {
         return Scan(found, skipped)
     }
 
+    /**
+     * The system folder a reported [path] is in, as the walk of [under] would
+     * have found it, without walking: the games root above it, the system
+     * folder and the system. Only the folders on the way from the root to
+     * [path] are asked, by the same prune, store and system rules, so the
+     * answer is the walk's for this path. Null when the walk would not read
+     * [path] as part of a system (a folder pruned on the way, a store's
+     * tree, no system folder within [MAX_SYSTEM_SEARCH_DEPTH] levels of the
+     * root, and no folder the person assigned that contains it).
+     */
+    fun systemFolderFor(
+        context: Context,
+        roots: List<File>,
+        path: File,
+        systemsById: Map<String, ConsoleSystemDef>,
+    ): Triple<File, File, ConsoleSystemDef>? {
+        val root = roots.filter { path.path.startsWith(it.path.trimEnd('/') + "/") }.maxByOrNull { it.path.length } ?: return null
+        val names = path.path.removePrefix(root.path.trimEnd('/') + "/").split('/')
+        var folder = root
+        for ((index, name) in names.withIndex()) {
+            if (index >= MAX_SYSTEM_SEARCH_DEPTH) break
+            folder = File(folder, name)
+            // The path itself is a file when it is the last name: only folders can be system folders.
+            if (index == names.size - 1 && !path.isDirectory) break
+            if (ScanPrune.skipReason(folder) != null || ScanPrune.storeRootOwner(folder) != null) return null
+            val system = SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)
+            if (system != null) return Triple(root, folder, system)
+        }
+        for ((assigned, systemId) in SystemOverridePrefs.assigned(context)) {
+            if (path.path != assigned && !path.path.startsWith("$assigned/")) continue
+            val system = systemsById[systemId]?.takeIf { it.canResolveFromFolder() } ?: continue
+            return Triple(root, File(assigned), system)
+        }
+        return null
+    }
+
     /** [under] for every games root, system folders only. */
     fun all(context: Context, systemsById: Map<String, ConsoleSystemDef>): List<Pair<File, ConsoleSystemDef>> =
         GamesRoots.current(context).flatMap { root -> under(context, root, systemsById).found }

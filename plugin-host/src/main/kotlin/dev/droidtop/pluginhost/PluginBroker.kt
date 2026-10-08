@@ -61,6 +61,15 @@ interface BrokerEnvironment {
      */
     fun librarySystems(): JSONObject
 
+    /** The folders a `library.files` `changed` report may name, as absolute paths: the person's game folders. */
+    fun gamesRoots(): List<String> = emptyList()
+
+    /**
+     * A plugin reports files it added, removed or changed in the person's game folders (`library.files` `changed`,
+     * docs/plugin-api.md 3 A3): droidtop indexes exactly those, off this thread, and walks nothing. True when the report was taken.
+     */
+    fun libraryFilesChanged(pluginId: String, change: dev.droidtop.library.settings.PathChange): Boolean = false
+
     /**
      * A `social.provider` plugin says its friends or a conversation changed (`social.changed`, docs/plugin-api.md 3 C19):
      * droidtop asks it again off this thread. True when the change was taken. The broker checks the point first.
@@ -118,6 +127,25 @@ object HostApis {
         val names = if (list != null) List(list.length()) { list.optString(it) } else listOfNotNull(args.optString("package").takeIf { it.isNotBlank() })
         if (names.isEmpty() || names.size > MAX_PACKAGES || names.any { it.isBlank() }) invalid("packages must list 1 to $MAX_PACKAGES package names")
         return names
+    }
+
+    /** The most paths one `library.files` `changed` call may name, and the longest one. */
+    const val MAX_CHANGED_PATHS = 200
+    const val MAX_PATH_LENGTH = 4096
+
+    private fun filesChange(args: JSONObject): dev.droidtop.library.settings.PathChange {
+        fun list(name: String): List<String> {
+            val array = args.optJSONArray(name) ?: if (args.has(name)) invalid("$name must be a list of paths") else return emptyList()
+            return List(array.length()) { index ->
+                (array.opt(index) as? String)?.takeIf { it.isNotBlank() && it.length <= MAX_PATH_LENGTH }
+                    ?: invalid("$name must hold only paths of at most $MAX_PATH_LENGTH characters")
+            }
+        }
+        val change = dev.droidtop.library.settings.PathChange(list("added"), list("removed"), list("changed"))
+        val count = change.added.size + change.removed.size + change.changed.size
+        if (count == 0) invalid("name at least one path in added, removed or changed")
+        if (count > MAX_CHANGED_PATHS) invalid("name at most $MAX_CHANGED_PATHS paths in one call")
+        return change
     }
 
     private fun declaredPackages(declared: DeclaredPermission): Set<String> {
@@ -227,6 +255,21 @@ object HostApis {
             if (args.has("friendId") && args.optString("friendId").isBlank()) invalid("friendId must not be blank")
             if (args.has("message") && args.optJSONObject("message") == null) invalid("message must be an object")
             JSONObject().put("accepted", env.socialChanged(record.manifest.id, args))
+        },
+        // docs/plugin-api.md 3 A3: a plugin that put a file in a game folder (or took one out) says so, and droidtop looks at exactly
+        // that, never at the whole library. The grant is the one that lets it write there at all; the paths must be inside the
+        // person's game folders (a game folder itself is a rescan, not a report).
+        HostOp(
+            "library.files", "changed",
+            permission = "library.folders.write",
+            target = { "${it.optJSONArray("added")?.length() ?: 0} added, ${it.optJSONArray("removed")?.length() ?: 0} removed, ${it.optJSONArray("changed")?.length() ?: 0} changed" },
+        ) { env, record, args ->
+            val change = filesChange(args)
+            val outside = dev.droidtop.library.settings.LibraryPaths.outside(change.added + change.removed + change.changed, env.gamesRoots())
+            if (outside.isNotEmpty()) {
+                throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "${outside.first()} is not inside your game folders")
+            }
+            JSONObject().put("accepted", env.libraryFilesChanged(record.manifest.id, change))
         },
         // docs/plugin-api.md 3 A1: the user's systems and each one's chosen emulator, so a panel can list every system, not only those it heard about.
         HostOp("library.read", "systems", permission = "library.read") { env, _, _ -> env.librarySystems() },

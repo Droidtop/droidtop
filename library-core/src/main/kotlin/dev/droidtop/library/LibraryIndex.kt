@@ -183,7 +183,85 @@ data class LibrarySlice(val segments: List<ScanStep.Segment> = emptyList()) {
     fun without(id: String): LibrarySlice =
         copy(segments = segments.map { segment -> segment.copy(entries = segment.entries.filterNot { it.id == id }) })
 
+    /**
+     * Applies what one provider says about one reported path
+     * (docs/SPEC.md 7g, "Targeted indexing"). Unlike [merge], the part is
+     * not replaced: only the entries that were under [PathIndexing.under]
+     * are, by [PathIndexing.entries], and every other entry of the part is
+     * left exactly as it was. A game that was under the path and is not in
+     * the answer is kept, marked missing, as a walk would keep it. A part
+     * that does not exist yet is created, with [folderMtime] as its change
+     * stamp (0, unknown, when the index has none, so the slow pass looks at
+     * it once). An answer with no [PathIndexing.under] is a whole part, and
+     * is merged like a walk's step.
+     */
+    fun mergePath(indexing: PathIndexing, folderMtime: Long): LibrarySlice {
+        val under = indexing.under
+            ?: return merge(ScanStep.Segment(indexing.key, indexing.root, indexing.entries, indexing.folderMtime ?: folderMtime))
+        val previous = segments.firstOrNull { it.key == indexing.key && it.root == indexing.root }
+        val found = indexing.entries.mapTo(HashSet()) { it.id }
+        val kept = previous?.entries.orEmpty().filter { it.id !in found }
+        val merged = ScanStep.Segment(
+            key = indexing.key,
+            root = indexing.root,
+            entries = indexing.entries + kept.map { if (it.isUnder(under)) it.asMissing() else it },
+            folderMtime = indexing.folderMtime ?: previous?.folderMtime ?: folderMtime,
+        )
+        return if (previous == null) {
+            copy(segments = segments + merged)
+        } else {
+            copy(segments = segments.map { if (it.key == indexing.key && it.root == indexing.root) merged else it })
+        }
+    }
+
+    /**
+     * The ids of the entries that are on disk at or under [path], in any part.
+     * A store row that is not installed is not on disk, even where its
+     * install path says it would go.
+     */
+    fun idsUnder(path: String): List<String> =
+        segments.flatMap { segment -> segment.entries.filter { it.isOnDiskUnder(path) }.map { it.id } }.distinct()
+
+    /** The slice without the entries [idsUnder] names: what a file or folder that was deleted leaves behind. */
+    fun withoutUnder(path: String): LibrarySlice =
+        copy(segments = segments.map { segment -> segment.copy(entries = segment.entries.filterNot { it.isOnDiskUnder(path) }) })
+
+    private fun LibraryEntry.isOnDiskUnder(path: String): Boolean = isUnder(path) && pcInfo?.installed != false
+
     private fun LibraryEntry.asMissing(): LibraryEntry = if (missing) this else copy(missing = true)
+}
+
+/**
+ * What one provider's own detection says about ONE reported path
+ * ([LibraryProvider.indexPath], docs/SPEC.md 7g, "Targeted indexing"): the
+ * part of its slice the path belongs to ([key] and [root], as a
+ * [ScanStep.Segment] names them) and [entries], everything it now holds at
+ * or under [under], the path the answer is for. A null [under] says [entries]
+ * are the WHOLE part (the stores' rows, which are not under any path).
+ * [folderMtime] is the part's change stamp when only the provider can take
+ * it (the store part's); null leaves the one the index already has.
+ */
+data class PathIndexing(
+    val key: String,
+    val root: String?,
+    val entries: List<LibraryEntry>,
+    val under: String? = null,
+    val folderMtime: Long? = null,
+)
+
+/**
+ * The place on disk this entry is the game of, or null when it is not one: a
+ * ROM or an engine game is its own path, a PC game keeps its folder in its PC
+ * facts and its id is the store's. What "an entry under a path" means for
+ * [LibrarySlice.mergePath] and [LibrarySlice.withoutUnder].
+ */
+val LibraryEntry.location: String?
+    get() = pcInfo?.installPath?.takeIf { it.isNotBlank() } ?: id.takeIf { it.startsWith("/") }
+
+/** Whether this entry is at or under [path] (a file or a folder, no trailing slash). */
+fun LibraryEntry.isUnder(path: String): Boolean {
+    val own = location ?: return false
+    return own == path || own.startsWith("$path/")
 }
 
 /**

@@ -335,6 +335,44 @@ object GameEngineDetector {
     data class FolderList(val folders: List<File>, val skipped: ScanSkips = ScanSkips())
 
     /**
+     * Where a reported path sits in the engine walk: the [root] above it, the
+     * top-level folder of that root it is in ([part], the unit the index
+     * keeps entries by) and the [folder] to look at, which is the path itself
+     * or, for a file, its folder.
+     */
+    data class PathPlace(val root: File, val part: File, val folder: File)
+
+    /**
+     * [PathPlace] for [path] among [roots], without reading a directory: the
+     * deepest root above it, and every folder from that root down to the
+     * folder checked by the same rules the walk applies to a child (the prune
+     * rules, ROM system folders, the depth bound with part and version folders
+     * free). Null when no walk of any root would enter that folder, or when
+     * [path] is not below a root.
+     */
+    fun placeOf(path: File, roots: List<File>, systemsById: Map<String, ConsoleSystemDef>): PathPlace? {
+        val folder = (if (path.isDirectory) path else path.parentFile) ?: return null
+        val root = roots.filter { folder.path.startsWith(it.path.trimEnd('/') + "/") }.maxByOrNull { it.path.length } ?: return null
+        val names = folder.path.removePrefix(root.path.trimEnd('/') + "/").split('/')
+        var current = root
+        var part: File? = null
+        var depth = 0
+        for ((index, name) in names.withIndex()) {
+            current = File(current, name)
+            val childDepth = if (index == 0) 1 else depth + 1
+            depth = when {
+                index == 0 -> 1
+                GameNaming.isStructuralFolderName(name) -> depth
+                depth < MAX_SCAN_DEPTH -> depth + 1
+                else -> return null
+            }
+            if (ScanPrune.skipReason(current) != null || isConsoleSystemFolder(current, systemsById, childDepth)) return null
+            if (index == 0) part = current
+        }
+        return PathPlace(root, part ?: return null, folder)
+    }
+
+    /**
      * Every game under ONE top-level folder (see [topLevelFolders]).
      * [budget] is asked for a FRESH budget at every folder the walk
      * enters, bounding that folder own listing and detection rather than
@@ -1348,6 +1386,64 @@ class EngineGameProvider(
     }
 
     /**
+     * The roots the engine walk reads: the person's game folders, the extra
+     * roots (store libraries) and the parents of the store installs it was
+     * given. A store game's install directory is a CHILD of the root
+     * detection walks, so its parent is the root: the same relationship
+     * PcLibrary.knownInstallRoots already produces, kept here so this
+     * provider works from a bare list of installs too.
+     */
+    private fun rootsFor(installs: List<StoreInstall>): List<File> =
+        (GamesRoots.current(context) + extraRoots() + installs.mapNotNull { it.installDir.parentFile })
+            .distinctBy { it.absolutePath }
+
+    /**
+     * What a reported path is, to the engine walk (docs/SPEC.md 7g, "Targeted
+     * indexing"): the folder it names, or the folder a reported file is in,
+     * detected with the walk's own rules ([GameEngineDetector.scanFolder]) as
+     * if it were a top-level folder, so a new game folder costs a look at
+     * that folder's own contents and nothing else. A folder the walk would
+     * not enter ([GameEngineDetector.placeOf]) is not this provider's, and a
+     * folder inside a game whose engine evidence sits higher up stands for
+     * that game's folder. A look that ran past the folder budget answers
+     * nothing, as a walk's does: the index keeps what it had.
+     */
+    override suspend fun indexPath(path: File): List<PathIndexing> {
+        if (!path.exists()) return emptyList()
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+            val defs = EnginesDatabase.defs(context)
+            val installs = storeInstalls()
+            val place = GameEngineDetector.placeOf(path, rootsFor(installs), systemsById) ?: return@withContext emptyList()
+            // A game's own subfolder is its payload, not another game: when a folder above the reported one
+            // is the game, that is the folder to look at.
+            val ancestors = generateSequence(place.folder.parentFile) { it.parentFile }
+                .takeWhile { it.path.length > place.part.path.length - 1 && it.path.startsWith(place.part.path) }
+                .toList().asReversed()
+            val folder = ancestors.firstOrNull { ancestor -> GameEngineDetector.engineHere(ancestor, defs) != null } ?: place.folder
+            val verdicts = EngineVerdictStore.forRules(context, defs)
+            val scanned = try {
+                GameEngineDetector.scanFolder(
+                    folder,
+                    systemsById,
+                    defs,
+                    override = { candidate -> EngineOverridePrefs.engineFor(context, candidate.absolutePath) },
+                    options = GameEngineDetector.EngineWalkOptions(
+                        verdicts = verdicts,
+                        folderBudgetMs = ScanBudget.DEFAULT_TOP_FOLDER_BUDGET_MS,
+                    ),
+                    budget = { ScanBudget.start() },
+                )
+            } finally {
+                EngineVerdictStore.save(context)
+            }
+            if (scanned.slow) return@withContext emptyList()
+            val entries = scanned.games.map { it.toEntry(place.root, place.part, installs.byInstallDir()) }.finish()
+            listOf(PathIndexing(key = place.part.absolutePath, root = place.root.absolutePath, entries = entries, under = folder.path))
+        }
+    }
+
+    /**
      * The one walk behind both [scan] and [scanProgressive]: every root's
      * top-level folders, each scanned under its own budget and handed to
      * [publish] as it finishes -- with the folder it is the answer FOR,
@@ -1389,8 +1485,7 @@ class EngineGameProvider(
         // detection walks, so its parent is the root: the same
         // relationship PcLibrary.knownInstallRoots already produces, kept
         // here so this provider works from a bare list of installs too.
-        val roots = (GamesRoots.current(context) + extraRoots() + installs.mapNotNull { it.installDir.parentFile })
-            .distinctBy { it.absolutePath }
+        val roots = rootsFor(installs)
         // The verdicts every walk shares (the PC walk too, [EngineVerdictStore]),
         // so a folder reached through two overlapping roots, or already
         // checked by the PC walk or the last scan, is not checked again.

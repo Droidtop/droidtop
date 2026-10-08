@@ -435,15 +435,21 @@ no destination, such as the PC library). Ops:
   `acquire`. Optional: droidtop's default detail shows the result's title
   and a Download job.
 - `acquire {ref, values, context}` → a **job**. It writes only into
-  `context.destination`. When it succeeds droidtop rescans the library, so
-  the new game appears; results become games only through that scan (12a,
-  A10). Additive reply: a successful job may return `download` as a JSON
+  `context.destination`. Results become games only when droidtop's own
+  detection finds the files (12a, A10), and droidtop looks at exactly the
+  files the job names instead of rescanning the library: a job that wrote
+  the file itself returns `placed` (a JSON string holding a list of
+  paths, absolute or relative to `context.destination`) or reports them with
+  `library.files` `changed` (A2), and a job that returns `download` has its
+  file reported by droidtop when it is placed. A job that does neither
+  still gets a background rescan, the only case left that does. Additive reply: a successful job may return `download` as a JSON
   string containing `{url, headers?, fileName, sha256?, size?}` instead of
   downloading the file itself. `url` is HTTP(S); `fileName` is a bare file
   name; `sha256` is 64 hexadecimal characters and `size` is a positive
   byte count used as a size cap. droidtop queues it through DownloadManager
   into its own downloads area, then places it in `context.destination` and
-  rescans. Credential headers (Authorization, cookies, token and key
+  indexes that file, from the download job, so the game appears even if the
+  page that started it was closed or droidtop restarted meanwhile. Credential headers (Authorization, cookies, token and key
   headers) remain in memory only. A plugin may omit `download` and continue
   doing its own transfer as before.
 
@@ -535,7 +541,7 @@ a contract 1 plugin keeps the legacy translation.
   contract 2 `search` and opens source `detail` views, with contract 1
   droidtop defaults. `AcquireContentSources` delegates its per-system
   screen to `SourceScreens`; Gaming's shared search opens the same detail
-  screen. Successful acquire jobs rescan the library.
+  screen. A successful acquire job's files are indexed (A2), not rescanned.
 - **Not built yet** (queued): reply views for `ui.context_action` and
   `ui.quick_tile`, and samples that use views.
 
@@ -964,6 +970,9 @@ comments.
   - `lookup {title, platform, ids}` (defaults to `search`);
   - `options {result}`;
   - `acquire {result, choice, destination}`, a **job**.
+  - Host call `library.files` op `changed` (version 1): see the end of this
+    entry. A source that put a file in a game folder says so and droidtop
+    indexes that file.
 - **Surfaces:**
   - G: gamelist Options → Get games, and global search results (#12);
   - A: a system's settings → Get games, and the launcher's Games grid
@@ -978,10 +987,26 @@ comments.
   wire contract this UI defines"); the interface is being built by
   `pluginsearch`.
 - **Rules:**
-  - Results become games only when droidtop's own scan finds the files.
+  - Results become games only when droidtop's own detection finds the files.
     Plugins contribute no library entries (12a).
   - `destination` is a host-resolved folder. A plugin-returned path is
-    never used.
+    never used to write; it is only ever a name for a file already written
+    there.
+  - **`library.files` `changed {added[], removed[], changed[]}`** (host
+    call, version 1; Droidtop/tracker#354, docs/SPEC.md 7g "Targeted
+    indexing"). Absolute paths, 1 to 200 per call. Droidtop classifies and
+    adds, updates or removes exactly those files and folders in its index
+    with the rules a scan uses, looking at a new game folder's own contents
+    and walking nothing else, off the plugin's thread. Permission:
+    `library.folders.write`, so it is declared in the manifest and shown on
+    the permission screen with "Add files to your game folders". Every path
+    must be inside one of the person's game folders and strictly below it (a
+    game folder itself is a rescan); a call naming any path outside them is
+    refused whole with `PERMISSION_DENIED` and indexes nothing. Reply
+    `{accepted: true}`. From a Python plugin it is
+    `droidtop.host.call("library.files", "changed", {"added": [path]})`; native and
+    Flutter plugins use the same host call. Report a game's folder rather
+    than a file deep inside a folder droidtop has never seen.
 
 **A3 Metadata providers and scrapers.** EP `library.metadata@1`. Risk
 medium.

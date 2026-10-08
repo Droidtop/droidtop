@@ -79,6 +79,19 @@ class SettingsCatalogInitProvider : ContentProvider() {
             val seconds = (android.os.SystemClock.elapsedRealtime() - started + 500) / 1000
             "Rescan finished in $seconds s: $games game folders and store entries, $apps apps."
         }
+        // "These files changed" (docs/SPEC.md 7g, "Targeted indexing"): a finished download, a store install or
+        // removal and a plugin's `library.files` report all end here, and the library looks at exactly those paths.
+        // Reports left by a process that ended before it indexed them, or made before this ran, are indexed now.
+        dev.droidtop.library.settings.LibraryPaths.roots = {
+            dev.droidtop.library.GamesRoots.current(appContext).map { it.absolutePath }
+        }
+        dev.droidtop.library.settings.LibraryPaths.install(appContext) { change ->
+            dev.droidtop.app.LibraryCore.library(appContext).indexPaths(
+                added = change.added.map { java.io.File(it) },
+                removed = change.removed.map { java.io.File(it) },
+                changed = change.changed.map { java.io.File(it) },
+            )
+        }
         // The at-most-daily release probe (one small unauthenticated
         // download, off switch in Settings > Software updates). Process
         // start is the honest trigger: droidtop is a launcher, so its

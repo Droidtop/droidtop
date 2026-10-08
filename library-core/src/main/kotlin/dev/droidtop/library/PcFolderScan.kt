@@ -256,6 +256,49 @@ object PcFolderScan {
         )
     }
 
+    /**
+     * The PC games at or under ONE folder of a games [root], without walking
+     * anything else (docs/SPEC.md 7g, "Targeted indexing"): the rules of
+     * [scanTopLevel], asked of [folder] at the depth it has in a walk of
+     * [root]. Every folder from the root down to [folder] is checked first by
+     * the walk's own prune and ROM-system rules, and when one of them above
+     * [folder] is itself a game (rule 2) that folder is the answer, because
+     * what is inside a game is its payload. Null when no walk of the root
+     * would enter [folder], or when the look ran past [Options.folderBudgetMs]:
+     * the caller then keeps what it had.
+     */
+    fun scanPath(
+        root: File,
+        folder: File,
+        defs: List<EngineDef> = emptyList(),
+        options: Options = Options(),
+    ): List<File>? {
+        val prefix = root.path.trimEnd('/') + "/"
+        if (!folder.path.startsWith(prefix)) return null
+        val names = folder.path.removePrefix(prefix).split('/')
+        val walk = Walk(defs, options)
+        return try {
+            var current = root
+            var depth = 0
+            for ((index, name) in names.withIndex()) {
+                current = File(current, name)
+                depth = when {
+                    index == 0 -> 1
+                    GameNaming.isStructuralFolderName(name) -> depth
+                    depth < MAX_SCAN_DEPTH -> depth + 1
+                    else -> return null
+                }
+                if (!walk.walkable(current, depth)) return null
+                if (index < names.size - 1 && walk.isGameItself(current)) return listOf(current)
+            }
+            walk.walk(folder, depth)
+        } catch (_: FolderTooSlow) {
+            null
+        } catch (cancelled: CancellationException) {
+            if (walk.timedOut && !options.cancelled()) null else throw cancelled
+        }
+    }
+
     /** Thrown inside a walk that ran past its folder budget. */
     private class FolderTooSlow : RuntimeException("PC folder scan over its time budget")
 
@@ -534,7 +577,13 @@ object PcFolderScan {
                 }
             }
 
-        private fun walkable(folder: File, depth: Int): Boolean {
+        /** Rule 2 for one folder: it directly holds a program, is no store root, and does not hold engine games. */
+        fun isGameItself(folder: File): Boolean {
+            val listing = listingOf(folder)
+            return ScanPrune.storeRootOwner(folder) == null && listing.hasProgram && !holdsEngineGames(folder, listing)
+        }
+
+        fun walkable(folder: File, depth: Int): Boolean {
             if (!ScanPrune.isScannableFolder(folder)) return false
             if (isRomSystemFolder(folder, depth)) {
                 if (skipped.add(folder.path)) skips.add(folder, GameEngineDetector.CONSOLE_SYSTEM_FOLDER_REASON)

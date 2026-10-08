@@ -764,6 +764,25 @@ interface LibraryProvider {
      * rescan already costs -- never less, never wrong.
      */
     fun slowRebuildProgressive(knownMtimes: Map<PartRef, Long>, pauseMs: Long): Flow<ScanStep> = rescanProgressive()
+
+    /**
+     * What this provider's own detection says about ONE reported path, a file
+     * or a folder, without walking anything else (docs/SPEC.md 7g, "Targeted
+     * indexing"): the same rules a walk applies, asked of this path and, for
+     * a new game folder, of that folder's own contents. [path] may no longer
+     * exist (a removal); a provider with nothing to say about it, which is
+     * most of them for most paths, returns an empty list. Runs on an IO
+     * thread; never touches the index itself, [Library.indexPaths] merges
+     * the answer.
+     */
+    suspend fun indexPath(path: File): List<PathIndexing> = emptyList()
+
+    /**
+     * Whether [indexPath] must run before the other providers' for the same
+     * report, because they read what it learns: the PC provider's store rows
+     * hold the installs the engine provider attaches to a game it claims.
+     */
+    val indexesPathsEarly: Boolean get() = false
 }
 
 /**
@@ -1021,6 +1040,146 @@ class Library(
         }
         return stateFor(key).value?.size ?: 0
     }
+
+    /** What [indexPaths] did, for the log line and the tests. */
+    data class PathIndexed(val reindexed: Int, val dropped: Int, val partsChanged: Int)
+
+    /**
+     * Tells the library that these files and folders changed, and brings the
+     * index up to date for exactly those (docs/SPEC.md 7g, "Targeted
+     * indexing"). What droidtop or a plugin just put on disk, or took off,
+     * never needs a walk to be seen: every provider that has a slice is asked
+     * what its detection says about each path ([LibraryProvider.indexPath])
+     * and only the entries at or under that path are replaced in it; the
+     * rest of the part, and every other part, is not read or written.
+     *
+     *  - [added] and [changed] are indexed alike (a new file and a replaced
+     *    one are both "look at this"); one that is no longer there is a
+     *    removal. A path inside a game that is already indexed stands for that
+     *    game's folder, so the game is looked at again as a whole and a file
+     *    in its data is not mistaken for a game.
+     *  - [removed] paths that are gone are dropped from the index and their
+     *    per-game records deleted (nothing would remember them otherwise: the
+     *    index is rebuilt from the records); play history, favourites and
+     *    metadata stay under the id, so the game comes back as it was if it
+     *    is put back. A path reported removed that still exists is looked at
+     *    as changed.
+     *  - A provider with no slice yet is left alone: nothing has walked it,
+     *    and the first walk will find these paths.
+     *
+     * Off the main thread. Returns how many entries it replaced and dropped.
+     */
+    suspend fun indexPaths(
+        added: Collection<File> = emptyList(),
+        removed: Collection<File> = emptyList(),
+        changed: Collection<File> = emptyList(),
+    ): PathIndexed = withContext(Dispatchers.IO) {
+        val normalized = { files: Collection<File> -> files.map { File(it.absolutePath.trimEnd('/')) }.distinct() }
+        val reported = (normalized(added) + normalized(changed)).distinct()
+        val removedPaths = normalized(removed)
+        val gone = (removedPaths + reported.filterNot { it.exists() }).distinct().filterNot { it.exists() }
+        val stillThere = (reported + removedPaths).distinct().filter { it.exists() }
+        val ordered = providers.filter { it.indexed }.sortedByDescending { it.indexesPathsEarly }
+        var reindexed = 0
+        var dropped = 0
+        var partsChanged = 0
+        val touched = HashSet<String>()
+        val learned = ArrayList<LibraryEntry>()
+
+        // What is gone first: a store row that is still listed comes back with its provider's answer below.
+        for (path in gone) {
+            for (provider in ordered) {
+                lockOf(provider).withLock {
+                    val current = currentSlice(provider) ?: return@withLock
+                    val ids = current.idsUnder(path.path)
+                    if (ids.isEmpty()) return@withLock
+                    withContext(kotlinx.coroutines.NonCancellable) {
+                        val next = current.withoutUnder(path.path)
+                        index.save(provider.indexKey, next)
+                        slices[provider.indexKey] = next
+                        ids.forEach { records.delete(it) }
+                    }
+                    dropped += ids.size
+                    partsChanged++
+                    touched += provider.indexKey
+                }
+            }
+        }
+
+        // Each path stands for the game it is inside, when that is indexed.
+        val gameFolders = if (stillThere.isEmpty()) emptySet() else indexedGameFolders()
+        val units = stillThere.map { path -> enclosingGameFolder(path, gameFolders) ?: path }.distinct()
+            .let { all -> all.filterNot { unit -> all.any { other -> other != unit && unit.path.startsWith(other.path + "/") } } }
+        for (provider in ordered) {
+            if (sliceOf(provider) == null) continue
+            for (path in units + gone) {
+                val answers = try {
+                    provider.indexPath(path)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (failed: Throwable) {
+                    Log.w("droidtop.Library", "${provider::class.simpleName} could not index ${path.path}", failed)
+                    emptyList()
+                }
+                for (answer in answers) {
+                    if (applyPath(provider, answer)) {
+                        partsChanged++
+                        reindexed += answer.entries.size
+                        touched += provider.indexKey
+                        learned += answer.entries
+                    }
+                }
+            }
+        }
+        if (touched.isNotEmpty()) {
+            facts.learn(learned)
+            republish()
+        }
+        ScanLog.write(
+            "index: ${added.size} added, ${removed.size} removed, ${changed.size} changed paths -> " +
+                "$reindexed entries looked at, $dropped dropped, $partsChanged parts changed, no walk",
+        )
+        PathIndexed(reindexed, dropped, partsChanged)
+    }
+
+    /** The places on disk of every game the index holds that is there, from every provider that has a slice. */
+    private suspend fun indexedGameFolders(): Set<String> {
+        val folders = HashSet<String>()
+        for (provider in providers) {
+            if (!provider.indexed) continue
+            val slice = sliceOf(provider) ?: continue
+            for (segment in slice.segments) {
+                for (entry in segment.entries) {
+                    if (!entry.missing) entry.location?.let { folders += it }
+                }
+            }
+        }
+        return folders
+    }
+
+    /** The folder of the indexed game that [path] is inside, or null when it is not inside one (or is the game's own folder). */
+    private fun enclosingGameFolder(path: File, gameFolders: Set<String>): File? {
+        var folder = path.parentFile
+        while (folder != null) {
+            if (folder.path in gameFolders) return folder
+            folder = folder.parentFile
+        }
+        return null
+    }
+
+    /** Merges one provider answer into its slice under its lock and writes it; true when the slice changed. */
+    private suspend fun applyPath(provider: LibraryProvider, answer: PathIndexing): Boolean =
+        withContext(kotlinx.coroutines.NonCancellable) {
+            val stamp = index.folderMtimes(provider.indexKey)[PartRef(answer.key, answer.root)] ?: 0L
+            lockOf(provider).withLock {
+                val current = currentSlice(provider) ?: return@withLock false
+                val next = current.mergePath(answer, stamp)
+                if (next == current) return@withLock false
+                index.save(provider.indexKey, next)
+                slices[provider.indexKey] = next
+                true
+            }
+        }
 
     fun scanInBackground(
         kinds: Set<LibraryEntryKind>,

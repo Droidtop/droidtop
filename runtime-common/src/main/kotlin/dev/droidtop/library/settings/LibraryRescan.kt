@@ -3,6 +3,10 @@ package dev.droidtop.library.settings
 import android.content.Context
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -39,6 +43,20 @@ object LibraryRescan {
         val running = active.get()?.takeIf { it.isActive } ?: return false
         running.cancel()
         return true
+    }
+
+    private val detached = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * A rescan that belongs to the library and not to any screen: returns at
+     * once, and the walk runs to its end whether or not the caller's screen
+     * is still there. For a change nobody can name the files of (a store's
+     * sign-in or sync); a change whose files are known is a
+     * [LibraryPaths] report, which walks nothing.
+     */
+    fun requestInBackground(context: Context) {
+        val app = context.applicationContext
+        detached.launch { runCatching { run(app) {} } }
     }
 
     suspend fun run(context: Context, onStatus: (String) -> Unit): String {

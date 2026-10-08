@@ -4226,7 +4226,7 @@ one:
 
   **Downloads (Droidtop/tracker#181, owner decision):** every single-file HTTP(S) download droidtop itself makes goes through Android's DownloadManager, as one native job of kind `download` (`DownloadJobs`, owner label "Downloads") in the same "Downloads and installs" list. Android shows its own notification and resumes a lost connection by itself. The job's checkpoint is the DownloadManager id, reported before anything else, so a restart re-attaches to the same download instead of queueing it again (`registerNative(..., reattachOnRestart = true)`: a restored download runs again from its checkpoint at once, it is not left paused); an entry Android no longer has is queued again. Progress is read from DownloadManager's cursor once a second, on the IO dispatcher. The file lands in droidtop's own external files directory (`downloads/<name>`, scoped storage needs no permission); the optional SHA-256 and size cap are checked there, then the job's post-processing step (a name registered with `DownloadJobs.registerPost`, so a restored job finds it) moves, unpacks or installs the file and the runner removes the DownloadManager entry and the file. The step `keep` leaves the file for the caller (the app updater, which commits it to the system installer from the UI process).
   **Pause is not offered for a download.** DownloadManager has no public pause, and remove-and-re-enqueue with a `Range` would need a per-server probe for range support and a second partial-file bookkeeping beside Android's own, to gain only what Android's automatic resume already does (a dropped connection or a restart carries on). A download therefore declares itself non-pausable (`startNative(..., pausable = false)`): the jobs list shows Cancel and no Pause row, and `pause()` refuses it. Cancel runs the kind's `onCancel` hook (also for a restored job with no running coroutine): it removes the DownloadManager entry and any partial file.
-  Headers go with the request; an `Authorization` header is kept in memory only (never in the persisted job arguments), and a request to a token host is first resolved by hand to its final signed address (`GitHubAuth.downloadRequestFor`) because DownloadManager re-sends its headers on every redirect. Callers on this path: the plugin catalog's bundle install and update (`PluginCatalog`), the Python and Flutter runtimes, the app's own update APK, and contract-2 source-plugin acquires that return a download descriptor (docs/plugin-api.md 1.6). Those acquire jobs place the downloaded file in the destination folder and use their existing completion rescan; plugins without a descriptor continue their own transfer. Credential headers remain in memory only. Left on their own transports because they are not a single file: library scraping, store depots (chunked), container image layers (an OCI layout, flattened by droidtop), and the ES-DE theme repositories (a git clone, with only the small themes list fetched as a JSON read). Left because they are not droidtop's loop: the Windows support files (Wine and base-system archives are fetched by the vendored gamenative downloader, which is hooked, not rewritten).
+  Headers go with the request; an `Authorization` header is kept in memory only (never in the persisted job arguments), and a request to a token host is first resolved by hand to its final signed address (`GitHubAuth.downloadRequestFor`) because DownloadManager re-sends its headers on every redirect. Callers on this path: the plugin catalog's bundle install and update (`PluginCatalog`), the Python and Flutter runtimes, the app's own update APK, and contract-2 source-plugin acquires that return a download descriptor (docs/plugin-api.md 1.6). Those acquire jobs place the downloaded file in the destination folder and report that file to the library from the job, so it is indexed with no rescan and whether or not the page is open (7g, "Targeted indexing"); plugins without a descriptor continue their own transfer and report what they wrote. Credential headers remain in memory only. Left on their own transports because they are not a single file: library scraping, store depots (chunked), container image layers (an OCI layout, flattened by droidtop), and the ES-DE theme repositories (a git clone, with only the small themes list fetched as a JSON read). Left because they are not droidtop's loop: the Windows support files (Wine and base-system archives are fetched by the vendored gamenative downloader, which is hooked, not rewritten).
   **One summary notification:** `JobsSummaryNotification` posts a single low-importance notification, "N jobs running", counting every running job that has no notification of its own (library scrape, plugin work jobs including store depots, brokered jobs; DownloadManager downloads are excluded because Android already shows them). Tapping it opens Settings, where "Downloads and installs" lists them (there is no deep link to that screen yet). It is posted only when the notification permission is already granted (asked once, with its reason, where `DesktopNotificationPermission` asks it) and is updated only when the count changes.
 
 ## 5. Windows compatibility — no real virtualization
@@ -8766,6 +8766,95 @@ and it is the only thing that decides whether a walk happens at all. Play
 history and favourites are applied to whatever list the library hands out,
 index or walk (`withLibraryFacts`), so nothing about an entry differs by
 where it came from.
+
+### Targeted indexing: what droidtop or a plugin changes is not walked (directed 2026-10-08, Droidtop/tracker#354)
+
+Owner: "A full scan shouldn't be necessary after WE update something. The API
+should let the plugin notify the app that it added a file, and have it scan
+THAT." Until now a finished download reached the library only through the
+page that started it: the page ran a full "Rescan library" when its job
+ended (`GameSourceProvider.detailScreen`, `AcquireContentSources.runDownloadAndAwait`),
+so a download that finished after the page was closed, or after a restart
+(a restored `download` job runs its post step with nobody waiting), placed
+its file and was never indexed until some unrelated rescan. Store installs
+announced a full rescan from the job (`StoreChanges.announce`), which was
+independent of the page but walked every games root to find one folder.
+
+**One door: `Library.indexPaths(added, removed, changed)`.** It brings the
+index up to date for exactly the paths named, off the main thread, and walks
+nothing else.
+
+- Each provider that has a slice is asked what ITS detection says about the
+  path (`LibraryProvider.indexPath`): the ROM provider for a file in a system
+  folder (the system found by `SystemFolders.systemFolderFor`, the same prune,
+  store and system rules as the walk, asked of the folders on the way down
+  only; the file by the walk's extension and add-on-folder rules, the entry by
+  the same `romEntries` the walk uses); the engine provider and the PC folder
+  rule for a folder (`GameEngineDetector.placeOf` / `PcFolderScan.scanPath`:
+  the walk's rules, asked of that folder as if it were a top-level one, so a
+  new game folder costs a look at its own contents and nothing else); the PC
+  provider also re-reads the store part from the stores' own copies when the
+  path is inside a folder droidtop's stores install into. A provider with no
+  slice yet is left alone: the first walk finds the path.
+- The answer replaces only the entries at or under the path in their part
+  (`LibrarySlice.mergePath`); every other entry of the part, and every other
+  part, is untouched. A game that was under the path and is not in the answer
+  stays, marked missing, exactly as a walk would keep it. A part the index
+  has no stamp for is created with stamp 0, and a part it has one for keeps
+  it, so the slow pass looks at a part again only if its folder moved.
+- A path inside a game that is already indexed stands for that game's folder
+  (the game is looked at again as a whole), so a file in a game's data is not
+  mistaken for a game. A plugin that reports a deep file inside a folder the
+  library has never seen should report the game folder instead; what is
+  finer than that is the slow pass'.
+- `removed` paths that are gone leave the index and their per-game records
+  are deleted (the index is rebuilt from the records, so a dropped entry
+  with a live record would come back). This is an explicit statement that the
+  files are gone, unlike a walk not finding a folder, which stays "missing"
+  (above). Play history, favourites, collections and scraped metadata are
+  keyed by the entry id and stay, so the game returns as it was if the files
+  do. A store row that is no longer installed is not on disk and is never
+  dropped by a removal; the store part is read again and says "not
+  installed". A path reported removed that still exists is looked at as
+  changed.
+
+**Who reports.** `LibraryPaths.report` (`:runtime-common`, next to
+`LibraryRescan`) writes the report to a small file first
+(`files/library/pending_paths.json`), then hands it to the library on its own
+scope, and removes it only after the library returned for it. `:app` installs
+the library as the handler at process start (`SettingsCatalogInitProvider`),
+which indexes every report still waiting: that is the start-up
+reconciliation, a file read and the paths named, never a walk.
+
+- The `download` job's `place_in_folder` post step reports the file it
+  placed, from the job. A restored job whose file the dead process had
+  already placed (the entry is finished in Android's list, the file is gone
+  from the downloads area and present in the folder) is finished and
+  reported again instead of failing with "its file is missing".
+- `StoreInstallJob` reports the store's own answer for where the game is
+  (the store's folder when the store cannot say) when the install ends. A
+  store uninstall reports the folder removed. Sign-in, sign-out and sync
+  change store rows with no file to name; they keep the background rescan
+  (`StoreChanges`, now `LibraryRescan.requestInBackground`, which belongs to
+  the library and not to any screen).
+- A source plugin's `acquire` job that wrote the file itself: the job's reply
+  names what it wrote (`placed`, a JSON list of paths inside `destination`;
+  `filePath` for contract 1), or the plugin reports it with the host call
+  below. Only a plugin that does neither is still followed by a background
+  rescan, because droidtop cannot name a file it was not told. The detail
+  page no longer rescans; it only refreshes.
+
+**The plugin call: `library.files` op `changed` (version 1).** Arguments
+`{added[], removed[], changed[]}`, absolute paths, 1 to 200 in all. Permission
+`library.folders.write` ("Add files to your game folders", dangerous): the
+plugin already declares and is asked for it to write into a game folder, and
+it is on the permission screen like every other. Every path must be inside
+one of the person's game folders (a game folder itself is refused: that is a
+rescan, not a report), and a call with any path outside them is refused whole,
+`PERMISSION_DENIED`, naming the path, and indexes nothing. It works from
+native, Python and Flutter plugins alike, being a host call. The reply is
+`{accepted: true}`: the report is taken and indexed off the plugin's thread,
+and a plugin never learns what the library holds.
 
 ### Where an update comes from (2026-09-25)
 

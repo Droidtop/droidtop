@@ -27,6 +27,7 @@ import dev.droidtop.pluginhost.AcquireDownloadDescriptor
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.ViewAction
 import dev.droidtop.pluginhost.ViewNode
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -60,7 +61,8 @@ object PluginViews {
      * A page whose view comes from [op] on [point]. [hostContext] is the `context`
      * every call of this page carries (filled by droidtop only). [fallback] is the
      * view droidtop draws when the plugin answers UNSUPPORTED (an optional op).
-     * [onJobDone] runs after any job this page started finishes (a source rescans).
+     * [onJobDone] runs after any job this page started finishes, for the page's own business; the library hears of a source's files from the job
+     * ([AcquireIndexing], the download job), never from a page that may be gone by then.
      * [extraWhenFailed] adds rows under a load failure, for a way out the host knows.
      * [extraGroups] appends host data built from committed page values (source results).
      * [leadGroups] puts host rows above the plugin's own (a Quick Menu panel's tiles).
@@ -110,10 +112,15 @@ object PluginViews {
                 ActionOutcome(PluginViewCall.replyMessage(reply.data) ?: "Done", view, refetch = view == null)
             }
             ViewAction.Kind.JOB -> {
+                val startedAt = System.currentTimeMillis()
                 var result = runJob(context, record, point, action.op, callArgs, action.title ?: label, onStatus)
                 if (result.ok && point == "library.sources" && action.op == "acquire") {
                     val rawDescriptor = result.values["download"]
-                    if (rawDescriptor != null) {
+                    if (rawDescriptor == null) {
+                        // The plugin put the file there itself: it says which, or the library is told what is known.
+                        val destination = hostContext.optString("destination").takeIf { it.isNotBlank() }?.let(::File)
+                        withContext(Dispatchers.IO) { AcquireIndexing.afterAcquire(context, record.manifest.id, startedAt, destination, result.values) }
+                    } else {
                         val descriptor = AcquireDownloadDescriptor.parse(rawDescriptor)
                         val destination = hostContext.optString("destination").takeIf { it.isNotBlank() }
                         result = if (descriptor == null) {

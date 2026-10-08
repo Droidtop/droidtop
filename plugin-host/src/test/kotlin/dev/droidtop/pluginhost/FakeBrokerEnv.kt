@@ -63,6 +63,13 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
         systemsAsked++
         return systemsReply
     }
+    var roots: List<String> = emptyList()
+    override fun gamesRoots() = roots
+    val filesReports = mutableListOf<Pair<String, dev.droidtop.library.settings.PathChange>>()
+    override fun libraryFilesChanged(pluginId: String, change: dev.droidtop.library.settings.PathChange): Boolean {
+        filesReports += pluginId to change
+        return true
+    }
     val socialChanges = mutableListOf<Pair<String, JSONObject>>()
     override fun socialChanged(pluginId: String, change: JSONObject): Boolean {
         socialChanges += pluginId to change
