@@ -4563,10 +4563,14 @@ the IME commits becomes the key events that type it on the virtual key map
 (Shift included), Backspace, Enter and keys the IME sends directly go the
 same way, all into the X keyboard; a character no key types is dropped.
 No suggestions or autocorrect, so a password field gets exactly what was
-pressed. It opens and closes from the touch gesture a prefix binds to "show
-keyboard" (`TouchGestureConfig`; a three-finger tap by default in
-touchscreen mode), which nothing answered before; Back with
-it up closes the keyboard, not the game.
+pressed. A three-finger swipe up opens it, in every touch mode
+(`TouchpadView.trackKeyboardSwipe`: the three fingers' mean moves up by 64 dp
+and at least twice as far as sideways). Owner, 2026-10-08: it replaced the
+three-finger tap, and no pad button opens it, because Windows games often use
+the controller themselves. A gesture or radial slot a prefix binds to "show
+keyboard" still toggles it. Back with it up closes the keyboard, not the game
+(`WineGameActivity.dispatchKeyEvent`); when the IME took Back itself and went
+away, the window insets say so and the next Back is the game's again.
 
 Desktop mode is **out of scope here**. There a Windows program should
 appear as a window among others inside the container's sway compositor,

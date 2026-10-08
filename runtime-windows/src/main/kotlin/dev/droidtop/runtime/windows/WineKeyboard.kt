@@ -10,6 +10,8 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 /**
  * Where the soft keyboard lands while a Windows game is on screen.
@@ -26,6 +28,11 @@ import android.widget.FrameLayout
  * github.com/Droid-Deck/DroidDeck), which does the same for gamescope.
  * Invisible and unfocusable until asked for: a focused view would take the
  * D-pad and sticks away from the game.
+ *
+ * Opened by a three-finger swipe up ([com.winlator.widget.TouchpadView]).
+ * Back closes it: the activity hides it when it sees Back, and when the IME
+ * took Back itself and went away, the window insets say so and [shown]
+ * follows, so the next Back is the game's again.
  */
 class WineKeyboard(
     context: Context,
@@ -38,10 +45,21 @@ class WineKeyboard(
     var shown = false
         private set
 
+    /** The IME has been on screen since [show]; only then does its going away mean something. */
+    private var imeSeen = false
+
     init {
         isFocusable = false
         isFocusableInTouchMode = false
         layoutParams = FrameLayout.LayoutParams(1, 1)
+        ViewCompat.setOnApplyWindowInsetsListener(this) { _, insets ->
+            if (insets.isVisible(WindowInsetsCompat.Type.ime())) {
+                imeSeen = true
+            } else if (shown && imeSeen) {
+                hide()
+            }
+            insets
+        }
     }
 
     override fun onCheckIsTextEditor(): Boolean = shown
@@ -61,6 +79,7 @@ class WineKeyboard(
 
     fun show() {
         shown = true
+        imeSeen = false
         isFocusable = true
         isFocusableInTouchMode = true
         requestFocus()
@@ -70,6 +89,7 @@ class WineKeyboard(
 
     fun hide() {
         shown = false
+        imeSeen = false
         imm.hideSoftInputFromWindow(windowToken, 0)
         isFocusable = false
         isFocusableInTouchMode = false

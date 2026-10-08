@@ -208,12 +208,15 @@ class WineGameActivity : Activity() {
         }
         root.addView(touchpad, matchParent())
         // The soft keyboard's landing place: what it types becomes X key
-        // presses (WineKeyboard). Opened by the touch gesture a prefix binds
-        // to "show keyboard", which nothing answered before.
+        // presses (WineKeyboard). Three fingers swiping up open it (windows
+        // games often use the controller themselves, so no pad button does);
+        // a touch gesture or radial slot bound to "show keyboard" toggles it.
+        // Back closes it (dispatchKeyEvent).
         val soft = WineKeyboard(this) { event -> keyboard?.onKeyEvent(event) == true }
         softKeyboard = soft
         root.addView(soft)
         touchpad.setShowKeyboardCallback { soft.toggle() }
+        touchpad.setKeyboardSwipeCallback { soft.show() }
         setContentView(root)
 
         val session = WineXSession(this, prefix, target, workingDir, xServer, arguments)

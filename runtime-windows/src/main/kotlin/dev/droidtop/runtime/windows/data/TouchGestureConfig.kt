@@ -47,10 +47,6 @@ data class TouchGestureConfig(
     val twoFingerHoldMouseBehavior: String = MOUSE_BEHAVIOR_HOLD,
     val twoFingerHoldDelay: Int = DEFAULT_DELAY_MS,
 
-    // 9. Three-Finger Tap — customizable action
-    val threeFingerTapEnabled: Boolean = true,
-    val threeFingerTapAction: String = ACTION_SHOW_KEYBOARD,
-
     // 10. Three-Finger Drag — customizable action
     val threeFingerDragEnabled: Boolean = false,
     val threeFingerDragAction: String = PAN_ARROW_KEYS,
@@ -107,8 +103,6 @@ data class TouchGestureConfig(
             put(KEY_TWO_FINGER_HOLD_ACTION, twoFingerHoldAction)
             put(KEY_TWO_FINGER_HOLD_MOUSE_BEHAVIOR, twoFingerHoldMouseBehavior)
             put(KEY_TWO_FINGER_HOLD_DELAY, twoFingerHoldDelay)
-            put(KEY_THREE_FINGER_TAP_ENABLED, threeFingerTapEnabled)
-            put(KEY_THREE_FINGER_TAP_ACTION, threeFingerTapAction)
             put(KEY_THREE_FINGER_DRAG_ENABLED, threeFingerDragEnabled)
             put(KEY_THREE_FINGER_DRAG_ACTION, threeFingerDragAction)
             put(KEY_THREE_FINGER_HOLD_ENABLED, threeFingerHoldEnabled)
@@ -186,8 +180,6 @@ data class TouchGestureConfig(
         private const val KEY_TWO_FINGER_HOLD_ACTION = "twoFingerHoldAction"
         private const val KEY_TWO_FINGER_HOLD_MOUSE_BEHAVIOR = "twoFingerHoldMouseBehavior"
         private const val KEY_TWO_FINGER_HOLD_DELAY = "twoFingerHoldDelay"
-        private const val KEY_THREE_FINGER_TAP_ENABLED = "threeFingerTapEnabled"
-        private const val KEY_THREE_FINGER_TAP_ACTION = "threeFingerTapAction"
         private const val KEY_THREE_FINGER_DRAG_ENABLED = "threeFingerDragEnabled"
         private const val KEY_THREE_FINGER_DRAG_ACTION = "threeFingerDragAction"
         private const val KEY_THREE_FINGER_HOLD_ENABLED = "threeFingerHoldEnabled"
@@ -210,7 +202,6 @@ data class TouchGestureConfig(
          */
         fun compatibilityDefaults(): TouchGestureConfig = TouchGestureConfig(
             twoFingerHoldEnabled = false,
-            threeFingerTapEnabled = false,
             threeFingerHoldEnabled = false,
         )
 
@@ -252,8 +243,6 @@ data class TouchGestureConfig(
                         obj.optString(KEY_TWO_FINGER_HOLD_MOUSE_BEHAVIOR, MOUSE_BEHAVIOR_HOLD)
                     ),
                     twoFingerHoldDelay = obj.optInt(KEY_TWO_FINGER_HOLD_DELAY, DEFAULT_DELAY_MS),
-                    threeFingerTapEnabled = obj.optBoolean(KEY_THREE_FINGER_TAP_ENABLED, false),
-                    threeFingerTapAction = obj.optString(KEY_THREE_FINGER_TAP_ACTION, ACTION_SHOW_KEYBOARD),
                     threeFingerDragEnabled = obj.optBoolean(KEY_THREE_FINGER_DRAG_ENABLED, false),
                     threeFingerDragAction = obj.optString(KEY_THREE_FINGER_DRAG_ACTION, PAN_ARROW_KEYS),
                     threeFingerHoldEnabled = obj.optBoolean(KEY_THREE_FINGER_HOLD_ENABLED, false),

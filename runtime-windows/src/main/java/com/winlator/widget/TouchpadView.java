@@ -153,8 +153,13 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
     private boolean twoFingerHoldTriggered;
 
     // Three-finger tracking
-    private boolean threeFingerTapPossible;
-    private boolean threeFingerTapFired;
+    // A swipe up with three fingers opens the soft keyboard, in every touch
+    // mode (droidtop: it replaced the three-finger tap, because Windows games
+    // often use the controller themselves and there is no pad button for it).
+    private static final float KEYBOARD_SWIPE_UP_DP = 64f;
+    private Runnable keyboardSwipeCallback;
+    private boolean keyboardSwipeTracking, keyboardSwipeFired;
+    private float keyboardSwipeStartX, keyboardSwipeStartY;
     private boolean threeFingerDragging;
     private float threeFingerLastMidX, threeFingerLastMidY;
     private Runnable threeFingerHoldRunnable;
@@ -346,6 +351,7 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         boolean isStylus = isEventTriggeredByStylus(event);
+        if (!isStylus && !event.isFromSource(InputDevice.SOURCE_MOUSE)) trackKeyboardSwipe(event);
         if (touchscreenMouseDisabled
                 && !isStylus
                 && !event.isFromSource(InputDevice.SOURCE_MOUSE)) {
@@ -358,6 +364,55 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
         } else {
             return handleTouchpadEvent(event);
         }
+    }
+
+    /**
+     * Watches for three fingers moving up together, whatever the touch mode,
+     * and calls [keyboardSwipeCallback] once per gesture. It only looks; the
+     * mode's own handling of the touches carries on.
+     */
+    private void trackKeyboardSwipe(MotionEvent event) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                keyboardSwipeTracking = keyboardSwipeFired = false;
+                break;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                if (event.getPointerCount() == 3 && !keyboardSwipeFired) {
+                    keyboardSwipeTracking = true;
+                    keyboardSwipeStartX = meanX(event);
+                    keyboardSwipeStartY = meanY(event);
+                }
+                break;
+            case MotionEvent.ACTION_POINTER_UP:
+                if (event.getPointerCount() - 1 < 3) keyboardSwipeTracking = false;
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (keyboardSwipeTracking && !keyboardSwipeFired && event.getPointerCount() >= 3) {
+                    float up = keyboardSwipeStartY - meanY(event);
+                    float side = Math.abs(meanX(event) - keyboardSwipeStartX);
+                    if (up > KEYBOARD_SWIPE_UP_DP * getResources().getDisplayMetrics().density && up > 2f * side) {
+                        keyboardSwipeFired = true;
+                        if (keyboardSwipeCallback != null) keyboardSwipeCallback.run();
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private static float meanX(MotionEvent event) {
+        float sum = 0;
+        for (int i = 0; i < event.getPointerCount(); i++) sum += event.getX(i);
+        return sum / event.getPointerCount();
+    }
+
+    private static float meanY(MotionEvent event) {
+        float sum = 0;
+        for (int i = 0; i < event.getPointerCount(); i++) sum += event.getY(i);
+        return sum / event.getPointerCount();
     }
 
     @Override
@@ -834,9 +889,7 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
         twoFingerTapFired = false;
         twoFingerMiddleButtonDown = false;
         twoFingerGestureMode = TWO_FINGER_GESTURE_NONE;
-        threeFingerTapPossible = false;
         threeFingerDragging = false;
-        threeFingerTapFired = false;
         threeFingerGestureMode = THREE_FINGER_GESTURE_NONE;
         threeFingerHoldTriggered = false;
         accumulatedThreeFingerDelta = 0;
@@ -1265,12 +1318,6 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
             return;
         }
 
-        // Three-finger tap already sent its click — skip the tap on UP
-        if (threeFingerTapFired) {
-            threeFingerTapFired = false;
-            return;
-        }
-
         // Simple tap — only if finger stayed within tap tolerance
         if (gestureConfig.getTapEnabled() && !movedBeyondTapThreshold) {
             if (delayedPress != null) {
@@ -1341,8 +1388,6 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
         twoFingerDragging = false;
         twoFingerGestureMode = TWO_FINGER_GESTURE_NONE;
         threeFingerDragging = false;
-        threeFingerTapPossible = false;
-        threeFingerTapFired = false;
         threeFingerGestureMode = THREE_FINGER_GESTURE_NONE;
         longPressTriggered = false;
         longPressActionHeld = twoFingerHoldActionHeld = threeFingerHoldActionHeld = false;
@@ -1375,7 +1420,6 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
         twoFingerTapPossible = false;
         twoFingerGestureMode = TWO_FINGER_GESTURE_NONE;
 
-        threeFingerTapPossible = true;
         threeFingerDragging = false;
         threeFingerHoldTriggered = threeFingerHoldActionHeld = false;
         threeFingerGestureMode = THREE_FINGER_GESTURE_NONE;
@@ -1404,7 +1448,6 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
         if (gestureConfig.getThreeFingerHoldEnabled()) {
             threeFingerHoldRunnable = () -> {
                 threeFingerHoldTriggered = true;
-                threeFingerTapPossible = false;
                 setRadialMenuGesturePoint(threeFingerLastMidX, threeFingerLastMidY);
                 threeFingerHoldActionHeld = injectHoldAction(
                         gestureConfig.getThreeFingerHoldAction(),
@@ -1450,10 +1493,22 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
             return;
         }
 
+        // A three-finger swipe up opens the keyboard (trackKeyboardSwipe):
+        // it is not also a drag or a hold.
+        if (keyboardSwipeFired) {
+            cancelThreeFingerHoldTimer();
+            releasePanKeys();
+            releaseAllDragButtons();
+            threeFingerDragging = false;
+            threeFingerGestureMode = THREE_FINGER_GESTURE_NONE;
+            threeFingerLastMidX = midX;
+            threeFingerLastMidY = midY;
+            return;
+        }
+
         if (threeFingerGestureMode == THREE_FINGER_GESTURE_NONE) {
             accumulatedThreeFingerDelta += frameDelta;
             if (accumulatedThreeFingerDelta > (float) gestureConfig.getGestureThreshold()) {
-                threeFingerTapPossible = false;
                 cancelThreeFingerHoldTimer();
                 if (gestureConfig.getThreeFingerDragEnabled()) {
                     threeFingerGestureMode = THREE_FINGER_GESTURE_PAN;
@@ -1491,20 +1546,11 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
         if (threeFingerHoldTriggered) {
             threeFingerHoldActionHeld = releaseHoldAction(threeFingerHoldActionHeld, gestureConfig.getThreeFingerHoldAction());
             threeFingerHoldTriggered = false;
-        } else if (threeFingerTapPossible && !threeFingerDragging
-                && gestureConfig.getThreeFingerTapEnabled()) {
-            setRadialMenuGesturePoint(threeFingerLastMidX, threeFingerLastMidY);
-            injectClick(gestureConfig.getThreeFingerTapAction());
-            injectRelease(gestureConfig.getThreeFingerTapAction());
-            notifyHighlight(threeFingerLastMidX, threeFingerLastMidY);
-            notifyGesture("3F Tap");
-            threeFingerTapFired = true;
         }
 
         releasePanKeys();
         releaseAllDragButtons();
         threeFingerDragging = false;
-        threeFingerTapPossible = false;
         threeFingerGestureMode = THREE_FINGER_GESTURE_NONE;
         // Suppress single-finger tap/drag when last finger lifts after any 3F gesture
         movedBeyondTapThreshold = true;
@@ -2288,6 +2334,11 @@ public class TouchpadView extends View implements View.OnCapturedPointerListener
 
     public void setShowKeyboardCallback(Runnable callback) {
         this.showKeyboardCallback = callback;
+    }
+
+    /** Called when three fingers swipe up: the soft keyboard opens (and stays open if it is). */
+    public void setKeyboardSwipeCallback(Runnable callback) {
+        this.keyboardSwipeCallback = callback;
     }
 
     public void setOpenRadialMenuCallback(OpenRadialMenuCallback callback) {
