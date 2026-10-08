@@ -4545,6 +4545,20 @@ controllers report B as `KEYCODE_BACK`, so the controller bridge and the X
 keyboard see the event first and only an unclaimed back press ends the
 session.
 
+**The soft keyboard reaches the game as key presses** (2026-10-08,
+Droidtop/tracker#313). A Wine guest is an X11 client and has no idea of
+Android's text input, so a keyboard shown with nothing to type into typed
+nothing. `WineKeyboard` (adapted from DroidDeck's `KeyboardHost`, GPL-3.0) is
+an invisible view that becomes the IME's target only while it is shown: text
+the IME commits becomes the key events that type it on the virtual key map
+(Shift included), Backspace, Enter and keys the IME sends directly go the
+same way, all into the X keyboard; a character no key types is dropped.
+No suggestions or autocorrect, so a password field gets exactly what was
+pressed. It opens and closes from the touch gesture a prefix binds to "show
+keyboard" (`TouchGestureConfig`; a three-finger tap by default in
+touchscreen mode), which nothing answered before; Back with
+it up closes the keyboard, not the game.
+
 Desktop mode is **out of scope here**. There a Windows program should
 appear as a window among others inside the container's sway compositor,
 which is a different presentation problem with a different answer;

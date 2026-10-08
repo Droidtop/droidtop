@@ -76,6 +76,7 @@ class WineGameActivity : Activity() {
     private var touchpadView: TouchpadView? = null
     private var touchMouse: TouchMouse? = null
     private var keyboard: Keyboard? = null
+    private var softKeyboard: WineKeyboard? = null
     private var winHandler: WinHandler? = null
     private var failed = false
     private var startedAtMs = 0L
@@ -206,6 +207,13 @@ class WineGameActivity : Activity() {
             touchpad.setGestureConfig(TouchGestureConfig.fromJson(prefix.gestureConfig))
         }
         root.addView(touchpad, matchParent())
+        // The soft keyboard's landing place: what it types becomes X key
+        // presses (WineKeyboard). Opened by the touch gesture a prefix binds
+        // to "show keyboard", which nothing answered before.
+        val soft = WineKeyboard(this) { event -> keyboard?.onKeyEvent(event) == true }
+        softKeyboard = soft
+        root.addView(soft)
+        touchpad.setShowKeyboardCallback { soft.toggle() }
         setContentView(root)
 
         val session = WineXSession(this, prefix, target, workingDir, xServer, arguments)
@@ -283,6 +291,11 @@ class WineGameActivity : Activity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (failed) {
             if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) finish()
+            return true
+        }
+        // Back with the soft keyboard up closes the keyboard, not the game.
+        softKeyboard?.takeIf { it.shown && event.keyCode == KeyEvent.KEYCODE_BACK }?.let {
+            if (event.action == KeyEvent.ACTION_UP) it.hide()
             return true
         }
         if (winHandler?.onKeyEvent(event) == true) return true
