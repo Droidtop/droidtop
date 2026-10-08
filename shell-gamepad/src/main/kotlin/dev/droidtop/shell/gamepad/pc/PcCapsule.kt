@@ -44,7 +44,9 @@ import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.kindLine
+import androidx.compose.ui.layout.onGloballyPositioned
 import dev.droidtop.shell.gamepad.Corners
+import dev.droidtop.shell.gamepad.FloodOrigin
 import dev.droidtop.shell.gamepad.FocusLook
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
@@ -177,6 +179,7 @@ internal fun PcCapsule(
     val shape = Corners.Crisp
     val ring = selected && PadModality.showsFocus
     val title = GameNaming.displayName(entry.title)
+    val view = androidx.compose.ui.platform.LocalView.current
     Column(
         modifier = modifier
             .width(width)
@@ -189,6 +192,15 @@ internal fun PcCapsule(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(if (hero) HERO_ASPECT else CAPSULE_ASPECT)
+            // The capsule under the cursor says where it is, so its page can grow out of it
+            // (PageFlood.kt); only that one, so a scroll costs the others nothing.
+            .then(
+                if (selected) {
+                    Modifier.onGloballyPositioned { FloodOrigin.trackCapsule(entry.id, it, view) }
+                } else {
+                    Modifier
+                },
+            )
             .focusLift(ring, shape, wide = hero)
             .selectionFrame(
                 selected,

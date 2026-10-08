@@ -943,7 +943,14 @@ internal fun PcGameMenu(
             onClose()
         }
     }
-    Dialog(onDismissRequest = goBack) {
+    // One window at a time: a sheet this menu opens (DLC and versions, the
+    // install offer, a picker, a text field) takes the screen while it is
+    // open and the menu comes back, where it was, when it closes. Drawn under
+    // it, the menu showed round the smaller sheet with its own Close row
+    // (console, build 1519, Droidtop/tracker#371).
+    val childOpen = (contentOpen && ownStore != null) || storeOffer != null || pickingMatch ||
+        pickingReplacement || (pickingSameGame && grouping != null) || renaming || editingThread
+    if (!childOpen) Dialog(onDismissRequest = goBack) {
         HideSystemBarsInThisDialog()
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),

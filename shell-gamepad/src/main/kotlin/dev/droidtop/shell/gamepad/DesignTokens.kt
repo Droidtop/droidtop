@@ -112,8 +112,11 @@ object Measure {
  * A `RoundedCornerShape(N.dp)` in a Gaming screen is a defect.
  */
 object Corners {
+    /** [Crisp]'s radius, for what draws the shape itself (a flood leaving a button, PageFlood.kt). */
+    val CrispRadius: Dp = 3.dp
+
     /** Capsules, art, rows, buttons, chips that are not pills. */
-    val Crisp = RoundedCornerShape(3.dp)
+    val Crisp = RoundedCornerShape(CrispRadius)
     /** Panels, sheets, dialogs, the Quick Menu and the left menu when they float. */
     val Panel = RoundedCornerShape(6.dp)
     /** A large soft plate: the one generic focused surface that is not a card. */

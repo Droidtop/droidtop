@@ -10948,17 +10948,26 @@ structure, top to bottom, drawn only from theme tokens:
   nothing else stacked on the art (the source and engine are rows, not a
   line on the hero). Only portrait art: that art at its own shape on the
   right of a plate, never stretched across the band. No art: the plate and
-  the name. Its height is a share of the window's (44 percent landscape,
-  30 percent portrait, Steam's hero ends at about 46) and it goes, with the
-  action band, while the cursor is down in the tab's rows, so the tab strip
-  is the top edge and the rows get the screen, as on Steam's scrolled page
-  (`Motion.panelIn`).
+  the name. Its height is a share of the window's (46 percent landscape,
+  Steam's hero ends at about 46; 30 percent portrait).
+- **One scrolling page** (2026-10-08, Droidtop/tracker#363, Steam's game
+  page): the hero, the action band, the tab strip and the tab's rows are ONE
+  list. With the cursor down in the rows the hero and the band scroll away
+  and the tab strip stays pinned at the top (a sticky header); once rows pass
+  under it, it gains a plate within 100 ms (`PAGE_PLATE_MS`; the scrim role
+  with a shadow, Steam's frosted header without the blur droidtop does not
+  draw). Up to the tabs keeps the scroll; Up to the buttons brings the hero
+  back. The rows keep clear of the pinned strip (`keepInView(under = ...)`).
+  This replaces the rule that the hero and band collapsed while the cursor
+  was in the rows: one mechanism, the scroll.
 - **The action band** (`PageActionBand`): ONE large primary action
   (`ShellChip(large)`, the same `PcPlayState` verb and detail the card's A
   hint and the menu's first row use, so the three cannot disagree), the
-  quiet **facts strip** beside it, and Favourite and Options as small round
-  icon buttons (`PageIconButton`, with a spoken description) at the right
-  edge, all in one row (`factsStrip`): Last played,
+  quiet **facts strip** beside it (Steam's status panel: each fact a small
+  capitals label, the eyebrow role, over its value), and Favourite and
+  Options as small square buttons (`PageIconButton`, with a spoken
+  description; Options is a drawn gear that turns a quarter as the cursor
+  arrives) at the right edge, all in one row (`factsStrip`): Last played,
   Play time, Version (the installed version against the latest known:
   "0.9.5, v0.9.6 is available", the one wording of `GameUpdates.line`), Size
   and Runs with, only those that exist. It scrolls sideways rather than
@@ -10966,12 +10975,13 @@ structure, top to bottom, drawn only from theme tokens:
   same two functions (`lastPlayedPhrase`, `playtimeLine`) in the strip and in
   the Details tab, so the two never disagree. Under it the one line saying why the
   primary action is what it is. In portrait the strip sits under the
-  buttons. While the cursor is in the rows the band is gone.
+  buttons. While the cursor is in the rows the band has scrolled away.
   Store games have no installed or latest version until #222 gives them
   one; the strip simply has no Version fact for them.
 - **The tab strip** (`PageTabStrip`): Overview, Versions and updates, Extras,
-  Details, centred, scrolling sideways when it must, pinned under the band
-  (the top edge once the band is gone), L1/R1 glyphs at its ends. `pageTabOf` is the one place that says which tab a row lives under,
+  Details as Steam's uppercase tab pills (`ShellChip(tab = true)`), centred,
+  scrolling sideways when it must, under the band and pinned at the top once
+  the page scrolls, L1/R1 glyphs at its ends (half strength at an end). `pageTabOf` is the one place that says which tab a row lives under,
   by its title; a title no tab names is a detail, so a new row is never
   lost. No row repeats the facts strip (last played, play time, version,
   size, runs with). Overview: About, the unscraped game's Scrape row,
@@ -11021,6 +11031,21 @@ strip's ends. Like every layer it shows no Start pill, since Start's menu
 does nothing behind a window. A on a capsule in the library still plays
 (owner decision, 2026-10-02); the page is reached through the game's menu.
 A tap on a button, tab or row is the same press.
+
+**The page grows out of its capsule** (2026-10-08, Droidtop/tracker#363; owner:
+DroidDeck's signature motion, behind the Animations switch). Opened from the
+capsule under the cursor (Select's "Game page" row, or a long press on the selected
+capsule), the capsule's plate stretches over the screen on loose springs, the far
+edges first, and the page rises into it once it is covered; B draws it back down
+into the capsule before the page closes (`PageFlood`, `FloodOrigin`, ported from
+DroidDeck's `ui/PageFlood.kt`). **Play grows into the launch screen**: Play on the
+page grows out over the screen in the theme's launch colour, the launch screen
+appears as the colour fades (`LaunchFlood`, from DroidDeck's `ui/LaunchFlood.kt`).
+Both draw from a handful of animated values in the draw phase; the origins are
+screen rectangles because the page and the launch screen are other windows than
+the control they grow from; only the capsule under the cursor reports where it is.
+With motion off, or a page opened some other way, the page and the launch screen
+simply appear.
 
 **Not on the page yet:** the Saves and Activity tabs (#229, #230), and the
 Install, Update and Downloading verbs of the primary action (#223), which
@@ -12134,6 +12159,10 @@ dim, so a panel that wraps its content paints nothing outside itself), and glide
 fold its last 36dp fade out over a small down chevron (DroidDeck's anchored menu), so a cut row
 reads as "more below"; the fade is a layer only while there is more to scroll to. Corners are the
 panel radius (`Corners.Panel`, 6dp). The X Filter and Y Sort By sheets take their titles from it.
+**One window at a time:** a menu that opens a sheet of its own (the game menu's DLC and versions,
+its install offer, pickers and text fields) is not drawn while that sheet is open and comes back,
+where it was, when it closes; under a smaller sheet it showed round it with its own Close row
+(console, build 1519, Droidtop/tracker#371).
 
 ## 7k. The design system: one spacing scale, one type scale, one colour source
 
@@ -12991,6 +13020,10 @@ theme's roles (section 7k2).
   60 ms after the one before, capped at six steps (`Modifier.rise`); the capsule that takes the
   cursor gets a one-shot diagonal sheen over 1 s, and the Play button a slower 2 s stripe
   (`Modifier.shine`). Both run in the draw or layer phase only.
+- **Pages grow out of what opened them.** A game's page grows out of its capsule and draws back
+  into it, and Play grows into the launch screen (DroidDeck's floods, `PageFlood.kt`; section 7i,
+  "The game page"): edges on loose springs (`Motion.sp`), the far ones first, the window's ring
+  kept out of the way (`FocusGlide.hidden`) until it is done. With motion off they are cuts.
 - **Reduced motion is one switch.** Gaming's Settings > Shell > Animations (on by default) and
   Android's animator duration scale both feed `Motion.enabled` (`MotionSync`, observed live, read
   off the main thread): with the switch off or Android's "Remove animations" on, every role is a

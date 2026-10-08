@@ -125,7 +125,9 @@ This project is distributed under the GNU General Public License v3.0 (see
   `FocusGlide.kt`), the non-focusable keycap (`ui/SettingsWidgets.kt`, as `Keycap` in `TouchActions.kt`), and the
   wide-art cover, hero fill, status chip and empty-backdrop glow (`ui/FrontEndArt.kt`,
   `ui/FrontEndGames.kt`, `ui/FrontEndWidgets.kt`, `ui/FrontEndContent.kt`, in `pc/PcCapsule.kt` and
-  `pc/PcBackdrop.kt`). Each ported file names the DroidDeck file it came from. No DroidDeck artwork, logo or wordmark is used.
+  `pc/PcBackdrop.kt`), the fading foot of a long menu (`ui/SettingsWidgets.kt`, in `MenuPanel`, `GamingMenu.kt`),
+  and the page and launch floods (`ui/PageFlood.kt`, `ui/LaunchFlood.kt`, as `PageFlood.kt`). Each ported file names
+  the DroidDeck file it came from. No DroidDeck artwork, logo or wordmark is used.
 
 ## Bundled themes
 

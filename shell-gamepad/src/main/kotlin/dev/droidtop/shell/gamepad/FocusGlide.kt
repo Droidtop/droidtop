@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -81,6 +82,9 @@ internal class FocusGlide(val view: View) {
 
     /** Bumped when the current control moves under the ring (a scroll, a relayout). */
     var moves by mutableIntStateOf(0)
+
+    /** True while a page grows over the window (PageFlood.kt): the ring keeps out of it until it is done. */
+    var hidden by mutableStateOf(false)
 
     val current: GlideSource? get() = hot.lastOrNull()
 
@@ -364,7 +368,7 @@ internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable 
                 .matchParentSize()
                 .drawBehind {
                     val a = alpha.value
-                    if (a <= 0.01f || !PadModality.showsFocus) return@drawBehind
+                    if (a <= 0.01f || !PadModality.showsFocus || glide.hidden) return@drawBehind
                     val accent = MenuTokens.Accent
                     val ringAlpha = a * FocusLook.ringAlpha(breath.value)
                     val w = MenuTokens.FocusRingWidth.toPx()

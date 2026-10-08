@@ -24,15 +24,23 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
  * restarting an animation on every repeat.
  */
 
-/** Scrolls [index] fully into view, by as little as it takes. */
-internal suspend fun LazyListState.keepInView(index: Int, animate: Boolean = true) {
+/**
+ * Scrolls [index] fully into view, by as little as it takes. [under] is a
+ * sticky header the item must stay clear of (the game page's tab strip): its
+ * lower edge is the top of the room the item has. It is only for items
+ * after that header.
+ */
+internal suspend fun LazyListState.keepInView(index: Int, animate: Boolean = true, under: Int? = null) {
     // Two passes: an item that is not laid out yet is reached by an
     // estimate, and the second pass makes the estimate exact.
     repeat(2) {
         val info = layoutInfo
-        val visible = info.visibleItemsInfo
+        val all = info.visibleItemsInfo
+        val header = under?.let { h -> all.firstOrNull { it.index == h } }
+        // A pinned header is drawn over the rows, not among them: it takes no part in the estimate.
+        val visible = if (header == null) all else all.filter { it.index != under }
         if (visible.isEmpty()) return
-        val top = info.viewportStartOffset
+        val top = maxOf(info.viewportStartOffset, header?.let { it.offset + it.size } ?: Int.MIN_VALUE)
         val bottom = info.viewportEndOffset - info.afterContentPadding
         val row = visible.firstOrNull { it.index == index }
         val delta = when {

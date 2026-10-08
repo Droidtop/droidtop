@@ -1,7 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
 import dev.droidtop.library.friendlyLocation
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -24,12 +24,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +40,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -76,7 +82,14 @@ import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.LocalValueColumnWidth
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.Corners
+import dev.droidtop.shell.gamepad.Elevation
+import dev.droidtop.shell.gamepad.FloodOrigin
 import dev.droidtop.shell.gamepad.FocusGlideHost
+import dev.droidtop.shell.gamepad.PageFlood
+import dev.droidtop.shell.gamepad.QuickGlyph
+import dev.droidtop.shell.gamepad.QuickGlyphIcon
+import dev.droidtop.shell.gamepad.screenRect
 import dev.droidtop.shell.gamepad.Motion
 import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.ShoulderGlyph
@@ -109,18 +122,21 @@ import java.util.concurrent.ConcurrentHashMap
  * the structure a storefront game page has, drawn in droidtop's own
  * tokens. From the top:
  *
- * - **The hero band**: the game's hero art full-bleed, 44 percent of the
- *   height in landscape, with its large logo (or its name) bottom-left. With
- *   the cursor down in the tab content the hero and the action band go and
- *   the tab strip is the top edge, so the content gets the screen.
+ * - **The hero band**: the game's hero art full-bleed, 46 percent of the
+ *   height in landscape, fading into the page, with its large logo (or its
+ *   name) bottom-left. The whole page is ONE scrolling list, as Steam's: with
+ *   the cursor down in the tab's rows the hero and the action band scroll
+ *   away and the tab strip stays pinned at the top, gaining a plate once
+ *   rows pass under it.
  * - **The action band**, one row: ONE large primary action that says what A
  *   does (Play, or the one setup step that makes it Play, or why it cannot --
  *   [PcPlayState]), a quiet facts strip beside it ([factsStrip]: last
  *   played, play time, the version installed against the latest known, size,
- *   what runs it), small Favourite and Options icon buttons at the right
- *   edge, and the one-line reason under it.
+ *   what runs it, each a small capitals label over its value), small
+ *   Favourite and Options (a gear) square buttons at the right edge, and the
+ *   one-line reason under it.
  * - **The tab strip** (Overview, Versions and updates, Extras, Details),
- *   centred and pinned under the band. It OWNS L1/R1 while the page is open: the page
+ *   Steam's uppercase tab pills, centred under the band. It OWNS L1/R1 while the page is open: the page
  *   is a window of its own over the library, so its one `onPad` handler is
  *   what the shoulders reach, the same "nearest strip takes them" rule the
  *   shell applies (docs/SPEC.md 7j, "Gaming controls"). The glyphs sit at
@@ -147,10 +163,15 @@ import java.util.concurrent.ConcurrentHashMap
  * draws no hint row: it is a layer on the shell's one footer
  * ([DeclareLayerHints]) and stays clear of it.
  *
+ * The page grows out of the capsule it was opened from and draws back into
+ * it on B, and Play grows into the launch screen ([PageFlood], behind the
+ * Animations switch).
+ *
  * No disk work while drawing: everything shown is already on the
  * [LibraryEntry]; the lookups, the resolved runner, the folder's size and
  * the parts, run for this one game off the main thread.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun PcGamePage(
     entry: LibraryEntry,
@@ -279,19 +300,44 @@ internal fun PcGamePage(
     var row by remember(entry.id) { mutableIntStateOf(0) }
     var heldStep by remember { mutableStateOf(false) }
     val current = rowsByTab[tabs[tab]].orEmpty()
+    // ONE scrolling page, as Steam's: the hero, the play row, the tab strip
+    // (sticky: it pins to the top once rows pass under it) and the tab's rows.
     val listState = rememberLazyListState()
     val tabState = rememberLazyListState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "PC game page") }
-    LaunchedEffect(tab) {
-        listState.scrollToItem(0)
-        tabState.keepInView(tab)
-    }
-    LaunchedEffect(zone, row, current.size) {
-        if (zone == PageZone.CONTENT && current.isNotEmpty()) {
-            listState.keepInView(row.coerceIn(0, current.lastIndex), animate = !heldStep)
+    LaunchedEffect(tab) { tabState.keepInView(tab) }
+    LaunchedEffect(zone, row, tab, current.size) {
+        when (zone) {
+            // The top of the page: the hero and the play row in full.
+            PageZone.ACTIONS -> listState.keepInView(PAGE_ITEM_HERO, animate = !heldStep)
+            PageZone.TABS -> listState.keepInView(PAGE_ITEM_TABS, animate = !heldStep)
+            PageZone.CONTENT -> if (current.isNotEmpty()) {
+                listState.keepInView(
+                    PAGE_ITEM_FIRST_ROW + row.coerceIn(0, current.lastIndex),
+                    animate = !heldStep,
+                    under = PAGE_ITEM_TABS,
+                )
+            }
         }
     }
+    // The strip gains its plate once rows have passed under it (Steam's frosted tab header; an opaque
+    // plate here, droidtop draws no blur), within [PAGE_PLATE_MS].
+    val stuck by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > PAGE_ITEM_TABS ||
+                (listState.firstVisibleItemIndex == PAGE_ITEM_TABS && listState.firstVisibleItemScrollOffset > 0)
+        }
+    }
+    val plate = animateFloatAsState(if (stuck) 1f else 0f, Motion.tw(PAGE_PLATE_MS), label = "tab plate")
+
+    // The page grows out of the capsule it was opened from and draws back
+    // into it on B (PageFlood.kt); Play grows into the launch screen.
+    val view = LocalView.current
+    val origin = remember(entry.id) { FloodOrigin.capsuleRect(entry.id) }
+    var leaving by remember(entry.id) { mutableStateOf(false) }
+    val closePage: () -> Unit = { if (!leaving) leaving = true }
+    var playAt by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
 
     val buttons = 3
     fun pressButton(index: Int) {
@@ -299,6 +345,7 @@ internal fun PcGamePage(
             0 -> if (play.pressable) {
                 // The setup step runs over the page, which stays: closing it
                 // hid the page behind the offer (Droidtop/tracker#293).
+                if (play.ready) playAt?.takeIf { it.isAttached }?.let { FloodOrigin.markLaunch(screenRect(it, view)) }
                 if (play.ready || play.store != null) onClose()
                 onPlay()
             }
@@ -316,13 +363,7 @@ internal fun PcGamePage(
         if (zone == PageZone.CONTENT && rowsByTab[tabs[clamped]].isNullOrEmpty()) zone = PageZone.TABS
     }
 
-    val compact = zone == PageZone.CONTENT
-    val fullHero = (window.heightDp * (if (window.portrait) 0.30f else 0.44f)).dp
-    val heroHeight by animateDpAsState(
-        targetValue = if (compact) 0.dp else fullHero,
-        animationSpec = Motion.panelIn(),
-        label = "page hero",
-    )
+    val heroHeight = (window.heightDp * (if (window.portrait) PAGE_HERO_PORTRAIT else PAGE_HERO_LANDSCAPE)).dp
     val shoulderGlyphs = window.showsShoulderGlyphs()
     val shellMenus = LocalShellMenus.current
 
@@ -346,14 +387,18 @@ internal fun PcGamePage(
     }
 
     Dialog(
-        onDismissRequest = onClose,
+        onDismissRequest = closePage,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         GatePadInThisDialog()
         HideSystemBarsInThisDialog()
         DeclareLayerHints(hints, menusReachable = true)
+        // A full page dims nothing: the shell shows round the flood until the page covers it.
+        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect { dialogWindow?.setDimAmount(0f) }
         // The page is a window of its own: it hosts its own sliding ring.
         FocusGlideHost(Modifier.fillMaxSize()) {
+          PageFlood(from = origin, leaving = leaving, onLeft = onClose) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -361,7 +406,7 @@ internal fun PcGamePage(
                     .padding(bottom = window.frameBarHeight)
                     // B from the outermost node; the cursor's own presses
                     // nearer the focus target, so they are answered first.
-                    .ownPadButtons(onBack = onClose)
+                    .ownPadButtons(onBack = closePage)
                     .onPad { press ->
                         heldStep = press.repeat
                         when (press.action) {
@@ -436,103 +481,113 @@ internal fun PcGamePage(
                     .focusable()
                     .groundBackground(),
             ) {
-                if (heroHeight > 0.dp) PageHero(entry, heroHeight)
-                Column(modifier = Modifier.padding(horizontal = window.edgePadding)) {
-                    // While the cursor is in the rows the hero and this band
-                    // are gone and the tab strip is the top edge, as on
-                    // Steam's scrolled page.
-                    if (!compact) {
-                        PageActionBand(
-                            play = play,
-                            favourite = entry.favorite,
-                            selectedButton = if (zone == PageZone.ACTIONS) button else null,
-                            strip = strip,
-                            portrait = window.portrait,
-                            onPress = { index ->
-                                zone = PageZone.ACTIONS
-                                button = index
-                                pressButton(index)
-                            },
-                        )
-                    }
-                    PageTabStrip(
-                        tabs = tabs,
-                        tab = tab,
-                        cursorOnTabs = zone == PageZone.TABS,
-                        state = tabState,
-                        shoulderGlyphs = shoulderGlyphs,
-                        onSelect = { index ->
-                            zone = PageZone.TABS
-                            selectTab(index)
-                        },
-                    )
+                // One value column for the tab, content-sized to its widest
+                // value (docs/SPEC.md 7k), as the Settings catalog does.
+                val measurer = rememberTextMeasurer()
+                val valueStyle = MaterialTheme.typography.bodyMedium
+                val density = LocalDensity.current
+                val valueColumnWidth = remember(current, valueStyle, density.fontScale) {
+                    val widest = current.mapNotNull { it.value }
+                        .maxOfOrNull { measurer.measure(it, valueStyle, maxLines = 1, softWrap = false).size.width } ?: 0
+                    with(density) { widest.toDp() }.coerceIn(MenuTokens.ValueColumnMinWidth, MenuTokens.ValueColumnMaxWidth)
                 }
-                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    if (current.isEmpty()) {
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text(tabs[tab].emptyLine, color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
+                CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        contentPadding = PaddingValues(bottom = Space.Lg),
+                    ) {
+                        item(key = "hero") { PageHero(entry, heroHeight) }
+                        item(key = "band") {
+                            Box(Modifier.padding(horizontal = window.edgePadding)) {
+                                PageActionBand(
+                                    play = play,
+                                    favourite = entry.favorite,
+                                    selectedButton = if (zone == PageZone.ACTIONS) button else null,
+                                    strip = strip,
+                                    portrait = window.portrait,
+                                    onPlayPlaced = { playAt = it },
+                                    onPress = { index ->
+                                        zone = PageZone.ACTIONS
+                                        button = index
+                                        pressButton(index)
+                                    },
+                                )
+                            }
                         }
-                    } else {
-                        // One value column for the tab, content-sized to its
-                        // widest value (docs/SPEC.md 7k), as the Settings catalog does.
-                        val measurer = rememberTextMeasurer()
-                        val valueStyle = MaterialTheme.typography.bodyMedium
-                        val density = LocalDensity.current
-                        val valueColumnWidth = remember(current, valueStyle, density.fontScale) {
-                            val widest = current.mapNotNull { it.value }
-                                .maxOfOrNull { measurer.measure(it, valueStyle, maxLines = 1, softWrap = false).size.width } ?: 0
-                            with(density) { widest.toDp() }.coerceIn(MenuTokens.ValueColumnMinWidth, MenuTokens.ValueColumnMaxWidth)
-                        }
-                        CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.weight(1f).fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
-                                contentPadding = PaddingValues(
-                                    start = window.edgePadding,
-                                    end = window.edgePadding,
-                                    top = Space.Xs,
-                                    bottom = Space.Lg,
-                                ),
+                        stickyHeader(key = "tabs") {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .graphicsLayer { shadowElevation = plate.value * Elevation.Menu.toPx() }
+                                    .drawBehind { drawRect(MenuTokens.Scrim, alpha = plate.value) }
+                                    .padding(horizontal = window.edgePadding),
                             ) {
-                                itemsIndexed(current, key = { index, fact -> "$index:${fact.title}" }) { index, fact ->
-                                    HintTip(fact.tip, modifier = Modifier.fillMaxWidth()) {
-                                        MenuRow(
-                                            title = fact.title,
-                                            subtitle = fact.subtitle,
-                                            value = fact.value,
-                                            chevron = fact.onActivate != null,
-                                            selected = zone == PageZone.CONTENT && row == index,
-                                            uniformHeight = true,
-                                            ownScrollKeeping = true,
-                                            onClick = {
-                                                zone = PageZone.CONTENT
-                                                row = index
-                                                fact.onActivate?.invoke()
-                                            },
-                                        )
-                                    }
+                                PageTabStrip(
+                                    tabs = tabs,
+                                    tab = tab,
+                                    cursorOnTabs = zone == PageZone.TABS,
+                                    state = tabState,
+                                    shoulderGlyphs = shoulderGlyphs,
+                                    onSelect = { index ->
+                                        zone = PageZone.TABS
+                                        selectTab(index)
+                                    },
+                                )
+                            }
+                        }
+                        if (current.isEmpty()) {
+                            item(key = "empty:$tab") {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = Space.Xxxl),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(tabs[tab].emptyLine, color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
+                                }
+                            }
+                        } else {
+                            itemsIndexed(current, key = { index, fact -> "$tab:$index:${fact.title}" }) { index, fact ->
+                                HintTip(
+                                    fact.tip,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = window.edgePadding, vertical = MenuTokens.RowSpacing / 2),
+                                ) {
+                                    MenuRow(
+                                        title = fact.title,
+                                        subtitle = fact.subtitle,
+                                        value = fact.value,
+                                        chevron = fact.onActivate != null,
+                                        selected = zone == PageZone.CONTENT && row == index,
+                                        uniformHeight = true,
+                                        ownScrollKeeping = true,
+                                        onClick = {
+                                            zone = PageZone.CONTENT
+                                            row = index
+                                            fact.onActivate?.invoke()
+                                        },
+                                    )
                                 }
                             }
                         }
-                        // The selected row in full, so no row has to grow to be
-                        // read: the whole description, a long value, where the
-                        // facts came from. Only while the cursor is down here,
-                        // when the band above has made the room.
-                        if (compact) {
-                            val selected = current.getOrNull(row)
-                            CatalogDetailStrip(
-                                selected?.let { fact ->
-                                    listOfNotNull(
-                                        fact.value?.takeIf { it.length > 14 },
-                                        fact.subtitle,
-                                    ).joinToString("\n")
-                                }.orEmpty(),
-                            )
-                        }
                     }
                 }
+                // The selected row in full, so no row has to grow to be read:
+                // the whole description, a long value, where the facts came
+                // from. Only while the cursor is in the rows.
+                if (zone == PageZone.CONTENT && current.isNotEmpty()) {
+                    val selected = current.getOrNull(row)
+                    CatalogDetailStrip(
+                        selected?.let { fact ->
+                            listOfNotNull(
+                                fact.value?.takeIf { it.length > 14 },
+                                fact.subtitle,
+                            ).joinToString("\n")
+                        }.orEmpty(),
+                    )
+                }
             }
+          }
         }
     }
     PluginPageScreen(pluginRows)
@@ -556,6 +611,18 @@ internal fun PcGamePage(
 
 /** Where the page's one cursor is: the action band's buttons, the tab strip, or the tab's rows. */
 private enum class PageZone { ACTIONS, TABS, CONTENT }
+
+/** The page's one list: the hero, the action band, the sticky tab strip, then the tab's rows. */
+internal const val PAGE_ITEM_HERO = 0
+internal const val PAGE_ITEM_TABS = 2
+internal const val PAGE_ITEM_FIRST_ROW = 3
+
+/** The hero's share of the window's height: Steam's hero ends at about 46 percent. */
+internal const val PAGE_HERO_LANDSCAPE = 0.46f
+internal const val PAGE_HERO_PORTRAIT = 0.30f
+
+/** How quickly the tab strip's plate appears once rows pass under it (Steam: 0.1 s). */
+internal const val PAGE_PLATE_MS = 100
 
 /**
  * The hero band: the game's hero art edge to edge, darkened toward the
@@ -637,11 +704,14 @@ private fun PageActionBand(
     selectedButton: Int?,
     strip: List<Pair<String, String>>,
     portrait: Boolean,
+    // Where Play is, for the launch to grow out of (PageFlood.kt).
+    onPlayPlaced: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit,
     onPress: (Int) -> Unit,
 ) {
     val primary: @Composable () -> Unit = {
         ShellChip(
             play.verb,
+            modifier = Modifier.onGloballyPositioned(onPlayPlaced),
             primary = true,
             large = true,
             enabled = play.pressable,
@@ -659,7 +729,7 @@ private fun PageActionBand(
                 onClick = { onPress(1) },
             )
             PageIconButton(
-                glyph = "\u22EF",
+                glyph = null,
                 description = "Game options",
                 on = false,
                 selected = selectedButton == 2,
@@ -697,9 +767,20 @@ private fun PageActionBand(
     }
 }
 
-/** A small round button for the cursor to rest on: a glyph, never a word, with a spoken description. */
+/**
+ * A small square button for the cursor to rest on (Steam's gear and favourite beside the status panel): a
+ * glyph, never a word, with a spoken description. At rest it is a quiet plate; under the cursor it turns
+ * solid, as every quiet button does. Null [glyph] is the gear (the game's options), drawn, which turns a
+ * quarter as the cursor arrives (DroidDeck's cog, ui/FrontEndWidgets.kt at 9310d19).
+ */
 @Composable
-private fun PageIconButton(glyph: String, description: String, on: Boolean, selected: Boolean, onClick: () -> Unit) {
+private fun PageIconButton(glyph: String?, description: String, on: Boolean, selected: Boolean, onClick: () -> Unit) {
+    val lit = selected && dev.droidtop.shell.gamepad.input.PadModality.showsFocus
+    val ink = when {
+        lit -> MenuTokens.OnSelected
+        on -> MenuTokens.Favourite
+        else -> MenuTokens.OnSurface
+    }
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -707,17 +788,28 @@ private fun PageIconButton(glyph: String, description: String, on: Boolean, sele
             .semantics { contentDescription = description }
             .focusProperties { canFocus = false }
             .clickable(onClick = onClick)
-            .selectionFrame(selected, CircleShape),
+            .selectionFrame(selected, Corners.Crisp, selectedFill = MenuTokens.Selected),
     ) {
-        Text(
-            glyph,
-            color = if (on) MenuTokens.Favourite else MenuTokens.OnSurface,
-            style = MaterialTheme.typography.titleLarge,
-        )
+        if (glyph != null) {
+            Text(glyph, color = ink, style = MaterialTheme.typography.titleLarge)
+        } else {
+            val turn = animateFloatAsState(if (lit) GEAR_TURN_DEGREES else 0f, Motion.focus(), label = "gear")
+            QuickGlyphIcon(
+                glyph = QuickGlyph.SETTINGS,
+                tint = ink,
+                modifier = Modifier.size(24.dp).graphicsLayer { rotationZ = turn.value },
+            )
+        }
     }
 }
 
-/** The facts strip: a label over a value, quiet, scrolling sideways rather than clipping at a large text size. */
+/** How far the gear turns as the cursor reaches it. */
+private const val GEAR_TURN_DEGREES = 90f
+
+/**
+ * The status panel beside Play (Steam's): each fact a small capitals label over its value, quiet, scrolling
+ * sideways rather than clipping at a large text size.
+ */
 @Composable
 private fun PageFactsStrip(facts: List<Pair<String, String>>, modifier: Modifier = Modifier) {
     Row(
@@ -725,8 +817,8 @@ private fun PageFactsStrip(facts: List<Pair<String, String>>, modifier: Modifier
         horizontalArrangement = Arrangement.spacedBy(Space.Xl),
     ) {
         facts.forEach { (label, value) ->
-            Column {
-                Text(label, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            Column(verticalArrangement = Arrangement.spacedBy(Space.Hair)) {
+                Text(label.uppercase(), color = MenuTokens.OnSurfaceMuted, style = TypeRole.eyebrow, maxLines = 1)
                 Text(value, color = MenuTokens.OnSurface, style = TypeRole.value, maxLines = 1)
             }
         }
@@ -748,7 +840,8 @@ private fun PageTabStrip(
     onSelect: (Int) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        if (shoulderGlyphs) ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = Space.Sm))
+        // A shoulder with nowhere to go is drawn at half strength, as on the library's strip.
+        if (shoulderGlyphs) ShoulderGlyph("L1", badge = true, dimmed = tab <= 0, modifier = Modifier.padding(end = Space.Sm))
         LazyRow(
             state = state,
             contentPadding = PaddingValues(vertical = Space.Sm),
@@ -759,12 +852,15 @@ private fun PageTabStrip(
                 ShellChip(
                     tabs[index].label,
                     on = index == tab,
+                    tab = true,
                     selected = cursorOnTabs && index == tab,
                     onClick = { onSelect(index) },
                 )
             }
         }
-        if (shoulderGlyphs) ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = Space.Sm))
+        if (shoulderGlyphs) {
+            ShoulderGlyph("R1", badge = true, dimmed = tab >= tabs.lastIndex, modifier = Modifier.padding(start = Space.Sm))
+        }
     }
 }
 
