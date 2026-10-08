@@ -62,6 +62,10 @@ android {
             // (docs/SPEC.md 9). What is packed and what is left out:
             // build-scripts/windows-runtime-prebuilt.sh.
             jniLibs.srcDir("prebuilt/jniLibs")
+            // The lsfg-vk Vulkan layer, both ABIs, built by
+            // .github/workflows/lsfg-vk-layer.yml and fetched against
+            // lsfg-layer.pin (build-scripts/fetch-lsfg-layer.sh).
+            jniLibs.srcDir("lsfg/jniLibs")
             assets.srcDir("prebuilt/assets")
         }
     }

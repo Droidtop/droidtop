@@ -1,0 +1,96 @@
+name: lsfg-vk layer
+
+# Builds the lsfg-vk Vulkan layer (Lossless Scaling frame generation, MIT)
+# for both ABIs the fat APK ships and publishes liblsfg-vk-layer.so per ABI as
+# a prerelease of this repository, the build-toolchains precedent
+# (docs/SPEC.md 5c, "Frame generation"). The layer is only code; the
+# Lossless.dll it reads at run time is the user's own, from their Steam
+# install of Lossless Scaling, and is never built, fetched or shipped here.
+# The build fetches the release by runtime-windows/lsfg-layer.pin (tag and
+# SHA-256, build-scripts/fetch-lsfg-layer.sh).
+
+on:
+  push:
+    paths:
+      - '.github/workflows/lsfg-vk-layer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # GameNative/lsfg-vk-android at the commit their Wine runtime pins.
+  LSFG_REPO: GameNative/lsfg-vk-android
+  LSFG_REF: feb7899a6d0f419e27bf47102b6df8ff17e50122
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout lsfg-vk-android
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ env.LSFG_REPO }}
+          ref: ${{ env.LSFG_REF }}
+          path: lsfg
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Cache Android NDK
+        id: cache-ndk
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/ndk/android-ndk-r27d
+          key: android-ndk-r27d
+
+      - name: Android NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/ndk && cd ~/ndk
+          curl -fsSL -o ndk.zip https://dl.google.com/android/repository/android-ndk-r27d-linux.zip
+          unzip -q ndk.zip && rm ndk.zip
+
+      - name: Build
+        env:
+          NDK_ROOT: /home/runner/ndk/android-ndk-r27d
+        run: |
+          sudo apt-get install -y ninja-build zstd
+          mkdir -p out/stage
+          for abi in arm64-v8a x86_64; do
+            # LSFGVK_ANDROID_WINE: the Wine-on-Android build. volk takes its
+            # platform defines from VOLK_STATIC_DEFINES, and framegen's
+            # AHardwareBuffer import needs the VK_ANDROID_* types that
+            # vulkan.h declares only under VK_USE_PLATFORM_ANDROID_KHR.
+            cmake -S lsfg -B "build-$abi" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
+              -DANDROID_ABI="$abi" -DANDROID_PLATFORM=android-26 -DANDROID_STL=c++_shared \
+              -DLSFGVK_ANDROID_WINE=ON -DVOLK_STATIC_DEFINES=VK_USE_PLATFORM_ANDROID_KHR \
+              -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384"
+            cmake --build "build-$abi" --target lsfg-vk
+            mkdir -p "out/stage/jniLibs/$abi"
+            cp "build-$abi/liblsfg-vk.so" "out/stage/jniLibs/$abi/liblsfg-vk-layer.so"
+            "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" "out/stage/jniLibs/$abi/liblsfg-vk-layer.so"
+            file "out/stage/jniLibs/$abi/liblsfg-vk-layer.so"
+          done
+          cp lsfg/LICENSE.md out/stage/LICENSE-lsfg-vk.md
+          tar -C out/stage -cf - . | zstd -19 -T0 -q -o out/lsfg-vk-layer.tar.zst
+          cd out && sha256sum lsfg-vk-layer.tar.zst | tee lsfg-vk-layer.tar.zst.sha256
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="lsfg-vk-layer-${LSFG_REF:0:8}"
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$tag already published; a pin's release is never replaced"
+            exit 0
+          fi
+          gh release create "$tag" -R "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
+            --title "lsfg-vk layer (${LSFG_REPO} ${LSFG_REF:0:8})" \
+            --notes "liblsfg-vk-layer.so for arm64-v8a and x86_64, built by lsfg-vk-layer.yml from ${LSFG_REPO} at ${LSFG_REF} (MIT). Needs the user's own Lossless Scaling install at run time; the DLL is not part of this." \
+            out/lsfg-vk-layer.tar.zst out/lsfg-vk-layer.tar.zst.sha256
