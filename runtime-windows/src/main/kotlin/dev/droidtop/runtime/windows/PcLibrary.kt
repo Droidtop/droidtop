@@ -4,10 +4,8 @@ import android.content.Context
 import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
 import app.gamenative.utils.CustomGameScanner
-import app.gamenative.utils.GameCompatibilityCache
 import dev.droidtop.library.EngineVerdictStore
 import dev.droidtop.library.GameTitleParser
-import dev.droidtop.library.PcCompatibility
 import dev.droidtop.library.PcFolderScan
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.PcStoreNames
@@ -59,24 +57,6 @@ object PcLibrary {
      */
     enum class Source { STEAM, GOG, EPIC, AMAZON, ITCH, FOLDER }
 
-    /**
-     * Community compatibility reports for a title, from gamenative's own
-     * `api.gamenative.app/api/game-runs` service.
-     *
-     * **Reference, never a gate** (directed 2026-09-01). droidtop shows
-     * this and lets the user decide; it must never block a download, hide
-     * an entry, or reorder a library on its own. A rating is other
-     * people's experience on other hardware, which is useful information
-     * and a bad decision-maker.
-     */
-    data class Compatibility(
-        val averageRating: Float,
-        val playableReports: Int,
-        val gpuPlayableReports: Int,
-        val hasBeenTried: Boolean,
-        val reportedNotWorking: Boolean,
-    )
-
     /** One PC game, whatever it came from. */
     data class Game(
         /** Stable across scans and unique across sources: `"steam:440"`. */
@@ -90,7 +70,6 @@ object PcLibrary {
         /** On-disk size when installed, download size when not, 0 when unknown. */
         val sizeBytes: Long,
         val artUrl: String?,
-        val compatibility: Compatibility?,
         /** The build installed, when the store words one; never made up ([PcInfo.installedVersion]). */
         val installedVersion: String? = null,
         /** Other stores' ids the store's own row names ([PcInfo.externalIds]). */
@@ -331,7 +310,7 @@ object PcLibrary {
     /**
      * The installs behind [knownInstallRoots], with the store's own facts
      * attached. Engine detection takes these so that a store-installed
-     * engine game keeps its source, size, compatibility and cover art
+     * engine game keeps its source, size and cover art
      * after its duplicate `pc` entry is suppressed.
      *
      * Same one-scan-behind caveat as [knownInstallRoots], and for the
@@ -354,23 +333,6 @@ object PcLibrary {
     private var folderSourceInstalls: List<StoreInstall> = emptyList()
 
     /**
-     * Cached community compatibility only — no network call. Scanning a
-     * library must not depend on a reachable server or a signed-in
-     * account, so an entry simply carries no rating until something else
-     * has populated the cache.
-     */
-    private fun compatibilityFor(title: String): Compatibility? =
-        runCatching { GameCompatibilityCache.getCached(title) }.getOrNull()?.let { response ->
-            Compatibility(
-                averageRating = response.avgRating,
-                playableReports = response.totalPlayableCount,
-                gpuPlayableReports = response.gpuPlayableCount,
-                hasBeenTried = response.hasBeenTried,
-                reportedNotWorking = response.isNotWorking,
-            )
-        }
-
-    /**
      * A row of a store droidtop runs itself. Null for a store this enum
      * does not name yet: a store is a [Source] before its rows can be
      * filtered on or drawn with its name.
@@ -386,7 +348,6 @@ object PcLibrary {
             installPath = installPath,
             sizeBytes = sizeBytes,
             artUrl = artUrl,
-            compatibility = compatibilityFor(title),
             installedVersion = installedVersion,
             externalIds = externalIds,
         )
@@ -670,7 +631,6 @@ object PcLibrary {
             installPath = folderPath,
             sizeBytes = sizeBytes,
             artUrl = localArt,
-            compatibility = compatibilityFor(title),
         )
     }
 }
@@ -706,15 +666,6 @@ fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
     externalIds = externalIds,
     latestVersion = StoreUpdates.resultFor(id)?.latest,
     update = StoreUpdates.resultFor(id)?.update ?: StoreUpdate.UNKNOWN,
-    compatibility = compatibility?.let {
-        PcCompatibility(
-            averageRating = it.averageRating,
-            playableReports = it.playableReports,
-            gpuPlayableReports = it.gpuPlayableReports,
-            hasBeenTried = it.hasBeenTried,
-            reportedNotWorking = it.reportedNotWorking,
-        )
-    },
 )
 
 fun PcLibrary.Source.displayName(): String = when (this) {
