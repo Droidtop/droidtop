@@ -7,12 +7,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CompanionTabsTest {
-    @Test fun everyModeGetsTheFourCommonTabsInOrder() {
+    @Test fun everyModeGetsTheCommonTabsInOrder() {
         val tabs = companionTabs(Mode.GAMING, SecondScreenInputPrefs.Role.COMPANION)
         assertEquals(
-            listOf(CompanionTab.HOME, CompanionTab.TASKS, CompanionTab.PERFORMANCE, CompanionTab.SYSTEM),
+            listOf(CompanionTab.HOME, CompanionTab.SOCIAL, CompanionTab.TASKS, CompanionTab.PERFORMANCE, CompanionTab.SYSTEM),
             tabs,
         )
+    }
+
+    @Test fun kioskAndKidLeaveTheSocialTabOut() {
+        val tabs = companionTabs(Mode.GAMING, SecondScreenInputPrefs.Role.COMPANION, social = false)
+        assertFalse(tabs.contains(CompanionTab.SOCIAL))
+        assertEquals(CompanionTab.HOME, tabs.first())
     }
 
     @Test fun desktopAddsTheInputSurfaceAndOpensOnIt() {

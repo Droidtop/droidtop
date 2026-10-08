@@ -1572,7 +1572,8 @@ Risk medium.
   notification only when the plugin holds `notify.post`; without it the
   unread count still moves.
 - **Surfaces:** G: the Social place (a left-menu place), the Quick Menu's
-  Social tile (the unread count over every provider); the notifications. Every row is droidtop's own: the plugin
+  Social tile (the unread count over every provider), the companion's
+  Social tab; the notifications. Every row is droidtop's own: the plugin
   never draws one.
 - **Permission:** the approval of the point ("Friends and chat"), and
   `notify.post` for notifications. Staying connected in the background

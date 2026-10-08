@@ -2958,7 +2958,9 @@ every host that draws the companion (the registry's `Surface`, used by `SecondSc
 picks the tab it opens on. Standard's own second screen keeps its launcher-style surface.
 
 - **Tabs, in strip order:** Home (today's widgets and info surface, `CompanionSurface`, the host's own
-  add/remove controls where it has them), Tasks, Performance, System and Input. Input (the keyboard and
+  add/remove controls where it has them), Social (every provider's friends and conversations, with
+  droidtop's own keyboard for typing; not in Kiosk and Kid; see "Social", Droidtop/tracker#327), Tasks,
+  Performance, System and Input. Input (the keyboard and
   trackpad surface) is offered in Desktop mode and wherever a mode's role is set to Input. Desktop opens on
   Input (section 6c, unchanged); every other mode opens on Home. Only the selected tab is composed.
 - **Touch only, screens independent.** No tab takes focus: each host already denies focus to the whole tree
@@ -3353,8 +3355,10 @@ What is true on Android, and what this section corrects in the text above:
   does not install `PadGate`, `Modifier.onPad`, or an initial focus request;
   D-pad and gamepad events stay with the shell on the other display. Tapping
   still dispatches normal touch actions. Text entry on a companion uses the
-  existing second-screen keyboard surface and its input connection; it does
-  not make the companion window focusable.
+  existing second-screen keyboard surface and its input connection, or, for
+  a field of the companion's own (the Social tab's draft), the same keyboard
+  view typing into that field directly ("Social"); it never makes the
+  companion window focusable.
 - The selected IME may receive an input session for an editor on a
   non-default display without Android drawing its IME window. Console
   evidence for Droidtop/tracker#156: with Gboard selected and Chrome focused
@@ -9554,11 +9558,12 @@ follows:
   connection opened only for a job never announces a presence. Sign-out ends
   the connection and forgets the friends.
 - **Friends and chat** (`SteamFriendsHub` in `:stores`, Steam's
-  `SocialProvider`; the place, the tile and the notifications are every
-  provider's, see "Social" after "Places", Droidtop/tracker#327). Steam is the
-  first social provider: its friends and conversations appear in the
-  **Social place** in the Gaming left menu and the Quick Menu's Social tile
-  beside every other provider's. What Steam carries:
+  `SocialProvider`; the place, the tile, the companion tab and the
+  notifications are every provider's, see "Social" after "Places",
+  Droidtop/tracker#327). Steam is the first social provider: its friends and
+  conversations appear in the **Social place** in the Gaming left menu, the
+  companion's Social tab and the Quick Menu's Social tile beside every other
+  provider's. What Steam carries:
   the friends list and personas arrive by JavaSteam's callbacks; messages use
   the new Steam chat service (`FriendMessages` and `FriendMessagesClient`,
   `ServiceMethodNotification`): `GetActiveMessageSessions` once after each
@@ -12016,7 +12021,7 @@ total is the sum over providers. A provider set to Offline shows no
 friends. `SocialHub.changes()` is the one flow live screens and the count
 follow; nothing polls. A store pushes (Steam's callbacks); a plugin is
 asked when a social screen opens (`SocialHub.refresh`: once per visit and
-at most every 30 s in the place) and
+at most every 30 s in the place, once when the companion tab opens) and
 when it says something changed (`social.changed`, below), never on a timer
 and never from list drawing.
 
@@ -12033,6 +12038,23 @@ and never from list drawing.
   places.
 - **The Quick Menu's System tab** has a "Social" tile (`SocialBadge`) whose
   value is the unread count over every provider; it opens the place.
+- **The companion's Social tab** (`CompanionSocialTab`, after Home; not in
+  Kiosk and Kid): the same Conversations and Friends by touch, with the
+  unread count on the tab's pill. A conversation shows the messages newest
+  at the bottom, a draft field, Send, and a Keys pill that shows droidtop's
+  own keyboard (the forked Hacker's Keyboard view, `SecondScreenKeyboard.createView`,
+  through the same `SecondScreenKeyboardListener` the Input tab uses) inside
+  the companion window, typing straight into the draft (`CompanionDraft`:
+  the caret, Shift, Backspace, the arrows, Enter sends). **Decision: the
+  companion's text entry is droidtop's keyboard in the companion's own
+  window, never Android's IME.** Android places an IME window by the
+  focused display's IME policy, which an app cannot set, and a focusable
+  companion takes the pad from the shell (4c, "a Presentation takes no
+  focus"); the add-on display's keyboard trouble (Droidtop/tracker#314) is
+  exactly that. A keyboard view in the same window needs neither focus nor
+  an IME, so the companion stays touch-only and focus-free and the field
+  works whatever the IME or the display does. A tap on the field places the
+  caret where it lands and shows the keys.
 - **Notifications** (`SocialNotifications`): a message that arrives while its
   conversation is not open is one notification per conversation (provider
   and friend), titled with the friend's name, the service as sub-text,

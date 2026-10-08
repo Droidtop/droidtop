@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,27 +30,37 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.droidtop.display.SecondaryDisplayContent
+import dev.droidtop.library.settings.SocialBadge
+import dev.droidtop.library.settings.UiModePrefs
+import dev.droidtop.library.social.SocialHub
 import dev.droidtop.runtime.tasks.TaskManager
 
 /**
  * The companion's tabs (docs/SPEC.md "The companion's tabs", Droidtop/tracker#247): Home (the widgets
- * and info surface, [CompanionSurface]), Tasks, Performance, System and, in Desktop mode or when the
- * user chose it as this mode's second-screen role, the keyboard and trackpad Input surface (section 6c).
+ * and info surface, [CompanionSurface]), Social (every provider's friends and conversations,
+ * [CompanionSocialTab], Droidtop/tracker#327; not in Kiosk and Kid), Tasks, Performance, System and,
+ * in Desktop mode or when the user chose it as this mode's second-screen role, the keyboard and
+ * trackpad Input surface (section 6c).
  * Touch only: every host denies focus to this whole tree (`focusProperties { canFocus = false }`), so
  * nothing here ever takes a controller or a key from the shell on the other screen (#186, #265).
  */
 internal enum class CompanionTab(val label: String) {
     HOME("Home"),
+    SOCIAL("Social"),
     TASKS("Tasks"),
     PERFORMANCE("Performance"),
     SYSTEM("System"),
     INPUT("Input"),
 }
 
-/** The tabs a mode offers, in strip order. Input is there where the user can want it: Desktop, or a mode set to the input role. */
-internal fun companionTabs(mode: SecondaryDisplayContent.Mode, role: SecondScreenInputPrefs.Role): List<CompanionTab> =
+/**
+ * The tabs a mode offers, in strip order. Input is there where the user can want it: Desktop, or a mode set to the input
+ * role. Social is left out where [social] is false: Kiosk and Kid, which hide the Social place too.
+ */
+internal fun companionTabs(mode: SecondaryDisplayContent.Mode, role: SecondScreenInputPrefs.Role, social: Boolean = true): List<CompanionTab> =
     buildList {
         add(CompanionTab.HOME)
+        if (social) add(CompanionTab.SOCIAL)
         add(CompanionTab.TASKS)
         add(CompanionTab.PERFORMANCE)
         add(CompanionTab.SYSTEM)
@@ -69,8 +80,13 @@ internal fun defaultCompanionTab(role: SecondScreenInputPrefs.Role): CompanionTa
 internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable () -> Unit) {
     val context = LocalContext.current
     val role = SecondScreenInputPrefs.role(context, mode)
-    val tabs = companionTabs(mode, role)
+    val social = remember { !UiModePrefs.get(context).hidesSettings }
+    val tabs = companionTabs(mode, role, social)
     var selected by remember(mode, role) { mutableStateOf(defaultCompanionTab(role)) }
+    // The Social tab's unread count over every provider, read when something changes, never polled.
+    val unread by produceState(initialValue = SocialBadge.unread, social) {
+        if (social) SocialHub.changes().collect { value = SocialHub.unread() }
+    }
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(
             modifier = Modifier
@@ -80,11 +96,15 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            tabs.forEach { tab -> CompanionPill(tab.label, selected = tab == selected) { selected = tab } }
+            tabs.forEach { tab ->
+                val label = if (tab == CompanionTab.SOCIAL && unread > 0) "${tab.label} $unread" else tab.label
+                CompanionPill(label, selected = tab == selected) { selected = tab }
+            }
         }
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (selected) {
                 CompanionTab.HOME -> home()
+                CompanionTab.SOCIAL -> CompanionSocialTab()
                 CompanionTab.TASKS -> CompanionTasksTab()
                 CompanionTab.PERFORMANCE -> CompanionPerformanceTab()
                 CompanionTab.SYSTEM -> CompanionSystemTab()
