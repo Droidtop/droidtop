@@ -12,7 +12,7 @@ name: Steamworks shim
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci/win-games-3-shim]
     paths:
       - 'build-scripts/steamworks-shim/**'
       - '.github/workflows/steamworks-shim.yml'
