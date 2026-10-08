@@ -17,6 +17,7 @@ import androidx.annotation.NonNull;
 
 import com.winlator.PrefManager;
 
+import dev.droidtop.runtime.windows.utils.LsfgVkManager;
 import dev.droidtop.runtime.windows.utils.X86_64GuestLibs;
 import dev.droidtop.runtime.windows.utils.X86_64Graphics;
 import com.winlator.box86_64.Box86_64Preset;
@@ -376,9 +377,9 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
             X86_64Graphics.applyLaunchEnv(context, container, envVars);
         }
 
-        // droidtop: LSFG frame generation (LsfgVkManager) is not carried. It
-        // needs Lossless Scaling's DLL from a Steam install GameNative's Steam
-        // knew about, and droidtop never offered it.
+        // droidtop: LSFG frame generation, when this game has it on and the
+        // person's own Lossless Scaling is installed in droidtop's Steam.
+        LsfgVkManager.applyLaunchEnv(context, container, envVars);
 
         Log.d("BionicProgramLauncherComponent", "env vars are " + envVars.toString());
 

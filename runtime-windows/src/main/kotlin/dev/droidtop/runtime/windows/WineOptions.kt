@@ -3,6 +3,7 @@ package dev.droidtop.runtime.windows
 import android.content.Context
 import dev.droidtop.runtime.windows.R
 import dev.droidtop.runtime.windows.utils.ContainerUtils
+import dev.droidtop.runtime.windows.utils.LsfgVkManager
 import dev.droidtop.runtime.windows.utils.ManifestComponentHelper
 import dev.droidtop.runtime.windows.utils.ManifestContentTypes
 import dev.droidtop.runtime.windows.utils.ManifestEntry
@@ -87,6 +88,11 @@ object WineOptions {
     const val DXVK = "wine_dxvk"
     const val VKD3D = "wine_vkd3d"
 
+    /** The frame generation row of a game: not a prefix setting, so its own key and its own place among a game's choices. */
+    const val LSFG = "wine_lsfg"
+    private const val LSFG_KEY = "lsfg"
+    private const val LSFG_OFF = "off"
+
     private const val NOT_HERE = " (downloads when used)"
 
     /**
@@ -117,7 +123,8 @@ object WineOptions {
             prefixName = container.name?.takeIf { it.isNotBlank() } ?: container.id,
             ownPrefix = own,
             ownChoices = choices.size,
-            rows = rows(context, settings, Lists.load(context), choices.keys),
+            rows = rows(context, settings, Lists.load(context), choices.keys) +
+                listOfNotNull(entryId?.let { lsfgRow(context, it) }),
             missing = runCatching { WineComponents.missing(context, container) }.getOrDefault(emptyList()),
         )
     }
@@ -135,6 +142,11 @@ object WineOptions {
             previous?.join()
             runCatching {
                 WindowsBackbone.awaitReady(app)
+                if (rowId == LSFG && entryId != null) {
+                    val stored = WineGameOptionsPrefs.get(app, entryId) - LSFG_KEY
+                    WineGameOptionsPrefs.set(app, entryId, if (value == LSFG_OFF) stored else stored + (LSFG_KEY to value))
+                    return@runCatching
+                }
                 val container = PcContainers.forGame(app, entryId) ?: return@runCatching
                 val data = ContainerUtils.toContainerData(container)
                 val shared = read(data)
@@ -146,9 +158,9 @@ object WineOptions {
                 val next = apply(app, current, rowId, value)
                 if (next.wine != shared.wine) {
                     PcContainers.createOwn(app, entryId, title ?: entryId, write(data, next))
-                    WineGameOptionsPrefs.set(app, entryId, emptyMap())
+                    setWineChoices(app, entryId, emptyMap())
                 } else {
-                    WineGameOptionsPrefs.set(app, entryId, WineOptionPlan.diff(shared, next))
+                    setWineChoices(app, entryId, WineOptionPlan.diff(shared, next))
                 }
             }.onFailure { android.util.Log.w(TAG, "Wine option $rowId=$value not saved", it) }
         }
@@ -157,7 +169,7 @@ object WineOptions {
     /** Drops [entryId]'s own choices, so it runs with the shared settings again. */
     suspend fun useShared(context: Context, entryId: String): String = withContext(Dispatchers.IO) {
         lastWrite?.join()
-        WineGameOptionsPrefs.set(context, entryId, emptyMap())
+        setWineChoices(context, entryId, emptyMap())
         "This game uses the shared settings again."
     }
 
@@ -171,12 +183,54 @@ object WineOptions {
             .fold({ "Everything these settings need is on this device." }, { "Download failed: ${it.message ?: it}" })
     }
 
+    /** Stores [wine] as [entryId]'s Wine choices, leaving its frame generation choice as it is. */
+    private fun setWineChoices(context: Context, entryId: String, wine: Map<String, String>) {
+        val lsfg = WineGameOptionsPrefs.get(context, entryId)[LSFG_KEY]
+        WineGameOptionsPrefs.set(context, entryId, if (lsfg == null) wine else wine + (LSFG_KEY to lsfg))
+    }
+
+    /**
+     * The frame generation row of [entryId]: Off unless the game chose a
+     * multiplier, and not offered at all (no choices, the summary says why)
+     * while droidtop's Steam has no installed Lossless Scaling, which droidtop
+     * never downloads for anyone. Disk and database work.
+     */
+    private suspend fun lsfgRow(context: Context, entryId: String): WineOptionRow {
+        val chosen = WineGameOptionsPrefs.get(context, entryId)[LSFG_KEY]
+        val installed = LsfgVkManager.losslessFolder(context) != null
+        val title = "Frame generation (Lossless Scaling)"
+        if (!installed) {
+            return WineOptionRow(
+                LSFG, title,
+                "Lossless Scaling is not installed. Install it from your Steam library in Stores; droidtop never downloads it for you. Until then frame generation stays off.",
+                "Off", emptyList(),
+            )
+        }
+        val current = chosen?.let { LsfgVkManager.multiplier(it).toString() } ?: LSFG_OFF
+        return WineOptionRow(
+            LSFG, title,
+            "Shows more frames than the game draws, using your Lossless Scaling install. Costs speed and adds delay; off unless you turn it on for this game.",
+            current,
+            listOf(WineOptionChoice(LSFG_OFF, "Off")) + LsfgVkManager.MULTIPLIERS.map { WineOptionChoice(it.toString(), "${it}x") },
+            ownChoice = chosen != null,
+        )
+    }
+
+    /** The frame generation launch overrides of [entryId] (`Container.LAUNCH_OVERRIDE_KEYS`): on at its multiplier, or none. */
+    private fun lsfgOverrides(context: Context, entryId: String?): Map<String, String> {
+        val chosen = entryId?.let { WineGameOptionsPrefs.get(context, it)[LSFG_KEY] } ?: return emptyMap()
+        return mapOf(LsfgVkManager.EXTRA_ARMED to "true", LsfgVkManager.EXTRA_MULTIPLIER to LsfgVkManager.multiplier(chosen).toString())
+    }
+
     /**
      * The launch-time values [entryId]'s own choices put over [container]
-     * (`Container.setLaunchOverrides` keys), or none when the game has no
-     * choices of its own or runs in a prefix of its own. Disk work.
+     * (`Container.setLaunchOverrides` keys): its Wine choices, unless it runs
+     * in a prefix of its own, and its frame generation. Disk work.
      */
-    fun launchOverrides(context: Context, entryId: String?, container: Container): Map<String, String> {
+    fun launchOverrides(context: Context, entryId: String?, container: Container): Map<String, String> =
+        wineOverrides(context, entryId, container) + lsfgOverrides(context, entryId)
+
+    private fun wineOverrides(context: Context, entryId: String?, container: Container): Map<String, String> {
         if (entryId == null || PcContainers.isOwnPrefix(entryId, container)) return emptyMap()
         val choices = gameChoices(context, entryId)
         if (choices.isEmpty()) return emptyMap()

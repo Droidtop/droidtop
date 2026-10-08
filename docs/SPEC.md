@@ -4584,6 +4584,42 @@ Compose radial/quick menu wired through its game screen's state, so it is
 a port rather than a move, and droidtop has no host hotkey of its own on
 this path yet.
 
+## 5c. Frame generation (LSFG)
+
+Lossless Scaling's frame generation returns as a per-game option (owner,
+2026-10-08; the runtime lift had dropped it because the DLL came from a Steam
+install only GameNative's Steam knew, and droidtop now has its own,
+`:stores`).
+
+- **The layer** is the lsfg-vk Vulkan implicit layer (GameNative/lsfg-vk-android
+  at `feb7899a`, MIT), code droidtop ships: `.github/workflows/lsfg-vk-layer.yml`
+  builds `liblsfg-vk-layer.so` for arm64-v8a and x86_64 with the NDK and
+  publishes it as a prerelease (`lsfg-vk-layer-<commit>`);
+  `runtime-windows/lsfg-layer.pin` names the release and SHA-256 and
+  `build-scripts/fetch-lsfg-layer.sh` puts it into `runtime-windows/lsfg/jniLibs`
+  (`android-setup`). It is separate from the Windows runtime's re-hosted
+  prebuilts (`prebuilt.pin`), which still leave the old arm64 layer out.
+- **The DLL** is Lossless Scaling's own `Lossless.dll`, from the person's own
+  install of Lossless Scaling (Steam app 993090) that droidtop's Steam
+  (`:stores`) put in their game folders. droidtop never downloads that game for
+  anyone and never ships or redistributes the DLL; at launch it is copied from
+  the install into the prefix's home (`.local/share/lsfg-vk`) where the layer
+  reads it. `StoreLibrary.installedPath` answers "where is this installed" from
+  the store's install row alone.
+- **The option** is a row of a game's Wine and graphics settings, "Frame
+  generation (Lossless Scaling)": Off (the default) or 2x, 3x, 4x. It is the
+  game's own choice in `WineGameOptionsPrefs` (key `lsfg`), whatever prefix the
+  game runs in, and reaches the launch as the container's launch overrides
+  `lsfgEnabled` and `lsfgMultiplier`. While Lossless Scaling is not installed
+  the row offers no choice and says so: install it from the Steam library in
+  Stores; frame generation stays off until then.
+- **A launch** (`LsfgVkManager.applyLaunchEnv`, from
+  `BionicProgramLauncherComponent`) installs the layer, a manifest and the DLL
+  into the prefix home, writes the layer's `conf.toml` (flow scale 0.80,
+  performance mode, mailbox present, no fps cap) and adds the layer folder to
+  `VK_LAYER_PATH`. With the option off the manifest is removed so the Vulkan
+  loader cannot find a stale layer. bionic prefixes only.
+
 ## 6. Input
 
 One Wayland seat (`:input-seat`), fed from every physical source: touch,
@@ -12773,9 +12809,7 @@ Gone with it: GameNative's UI, Hilt (`DroidtopApplication` is a plain
 Application), Room's `PluviaDatabase` (`:stores` imported it), the unused
 `SteamService`, PostHog, Play feature delivery, power control (nothing
 droidtop runs started it), `BestConfigService`'s api.gamenative.app lookups,
-`GameCompatibilityCache`, and LSFG frame generation (it needs Lossless
-Scaling's DLL from a Steam install only GameNative's Steam knew; droidtop
-never offered it).
+`GameCompatibilityCache` (LSFG frame generation came back, section 5c).
 
 **The runtime's native code and prebuilt binaries.** The x86_64 libraries are
 built by `runtime-windows/native` from GameNative's native sources, copied
@@ -12789,7 +12823,7 @@ PulseAudio modules, the JSON lists): **re-hosted, not committed and not
 rebuilt.** `.github/workflows/windows-runtime-prebuilt.yml` packs them
 unmodified from the fork at a pinned commit
 (`build-scripts/windows-runtime-prebuilt.sh` says what is left out: the
-on-demand dxwrapper payloads, Steam-only files, LSFG, the Quest OpenXR
+on-demand dxwrapper payloads, Steam-only files, the old LSFG layer (section 5c), the Quest OpenXR
 loader, SteamBootstrap, libpatchelf) and publishes them as a prerelease of
 this repository, the `build-toolchains` precedent; the build fetches that
 release by `runtime-windows/prebuilt.pin` (tag and SHA-256) into

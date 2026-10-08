@@ -205,6 +205,14 @@ interface StoreLibrary {
     suspend fun games(context: Context): List<StoreGame>
 
     /**
+     * Where [gameId] is installed, or null when it is not. Reads the whole
+     * library unless the store has a cheaper answer, so a caller asking for
+     * one game on a launch path wants a store that overrides this.
+     */
+    suspend fun installedPath(context: Context, gameId: String): String? =
+        games(context).firstOrNull { it.gameId == gameId && it.installed }?.installPath
+
+    /**
      * Downloads and installs [gameId] (or updates it in place, when it is
      * installed) under [root], the folder the person picked for this store,
      * reporting through [progress]. Returns the one line the Downloads

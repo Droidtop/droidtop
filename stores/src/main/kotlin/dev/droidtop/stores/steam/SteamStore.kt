@@ -116,6 +116,11 @@ class SteamStore : StoreLibrary {
         }
     }
 
+    override suspend fun installedPath(context: Context, gameId: String): String? = withContext(Dispatchers.IO) {
+        val install = gameId.toIntOrNull()?.let { db(context).installs().find(it) }
+        install?.takeIf { it.isDownloaded && it.installPath.isNotBlank() }?.installPath
+    }
+
     /** The size of the base game's files in [language], from product info alone (no disk). */
     private fun baseSize(app: SteamApp, language: String): Long {
         val base = app.depots.filterValues { it.dlcAppId == SteamIds.INVALID_APP_ID }

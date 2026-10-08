@@ -31,7 +31,7 @@ import timber.log.Timber
  * and its Steam DLL markers are not carried.
  */
 object ContainerUtils {
-    /** GameNative's LsfgVkManager.EXTRA_ARMED: kept so a prefix's own value survives a save. */
+    /** LsfgVkManager.EXTRA_ARMED: kept so a prefix's own value survives a save. */
     private const val LSFG_ENABLED_EXTRA = "lsfgEnabled"
 
     data class GpuInfo(
@@ -296,7 +296,7 @@ object ContainerUtils {
             sharpnessLevel = container.getExtra("sharpnessLevel", "100").toIntOrNull() ?: 100,
             sharpnessDenoise = container.getExtra("sharpnessDenoise", "100").toIntOrNull() ?: 100,
             // LSFG Vulkan frame generation
-            lsfgEnabled = container.getExtra(LSFG_ENABLED_EXTRA, "false").toBoolean(),
+            lsfgEnabled = container.getOwnExtra(LSFG_ENABLED_EXTRA, "false").toBoolean(),
         )
     }
 

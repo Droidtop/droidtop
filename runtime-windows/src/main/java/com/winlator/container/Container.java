@@ -257,7 +257,8 @@ public class Container {
      * container's own values, so nothing set here outlives the launch.
      */
     public static final java.util.List<String> LAUNCH_OVERRIDE_KEYS = java.util.Arrays.asList(
-        "graphicsDriver", "graphicsDriverConfig", "dxwrapper", "dxwrapperConfig", "emulator", "box64Version", "fexcoreVersion");
+        "graphicsDriver", "graphicsDriverConfig", "dxwrapper", "dxwrapperConfig", "emulator", "box64Version", "fexcoreVersion",
+        "lsfgEnabled", "lsfgMultiplier");
     private final java.util.Map<String, String> launchOverrides = new java.util.HashMap<>();
 
     public void setLaunchOverrides(java.util.Map<String, String> overrides) {
@@ -596,6 +597,14 @@ public class Container {
     }
 
     public String getExtra(String name, String fallback) {
+        // droidtop: the LSFG extras are launch-time overridable (frame
+        // generation is a per-game choice over the shared prefix).
+        String override = launchOverrides.get(name);
+        return override != null ? override : getOwnExtra(name, fallback);
+    }
+
+    /** The container's own extra, whatever a launch override says: what a save writes back. */
+    public String getOwnExtra(String name, String fallback) {
         try {
             return extraData != null && extraData.has(name) ? extraData.getString(name) : fallback;
         }
