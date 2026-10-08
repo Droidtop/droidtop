@@ -233,7 +233,7 @@ class SteamStoreTest {
         assertFalse(SteamLibrarySync.isLibraryGame(app(AppType.music), keepInstalledKinds = true))
     }
 
-    private fun licence(packageId: Int, owner: Int, apps: List<Int>, vararg flags: ELicenseFlags) = SteamLicense(
+    private fun licence(packageId: Int, owner: Int, apps: List<Int>, billing: Int = 10, vararg flags: ELicenseFlags) = SteamLicense(
         packageId = packageId,
         lastChangeNumber = 1,
         licenseFlags = if (flags.isEmpty()) EnumSet.noneOf(ELicenseFlags::class.java) else EnumSet.copyOf(flags.toList()),
@@ -241,44 +241,45 @@ class SteamStoreTest {
         accessToken = 0L,
         ownerAccountId = listOf(owner),
         appIds = apps,
+        billingType = billing,
     )
 
-    // The account is 7; 9 is a family member who lends games.
+    // The account is 7; 9 is a family member who lends games. Billing 10 is BillOnceOrCDKey, 1 BillOnceOnly, 12 FreeOnDemand.
     private val licences = listOf(
-        licence(SteamOwnership.FREE_SUB, 7, listOf(100, 101, 102)),
+        licence(SteamOwnership.FREE_SUB, 7, listOf(100, 101, 102), billing = 0),
         licence(10, 7, listOf(1, 2)),
-        licence(11, 9, listOf(2, 3)),
-        licence(12, 7, listOf(4), ELicenseFlags.Expired),
-        licence(13, 7, listOf(5), ELicenseFlags.CancelledByUser),
-        licence(14, 7, listOf(60)),
+        licence(11, 9, listOf(2, 3), billing = 1),
+        licence(12, 7, listOf(4), 10, ELicenseFlags.Expired),
+        licence(13, 7, listOf(5), 10, ELicenseFlags.CancelledByUser),
+        licence(14, 7, listOf(60), billing = 1),
+        licence(15, 7, listOf(7, 8, 2), billing = 12),
+        licence(16, 7, listOf(9), billing = -1),
     )
 
     @Test
-    fun `own licences own, a family member's lend, and the free sub and ended licences grant nothing`() {
+    fun `paid licences own, free ones once played, a family member's lend, the free sub and ended licences nothing`() {
         val ownership = SteamOwnership.of(licences, accountId = 7)
-        assertEquals(setOf(1, 2, 60), ownership.own)
-        // A game both own and lent is the account's own.
+        // A package whose billing type is not read yet counts as paid.
+        assertEquals(setOf(1, 2, 60, 9), ownership.paid)
+        // A game both paid for and free is paid for; both own and lent is own.
+        assertEquals(setOf(7, 8), ownership.free)
         assertEquals(setOf(3), ownership.family)
         assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(1))
+        assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(7, played = true))
+        assertEquals(SteamOwnership.Status.FREE, ownership.statusOf(8))
         assertEquals(SteamOwnership.Status.FAMILY, ownership.statusOf(3))
         for (app in listOf(4, 5, 100, 101)) assertEquals("$app", SteamOwnership.Status.NONE, ownership.statusOf(app))
         // A free-to-start game is owned through its DLC.
         assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(6, dlc = listOf(60)))
         // With no account id known, every live licence is the account's own.
-        assertEquals(setOf(1, 2, 3, 60), SteamOwnership.of(licences, accountId = null).own)
+        assertEquals(setOf(1, 2, 3, 60, 9), SteamOwnership.of(licences, accountId = null).paid)
     }
 
     @Test
-    fun `a sync summary counts licences, the free sub, and apps by whose licence grants them`() {
-        val kinds = listOf(
-            SteamAppKind(1, AppType.game.code, SteamIds.INVALID_APP_ID),
-            SteamAppKind(2, AppType.game.code, SteamIds.INVALID_APP_ID),
-            SteamAppKind(3, AppType.game.code, SteamIds.INVALID_APP_ID),
-            SteamAppKind(4, AppType.game.code, SteamIds.INVALID_APP_ID),
+    fun `a sync summary counts licences by billing type, apps by whose licence grants them, and played free games`() {
+        val kinds = listOf(1, 2, 3, 4, 6, 7, 8, 9, 100).map { SteamAppKind(it, AppType.game.code, SteamIds.INVALID_APP_ID) } + listOf(
             SteamAppKind(5, AppType.dlc.code, 1),
             SteamAppKind(60, AppType.dlc.code, 6),
-            SteamAppKind(6, AppType.game.code, SteamIds.INVALID_APP_ID),
-            SteamAppKind(100, AppType.game.code, SteamIds.INVALID_APP_ID),
             SteamAppKind(101, AppType.demo.code, SteamIds.INVALID_APP_ID),
             SteamAppKind(102, AppType.invalid.code, SteamIds.INVALID_APP_ID),
         )
@@ -286,16 +287,18 @@ class SteamStoreTest {
             licences = emptyList(),
             stored = licences,
             accountId = 7,
-            billing = mapOf(12 to 2, 1 to 4),
             kinds = kinds,
             ownership = SteamOwnership.of(licences, accountId = 7),
+            played = setOf(7),
+            playtimeRead = true,
         )
         assertEquals(
             "steam sync: 0 licences (payment: none; flags: CancelledByUser 1, Expired 1; another account's 1; " +
-                "free sub held, 3 apps); packages by billing type: 1 4, 12 2; " +
-                "own apps by type: game 2, dlc 1; family apps by type: game 1; " +
+                "free sub held, 3 apps); own live licences by billing type: -1: 1 packages, 1 games, 0 dlc, " +
+                "1: 1 packages, 0 games, 1 dlc, 10: 1 packages, 2 games, 0 dlc, 12: 1 packages, 3 games, 0 dlc; " +
+                "paid apps by type: game 3, dlc 1; free apps by type: game 2; family apps by type: game 1; " +
                 "only in the free sub or ended licences: game 2, demo 1, dlc 1, no product info 1; " +
-                "library games: own 3, family 1",
+                "free games played or installed 1 of 2; library games: own 5, free not played 1, family 1",
             line,
         )
     }

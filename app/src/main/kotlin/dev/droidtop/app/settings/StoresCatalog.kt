@@ -15,6 +15,7 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.library.stores.StoreHolding
 import dev.droidtop.library.stores.StoreChanges
 import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.library.stores.StoreLibrary
@@ -116,19 +117,25 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
 }
 
 /** One store's games as the library has them. */
-internal data class StoreCounts(val total: Int, val installed: Int, val family: Int = 0)
+internal data class StoreCounts(val total: Int, val installed: Int, val family: Int = 0, val free: Int = 0)
 
-/** The account's own games of [source]; another account's (a Steam Family's) are counted apart. */
+/** The account's own games of [source]; a family's and unplayed free ones are counted apart. */
 internal fun storeCounts(games: List<PcLibrary.Game>, source: PcLibrary.Source): StoreCounts {
     val all = games.filter { it.source == source }
-    val mine = all.filterNot { it.familyShared }
-    return StoreCounts(mine.size, mine.count { it.installed }, all.size - mine.size)
+    val mine = all.filter { it.holding == StoreHolding.OWNED }
+    return StoreCounts(
+        mine.size,
+        mine.count { it.installed },
+        all.count { it.holding == StoreHolding.FAMILY },
+        all.count { it.holding == StoreHolding.FREE },
+    )
 }
 
 /** The library row's value: what is known, in words ("12 games, 3 installed"). */
 internal fun countsLine(counts: StoreCounts, signedIn: Boolean): String = when {
     counts.total > 0 -> "${counts.total} ${if (counts.total == 1) "game" else "games"}, ${counts.installed} installed" +
-        if (counts.family > 0) ", ${counts.family} more from your family" else ""
+        (if (counts.family > 0) ", ${counts.family} more from your family" else "") +
+        (if (counts.free > 0) ", ${counts.free} free games not played" else "")
     signedIn -> "No games read from this store yet"
     else -> "Sign in to read this store's library"
 }

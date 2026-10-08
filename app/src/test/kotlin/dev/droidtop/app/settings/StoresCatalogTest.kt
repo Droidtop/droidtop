@@ -35,6 +35,10 @@ class StoresCatalogTest {
     @Test
     fun `the library line is honest about an empty or signed out store`() {
         assertEquals("3 games, 1 installed", countsLine(StoreCounts(3, 1), signedIn = true))
+        assertEquals(
+            "3 games, 1 installed, 2 more from your family, 5 free games not played",
+            countsLine(StoreCounts(3, 1, family = 2, free = 5), signedIn = true),
+        )
         assertEquals("1 game, 0 installed", countsLine(StoreCounts(1, 0), signedIn = true))
         assertEquals("No games read from this store yet", countsLine(StoreCounts(0, 0), signedIn = true))
         assertEquals("Sign in to read this store's library", countsLine(StoreCounts(0, 0), signedIn = false))

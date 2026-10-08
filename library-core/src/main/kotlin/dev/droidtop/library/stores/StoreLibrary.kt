@@ -41,14 +41,28 @@ data class StoreGame(
      * today.
      */
     val externalIds: Map<String, String> = emptyMap(),
-    /**
-     * Playable through another account's licence (Steam Families), not owned:
-     * listed apart, as the store's family ([PcStoreNames.family]).
-     */
-    val familyShared: Boolean = false,
+    /** How the account holds the game; anything but [StoreHolding.OWNED] is listed apart. */
+    val holding: StoreHolding = StoreHolding.OWNED,
 ) {
     /** The id the library knows this row by: `"gog:1207658691"`. */
     val key: String get() = "$store:$gameId"
+}
+
+/**
+ * How an account holds a store's game (docs/SPEC.md 7g, "Stores"). Only
+ * [OWNED] games count as the person's library; the others are listed apart,
+ * each under its own name ([PcStoreNames.groupOf]), the way Steam keeps a
+ * family's games and unplayed free games out of a profile's count.
+ */
+enum class StoreHolding {
+    /** Bought, keyed or gifted, or free and played or installed. */
+    OWNED,
+
+    /** Free, added to the account, never played and not installed. */
+    FREE,
+
+    /** Another account's, lent (Steam Families). */
+    FAMILY,
 }
 
 /**

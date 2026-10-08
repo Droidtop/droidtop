@@ -314,8 +314,16 @@ object PcStoreNames {
     /** The catalog item id prefix of a store page's "Open library" row; the label follows. */
     const val LIBRARY_ITEM_PREFIX = "store_library:"
 
-    /** Where the games another account lends through [store] are listed: "Steam Family". */
-    fun family(store: String): String = "$store Family"
+    /**
+     * Where a store's games held as [holding] are listed: the store's own name
+     * for its owned games, "Steam Family" for another account's, "Steam Free"
+     * for free games never played.
+     */
+    fun groupOf(store: String, holding: dev.droidtop.library.stores.StoreHolding): String = when (holding) {
+        dev.droidtop.library.stores.StoreHolding.OWNED -> store
+        dev.droidtop.library.stores.StoreHolding.FAMILY -> "$store Family"
+        dev.droidtop.library.stores.StoreHolding.FREE -> "$store Free"
+    }
 }
 
 /**

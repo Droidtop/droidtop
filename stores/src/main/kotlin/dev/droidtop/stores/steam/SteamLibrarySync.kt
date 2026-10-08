@@ -3,6 +3,7 @@ package dev.droidtop.stores.steam
 import android.content.Context
 import androidx.room.withTransaction
 import dev.droidtop.library.ScanLog
+import `in`.dragonbra.javasteam.steam.steamclient.SteamClient
 import `in`.dragonbra.javasteam.enums.ELicenseFlags
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.License
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.PICSRequest
@@ -49,25 +50,35 @@ internal object SteamLibrarySync {
     }
 
     /** Reads the account's library; logged on already. Returns how many games it holds. */
-    suspend fun run(context: Context, apps: SteamApps, licences: List<License>): Int {
+    suspend fun run(context: Context, steam: SteamClient, apps: SteamApps, licences: List<License>): Int {
         val db = SteamDatabase.get(context)
         val accountId = SteamSession.accountId
         storeLicences(db, licences, accountId)
-        val billing = HashMap<Int, Int>()
-        val appIds = readPackages(db, apps, billing)
+        val appIds = readPackages(db, apps)
         readApps(db, apps, appIds)
+        // What the account has played, for its free games (SteamOwnership); the last answer stands when Steam gives none.
+        val steamId64 = SteamCredentials.load(context)?.steamId64?.takeIf { it != 0L }
+        val playedNow = steamId64?.let { id ->
+            runCatching { SteamPlaytime.read(steam, id) }.onFailure { Timber.tag(TAG).w(it, "Steam gave no playtimes") }.getOrNull()
+        }
+        playedNow?.let { SteamPlaytime.save(context, it) }
+        val played = playedNow ?: SteamPlaytime.load(context)
+        val installed = db.installs().all().filter { it.isDownloaded }.mapTo(HashSet()) { it.id }
         val stored = db.licenses().all()
         val ownership = SteamOwnership.of(stored, accountId)
         val kinds = db.apps().kinds()
         val dlcByBase = kinds.filter { it.base != SteamIds.INVALID_APP_ID }.groupBy({ it.base }, { it.id })
-        val ownGames = db.apps().owned(PLAYABLE_TYPES).count { ownership.statusOf(it.id, dlcByBase[it.id].orEmpty()) == SteamOwnership.Status.OWN }
+        val ownGames = db.apps().owned(PLAYABLE_TYPES).count {
+            ownership.statusOf(it.id, dlcByBase[it.id].orEmpty(), played = it.id in played || it.id in installed) == SteamOwnership.Status.OWN
+        }
         val line = summary(
             licences = licences,
             stored = stored,
             accountId = accountId,
-            billing = billing,
             kinds = kinds,
             ownership = ownership,
+            played = played + installed,
+            playtimeRead = playedNow != null,
         )
         ScanLog.write(line)
         Timber.tag(TAG).i(line)
@@ -78,19 +89,22 @@ internal object SteamLibrarySync {
      * One line per sync for scan.log (Droidtop/tracker#360, #377), to set
      * against the counts Steam's own profile shows: the licences by payment
      * method and by flag, how many are another account's (Steam Families),
-     * whether the free sub is held and how many apps it names, the packages
-     * by billing type (Steam's EBillingType number), then the apps by
-     * product-info type that the account's own licences grant, that only a
+     * whether the free sub is held and how many apps it names, the own
+     * packages and the own games and DLC they grant by billing type (Steam's
+     * EBillingType number; a game counts under each type that grants it), the
+     * apps by product-info type that paid licences, free licences and only a
      * family member's grant, and that only the free sub or an ended licence
-     * names, and the library games of each kind ([SteamOwnership]).
+     * names, how many free games were played or are installed, and the
+     * library games of each kind ([SteamOwnership]).
      */
     fun summary(
         licences: List<License>,
         stored: List<SteamLicense>,
         accountId: Int?,
-        billing: Map<Int, Int>,
         kinds: List<SteamAppKind>,
         ownership: SteamOwnership,
+        played: Set<Int>,
+        playtimeRead: Boolean,
     ): String {
         fun Map<String, Int>.words() = entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .joinToString(", ") { "${it.key} ${it.value}" }.ifEmpty { "none" }
@@ -102,17 +116,31 @@ internal object SteamLibrarySync {
         val freeSub = stored.firstOrNull { it.packageId == SteamOwnership.FREE_SUB }
         val named = stored.flatMapTo(HashSet()) { it.appIds }
         val dlcByBase = kinds.filter { it.base != SteamIds.INVALID_APP_ID }.groupBy({ it.base }, { it.id })
-        val ownApps = kinds.filter { it.id in ownership.own }
-        val familyApps = kinds.filter { it.id in ownership.family }
-        val notGranted = kinds.filter { it.id in named && it.id !in ownership.own && it.id !in ownership.family }
+        val typeOf = kinds.associate { it.id to it }
+        val granted = ownership.paid + ownership.free + ownership.family
+        val notGranted = kinds.filter { it.id in named && it.id !in granted }
+        // The own live licences, by billing type: how many packages, and the games and DLC they grant.
+        val ownLive = stored.filter { SteamOwnership.grants(it) && SteamOwnership.isOwn(it, accountId) }
+        val byBilling = ownLive.groupBy { it.billingType }.entries.sortedBy { it.key }.joinToString(", ") { (type, rows) ->
+            val apps = rows.flatMapTo(HashSet()) { it.appIds }.mapNotNull { typeOf[it] }
+            val games = apps.count { it.type == AppType.game.code && it.base == SteamIds.INVALID_APP_ID }
+            val dlc = apps.count { it.type == AppType.dlc.code }
+            "$type: ${rows.size} packages, $games games, $dlc dlc"
+        }.ifEmpty { "none" }
+        val freeGames = kinds.filter { it.id in ownership.free && it.type == AppType.game.code && it.base == SteamIds.INVALID_APP_ID }
         val games = kinds.filter { it.type == AppType.game.code && it.base == SteamIds.INVALID_APP_ID }
-            .groupingBy { ownership.statusOf(it.id, dlcByBase[it.id].orEmpty()) }.eachCount()
+            .groupingBy { ownership.statusOf(it.id, dlcByBase[it.id].orEmpty(), played = it.id in played) }.eachCount()
         return "steam sync: ${licences.size} licences (payment: $payment; flags: $flags; another account's $borrowed; " +
             "free sub ${if (freeSub == null) "not held" else "held, ${freeSub.appIds.size} apps"}); " +
-            "packages by billing type: ${billing.mapKeys { it.key.toString() }.words()}; " +
-            "own apps by type: ${byType(ownApps)}; family apps by type: ${byType(familyApps)}; " +
+            "own live licences by billing type: $byBilling; " +
+            "paid apps by type: ${byType(kinds.filter { it.id in ownership.paid })}; " +
+            "free apps by type: ${byType(kinds.filter { it.id in ownership.free })}; " +
+            "family apps by type: ${byType(kinds.filter { it.id in ownership.family })}; " +
             "only in the free sub or ended licences: ${byType(notGranted)}; " +
-            "library games: own ${games[SteamOwnership.Status.OWN] ?: 0}, family ${games[SteamOwnership.Status.FAMILY] ?: 0}"
+            "free games played or installed ${freeGames.count { it.id in played }} of ${freeGames.size}" +
+            (if (playtimeRead) "" else " (playtimes not read this sync)") + "; " +
+            "library games: own ${games[SteamOwnership.Status.OWN] ?: 0}, free not played ${games[SteamOwnership.Status.FREE] ?: 0}, " +
+            "family ${games[SteamOwnership.Status.FAMILY] ?: 0}"
     }
 
     /** The licences as GameNative kept them: each raw, for the depot downloader, and one row per package. */
@@ -137,6 +165,7 @@ internal object SteamLibrarySync {
                     // What the package grants is read below; until then the last read stands.
                     appIds = known?.appIds.orEmpty(),
                     depotIds = known?.depotIds.orEmpty(),
+                    billingType = known?.billingType ?: -1,
                 )
             }
             rows.chunked(500).forEach { db.licenses().insertAll(it) }
@@ -151,7 +180,7 @@ internal object SteamLibrarySync {
      * not expired wins (GameNative's package ranking). Returns every app id
      * the packages name.
      */
-    private suspend fun readPackages(db: SteamDatabase, apps: SteamApps, billing: MutableMap<Int, Int>): Set<Int> {
+    private suspend fun readPackages(db: SteamDatabase, apps: SteamApps): Set<Int> {
         val accountId = SteamSession.accountId
         val licences = db.licenses().all()
         val byPackage = licences.associateBy { it.packageId }
@@ -167,9 +196,8 @@ internal object SteamLibrarySync {
                 db.withTransaction {
                     for (pkg in result.packages.values.sortedBy { rank(it.id) }) {
                         val appIds = pkg.keyValues["appids"].children.map { it.asInteger() }
-                        billing.merge(pkg.keyValues["billingtype"].asInteger(-1), 1, Int::plus)
                         val depotIds = pkg.keyValues["depotids"].children.map { it.asInteger() }
-                        db.licenses().setContents(pkg.id, appIds, depotIds)
+                        db.licenses().setContents(pkg.id, appIds, depotIds, pkg.keyValues["billingtype"].asInteger(-1))
                         for (appId in appIds) {
                             val existing = db.apps().find(appId)
                             when {

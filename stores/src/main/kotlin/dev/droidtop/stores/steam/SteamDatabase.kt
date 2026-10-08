@@ -97,6 +97,9 @@ data class SteamLicense(
     val ownerAccountId: List<Int>,
     @ColumnInfo("app_ids")
     val appIds: List<Int> = emptyList(),
+    /** The package's EBillingType number from its product info ([SteamOwnership.FREE_BILLING]); -1 until read. */
+    @ColumnInfo("billing_type", defaultValue = "-1")
+    val billingType: Int = -1,
     @ColumnInfo("depot_ids")
     val depotIds: List<Int> = emptyList(),
 )
@@ -241,8 +244,8 @@ interface SteamLicenseDao {
     @Query("SELECT * FROM steam_license WHERE packageId IN (:packageIds)")
     suspend fun findAll(packageIds: List<Int>): List<SteamLicense>
 
-    @Query("UPDATE steam_license SET app_ids = :appIds, depot_ids = :depotIds WHERE packageId = :packageId")
-    suspend fun setContents(packageId: Int, appIds: List<Int>, depotIds: List<Int>)
+    @Query("UPDATE steam_license SET app_ids = :appIds, depot_ids = :depotIds, billing_type = :billingType WHERE packageId = :packageId")
+    suspend fun setContents(packageId: Int, appIds: List<Int>, depotIds: List<Int>, billingType: Int)
 
     @Query("DELETE FROM steam_license WHERE packageId NOT IN (:keep)")
     suspend fun deleteAllBut(keep: List<Int>)
@@ -280,7 +283,7 @@ interface AppInfoDao {
 
 @Database(
     entities = [SteamApp::class, SteamLicense::class, CachedLicense::class, AppInfo::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(SteamConverters::class)
@@ -321,13 +324,20 @@ abstract class SteamDatabase : RoomDatabase() {
             }
         }
 
+        /** Version 3: each licence's billing type, read on the next sync (Droidtop/tracker#377). */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE steam_license ADD COLUMN billing_type INTEGER NOT NULL DEFAULT -1")
+            }
+        }
+
         @Volatile
         private var instance: SteamDatabase? = null
 
         fun get(context: Context): SteamDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(context.applicationContext, SteamDatabase::class.java, NAME)
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .addCallback(
                         object : RoomDatabase.Callback() {
                             override fun onCreate(db: SupportSQLiteDatabase) {

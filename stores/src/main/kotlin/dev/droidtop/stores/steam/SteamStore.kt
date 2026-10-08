@@ -11,6 +11,7 @@ import dev.droidtop.library.stores.SaveSyncResult
 import dev.droidtop.library.stores.StoreContentChoice
 import dev.droidtop.library.stores.StoreContentOptions
 import dev.droidtop.library.stores.StoreGame
+import dev.droidtop.library.stores.StoreHolding
 import dev.droidtop.library.stores.StoreLaunch
 import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StorePlayer
@@ -91,10 +92,10 @@ class SteamStore : StoreLibrary {
 
     override suspend fun sync(context: Context): Result<Int> = withContext(Dispatchers.IO) {
         runCatching {
-            SteamSession.use(context) {
+            SteamSession.use(context) { steam ->
                 SteamSession.logOn(context).getOrThrow()
                 val apps = SteamSession.apps ?: error("Steam is not connected")
-                SteamLibrarySync.run(context, apps, SteamSession.licences())
+                SteamLibrarySync.run(context, steam, apps, SteamSession.licences())
             }
         }
     }
@@ -102,15 +103,17 @@ class SteamStore : StoreLibrary {
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
         val db = db(context)
         val installs = db.installs().all().filter { it.isDownloaded && it.installPath.isNotBlank() }.associateBy { it.id }
-        // Whose licence grants each game (SteamOwnership): the account's own, a
-        // family member's (listed, marked), or only the free sub or an ended
-        // licence (not listed).
+        // Whose licence grants each game (SteamOwnership): the account's own
+        // (paid, or free and played or installed), free and unplayed (listed
+        // apart), a family member's (listed apart), or only the free sub or an
+        // ended licence (not listed).
         val accountId = SteamCredentials.load(context)?.steamId64?.takeIf { it != 0L }?.let { (it and 0xFFFFFFFFL).toInt() }
         val ownership = SteamOwnership.of(db.licenses().all(), accountId)
         val dlcByBase = db.apps().dlcKinds().groupBy({ it.base }, { it.id })
+        val played = SteamPlaytime.load(context)
         val status = HashMap<Int, SteamOwnership.Status>()
         val owned = db.apps().owned(SteamLibrarySync.PLAYABLE_TYPES).filter { app ->
-            val standing = ownership.statusOf(app.id, dlcByBase[app.id].orEmpty())
+            val standing = ownership.statusOf(app.id, dlcByBase[app.id].orEmpty(), played = app.id in played || app.id in installs)
             status[app.id] = standing
             standing != SteamOwnership.Status.NONE
         }
@@ -131,7 +134,11 @@ class SteamStore : StoreLibrary {
                 installPath = install?.installPath,
                 sizeBytes = baseSize(app, language),
                 artUrl = app.coverUrl,
-                familyShared = status[app.id] == SteamOwnership.Status.FAMILY,
+                holding = when (status[app.id]) {
+                    SteamOwnership.Status.FAMILY -> StoreHolding.FAMILY
+                    SteamOwnership.Status.FREE -> StoreHolding.FREE
+                    else -> StoreHolding.OWNED
+                },
             )
         }
     }
@@ -404,7 +411,7 @@ class SteamStore : StoreLibrary {
     }
 
     override fun changeStamp(context: Context): Long =
-        StoreFiles.stamp(SteamDatabase.files(context) + SteamCredentials.file(context))
+        StoreFiles.stamp(SteamDatabase.files(context) + SteamCredentials.file(context) + SteamPlaytime.file(context))
 
     private suspend fun installOf(context: Context, gameId: String): Pair<AppInfo, File> {
         val appId = gameId.toIntOrNull() ?: error("$gameId is not a Steam app id")

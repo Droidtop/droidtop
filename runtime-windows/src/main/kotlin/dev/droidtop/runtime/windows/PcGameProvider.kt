@@ -29,7 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Raise it when a store's rule for what is a library entry changes; see [PcGameProvider.storeStamp]. */
-private const val STORE_LIST_RULES = 4L
+private const val STORE_LIST_RULES = 5L
 
 /**
  * Real "PC" games -- ES-DE's own `"pc"` system id (per direction: "PC", not
