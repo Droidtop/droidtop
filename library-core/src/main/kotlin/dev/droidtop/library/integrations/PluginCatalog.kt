@@ -11,6 +11,7 @@ import dev.droidtop.pluginhost.PluginInstallResult
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginOriginKeys
+import dev.droidtop.pluginhost.PluginRevocations
 import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.runtime.util.Versions
@@ -38,6 +39,9 @@ import kotlinx.coroutines.withContext
 object PluginCatalog {
     /** Relative to the platform-database base URL (SPEC 12a "The index"). */
     const val INDEX_RELATIVE_PATH = "droidtop-plugins/index.json"
+
+    /** The master-signed revocation list, beside the index (SPEC 12a "Revocation"). */
+    const val REVOCATIONS_RELATIVE_PATH = "droidtop-plugins/revocations.json"
 
     /** The only stream droidtop offers (SPEC 12a "What the catalog offers"). */
     const val STREAM_STABLE = "stable"
@@ -116,16 +120,17 @@ object PluginCatalog {
 
     /**
      * Whether this build of droidtop will accept bundles for [origin]:
-     * it pins a key for the origin AND the index's key document for it
-     * names that same key (SPEC 12a "The index": "the key block is
-     * cross-checked, not trusted"). A tampered index cannot rebind a
-     * pinned origin to a new key, and an origin this build does not pin
-     * is not installable no matter what the index says.
+     * it is the official origin AND the index's key document for it
+     * names one of the keys this build pins for it -- the legacy origin
+     * key or the plugin master (SPEC 12a "The index": "the key block is
+     * cross-checked, not trusted"). A tampered index cannot rebind the
+     * origin to a new key, and an origin this build does not pin is not
+     * installable no matter what the index says.
      */
     fun originOffered(origin: String, indexKeySha256: String?): Boolean {
-        val pin = PluginOriginKeys.keyFingerprintFor(origin) ?: return false
-        val declared = indexKeySha256?.uppercase() ?: return false
-        return pin.equals(declared, ignoreCase = true)
+        if (!PluginOriginKeys.isOfficial(origin)) return false
+        val declared = indexKeySha256?.lowercase() ?: return false
+        return declared in PluginOriginKeys.officialAnchorFingerprints()
     }
 
     /**
@@ -290,6 +295,21 @@ object PluginCatalog {
         val dir = cacheFile(context).parentFile
         dir?.mkdirs()
         PlatformDatabaseTransport.write(cacheFile(context), text)
+        refreshRevocations(context)
         return parsed
+    }
+
+    /**
+     * The plugin master's revocation list, published beside the index
+     * (SPEC 12a "Revocation") and fetched with it. [PluginRevocations.accept]
+     * keeps it only when the master signed it and its sequence is newer than
+     * the one on file; a missing, unreadable or unsigned list changes
+     * nothing, and never fails the catalog fetch it rides along with.
+     */
+    private fun refreshRevocations(context: Context) {
+        val text = runCatching {
+            PlatformDatabaseTransport.getOrNull(PlatformDatabaseSource.urlFor(context, REVOCATIONS_RELATIVE_PATH), GitHubTokenStore.get(context))
+        }.getOrNull() ?: return
+        PluginRevocations.accept(PluginStore.root(context), text)
     }
 }

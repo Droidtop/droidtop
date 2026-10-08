@@ -36,13 +36,19 @@ sealed interface PluginInstallResult {
  *
  *   manifest.json     the [PluginManifest], UTF-8
  *   manifest.sig      base64 ECDSA-P256/SHA-256 signature over manifest.json's raw bytes
+ *   origin.cert       optional: the plugin master's certificate for the signing key ([PluginCertificates])
  *   <payload files>   exactly the paths [PluginManifest.payload] declares, nothing more, nothing fewer
  */
 object PluginBundleInstaller {
     private const val MAX_MANIFEST_BYTES = 64 * 1024
     private const val MAX_ENTRY_BYTES = 64L * 1024 * 1024
 
-    fun install(bundleFile: File, pluginsRoot: File, userKeys: Map<String, String> = emptyMap()): PluginInstallResult {
+    fun install(
+        bundleFile: File,
+        pluginsRoot: File,
+        userKeys: Map<String, String> = emptyMap(),
+        nowEpochSeconds: Long = System.currentTimeMillis() / 1000,
+    ): PluginInstallResult {
         val entries = linkedMapOf<String, ByteArray>()
         try {
             TarArchiveInputStream(XZCompressorInputStream(bundleFile.inputStream().buffered())).use { tar ->
@@ -85,9 +91,19 @@ object PluginBundleInstaller {
         }
 
         // Checklist point 3: signature and schema before anything else touches disk as "the plugin".
-        if (!BundleSignature.verifyManifest(manifestBytes, signatureBase64, manifest.origin, userKeys)) {
-            return PluginInstallResult.Refused(PluginInstallError("signature doesn't verify against a trusted key for origin \"${manifest.origin}\""))
+        val certificateText = entries[PluginCertificates.FILE_NAME]?.toString(Charsets.UTF_8)
+        val verdict = BundleSignature.verifyBundle(
+            manifestBytes, signatureBase64, manifest.origin, manifest.id, certificateText,
+            userKeys, PluginRevocations.load(pluginsRoot), nowEpochSeconds,
+        )
+        // The fingerprint approval binds to: the master's for a certified
+        // bundle, the legacy official key's, or the user-trusted key's
+        // ([BundleVerdict.Verified.anchorSha256]).
+        val verified = when (verdict) {
+            is BundleVerdict.Refused -> return PluginInstallResult.Refused(PluginInstallError(verdict.reason))
+            is BundleVerdict.Verified -> verdict
         }
+        val keyFingerprint = verified.anchorSha256
 
         // Checklist point 2: never shadow a built-in id or one another origin already installed under.
         val existingRoot = File(pluginsRoot, manifest.id)
@@ -101,7 +117,7 @@ object PluginBundleInstaller {
 
         // Checklist point 1: every declared payload file present with a matching hash, and no extra files smuggled in unaccounted for.
         val declaredPaths = manifest.payload.map { it.path }.toSet()
-        val extraFiles = entries.keys - declaredPaths - setOf("manifest.json", "manifest.sig")
+        val extraFiles = entries.keys - declaredPaths - setOf("manifest.json", "manifest.sig", PluginCertificates.FILE_NAME)
         if (extraFiles.isNotEmpty()) {
             return PluginInstallResult.Refused(PluginInstallError("bundle contains files not declared in the manifest: ${extraFiles.joinToString()}"))
         }
@@ -118,6 +134,8 @@ object PluginBundleInstaller {
         if (!existingRoot.isDirectory) existingRoot.mkdirs() else existingRoot.listFiles()?.forEach { it.deleteRecursively() }
         File(existingRoot, "manifest.json").writeBytes(manifestBytes)
         File(existingRoot, "manifest.sig").writeText(signatureBase64)
+        // Kept beside the manifest so every re-verification checks the same chain the install did.
+        if (verified.certificate != null && certificateText != null) File(existingRoot, PluginCertificates.FILE_NAME).writeText(certificateText)
         for (file in manifest.payload) {
             val target = File(existingRoot, file.path)
             target.parentFile?.mkdirs()
@@ -137,29 +155,23 @@ object PluginBundleInstaller {
         }
 
         val digest = Sha256.hex(manifestBytes)
-        // The key this bundle verified against is the origin's pinned key,
-        // or the user-trusted key for a third-party origin (the signature
-        // check above refused the install otherwise), so its fingerprint
-        // is exactly what "signed by the same key" means for the
-        // carry-over rule below. A user-trusted origin used to get an empty
-        // fingerprint here, so its updates never kept their approval.
-        val keyFingerprint = PluginOriginKeys.keyFingerprintFor(manifest.origin, userKeys).orEmpty()
-        // Approval carries over to an update signed by the SAME key the
-        // plugin was approved under (docs/SPEC.md 12a, "Trust over
-        // updates"): a re-install of the exact same bytes keeps whatever
-        // state it had, and a different digest keeps APPROVED -- with its
-        // enabled and root-approved bits -- when it verifies against that
-        // same pinned key. Everything else starts PENDING: a first
-        // install, an update of a plugin that was only ever PENDING, an
-        // update signed by a different key (a rotation is a new trust
-        // decision), and any update of a DENIED plugin (the user said no;
-        // it re-enters at PENDING).
+        // Approval carries over to an update verified under the SAME trust
+        // anchor the plugin was approved under (docs/SPEC.md 12a, "Trust
+        // over updates"): a re-install of the exact same bytes keeps
+        // whatever state it had, and a different digest keeps APPROVED --
+        // with its enabled and root-approved bits -- when it verifies under
+        // that same anchor: the same user-trusted key, or for the official
+        // origin droidtop's own anchors (the legacy key or the plugin
+        // master, [PluginOriginKeys.sameTrustAnchor]). Everything else
+        // starts PENDING: a first install, an update of a plugin that was
+        // only ever PENDING, an update signed by a different user key (a
+        // rotation is a new trust decision), and any update of a DENIED
+        // plugin (the user said no; it re-enters at PENDING).
         val sameBytes = existingState?.archiveDigest == digest
         val carriedOver = sameBytes || (
             existingState?.trust == PluginTrustState.APPROVED &&
                 existingState.manifest.origin == manifest.origin &&
-                existingState.approvedKeySha256.isNotEmpty() &&
-                existingState.approvedKeySha256 == keyFingerprint
+                PluginOriginKeys.sameTrustAnchor(existingState.approvedKeySha256, keyFingerprint)
             )
         val record = PluginRecord(
             manifest = manifest,
@@ -189,7 +201,9 @@ object PluginBundleInstaller {
      * happened -- fails this and [PluginStore] refuses to run it; so
      * does a plugin whose origin's user-trusted key was removed from
      * "Keys you trust", since [userKeys] is the same store
-     * [install] verified against.
+     * [install] verified against, and an official plugin whose
+     * certificate or key the master's revocation list has since withdrawn.
+     * A certificate that merely expired does not stop an installed plugin.
      */
     fun verifyInstalled(pluginsRoot: File, record: PluginRecord, userKeys: Map<String, String> = emptyMap()): PluginInstallError? {
         val dir = File(pluginsRoot, record.manifest.id)
@@ -200,8 +214,14 @@ object PluginBundleInstaller {
         if (Sha256.hex(manifestBytes) != record.archiveDigest) {
             return PluginInstallError("manifest.json changed on disk since approval")
         }
-        if (!BundleSignature.verifyManifest(manifestBytes, sigFile.readText(), record.manifest.origin, userKeys)) {
-            return PluginInstallError("signature no longer verifies")
+        val certificateFile = File(dir, PluginCertificates.FILE_NAME)
+        val certificateText = if (certificateFile.isFile) certificateFile.readText() else null
+        val verdict = BundleSignature.verifyBundle(
+            manifestBytes, sigFile.readText(), record.manifest.origin, record.manifest.id, certificateText,
+            userKeys, PluginRevocations.load(pluginsRoot),
+        )
+        if (verdict is BundleVerdict.Refused) {
+            return PluginInstallError("signature no longer verifies: ${verdict.reason}")
         }
         for (file in record.manifest.payload) {
             val target = File(dir, file.path)

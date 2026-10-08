@@ -28,6 +28,10 @@ class BundleSignatureTest {
             }.sign(),
         )
 
+    /** The manifest signature through the one bundle-trust decision, with no certificate. */
+    private fun verifies(data: ByteArray, signatureBase64: String, origin: String, userKeys: Map<String, String> = emptyMap()): Boolean =
+        BundleSignature.verifyBundle(data, signatureBase64, origin, "$origin.sample", null, userKeys) is BundleVerdict.Verified
+
     @Test
     fun `verifies a real ECDSA P-256 signature against the pinned key`() {
         val pair = generateKeyPair()
@@ -35,7 +39,7 @@ class BundleSignatureTest {
         val publicKeyBase64 = Base64.getEncoder().encodeToString(pair.public.encoded)
 
         PluginOriginKeys.withOrigin("testorigin", publicKeyBase64) {
-            assertTrue(BundleSignature.verifyManifest(data, sign(pair.private, data), "testorigin"))
+            assertTrue(verifies(data, sign(pair.private, data), "testorigin"))
         }
     }
 
@@ -46,13 +50,13 @@ class BundleSignatureTest {
         val data = "hello plugin manifest".toByteArray()
 
         PluginOriginKeys.withOrigin("testorigin", Base64.getEncoder().encodeToString(pair.public.encoded)) {
-            assertFalse(BundleSignature.verifyManifest(data, sign(impostor.private, data), "testorigin"))
+            assertFalse(verifies(data, sign(impostor.private, data), "testorigin"))
         }
     }
 
     @Test
     fun `rejects an unpinned origin outright`() {
-        assertFalse(BundleSignature.verifyManifest("data".toByteArray(), Base64.getEncoder().encodeToString(byteArrayOf(1, 2, 3)), "no-such-origin"))
+        assertFalse(verifies("data".toByteArray(), Base64.getEncoder().encodeToString(byteArrayOf(1, 2, 3)), "no-such-origin"))
     }
 
     @Test
@@ -70,7 +74,7 @@ class BundleSignatureTest {
         // that origin "droidtop" resolves and verifies through exactly
         // the path a shipped official bundle takes.
         PluginOriginKeys.withOrigin(PluginOriginKeys.OFFICIAL_ORIGIN, Base64.getEncoder().encodeToString(pair.public.encoded)) {
-            assertTrue(BundleSignature.verifyManifest(data, sign(pair.private, data), PluginOriginKeys.OFFICIAL_ORIGIN))
+            assertTrue(verifies(data, sign(pair.private, data), PluginOriginKeys.OFFICIAL_ORIGIN))
         }
     }
 
@@ -80,9 +84,9 @@ class BundleSignatureTest {
         val data = "hello plugin manifest".toByteArray()
         val userKeys = mapOf("acme" to Base64.getEncoder().encodeToString(pair.public.encoded))
 
-        assertTrue(BundleSignature.verifyManifest(data, sign(pair.private, data), "acme", userKeys))
+        assertTrue(verifies(data, sign(pair.private, data), "acme", userKeys))
         // Without the user key the origin is unknown -- refused, not downgraded.
-        assertFalse(BundleSignature.verifyManifest(data, sign(pair.private, data), "acme"))
+        assertFalse(verifies(data, sign(pair.private, data), "acme"))
     }
 
     @Test
@@ -97,7 +101,7 @@ class BundleSignatureTest {
         val resolved = PluginOriginKeys.resolve(PluginOriginKeys.OFFICIAL_ORIGIN, userKeys)
         assertArrayEquals(Base64.getDecoder().decode(PluginOriginKeys.officialKeyBase64()), resolved?.encoded)
         // ... so the forged signature does not verify.
-        assertFalse(BundleSignature.verifyManifest(data, sign(attacker.private, data), PluginOriginKeys.OFFICIAL_ORIGIN, userKeys))
+        assertFalse(verifies(data, sign(attacker.private, data), PluginOriginKeys.OFFICIAL_ORIGIN, userKeys))
     }
 
     @Test
@@ -107,10 +111,10 @@ class BundleSignatureTest {
         val store = tmp.newFile("plugin-user-keys.json")
 
         UserOriginKeys.add(store, "acme", Base64.getEncoder().encodeToString(pair.public.encoded), source = "https://example.com/plugins")
-        assertTrue(BundleSignature.verifyManifest(data, sign(pair.private, data), "acme", UserOriginKeys.loadBase64(store)))
+        assertTrue(verifies(data, sign(pair.private, data), "acme", UserOriginKeys.loadBase64(store)))
 
         assertTrue(UserOriginKeys.remove(store, "acme"))
         // The origin is unknown again: refused, exactly like a never-trusted one.
-        assertFalse(BundleSignature.verifyManifest(data, sign(pair.private, data), "acme", UserOriginKeys.loadBase64(store)))
+        assertFalse(verifies(data, sign(pair.private, data), "acme", UserOriginKeys.loadBase64(store)))
     }
 }

@@ -267,7 +267,7 @@ each plugin:
 
 | Stage | What happens | Existing code |
 | --- | --- | --- |
-| **Install** | Picker or catalog download → `PluginBundleInstaller` checks: signature against the origin key, every payload hash, the manifest schema, the namespace, the ABIs, the contract version. **v2 adds:** every `provides`/`permissions`/`exports`/`requires` entry is checked against the host registries, and a `requires` on `priv.*` must be `optional` (§2.7). The record lands PENDING. No plugin code runs before approval, not even to describe itself. | `PluginBundleInstaller`, `PluginStore` |
+| **Install** | Picker or catalog download → `PluginBundleInstaller` checks: signature against the plugin's master-certified key (official) or the origin key (user-trusted), the certificate's plugin id and revocation, every payload hash, the manifest schema, the namespace, the ABIs, the contract version. **v2 adds:** every `provides`/`permissions`/`exports`/`requires` entry is checked against the host registries, and a `requires` on `priv.*` must be `optional` (§2.7). The record lands PENDING. No plugin code runs before approval, not even to describe itself. | `PluginBundleInstaller`, `PluginStore` |
 | **Approve** | The approval screen shows, in plain language: what the plugin adds and where (grouped by mode), what it can access (normal permissions as a short list; each dangerous permission and high-risk extension point as its own line), what it needs from other plugins, and its trust badge (Official / Added by you). Every item is a tick box and **the plugin runs with the ticked subset** (decided 2026-10-01, §4.3 "Approval is a list"). Unticked dangerous permissions stay at `ask` (§4.3). | the approval screen in `AppSettingsCatalogs.pluginsScreen` |
 | **Enable** | An approved plugin is enabled by default. Disabling stops every call to it and hides its contributions everywhere, because `PluginStore.runnableFor` is the only iterator (checklist point 6). | `PluginStore.setEnabled` |
 | **Resolve** | On every install, approve, enable, disable, uninstall or crash, the `requires` graph is recomputed (§2.3). A plugin whose *required* API has no runnable provider is **Waiting**. It is not disabled, and it resumes by itself when a provider appears. | new: `PluginApiResolver` |
@@ -1877,7 +1877,9 @@ The process boundary is **crash containment, not a security sandbox**
 
 **Enforced today:**
 
-- **Install integrity.** Signature, per-origin keys, the trust tiers,
+- **Install integrity.** Signature, per-plugin keys certified by the
+  pinned plugin master (with revocation), per-origin keys for user-trusted
+  origins, the trust tiers,
   every payload hash, re-verification before every activation, id
   namespacing and ABI coverage. Official bundles are signed by CI
   (repo secret `PLUGIN_SIGNING_KEY`, optional `PLUGIN_SIGNING_CERT` packaged as

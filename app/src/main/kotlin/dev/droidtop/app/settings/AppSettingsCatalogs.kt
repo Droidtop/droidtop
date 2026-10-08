@@ -2437,8 +2437,9 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "plugin_keys_official",
                                 title = PluginOriginKeys.OFFICIAL_ORIGIN,
-                                subtitle = "Official: certified inside droidtop itself. Key fingerprint " +
-                                    (UserOriginKeys.fingerprint(PluginOriginKeys.officialKeyBase64()) ?: "unavailable"),
+                                subtitle = "Official: certified inside droidtop itself. Plugin master key " +
+                                    (PluginOriginKeys.masterKeyBase64()?.let(UserOriginKeys::fingerprint) ?: "not pinned in this build") +
+                                    "; legacy key " + (UserOriginKeys.fingerprint(PluginOriginKeys.officialKeyBase64()) ?: "unavailable"),
                                 run = {},
                             ),
                         )

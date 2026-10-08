@@ -14090,9 +14090,10 @@ path FETCHES the key from the source the user adds; manual paste/file is
 the secondary path for sources that publish no key.
 
 - **Three tiers, one resolution order.** An origin is OFFICIAL
-  ("droidtop" — the one pinned entry in `PluginOriginKeys`, certified
-  exactly as before: pinned in the app binary; the §8 production-root
-  follow-up note stands), USER-TRUSTED (an origin the user chose to
+  ("droidtop": its bundles verify through the plugin master's
+  certificates, or during the transition the legacy origin key, both
+  pinned in the app binary; "Per-plugin keys and the plugin master"
+  below), USER-TRUSTED (an origin the user chose to
   trust, stored in droidtop's own private storage, never in the pinned
   set), or unknown (refused outright, as always). `PluginOriginKeys.
   resolve` checks the official pinned key FIRST, then user-trusted
@@ -14321,6 +14322,81 @@ the secondary path for sources that publish no key.
   `{ "<origin>": { "key": "<SPKI base64>", "source": "<url it was fetched from, absent when pasted by hand>" } }`.
   The official origin has no entry there and never can.
 
+**Per-plugin keys and the plugin master (owner, 2026-10-08).** "Every
+plugin repo gets a different key derived from the master." Official
+plugin bundles are signed in each repository's CI (decided earlier) with
+that repository's OWN key, never one shared key, so no repository needs
+access to another's secrets or write access to the organisation.
+
+- **The chain.** droidtop pins one plugin MASTER public key in the binary
+  (`PluginOriginKeys.MASTER`, P-256). The master signs only certificates
+  and revocation lists, never a bundle. A certificate
+  (`PluginCertificates`) binds one repository's public key to the plugin
+  ids it may sign (exact ids, or a namespace written `droidtop.<name>.*`),
+  with a `certId` (`<owner>/<repo>#<generation>`) and a validity window
+  (`notBefore`/`notAfter`, epoch seconds). It ships inside the bundle as
+  `origin.cert`, beside `manifest.json` and `manifest.sig`; the CI writes
+  it from the repository's `PLUGIN_SIGNING_CERT` secret and signs with
+  `PLUGIN_SIGNING_KEY`. `BundleSignature.verifyBundle` is the one
+  decision, for install, for the re-verification before every activation,
+  and for the repository update pass: manifest signature, then the
+  certified key, then the certificate, then the pinned master, and the
+  certificate must name the manifest's id. What the master signs is a
+  line-per-field text (`PluginCertificates.signedBytes`,
+  `PluginRevocations.signedBytes`), not the JSON, so the signature never
+  depends on a JSON writer's ordering.
+- **Derivation.** Keys are derived from the owner's offline master seed
+  with HKDF-SHA256, the same construction Enginehost's
+  `derive-official-key.py` uses but with droidtop's own salt
+  (`droidtop-plugin-master-v1`), so the same seed yields unrelated keys for
+  the two apps: the master from `droidtop/plugin-master-signing/v1`, a
+  repository key from `droidtop/plugin-bundle-signing/v1`, the lowercased
+  `owner/repo` and, for a replacement, `generation=N`. A derived key is
+  reproducible from the seed, so nothing private is kept anywhere but the
+  repository's secret. The owner provisions a repository with the
+  coordination tree's `bin/plugin-key-provision official` (derive, certify,
+  `gh secret set` both secrets from files, shred); `master-public` prints
+  the value to pin. Until it is pinned every certified bundle is refused
+  with a reason that says so.
+- **Expiry and revocation.** Validity is checked when a bundle is installed
+  or updated; an installed plugin is not stopped by its certificate
+  expiring (a device with a wrong clock must not lose its plugins), only
+  by revocation. The master-signed revocation list
+  (`PluginRevocations`: a `sequence`, `certIds`, key `keySha256`s) is
+  published beside the catalog index as `droidtop-plugins/revocations.json`
+  and fetched with it; droidtop keeps it in the plugins root only when the
+  master signed it and its sequence is higher than the one on file (an old
+  list cannot be replayed to un-revoke), and verifies it again every time
+  it is read. A revoked certificate or key refuses new installs and stops
+  installed plugins at their next activation ("signature no longer
+  verifies: ..."). A rotation is a new generation with a new `certId`; the
+  old one is then revoked.
+- **Approval across keys.** Approval binds to the trust anchor
+  (`PluginRecord.approvedKeySha256`): the master's fingerprint for a
+  certified bundle, the legacy official key's, or the user-trusted key's.
+  The two official anchors count as one (`PluginOriginKeys.
+  sameTrustAnchor`), so moving a plugin from the legacy key to its own
+  certified key, or rotating its certified key, keeps its approval; the
+  certificate's id binding is what stops one plugin's key from speaking
+  for another.
+- **Transition from the single origin key.** The legacy "droidtop" origin
+  key stays pinned and verifies official bundles that carry NO
+  certificate, so plugins installed from it keep running and updating
+  meanwhile; a plugin key cannot sign an official bundle without its
+  certificate. The transition ends when every official repository has
+  published a certified release in the catalog: the owner then publishes a
+  revocation list naming the legacy key's fingerprint (from then on only
+  certified bundles install or run), and the next droidtop release deletes
+  the legacy pin.
+- **Private plugins.** A private plugin is signed by the same CI process
+  with a key that is NOT derived from the master (`plugin-key-provision
+  independent`: `PLUGIN_SIGNING_KEY` only, no certificate) under its own
+  origin id, and reaches a device through "Keys you trust" exactly like
+  any third-party origin, using the same bundle format. A certificate in a
+  non-official bundle is ignored: only the person's own trust decision
+  vouches for it, and a master certificate never gives standing outside
+  the official origin.
+
 Unit-tested in `net-core` (`GitHubDeviceFlowTest`: interval, `slow_down`, denial,
 expiry, cancel, offline; `GitHubAccountTest`: the credential store seam), in
 `plugin-host` (`PluginReposTest`: repository names, the trust decisions, update
@@ -14397,13 +14473,12 @@ what the index says is display data, never a trust decision.
   posture Enginehost's own index lives by. The `key` block is
   cross-checked, not trusted: an origin is offered at all only when this
   build of droidtop pins a key for it (`PluginOriginKeys`) AND the
-  index's `keySha256` matches that pin's own fingerprint, so a tampered
-  index cannot rebind a pinned origin to a new key; an origin whose key
-  this build does not pin is listed but not installable. (Pinning a new
-  origin is an app change today — a `PluginOriginKeys` entry — and the
-  Enginehost-style offline root that certifies new origins without an app
-  change remains the deferred step §12a already noted for
-  `PluginOriginKeys` itself, now with a real second use.) An index with
+  index's `keySha256` matches one of its official anchors (the legacy
+  origin key or the plugin master), so a tampered index cannot rebind a
+  pinned origin to a new key; an origin whose key this build does not pin
+  is listed but not installable. New official plugins need no app change:
+  each repository's key is certified by the master ("Per-plugin keys and
+  the plugin master" above). An index with
   an unknown `schemaVersion` is refused whole (a newer format is not
   guessed at), the same validate-before-replace posture as the platform
   databases.
@@ -14540,18 +14615,21 @@ what the index says is display data, never a trust decision.
    fails any step never has its code loaded, not even to ask it to
    describe itself.
 4. Signing is real, not a placeholder gesture: ECDSA P-256/SHA-256 over
-   the exact manifest bytes, verified against a per-origin public key
-   (`BundleSignature`, `PluginOriginKeys`): the official pinned key first,
-   then any user-trusted key "Keys you trust" stores (above). Approval is bound to the
+   the exact manifest bytes (`BundleSignature.verifyBundle`): an official
+   bundle against its own repository key, certified for its id by the
+   pinned plugin master ("Per-plugin keys and the plugin master" above;
+   the legacy origin key for uncertified bundles during the transition),
+   any other origin against the user-trusted key "Keys you trust" stores. Approval is bound to the
    plugin's identity under a key, not to one byte-string: the record
    stores the digest it was verified against
    (`PluginRecord.archiveDigest`, a SHA-256 over the signed manifest)
    AND the fingerprint of the key approval was bound to
    (`PluginRecord.approvedKeySha256`). A re-install of the exact same
    bytes keeps its state; an update with different bytes keeps it too
-   when the new bundle's signature verifies against the SAME pinned key
-   (the catalog's whole job, "The catalog" above), and starts back at
-   PENDING when the key differs, when the origin differs, or when the
+   when the new bundle verifies under the SAME trust anchor (the same
+   user-trusted key, or for the official origin the legacy key or the
+   plugin master, which count as one; the catalog's whole job, "The
+   catalog" above), and starts back at PENDING when the key differs, when the origin differs, or when the
    plugin was never APPROVED in the first place. A DENIED state never
    carries over under any digest.
 5. droidtop treats what a plugin returns as untrusted input: every

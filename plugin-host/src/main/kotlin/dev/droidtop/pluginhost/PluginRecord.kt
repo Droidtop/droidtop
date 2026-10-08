@@ -15,12 +15,14 @@ data class PluginRecord(
     /** SHA-256 over the exact signed manifest bytes -- what this installed copy was verified against. */
     val archiveDigest: String,
     /**
-     * The fingerprint ([PluginOriginKeys.keyFingerprintFor]) of the pinned
-     * key this bundle's signature verified against when it was
-     * (re)installed -- what approval is bound to, alongside the digest
-     * (docs/SPEC.md 12a checklist point 4, "Trust over updates"): an
-     * update that verifies against this same key carries the APPROVED
-     * state over to its new digest, and anything else starts PENDING.
+     * The fingerprint ([BundleVerdict.Verified.anchorSha256]) of the trust
+     * anchor this bundle verified under when it was (re)installed: the
+     * plugin master for a certified official bundle, the legacy official
+     * key, or the user-trusted key. What approval is bound to, alongside
+     * the digest (docs/SPEC.md 12a checklist point 4, "Trust over
+     * updates"): an update verified under the same anchor
+     * ([PluginOriginKeys.sameTrustAnchor]) carries the APPROVED state over
+     * to its new digest, and anything else starts PENDING.
      * Empty for records written by builds before the field existed: they
      * get no carry-over on their first update, one re-approval, the safe
      * direction.

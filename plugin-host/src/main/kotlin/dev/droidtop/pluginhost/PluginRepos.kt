@@ -107,7 +107,11 @@ object PluginRepos {
 
     // ----- Updates -----
 
-    /** A bundle's manifest and signature, read without extracting anything. */
+    /**
+     * A bundle's manifest and signature, read without extracting anything. No certificate: a
+     * repository here is a user-trusted origin, never the official one, and a certificate only
+     * speaks for the official origin ([BundleSignature.verifyBundle]).
+     */
     class Peeked(val manifest: PluginManifest, val manifestBytes: ByteArray, val signatureBase64: String)
 
     /**
@@ -165,7 +169,9 @@ object PluginRepos {
         userKeys: Map<String, String>,
         installed: List<PluginRecord>,
         /** The signature check; replaceable so the eligibility rules are tested without any key material. */
-        signatureValid: (Peeked) -> Boolean = { BundleSignature.verifyManifest(it.manifestBytes, it.signatureBase64, it.manifest.origin, userKeys) },
+        signatureValid: (Peeked) -> Boolean = {
+            BundleSignature.verifyBundle(it.manifestBytes, it.signatureBase64, it.manifest.origin, it.manifest.id, null, userKeys) is BundleVerdict.Verified
+        },
     ): UpdateDecision {
         val manifest = peeked.manifest
         if (manifest.origin != repoOrigin) {
