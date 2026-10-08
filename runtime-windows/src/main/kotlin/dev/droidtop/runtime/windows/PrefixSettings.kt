@@ -1,8 +1,8 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.R
-import app.gamenative.utils.ContainerUtils
+import dev.droidtop.runtime.windows.R
+import dev.droidtop.runtime.windows.utils.ContainerUtils
 import com.winlator.box86_64.Box86_64PresetManager
 import com.winlator.container.ContainerData
 import com.winlator.core.KeyValueSet

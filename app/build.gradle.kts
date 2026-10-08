@@ -2,13 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    // Hilt: the vendored gamenative tree (:runtime-windows) is Hilt-built
-    // -- its activities are @AndroidEntryPoint -- and Hilt requires the
-    // FINAL application module to carry the plugin and the annotated
-    // Application class (DroidtopApplication) for their object graph to
-    // exist at runtime.
-    alias(libs.plugins.google.ksp)
-    alias(gn.plugins.dagger.hilt)
 }
 
 android {
@@ -204,9 +197,9 @@ android {
         // and put a check back in front of the artifact (SPEC 10b).
         checkReleaseBuilds = false
         // Scope, one mechanism: a baseline that holds ONLY the findings in
-        // trees droidtop vendors rather than writes -- the gamenative tree
-        // (vendor/gamenative/..., compiled into :runtime-windows by
-        // srcDir) and shell-default's vendored AOSP sub-libraries,
+        // trees droidtop vendors rather than writes -- Winlator's runtime,
+        // which :runtime-windows carries unchanged
+        // (runtime-windows/src/main/java/com/winlator) -- and shell-default's vendored AOSP sub-libraries,
         // :WMShared (shell-default/wm_shared), :msdl
         // (shell-default/msdllib) and :Shared (shell-default/shared), so
         // lint reports them against this gate like any other source.
@@ -226,7 +219,7 @@ android {
 
 // Two protobuf runtimes meet in this app: shell-default's Launcher3
 // protos are generated LITE and pull protobuf-javalite, while the
-// vendored gamenative tree (JavaSteam's Steam protos) needs full
+// Steam client in :stores (JavaSteam's Steam protos) needs full
 // protobuf-java. Both jars ship the same com.google.protobuf classes,
 // which is exactly the duplicate-class failure this resolves. The full
 // runtime is the documented superset -- lite-generated code runs on it
@@ -243,11 +236,6 @@ configurations.all {
 dependencies {
     implementation(project(":net-core"))
 
-    // Hilt runtime + compiler for this, the application module -- see the
-    // plugins block comment. Versions from gamenative's own catalog so
-    // they track the fork exactly.
-    implementation(gn.bundles.hilt)
-    ksp(gn.hilt.android.compiler)
     implementation(project(":runtime-common"))
     implementation(project(":host-bridge"))
     implementation(project(":runtime-windows"))

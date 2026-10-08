@@ -2,22 +2,19 @@ package dev.droidtop.runtime.windows
 
 import android.content.Context
 import android.system.Os
-import app.gamenative.utils.CustomGameIdStore
-import app.gamenative.utils.CustomGameIdStores
 import dev.droidtop.library.GameFolderIds
 import java.io.File
 
 /**
- * droidtop's id store for the vendored gamenative scanner: the id of a
- * PC game folder lives in droidtop's own storage, never in a
+ * Where the folder scanner ([dev.droidtop.runtime.windows.utils.CustomGameScanner])
+ * keeps a PC game folder's id: droidtop's own storage, never a
  * `.gamenative` file inside the user's game folder (docs/SPEC.md 7g,
- * tracker#269). gamenative-tux as its own app keeps the file; this is
- * the hook the fork gives an embedding host.
+ * tracker#269).
  *
  * A `.gamenative` file that is already there is read as legacy identity
  * and adopted ([GameFolderIds]); it is not written and not deleted.
  */
-object DroidtopGameIdStore : CustomGameIdStore {
+object DroidtopGameIdStore {
     private val APP_ID = Regex("${'"'}appId${'"'}[ ]*:[ ]*([0-9]+)")
 
     @Volatile
@@ -33,13 +30,13 @@ object DroidtopGameIdStore : CustomGameIdStore {
                 legacyRead = ::readLegacyFile,
                 stat = ::statOf,
             )
-            CustomGameIdStores.install(this)
+            dev.droidtop.runtime.windows.utils.CustomGameCache.invalidate()
         }
     }
 
-    override fun read(folder: File): Int? = ids?.idFor(folder)
+    fun read(folder: File): Int? = ids?.idFor(folder)
 
-    override fun write(folder: File, gameId: Int) {
+    fun write(folder: File, gameId: Int) {
         ids?.remember(folder, gameId)
     }
 

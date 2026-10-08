@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="cancel">취소</string>
+    <string name="compatibility">호환성</string>
+    <string name="copy">복사</string>
+    <string name="denuvo">Denuvo</string>
+    <string name="extreme">극한</string>
+    <string name="intermediate">중간</string>
+    <string name="manifest_download_failed">다운로드 실패: %1$s</string>
+    <string name="manifest_install_failed">%1$s 설치 실패</string>
+    <string name="manifest_install_success">%1$s 설치됨</string>
+    <string name="ok">확인</string>
+    <string name="performance">성능</string>
+    <string name="shooter_mode_off">스틱 활성화</string>
+    <string name="shooter_mode_on">마우스 활성화</string>
+    <string name="stability">안정성</string>
+    <string name="unity">Unity</string>
+    <string name="unity_mono_bleeding_edge">Unity Mono Bleeding Edge</string>
+    <string name="untitled">제목 없음</string>
+</resources>

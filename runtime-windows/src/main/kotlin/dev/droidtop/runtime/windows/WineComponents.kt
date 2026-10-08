@@ -1,18 +1,17 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.R
-import app.gamenative.data.GameSource
-import app.gamenative.utils.BestConfigService
-import app.gamenative.utils.LaunchDependencies
-import app.gamenative.utils.ManifestContentTypes
-import app.gamenative.utils.ManifestInstaller
-import app.gamenative.utils.ManifestRepository
-import app.gamenative.utils.X86_64GuestLibs
-import app.gamenative.utils.X86_64Graphics
+import dev.droidtop.runtime.windows.R
+import dev.droidtop.runtime.windows.utils.ComponentRequests
+import dev.droidtop.runtime.windows.utils.ManifestContentTypes
+import dev.droidtop.runtime.windows.utils.ManifestInstaller
+import dev.droidtop.runtime.windows.utils.ManifestRepository
+import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
+import dev.droidtop.runtime.windows.utils.X86_64Graphics
 import com.winlator.container.Container
 import com.winlator.contents.ContentProfile
 import com.winlator.contents.ContentsManager
+import com.winlator.core.TarCompressorUtils
 import com.winlator.core.WineInfo
 import com.winlator.xenvironment.ImageFs
 import java.io.File
@@ -32,9 +31,9 @@ import kotlinx.serialization.json.jsonObject
  * One step for setup, for the Wine settings screen's "Download" row and for
  * every launch, so a choice made anywhere is fetched the same way. Nothing
  * here is droidtop's own downloader: the two Proton 9 builds come through
- * gamenative's [LaunchDependencies] (as setup always did), everything else
+ * GameNative's download host ([RuntimeDownloads]), everything else
  * through upstream GameNative's component manifest, resolved by
- * [BestConfigService.resolveMissingManifestInstallRequests] and installed by
+ * [ComponentRequests.resolveMissing] and installed by
  * [ManifestInstaller] -- exactly what GameNative's own pre-launch does
  * (PluviaMain.preLaunchApp).
  */
@@ -85,8 +84,8 @@ internal object WineComponents {
 
     /**
      * The Wine build itself. The two Proton 9 builds (`bionic_wine_entries`)
-     * come from gamenative's own launch dependency, fetched from its download
-     * host ([GameNativeDownloads]). A manifest build (arm64ec
+     * are archives on GameNative's download host ([RuntimeDownloads]),
+     * unpacked into the shared Proton store. A manifest build (arm64ec
      * Proton 10 and later) is a `.wcp` the manifest installer puts into the
      * contents store.
      */
@@ -96,16 +95,17 @@ internal object WineComponents {
             val archive = File(context.filesDir, "$wine.txz")
             if (!wineBinary(context, wine).isFile && !(archive.isFile && archive.length() > 0)) {
                 onStatus("Downloading Wine…")
-                GameNativeDownloads.fetch(archive.name, archive) { onStatus("Downloading Wine… ${percent(it)}") }
+                RuntimeDownloads.fetch(archive.name, archive) { onStatus("Downloading Wine… ${percent(it)}") }
             }
-            LaunchDependencies().ensureLaunchDependencies(
-                context = context,
-                container = container,
-                gameSource = GameSource.CUSTOM_GAME,
-                gameId = 0,
-                setLoadingMessage = { message -> onStatus(message) },
-                setLoadingProgress = { fraction -> if (fraction >= 0f) onStatus("Installing Wine… ${percent(fraction)}") },
-            )
+            // Into the shared Proton store, where ImageFsInstaller links
+            // opt/<build> from (GameNative's BionicDefaultProtonDependency).
+            val outDir = File(ImageFs.getSharedProtonDir(context), wine)
+            if (!File(outDir, "bin").isDirectory) {
+                onStatus("Installing Wine…")
+                check(TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, archive, outDir)) {
+                    "couldn't unpack $wine from ${archive.absolutePath}"
+                }
+            }
             return@withContext
         }
         if (wineBinary(context, wine).isFile) return@withContext
@@ -139,12 +139,12 @@ internal object WineComponents {
     private fun isBundledProton(context: Context, wineVersion: String): Boolean =
         context.resources.getStringArray(R.array.bionic_wine_entries).any { it.equals(wineVersion, ignoreCase = true) }
 
-    private suspend fun manifestRequests(context: Context, container: Container): List<BestConfigService.ManifestInstallRequest> {
+    private suspend fun manifestRequests(context: Context, container: Container): List<ComponentRequests.ManifestInstallRequest> {
         // The saved config, with a game's launch-time choices over it: what
         // this launch will actually ask for.
         val saved = Json.parseToJsonElement(container.containerJson).jsonObject
         val config = JsonObject(saved + container.launchOverrides.mapValues { JsonPrimitive(it.value) })
-        return BestConfigService.resolveMissingManifestInstallRequests(context, config, "exact_gpu_match")
+        return ComponentRequests.resolveMissing(context, config)
             // On x86_64 the arm64 drivers are never used (X86_64Graphics).
             .filterNot { X86_64GuestLibs.isX86_64Host() && it.isDriver }
     }

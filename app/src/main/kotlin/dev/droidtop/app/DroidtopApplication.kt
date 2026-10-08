@@ -34,14 +34,6 @@ import dev.droidtop.runtime.AudioHandOff
  * (see AndroidManifest.xml) so this subclass wins over the plain
  * `LauncherApplication` declaration merged in from that module.
  */
-// Also the app's Hilt application: the vendored gamenative tree's
-// activities are @AndroidEntryPoint and need the object graph rooted
-// here. Hilt's bytecode transform works over any base class, so
-// extending LauncherApplication is not a conflict. gamenative's own
-// PluviaApp process bootstrap is reached through the fork's single
-// static init path (PluviaApp.bootstrap) from ModeStartup, instead of
-// inheriting an onCreate written for a different app's lifecycle.
-@dagger.hilt.android.HiltAndroidApp
 class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
@@ -61,9 +53,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // the mode snapshot was already taken by
         // SettingsCatalogInitProvider (a ContentProvider's onCreate runs
         // before this), and ModeStartup turns it into what actually runs.
-        // The vendored gamenative backbone used to be bootstrapped here
-        // unconditionally, in every mode; it now starts only for the two
-        // modes that use it. See ModeStartup.
+        // The Windows runtime starts only for the modes that use it. See ModeStartup.
         ModeStartup.install(this)
         // PC game folders get their ids from droidtop's own storage, never from a
         // .gamenative file written into the user's folder (SPEC 7g, tracker#269).

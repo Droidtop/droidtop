@@ -2,7 +2,12 @@ package dev.droidtop.runtime.windows
 
 import android.app.Application
 import android.content.Context
-import app.gamenative.PluviaApp
+import android.hardware.display.DisplayManager
+import android.os.Build
+import android.util.DisplayMetrics
+import android.view.Display
+import com.winlator.container.Container
+import dev.droidtop.runtime.windows.utils.StoragePaths
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -11,35 +16,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
- * The vendored gamenative backbone's process bootstrap, as something the
- * rest of droidtop can name. The vendored tree is compiled INTO this
- * module (`runtime-windows/build.gradle.kts` srcDirs), so `app.gamenative`
- * is this module's own compile classpath and nobody else's: `:app` depends
- * on `:runtime-windows`, not on gamenative, and mode gating in
- * `dev.droidtop.app.ModeStartup` reaches the bootstrap through here rather
- * than through a class it cannot see.
+ * The Windows runtime's process start: the runtime's preferences
+ * ([PrefManager], GameNative's DataStore file, read once), the storage
+ * paths the folder scanner and the Steam carry-over read ([StoragePaths]),
+ * and a Timber tree for the runtime's logging. What GameNative's
+ * `PluviaApp.bootstrap` did besides (its Steam/store services, the
+ * Hilt-built database, telemetry, power control, its container migration)
+ * belonged to GameNative's app and went with the submodule (docs/SPEC.md 9).
  *
- * What the bootstrap does: preferences, the download service, Steam
- * prerequisites, the container migration and the container-file preload,
- * telemetry setup, and a native library preload. It is the heaviest thing
- * droidtop starts, it reaches the network, and most of `PluviaApp.
- * bootstrap`'s own body runs on the calling thread rather than a
- * background one (Droidtop/tracker#41: a 59s single call, traced to
- * `PluviaApp.bootstrap` on the main thread by way of `ensureGamenative` /
- * `Modes.reload` / `OnboardingActivity.finishOnboarding`). `vendor/
- * gamenative` is upstream code we hook rather than rewrite, so the fix
- * lives here: this object is the one place that calls into it, and it
- * now always does so off the caller's thread, on its own background
- * scope, tracked by [state] so a caller that genuinely needs the result
- * (the PC launch path, the store and container-config screens) can
- * suspend on [awaitReady] instead of assuming the call already finished.
- *
- * [ensureStarted] itself never blocks and is safe to call repeatedly
- * (from every `ModeStartup.apply` pass, e.g. a tab switch that re-applies
- * the current mode set) -- the backing coroutine is launched at most
- * once, guarded by [state].
+ * The first read is disk work, so it runs on a background scope; [state]
+ * says when it is done and [awaitReady] suspends until then.
+ * [ensureStarted] never blocks and starts the work at most once.
  */
 object WindowsBackbone {
 
@@ -49,41 +39,72 @@ object WindowsBackbone {
 
     private val _state = MutableStateFlow(State.NOT_STARTED)
 
-    /** Current bootstrap progress, for a screen that wants to show it. */
+    /** Current start progress, for a screen that wants to show it. */
     val state: StateFlow<State> = _state
 
-    /**
-     * Starts the backbone in the background if it is not already up or
-     * starting, and returns immediately either way. Crash handling stays
-     * droidtop's own (Bugsink, installed by `LauncherApplication`), hence
-     * the explicit `installCrashHandler = false`.
-     */
+    @Volatile
+    private var app: Context? = null
+
     @JvmStatic
     fun ensureStarted(context: Context) {
-        val app = context.applicationContext as? Application ?: return
-        // compareAndSet so two racing callers (mode-apply and a PC screen
-        // opening at the same time) launch the coroutine exactly once.
+        val application = context.applicationContext as? Application ?: return
+        app = application
         if (!_state.compareAndSet(State.NOT_STARTED, State.STARTING)) return
         scope.launch {
             try {
-                PluviaApp.bootstrap(app, installCrashHandler = false)
+                if (Timber.treeCount == 0) Timber.plant(Timber.DebugTree())
+                runCatching { PrefManager.init(application) }
+                    .onFailure { android.util.Log.w(TAG, "Windows runtime preferences unreadable", it) }
+                runCatching { StoragePaths.init(application) }
+                    .onFailure { android.util.Log.w(TAG, "Windows runtime storage paths unreadable", it) }
             } finally {
                 _state.value = State.READY
             }
         }
     }
 
-    /**
-     * Starts the backbone if needed and suspends until it is ready. For
-     * the handful of screens that cannot show gamenative UI before the
-     * bootstrap has actually run (the PC store, container config, Steam
-     * sign-in, launching a Windows game): they call this from a
-     * `LaunchedEffect`/coroutine and show a "Preparing Windows support…"
-     * state while it is pending, rather than assuming `ensureStarted`
-     * already finished the way the old synchronous call let them.
-     */
+    /** Starts the runtime if needed and suspends until it is ready. */
     suspend fun awaitReady(context: Context) {
         ensureStarted(context)
         state.filter { it == State.READY }.first()
     }
+
+    @Volatile
+    private var screenSize: String? = null
+
+    /**
+     * The screen size a new prefix starts with: the closest of Winlator's
+     * 4:3, 16:10 and 16:9 sizes to the built-in display's shape
+     * (GameNative's `PluviaApp.getDefaultScreenSize`).
+     */
+    @JvmStatic
+    fun defaultScreenSize(): String {
+        screenSize?.let { return it }
+        val result = runCatching {
+            val display = app?.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
+                ?: return@runCatching Container.DEFAULT_SCREEN_SIZE_16_9
+            val width: Int
+            val height: Int
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                width = display.mode.physicalWidth
+                height = display.mode.physicalHeight
+            } else {
+                val metrics = DisplayMetrics()
+                @Suppress("DEPRECATION")
+                display.getRealMetrics(metrics)
+                width = metrics.widthPixels
+                height = metrics.heightPixels
+            }
+            val aspect = maxOf(width, height).toFloat() / minOf(width, height).toFloat()
+            when {
+                aspect < 1.5f -> Container.DEFAULT_SCREEN_SIZE_4_3
+                aspect < 1.7f -> Container.DEFAULT_SCREEN_SIZE_16_10
+                else -> Container.DEFAULT_SCREEN_SIZE_16_9
+            }
+        }.getOrDefault(Container.DEFAULT_SCREEN_SIZE_16_9)
+        if (app != null) screenSize = result
+        return result
+    }
+
+    private const val TAG = "droidtop.WindowsRuntime"
 }

@@ -1,13 +1,13 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.R
-import app.gamenative.utils.ContainerUtils
-import app.gamenative.utils.ManifestComponentHelper
-import app.gamenative.utils.ManifestContentTypes
-import app.gamenative.utils.ManifestEntry
-import app.gamenative.utils.X86_64GuestLibs
-import app.gamenative.utils.X86_64Graphics
+import dev.droidtop.runtime.windows.R
+import dev.droidtop.runtime.windows.utils.ContainerUtils
+import dev.droidtop.runtime.windows.utils.ManifestComponentHelper
+import dev.droidtop.runtime.windows.utils.ManifestContentTypes
+import dev.droidtop.runtime.windows.utils.ManifestEntry
+import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
+import dev.droidtop.runtime.windows.utils.X86_64Graphics
 import com.winlator.container.Container
 import com.winlator.container.ContainerData
 import com.winlator.core.DefaultVersion

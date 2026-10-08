@@ -1,14 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Curated slice of the vendored gamenative manifest (per direction:
-     gamenative's UI stays out of the way, droidtop supplies its own UI
-     layer over the services). Only the backbone components droidtop
-     actually drives are declared: the Wine game activity and the
-     notification Exit receiver. GameNative's Steam foreground service is
-     not declared: Steam is droidtop's own store (docs/SPEC.md 7g "Stores",
-     dev.droidtop.stores.steam) and nothing starts that service. The vendor tree's activities, launcher
-     aliases, OAuth callbacks and FileProvider are deliberately absent;
-     droidtop's app module already owns a FileProvider under the same
-     authority pattern, and every user surface is droidtop's own. -->
+<!-- The Windows runtime's one component: the activity a Windows game is
+     seen and played in (docs/SPEC.md 5b). Every other surface is
+     droidtop's own. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -38,9 +31,5 @@
             android:screenOrientation="userLandscape"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|layoutDirection"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
-
-        <receiver
-            android:name="app.gamenative.service.NotificationActionReceiver"
-            android:exported="false" />
     </application>
 </manifest>

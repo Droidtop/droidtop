@@ -25,7 +25,7 @@
 # Classes the native code calls back into or constructs by name (FindClass,
 # GetMethodID). Whole packages, because the lookups are scattered through C
 # that is not ours.
-#   com.winlator.**       gamenative's Winlator tree: xconnector, renderers, GPU helpers
+#   com.winlator.**       the Windows runtime's Winlator tree: xconnector, renderers, GPU helpers
 #   host-bridge           Toplevel, the clipboard and toplevel sinks (hostbridge_jni.cpp)
 #   plugin-host           PythonCallException (droidtoppy_jni.c) and the bridge
 #   TunnelNative          hev-socks5-tunnel's JNI surface
@@ -70,23 +70,15 @@
 -keep class org.chickenhook.restrictionbypass.** { *; }
 -keep class dev.rikka.tools.refine.** { *; }
 
-# gamenative, from its own app/proguard-rules.pro (it ships minified with
-# these): JavaSteam builds services and messages by reflection, the crypto
-# provider is registered by name, Timber's release tree, XR and Samsung SDK
-# glue.
+# JavaSteam (droidtop's Steam, :stores), from GameNative's own
+# app/proguard-rules.pro: it builds services and messages by reflection and
+# its crypto provider is registered by name.
 -keep class in.dragonbra.javasteam.** { *; }
 -keep class * extends in.dragonbra.javasteam.steam.handlers.steamunifiedmessages.UnifiedService { *; }
 -keep class org.spongycastle.**
 -dontwarn org.spongycastle.jce.provider.X509LDAPCertStoreSpi
 -dontwarn org.spongycastle.x509.util.LDAPStoreHelper
 -keep class timber.log.Timber { *; }
--keep class app.gamenative.ReleaseTree { *; }
--keep class horizon.** { *; }
--keep class com.meta.horizon.** { *; }
--dontwarn horizon.**
--dontwarn com.meta.horizon.**
--keep class com.samsung.sdk.sperf.** { *; }
--dontwarn com.samsung.sdk.sperf.**
 
 # Protobuf. Two runtimes meet in this app (app/build.gradle.kts substitutes the
 # full one for the lite one) and generated messages are reached by reflection
