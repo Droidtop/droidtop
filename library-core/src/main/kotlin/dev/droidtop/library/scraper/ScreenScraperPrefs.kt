@@ -1,27 +1,26 @@
 package dev.droidtop.library.scraper
 
 import android.content.Context
+import dev.droidtop.library.credentials.CredentialStore
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * ScreenScraper credentials. The USERNAME/PASSWORD pair is the user's
- * own screenscraper.fr account (optional; raises rate limits). The dev
- * pair is an APPLICATION credential (real ES-DE embeds its own and
- * never surfaces it) -- no settings field exposes it; it falls back to
- * the compiled-in pair in [ScreenScraperDevCredentials], and a stored
- * value (from settings restore -- only an explicitly opted-in encoded
- * credential section restores it -- or from anyone running their own
- * registered pair) wins over it. Same shared prefs file every other
- * droidtop setting uses (directed 2026-08-31, replacing the retired
- * debug-credentials file).
+ * own screenscraper.fr account (optional; raises rate limits) and is kept in
+ * [CredentialStore] (encrypted). The dev pair is an APPLICATION credential
+ * that identifies droidtop (real ES-DE embeds its own and never surfaces it)
+ * -- no settings field exposes it; it falls back to the compiled-in pair in
+ * [ScreenScraperDevCredentials], and a stored value (from settings restore --
+ * only an explicitly opted-in encoded credential section restores it -- or
+ * from anyone running their own registered pair) wins over it. It stays in
+ * the shared prefs file every other droidtop setting uses (directed
+ * 2026-08-31, replacing the retired debug-credentials file): it identifies
+ * the application, it does not authenticate a person.
  */
 object ScreenScraperPrefs {
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_DEV_ID = "droidtop_screenscraper_devid"
     private const val KEY_DEV_PASSWORD = "droidtop_screenscraper_devpassword"
-    private const val KEY_USER_ID = "droidtop_screenscraper_ssid"
-    private const val KEY_USER_PASSWORD = "droidtop_screenscraper_sspassword"
 
     /**
      * droidtop's own application credentials, unless the user has deliberately
@@ -43,15 +42,7 @@ object ScreenScraperPrefs {
             ?.takeIf { it.isNotBlank() }
             ?: ScreenScraperDevCredentials.devPassword
 
-    fun userId(context: Context): String =
-        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_USER_ID, "") ?: ""
+    fun userId(context: Context): String = CredentialStore.get(context, CredentialStore.SCREENSCRAPER_USER)
 
-    fun userPassword(context: Context): String =
-        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_USER_PASSWORD, "") ?: ""
-
-    fun set(context: Context, devId: String, devPassword: String, userId: String, userPassword: String) {
-        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putStrings(
-            mapOf(KEY_DEV_ID to devId, KEY_DEV_PASSWORD to devPassword, KEY_USER_ID to userId, KEY_USER_PASSWORD to userPassword),
-        )
-    }
+    fun userPassword(context: Context): String = CredentialStore.get(context, CredentialStore.SCREENSCRAPER_PASSWORD)
 }

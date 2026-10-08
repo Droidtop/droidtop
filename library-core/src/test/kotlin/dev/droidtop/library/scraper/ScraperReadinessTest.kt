@@ -23,7 +23,7 @@ class ScraperReadinessTest {
             lastRefusal = ScrapeLookup.Refused("TheGamesDB", 401, "Invalid API key"),
         )
         assertTrue(summary, summary.contains("refused every request"))
-        assertTrue(summary, summary.contains("$SCRAPER_SETTINGS > TheGamesDB > API key"))
+        assertTrue(summary, summary.contains("$SOURCE_SETUP > TheGamesDB"))
     }
 
     @Test
@@ -57,7 +57,7 @@ class ScraperReadinessTest {
     fun `the missing-key sentence says where the key goes and what needs none`() {
         val text = ScraperReadiness.THEGAMESDB_KEY_MISSING
         assertTrue(text, text.contains("thegamesdb.net"))
-        assertTrue(text, text.contains("$SCRAPER_SETTINGS > TheGamesDB > API key"))
+        assertTrue(text, text.contains("$SOURCE_SETUP > TheGamesDB"))
         assertTrue(text, text.contains("libretro database"))
     }
 
@@ -78,7 +78,7 @@ class ScraperReadinessTest {
             sourceRefused = 1,
         )
         assertTrue(summary, summary.startsWith("Sony PlayStation 2: TheGamesDB refused every request"))
-        assertTrue(summary, summary.contains("$SCRAPER_SETTINGS > TheGamesDB > API key"))
+        assertTrue(summary, summary.contains("$SOURCE_SETUP > TheGamesDB"))
     }
 
     @Test

@@ -24,8 +24,8 @@ object ScraperReadiness {
     /** TheGamesDB asked for with no key: the pass, the manual match and the picker all say this. */
     const val THEGAMESDB_KEY_MISSING =
         "TheGamesDB needs your own free API key in this build, and none is set. Get one at thegamesdb.net " +
-            "and enter it under $SCRAPER_SETTINGS > TheGamesDB > API key, or choose ScreenScraper or the " +
-            "libretro database there, which need no key."
+            "and enter it under $SOURCE_SETUP > TheGamesDB, or choose ScreenScraper or the " +
+            "libretro database under $SCRAPER_SETTINGS, which need no key."
 
     /**
      * Why the selected ROM source cannot run, with the fix; null when it can.
@@ -83,7 +83,7 @@ object ScraperReadiness {
         if (!rejectedCredentials(refusal)) return null
         return when {
             refusal.source == "TheGamesDB" ->
-                "Check the API key under $SCRAPER_SETTINGS > TheGamesDB > API key."
+                "Check the API key under $SOURCE_SETUP > TheGamesDB."
             refusal.source.startsWith("IGDB") ->
                 "Check the Client ID and Client Secret under $SOURCE_SETUP > IGDB."
             refusal.source == SteamGridDbScraperClient.SOURCE ->

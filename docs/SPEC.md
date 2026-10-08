@@ -10295,24 +10295,99 @@ for an hour, and quota responses for fifteen minutes. A later pass therefore con
 cached answers instead of repeating completed lookups. Before a ROM has metadata, its row still
 uses `GameNaming.displayName` to turn filename slugs into readable display text.
 
-**Scraping needs no setup, and keys are guided (directed 2026-10-02, tracker #264).** A fresh
-install scrapes with nothing entered: ROMs from ScreenScraper's anonymous tier (the default
-`ScraperSource`), the libretro database, and TheGamesDB through droidtop's own application key
-when the build carries one (`TheGamesDbPrefs.builtInKey`, the `THEGAMESDB_APP_KEY` CI secret
-read by `library-core/build.gradle.kts` into `BuildConfig`; blank in a build made without it, never
-committed, and a key the person enters under Accounts and sources > TheGamesDB takes precedence).
-PC and engine games default to Lutris plus the keyless Steam store. IGDB (a Twitch developer
-application's Client ID and Secret, client-credentials token, no user sign-in) and SteamGridDB (an
-API key from the person's preferences page) are optional and never shipped: each has ONE row under
-Settings > Accounts and sources whose value is its state (`Not set`, `Not tested`, `Connected`,
-`ScraperKeyState`) and whose guide is a screen behind the row (`ScraperKeySetupActivity`):
-numbered steps of at most five words (`ScraperKeyService.steps`), the official page as a QR code
-generated on the device and an Open button for the device's browser, the input fields, and Test,
-one real request (`ScraperKeyCheck`) that ends in `Connected` or a one-line error. The state is
-`Connected` only after a test passed with the stored credential; any change to it clears that. No
-prose on the rows or the guide: the credit line (`ScraperKeyService.credit`, "Data from IGDB.com",
-"Art from SteamGridDB") is the guide's tooltip, and a game's Details already credits each source
-for the fields it supplied ("Where these facts came from", `sourcesLine`).
+**Scraping needs no setup, and keys are guided (directed 2026-10-02, tracker #264; helpers
+added 2026-10-08).** A fresh install scrapes with nothing entered: ROMs from ScreenScraper's
+anonymous tier (the default `ScraperSource`), the libretro database, and TheGamesDB through
+droidtop's own application key when the build carries one (`TheGamesDbPrefs.builtInKey`, the
+`THEGAMESDB_APP_KEY` CI secret read by `library-core/build.gradle.kts` into `BuildConfig`; blank
+in a build made without it, never committed, and a key the person enters under Accounts and
+sources > TheGamesDB takes precedence). PC and engine games default to Lutris plus the keyless
+Steam store. The rule behind it: droidtop ships keys that IDENTIFY it (the ScreenScraper
+developer ID, the TheGamesDB application key) and never a key that AUTHENTICATES a person (their
+own key, their account, a secret); anything of the second kind is supplied by the person.
+
+**Supplying your own keys (directed 2026-10-08, tracker #264).** Four sources take a credential of
+the person's own, and all four have the same row and the same guide (`ScraperKeyService`): IGDB
+(a Twitch developer application's Client ID and Secret, client-credentials token, no user
+sign-in), SteamGridDB (an API key from the person's preferences page), TheGamesDB (an API key) and
+ScreenScraper (the person's own username and password, which raises their daily limit; the
+developer ID stays droidtop's). Each has ONE row under Settings > Accounts and sources whose value
+is its state (`Not set`, `Not tested`, `Connected`; `Built in` for TheGamesDB on a build that
+carries the application key, `No account` for ScreenScraper, `ScraperKeyState`) and whose guide is
+a screen behind the row (`ScraperKeySetupActivity`). Store sign-ins (Steam, GOG, Epic, Amazon,
+itch.io) and the GitHub token have their own flows (7g, 12a) and are not repeated here. A
+service's fields (`ScraperKeyService.fields`) have the same ids in the phone page, the key page and
+the vault. The state is `Connected` only after a test passed with the stored credential; any change
+to it clears that. Test (`ScraperKeyCheck`) is the one place a request is made with the person's
+key, and only when they press it: saving a key, from any path below, runs nothing. No prose on the
+rows or the guide: what the source adds is a label (`ScraperKeyService.gets`, "Covers, heroes,
+logos"), the credit line (`credit`, "Data from IGDB.com") is the guide's tooltip, and a game's
+Details already credits each source for the fields it supplied ("Where these facts came from",
+`sourcesLine`). Three ways to get a key into the fields, all ending in the same store:
+
+1. **The key page in the app (the primary way).** A browser pane (`KeyWebPane`) shows the
+   service's own page for making the key, with droidtop's numbered steps beside it that follow the
+   address being shown (`KeyPages.stepIndex`; a step's tooltip carries the detail). The person
+   signs in and creates the key themselves. When the key, Client ID or Client Secret is on the
+   page, the panel says "Client ID: found ••••abcd" with Use and Ignore; Use stores that field in
+   the encrypted store and nothing else happens until they press Test. The Twitch Client Secret is
+   shown only once, when it is made: the page is read once a second while it is the capture page,
+   so it is held (in memory only) from the moment it appears until the person uses or ignores it.
+   Reading is narrow by construction: the addresses, steps, selectors and value patterns live in
+   one data file, `app/src/main/assets/key-pages.json`, so a provider's change is a data fix. A
+   field is read only on its entry's exact `capture.host` over https and a path matching
+   `capture.pathMatch` (`KeyPages.captureAllowed`, checked again when the answer arrives), only
+   from an element matching one of its selectors or sitting beside one of its labels, and only if
+   the value fits its pattern. The pane runs a read-only script with `evaluateJavascript` and takes
+   the answer; there is no JavaScript bridge, so no page script can call back into the app, and no
+   other page content is read or kept. The pane loads only https pages of the entry's `hosts`
+   (`KeyPages.canLoad`). Each service has its own browser profile (`androidx.webkit` profiles), so
+   its sign-in cookies are separate from every other service and from the stores' sign-ins, and the
+   profile is deleted when the pane closes unless the person turned "Stay signed in" on (off by
+   default; a leftover profile is also deleted at the next start). A system WebView without profile
+   support (`WebViewFeature.MULTI_PROFILE`) cannot isolate cookies, so it does not open the pane
+   and the guide opens on the other two ways. The pad moves in the page natively; L1 and R1 move
+   between the page and the panel, B goes back in the page and then closes; the on-screen keyboard
+   is the system one. The file's entries say `"verified": false` until someone has watched them
+   work on the live page; the selectors were written from the providers' public documentation, not
+   from a live page. ScreenScraper has no capture entry: its password is never read from a page, the
+   pane only walks the person through making the account. If a provider refuses the embedded
+   browser (a sign-in that redirects to another host, such as a third-party OAuth page, is not
+   loaded in the pane, and an HTTP 403 on the page counts too) the panel shows one row, "Use
+   browser and phone", which opens the system browser on the service's page and starts the phone
+   page below.
+2. **The official page elsewhere.** The guide's manual screen shows the page as a QR code
+   generated on the device and "Open on this device" for the system browser, the numbered
+   steps, and the fields. Each field has Paste (the clipboard) beside it, and takes text from the
+   on-screen keyboard.
+3. **A phone page on the local network (nobody types a 30 character secret on a gamepad).**
+   "Use my phone" (`HandoffSession`, `HandoffHttp`, `HandoffServer`) shows a QR code for
+   `http://<lan address>:<port>/h/<token>`. The token is 128 random bits and is the whole
+   address; it works once. The server listens on an ephemeral port only while the code is on
+   screen (cancel, leaving the screen, five minutes, or sixty seconds after a submit end it),
+   answers only loopback, site-local and link-local peers, and parses at most an 8 KB head and a
+   4 KB body with a 5 second read timeout. HTTPS is not used on the LAN. The page is one inline
+   form with no script or outside resource and `Cache-Control: no-store`, a content security
+   policy, and no referrer; it takes exactly the service's declared fields (an undeclared field,
+   or one that is empty, over its length or holds a control character, is refused), at most twenty
+   requests a minute, and five wrong tokens close the session. Every wrong path answers the same
+   empty 404. What the phone sent is held in memory and shown on the console masked (a secret as
+   its last four characters and its length) with Save and Discard; only Save stores it. The page
+   is never an HTTP client of anything else.
+
+**Credentials are stored encrypted (directed 2026-10-08, tracker #264).** Every credential the
+person supplies (the six fields above) is kept by `CredentialStore`, one helper for all of them:
+AES-256-GCM under a non-exportable Android Keystore key (`KeystoreSecretCipher`, the same
+mechanism the GitHub token uses, `GitHubTokenStore`, with its own key alias), the sealed value in
+a private preferences file of its own (`droidtop_credentials`), opened once per process and
+cached in memory. The first access moves values that older builds kept in the plain launcher
+preferences into it (`CredentialVault.migrateFrom`), removing each plain value only after it reads
+back from the vault, so a failure loses nothing. A value that cannot be opened (the key was lost)
+reads as not set; nothing falls back to plain text. Credentials are never logged (the refusal
+text a failed test shows is the server's own first line, and requests redact the key from the
+subject they log), the app opts out of backups, Share diagnostics never includes the file, and the
+settings backup exports them only in its opt-in encoded section, read from and restored into the
+store. Verified flags and "Stay signed in" are plain preferences: they are not secrets.
 
 ### PC and engine games: what the scrape asks, and of whom
 

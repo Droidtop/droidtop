@@ -71,8 +71,6 @@ import dev.droidtop.library.scraper.ScraperKeyCheck
 import dev.droidtop.library.scraper.ScraperKeyService
 import dev.droidtop.library.scraper.ScraperSource
 import dev.droidtop.library.scraper.ScraperSourcePrefs
-import dev.droidtop.library.scraper.ScreenScraperPrefs
-import dev.droidtop.library.scraper.TheGamesDbPrefs
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -1423,26 +1421,8 @@ object AppSettingsCatalogs {
                 id = "accounts_scrapers",
                 title = "Scraper sources",
                 items = listOf(
-                    NestedScreenItem(
-                        id = "accounts_screenscraper",
-                        title = "ScreenScraper",
-                        inline = screenScraperAccountScreen(),
-                        valueLabel = {
-                            if (ScreenScraperPrefs.userId(context).isBlank()) "No account (still works)" else "Signed in as ${ScreenScraperPrefs.userId(context)}"
-                        },
-                    ),
-                    NestedScreenItem(
-                        id = "accounts_thegamesdb",
-                        title = "TheGamesDB",
-                        inline = theGamesDbAccountScreen(),
-                        valueLabel = {
-                            when {
-                                TheGamesDbPrefs.ownKey(context).isNotBlank() -> "Your key"
-                                TheGamesDbPrefs.builtInKey.isNotBlank() -> "Built in"
-                                else -> "Not set"
-                            }
-                        },
-                    ),
+                    guidedKeyRow(context, ScraperKeyService.SCREENSCRAPER, "ScreenScraper"),
+                    guidedKeyRow(context, ScraperKeyService.THEGAMESDB, "TheGamesDB"),
                     guidedKeyRow(context, ScraperKeyService.IGDB, "IGDB (PC & engine games)"),
                     guidedKeyRow(context, ScraperKeyService.STEAMGRIDDB, "SteamGridDB (PC & engine games)"),
                 ),
@@ -1470,49 +1450,6 @@ object AppSettingsCatalogs {
             ),
         )
     }
-
-    private fun screenScraperAccountScreen() = CatalogScreen(
-        id = "accounts_screenscraper_edit",
-        title = "ScreenScraper account",
-        subtitle = "Your account details only; droidtop's own developer ID is built in",
-        groups = { context ->
-            listOf(
-                CatalogGroup(
-                    id = "accounts_screenscraper_fields",
-                    title = null,
-                    items = listOf(
-                        screenScraperField(context, "ss_user_id", "Username", ScreenScraperPrefs.userId(context)) { c, v ->
-                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.devId(c), ScreenScraperPrefs.devPassword(c), v, ScreenScraperPrefs.userPassword(c))
-                        },
-                        screenScraperField(context, "ss_user_password", "Password", ScreenScraperPrefs.userPassword(context), secret = true) { c, v ->
-                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.devId(c), ScreenScraperPrefs.devPassword(c), ScreenScraperPrefs.userId(c), v)
-                        },
-                    ),
-                ),
-            )
-        },
-    )
-
-    private fun theGamesDbAccountScreen() = CatalogScreen(
-        id = "accounts_thegamesdb_edit",
-        title = "TheGamesDB",
-        groups = { context ->
-            listOf(
-                CatalogGroup(
-                    id = "accounts_thegamesdb_fields",
-                    title = null,
-                    items = listOf(
-                        TextInputItem(
-                            id = "tgdb_api_key",
-                            title = "Your own API key",
-                            value = TheGamesDbPrefs.ownKey(context),
-                            onChange = { c, v -> TheGamesDbPrefs.set(c, v.trim()) },
-                        ),
-                    ),
-                ),
-            )
-        },
-    )
 
     /**
      * An optional source that needs the person's own credential: one row,
@@ -3034,21 +2971,6 @@ object AppSettingsCatalogs {
                 ),
             )
         },
-    )
-
-    private fun screenScraperField(
-        context: Context,
-        id: String,
-        title: String,
-        value: String,
-        secret: Boolean = false,
-        write: (Context, String) -> Unit,
-    ) = TextInputItem(
-        id = id,
-        title = title,
-        value = value,
-        secret = secret,
-        onChange = { c, v -> write(c, v.trim()) },
     )
 
     // ------------------------------------------------------------------

@@ -19,8 +19,28 @@ class ScraperKeySetupTest {
 
     @Test
     fun `each guide points at the official https page`() {
-        assertEquals("https://dev.twitch.tv/console", ScraperKeyService.IGDB.url)
+        assertEquals("https://dev.twitch.tv/console/apps", ScraperKeyService.IGDB.url)
         assertTrue(ScraperKeyService.STEAMGRIDDB.url.startsWith("https://www.steamgriddb.com/"))
+        for (service in ScraperKeyService.entries) assertTrue(service.title, service.url.startsWith("https://"))
+    }
+
+    @Test
+    fun `every service names its fields and what it gets`() {
+        for (service in ScraperKeyService.entries) {
+            assertTrue(service.title, service.fields.isNotEmpty())
+            assertTrue(service.title, service.gets.isNotBlank())
+            assertEquals(service.fields.map { it.id }, service.handoffFields().map { it.id })
+            assertEquals(service.fields.map { it.secret }, service.handoffFields().map { it.secret })
+        }
+        assertEquals(listOf("client_id", "client_secret"), ScraperKeyService.IGDB.fields.map { it.id })
+        assertEquals(listOf("username", "password"), ScraperKeyService.SCREENSCRAPER.fields.map { it.id })
+    }
+
+    @Test
+    fun `no field shares a storage key with another service`() {
+        val keys = ScraperKeyService.entries.flatMap { s -> s.fields.map { it.storeKey } }
+        assertEquals(keys.size, keys.toSet().size)
+        assertTrue(dev.droidtop.library.credentials.CredentialStore.KEYS.containsAll(keys))
     }
 
     @Test

@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "note": "Pages are written from each provider's public documentation. Every entry has verified false until someone has watched it work on the live page; fix addresses, selectors and patterns here, no code change needed. A field is read only from capture.host on a path matching capture.pathMatch, and only an element matching a selector or sitting beside one of the labels, and only if it fits pattern.",
+  "pages": {
+    "IGDB": {
+      "verified": false,
+      "startUrl": "https://dev.twitch.tv/console/apps",
+      "hosts": ["dev.twitch.tv", "*.twitch.tv"],
+      "steps": [
+        { "label": "Sign in to Twitch", "hint": "Use your own Twitch account. Turn on two-factor sign-in if Twitch asks; the developer console needs it.", "urlMatch": "^https://(www|passport|id)\\.twitch\\.tv/" },
+        { "label": "Register an application", "hint": "Name it anything. Category: Application Integration. Client type: Confidential. OAuth redirect URL: http://localhost", "urlMatch": "^https://dev\\.twitch\\.tv/console/apps/(create|\\?)?" },
+        { "label": "Open Manage on it", "hint": "Your application is listed under Applications; its Manage button opens the page with the Client ID.", "urlMatch": "^https://dev\\.twitch\\.tv/console/apps/?$" },
+        { "label": "Press New Secret", "hint": "Twitch shows the Client Secret only once. droidtop reads it the moment it appears.", "urlMatch": "^https://dev\\.twitch\\.tv/console/apps/[^/?#]+" }
+      ],
+      "capture": {
+        "host": "dev.twitch.tv",
+        "pathMatch": "^/console/apps/[^/]+/?$",
+        "fields": [
+          { "id": "client_id", "selectors": [], "labels": ["client id"], "pattern": "[a-z0-9]{30}" },
+          { "id": "client_secret", "selectors": [], "labels": ["client secret"], "pattern": "[a-z0-9]{30}" }
+        ]
+      }
+    },
+    "STEAMGRIDDB": {
+      "verified": false,
+      "startUrl": "https://www.steamgriddb.com/profile/preferences/api",
+      "hosts": ["www.steamgriddb.com", "steamgriddb.com", "steamcommunity.com"],
+      "steps": [
+        { "label": "Sign in", "hint": "Steam sign-in works here. Google, Discord and Twitter may refuse an embedded browser; droidtop then offers the system browser.", "urlMatch": "^https://(www\\.)?steamgriddb\\.com/(login|auth)|^https://steamcommunity\\.com/" },
+        { "label": "Open Preferences, API", "hint": "Your profile menu, Preferences, then the API tab.", "urlMatch": "^https://(www\\.)?steamgriddb\\.com/profile/preferences/?$" },
+        { "label": "Show the API key", "hint": "The key is a 32 character code on the API tab. droidtop offers to use it when it appears.", "urlMatch": "^https://(www\\.)?steamgriddb\\.com/profile/preferences/api" }
+      ],
+      "capture": {
+        "host": "www.steamgriddb.com",
+        "pathMatch": "^/profile/preferences/api/?$",
+        "fields": [
+          { "id": "api_key", "selectors": ["input[readonly]", "input[type=text]", "input[type=password]", "code"], "labels": ["api key"], "pattern": "[a-f0-9]{32}" }
+        ]
+      }
+    },
+    "THEGAMESDB": {
+      "verified": false,
+      "startUrl": "https://forums.thegamesdb.net/",
+      "hosts": ["forums.thegamesdb.net", "thegamesdb.net", "*.thegamesdb.net"],
+      "steps": [
+        { "label": "Sign in or register", "hint": "A free forum account; the key is tied to it.", "urlMatch": "^https://forums\\.thegamesdb\\.net/(login|register)" },
+        { "label": "Request an API key", "hint": "Follow the forum's API access page and fill in the short request.", "urlMatch": "^https://forums\\.thegamesdb\\.net/.*(api|key)" },
+        { "label": "Open your key", "hint": "A 64 character code. droidtop offers to use it when it appears.", "urlMatch": "^https://forums\\.thegamesdb\\.net/" }
+      ],
+      "capture": {
+        "host": "forums.thegamesdb.net",
+        "pathMatch": "^/",
+        "fields": [
+          { "id": "api_key", "selectors": ["input[readonly]", "code"], "labels": ["api key", "your api key", "public key"], "pattern": "[a-f0-9]{64}" }
+        ]
+      }
+    },
+    "SCREENSCRAPER": {
+      "verified": false,
+      "startUrl": "https://screenscraper.fr/membreinscription.php",
+      "hosts": ["screenscraper.fr", "www.screenscraper.fr"],
+      "steps": [
+        { "label": "Create an account", "hint": "Free. Pick a username and password you will type once on the next screen.", "urlMatch": "^https://(www\\.)?screenscraper\\.fr/membreinscription" },
+        { "label": "Confirm the email", "hint": "ScreenScraper emails a confirmation link; open it in the system browser or on your phone.", "urlMatch": "^https://(www\\.)?screenscraper\\.fr/.*(valid|confirm)" },
+        { "label": "Sign in once", "hint": "Check the login works here. Your password is never read from this page.", "urlMatch": "^https://(www\\.)?screenscraper\\.fr/" }
+      ]
+    }
+  }
+}

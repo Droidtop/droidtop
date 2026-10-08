@@ -1,14 +1,7 @@
 package dev.droidtop.net
 
 import android.content.Context
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import android.util.Base64
-import java.security.KeyStore
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
 
 /**
  * Where the user's own GitHub credential lives (docs/SPEC.md 12a "GitHub
@@ -30,9 +23,7 @@ object GitHubTokenStore {
     private const val PREF_ORIGIN = "origin"
     private const val PREF_SCOPE = "scope"
     private const val KEY_ALIAS = "droidtop.github.token"
-    private const val PROVIDER = "AndroidKeyStore"
-    private const val TRANSFORM = "AES/GCM/NoPadding"
-    private const val IV_BYTES = 12
+    private val cipher = KeystoreSecretCipher(KEY_ALIAS)
 
     fun get(context: Context): String? = credential(context)?.token
 
@@ -71,11 +62,7 @@ object GitHubTokenStore {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val stored = prefs.getString(PREF_CIPHERTEXT, null) ?: return null
         val token = runCatching {
-            val bytes = Base64.decode(stored, Base64.NO_WRAP)
-            val key = key(create = false) ?: return null
-            val cipher = Cipher.getInstance(TRANSFORM)
-            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, bytes, 0, IV_BYTES))
-            String(cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES), Charsets.UTF_8)
+            String(cipher.decrypt(Base64.decode(stored, Base64.NO_WRAP)), Charsets.UTF_8)
         }.getOrNull() ?: return null
         val origin = runCatching { GitHubTokenOrigin.valueOf(prefs.getString(PREF_ORIGIN, null).orEmpty()) }
             .getOrDefault(GitHubTokenOrigin.PASTED)
@@ -86,9 +73,7 @@ object GitHubTokenStore {
         val clean = credential.token.trim()
         if (clean.isEmpty()) return false
         return runCatching {
-            val cipher = Cipher.getInstance(TRANSFORM)
-            cipher.init(Cipher.ENCRYPT_MODE, key(create = true)!!)
-            val encrypted = cipher.iv + cipher.doFinal(clean.toByteArray(Charsets.UTF_8))
+            val encrypted = cipher.encrypt(clean.toByteArray(Charsets.UTF_8))
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putString(PREF_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
                 .putString(PREF_LOGIN, credential.login)
@@ -150,19 +135,4 @@ object GitHubTokenStore {
             connection.disconnect()
         }
     }.getOrElse { "Couldn't reach GitHub (${it.message ?: "no network"})" }
-
-    private fun key(create: Boolean): SecretKey? {
-        val store = KeyStore.getInstance(PROVIDER).apply { load(null) }
-        (store.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
-        if (!create) return null
-        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
-        generator.init(
-            KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setKeySize(256)
-                .build(),
-        )
-        return generator.generateKey()
-    }
 }

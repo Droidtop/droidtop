@@ -464,7 +464,7 @@
           scope rather than external-path's narrower primary-volume-only
           coverage.
         -->
-        <!-- The guided key setup for IGDB and SteamGridDB, opened from their rows under Accounts and sources. -->
+        <!-- The guided key setup for IGDB, SteamGridDB, TheGamesDB and ScreenScraper, opened from their rows under Accounts and sources. -->
         <activity
             android:name=".ScraperKeySetupActivity"
             android:exported="false" />

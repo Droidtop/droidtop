@@ -1,9 +1,11 @@
 package dev.droidtop.app
 
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
@@ -19,8 +21,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,29 +35,38 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.droidtop.app.ui.DroidtopTheme
 import dev.droidtop.app.ui.QrCode
+import dev.droidtop.library.credentials.handoff.HandoffHttp
+import dev.droidtop.library.credentials.handoff.HandoffServer
+import dev.droidtop.library.credentials.handoff.HandoffSession
+import dev.droidtop.library.credentials.web.KeyPageSpec
+import dev.droidtop.library.credentials.web.KeyPages
 import dev.droidtop.library.scraper.ScraperKeyCheck
 import dev.droidtop.library.scraper.ScraperKeyService
 import dev.droidtop.library.scraper.ScraperKeyState
-import dev.droidtop.library.scraper.ScraperPrefs
-import dev.droidtop.library.scraper.SteamGridDbPrefs
 import dev.droidtop.shell.gamepad.HintTip
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The guided setup for the two optional scraper sources that need the
- * person's own credential (docs/SPEC.md 7h, "Keyless by default"): numbered
- * steps of a few words, the official page as a QR code a phone can scan
- * (generated on the device, no network) and an Open button for this
- * device's browser, the input fields, and one test call that ends in
- * "Connected" or a one-line error. Opened from the source's row under
+ * The guided setup for a scraper source that needs the person's own
+ * credential (docs/SPEC.md 7h, "Supplying your own keys"). Three ways in, one
+ * screen: the service's own page in a browser pane that reads the key off the
+ * page when the person confirms ([KeyWebPane]); a QR code and button that open
+ * the official page elsewhere; and a one-time page on the local network so the
+ * key is pasted from a phone or PC instead of typed on a gamepad. Fields also
+ * take the clipboard. Every path ends in the same encrypted store, and nothing
+ * is tested until Test is pressed. Opened from the source's row under
  * Settings > Accounts and sources.
  */
 class ScraperKeySetupActivity : AppCompatActivity() {
+    private val panelFocus = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val service = ScraperKeyService.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_SERVICE) }
@@ -62,15 +77,33 @@ class ScraperKeySetupActivity : AppCompatActivity() {
         setContent {
             DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 Scaffold { padding ->
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        SetupScreen(service)
+                    var page by remember { mutableStateOf<KeyPageSpec?>(null) }
+                    var loaded by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        page = withContext(Dispatchers.IO) {
+                            runCatching {
+                                KeyPages.parse(assets.open("key-pages.json").bufferedReader().use { it.readText() })[service.name]
+                            }.getOrNull()
+                        }
+                        loaded = true
+                    }
+                    if (loaded) {
+                        SetupHost(service, page, panelFocus.value, onClose = { finish() }, modifier = Modifier.fillMaxSize().padding(padding))
                     }
                 }
             }
         }
+    }
+
+    // L1 and R1 move between the page and the steps beside it; the page otherwise swallows the pad.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN &&
+            (event.keyCode == KeyEvent.KEYCODE_BUTTON_L1 || event.keyCode == KeyEvent.KEYCODE_BUTTON_R1)
+        ) {
+            panelFocus.value = !panelFocus.value
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     companion object {
@@ -81,74 +114,232 @@ class ScraperKeySetupActivity : AppCompatActivity() {
     }
 }
 
+private enum class SetupMode { WEB, MANUAL }
+
 @Composable
-private fun SetupScreen(service: ScraperKeyService) {
+private fun SetupHost(
+    service: ScraperKeyService,
+    page: KeyPageSpec?,
+    panelFocus: Boolean,
+    onClose: () -> Unit,
+    modifier: Modifier,
+) {
+    val context = LocalContext.current
+    val paneAvailable = page != null && KeyWebProfiles.supported()
+    var mode by remember { mutableStateOf(if (paneAvailable) SetupMode.WEB else SetupMode.MANUAL) }
+    // Set when the provider refused the pane: the manual screen opens the browser and starts the phone page.
+    var fellBack by remember { mutableStateOf(false) }
+    if (mode == SetupMode.WEB && page != null) {
+        KeyWebPane(
+            service = service,
+            page = page,
+            panelFocus = panelFocus,
+            onOtherWays = { mode = SetupMode.MANUAL },
+            onFallback = {
+                fellBack = true
+                mode = SetupMode.MANUAL
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(service.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            },
+            onClose = onClose,
+        )
+    } else {
+        Column(
+            modifier = modifier.padding(20.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ManualSetup(
+                service = service,
+                autoPhone = fellBack,
+                browserPaneAvailable = paneAvailable,
+                onBrowserPane = { mode = SetupMode.WEB },
+            )
+        }
+    }
+}
+
+private class HandoffRun(val session: HandoffSession, val server: HandoffServer, val url: String)
+
+@Composable
+private fun ManualSetup(service: ScraperKeyService, autoPhone: Boolean, browserPaneAvailable: Boolean, onBrowserPane: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var state by remember { mutableStateOf(ScraperKeyCheck.state(context, service)) }
+    var state by remember { mutableStateOf("") }
     var testing by remember { mutableStateOf(false) }
-    // IGDB takes a pair, SteamGridDB one key; the fields buffer here and are stored on Test.
-    var clientId by remember { mutableStateOf(ScraperPrefs.clientId(context)) }
-    var secret by remember { mutableStateOf(ScraperPrefs.clientSecret(context)) }
-    var apiKey by remember { mutableStateOf(SteamGridDbPrefs.apiKey(context)) }
     var result by remember { mutableStateOf<String?>(null) }
+    var loaded by remember { mutableStateOf(false) }
+    // The fields buffer here and are stored on Test; the vault is read off the main thread.
+    val buffer = remember { mutableStateMapOf<String, String>() }
+    var handoff by remember { mutableStateOf<HandoffRun?>(null) }
+    var phoneError by remember { mutableStateOf<String?>(null) }
+
+    suspend fun refresh() {
+        state = withContext(Dispatchers.IO) { ScraperKeyCheck.state(context, service) }
+    }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { buffer.putAll(service.read(context)) }
+        refresh()
+        loaded = true
+    }
+
+    fun stopPhone() {
+        handoff?.server?.stop()
+        handoff = null
+    }
+
+    fun startPhone() {
+        stopPhone()
+        phoneError = null
+        scope.launch {
+            val started = withContext(Dispatchers.IO) {
+                val host = HandoffServer.lanAddress() ?: return@withContext null
+                val session = HandoffSession(service.handoffFields(), System::currentTimeMillis)
+                val server = HandoffServer(session, HandoffHttp(session, "${service.title} key"))
+                val port = runCatching { server.start() }.getOrNull() ?: return@withContext null
+                HandoffRun(session, server, HandoffServer.url(host, port, session.token))
+            }
+            if (started == null) phoneError = "No network" else handoff = started
+        }
+    }
+    LaunchedEffect(autoPhone) { if (autoPhone) startPhone() }
+    DisposableEffect(Unit) { onDispose { handoff?.server?.stop() } }
+
+    // Ends the page when it expires or is closed; the server stops itself, the screen follows.
+    var tick by remember { mutableStateOf(0) }
+    LaunchedEffect(handoff) {
+        while (handoff != null) {
+            delay(500)
+            tick++
+            val current = handoff ?: break
+            if (!current.session.isLive()) stopPhone()
+        }
+    }
 
     Text(service.title, style = MaterialTheme.typography.headlineMedium)
     HintTip(service.credit) {
         Text(result ?: state, style = MaterialTheme.typography.titleMedium)
     }
+    Text(service.gets, style = MaterialTheme.typography.labelLarge)
+    if (browserPaneAvailable) {
+        Button(onClick = onBrowserPane) { Text("Open the key page here") }
+    }
     service.steps.forEachIndexed { index, step ->
         Text("${index + 1}  $step", style = MaterialTheme.typography.bodyLarge)
     }
-    QrCode(content = service.url, size = 220.dp)
-    Button(onClick = {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(service.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    }) { Text("Open") }
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        QrCode(content = service.url, size = 180.dp)
+        Button(onClick = {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(service.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }) { Text("Open on this device") }
+    }
 
-    when (service) {
-        ScraperKeyService.IGDB -> {
-            OutlinedTextField(
-                value = clientId, onValueChange = { clientId = it.trim() },
-                label = { Text("Client ID") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = secret, onValueChange = { secret = it.trim() },
-                label = { Text("Client Secret") }, singleLine = true,
-                visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
-            )
+    if (loaded) {
+        service.fields.forEach { field ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = buffer[field.id].orEmpty(),
+                    onValueChange = { buffer[field.id] = it.trim() },
+                    label = { Text(field.label) },
+                    singleLine = true,
+                    visualTransformation = if (field.secret) PasswordVisualTransformation() else VisualTransformation.None,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { clipboardText(context)?.let { buffer[field.id] = it } }) { Text("Paste") }
+            }
         }
-        ScraperKeyService.STEAMGRIDDB -> OutlinedTextField(
-            value = apiKey, onValueChange = { apiKey = it.trim() },
-            label = { Text("API key") }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
+    }
+
+    val current = handoff
+    if (current == null) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            HintTip("Shows a code. Scan it with a phone or PC on the same network and paste the key there.") {
+                Button(onClick = { startPhone() }) { Text("Use my phone") }
+            }
+            phoneError?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        }
+    } else {
+        PhonePanel(
+            service = service,
+            handoff = current,
+            tick = tick,
+            onSave = { values ->
+                scope.launch {
+                    withContext(Dispatchers.IO) { service.write(context, values) }
+                    values.forEach { (id, value) -> buffer[id] = value }
+                    stopPhone()
+                    result = null
+                    refresh()
+                }
+            },
+            onCancel = { stopPhone() },
         )
     }
+
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Button(enabled = !testing, onClick = {
+        Button(enabled = !testing && loaded, onClick = {
             testing = true
             result = "Testing"
             scope.launch {
                 val line = withContext(Dispatchers.IO) {
-                    when (service) {
-                        ScraperKeyService.IGDB -> ScraperPrefs.set(context, clientId, secret)
-                        ScraperKeyService.STEAMGRIDDB -> SteamGridDbPrefs.set(context, apiKey)
-                    }
+                    service.write(context, buffer.toMap())
                     ScraperKeyCheck.test(context, service)
                 }
-                state = ScraperKeyCheck.state(context, service)
+                refresh()
                 result = line
                 testing = false
             }
         }) { Text("Test") }
-        if (state != ScraperKeyState.NOT_SET) {
+        if (state != ScraperKeyState.NOT_SET && state != ScraperKeyState.NO_ACCOUNT && state != ScraperKeyState.BUILT_IN) {
             Button(onClick = {
-                when (service) {
-                    ScraperKeyService.IGDB -> { ScraperPrefs.set(context, "", ""); clientId = ""; secret = "" }
-                    ScraperKeyService.STEAMGRIDDB -> { SteamGridDbPrefs.set(context, ""); apiKey = "" }
+                scope.launch {
+                    withContext(Dispatchers.IO) { service.write(context, service.fields.associate { it.id to "" }) }
+                    buffer.clear()
+                    result = null
+                    refresh()
                 }
-                state = ScraperKeyCheck.state(context, service)
-                result = null
             }) { Text("Clear") }
         }
     }
+}
+
+@Composable
+private fun PhonePanel(
+    service: ScraperKeyService,
+    handoff: HandoffRun,
+    tick: Int,
+    onSave: (Map<String, String>) -> Unit,
+    onCancel: () -> Unit,
+) {
+    // tick only forces a redraw of the countdown and of a freshly received page.
+    val received = remember(tick) { handoff.session.received() }
+    if (received == null) {
+        val seconds = (handoff.session.remainingMs() / 1000).toInt()
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            QrCode(content = handoff.url, size = 200.dp)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("%d:%02d".format(seconds / 60, seconds % 60), style = MaterialTheme.typography.titleMedium)
+                Button(onClick = onCancel) { Text("Cancel") }
+            }
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Received", style = MaterialTheme.typography.titleMedium)
+            service.fields.forEach { field ->
+                Text(
+                    "${field.label}: ${HandoffSession.maskForReview(received[field.id].orEmpty(), field.secret)}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = { onSave(received) }) { Text("Save") }
+                TextButton(onClick = onCancel) { Text("Discard") }
+            }
+        }
+    }
+}
+
+/** The clipboard's text, trimmed; null when it holds none. */
+private fun clipboardText(context: Context): String? {
+    val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return null
+    return manager.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()?.trim()?.takeIf { it.isNotEmpty() }
 }

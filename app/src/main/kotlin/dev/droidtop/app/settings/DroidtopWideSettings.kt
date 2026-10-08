@@ -17,6 +17,7 @@ import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
+import dev.droidtop.library.credentials.CredentialStore
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.shell.standard.HomeRolePrefs
 import org.json.JSONArray
@@ -415,7 +416,7 @@ object DroidtopWideSettings {
         for ((key, value) in CatalogPrefs.prefs(context).all) {
             if (key == KEY_BACKUP_CREDENTIALS) continue
             if (isCredentialKey(key)) {
-                if (includeCredentials && key in CREDENTIAL_KEYS && value is String) credentials.put(key, value)
+                if (includeCredentials && key in CREDENTIAL_KEYS && key !in CredentialStore.KEYS && value is String) credentials.put(key, value)
                 continue
             }
             when (value) {
@@ -425,6 +426,8 @@ object DroidtopWideSettings {
             }
         }
         if (includeCredentials) {
+            // The user's own keys live in the encrypted store, not the preferences file.
+            CredentialStore.snapshot(context).forEach { (key, value) -> credentials.put(key, value) }
             json.put(BACKUP_CREDENTIALS_FIELD, Base64.encodeToString(credentials.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP))
         }
         context.contentResolver.openOutputStream(uri)?.use { it.write(json.toString(2).toByteArray()) }
@@ -473,7 +476,11 @@ object DroidtopWideSettings {
         json.optString(BACKUP_CREDENTIALS_FIELD).takeIf { it.isNotEmpty() }?.let { encoded ->
             val credentials = JSONObject(String(Base64.decode(encoded, Base64.NO_WRAP), Charsets.UTF_8))
             for (key in credentials.keys()) {
-                if (key in CREDENTIAL_KEYS) editor.putString(key, credentials.getString(key))
+                if (key in CredentialStore.KEYS) {
+                    CredentialStore.put(context, key, credentials.getString(key))
+                } else if (key in CREDENTIAL_KEYS) {
+                    editor.putString(key, credentials.getString(key))
+                }
             }
         }
         editor.apply()
