@@ -7,6 +7,7 @@ import dev.droidtop.library.PcInfo
 import dev.droidtop.shell.gamepad.query.LibraryQuery
 import dev.droidtop.shell.gamepad.query.LibrarySortKey
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -109,8 +110,17 @@ class PcShelvesTest {
     }
 
     @Test
-    fun `the hero card is as wide as landscape art is at a capsule's height`() {
-        assertEquals(HERO_ASPECT / CAPSULE_ASPECT, heroWidth(androidx.compose.ui.unit.Dp(1f)).value, 0.001f)
+    fun `the hero card is Steam's featured card, 3_2 capsules wide at a capsule's height`() {
+        assertEquals(3.2f, heroWidth(androidx.compose.ui.unit.Dp(1f)).value, 0.001f)
+        assertEquals(CAPSULE_ASPECT * 3.2f, HERO_ASPECT, 0.001f)
+    }
+
+    @Test
+    fun `only art noticeably wider than tall is shown whole in a portrait capsule`() {
+        assertTrue(isWideArt(640f, 480f))
+        assertFalse(isWideArt(600f, 900f))
+        assertFalse(isWideArt(105f, 100f))
+        assertFalse(isWideArt(0f, 0f))
     }
 
     @Test

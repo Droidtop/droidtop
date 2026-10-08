@@ -10895,19 +10895,36 @@ own games, in droidtop's own treatment:
 - **Continue playing is the first shelf** and the first card of the first
   shelf is always the **hero card** (`isHeroCard`; on a library nothing has
   been played from, whichever shelf leads), so Home and Overview both open on
-  one large piece of art (`PcCapsule(hero = true)`): the game's landscape hero art at the
-  capsules' own height (`heroWidth`, `HERO_ASPECT` 16:9) so the row keeps
-  one baseline, the name under it and one quiet line,
-  "Played yesterday · 2 h 5 min" (`heroCaption`). That row has no heading,
-  as the Deck's recent row has none: the caption says what it is. Only portrait art: that art
-  at its own shape beside the title on the plate, never stretched. Recently
-  added follows as its own shelf, unchanged.
+  one large piece of art (`PcCapsule(hero = true)`): Steam's featured card,
+  3.2 capsules wide at the capsules' own height (`heroWidth`,
+  `HERO_CAPSULES_WIDE`, so landscape hero art loses a thin band top and
+  bottom) so the row keeps one baseline, under it one small uppercase label,
+  "PLAYED YESTERDAY · 2 H 5 MIN" (`heroCaption`, the eyebrow role), above the
+  name in bold (2026-10-08, Droidtop/tracker#363). That row has no heading,
+  as the Deck's recent row has none: the label says what it is. Only portrait
+  art: that art whole at its own shape beside a small label (the kind of
+  game) over the title, over a soft, darkened copy of itself filling the card
+  (a small decode scaled up, no blur) under a ground-coloured gradient from
+  the left (DroidDeck's hero), never stretched and never a flat grey slab.
+  Recently added follows as its own shelf, unchanged.
+- **Shelves are Steam's** (2026-10-08, Droidtop/tracker#363): 24dp between
+  shelves and 12dp between capsules, the heading in the heading role (22/28
+  bold), quieter until the cursor is on that shelf; the shelves rise in one
+  after another when the page first appears and are simply there when
+  scrolled back to. **Wide art in a portrait capsule** (a Retro game's
+  screenshot, a header) is shown whole over a soft, darkened copy of itself
+  (DroidDeck's cover treatment) instead of being cropped into 2:3; box art
+  still fills the capsule. A capsule's corner marks are small uppercase chips
+  with a hairline of their own ink.
 - **The backdrop** (`PcBackdrop`) is the art of the game under the cursor
   (`backdropArt`: its hero, else its box art), crossfading as the cursor
-  moves, shown at 70% opacity and darkened toward the ground by a scrim (35% at
-  the top to 85% at the bottom; the Steam original measures about half
-  brightness) that is heaviest where the shelves' text sits. It keeps the last game's art while the cursor is on
-  the strip, and draws nothing (the plain ground) for a game with no art.
+  moves over 500 ms (quick-out), shown at 70% opacity and darkened toward the
+  ground by a scrim (50% at the top to 85% at the bottom, Steam's about half
+  brightness) and a vignette centred high (clear at the centre-top, falling
+  to the ground at the edges, as Steam masks its home backdrop). It keeps the
+  last game's art while the cursor is on the strip; for a game with no art it
+  draws a quiet glow of the theme's accent from the top-left corner (12% at
+  the corner), never a per-game colour.
   Cheap on purpose: **no live blur**: the art is decoded small (640 by 360)
   and scaled up under the scrim, so it is soft by construction and costs one
   small bitmap; the games two either side of the cursor are **preloaded**

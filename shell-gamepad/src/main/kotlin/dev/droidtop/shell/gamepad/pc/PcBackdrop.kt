@@ -9,7 +9,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil3.SingletonImageLoader
@@ -36,14 +39,19 @@ import dev.droidtop.shell.gamepad.Motion
  * - **No disk work from here**: the art is a URI the entry already carries
  *   and Coil decodes it off the main thread.
  *
- * With no art the backdrop draws nothing and the page's own ground shows.
- * Colours come from the theme tokens, never a literal.
+ * Steam's treatment, restated (docs/SPEC.md 7i): the art at about half
+ * brightness, a vignette that keeps the centre-top and lets the edges fall
+ * to the ground, and a 500 ms quick-out crossfade as the cursor moves. With
+ * no art the page gets a quiet glow of the theme's accent from the top-left
+ * corner (DroidDeck's empty backdrop, ui/FrontEndContent.kt at 9310d19)
+ * instead of a dead flat ground, never a per-game colour. Colours come from
+ * the theme tokens, never a literal.
  */
 @Composable
 internal fun PcBackdrop(art: String?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Box(modifier = modifier.fillMaxSize()) {
-        Crossfade(targetState = art, animationSpec = Motion.ambientFade(), label = "pc backdrop") { shown ->
+        Crossfade(targetState = art, animationSpec = Motion.backdrop(), label = "pc backdrop") { shown ->
             if (shown != null) {
                 AsyncImage(
                     model = remember(shown) { backdropRequest(context, shown) },
@@ -55,7 +63,8 @@ internal fun PcBackdrop(art: String?, modifier: Modifier = Modifier) {
             }
         }
         if (art != null) {
-            // Darker toward the bottom, where the shelves' text sits.
+            // Darker toward the bottom, where the shelves' text sits, and a
+            // vignette centred high, as Steam masks its home backdrop.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -66,7 +75,33 @@ internal fun PcBackdrop(art: String?, modifier: Modifier = Modifier) {
                                 MenuTokens.Ground.copy(alpha = BACKDROP_SCRIM_BOTTOM),
                             ),
                         ),
-                    ),
+                    )
+                    .drawBehind {
+                        drawRect(
+                            Brush.radialGradient(
+                                0f to Color.Transparent,
+                                0.76f to MenuTokens.Ground.copy(alpha = 0.4f),
+                                1f to MenuTokens.Ground,
+                                center = Offset(size.width * 0.5f, size.height * 0.18f),
+                                radius = maxOf(size.width, size.height) * 0.8f,
+                            ),
+                        )
+                    },
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawBehind {
+                        drawRect(
+                            Brush.radialGradient(
+                                0f to MenuTokens.Accent.copy(alpha = BACKDROP_GLOW_ALPHA),
+                                1f to Color.Transparent,
+                                center = Offset.Zero,
+                                radius = maxOf(size.width, size.height) * 0.7f,
+                            ),
+                        )
+                    },
             )
         }
     }
@@ -104,9 +139,12 @@ internal const val BACKDROP_PRELOAD_REACH = 2
 
 /**
  * How much of the art shows through, and the ground laid over it, top and
- * bottom: lighter than before (the Steam original measures about half
- * brightness at 70% opacity), still heaviest where the shelves' text sits.
+ * bottom: Steam's about half brightness at 70% opacity, heaviest where the
+ * shelves' text sits.
  */
 private const val BACKDROP_ART_ALPHA = 0.7f
-private const val BACKDROP_SCRIM_TOP = 0.35f
+private const val BACKDROP_SCRIM_TOP = 0.5f
 private const val BACKDROP_SCRIM_BOTTOM = 0.85f
+
+/** The empty backdrop's accent glow at its corner: a hint of colour, not a fill. */
+private const val BACKDROP_GLOW_ALPHA = 0.12f

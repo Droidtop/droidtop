@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,8 +25,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -35,11 +38,14 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.kindLine
+import dev.droidtop.shell.gamepad.Corners
+import dev.droidtop.shell.gamepad.FocusLook
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.Space
@@ -47,6 +53,7 @@ import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.focusLift
 import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.selectionFrame
+import dev.droidtop.shell.gamepad.shine
 
 /**
  * Steam's library capsule is 600x900, a 2:3 portrait, and every shelf and
@@ -57,13 +64,21 @@ import dev.droidtop.shell.gamepad.selectionFrame
 internal const val CAPSULE_ASPECT = 2f / 3f
 
 /**
- * The hero card's shape: the landscape art (16:9) a scrape leaves as the
- * game's hero. The Continue playing shelf's first card is drawn this way,
- * at the capsules' own height, so the row keeps one baseline.
+ * How many capsules wide the hero card is: Steam's featured card on Home is
+ * about 3.2 portrait capsules wide at the same height, so the game you most
+ * likely want is the biggest thing on the screen and the row keeps one
+ * baseline.
  */
-internal const val HERO_ASPECT = 16f / 9f
+internal const val HERO_CAPSULES_WIDE = 3.2f
 
-/** A hero card as wide as its landscape art is at a capsule's height. */
+/**
+ * The hero card's shape: [HERO_CAPSULES_WIDE] capsules at a capsule's
+ * height, a little wider than 2:1. Landscape art (16:9) fills it with a
+ * thin band cropped top and bottom, as Steam's featured card does.
+ */
+internal const val HERO_ASPECT = CAPSULE_ASPECT * HERO_CAPSULES_WIDE
+
+/** A hero card as wide as [HERO_CAPSULES_WIDE] capsules. */
 internal fun heroWidth(capsuleWidth: Dp): Dp = capsuleWidth * (HERO_ASPECT / CAPSULE_ASPECT)
 
 /**
@@ -122,14 +137,19 @@ internal fun capsuleStatusOf(entry: LibraryEntry, download: StoreDownloads.Progr
  * the touch route to Y (the game's page), the convention every card in
  * this shell follows.
  *
+ * The focus look is Steam's (docs/SPEC.md "Gaming motion and focus"): the
+ * capsule lifts ([focusLift]), the window's ring sits just outside its
+ * crisp corners, and a sheen crosses it once as the cursor arrives.
+ *
  * [badge], set on the shelves, says what the game is (PC, Retro, App,
  * Engine) and its store or system in words at the bottom-left (it replaces
  * the store letter).
  *
  * [hero] draws the game as a landscape card (docs/SPEC.md 7i, "Home art"):
- * its hero art, or, when only portrait art exists, that art beside the
- * title on the plate, and under it the name and one quiet line of when it
- * was last played ([heroCaption]). The caller gives it a [heroWidth].
+ * its hero art, or, when only portrait art exists, that art whole beside
+ * the title over a soft, darkened copy of itself, and under it one small
+ * label of when it was last played ([heroCaption]) above the name. The
+ * caller gives it a [heroWidth].
  */
 @Composable
 internal fun PcCapsule(
@@ -144,11 +164,8 @@ internal fun PcCapsule(
     hero: Boolean = false,
     badge: KindBadge? = null,
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = Corners.Crisp
     val ring = selected && PadModality.showsFocus
-    // The one focus treatment (docs/SPEC.md "Gaming motion and focus"): the
-    // capsule lifts and gains a shadow under the cursor and the rest sit
-    // slightly dimmed.
     val title = GameNaming.displayName(entry.title)
     Column(
         modifier = modifier
@@ -162,8 +179,15 @@ internal fun PcCapsule(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(if (hero) HERO_ASPECT else CAPSULE_ASPECT)
-            .focusLift(ring, shape)
-            .selectionFrame(selected, shape, rest = MenuTokens.Card, restOutline = MenuTokens.CardOutline),
+            .focusLift(ring, shape, wide = hero)
+            .selectionFrame(
+                selected,
+                shape,
+                rest = MenuTokens.Card,
+                restOutline = MenuTokens.CardOutline,
+                ringOutset = FocusLook.RingOffsetDp.dp,
+            )
+            .shine(ring),
     ) {
         // A hero card wants the landscape art; a capsule the box art.
         val art = if (hero) entry.heroUri else entry.artworkUri
@@ -172,35 +196,51 @@ internal fun PcCapsule(
         // (console, build 1386: three blank cards on Home's Recently added).
         var artFailed by remember(art) { mutableStateOf(false) }
         if (art != null && !artFailed) {
-            AsyncImage(
-                model = art,
-                contentDescription = title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().clip(shape),
-                onError = { artFailed = true },
-            )
+            CapsuleArt(art, title, wholeIfWide = !hero, onError = { artFailed = true })
         } else if (hero && entry.artworkUri != null && entry.artworkUri != art) {
             // Only portrait art: it is never stretched across a landscape
-            // card. It sits at its own shape beside the title.
+            // card. It sits whole at its own shape beside the title, over a
+            // soft, darkened copy of itself that fills the card (DroidDeck's
+            // GameHero, ui/FrontEndGames.kt at 9310d19), never a flat slab.
+            SoftArt(entry.artworkUri!!)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            0f to MenuTokens.Ground.copy(alpha = 0.92f),
+                            0.55f to MenuTokens.Ground.copy(alpha = 0.6f),
+                            1f to Color.Transparent,
+                        ),
+                    ),
+            )
             Row(
                 modifier = Modifier.fillMaxSize().padding(Space.Sm),
-                horizontalArrangement = Arrangement.spacedBy(Space.Md),
+                horizontalArrangement = Arrangement.spacedBy(Space.Lg),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AsyncImage(
                     model = entry.artworkUri,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxHeight().aspectRatio(CAPSULE_ASPECT).clip(RoundedCornerShape(6.dp)),
+                    modifier = Modifier.fillMaxHeight().aspectRatio(CAPSULE_ASPECT).clip(Corners.Crisp),
                 )
-                Text(
-                    title,
-                    color = MenuTokens.OnSurface,
-                    style = TypeRole.rowTitle,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Hair)) {
+                    Text(
+                        entry.kindLine().uppercase(),
+                        color = MenuTokens.Accent,
+                        style = TypeRole.eyebrow,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        title,
+                        color = MenuTokens.OnSurface,
+                        style = TypeRole.heroTitle,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         } else {
             // No art: the plate carries the name, as the Deck does for
@@ -243,17 +283,20 @@ internal fun PcCapsule(
         CapsuleCorners(entry, download, parts, badge)
     }
     if (hero) {
+        // Steam's featured card says when it was played under it; the small
+        // label leads, the name follows in the heading weight.
         Text(
-            title,
-            color = if (selected) MenuTokens.OnSurface else MenuTokens.Value,
-            style = TypeRole.rowTitle,
+            heroCaption(entry, System.currentTimeMillis()).uppercase(),
+            color = MenuTokens.OnSurfaceMuted,
+            style = TypeRole.eyebrow,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            heroCaption(entry, System.currentTimeMillis()),
-            color = MenuTokens.OnSurfaceMuted,
-            style = MaterialTheme.typography.labelSmall,
+            title,
+            color = if (selected) MenuTokens.OnSurface else MenuTokens.Value,
+            style = TypeRole.rowTitle,
+            fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -261,7 +304,58 @@ internal fun PcCapsule(
     }
 }
 
-/** The top-left badge: the game's [CapsuleStatus], on a plate that stays legible over any art. */
+/**
+ * A capsule's art. Box art fills the capsule. Wide art in a portrait
+ * capsule ([wholeIfWide]) -- a Retro game's screenshot, a header image -- is
+ * shown whole over a soft, darkened copy of itself instead of losing its
+ * sides to the crop (DroidDeck's CoverImage, ui/FrontEndArt.kt at 9310d19).
+ * The soft copy is a small decode scaled up, not a blur (docs/SPEC.md 7i,
+ * "no live blur"), and is only requested once the art has turned out wide.
+ */
+@Composable
+private fun BoxScope.CapsuleArt(art: String, title: String, wholeIfWide: Boolean, onError: () -> Unit) {
+    var wide by remember(art) { mutableStateOf(false) }
+    if (wide) {
+        SoftArt(art)
+        Box(Modifier.matchParentSize().background(MenuTokens.Scrim.copy(alpha = SOFT_ART_DARKEN)))
+    }
+    AsyncImage(
+        model = art,
+        contentDescription = title,
+        contentScale = if (wide) ContentScale.Fit else ContentScale.Crop,
+        modifier = Modifier.fillMaxSize(),
+        onError = { onError() },
+        onSuccess = { state ->
+            val size = state.painter.intrinsicSize
+            if (wholeIfWide && isWideArt(size.width, size.height)) wide = true
+        },
+    )
+}
+
+/** A soft copy of [art] filling its box: a tiny decode scaled up, so it is soft by construction. */
+@Composable
+private fun SoftArt(art: String) {
+    val context = LocalContext.current
+    AsyncImage(
+        model = remember(art) {
+            ImageRequest.Builder(context).data(art).size(coil3.size.Size(SOFT_ART_WIDTH_PX, SOFT_ART_HEIGHT_PX)).build()
+        },
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.fillMaxSize(),
+    )
+}
+
+/** Whether art of this size loses real content to a portrait capsule's crop: noticeably wider than tall. Pure. */
+internal fun isWideArt(width: Float, height: Float): Boolean =
+    width > 0f && height > 0f && width > height * 1.1f
+
+/** The soft copy's decode size and how much it is darkened under the whole art. */
+private const val SOFT_ART_WIDTH_PX = 24
+private const val SOFT_ART_HEIGHT_PX = 36
+private const val SOFT_ART_DARKEN = 0.45f
+
+/** The top-left badge: the game's [CapsuleStatus], on a chip that stays legible over any art. */
 @Composable
 internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: StoreDownloads.Progress? = null) {
     val status = capsuleStatusOf(entry, download) ?: return
@@ -273,15 +367,7 @@ internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: StoreDow
         CapsuleStatus.MISSING -> Triple("Missing", MenuTokens.Scrim, MenuTokens.Danger)
         CapsuleStatus.INSTALLED -> Triple("✓", MenuTokens.Scrim, MenuTokens.Affirmative)
     }
-    Box(
-        modifier = Modifier
-            .align(Alignment.TopStart)
-            .padding(Space.Sm)
-            .background(fill, RoundedCornerShape(50))
-            .padding(horizontal = Space.Sm, vertical = Space.Hair),
-    ) {
-        Text(text, color = ink, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-    }
+    CapsuleChip(text, ink, fill, Modifier.align(Alignment.TopStart))
 }
 
 /**
@@ -295,9 +381,9 @@ private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownload
     if (badge != null) {
         KindMark(badge, Modifier.align(Alignment.BottomStart))
     } else if (entry.isStoreRow() && source != null) {
-        CornerMark(source.toString(), Modifier.align(Alignment.BottomStart))
+        CapsuleChip(source.toString(), MenuTokens.OnSurface, MenuTokens.Scrim, Modifier.align(Alignment.BottomStart))
     }
-    if (parts > 1) CornerMark("×$parts", Modifier.align(Alignment.BottomEnd))
+    if (parts > 1) CapsuleChip("×$parts", MenuTokens.OnSurface, MenuTokens.Scrim, Modifier.align(Alignment.BottomEnd))
     if (download != null) {
         Box(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(MenuTokens.Scrim)) {
             Box(
@@ -310,39 +396,49 @@ private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownload
     }
 }
 
-/** The kind badge on its dark plate: the kind in bold, then its store or system quieter. */
+/**
+ * The kind badge as a capsule chip (the look of [CapsuleChip]): the kind in
+ * bold, then its store or system quieter, in small capitals.
+ */
 @Composable
 private fun KindMark(badge: KindBadge, modifier: Modifier) {
     val muted = MenuTokens.OnSurfaceMuted
     Text(
         buildAnnotatedString {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(badge.kind.word) }
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(badge.kind.word.uppercase()) }
             badge.detail?.let { detail ->
-                withStyle(SpanStyle(color = muted)) { append(" · $detail") }
+                withStyle(SpanStyle(color = muted)) { append(" · ${detail.uppercase()}") }
             }
         },
         color = MenuTokens.OnSurface,
-        style = MaterialTheme.typography.labelSmall,
+        style = TypeRole.eyebrow,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .padding(Space.Sm)
-            .background(MenuTokens.Scrim, RoundedCornerShape(50))
+            .background(MenuTokens.Scrim, Corners.Pill)
+            .border(1.dp, MenuTokens.OnSurface.copy(alpha = 0.3f), Corners.Pill)
             .padding(horizontal = Space.Sm, vertical = Space.Hair),
     )
 }
 
+/**
+ * The one chip a capsule carries in a corner (DroidDeck's status Chip,
+ * ui/FrontEndWidgets.kt at 9310d19): a pill on [fill] with a hairline of
+ * its own [ink], so it reads over any art, the label in small capitals.
+ */
 @Composable
-private fun CornerMark(text: String, modifier: Modifier) {
+private fun CapsuleChip(text: String, ink: Color, fill: Color, modifier: Modifier) {
     Text(
-        text,
-        color = MenuTokens.OnSurface,
-        style = MaterialTheme.typography.labelSmall,
+        text.uppercase(),
+        color = ink,
+        style = TypeRole.eyebrow,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .padding(Space.Sm)
-            .background(MenuTokens.Scrim, RoundedCornerShape(50))
+            .background(fill, Corners.Pill)
+            .border(1.dp, ink.copy(alpha = 0.3f), Corners.Pill)
             .padding(horizontal = Space.Sm, vertical = Space.Hair),
     )
 }

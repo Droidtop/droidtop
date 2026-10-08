@@ -61,6 +61,8 @@ import dev.droidtop.shell.gamepad.HelpRowClaim
 import dev.droidtop.shell.gamepad.GamingSection
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.Motion
+import dev.droidtop.shell.gamepad.rise
 import dev.droidtop.shell.gamepad.OwnShoulders
 import dev.droidtop.shell.gamepad.StatusClusterRoom
 import dev.droidtop.shell.gamepad.ViewStrip
@@ -959,6 +961,14 @@ private fun PcShelvesHome(
     }
     val width = capsuleWidth()
     val heroCardWidth = heroWidth(width)
+    // The shelves rise in one after another when the page first appears
+    // (docs/SPEC.md "Gaming motion and focus"); a shelf scrolled back into
+    // view later is simply there.
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(Motion.ms(Motion.RiseMs + Motion.riseDelay(Motion.RiseMaxSteps)))
+        entered = true
+    }
     LazyColumn(
         state = columnState,
         modifier = Modifier.fillMaxSize(),
@@ -968,18 +978,23 @@ private fun PcShelvesHome(
             top = if (mixed) maxOf(Space.Sm, StatusClusterRoom.size.height) else Space.Sm,
             bottom = Space.Lg,
         ),
-        verticalArrangement = Arrangement.spacedBy(Space.Lg),
+        // Steam's home spacing: 24dp between shelves, 12dp between capsules.
+        verticalArrangement = Arrangement.spacedBy(Space.Xl),
     ) {
         itemsIndexed(shelves, key = { _, shelf -> shelf.id }) { shelfIndex, shelf ->
             val onThisShelf = !state.stripFocused && !onDest && state.shelfIndex == shelfIndex
-            Column {
+            Column(if (entered) Modifier else Modifier.rise(shelfIndex)) {
                 // The hero row of what was being played carries no heading,
                 // as the Deck's recent row has none: the hero card's own
                 // caption ("Played today · 2 h") says what the row is.
+                // Steam's shelf heading: the heading weight, quieter until
+                // the cursor is on the shelf.
                 if (!(shelfIndex == 0 && shelf.id == SHELF_CONTINUE)) Text(
                     shelf.heading,
                     color = if (onThisShelf) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
-                    style = TypeRole.rowTitle,
+                    style = TypeRole.screenTitle,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.padding(
                         start = window.edgePadding,
                         end = window.edgePadding,
@@ -1015,7 +1030,11 @@ private fun PcShelvesHome(
         // Home's way to the libraries: the Retro and PC menus, the last stop of
         // the one list rather than a bar above it.
         if (mixed) item(key = "home-destinations") {
-            HomeDestinations(selected = state.destIndex.takeIf { onDest }, onOpen = onOpenSection)
+            HomeDestinations(
+                selected = state.destIndex.takeIf { onDest },
+                onOpen = onOpenSection,
+                modifier = if (entered) Modifier else Modifier.rise(shelves.size),
+            )
         }
     }
 }
@@ -1035,11 +1054,11 @@ internal val HOME_DESTINATIONS = listOf(
  * pad is on; a tap opens at once, as a strip chip does.
  */
 @Composable
-private fun HomeDestinations(selected: Int?, onOpen: (Int) -> Unit) {
+private fun HomeDestinations(selected: Int?, onOpen: (Int) -> Unit, modifier: Modifier = Modifier) {
     val window = LocalShellWindow.current
     Row(
         horizontalArrangement = Arrangement.spacedBy(Space.Md),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = window.edgePadding),
+        modifier = modifier.fillMaxWidth().padding(horizontal = window.edgePadding),
     ) {
         HOME_DESTINATIONS.forEachIndexed { index, destination ->
             dev.droidtop.shell.gamepad.ShellChip(

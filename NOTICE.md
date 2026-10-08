@@ -123,10 +123,11 @@ This project is distributed under the GNU General Public License v3.0 (see
   design tokens: the motion switch and its snap rule, Rise and the sheen (`ui/FrontEndScreen.kt`,
   as `shell-gamepad/.../MotionEffects.kt` and `MotionTokens.kt`), the accent-tinted lift
   (`ui/FrontEndArt.kt`, as `FocusLift.kt`), the sliding focus ring (`ui/FocusGlide.kt`, as
-  `FocusGlide.kt`), the primary button's tinted lift (`ui/FrontEndWidgets.kt`, in `GamingMenu.kt`)
-  and the non-focusable keycap (`ui/SettingsWidgets.kt`, as `Keycap` in `TouchActions.kt`). Each
-  ported file names the DroidDeck file it came from.
-  No DroidDeck artwork, logo or wordmark is used.
+  `FocusGlide.kt`), the primary button's tinted lift (`ui/FrontEndWidgets.kt`, in `GamingMenu.kt`),
+  the non-focusable keycap (`ui/SettingsWidgets.kt`, as `Keycap` in `TouchActions.kt`), and the
+  wide-art cover, hero fill, status chip and empty-backdrop glow (`ui/FrontEndArt.kt`,
+  `ui/FrontEndGames.kt`, `ui/FrontEndWidgets.kt`, `ui/FrontEndContent.kt`, in `pc/PcCapsule.kt` and
+  `pc/PcBackdrop.kt`). Each ported file names the DroidDeck file it came from. No DroidDeck artwork, logo or wordmark is used.
 
 ## Bundled themes
 
