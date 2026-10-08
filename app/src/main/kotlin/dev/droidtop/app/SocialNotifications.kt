@@ -9,10 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import dev.droidtop.library.settings.Mode
+import dev.droidtop.library.settings.Place
 import dev.droidtop.library.settings.SocialBadge
 import dev.droidtop.library.social.SocialHub
-import dev.droidtop.shell.standard.BackButtonMenu
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,11 +46,8 @@ object SocialNotifications {
         }
     }
 
-    /** What opens the Social place: Gaming, on that place. */
-    fun openIntent(context: Context): Intent = Intent(context, MainActivity::class.java)
-        .putExtra(BackButtonMenu.EXTRA_MODE, Mode.GAMING.id)
-        .putExtra(BackButtonMenu.EXTRA_GAMING_START_SECTION, "SOCIAL")
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    /** What opens the Social place, in the mode the person is using ([PlaceLinks]). */
+    fun openIntent(context: Context): Intent = PlaceLinks.intent(context, Place.SOCIAL)
 
     private fun show(context: Context, incoming: SocialHub.Incoming) {
         runCatching {

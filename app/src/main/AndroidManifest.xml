@@ -337,11 +337,20 @@
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!--
+          One registered catalog screen outside any shell (CatalogScreenLink):
+          the places for Standard and Desktop, and the container manager.
+          A task of its own, opened fresh each time, so Back returns to
+          whatever opened it (the home screen, the desktop, a notification)
+          and never into an older droidtop screen.
+        -->
         <activity
-            android:name="dev.droidtop.app.ContainersActivity"
-            android:exported="false">
+            android:name="dev.droidtop.app.CatalogScreenActivity"
+            android:exported="false"
+            android:taskAffinity="dev.droidtop.app.screen"
+            android:excludeFromRecents="true">
             <intent-filter>
-                <action android:name="dev.droidtop.app.action.CONTAINERS" />
+                <action android:name="dev.droidtop.app.action.OPEN_SCREEN" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>

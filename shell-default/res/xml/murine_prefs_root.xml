@@ -61,6 +61,21 @@
         android:summary="@string/pref_category_misc_desc"
         android:fragment="app.murinelauncher.settings.SettingsMiscFragment"/>
 
+    <!-- droidtop: the places (Stores, Social, Downloads and installs,
+         Updates, Plugins). Standard has no left menu, so its settings list
+         is where they are reached; each row opens droidtop's screen host
+         (SettingsRootFragment sets the titles and intents from the one
+         place list, Place, and hides them in Kiosk and Kid). -->
+    <PreferenceCategory
+        android:key="pref_places"
+        android:title="@string/pref_subcategory_places">
+        <Preference android:key="pref_place_stores" android:icon="@drawable/ic_settings_general" />
+        <Preference android:key="pref_place_social" android:icon="@drawable/ic_settings_general" />
+        <Preference android:key="pref_place_plugin_jobs" android:icon="@drawable/ic_settings_general" />
+        <Preference android:key="pref_place_updates" android:icon="@drawable/ic_settings_general" />
+        <Preference android:key="pref_place_plugins" android:icon="@drawable/ic_settings_general" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
         <Preference
             android:icon="@drawable/ic_settings_general"

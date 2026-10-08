@@ -1976,7 +1976,7 @@ the `ContainerRuntime` interface that already exists (§3):
 - **What the screen is (built 2026-09-25).** The container manager is the
   catalog screen `containers` (`ContainersCatalog`, registered with the
   other settings screens): Desktop settings opens it in place, whichever
-  surface draws them, and `ContainersActivity` hosts it for the Desktop
+  surface draws them, and `CatalogScreenActivity` hosts it for the Desktop
   taskbar with the shell's hint row (A Select, B Back, Y Info), in
   droidtop's dark look, pad and touch alike. It replaced a hand-built
   Material list with no focus, no hint row, an error line at the top of
@@ -12461,8 +12461,10 @@ nothing else.
 The left menu is where things live. Beside the three tabs it lists five
 **places** (Social joined on 2026-10-08 as Friends, Droidtop/tracker#313, and took every provider as Social the same day, #327), each one a registered settings screen drawn in the shell's
 content area by the same navigator Settings uses (`PlaceCatalogView`, so
-the same B, Info sheet and touch behaviour). A place is a `GamingSection`
-with `isPlace = true` (the flag only orders the left menu: the
+the same B, Info sheet and touch behaviour). Which places exist is one list
+for every mode, `Place` (`:runtime-common`: screen id and title); a
+`GamingSection` that names a `Place` is a place (`isPlace`, which only
+orders the left menu: the
 main destinations first, then the places, then Settings), and a mode
 that hides Settings (Kiosk, Kid) hides the places too, because they are
 device management (`GamingSection.managesDevice`). The list is one pure
@@ -12523,13 +12525,37 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   are links to this one screen: the left-menu place in Gaming, the Quick
   Menu's System tab tile (it closes the menu and opens the place; a link to
   any screen that is a place does the same, `placeForScreen`, never a second
-  copy of the screen inside the sheet), Global settings, for Standard and
-  Desktop which have no left menu, and the plugin-repository update
-  notification, which opens Gaming on the Updates place
-  (`EXTRA_GAMING_START_SECTION` = `UPDATES`). Settings > System no longer
+  copy of the screen inside the sheet), Global settings, the ways in of
+  Standard and Desktop below, and the plugin-repository update
+  notification (`PlaceLinks`, below). Settings > System no longer
   carries a "Software updates" row of its own.
 - **Plugins** (`plugins`): the existing Plugins screen (installed,
   approvals, repositories, catalog), opened in place.
+
+**Places in every mode (decided 2026-10-08, Droidtop/tracker#346).** The
+places were Gaming sections only: Standard reached Stores, Social, Downloads
+and Plugins only under Settings > Other modes > Gaming mode settings, Desktop
+reached none, and a message or plugin-update notification opened Gaming
+whatever the mode (with Gaming off, Desktop or nothing). Now:
+
+- **One host.** `CatalogScreenActivity` (`:app`) draws one registered catalog
+  screen outside any shell, by the same `CatalogNavigator` as Gaming's places,
+  with the shell's hint row. Modules that cannot see `:app` open it by action
+  (`CatalogScreenLink`: `OPEN_SCREEN` and a screen id). It replaces
+  `ContainersActivity`, which was the same host wired to the container manager;
+  the Desktop taskbar's Containers opens through it too. It runs in a task of
+  its own, opened fresh each time, so Back returns to what opened it. A place
+  asked for in Kiosk or Kid is refused with a toast, so a shortcut or a
+  notification is not a way around the UI mode.
+- **Standard**: the settings list has a "droidtop" group with the five places
+  (`SettingsRootFragment` fills titles and links from `Place`), and droidtop's
+  icon has Social, Downloads and Updates as app shortcuts beside Games.
+- **Desktop**: the Start menu lists the places first, under "droidtop", Social
+  with its unread count.
+- **Links from outside** (`PlaceLinks`): a notification opens Gaming on the
+  place when Gaming is the mode in use (`Place.opensInGaming`: the last mode
+  is Gaming and Gaming is on), else the host. Message notifications and the
+  plugin-repository update notification use it.
 
 ### Social: one place for every provider (decided 2026-10-08, Droidtop/tracker#327)
 
@@ -12602,8 +12628,8 @@ and never from list drawing.
   conversation is not open is one notification per conversation (provider
   and friend), titled with the friend's name, the service as sub-text,
   replaced by that conversation's next message, on one "Messages" channel
-  (Steam's old "Steam messages" channel is removed); tapping it opens Gaming
-  on the Social place. Whether a provider's messages notify is the
+  (Steam's old "Steam messages" channel is removed); tapping it opens the
+  Social place in the mode in use ("Places in every mode"). Whether a provider's messages notify is the
   provider's rule: Steam's "Message notifications" switch, and a plugin's
   `notify.post` grant. Conversations taken from other apps' notifications
   never post here (below, "messages from your apps").

@@ -17,7 +17,7 @@ import dev.droidtop.runtime.linux.root.RootTarUnpacker
  * [DroidSpacesRuntime]'s real namespace/cgroup isolation, anything else
  * gets [ProotRuntime]. Root is checked by actually running a root shell
  * command rather than inferring from e.g. build tags — the only real
- * signal. Shared by [DesktopSessionService], [ContainersActivity] and
+ * signal. Shared by [DesktopSessionService], [CatalogScreenActivity] and
  * onboarding's Desktop step (one mechanism, not a copy per caller).
  *
  * Both backends pull through the same [CraneRootfsPuller] into one

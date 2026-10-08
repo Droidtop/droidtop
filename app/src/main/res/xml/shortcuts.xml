@@ -3,6 +3,9 @@
   A long press on droidtop's icon. "Games" opens the library's games grid
   (LauncherGamesActivity with SHOW_GAMES) whatever modes are on; without it
   the grid could only be reached with Gaming and Desktop both off.
+  Social, Downloads and Updates open those places in droidtop's screen
+  host (CatalogScreenActivity, by its OPEN_SCREEN action and a screen id),
+  so they are one long press away in every mode (docs/SPEC.md 7j).
 -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
@@ -14,5 +17,41 @@
             android:action="dev.droidtop.app.action.SHOW_GAMES"
             android:targetPackage="dev.droidtop.app"
             android:targetClass="dev.droidtop.app.LauncherGamesActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="place_social"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_social">
+        <intent
+            android:action="dev.droidtop.app.action.OPEN_SCREEN"
+            android:targetPackage="dev.droidtop.app"
+            android:targetClass="dev.droidtop.app.CatalogScreenActivity">
+            <extra android:name="dev.droidtop.app.extra.SCREEN_ID" android:value="social" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="place_downloads"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_downloads">
+        <intent
+            android:action="dev.droidtop.app.action.OPEN_SCREEN"
+            android:targetPackage="dev.droidtop.app"
+            android:targetClass="dev.droidtop.app.CatalogScreenActivity">
+            <extra android:name="dev.droidtop.app.extra.SCREEN_ID" android:value="plugin_jobs" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="place_updates"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_updates">
+        <intent
+            android:action="dev.droidtop.app.action.OPEN_SCREEN"
+            android:targetPackage="dev.droidtop.app"
+            android:targetClass="dev.droidtop.app.CatalogScreenActivity">
+            <extra android:name="dev.droidtop.app.extra.SCREEN_ID" android:value="updates" />
+        </intent>
     </shortcut>
 </shortcuts>

@@ -1926,44 +1926,36 @@ private fun ButtonHintFooter(
  * theme draws. The enum name GAMES is kept so a saved place and the
  * Settings deep link that name it keep working.
  */
-internal enum class GamingSection(val isPlace: Boolean = false) {
+internal enum class GamingSection(val place: dev.droidtop.library.settings.Place? = null) {
     GAMES, PC_GAMES, APPS, SETTINGS,
 
     /**
      * The places things live (docs/SPEC.md 7j, "Places", Droidtop/tracker#258):
      * reached from the left menu only, never as top-bar tabs, each one a
      * registered settings catalog screen drawn in place ([PlaceCatalogView]).
+     * Which places there are is the one list every mode reads
+     * ([dev.droidtop.library.settings.Place], Droidtop/tracker#346).
      */
-    STORES(isPlace = true),
-    SOCIAL(isPlace = true),
-    DOWNLOADS(isPlace = true),
-    UPDATES(isPlace = true),
-    PLUGINS(isPlace = true),
+    STORES(dev.droidtop.library.settings.Place.STORES),
+    SOCIAL(dev.droidtop.library.settings.Place.SOCIAL),
+    DOWNLOADS(dev.droidtop.library.settings.Place.DOWNLOADS),
+    UPDATES(dev.droidtop.library.settings.Place.UPDATES),
+    PLUGINS(dev.droidtop.library.settings.Place.PLUGINS),
     ;
+
+    val isPlace: Boolean get() = place != null
 
     /** A place or Settings: device management, which Kiosk and Kid hide. */
     val managesDevice: Boolean get() = this == SETTINGS || isPlace
 
     /** The settings-registry screen a place draws, null for a tab with a view of its own. */
-    val placeScreenId: String?
-        get() = when (this) {
-            STORES -> PLACE_STORES_SCREEN_ID
-            SOCIAL -> PLACE_SOCIAL_SCREEN_ID
-            DOWNLOADS -> PLACE_DOWNLOADS_SCREEN_ID
-            UPDATES -> PLACE_UPDATES_SCREEN_ID
-            PLUGINS -> PLACE_PLUGINS_SCREEN_ID
-            else -> null
-        }
+    val placeScreenId: String? get() = place?.screenId
 }
 
-// Registry ids of the screens the places draw. :app registers them (this
-// module cannot depend on it), the same way PC_STORES_SCREEN_ID names the
-// PC setup screen.
-internal const val PLACE_STORES_SCREEN_ID = "stores"
-internal const val PLACE_SOCIAL_SCREEN_ID = "social"
-internal const val PLACE_DOWNLOADS_SCREEN_ID = "plugin_jobs"
-internal const val PLACE_UPDATES_SCREEN_ID = "updates"
-internal const val PLACE_PLUGINS_SCREEN_ID = "plugins"
+// Registry ids of the screens the places draw, from the one place list.
+internal const val PLACE_SOCIAL_SCREEN_ID = dev.droidtop.library.settings.Place.ID_SOCIAL
+internal const val PLACE_UPDATES_SCREEN_ID = dev.droidtop.library.settings.Place.ID_UPDATES
+internal const val PLACE_PLUGINS_SCREEN_ID = dev.droidtop.library.settings.Place.ID_PLUGINS
 
 /**
  * The place a settings screen id IS, when the left menu lists it ([allowed]: a mode that hides
@@ -2006,11 +1998,8 @@ internal fun GamingSection.displayName(): String = when (this) {
     GamingSection.PC_GAMES -> "PC Games"
     GamingSection.APPS -> "Apps"
     GamingSection.SETTINGS -> "Settings"
-    GamingSection.STORES -> "Stores"
-    GamingSection.SOCIAL -> "Social"
-    GamingSection.DOWNLOADS -> "Downloads and installs"
-    GamingSection.UPDATES -> "Updates"
-    GamingSection.PLUGINS -> "Plugins"
+    GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS,
+    GamingSection.UPDATES, GamingSection.PLUGINS -> place!!.title
 }
 
 /**

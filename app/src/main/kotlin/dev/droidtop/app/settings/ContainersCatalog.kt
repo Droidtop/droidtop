@@ -58,7 +58,7 @@ import java.util.concurrent.ConcurrentHashMap
  * "The surface, precisely"): registered as [SCREEN_ID], so it is drawn by
  * the same navigator as every other settings screen, in droidtop's own
  * look, driven by pad and touch alike, in every surface that reaches
- * Desktop settings; `ContainersActivity` hosts it for the Desktop
+ * Desktop settings; `CatalogScreenActivity` hosts it for the Desktop
  * taskbar. It replaced a hand-built Material list with its own buttons,
  * which had no focus, no hint row and no way in by pad.
  *

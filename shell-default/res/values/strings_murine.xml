@@ -27,6 +27,7 @@
     <string name="pref_global_settings_title">Global settings</string>
 
     <string name="pref_subcategory_other_shells">Other modes</string>
+    <string name="pref_subcategory_places">droidtop</string>
 
     <string name="pref_subcategory_day_night">UI theme</string>
     <string name="pref_subcategory_layout">Layout</string>

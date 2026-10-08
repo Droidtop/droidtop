@@ -65,6 +65,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.library.settings.CatalogScreenLink
+import dev.droidtop.library.settings.Place
+import dev.droidtop.library.settings.SocialBadge
+import dev.droidtop.library.settings.UiModePrefs
 
 /**
  * "Desktop style" shell: a taskbar + start menu wrapped around the primary
@@ -699,16 +703,14 @@ private object DesktopPrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_TASKBAR_TOP, false)
 }
 
-// Action string, not a component class: :shell-desktop has no compile-time
-// dependency on :app (where ContainersActivity lives) -- same decoupling as
-// openSettings' component-name launch below. setPackage keeps it internal.
+// The container manager in droidtop's screen host (CatalogScreenLink): an
+// action, because :shell-desktop has no compile-time dependency on :app.
 private fun openContainers(context: Context) {
-    val intent = Intent("dev.droidtop.app.action.CONTAINERS").apply {
-        setPackage(context.packageName)
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    context.startActivity(intent)
+    context.startActivity(CatalogScreenLink.intent(context, CONTAINERS_SCREEN_ID))
 }
+
+/** `ContainersCatalog.SCREEN_ID` in :app, which this module cannot see. */
+private const val CONTAINERS_SCREEN_ID = "containers"
 
 private fun openModes(context: Context) {
     val intent = Intent(Intent.ACTION_MAIN).apply {
@@ -773,7 +775,33 @@ private fun BoxScope.StartMenu(
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
         val currentEntries = entries
+        // The places (Stores, Social, Downloads and installs, Updates, Plugins): Desktop has no left
+        // menu, so the Start menu lists them, from the one place list, each opened in droidtop's
+        // screen host (docs/SPEC.md 7j "Places in every mode", Droidtop/tracker#346). Read when the
+        // menu opens: the unread count is a plain number the social hub keeps current.
+        val places = remember { Place.visible(UiModePrefs.get(context)) }
+        val unread = remember { SocialBadge.unread }
         LazyColumn(modifier = Modifier.padding(8.dp)) {
+            if (places.isNotEmpty()) {
+                item(key = "places-header") { StartMenuHeader("droidtop") }
+                items(places, key = { "place:" + it.screenId }) { place ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                context.startActivity(Place.openIntent(context, place))
+                                onDismiss()
+                            }
+                            .padding(vertical = 4.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(place.title, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        if (place == Place.SOCIAL && unread > 0) {
+                            Text("$unread new", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
             // The primary container's own applications first: they are
             // what the desktop runs. Launched into the session, so their
             // windows appear on the desktop behind this menu.
