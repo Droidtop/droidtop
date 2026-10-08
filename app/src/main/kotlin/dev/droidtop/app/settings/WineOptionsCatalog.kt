@@ -1,7 +1,6 @@
 package dev.droidtop.app.settings
 
 import android.content.Context
-import dev.droidtop.app.PcContainerConfigActivity
 import dev.droidtop.library.WineSettingsScreen
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -10,6 +9,7 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
+import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.runtime.windows.WineOptionRow
 import dev.droidtop.runtime.windows.WineOptions
 import dev.droidtop.runtime.windows.WinePrefixes
@@ -120,15 +120,11 @@ object WineOptionsCatalog {
                 )
             }
             add(
-                ActionItem(
+                NestedScreenItem(
                     id = "wine_options_all",
                     title = if (overGame) "All shared prefix settings" else "All prefix settings",
-                    subtitle = if (overGame) {
-                        "GameNative's full configuration of the shared prefix (controller, drives, environment, components); changes there apply to every game that shares it"
-                    } else {
-                        "GameNative's full configuration: controller, drives, environment, components and the rest"
-                    },
-                    run = { ctx -> ctx.startActivity(PcContainerConfigActivity.intent(ctx, if (overGame) null else entryId, title)) },
+                    subtitle = if (overGame) "Changes apply to every game that shares the prefix" else null,
+                    inline = PrefixSettingsCatalog.screen(if (overGame) null else entryId, title),
                 ),
             )
             add(

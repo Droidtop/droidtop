@@ -5868,32 +5868,24 @@ distrobox-style) both need real UI, not just the underlying runtime logic.
 
 Two concrete references to build from rather than design blind:
 
-- **Wine prefix management**: [vendor/gamenative](../vendor/gamenative)
-  has its own real, working UI for exactly this — `ContainerConfigDialog.
-  kt`/`ContainerConfigState.kt` (Windows version selection, DXVK/VKD3D
-  configuration, installed-component tracking) and
-  `ContainerStorageManagerDialog.kt` (per-container storage).
-  **Decision (2026-08-31): these arrive by COMPILING, not porting** —
-  `:runtime-windows` now compiles the entire vendored gamenative tree
-  (see §9), so this UI is already built into droidtop's APK.
-  `DroidtopApplication` carries the Hilt graph, the store and
-  container-configuration activities are `:app` hosts
-  (`PcContainerConfigActivity` and the store hosts, §7i). **Since
-  2026-10-02 the options most games need are droidtop's own settings
-  rows** (§5a "Options, with defaults"): Wine build, x86 emulation,
-  graphics driver and Direct3D, drawn by droidtop's two-pane settings
-  in Settings > Windows games (the shared environment) and in a game's
-  "Wine and graphics" sheet (that game's own choices over the shared
-  prefix, or its own prefix once it picks another Wine build), from the fork's
-  lists and component manifest, not from gamenative's Android-styled
-  dialog. The dialog remains the "All prefix settings" row of both, for
-  the rest (controller, drives, environment, components). On an x86_64
-  device its Graphics tab lists the x86_64 drivers only, under the names
-  droidtop's rows use (`X86_64Graphics.label`, which parse back to the
-  ids), and hides the rows only the Wrapper driver reads (its build,
-  exposed extensions, device memory, adrenotools Turnip, resource type,
-  BCn emulation); it used to show "Wrapper" for a lavapipe prefix and mark
-  itself changed on open (Droidtop/tracker#303).
+- **Wine prefix management** is droidtop's own (2026-10-08, Droidtop/tracker#313). The options
+  most games need (Wine build, x86 emulation, graphics driver, Direct3D) are rows in Settings >
+  Windows games (the shared environment) and in a game's "Wine and graphics" sheet (that game's own
+  choices over the shared prefix, or its own prefix once it picks another Wine build), §5a "Options,
+  with defaults". **All prefix settings**, a row of both, is a nested two-pane settings screen
+  (`PrefixSettingsCatalog` over `PrefixSettings` in `:runtime-windows`): Display (screen size,
+  renderer, present mode, SurfaceFlinger compatibility, sharpening), Audio (driver, low latency),
+  Controller (SDL, XInput, DirectInput and its mapping, ignore mouse, touchscreen mode), CPU
+  (services at start, cores, 32-bit cores, Box64 and FEXCore presets), Wine (reported GPU,
+  offscreen rendering, video memory, CSMT, strict shader math, mouse warp, extra arguments),
+  Windows components (each Wine's own or Windows' own), Environment (one row per variable, an
+  emptied value removes it, and an add row taking NAME=value) and Drives (read only: letters come
+  from the game folders, §5b). Titles and values, no prose. Only fields droidtop's launch reads are
+  offered; Steam-, XR- and store-only fields of the container are not. Every write goes through
+  `ContainerUtils.applyToContainer`, the path GameNative's `ContainerConfigDialog` saved through, so
+  a prefix configured by either reads back the same. The dialog and its host activity
+  (`PcContainerConfigActivity`) are gone. For a game in the shared prefix the row edits the shared
+  prefix and says so.
   **Wine configuration** (`WinePrefixes.configure`), a row in both places,
   opens Wine's own `winecfg` in that prefix the way a game starts there:
   Windows version, DLL overrides, drives and audio are Wine's settings and
@@ -9441,9 +9433,10 @@ for users" above promises more than the store services hold:
 - **Sources** are wired: `PcLibrary` reads every store (`StoreLibraries`,
   "Stores" above) and `CustomGameScanner` into one `PcLibrary.Game` shape, and `PcGameProvider`
   publishes them as ordinary entries.
-- **Compatibility** is wired from `GameCompatibilityCache`, cached only: a
-  scan never makes a network call or needs a signed-in account, so a game
-  carries no rating until something else has filled the cache.
+- **Compatibility has no source in the PC store part** (2026-10-08, Droidtop/tracker#313). It
+  was read from GameNative's `GameCompatibilityCache`, which only GameNative's own library screens
+  ever filled, so in droidtop it was always empty; the read went with the runtime lift.
+  `PcInfo.compatibility` and the rows that show it stay for a source that fills it.
 - **Playtime has no source to read.** `LibraryPlayHistoryDao` holds only a
   last-played time, written by gamenative's own launch path, which droidtop
   does not use. The GOG, Epic and Amazon rows have a play-time column that

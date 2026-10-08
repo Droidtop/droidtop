@@ -136,7 +136,7 @@ class PcGameProvider(
      * roots themselves, which decide which of those count. GameNative's
      * own database is not among them: since Steam moved to droidtop's own
      * store, nothing the store part reads comes from it. What it does not
-     * see: the compatibility cache and a change to the engine rules;
+     * see: a change to the engine rules;
      * "Rescan library" is the answer there.
      *
      * One `stat` per file or folder, read BEFORE the part is walked, so

@@ -16,7 +16,6 @@ class StoresCatalogTest {
         installPath = null,
         sizeBytes = 0L,
         artUrl = null,
-        compatibility = null,
     )
 
     private val games = listOf(

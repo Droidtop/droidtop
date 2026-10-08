@@ -457,11 +457,6 @@
             android:name=".StoreSignInActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation" />
-        <activity
-            android:name=".PcContainerConfigActivity"
-            android:exported="false"
-            android:theme="@style/Theme.DroidTop.Dark"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
 
         <provider
             android:name="dev.droidtop.library.consoles.DroidtopFileProvider"
