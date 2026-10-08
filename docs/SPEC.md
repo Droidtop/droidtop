@@ -12890,8 +12890,8 @@ ABI picker compares names, "Fat APKs only" below). proot's talloc moved to
 `build-scripts/talloc`. The x86_64 guest-library and software-Vulkan recipes
 and their workflows moved to `build-scripts/x86_64-{guest-libs,lavapipe}` and
 `.github/workflows/`, publishing from `main` as prereleases of this
-repository; `X86_64GuestLibs`/`X86_64Graphics` keep pinning the fork's
-rig-tested releases until a droidtop-built one has passed the rig.
+repository; `X86_64GuestLibs`/`X86_64Graphics` pin droidtop's own releases
+(since 2026-10-08), so nothing the app downloads comes from the fork.
 
 ## 10. Build order
 

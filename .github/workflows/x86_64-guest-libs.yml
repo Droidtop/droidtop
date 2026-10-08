@@ -9,7 +9,7 @@ name: x86_64 guest libraries
 # Windows runtime (docs/SPEC.md 9). A run on main publishes a prerelease of
 # this repository (prerelease so the app's update check, which reads this
 # repository's releases, never mistakes it for a build); the pin in the code
-# moves to it after a rig check. Until then the pin names the fork's release.
+# moves to a new one after a rig check.
 
 on:
   push:

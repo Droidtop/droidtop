@@ -44,9 +44,9 @@ object X86_64Graphics {
     @JvmField
     val LABELS: List<String> = DRIVERS.map(::label)
 
-    /** Release of Droidtop/gamenative-tux that carries the asset; see .github/workflows/x86_64-lavapipe.yml. */
-    const val LAVAPIPE_TAG = "x86_64-lavapipe-20261002-9ec0ef03"
-    const val LAVAPIPE_SHA256 = "e2fa1476066e1ed01923446a14cae089495f514f9fde1e5233b58a383fca9edf"
+    /** Release of Droidtop/droidtop that carries the asset; see .github/workflows/x86_64-lavapipe.yml. */
+    const val LAVAPIPE_TAG = "x86_64-lavapipe-20261008-8a05a54d"
+    const val LAVAPIPE_SHA256 = "6fc782fa7d84410e2fada8adfbc57fdc2dd6d096918a07c35ede8a1b487dad3c"
     private val lavapipe = PinnedReleaseAsset(
         LAVAPIPE_TAG,
         "x86_64-lavapipe.tzst",

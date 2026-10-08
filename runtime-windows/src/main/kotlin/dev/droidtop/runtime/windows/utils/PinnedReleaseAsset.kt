@@ -25,7 +25,7 @@ class PinnedReleaseAsset(
     /** What a person reads when the download or the check fails ("the x86_64 Windows libraries"). */
     private val label: String,
 ) {
-    private val url = "https://github.com/Droidtop/gamenative-tux/releases/download/$tag/$asset"
+    private val url = "https://github.com/Droidtop/droidtop/releases/download/$tag/$asset"
 
     fun root(context: Context): File = File(context.filesDir, dirName)
 

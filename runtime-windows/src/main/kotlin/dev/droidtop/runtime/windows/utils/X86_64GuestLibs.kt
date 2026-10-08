@@ -30,10 +30,10 @@ import timber.log.Timber
  * bcrypt, crypt32 and secur32 open for their public-key work.
  */
 object X86_64GuestLibs {
-    /** Release of Droidtop/gamenative-tux that carries the asset; see .github/workflows/x86_64-guest-libs.yml. */
-    const val RELEASE_TAG = "x86_64-guest-libs-20261003-23a9dbe9"
+    /** Release of Droidtop/droidtop that carries the asset; see .github/workflows/x86_64-guest-libs.yml. */
+    const val RELEASE_TAG = "x86_64-guest-libs-20261008-8a05a54d"
     const val ASSET = "x86_64-guest-libs.tzst"
-    const val SHA256 = "acb50f08a12ff87f2109eeaec49c2890249357bdff80b7ca6853c19f809643c3"
+    const val SHA256 = "4e849852062b917f8f309c2cebd7873c696741c172e94edb29a868d86631ccbd"
     private val release = PinnedReleaseAsset(RELEASE_TAG, ASSET, SHA256, "x86_64-guest-libs", "the x86_64 Windows libraries")
 
     /** True on a device whose primary ABI is x86_64: Wine runs there without box64. */

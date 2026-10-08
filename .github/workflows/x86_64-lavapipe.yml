@@ -9,7 +9,7 @@ name: x86_64 software Vulkan
 # Windows runtime (docs/SPEC.md 9). A run on main publishes a prerelease of
 # this repository (prerelease so the app's update check, which reads this
 # repository's releases, never mistakes it for a build); the pin in the code
-# moves to it after a rig check. Until then the pin names the fork's release.
+# moves to a new one after a rig check.
 
 on:
   push:
@@ -25,9 +25,8 @@ permissions:
 env:
   # The guest libraries this driver is loaded beside; libraries they already
   # provide are left out of the archive (see build.sh).
-  GUEST_LIBS_TAG: x86_64-guest-libs-20261002-12f9f4d8
-  # Where that release is: droidtop's fork until this repository publishes its own.
-  GUEST_LIBS_REPO: Droidtop/gamenative-tux
+  GUEST_LIBS_TAG: x86_64-guest-libs-20261008-8a05a54d
+  GUEST_LIBS_REPO: Droidtop/droidtop
 
 jobs:
   build:
