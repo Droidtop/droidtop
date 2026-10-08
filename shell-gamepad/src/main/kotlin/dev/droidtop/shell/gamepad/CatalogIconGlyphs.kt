@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.DesktopWindows
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Gamepad
 import androidx.compose.material.icons.outlined.Home
@@ -78,6 +79,7 @@ internal fun LeftMenuEntry.glyph(): ImageVector = when {
         GamingSection.GAMES -> Icons.Outlined.SportsEsports
         GamingSection.APPS -> Icons.Outlined.Apps
         GamingSection.STORES -> Icons.Outlined.Storefront
+        GamingSection.FRIENDS -> Icons.Outlined.Group
         GamingSection.DOWNLOADS -> Icons.Outlined.Download
         GamingSection.UPDATES -> Icons.Outlined.SystemUpdate
         GamingSection.PLUGINS -> Icons.Outlined.Extension

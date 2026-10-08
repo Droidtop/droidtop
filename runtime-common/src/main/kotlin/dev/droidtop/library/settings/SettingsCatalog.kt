@@ -263,6 +263,13 @@ class CatalogScreen(
     val merged: Boolean = false,
     /** The settings category column's order, for a root whose groups name categories (docs/SPEC.md "Settings layout"). */
     val categoryOrder: List<String> = emptyList(),
+    /**
+     * Emits whenever this screen's content changes (after the value it was built from) without anything being done on it (a message
+     * arrived, a friend came online): the Gaming renderer builds [groups] again then, so a screen
+     * of live data stays current without polling. Null for a screen that only changes when it is
+     * used, which is every screen but the friends and their conversations.
+     */
+    val live: kotlinx.coroutines.flow.Flow<Any?>? = null,
 )
 
 /**

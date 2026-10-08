@@ -432,6 +432,21 @@
         </service>
 
         <!--
+          Keeps the Steam connection alive while the person is signed in and has not chosen
+          Offline, so friends and chat work (docs/SPEC.md 7g, Stores). The connection and its
+          retries are the stores module's; this service is the reason Android keeps the process,
+          with one silent ongoing notification. specialUse has no time limit.
+        -->
+        <service
+            android:name="dev.droidtop.app.SteamConnectionService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the signed-in Steam connection for friends and chat" />
+        </service>
+
+        <!--
           Real bug this fixes: AmStartCommandToIntentConverter used to hand
           emulator apps a plain file:// URI (Uri.fromFile), which crashes
           with android.os.FileUriExposedException the moment the Intent

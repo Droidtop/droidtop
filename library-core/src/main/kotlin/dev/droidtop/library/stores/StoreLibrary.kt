@@ -3,6 +3,7 @@ package dev.droidtop.library.stores
 import android.content.Context
 import android.util.Log
 import dev.droidtop.library.StoreUpdate
+import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.LibraryRescan
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -250,6 +251,16 @@ interface StoreLibrary {
     /** Checks [password] for the locked branch [branchId] of [gameId] with the store and keeps it when accepted. */
     suspend fun unlockBranch(context: Context, gameId: String, branchId: String, password: String): Result<Unit> =
         Result.failure(UnsupportedOperationException("$label has no locked branches"))
+
+    /** The store's friends and chat, when it has them and stays connected while signed in (Steam); null otherwise. */
+    val social: StoreSocial? get() = null
+
+    /**
+     * Rows the store adds to its page in the Stores place: its own settings
+     * (the connection, cloud saves). Read off the main thread; empty for a
+     * store with none (the default).
+     */
+    fun settingsItems(context: Context): List<CatalogItem> = emptyList()
 
     /** Whether the store keeps its games' saves in a cloud of its own that [syncSaves] reaches (Steam Cloud). */
     val hasCloudSaves: Boolean get() = false

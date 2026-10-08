@@ -102,6 +102,7 @@ import dev.droidtop.shell.gamepad.input.PadPress
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -297,6 +298,10 @@ fun CatalogNavigator(
     fun refresh() {
         version++
     }
+
+    // A screen of live data (the friends, a conversation) says when it changed; its rows are read
+    // again then. The first value is what the screen was just built from, so only later ones count.
+    LaunchedEffect(screen) { screen.live?.drop(1)?.collect { version++ } }
 
     // Coming back from another app's screen (Android's All files access page, a store page) re-reads the
     // rows, so a row that described what that screen changes shows the new state. The first resume is the

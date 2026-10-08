@@ -3,6 +3,7 @@ package dev.droidtop.stores.steam
 import android.content.Context
 import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreUpdate
+import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.stores.SaveConflictResolver
 import dev.droidtop.library.stores.SaveSyncPhase
 import dev.droidtop.library.stores.SaveSyncResult
@@ -12,6 +13,7 @@ import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLaunch
 import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreProgress
+import dev.droidtop.library.stores.StoreSocial
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreUpdateCheck
@@ -58,8 +60,14 @@ class SteamStore : StoreLibrary {
     override suspend fun completeSignIn(context: Context, secret: String): Result<String?> =
         Result.failure(UnsupportedOperationException("Steam signs in on its own screen"))
 
+    override val social: StoreSocial get() = SteamFriendsHub
+
+    override fun settingsItems(context: Context): List<CatalogItem> = SteamSettings.items(context)
+
     override suspend fun signOut(context: Context): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
+            SteamConnection.stop(context)
+            SteamFriendsHub.clear()
             runCatching { SteamSession.logOff() }
             SteamCredentials.clear(context)
             val db = db(context)
@@ -147,6 +155,8 @@ class SteamStore : StoreLibrary {
     ): SaveSyncResult? {
         val appId = gameId.toIntOrNull() ?: return null
         if (!signedIn(context)) return null
+        // A person who turned cloud saves off is only asked again by "Sync cloud saves" on the game's menu.
+        if (phase != SaveSyncPhase.MANUAL && !withContext(Dispatchers.IO) { SteamPrefs.cloudSaves(context) }) return null
         val found = withContext(Dispatchers.IO) {
             if (!File(prefix.prefixDir, "drive_c").isDirectory) null else runCatching { installOf(context, gameId) }.getOrNull()
         } ?: return null

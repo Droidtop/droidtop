@@ -149,6 +149,8 @@ internal class SteamSignIn(context: Context, private val store: SteamStore) : St
         SteamSession.logOn(app).getOrThrow()
         mutableStep.value = AccountSignInStep.Done(account)
         StoreChanges.announce(app)
+        // Signed in: Steam stays connected for friends and chat, unless the person chose Offline.
+        SteamConnection.refresh(app)
         // The library is read after the screen has said so; it may take a while.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             store.sync(app)

@@ -12,6 +12,7 @@ import `in`.dragonbra.javasteam.steam.handlers.steamapps.License
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.SteamApps
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.callback.LicenseListCallback
 import `in`.dragonbra.javasteam.steam.handlers.steamcloud.SteamCloud
+import `in`.dragonbra.javasteam.steam.handlers.steamfriends.SteamFriends
 import `in`.dragonbra.javasteam.steam.handlers.steamgameserver.SteamGameServer
 import `in`.dragonbra.javasteam.steam.handlers.steammasterserver.SteamMasterServer
 import `in`.dragonbra.javasteam.steam.handlers.steamscreenshots.SteamScreenshots
@@ -37,6 +38,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -51,15 +54,18 @@ import timber.log.Timber
  * GameNative's SteamService did to reach Steam (connect over a web socket
  * with a kept server list, log on with the refresh token a sign-in left,
  * take the licence list), lifted into droidtop (GameNative and JavaSteam,
- * GPL-3.0). It is not an Android service and keeps no notification: it is
- * opened by whoever needs Steam (the sign-in screen, a library sync, an
- * install job, an update check), held while they work ([use]), and closed a
- * few minutes after the last of them lets go. A Steam install runs inside
+ * GPL-3.0). It is opened by whoever needs Steam (the sign-in screen, a
+ * library sync, an install job, an update check, a save sync), held while
+ * they work ([use]), and closed a few minutes after the last of them lets
+ * go. While the person is signed in and has not chosen Offline, one more
+ * holder, [SteamConnection], keeps it open for good (friends and chat, owner
+ * 2026-10-08), so it then never closes by itself; the Android service that
+ * keeps the process alive for that is the app's. A Steam install runs inside
  * its job, which is what keeps the process alive while it downloads.
  *
- * Not carried from GameNative's service: friends and persona, achievements,
- * Steam Cloud, family sharing, game invites, collections and the continuous
- * product-info watcher; droidtop's library reads product info when it syncs.
+ * Not carried from GameNative's service: achievements, family sharing, game
+ * invites, collections and the continuous product-info watcher; droidtop's
+ * library reads product info when it syncs.
  */
 internal object SteamSession {
     private const val TAG = "SteamSession"
@@ -99,6 +105,20 @@ internal object SteamSession {
 
     /** The HTTP client the connection was configured with: Steam Cloud's file transfers go through it. */
     val httpClient: OkHttpClient? get() = client?.configuration?.httpClient as? OkHttpClient
+
+    /** Steam's friends handler on the current connection, or null while there is none. */
+    @Volatile
+    var friends: SteamFriends? = null
+        private set
+
+    /** Where the link to Steam stands: down, being made, or up and logged on. */
+    enum class Link { DOWN, CONNECTING, UP }
+
+    private val linkState = MutableStateFlow(Link.DOWN)
+    val link: StateFlow<Link> get() = linkState
+
+    /** The 64-bit Steam id of the current log-on, or null. */
+    val steamId64: Long? get() = client?.steamID?.takeIf { it.isValid }?.convertToUInt64()
 
     @Volatile private var connected = CompletableDeferred<Boolean>()
     @Volatile private var logOnAnswer: CompletableDeferred<EResult>? = null
@@ -159,6 +179,7 @@ internal object SteamSession {
     /** The client, connected: connects (trying another server after a timeout, three times) when it is not. */
     suspend fun connectedClient(context: Context): SteamClient = lock.withLock {
         client?.takeIf { it.isConnected && connected.isCompleted }?.let { return@withLock it }
+        if (linkState.value == Link.DOWN) linkState.value = Link.CONNECTING
         repeat(3) { attempt ->
             val fresh = client ?: start(context.applicationContext)
             connected = CompletableDeferred()
@@ -201,6 +222,7 @@ internal object SteamSession {
             )
             when (val result = withTimeoutOrNull(LOG_ON_TIMEOUT_MS) { answer.await() }) {
                 EResult.OK -> {
+                    linkState.value = Link.UP
                     val id = client?.steamID
                     if (id != null && id.isValid && id.convertToUInt64() != credentials.steamId64) {
                         SteamCredentials.save(context, credentials.copy(steamId64 = id.convertToUInt64()))
@@ -220,6 +242,13 @@ internal object SteamSession {
     /** The licence list of this log-on: waits for Steam to send it. */
     suspend fun licences(): List<License> =
         withTimeoutOrNull(LICENCES_TIMEOUT_MS) { licenceList.await() } ?: error("Steam did not send the list of what you own. Try again")
+
+    /** Closes the connection now unless someone holds it (the connection that is kept stops holding before it asks). */
+    suspend fun closeIfIdle() {
+        if (holders.get() > 0) return
+        idleClose?.cancel()
+        lock.withLock { disconnect() }
+    }
 
     /** Logs off and closes the connection; for a sign-out. */
     suspend fun logOff() {
@@ -255,16 +284,21 @@ internal object SteamSession {
         user = steam.getHandler(SteamUser::class.java)
         apps = steam.getHandler(SteamApps::class.java)
         cloud = steam.getHandler(SteamCloud::class.java)
+        friends = steam.getHandler(SteamFriends::class.java)
         subscriptions += manager.subscribe(ConnectedCallback::class.java) { connected.complete(true) }
         subscriptions += manager.subscribe(DisconnectedCallback::class.java) {
             Timber.tag(TAG).i("Disconnected from Steam (asked: ${it.isUserInitiated})")
+            linkState.value = Link.DOWN
             connected = CompletableDeferred()
             logOnAnswer?.complete(EResult.NoConnection)
         }
         subscriptions += manager.subscribe(LoggedOnCallback::class.java) { onLoggedOn(it) }
         subscriptions += manager.subscribe(LoggedOffCallback::class.java) {
             Timber.tag(TAG).i("Logged off Steam: ${it.result}")
+            linkState.value = Link.DOWN
         }
+        // Friends, personas and chat messages are read as they arrive (SteamFriendsHub).
+        subscriptions += SteamFriendsHub.attach(manager, steam, context)
         subscriptions += manager.subscribe(LicenseListCallback::class.java) { callback ->
             if (callback.result == EResult.OK) licenceList.complete(callback.licenseList.toList())
         }
@@ -301,6 +335,9 @@ internal object SteamSession {
         user = null
         apps = null
         cloud = null
+        friends = null
+        linkState.value = Link.DOWN
+        SteamFriendsHub.detach()
         connected = CompletableDeferred()
         logOnAnswer?.complete(EResult.NoConnection)
         logOnAnswer = null

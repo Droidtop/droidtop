@@ -267,8 +267,11 @@ internal object StoresCatalog {
             }
         }
 
-        listOf(
+        // The store's own settings (Steam's status, cloud saves and message notifications), once signed in.
+        val own = if (signedIn) runCatching { store.own?.settingsItems(context) }.getOrNull().orEmpty() else emptyList()
+        listOfNotNull(
             CatalogGroup(id = "store_${store.key}_account_group", title = "Account", items = account),
+            CatalogGroup(id = "store_${store.key}_settings_group", title = "Settings", items = own).takeIf { own.isNotEmpty() },
             CatalogGroup(id = "store_${store.key}_library_group", title = "Library", items = library),
             CatalogGroup(
                 id = "store_${store.key}_downloads_group",

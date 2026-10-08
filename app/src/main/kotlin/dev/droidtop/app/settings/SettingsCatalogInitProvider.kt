@@ -39,6 +39,9 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.library.stores.StoreInstallJob.register(appContext)
         // A store game's cloud saves, uploaded when the game ends, a job each (7g, "Stores").
         dev.droidtop.library.stores.StoreSaves.register(appContext)
+        // Steam stays connected while signed in (friends, chat): its service, the message
+        // notification and the unread count, then the connection itself (7g, "Stores").
+        dev.droidtop.app.SteamConnectionService.install(appContext)
         // The one single-file download runner and the post step of the plugin catalog's bundles; a
         // download that finished while the process was dead is re-attached and finished by these.
         dev.droidtop.pluginhost.DownloadJobs.register(appContext)
