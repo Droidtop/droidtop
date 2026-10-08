@@ -396,12 +396,11 @@ class PcGameProvider(
                 } else {
                     null
                 }
+                // Several equally likely programs and nothing to tell them apart:
+                // the person chooses, and the shell offers the choice on the spot.
                 val windows = storeLaunch?.let { WindowsLaunch(it.executable, it.workingDir, it.arguments) }
-                    ?: WindowsLaunchResolver.resolve(picked, gameRoot)
-                    ?: error(
-                        "Can't launch ${entry.title}: couldn't identify which executable to run in " +
-                            "${gameRoot.absolutePath}. Pick one explicitly for this game.",
-                    )
+                    ?: withContext(Dispatchers.IO) { WindowsLaunchResolver.resolve(picked, gameRoot) }
+                    ?: throw dev.droidtop.library.ProgramNotIdentified(entry.id, entry.title, gameRoot.absolutePath)
                 // A store's cloud saves are brought up to date first (Steam Cloud); it never holds the game back for long.
                 dev.droidtop.library.stores.StoreSaves.beforeLaunch(context, entry.id, GameNaming.displayName(entry.title))
                     ?.let { Log.i("droidtop.PcGameProvider", it) }

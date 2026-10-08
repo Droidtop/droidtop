@@ -1705,15 +1705,20 @@ class EngineGameProvider(
 
         // The game's own Wine settings (docs/SPEC.md 7i) name its program
         // when it has them; detection otherwise, as before.
-        val windowsLaunch = if (windows) WindowsLaunchResolver.resolve(context, entryId, gameRoot) else null
+        val windowsLaunch = if (windows) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { WindowsLaunchResolver.resolve(context, entryId, gameRoot) }
+        } else {
+            null
+        }
         val executable = if (windows) {
-            windowsLaunch?.executable
+            // Several equally likely programs: the person chooses (the shell
+            // offers the choice with the failure), the same as a PC game.
+            windowsLaunch?.executable ?: throw ProgramNotIdentified(entryId, gameRoot.name, gameRoot.absolutePath)
         } else {
             GameExecutableResolver.linuxExecutable(gameRoot)
         } ?: error(
-            "Couldn't identify which file to run in ${gameRoot.name} — it has no single obvious " +
-                (if (windows) "Windows executable" else "Linux launcher") +
-                ". Set one explicitly with a custom player.",
+            "Couldn't identify which file to run in ${gameRoot.name}: it has no single obvious Linux launcher. " +
+                "Set one explicitly with a custom player.",
         )
 
         val result = if (windows) {

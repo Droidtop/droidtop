@@ -1,6 +1,7 @@
 package dev.droidtop.app.settings
 
 import android.content.Context
+import dev.droidtop.library.WindowsPrograms
 import dev.droidtop.library.WineSettingsScreen
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -32,23 +33,23 @@ object WineOptionsCatalog {
     fun gameScreen(): CatalogScreen = CatalogScreen(
         id = WineSettingsScreen.ID,
         title = "Wine and graphics",
-        groups = { context -> groups(context, entryId = null, title = null) },
+        groups = { context -> groups(context, entryId = null, title = null, gameRoot = null) },
         // Reached from a game's page only: per-game rows are the screen's,
         // not settings search's (CatalogScreen.indexGroups).
         indexGroups = { _ -> emptyList() },
         forDeepLink = { argument ->
-            val (entryId, title) = WineSettingsScreen.parse(argument)
+            val target = WineSettingsScreen.parse(argument)
             CatalogScreen(
                 id = WineSettingsScreen.ID,
                 title = "Wine and graphics",
-                subtitle = title,
-                groups = { context -> groups(context, entryId, title) },
+                subtitle = target.title,
+                groups = { context -> groups(context, target.entryId, target.title, target.gameRoot) },
             )
         },
     )
 
-    /** The rows for [entryId], or for the shared environment when it is null. */
-    suspend fun groups(context: Context, entryId: String?, title: String?): List<CatalogGroup> {
+    /** The rows for [entryId] (whose folder is [gameRoot]), or for the shared environment when it is null. */
+    suspend fun groups(context: Context, entryId: String?, title: String?, gameRoot: String? = null): List<CatalogGroup> {
         val state = WineOptions.state(context, entryId) ?: return listOf(
             CatalogGroup(
                 id = "wine_options_none",
@@ -95,6 +96,18 @@ object WineOptionsCatalog {
                             run = {},
                         )
                     },
+                )
+            }
+            // Which program the game runs: the one choice screen the
+            // game's options, its page and a launch failure open too.
+            if (entryId != null && gameRoot != null) {
+                add(
+                    NestedScreenItem(
+                        id = WindowsPrograms.SCREEN_ID,
+                        title = "Program",
+                        subtitle = "Which program in the game's folder starts it",
+                        inline = WindowsPrograms.screen(entryId, title ?: entryId, gameRoot),
+                    ),
                 )
             }
             state.rows.forEach { row -> add(item(row, entryId, title, overGame)) }

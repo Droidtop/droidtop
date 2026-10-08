@@ -168,6 +168,8 @@ internal fun PcGameMenu(
     // This game's Wine and graphics settings (docs/SPEC.md 5a), in a sheet
     // over the menu; null when it is closed.
     var wineScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
+    // Which program the game runs (docs/SPEC.md 7i, "Which program runs"), in a sheet the same way.
+    var programScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     // The free-space offer before a store install or update opens its own
     // window over the menu (Droidtop/tracker#227); null when it is closed.
     var storeOffer by remember(entry) { mutableStateOf<StoreInstallOffer?>(null) }
@@ -340,6 +342,16 @@ internal fun PcGameMenu(
             onExit = {
                 wineScreen = null
                 // Picking another Wine build moves the game to its own prefix.
+                reloadToken++
+            },
+        )
+        return
+    }
+    programScreen?.let { screen ->
+        dev.droidtop.shell.gamepad.CatalogSheet(
+            root = screen,
+            onExit = {
+                programScreen = null
                 reloadToken++
             },
         )
@@ -670,18 +682,15 @@ internal fun PcGameMenu(
         onOpenWineSettings = {
             val screen = dev.droidtop.library.settings.SettingsScreenRegistry.get(
                 dev.droidtop.library.WineSettingsScreen.ID,
-                dev.droidtop.library.WineSettingsScreen.argument(entry.id, gameName),
+                dev.droidtop.library.WineSettingsScreen.argument(entry.id, gameName, engineChoice.folder),
             )
             if (screen != null) wineScreen = screen else status = "Wine settings aren't available in this build"
         },
         wineSettings = wineSettings,
         onImportLutris = { importingLutris = true },
-        onClearWineSettings = {
-            scope.launch {
-                withContext(Dispatchers.IO) { WineGameSettingsPrefs.set(context, entry.id, null) }
-                status = "This game runs the program droidtop detects again."
-                reloadToken++
-            }
+        // The game's folder is known once the engine row's facts are read (on IO).
+        onChooseProgram = engineChoice.folder?.let { folder ->
+            { programScreen = dev.droidtop.library.WindowsPrograms.screen(entry.id, gameName, folder) }
         },
     )
 
@@ -1194,7 +1203,7 @@ private fun rememberPcActions(
     onOpenWineSettings: () -> Unit,
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
-    onClearWineSettings: () -> Unit,
+    onChooseProgram: (() -> Unit)?,
 ): PcMenuSections {
     val isEngineGame = entry.kind != LibraryEntryKind.WINE_PROFILE
     val runsOnEnginehost = runner?.option?.strategy == GameLaunchStrategy.ENGINEHOST
@@ -1284,7 +1293,7 @@ private fun rememberPcActions(
                 onOpenPrefix = onOpenWineSettings,
                 wineSettings = wineSettings,
                 onImportLutris = onImportLutris,
-                onClearWineSettings = onClearWineSettings,
+                onChooseProgram = onChooseProgram,
             ),
         ).flatten(),
     )
@@ -1401,7 +1410,7 @@ private fun runnerRows(
     onOpenPrefix: () -> Unit,
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
-    onClearWineSettings: () -> Unit,
+    onChooseProgram: (() -> Unit)?,
 ): List<PcActionRow>? = when {
     runsOnEnginehost -> listOfNotNull(
         PcActionRow("Saves", "Opens Enginehost's save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
@@ -1418,19 +1427,19 @@ private fun runnerRows(
     )
     hasWindowsRoute -> listOfNotNull(
         PcActionRow("Wine and graphics", wineRowDetail(android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"), onOpenPrefix),
-        // The game's own program, when an import chose one; selecting
-        // it goes back to the program droidtop detects (docs/SPEC.md 7i).
-        wineSettings?.executable?.let { exe ->
-            PcActionRow(
-                "Program: $exe",
+        // Which program the game runs: the person's choice (or an
+        // import's), else the one droidtop picks (docs/SPEC.md 7i).
+        PcActionRow(
+            "Program",
+            wineSettings?.executable?.let { exe ->
                 listOfNotNull(
-                    wineSettings.arguments.takeIf { it.isNotEmpty() }?.joinToString(" ", prefix = "With "),
+                    exe,
+                    wineSettings.arguments.takeIf { it.isNotEmpty() }?.joinToString(" ", prefix = "with "),
                     wineSettings.source?.let { "from $it" },
-                    "select to go back to the program droidtop detects",
-                ).joinToString(" - "),
-                onClearWineSettings,
-            )
-        },
+                ).joinToString(" - ")
+            } ?: "The one droidtop picks; choose another",
+            onChooseProgram,
+        ),
         PcActionRow(
             "Import a Lutris install script",
             "Review every change first",

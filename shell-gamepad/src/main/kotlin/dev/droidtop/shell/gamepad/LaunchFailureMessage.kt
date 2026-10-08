@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.ProgramNotIdentified
 import dev.droidtop.library.consoles.NoEmulatorInstalled
 
 /**
@@ -15,6 +16,9 @@ object LaunchFailureMessage {
     fun userMessage(game: String?, cause: Throwable?): String = when {
         cause is NoEmulatorInstalled ->
             "No ${cause.systemName} emulator is installed yet."
+        // Droidtop/tracker#308: what is wrong, never emulator advice.
+        cause is ProgramNotIdentified ->
+            "droidtop can't tell which program starts \"${game?.takeIf { it.isNotBlank() } ?: cause.title}\"."
         else -> if (game.isNullOrBlank()) {
             "The game couldn't be started."
         } else {

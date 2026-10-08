@@ -18,8 +18,9 @@ import java.io.File
  * arguments are not another's. Paths are relative to the game's folder,
  * so a folder that moves with its game keeps them.
  *
- * Today the one writer is the Lutris importer (§7e3); [source] says so on
- * the game's own screen, and clearing it returns the game to detection.
+ * Two writers: the Lutris importer (§7e3), whose [source] says so on the
+ * game's own screen, and the person's program choice ([WindowsPrograms]).
+ * Clearing it returns the game to detection.
  */
 @Serializable
 data class WineGameSettings(
@@ -90,12 +91,18 @@ object WineSettingsScreen {
     const val ID = "windows_game_wine"
     private const val SEPARATOR = "\n"
 
-    /** The deep-link argument for one game: its library id and its title. */
-    fun argument(entryId: String, title: String): String = entryId + SEPARATOR + title
+    /** One game the screen is for: its library id, its title, and its folder when it has one (for the Program row). */
+    data class Target(val entryId: String, val title: String, val gameRoot: String?)
 
-    /** [argument] read back: the entry id, then the title. */
-    fun parse(argument: String): Pair<String, String> =
-        argument.substringBefore(SEPARATOR) to argument.substringAfter(SEPARATOR, argument.substringBefore(SEPARATOR))
+    /** The deep-link argument for one game: its library id, its title and its folder. */
+    fun argument(entryId: String, title: String, gameRoot: String? = null): String =
+        listOfNotNull(entryId, title, gameRoot).joinToString(SEPARATOR)
+
+    /** [argument] read back. */
+    fun parse(argument: String): Target {
+        val parts = argument.split(SEPARATOR)
+        return Target(parts[0], parts.getOrNull(1) ?: parts[0], parts.getOrNull(2)?.takeIf { it.isNotBlank() })
+    }
 }
 
 /** What a Windows launch of one game runs: the program, where it starts, and its arguments. */
