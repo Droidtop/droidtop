@@ -49,6 +49,7 @@ import dev.droidtop.shell.gamepad.query.pillText
 import dev.droidtop.shell.gamepad.query.queryCountLine
 import dev.droidtop.shell.gamepad.query.rememberSavedViews
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
@@ -70,12 +71,15 @@ internal const val GAME_FOLDERS_SCREEN_ID = "rom_folders"
  * raised fill), the black ground, the screen header, and a [TouchHintBar]
  * that names every action and dispatches it.
  *
- * What it does is Launcher mode's and no more: A plays, X filters and Y
- * sorts over the one query model every list uses (a long press, or Select's
- * Options, pins the game to the home screen; Options also opens Game
- * folders in place -- the settings screen that fills an empty grid, rendered
- * by the same navigator the shell's settings use) and B leaves. There are
- * no themes, detail pages or Quick Menu here; those are Gaming's.
+ * What it does: A plays, X filters and Y sorts over the one query model
+ * every list uses; Select's Options pins the game to the home screen and
+ * opens Game folders in place (the settings screen that fills an empty
+ * grid, rendered by the same navigator the shell's settings use); B leaves.
+ * A PC or engine game is Gaming's PC game wired out (Droidtop/tracker#349):
+ * A follows the same primary-action rule as the PC Games tab (a store game
+ * that is not installed offers the install), and a long press or Options >
+ * Game page opens the same page and menu ([PcGameStandalone]). A long press
+ * on any other game pins it. There are no themes or Quick Menu here.
  *
  * [games] null is "not read yet", which says so rather than "no games".
  */
@@ -84,6 +88,10 @@ fun LauncherGamesScreen(
     games: List<LibraryEntry>?,
     onPlay: (LibraryEntry) -> Unit,
     onPin: (LibraryEntry) -> Unit,
+    /** The library, for a PC game's page and menu; null leaves PC games with Play and Pin only. */
+    library: dev.droidtop.library.Library? = null,
+    /** The Downloads place, where a store install runs (the page's and the install offer's link). */
+    onOpenDownloads: () -> Unit = {},
 ) {
     val shellWindow = currentShellWindow()
     CompositionLocalProvider(LocalShellWindow provides shellWindow) {
@@ -124,6 +132,8 @@ fun LauncherGamesScreen(
                     onPlay = onPlay,
                     onPin = onPin,
                     onOpenFolders = if (foldersScreen != null) ({ foldersOpen = true }) else null,
+                    library = library,
+                    onOpenDownloads = onOpenDownloads,
                 )
             }
         }
@@ -136,9 +146,16 @@ private fun GamesGrid(
     onPlay: (LibraryEntry) -> Unit,
     onPin: (LibraryEntry) -> Unit,
     onOpenFolders: (() -> Unit)?,
+    library: dev.droidtop.library.Library?,
+    onOpenDownloads: () -> Unit,
 ) {
     val window = LocalShellWindow.current
     val pad = rememberGridPad()
+    // A PC or engine game takes the PC Games tab's primary action and has its page (Droidtop/tracker#349).
+    fun hasPage(entry: LibraryEntry) = library != null && entry.isPcOrEngineGame
+    var pageId by remember { mutableStateOf<String?>(null) }
+    val pcLaunch = dev.droidtop.shell.gamepad.pc.rememberPcLaunch(onLaunch = onPlay, onOpenDownloads = onOpenDownloads)
+    val play: (LibraryEntry) -> Unit = { entry -> if (hasPage(entry)) pcLaunch.launch(entry) else onPlay(entry) }
     val emptyAction = remember { FocusRequester() }
     // The one query model the Gaming lists use (docs/SPEC.md 7j): this view's filters and sort are
     // remembered, and applied off the main thread.
@@ -250,11 +267,11 @@ private fun GamesGrid(
                             GameCard(
                                 entry = entry,
                                 modifier = Modifier.focusRequester(pad.requester(index)),
-                                onLaunch = { onPlay(entry) },
+                                onLaunch = { play(entry) },
                                 onFocused = { pad.focused = index },
-                                // Y and a long press: the shell's "act on this
-                                // one", which in the Launcher is pinning it.
-                                onShowDetail = { onPin(entry) },
+                                // A long press: the shell's "act on this one",
+                                // a PC game's page, else pinning it.
+                                onShowDetail = { if (hasPage(entry)) pageId = entry.id else onPin(entry) },
                             )
                         }
                     }
@@ -290,11 +307,25 @@ private fun GamesGrid(
     if (sortOpen) {
         LibrarySortSheet(scope = scope, query = query, onQueryChange = { query = it }, onDismiss = { sortOpen = false })
     }
+    // The PC Games tab's page, menu and install offer, wired out (Droidtop/tracker#349).
+    val pageLibrary = library
+    val openPage = pageId
+    if (pageLibrary != null && openPage != null) {
+        dev.droidtop.shell.gamepad.pc.PcGameStandalone(
+            library = pageLibrary,
+            entryId = openPage,
+            onLaunch = onPlay,
+            onOpenDownloads = onOpenDownloads,
+            onClose = { pageId = null },
+        )
+    }
+    dev.droidtop.shell.gamepad.pc.PcLaunchOfferSheet(pcLaunch)
     if (optionsOpen) {
         val focused = list?.getOrNull(pad.focused)
         LauncherGamesOptions(
             game = focused,
             onPin = onPin,
+            onOpenPage = focused?.takeIf { hasPage(it) }?.let { game -> { pageId = game.id } },
             onOpenFolders = onOpenFolders,
             onDismiss = { optionsOpen = false },
         )
@@ -310,13 +341,15 @@ private fun GamesGrid(
 private fun LauncherGamesOptions(
     game: LibraryEntry?,
     onPin: (LibraryEntry) -> Unit,
+    onOpenPage: (() -> Unit)?,
     onOpenFolders: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     class Option(val title: String, val onClick: () -> Unit)
 
-    val options = remember(game, onOpenFolders) {
+    val options = remember(game, onOpenFolders, onOpenPage) {
         buildList<Option> {
+            if (onOpenPage != null) add(Option("Game page") { onDismiss(); onOpenPage() })
             if (game != null) add(Option("Pin to home screen") { onDismiss(); onPin(game) })
             if (onOpenFolders != null) add(Option("Game folders") { onDismiss(); onOpenFolders() })
         }

@@ -23,7 +23,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -43,11 +42,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.AppCategoryRules
-import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.library.LibraryGrouping
-import dev.droidtop.library.PartProgress
 import dev.droidtop.library.RunnerAction
 import dev.droidtop.library.RunnerState
 import dev.droidtop.library.StoreDownloads
@@ -90,7 +86,6 @@ import dev.droidtop.shell.gamepad.query.LibrarySortKey
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -219,13 +214,6 @@ internal class PcGamesState {
  */
 internal enum class PcView { HOME, OVERVIEW, GRID }
 
-/** The folded library and, per drawn game, every folder and store row behind it (docs/SPEC.md 7m). */
-private class FoldedPcLibrary(
-    val games: List<LibraryEntry>,
-    val siblings: Map<String, List<LibraryEntry>>,
-    /** A multi-part game's card id to the entry Play starts (the first part not finished, docs/SPEC.md 7n); only games where that differs from the card. */
-    val continuing: Map<String, LibraryEntry>,
-)
 
 /**
  * The PC Games tab (docs/SPEC.md 7i, 2026-10-01): droidtop's own library
@@ -290,16 +278,7 @@ internal fun PcGamesSection(
         // the refreshed entries arrive instead of replacing the grid with
         // an empty state during that gap.
         if (entries.isEmpty() && folded?.games?.isNotEmpty() == true) return@LaunchedEffect
-        folded = withContext(Dispatchers.Default) {
-            val groups = LibraryGrouping.group(entries, PartProgress.finished(context), GamesRoots.current(context).map { it.absolutePath })
-            FoldedPcLibrary(
-                games = groups.map { it.displayEntry },
-                siblings = groups.associate { group -> group.displayEntry.id to group.entriesByPath.values.toList() },
-                continuing = groups
-                    .mapNotNull { group -> group.continueEntry?.takeIf { it.id != group.displayEntry.id }?.let { group.displayEntry.id to it } }
-                    .toMap(),
-            )
-        }
+        folded = withContext(Dispatchers.Default) { foldPcLibrary(context, entries) }
     }
     val games = folded?.games
     // How many folders or store copies of one drawn game are on this device,
@@ -425,28 +404,13 @@ internal fun PcGamesSection(
     // offer first (Droidtop/tracker#227): the size and the room the chosen
     // game folder has are named before anything downloads; a download
     // already running goes straight to the store's queue.
+    // The rule is shared with every host outside Gaming (rememberPcLaunch, Droidtop/tracker#349).
     val downloads by StoreDownloads.active.collectAsState()
-    var storeOffer by remember { mutableStateOf<StoreInstallOffer?>(null) }
-    val storeScope = rememberCoroutineScope()
-    fun say(line: String?) {
-        line?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
-    }
-    // The install offer was taken: the game's store starts its job here.
-    fun proceed(entry: LibraryEntry, volumePath: String) {
-        val own = entry.ownStore()
-        if (own == null) {
-            say(NO_STORE_LINE)
-        } else {
-            storeScope.launch { say(startOwnStoreInstall(context, entry, own, volumePath)) }
-        }
-    }
-    val launch: (LibraryEntry) -> Unit = { entry ->
-        when (val stage = storeStageOf(entry, entry.downloadKey()?.let { downloads[it] })) {
-            StoreStage.INSTALL, StoreStage.UPDATE -> storeOffer = StoreInstallOffer(entry, stage)
-            null -> onLaunch(folded?.continuing?.get(entry.id) ?: entry)
-            else -> say(continueStoreDownload(context, entry, stage) { onOpenSection(GamingSection.DOWNLOADS) })
-        }
-    }
+    val pcLaunch = rememberPcLaunch(
+        onLaunch = { entry -> onLaunch(folded?.continuing?.get(entry.id) ?: entry) },
+        onOpenDownloads = { onOpenSection(GamingSection.DOWNLOADS) },
+    )
+    val launch: (LibraryEntry) -> Unit = pcLaunch.launch
     // A on a capsule plays it, except a Windows game whose environment is not
     // set up yet: that opens the game page, whose primary button is the setup
     // step, rather than a download offer over the grid (Droidtop/tracker#293).
@@ -915,17 +879,8 @@ internal fun PcGamesSection(
             onDismiss = { otherMenu = null },
         )
     }
-    // The free-space offer before a store install or update: its own
-    // window over the tab, the one place the volume is chosen
-    // (Droidtop/tracker#227).
-    StoreInstallOfferSheet(
-        offer = storeOffer,
-        onProceed = { o, volumePath ->
-            storeOffer = null
-            proceed(o.entry, volumePath)
-        },
-        onDismiss = { storeOffer = null },
-    )
+    // The free-space offer before a store install or update.
+    PcLaunchOfferSheet(pcLaunch)
 }
 
 /**

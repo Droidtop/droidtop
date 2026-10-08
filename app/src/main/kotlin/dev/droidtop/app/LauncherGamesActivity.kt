@@ -128,6 +128,12 @@ class LauncherGamesActivity : AppCompatActivity() {
                     games = shown,
                     onPlay = { GameLaunchActivity.dispatch(this, it) },
                     onPin = { pin(applicationContext, it) },
+                    library = library,
+                    onOpenDownloads = {
+                        startActivity(
+                            dev.droidtop.library.settings.Place.openIntent(this, dev.droidtop.library.settings.Place.DOWNLOADS),
+                        )
+                    },
                 )
             }
         }

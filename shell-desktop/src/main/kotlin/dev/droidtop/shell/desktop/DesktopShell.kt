@@ -69,6 +69,11 @@ import dev.droidtop.library.settings.CatalogScreenLink
 import dev.droidtop.library.settings.Place
 import dev.droidtop.library.settings.SocialBadge
 import dev.droidtop.library.settings.UiModePrefs
+import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.scraper.isPcOrEngineGame
+import dev.droidtop.shell.gamepad.pc.PcGameStandalone
+import dev.droidtop.shell.gamepad.pc.PcLaunchOfferSheet
+import dev.droidtop.shell.gamepad.pc.rememberPcLaunch
 
 /**
  * "Desktop style" shell: a taskbar + start menu wrapped around the primary
@@ -130,6 +135,20 @@ fun DesktopShell(
     onOpenSetup: () -> Unit = {},
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
+    // A library entry launches the way it launches everywhere (Library.launch, SPEC 2b). A PC or
+    // engine game first takes Gaming's primary-action rule (a store game that is not installed offers
+    // the install) and has Gaming's page and menu, opened from the Start menu's long press
+    // (Droidtop/tracker#349). Both live here, not in the Start menu, which closes as they open.
+    val context = LocalContext.current
+    var pageId by remember { mutableStateOf<String?>(null) }
+    val openDownloads: () -> Unit = { context.startActivity(Place.openIntent(context, Place.DOWNLOADS)) }
+    val launchEntry: (LibraryEntry) -> Unit = { entry ->
+        // In the library's scope: closing the menu, which the same tap does, must not cancel it.
+        library.launchInBackground(entry.id) { result ->
+            if (result is LaunchResult.Refused) onLaunchFailure(result.reason)
+        }
+    }
+    val pcLaunch = rememberPcLaunch(onLaunch = launchEntry, onOpenDownloads = openDownloads)
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup)
@@ -154,10 +173,22 @@ fun DesktopShell(
                 library = library,
                 loadLinuxApps = loadLinuxApps,
                 onLaunchLinuxApp = onLaunchLinuxApp,
-                onLaunchFailure = onLaunchFailure,
+                onPlay = { entry -> if (entry.isPcOrEngineGame) pcLaunch.launch(entry) else launchEntry(entry) },
+                onOpenPage = { entry -> pageId = entry.id },
                 onDismiss = { startMenuOpen = false },
             )
         }
+
+        pageId?.let { id ->
+            PcGameStandalone(
+                library = library,
+                entryId = id,
+                onLaunch = launchEntry,
+                onOpenDownloads = openDownloads,
+                onClose = { pageId = null },
+            )
+        }
+        PcLaunchOfferSheet(pcLaunch)
     }
 }
 
@@ -738,7 +769,8 @@ private fun BoxScope.StartMenu(
     library: Library,
     loadLinuxApps: (suspend () -> List<ContainerApp>)?,
     onLaunchLinuxApp: ((ContainerApp) -> Unit)?,
-    onLaunchFailure: (String) -> Unit,
+    onPlay: (LibraryEntry) -> Unit,
+    onOpenPage: (LibraryEntry) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -849,20 +881,28 @@ private fun BoxScope.StartMenu(
                     )
                 }
                 else -> items(currentEntries, key = { it.id }) { entry ->
+                    // A tap plays; a long press on a PC or engine game opens its page.
+                    val hasPage = entry.isPcOrEngineGame
                     Text(
                         entry.title,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp, horizontal = 8.dp)
-                            .clickable {
-                                // In the library's scope: closing the menu,
-                                // which this same tap does, must not cancel it.
-                                library.launchInBackground(entry.id) { result ->
-                                    if (result is LaunchResult.Refused) onLaunchFailure(result.reason)
-                                }
-                                onDismiss()
-                            },
+                            .combinedClickable(
+                                onClick = {
+                                    onPlay(entry)
+                                    onDismiss()
+                                },
+                                onLongClick = if (hasPage) {
+                                    {
+                                        onOpenPage(entry)
+                                        onDismiss()
+                                    }
+                                } else {
+                                    null
+                                },
+                            )
+                            .padding(vertical = 4.dp, horizontal = 8.dp),
                     )
                 }
             }

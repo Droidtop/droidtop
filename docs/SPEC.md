@@ -307,6 +307,11 @@ nothing else of this section exists:
   container's desktop is Wine-in-the-container, §11's open risk, and no
   launch path assumes it. `WindowPlacement` therefore applies to
   container windows and to compositor outputs, not to Activities.
+  A PC or engine game's tap takes Gaming's primary-action rule and a long
+  press opens Gaming's page, from the Start menu (§7i "The game page,
+  outside Gaming"); the page and the install offer are drawn by the
+  Desktop shell itself, over the desktop, since the Start menu closes as
+  they open.
 
 ### Emulators, and Android apps as windows
 
@@ -436,8 +441,8 @@ package from the drawer. It now works like this:
   Gaming shell's Games section reads, run by the same loop
   (`Library.scanFollowingGamesRoots`, which follows the games roots as they
   change), so with both on there is one scan, and missing games are left
-  out (hidden ones by the query's one Hidden rule, §7j). No themes, no scraped detail views, no Quick Menu: those
-  are Gaming's.
+  out (hidden ones by the query's one Hidden rule, §7j). No themes and no Quick Menu: those
+  are Gaming's. A PC or engine game has Gaming's page (§7i "The game page, outside Gaming").
 - **It is droidtop's own chrome, not a stock screen** (decided 2026-09-25,
   after the rig's user did not recognise the first version as droidtop's).
   It is drawn by the shell (`LauncherGamesScreen`, `:shell-gamepad`) from
@@ -10910,6 +10915,28 @@ a gamelist and has no system to switch, so Left/Right are free, and the
 Deck's library tabs are the better shape.
 
 ### The game page
+
+**Outside Gaming (decided 2026-10-08, Droidtop/tracker#349).** Owner: "Still
+focus on gaming mode for now, just wire it in OUT from there". The page was
+reachable only from the PC Games tab, so Standard's Games grid and Desktop's
+Start menu could only press Play: a store game that was not installed could not
+be installed there, and the runner, Windows setup, DLC and versions, saves and
+favourite were Gaming-only. Now the same pieces are hosted outside Gaming, not
+copied:
+
+- `rememberPcLaunch` (`:shell-gamepad` `pc/PcGameHost.kt`) is the one
+  primary-action rule (install or update offer, a running download to the
+  store's queue, else launch) with `PcLaunchOfferSheet` for the offer; the PC
+  Games tab uses it too, which is where it was written inline before.
+- `PcGameStandalone` draws `PcGamePage`, `PcGameMenu` and the offer for one game
+  from any host: it folds the library's PC and engine games itself
+  (`foldPcLibrary`, the tab's fold), finds the game an entry belongs to, and
+  calls back to launch (the host's own launch path) and to open Downloads (the
+  place, in the screen host).
+- Standard's Games grid: A on a PC or engine game takes the rule; a long press
+  or Options > Game page opens the page (a long press on any other game still
+  pins it). Desktop's Start menu: a tap takes the rule; a long press opens the
+  page over the desktop. Retro games keep their themed detail in Gaming only.
 
 Droidtop/tracker#254, 2026-10-02. The page keeps one job, "everything about
 this game and the one thing you most likely want to do", and has this
