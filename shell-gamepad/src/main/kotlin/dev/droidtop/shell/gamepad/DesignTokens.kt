@@ -10,6 +10,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -103,6 +104,39 @@ object Measure {
 }
 
 /**
+ * The corner scale: three radii and the pill, and nothing in between. The
+ * values are Steam's (measured, docs/SPEC.md 7k): crisp corners on the
+ * things that hold art and the controls beside them, because a large radius
+ * crops art and makes it read smaller; a little more on the panels that
+ * float over a page; one soft plate for a large generic focused surface.
+ * A `RoundedCornerShape(N.dp)` in a Gaming screen is a defect.
+ */
+object Corners {
+    /** Capsules, art, rows, buttons, chips that are not pills. */
+    val Crisp = RoundedCornerShape(3.dp)
+    /** Panels, sheets, dialogs, the Quick Menu and the left menu when they float. */
+    val Panel = RoundedCornerShape(6.dp)
+    /** A large soft plate: the one generic focused surface that is not a card. */
+    val Plate = RoundedCornerShape(16.dp)
+    /** Tabs, status badges, hint glyphs: fully round ends. */
+    val Pill = RoundedCornerShape(50)
+}
+
+/**
+ * Elevation, in dp, by role. Only the platform's own shadow is used (no
+ * blur, no drawn glow), and only where something is lifted: a capsule
+ * carries a small one at rest and a deep one when focused (FocusLook), the
+ * primary action a moderate one that deepens when selected, and a floating
+ * menu one deeper still. A focused thing's shadow takes the theme's accent
+ * ([MenuTokens.Accent]) so the lift reads as light, not as a dark smudge.
+ */
+object Elevation {
+    val PrimaryRest: Dp = 4.dp
+    val PrimaryFocused: Dp = 14.dp
+    val Menu: Dp = 24.dp
+}
+
+/**
  * The type scale, and the job of each role. droidtop's chrome supplies
  * this to [MaterialTheme] rather than inheriting the platform default, so
  * two screens in the same flow cannot use different roles for the same
@@ -114,9 +148,25 @@ object Measure {
  * detail of this file.
  */
 object TypeRole {
-    /** The name of the screen you are on. One per screen, at the top. */
+    /** The name of the screen you are on, and a shelf's heading. One per block, at its top. */
     val screenTitle: TextStyle
         @Composable @ReadOnlyComposable get() = MaterialTheme.typography.headlineSmall
+
+    /** A game's name over its own art: the hero card, the game page. */
+    val heroTitle: TextStyle
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.headlineMedium
+
+    /**
+     * A short label set above or beside a value or a title ("LAST PLAYED",
+     * "2 HOURS"): drawn uppercase and tracked out, so it reads as a label
+     * and never competes with what it labels.
+     */
+    val eyebrow: TextStyle
+        @Composable @ReadOnlyComposable get() = sectionLabel
+
+    /** A tab or a view chip's label. Drawn uppercase. */
+    val tabLabel: TextStyle
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.titleSmall
 
     /** The name of a row, a card, a tile or a choice. */
     val rowTitle: TextStyle
@@ -136,7 +186,10 @@ object TypeRole {
 
     /** A group marker above a run of rows. Drawn uppercase, tracked out. */
     val sectionLabel: TextStyle
-        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelMedium
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelMedium.copy(
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.5.sp,
+        )
 
     /** The label on a button. */
     val button: TextStyle
@@ -144,26 +197,40 @@ object TypeRole {
 }
 
 /**
- * The scale itself. Sizes step rather than drift, and line heights are
- * 1.35x the size for prose and 1.25x for single-line roles, so a row's
- * height is predictable from its type.
+ * The scale itself: Steam's gamepad ladder (measured, docs/SPEC.md 7k),
+ * re-expressed in Material's roles. A heading 22/28 bold, a title over art
+ * 26 at 1.1 lines, body and buttons 16/20, supporting 14/18, tab labels and
+ * small labels 12 with tracking. The sizes and weights are droidtop's; the
+ * typeface is not decided here: a Gaming theme's own fonts replace the
+ * families (GamingTheme), so a theme keeps control of its look.
  */
 val DroidtopTypography: Typography = Typography().let { stock ->
     stock.copy(
-        headlineSmall = stock.headlineSmall.copy(
-            fontSize = 24.sp,
-            lineHeight = 30.sp,
+        headlineMedium = stock.headlineMedium.copy(
+            fontSize = 26.sp,
+            lineHeight = 29.sp,
             fontWeight = FontWeight.SemiBold,
+        ),
+        headlineSmall = stock.headlineSmall.copy(
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.Bold,
         ),
         titleMedium = stock.titleMedium.copy(
             fontSize = 16.sp,
             lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,
         ),
-        bodyMedium = stock.bodyMedium.copy(fontSize = 15.sp, lineHeight = 21.sp),
-        bodySmall = stock.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
-        labelMedium = stock.labelMedium.copy(fontSize = 12.sp, lineHeight = 15.sp),
-        labelLarge = stock.labelLarge.copy(fontSize = 15.sp, lineHeight = 19.sp),
+        titleSmall = stock.titleSmall.copy(
+            fontSize = 12.sp,
+            lineHeight = 22.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp,
+        ),
+        bodyMedium = stock.bodyMedium.copy(fontSize = 16.sp, lineHeight = 20.sp),
+        bodySmall = stock.bodySmall.copy(fontSize = 14.sp, lineHeight = 18.sp),
+        labelMedium = stock.labelMedium.copy(fontSize = 12.sp, lineHeight = 16.sp),
+        labelLarge = stock.labelLarge.copy(fontSize = 16.sp, lineHeight = 20.sp),
     )
 }
 
@@ -336,8 +403,8 @@ object MenuTokens {
     val HintBar: Color get() = GamingTheme.palette.hintBar
     val HintPillOutline: Color get() = GamingTheme.palette.hintPillOutline
 
-    val RowShape = RoundedCornerShape(10.dp)
-    val OverlayShape = RoundedCornerShape(14.dp)
+    val RowShape = Corners.Crisp
+    val OverlayShape = Corners.Panel
     val RowSpacing = 6.dp
 
     /**
@@ -403,7 +470,7 @@ object MenuTokens {
      * gutter, and both end in the same hairline on the side facing the
      * content. [FrameBarHeightTouch] leaves a hint's 48dp tap target room.
      */
-    val FrameBarHeight = 44.dp
+    val FrameBarHeight = 40.dp
     val FrameBarHeightTouch = 52.dp
     val FrameHairline: Color get() = CardOutline
 
@@ -457,9 +524,9 @@ object MenuTokens {
     val HintLabelTextSize = 13.sp
 
     /**
-     * The width of the focus ring `selectionFrame` draws (GamingMenu.kt):
-     * one value for every focusable thing the shell draws, cards, rows,
-     * chips, tabs and tiles alike (docs/SPEC.md 7k).
+     * The width of the focus ring (FocusGlide.kt): one value for every
+     * focusable thing the shell draws, cards, rows, chips, tabs and tiles
+     * alike (docs/SPEC.md 7k). Steam's 2dp.
      */
-    val FocusRingWidth = 3.dp
+    val FocusRingWidth = FocusLook.RingWidthDp.dp
 }

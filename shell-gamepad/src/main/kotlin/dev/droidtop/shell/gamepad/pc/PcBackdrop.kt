@@ -2,7 +2,6 @@ package dev.droidtop.shell.gamepad.pc
 
 import android.content.Context
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,7 +43,7 @@ import dev.droidtop.shell.gamepad.Motion
 internal fun PcBackdrop(art: String?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Box(modifier = modifier.fillMaxSize()) {
-        Crossfade(targetState = art, animationSpec = tween(Motion.AmbientFadeMs), label = "pc backdrop") { shown ->
+        Crossfade(targetState = art, animationSpec = Motion.ambientFade(), label = "pc backdrop") { shown ->
             if (shown != null) {
                 AsyncImage(
                     model = remember(shown) { backdropRequest(context, shown) },

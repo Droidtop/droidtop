@@ -11922,6 +11922,23 @@ a step on it. A measurement that is not a step is a defect, not a preference. Th
 touch target applies in every orientation and on every input, because a pad-shaped device
 still has a touchscreen; it is not conditional on the window being touch-first.
 
+**Steam's measured proportions (owner direction 2026-10-08, Droidtop/tracker#363).** The
+spacing, type, corners and elevation below follow Steam Big Picture's gamepad UI, measured and
+restated as droidtop's own tokens; the colours do not ("It's not the colors that are the issue.
+We WANT that, it gives our users more customization and control. We just need the feel, polish,
+and structure"): every colour stays a theme role (section 7k2), and a theme's own fonts still
+replace the families. The content gutter (`ShellWindow.edgePadding`) is 2.8 percent of the
+window's width (4 percent from 1500dp, never under 16dp), so shelves, page content and settings
+share one left edge; the header and footer use 12dp plus 1.4 percent (`barPadding`) and are 40dp
+tall at least. Corners are three radii and the pill (`Corners`): crisp 3dp on capsules, art,
+rows and buttons (a large radius crops art and makes it read smaller), 6dp on panels, sheets and
+dialogs, a 16dp plate for a large generic focused surface, pills for tabs, badges and glyphs.
+The type ladder: a screen or shelf heading 22/28 bold, a title over art 26 at 1.1 lines
+(`heroTitle`), body and buttons 16/20, supporting 14/18, a tab label 12/22 bold uppercase tracked
+(`tabLabel`), a section label and a label set over a value 12/16 semibold uppercase tracked
+(`sectionLabel`, `eyebrow`). Elevation is the platform shadow only, by role (`Elevation`,
+`FocusLook`): a focused thing's shadow takes the theme's accent.
+
 **Type.** droidtop's chrome has its own type scale, supplied to the theme alongside the colour
 scheme rather than inherited from the platform default, and each role has one documented job:
 what a screen title is, what a row title is, what a row's supporting line is, what a section
@@ -12664,34 +12681,50 @@ Settings tab, the left menu's places, Console systems and Containers.
   (Sort by, Search). Sentences stay for failures and for confirmations of a
   consequential or destructive action.
 
-### Gaming motion and focus (directed 2026-10-01, Droidtop/tracker#256)
+### Gaming motion and focus (directed 2026-10-01, Droidtop/tracker#256; Steam's measured values and DroidDeck's mechanisms 2026-10-08, Droidtop/tracker#363)
 
 The shell's own chrome (not a themed ES-DE view, which plays the theme's own transitions) has
-one motion vocabulary and one focus treatment. The principles come from studying how Steam Big
-Picture feels, with credit to its designers; the values are droidtop's own, in
-`MotionTokens.kt` (`Motion`, `FocusLook`) beside the other tokens.
+one motion vocabulary and one focus treatment. Owner, 2026-10-08: "much more closely mimic
+steam's UI ... We need a LOT of polish", and "as close to steam's uis (both steam and droiddeck)
+as possible while making it still really good for our uses". The durations, curves and focus
+ratios are Steam Big Picture's, measured from its gamepad UI and restated as droidtop's own roles
+(credit to its designers; nothing of Valve's is copied); the switch, the staggered entry, the
+sheen and the tinted lift are ported from DroidDeck's Compose front end (GPL-3.0, NOTICE.md). All
+of it lives in `MotionTokens.kt` (`Motion`, `FocusLook`) and `MotionEffects.kt`; colours stay the
+theme's roles (section 7k2).
 
 - **One mechanism.** Every animation the shell's own chrome plays takes its duration and curve
-  from `Motion` by role (focus lift, release, ring landing, carousel centre, panel in and out,
-  screen crossfade, ambient pulse and fade). A literal `tween(...)` or `spring()` in chrome code
-  is a defect.
+  from `Motion` by role (row focus, capsule lift, release, ring landing and breath, carousel
+  centre, panel in and out, screen crossfade, backdrop, rise, sheen, ambient pulse and fade),
+  built with `Motion.tw`/`Motion.sp`. A literal `tween(...)` or `spring()` in chrome code is a
+  defect. Curves: quick-out (0.17, 0.45, 0.14, 0.83) for rows, menus, the backdrop and the first
+  press of a scroll; glide (0.16, 0.86, 0.43, 0.99) for a lift, panels, the ring and the sheen;
+  soft-land (0, 0.73, 0.48, 1) for a capsule letting go; exit (0.6, 0, 1, 1) for leaving.
 - **Colour answers at once, shape glides.** A focus fill or colour change is instant
-  (`Motion.ColourMs`); lift, shadow and brightness glide in over `LiftMs` and settle back over
-  the longer `ReleaseMs`, because letting go slower than taking reads as weight.
+  (`Motion.ColourMs`); a row's transform takes 320 ms; a capsule's lift, shadow and brightness
+  glide in over 300 ms and settle back over 600 ms, because letting go slower than taking reads as
+  weight. A press acknowledges itself in 50 ms.
 - **One focus treatment** (`selectionFrame` for the outline and fill, `focusLift` for a
-  capsule): the focused item is slightly larger (5 percent), at full brightness, with a deeper
-  shadow, and its outline lands (thicker and transparent, thinning and fading in over
-  `RingLandMs`); unfocused capsules sit about 10 percent dimmed. It is cheap by construction: no
-  blur, the shadow only on the focused item, every animated value read in the layer or draw
-  phase so a focus move recomposes nothing. Because of that there is no low-performance mode to
-  switch it off; a blur or backdrop effect added later must come with one.
+  capsule): the focused capsule grows 5.3 percent from near its bottom edge (a landscape card 2.4
+  percent), rises 4dp, comes up from 90 to 100 percent brightness, and its platform shadow deepens
+  from 4 to 18dp and takes the theme's accent, so the lift reads as light. It is cheap by
+  construction: no blur, every animated value read in the layer or draw phase so a focus move
+  recomposes nothing. Because of that there is no low-performance mode to switch it off; a blur or
+  backdrop effect added later must come with one.
+- **Pages assemble, they do not pop.** A page's blocks fade up from 8dp below over 500 ms, each
+  60 ms after the one before, capped at six steps (`Modifier.rise`); the capsule that takes the
+  cursor gets a one-shot diagonal sheen over 1 s, and the Play button a slower 2 s stripe
+  (`Modifier.shine`). Both run in the draw or layer phase only.
+- **Reduced motion is one switch.** Gaming's Settings > Shell > Animations (on by default) and
+  Android's animator duration scale both feed `Motion.enabled` (`MotionSync`, observed live, read
+  off the main thread): with the switch off or Android's "Remove animations" on, every role is a
+  snap and every wall-clock wait between animations is zero, so nothing in the chrome moves on its
+  own. Compose already stretches its own clock by a non-zero animator scale.
 - **The scroll centres the focus.** A shelf, the view strip and the PC grid scroll the selected
   item to the middle of the visible span (`keepCentred`), clamped where the list ends, so what is
   on both sides stays visible. The first press eases; a press arriving while a scroll is moving,
   and a held direction repeating, is linear (`Motion.scroll(chained)`), so holding a direction is
   one smooth glide. Tall pages of rows keep the least-scroll rule (`keepInView`, section 6e).
-- Reduced motion (turning the lift and fades into instant changes) is not yet wired; it will read
-  one switch and apply to `Motion` and `FocusLook` only.
 
 ## 7k2. Gaming theming: the active ES-DE theme as droidtop's own design tokens (owner direction 2026-10-01, Droidtop/tracker#185)
 

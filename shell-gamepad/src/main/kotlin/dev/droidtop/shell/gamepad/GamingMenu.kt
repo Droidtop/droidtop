@@ -43,7 +43,6 @@ import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -55,8 +54,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
@@ -145,7 +142,7 @@ fun Modifier.selectionFrame(
     // nothing.
     val landed = animateFloatAsState(
         targetValue = if (shown) 1f else 0f,
-        animationSpec = if (shown) Motion.ringLand<Float>() else tween<Float>(Motion.ColourMs),
+        animationSpec = if (shown) Motion.tw<Float>(Motion.RingLandMs, easing = Motion.Glide) else Motion.tw<Float>(Motion.ColourMs),
         label = "focus ring",
     )
     Modifier
@@ -160,11 +157,11 @@ fun Modifier.selectionFrame(
             }
             val p = landed.value
             if (p > 0f) {
-                val w = MenuTokens.FocusRingWidth.toPx() * FocusLook.ringWidthFactor(p)
+                val w = MenuTokens.FocusRingWidth.toPx() * (1f + (1f - p))
                 inset(w / 2f) {
                     drawOutline(
                         shape.createOutline(this.size, layoutDirection, this),
-                        ringColor.copy(alpha = ringColor.alpha * FocusLook.ringAlpha(p)),
+                        ringColor.copy(alpha = ringColor.alpha * p),
                         style = Stroke(w),
                     )
                 }
@@ -291,8 +288,7 @@ internal fun MenuSectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
         text.uppercase(),
         color = MenuTokens.SectionLabel,
-        style = MaterialTheme.typography.labelMedium,
-        letterSpacing = TextUnit(1.2f, TextUnitType.Sp),
+        style = TypeRole.sectionLabel,
         modifier = modifier.padding(top = 18.dp, bottom = 6.dp, start = 4.dp),
     )
 }

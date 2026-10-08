@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -107,7 +106,7 @@ internal fun Screensaver(entries: List<LibraryEntry>, onDismiss: () -> Unit) {
     val entry = withArt[index.coerceIn(withArt.indices)]
 
     Box(Modifier.fillMaxSize().groundBackground().then(dismissModifier)) {
-        Crossfade(targetState = entry, animationSpec = tween(Motion.AmbientFadeMs), label = "screensaver-slide") { shown ->
+        Crossfade(targetState = entry, animationSpec = Motion.ambientFade(), label = "screensaver-slide") { shown ->
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AsyncImage(
                     model = shown.artworkUri,

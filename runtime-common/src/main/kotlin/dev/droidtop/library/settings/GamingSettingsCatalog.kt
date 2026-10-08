@@ -57,6 +57,7 @@ object GamingSettingsCatalog {
     const val ID_GLOBAL_SETTINGS = "pref_global_settings"
     const val ID_DEFAULT_SECTION = "pref_gaming_default_section"
     const val ID_SHOW_HINTS = "pref_gaming_show_hints"
+    const val ID_ANIMATIONS = "pref_gaming_animations"
     const val ID_SCRAPER = "pref_gaming_scraper"
     const val ID_ACCOUNTS_AND_SOURCES = "pref_gaming_accounts_and_sources"
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
@@ -152,6 +153,7 @@ object GamingSettingsCatalog {
             items = buildList {
                 add(defaultSectionItem(context))
                 add(showHintsItem(context))
+                add(animationsItem(context))
                 // Nested catalog screens whose DATA lives in :app -- resolved
                 // through SettingsScreenRegistry (registered at process start
                 // by :app's SettingsCatalogInitProvider), so they render
@@ -784,6 +786,24 @@ object GamingSettingsCatalog {
             CatalogPrefs.prefs(ctx).edit().putBoolean(ID_SHOW_HINTS, value).apply()
         },
     )
+
+    /**
+     * Gaming's own motion switch (docs/SPEC.md "Gaming motion and focus"): off,
+     * every animation the shell's chrome plays is an instant change. Android's
+     * "Remove animations" turns it off too, whatever this says.
+     */
+    private fun animationsItem(context: Context) = ToggleItem(
+        id = ID_ANIMATIONS,
+        title = "Animations",
+        subtitle = "Focus, panels and pages move; off, every change is instant",
+        current = animationsOn(context),
+        onToggle = { ctx, value ->
+            CatalogPrefs.prefs(ctx).edit().putBoolean(ID_ANIMATIONS, value).apply()
+        },
+    )
+
+    /** The Animations switch's value: on unless the person turned it off. */
+    fun animationsOn(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(ID_ANIMATIONS, true)
 
     // The one role model (MainScreen): this row and Swap screens both
     // write it, and both Gaming and Desktop read it -- hence "Main

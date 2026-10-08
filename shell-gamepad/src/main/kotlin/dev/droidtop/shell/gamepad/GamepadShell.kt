@@ -420,6 +420,9 @@ private fun GamepadShellBody(
         kotlinx.coroutines.flow.MutableStateFlow(android.os.SystemClock.elapsedRealtime())
     }
     var screensaverOn by remember { mutableStateOf(false) }
+    // Gaming's Animations switch and Android's animator scale (docs/SPEC.md
+    // "Gaming motion and focus"), observed for as long as the shell is drawn.
+    MotionSync()
     // Observed, not read once: the row that sets it is in this shell's
     // own Settings section (see ScreensaverPrefs.changes).
     val screensaverMode by remember { dev.droidtop.library.settings.ScreensaverPrefs.changes(context) }
@@ -1203,7 +1206,7 @@ private fun GamepadShellBody(
             // own animation and not two animations at once.
             androidx.compose.animation.Crossfade(
                 targetState = currentScreenKey,
-                animationSpec = androidx.compose.animation.core.tween(SHELL_SCREEN_TRANSITION_MS),
+                animationSpec = Motion.screen(),
                 label = "shell screen",
                 modifier = Modifier.fillMaxSize(),
             ) { screenKey ->
@@ -1982,16 +1985,6 @@ internal const val PLACE_PLUGINS_SCREEN_ID = "plugins"
  */
 internal fun placeForScreen(screenId: String, allowed: List<GamingSection>): GamingSection? =
     allowed.firstOrNull { it.isPlace && it.placeScreenId == screenId }
-
-/**
- * How long one shell-drawn screen takes to become another. ES-DE's own
- * inter-view fade is 500 ms at its slowest and 160 ms at its fastest
- * (ViewController.cpp's transition durations); the shell's own screens
- * are not theme content, so they take the short end of that -- long
- * enough not to be a cut, short enough that a pad user pressing B twice
- * is never waiting on it.
- */
-private const val SHELL_SCREEN_TRANSITION_MS = Motion.ScreenMs
 
 /**
  * The sections a given UI mode allows. Kiosk and Kid hide Settings --

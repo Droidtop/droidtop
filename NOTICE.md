@@ -117,6 +117,13 @@ This project is distributed under the GNU General Public License v3.0 (see
   own repository so it can be updated between builds. `library-core`
   copies the pinned commit's databases into its generated assets at build
   time. The repository carries no licence file of its own.
+- **DroidDeck** — https://github.com/Droid-Deck/DroidDeck — GPL-3.0, read at `9310d19`. Parts of
+  the Gaming shell's look and motion are ported from its Compose front end (Kurt Himebauch,
+  The412Banner, MaxsTechReview and contributors), reworked to droidtop's cursor selection and
+  design tokens: the motion switch and its snap rule, Rise and the sheen (`ui/FrontEndScreen.kt`,
+  as `shell-gamepad/.../MotionEffects.kt` and `MotionTokens.kt`), the accent-tinted lift
+  (`ui/FrontEndArt.kt`, as `FocusLift.kt`). Each ported file names the DroidDeck file it came from.
+  No DroidDeck artwork, logo or wordmark is used.
 
 ## Bundled themes
 
@@ -180,6 +187,7 @@ file are theirs. The Turnip feed labels there follow DroidDeck's
 
 Moonlight Android (input interaction model, LAN host discovery approach),
 KDE Connect Android (remote input reference), Playnite (library/plugin
-model, and the store library interface), Lutris (store services), distrobox (host-integration mechanism), Qubes OS (dom0/AppVM
+model, and the store library interface), Steam Big Picture / Steam Deck UI (layout, spacing,
+type, focus and motion vocabulary, measured; no code, art, icons, fonts or sounds used), Lutris (store services), distrobox (host-integration mechanism), Qubes OS (dom0/AppVM
 architectural split). See [docs/SPEC.md](docs/SPEC.md) for how each
 informed the design.

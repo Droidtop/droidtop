@@ -85,17 +85,15 @@ data class ShellWindow(
     val touchFirst: Boolean get() = portrait || (minOf(widthDp, heightDp) < 600 && !padPresent)
 
     /**
-     * The shell's own screen-edge gutter. 48dp is right for a TV-distance
-     * 1280dp-wide screen and eats a tenth of a phone's width, so it
-     * shrinks with the window rather than being repeated as a magic
-     * number at every call site.
+     * The shell's own screen-edge gutter: one proportion of the window's
+     * width, as Steam's gamepad UI uses for its shelves, page content,
+     * play section and settings (docs/SPEC.md 7k), so every left edge in
+     * the shell lines up. [contentGutterDp] is the rule.
      */
-    val edgePadding: Dp
-        get() = when (widthClass) {
-            ShellWidthClass.COMPACT -> 16.dp
-            ShellWidthClass.MEDIUM -> 32.dp
-            ShellWidthClass.EXPANDED -> 48.dp
-        }
+    val edgePadding: Dp get() = contentGutterDp(widthDp).dp
+
+    /** The header's and footer's own side gutter ([barGutterDp]). */
+    val barPadding: Dp get() = barGutterDp(widthDp).dp
 
     /** Gap between top-level tabs; the same reasoning as [edgePadding]. */
     val tabGap: Dp
@@ -258,6 +256,18 @@ fun esDeHelpRowOwner(
  * screen that draws a bar of its own.
  */
 val LocalHelpRowOwner = staticCompositionLocalOf { HelpRowOwner.SHELL }
+
+/**
+ * The content gutter for a window [widthDp] wide: 2.8 percent of the width
+ * (4 percent from 1500dp, where a line of capsules would otherwise run edge
+ * to edge on a television), never under 16dp, so a phone held upright keeps
+ * a thumb's room. Pure.
+ */
+fun contentGutterDp(widthDp: Int): Float =
+    maxOf(16f, widthDp * if (widthDp >= 1500) 0.04f else 0.028f)
+
+/** The bars' side gutter: 12dp plus 1.4 percent of the width. Pure. */
+fun barGutterDp(widthDp: Int): Float = 12f + widthDp * 0.014f
 
 val LocalShellWindow = staticCompositionLocalOf {
     // Only ever seen by a preview or a test composing a screen outside

@@ -103,7 +103,7 @@ internal fun TouchHintBar(
                 .then(if (background.alpha > 0f) Modifier.frameEdge(atTop = true) else Modifier)
                 .horizontalScroll(rememberScrollState())
                 .heightIn(min = window.frameBarHeight)
-                .padding(horizontal = if (tight) minOf(window.edgePadding, 12.dp) else window.edgePadding),
+                .padding(horizontal = if (tight) minOf(window.barPadding, 12.dp) else window.barPadding),
             horizontalArrangement = Arrangement.spacedBy(if (tight) 10.dp else 24.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

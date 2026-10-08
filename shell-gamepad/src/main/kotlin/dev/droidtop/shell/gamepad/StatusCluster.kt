@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -70,8 +69,8 @@ internal fun FloatingStatusCluster(onClick: () -> Unit, modifier: Modifier = Mod
     Box(
         modifier = modifier
             .onSizeChanged { px -> StatusClusterRoom.size = with(density) { DpSize(px.width.toDp(), px.height.toDp()) } }
-            .padding(horizontal = window.edgePadding, vertical = 8.dp)
-            .background(MenuTokens.Surface.copy(alpha = 0.58f), RoundedCornerShape(12.dp))
+            .padding(horizontal = window.barPadding, vertical = 8.dp)
+            .background(MenuTokens.Surface.copy(alpha = 0.58f), Corners.Pill)
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         StatusCluster(showBatteryPercent = true, onClick = onClick)
