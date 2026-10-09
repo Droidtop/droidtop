@@ -139,6 +139,89 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun aFileNameIsKeptAsGivenWithSpacesAndOnlyIllegalCharactersAreReplaced() {
+        assertEquals("Pro Race (USA) [!].zip", AcquireFileName.clean("Pro Race (USA) [!].zip"))
+        assertEquals("Pokémon Rouge.7z", AcquireFileName.clean("Pokémon Rouge.7z"))
+        assertEquals("Who_ What_.zip", AcquireFileName.clean("Who? What*.zip"))
+        assertEquals("a_b.zip", AcquireFileName.clean("a:b.zip"))
+        assertNull(AcquireFileName.clean("../game.zip"))
+        assertNull(AcquireFileName.clean("dir/game.zip"))
+        assertNull(AcquireFileName.clean("dir\\game.zip"))
+        assertNull(AcquireFileName.clean(".hidden.zip"))
+        assertNull(AcquireFileName.clean("   "))
+        assertNull(AcquireFileName.clean("x".repeat(AcquireFileName.MAX_BYTES + 1)))
+        assertEquals("x".repeat(AcquireFileName.MAX_BYTES), AcquireFileName.clean("x".repeat(AcquireFileName.MAX_BYTES)))
+        val descriptor = AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"Pro Race.zip","unpack":"archive"}""")!!
+        assertEquals("Pro Race.zip", descriptor.fileName)
+        assertTrue(descriptor.unpack)
+        assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"a.zip","unpack":"everything"}"""))
+        assertFalse(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"a.zip"}""")!!.unpack)
+    }
+
+    @Test
+    fun theFileInDroidtopsDownloadsAreaIsNamedSafelyWhateverTheDisplayName() {
+        assertEquals("acquire_5.zip", AcquireFileName.areaName(5, "Pro Race (USA).zip"))
+        assertEquals("acquire_5", AcquireFileName.areaName(5, "Readme"))
+        assertEquals("acquire_5", AcquireFileName.areaName(5, "weird.ext ension"))
+    }
+
+    private fun zipOf(file: File, vararg entries: Pair<String, String>): File {
+        java.util.zip.ZipOutputStream(file.outputStream()).use { zip ->
+            for ((name, text) in entries) {
+                zip.putNextEntry(java.util.zip.ZipEntry(name))
+                zip.write(text.toByteArray())
+                zip.closeEntry()
+            }
+        }
+        return file
+    }
+
+    @Test
+    fun anArchiveIsUnpackedIntoItsOwnFolderAndTheArchiveIsDeleted() = runBlocking {
+        val archive = zipOf(File(dir, "downloads/acquire_1.zip").also { it.parentFile.mkdirs() }, "GAME/RUN.EXE" to "exe", "readme.txt" to "hi")
+        val games = File(dir, "games/dos")
+        val folder = DownloadJobs.unpackIntoFolder(archive, mapOf("destinationPath" to games.path, "targetName" to "Prince of Persia.zip"))
+        assertEquals(File(games, "Prince of Persia"), folder)
+        assertEquals("exe", File(folder, "GAME/RUN.EXE").readText())
+        assertEquals("hi", File(folder, "readme.txt").readText())
+        assertFalse(archive.exists())
+        assertEquals(listOf("Prince of Persia"), games.list()!!.toList())
+    }
+
+    @Test
+    fun anArchiveThatReachesOutsideItsFolderIsRefusedAndNothingIsLeftBehind() = runBlocking {
+        val archive = zipOf(File(dir, "downloads/acquire_2.zip").also { it.parentFile.mkdirs() }, "ok.txt" to "fine", "../evil.txt" to "bad")
+        val games = File(dir, "games/dos")
+        try {
+            DownloadJobs.unpackIntoFolder(archive, mapOf("destinationPath" to games.path, "targetName" to "Evil.zip"))
+            fail("an entry outside the folder must refuse the archive")
+        } catch (e: IllegalStateException) {
+            assertTrue(e.message!!.startsWith("could not unpack Evil.zip"))
+        }
+        assertTrue("the download is kept", archive.exists())
+        assertEquals(emptyList<String>(), games.list()!!.toList())
+        assertFalse(File(games.parentFile, "evil.txt").exists())
+    }
+
+    @Test
+    fun anExistingFolderIsNeverUnpackedOver() = runBlocking {
+        val archive = zipOf(File(dir, "downloads/acquire_3.zip").also { it.parentFile.mkdirs() }, "a.txt" to "a")
+        val games = File(dir, "games/dos")
+        File(games, "Game").mkdirs()
+        File(games, "Game/mine.txt").writeText("mine")
+        try {
+            DownloadJobs.unpackIntoFolder(archive, mapOf("destinationPath" to games.path, "targetName" to "Game.zip"))
+            fail("an existing folder is never replaced")
+        } catch (e: IllegalArgumentException) {
+            assertEquals("a folder with that name already exists", e.message)
+        }
+        assertEquals("mine", File(games, "Game/mine.txt").readText())
+        assertTrue(archive.exists())
+        assertNull(DownloadJobs.archiveStem("Game.exe"))
+        assertEquals("My Game", DownloadJobs.archiveStem("My Game.RAR"))
+    }
+
+    @Test
     fun acquireDownloadDescriptorRejectsUnsafeOrInvalidFields() {
         assertNull(AcquireDownloadDescriptor.parse("""{"url":"file:///etc/passwd","fileName":"game.zip"}"""))
         assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"../game.zip"}"""))

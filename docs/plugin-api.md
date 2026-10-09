@@ -455,12 +455,12 @@ no destination, such as the PC library). Ops:
   `library.files` `changed` (A2), and a job that returns `download` has its
   file reported by droidtop when it is placed. A job that does neither
   still gets a background rescan, the only case left that does. Additive reply: a successful job may return `download` as a JSON
-  string containing `{url, headers?, fileName, sha256?, sha1?, md5?, size?}` instead of
-  downloading the file itself. `url` is HTTP(S); `fileName` is a bare file
-  name; `sha256` is 64, `sha1` 40 and `md5` 32 hexadecimal characters (a
+  string containing `{url, headers?, fileName, unpack?, sha256?, sha1?, md5?, size?}` instead of
+  downloading the file itself. `url` is HTTP(S); `fileName` is the name the
+  file is placed under, kept as given (see "File names" below); `sha256` is 64, `sha1` 40 and `md5` 32 hexadecimal characters (a
   source gives whichever it publishes; when several are given droidtop checks
   the strongest, and a mismatch deletes the file and fails the job) and
-  `size` is a positive byte count used as a size cap. droidtop queues it through DownloadManager
+  `size` is a positive byte count used as a size cap. droidtop's own resumable downloader fetches it
   into its own downloads area, then places it in `context.destination` and
   indexes that file, from the download job, so the game appears even if the
   page that started it was closed or droidtop restarted meanwhile. Credential headers (Authorization, cookies, token and key
@@ -476,6 +476,32 @@ no destination, such as the PC library). Ops:
   person already set is kept, and they change or clear it on the Engine row
   like any pin. An id droidtop does not know is ignored; the download goes
   ahead either way.
+
+  **System hint, file names, unpacking and redirects** (2026-10-09,
+  Droidtop/tracker#417). With `download`, a job may return `system`, droidtop's
+  id for the game's platform (`dos`, `windows`, `snes`, ...). When the Get games
+  screen is not already that system's own (a search from the PC library or from
+  global search), the download is placed in that system's games folder, so the
+  system's player finds it; a system with no games folder fails the job with a
+  sentence saying so, and the game is never dropped in another system's folder.
+  **File names:** `fileName` is kept as given, because the library reads
+  titles and regions from it: spaces, brackets and accents stay. It must not
+  hold `/` or `\`, start with a dot, or exceed 200 bytes of UTF-8; characters
+  no file system takes (`: * ? " < > |` and control characters) are replaced
+  by `_`. **Unpacking:** `unpack: "archive"` unpacks a zip, 7z or rar into a
+  new folder named like the file less its extension (`Prince of Persia.zip`
+  becomes the folder `Prince of Persia`) and deletes the archive, as the last
+  step of the same Downloads job, so it survives the page closing or a restart.
+  droidtop's own extractor proves every entry stays inside that folder, creates
+  no symlink, and refuses encrypted entries and archive bombs. The folder is
+  filled under a hidden name and renamed when whole, an existing folder is never
+  touched, and a failed unpack keeps the download and fails the job with a
+  sentence. An engine hint pins the unpacked folder like it pins a placed file.
+  **Headers across redirects:** `headers` (cookies, Referer, Origin and the
+  credential headers) are sent on every hop that stays on the same host over
+  the same or a stronger scheme, so a link that answers 302 to a signed address
+  on the same site still sees the session; a redirect to another host, or from
+  https to http, drops them.
 
 This reply extension is part of the additive 1.6 acquire contract; it does
 not change the view document's `view: 1` or the manifest's

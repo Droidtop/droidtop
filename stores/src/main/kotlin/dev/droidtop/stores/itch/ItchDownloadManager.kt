@@ -2,7 +2,7 @@ package dev.droidtop.stores.itch
 
 import dev.droidtop.stores.data.DownloadInfo
 import dev.droidtop.stores.data.ItchUpload
-import dev.droidtop.stores.util.ArchiveExtractor
+import dev.droidtop.runtime.util.ArchiveExtractor
 import dev.droidtop.stores.util.StoreHttp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

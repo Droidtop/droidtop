@@ -1,4 +1,4 @@
-package dev.droidtop.stores.util
+package dev.droidtop.runtime.util
 
 import dev.droidtop.runtime.SafeDelete
 import kotlinx.coroutines.Dispatchers
@@ -6,25 +6,24 @@ import kotlinx.coroutines.withContext
 import me.zhanghai.android.libarchive.Archive
 import me.zhanghai.android.libarchive.ArchiveEntry
 import me.zhanghai.android.libarchive.ArchiveException
-import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.zip.ZipFile
 
-internal data class ArchiveEntryInfo(
+data class ArchiveEntryInfo(
     val path: String,
     val directory: Boolean,
     val sizeBytes: Long,
 )
 
-internal data class ArchiveExtractionResult(
+data class ArchiveExtractionResult(
     val destination: File,
     val entries: List<ArchiveEntryInfo>,
 )
 
-internal data class ArchiveExtractionProgress(
+data class ArchiveExtractionProgress(
     val format: String,
     val entriesProcessed: Int,
     val totalEntries: Int,
@@ -33,18 +32,19 @@ internal data class ArchiveExtractionProgress(
     val currentPath: String = "",
 )
 
-internal class UnsupportedArchiveException(message: String) : IOException(message)
+class UnsupportedArchiveException(message: String) : IOException(message)
 
 /**
  * Unpacks an untrusted archive (zip, 7z, rar) into a folder, or places a
- * bare executable there: GameNative's ModArchiveExtractor (app.gamenative.mods,
+ * bare executable there, for every caller (the itch.io store's installs and a
+ * source's unpacked downloads, docs/SPEC.md 12a "Downloads"): GameNative's ModArchiveExtractor (app.gamenative.mods,
  * GPL-3.0), which its itch.io store already reused, lifted with it. Every path
  * is proved to stay inside the destination, and the walk refuses symlinks,
  * encrypted entries and archives past the size and entry ceilings below.
  * Clearing the destination goes through [SafeDelete], never a walk that
  * follows a link.
  */
-internal object ArchiveExtractor {
+object ArchiveExtractor {
     // Hard ceilings prevent archive bombs and bound memory, disk, and path handling costs
     // (GameNative's ModImportSafetyLimits).
     private const val MAX_ENTRIES = 50_000
@@ -70,7 +70,6 @@ internal object ArchiveExtractor {
             }
 
             val archiveExtension = archiveExtension(archiveFile)
-            val startedAt = System.nanoTime()
             val entries = try {
                 when (archiveExtension) {
                     "zip" -> extractZip(archiveFile, destination, onProgress)
@@ -83,15 +82,6 @@ internal object ArchiveExtractor {
                 clear(destination)
                 throw e
             }
-            val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000L
-            Timber.i(
-                "Extracted archive format=%s archiveBytes=%d extractedBytes=%d entries=%d elapsedMs=%d",
-                archiveExtension,
-                archiveFile.length(),
-                entries.sumOf { it.sizeBytes },
-                entries.size,
-                elapsedMs,
-            )
             ArchiveExtractionResult(
                 destination = destination,
                 entries = entries.sortedBy { it.path.lowercase() },

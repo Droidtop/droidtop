@@ -16,11 +16,14 @@ import java.net.URL
  * strong ETag, else the `Last-Modified`; a server that has the same file answers 206 and the bytes are appended, one
  * whose file changed or that does not do ranges answers 200 with the whole file and the download starts again from
  * zero, which [Result.restarted] and [Progress.restarted] say. With no validator at all nothing can be trusted and it
- * starts again. Credential headers are dropped from a redirect to another host.
+ * starts again. Credential headers (and Referer and Origin) are kept across redirects on the same host only; a redirect to another host, or from https to http, drops them.
  */
 object ResumableDownload {
     private const val CHUNK = 64 * 1024
     private val SENSITIVE = setOf("authorization", "proxy-authorization", "cookie")
+
+    /** Headers that say where a request came from; kept on the same site (a file host checks them), dropped when a redirect leaves it. */
+    private val CONTEXTUAL = setOf("referer", "origin")
 
     /** Bytes written so far and the file's length when the server said (-1 otherwise). */
     class Progress(val bytes: Long, val total: Long, val restarted: Boolean)
@@ -274,8 +277,11 @@ object ResumableDownload {
             val location = c.getHeaderField("Location")
             if (status !in 300..399 || status == 304 || location == null) return c
             c.disconnect()
-            val next = URL(URL(current), location)
-            if (next.host != URL(current).host) sent = sent.filterKeys { it.lowercase() !in SENSITIVE }
+            val here = URL(current)
+            val next = URL(here, location)
+            // Same site: the same host, and not a step down from https. Anything else drops what identifies the person.
+            val sameSite = next.host.equals(here.host, ignoreCase = true) && !(here.protocol == "https" && next.protocol != "https")
+            if (!sameSite) sent = sent.filterKeys { it.lowercase() !in SENSITIVE && it.lowercase() !in CONTEXTUAL }
             current = next.toString()
         }
         throw IOException("more than 5 redirects from $url")

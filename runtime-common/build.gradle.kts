@@ -54,5 +54,8 @@ dependencies {
     // library gamenative's own archive code uses, so the APK carries one
     // copy of it.
     api(libs.commons.compress)
+    // 7z and RAR, through the libarchive build GameNative's mods importer used: ArchiveExtractor, shared by the itch.io
+    // store's installs and a source's unpacked downloads.
+    implementation(libs.libarchive.android)
     testImplementation(libs.junit)
 }

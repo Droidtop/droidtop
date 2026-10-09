@@ -22,7 +22,8 @@
       "properties": {
         "url": { "type": "string", "format": "uri", "pattern": "^https?://" },
         "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Credential values are held in memory only by droidtop and are not persisted with the job." },
-        "fileName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "fileName": { "type": "string", "minLength": 1, "description": "The name the file is placed under, kept as given (spaces, brackets and accents included). No / or \\, no leading dot, at most 200 bytes of UTF-8; : * ? \" < > | and control characters are replaced by _." },
+        "unpack": { "enum": ["none", "archive"], "description": "archive: unpack the zip, 7z or rar into a new folder named like the file less its extension, then delete the archive. Entries outside the folder, symlinks and encrypted entries refuse the archive." },
         "sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
         "sha1": { "type": "string", "pattern": "^[A-Fa-f0-9]{40}$", "description": "For a source that publishes no SHA-256. When several digests are given, droidtop checks the strongest (sha256, then sha1, then md5)." },
         "md5": { "type": "string", "pattern": "^[A-Fa-f0-9]{32}$", "description": "For a source that publishes no stronger digest (the Internet Archive lists md5, sha1 and crc32)." },

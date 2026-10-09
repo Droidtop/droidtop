@@ -27,6 +27,8 @@ class ResumableDownloadTest {
     /** (Range, If-Range) of every request to /f, in order. */
     private val requests = CopyOnWriteArrayList<Pair<String?, String?>>()
     private val authorizations = CopyOnWriteArrayList<String?>()
+    /** (Cookie, Referer) of every request, in order. */
+    private val identifying = CopyOnWriteArrayList<Pair<String?, String?>>()
     @Volatile private var body = data
     @Volatile private var etag: String? = "\"v1\""
     @Volatile private var lastModified: String? = null
@@ -40,7 +42,14 @@ class ResumableDownloadTest {
         server.createContext("/gone") { ex -> ex.sendResponseHeaders(404, -1); ex.close() }
         server.createContext("/moved") { ex ->
             authorizations += ex.requestHeaders.getFirst("Authorization")
+            identifying += ex.requestHeaders.getFirst("Cookie") to ex.requestHeaders.getFirst("Referer")
             ex.responseHeaders.add("Location", "http://localhost:${server.address.port}/f")
+            ex.sendResponseHeaders(302, -1)
+            ex.close()
+        }
+        server.createContext("/same") { ex ->
+            identifying += ex.requestHeaders.getFirst("Cookie") to ex.requestHeaders.getFirst("Referer")
+            ex.responseHeaders.add("Location", "/f")
             ex.sendResponseHeaders(302, -1)
             ex.close()
         }
@@ -57,6 +66,7 @@ class ResumableDownloadTest {
         val range = ex.requestHeaders.getFirst("Range")
         val ifRange = ex.requestHeaders.getFirst("If-Range")
         authorizations += ex.requestHeaders.getFirst("Authorization")
+        identifying += ex.requestHeaders.getFirst("Cookie") to ex.requestHeaders.getFirst("Referer")
         requests += range to ifRange
         etag?.let { ex.responseHeaders.add("ETag", it) }
         lastModified?.let { ex.responseHeaders.add("Last-Modified", it) }
@@ -222,6 +232,25 @@ class ResumableDownloadTest {
         assertEquals("Bearer secret", authorizations.first())
         assertNull("the second hop is another host", authorizations.last())
         assertArrayEquals(data, target().readBytes())
+    }
+
+    @Test
+    fun `cookie and referer follow a redirect on the same host`() {
+        val headers = mapOf("Cookie" to "PHPSESSID=abc", "Referer" to "https://site.example/game")
+        ResumableDownload.fetch("$base/same", target(), headers = headers)
+        assertEquals(listOf<Pair<String?, String?>>(
+            "PHPSESSID=abc" to "https://site.example/game",
+            "PHPSESSID=abc" to "https://site.example/game",
+        ), identifying.toList())
+        assertArrayEquals(data, target().readBytes())
+    }
+
+    @Test
+    fun `cookie and referer are dropped when a redirect changes host`() {
+        val headers = mapOf("Cookie" to "PHPSESSID=abc", "Referer" to "https://site.example/game")
+        ResumableDownload.fetch("$base/moved", target(), headers = headers)
+        assertEquals("PHPSESSID=abc" to "https://site.example/game", identifying.first())
+        assertEquals(null to null, identifying.last())
     }
 
     @Test

@@ -24,6 +24,7 @@ import dev.droidtop.pluginhost.PluginRunner
 import dev.droidtop.pluginhost.PluginView
 import dev.droidtop.pluginhost.PluginViewCall
 import dev.droidtop.pluginhost.AcquireDownloadDescriptor
+import dev.droidtop.pluginhost.AcquireFileName
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.ViewAction
 import dev.droidtop.pluginhost.ViewNode
@@ -122,7 +123,13 @@ object PluginViews {
                         withContext(Dispatchers.IO) { AcquireIndexing.afterAcquire(context, record.manifest.id, startedAt, destination, result.values) }
                     } else {
                         val descriptor = AcquireDownloadDescriptor.parse(rawDescriptor)
-                        val destination = hostContext.optString("destination").takeIf { it.isNotBlank() }
+                        // The source's system hint: the game's own system folder, unless this screen is already that system's.
+                        val systemHint = AcquireSystemHint.valid(result.values[AcquireSystemHint.KEY])
+                        val destination = if (AcquireSystemHint.overrides(systemHint, hostContext)) {
+                            AcquireSystemHint.folderFor(context, systemHint!!)?.absolutePath
+                        } else {
+                            hostContext.optString("destination").takeIf { it.isNotBlank() }
+                        }
                         // A download a page started in the plugin's web session: droidtop's own headers for it, by its token.
                         val captured = descriptor?.session?.let {
                             dev.droidtop.pluginhost.WebSessions.take(record.manifest.id, it, descriptor.url, System.currentTimeMillis())
@@ -132,17 +139,20 @@ object PluginViews {
                         } else if (descriptor.session != null && captured == null) {
                             PluginResult.failure("the download from ${record.manifest.label}'s web page is no longer waiting; open it again")
                         } else if (destination == null) {
-                            PluginResult.failure("the game folder is not available")
+                            PluginResult.failure(
+                                if (systemHint != null) "there is no games folder for $systemHint; add one under Settings > Game folders" else "the game folder is not available",
+                            )
                         } else {
                             DownloadJobs.run(
                                 context = context,
                                 title = action.title ?: label,
                                 post = DownloadJobs.POST_PLACE_IN_FOLDER,
                                 url = descriptor.url,
-                                name = "acquire_${System.currentTimeMillis()}_${descriptor.fileName}",
+                                name = AcquireFileName.areaName(System.currentTimeMillis(), descriptor.fileName),
                                 sha256 = descriptor.sha256,
                                 sha1 = descriptor.sha1,
                                 md5 = descriptor.md5,
+                                unpack = if (descriptor.unpack) DownloadJobs.UNPACK_ARCHIVE else null,
                                 maxBytes = descriptor.size ?: 0L,
                                 headers = descriptor.headers + captured?.headers.orEmpty(),
                                 extra = buildMap {

@@ -5,6 +5,7 @@ import java.io.File
 import java.net.URI
 import dev.droidtop.library.settings.LibraryPaths
 import dev.droidtop.library.settings.PathChange
+import dev.droidtop.runtime.util.ArchiveExtractor
 import dev.droidtop.runtime.util.Sha256
 import java.util.concurrent.ConcurrentHashMap
 import dev.droidtop.net.Http
@@ -50,6 +51,10 @@ object DownloadJobs {
     private const val ARG_SHA256 = "sha256"
     private const val ARG_SHA1 = "sha1"
     private const val ARG_MD5 = "md5"
+    private const val ARG_UNPACK = "unpack"
+
+    /** The job argument value that unpacks the downloaded archive into a folder instead of placing the file. */
+    const val UNPACK_ARCHIVE = "archive"
     private const val ARG_MAX_BYTES = "maxBytes"
     private const val ARG_HEADERS = "headers"
 
@@ -74,7 +79,7 @@ object DownloadJobs {
         val appContext = context.applicationContext
         registerPost(POST_PLACE_IN_FOLDER) { jobContext, file, args ->
             val target = withContext(Dispatchers.IO) {
-                placeInFolder(file, args).also {
+                (if (args[ARG_UNPACK] == UNPACK_ARCHIVE) unpackIntoFolder(file, args) else placeInFolder(file, args)).also {
                     // What the job carries about the placed file beyond its bytes (a source's engine hint), applied
                     // before the library looks at it, so the first index already reads it.
                     runCatching { onPlaced(jobContext, it, args) }
@@ -105,6 +110,33 @@ object DownloadJobs {
         return target
     }
 
+    /**
+     * Unpacks the downloaded archive (zip, 7z or rar) into a new folder of the target's name less its extension in the
+     * destination, and deletes the archive. [ArchiveExtractor] proves every entry stays inside the folder and refuses
+     * symlinks, encrypted entries and archive bombs. The folder is filled under a hidden name and renamed when whole,
+     * so a crash leaves no half-unpacked game; an existing folder is never touched. A failed unpack keeps the download.
+     */
+    internal suspend fun unpackIntoFolder(file: File, args: Map<String, String>): File {
+        val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
+        require(destination.isDirectory || destination.mkdirs()) { "the game folder is not available" }
+        val targetName = requireNotNull(args["targetName"]) { "the file name is missing" }
+        val folder = File(destination, requireNotNull(archiveStem(targetName)) { "$targetName is not a zip, 7z or rar archive" })
+        require(!folder.exists()) { "a folder with that name already exists" }
+        val building = File(destination, ".${folder.name}.unpacking")
+        try {
+            ArchiveExtractor.extract(file, building)
+        } catch (e: java.io.IOException) {
+            throw IllegalStateException("could not unpack $targetName: ${e.message}. The download is kept in droidtop's downloads folder", e)
+        }
+        check(building.renameTo(folder)) { "the unpacked game could not be placed in the game folder" }
+        file.delete()
+        return folder
+    }
+
+    /** The name of an archive less its extension, or null when [name] is not a zip, 7z or rar file. */
+    internal fun archiveStem(name: String): String? =
+        Regex("(?i)^(.+)\\.(zip|7z|rar)$").matchEntire(name)?.groupValues?.get(1)
+
     /** Names the post-processing step a job's `post` argument refers to. Registered at process start, so a restored job finds it. */
     fun registerPost(name: String, post: DownloadPost) {
         posts[name] = post
@@ -132,6 +164,8 @@ object DownloadJobs {
         /** Digests a source that publishes no SHA-256 gives (the Internet Archive lists MD5 and SHA-1); the strongest one given is checked. */
         sha1: String? = null,
         md5: String? = null,
+        /** [UNPACK_ARCHIVE] to unpack the downloaded archive into its own folder when placing it; null leaves it as the file it is. */
+        unpack: String? = null,
         maxBytes: Long = 0L,
         headers: Map<String, String> = emptyMap(),
         extra: Map<String, String> = emptyMap(),
@@ -155,6 +189,7 @@ object DownloadJobs {
             sha256?.let { put(ARG_SHA256, it) }
             sha1?.let { put(ARG_SHA1, it) }
             md5?.let { put(ARG_MD5, it) }
+            unpack?.let { put(ARG_UNPACK, it) }
             if (maxBytes > 0) put(ARG_MAX_BYTES, maxBytes.toString())
             if (plain.isNotEmpty()) put(ARG_HEADERS, JSONObject(plain.associate { it.key to it.value }).toString())
             if (sizeBytes > 0) put(DownloadGate.ARG_BYTES, sizeBytes.toString())
@@ -238,8 +273,10 @@ object DownloadJobs {
     ): String? {
         if (postName != POST_PLACE_IN_FOLDER || checkpoint != FETCHED) return null
         return withContext(Dispatchers.IO) {
-            val target = File(args["destinationPath"] ?: return@withContext null, args["targetName"] ?: return@withContext null)
-            if (file.exists() || !target.isFile) return@withContext null
+            val targetName = args["targetName"] ?: return@withContext null
+            val unpacked = args[ARG_UNPACK] == UNPACK_ARCHIVE
+            val target = File(args["destinationPath"] ?: return@withContext null, if (unpacked) (archiveStem(targetName) ?: return@withContext null) else targetName)
+            if (file.exists() || !(if (unpacked) target.isDirectory else target.isFile)) return@withContext null
             reportPlaced(target)
             "Added ${target.name}"
         }
@@ -336,6 +373,30 @@ object DownloadJobs {
     }
 }
 
+/**
+ * The name a source gives a download (docs/plugin-api.md 1.6, `fileName`): kept as given, spaces and brackets and
+ * accents included, because the library reads regions and titles from file names. Only what no file system takes
+ * is replaced (`: * ? " < > |` and control characters become `_`); a name with a path in it, a leading dot,
+ * nothing left, or more than [MAX_BYTES] bytes of UTF-8 is refused.
+ */
+object AcquireFileName {
+    const val MAX_BYTES = 200
+    private val ILLEGAL = Regex("[:*?\"<>|\\p{Cc}]")
+
+    fun clean(raw: String): String? {
+        if (raw.any { it == '/' || it == '\\' }) return null
+        val name = raw.replace(ILLEGAL, "_").trim().trimEnd('.', ' ')
+        if (name.isEmpty() || name.startsWith(".")) return null
+        return name.takeIf { it.toByteArray(Charsets.UTF_8).size <= MAX_BYTES }
+    }
+
+    /** A bare, safe name for the file in droidtop's downloads area: the extension of [display], nothing else of it. */
+    fun areaName(stamp: Long, display: String): String {
+        val extension = display.substringAfterLast('.', "").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
+        return "acquire_$stamp" + (extension?.let { ".$it" } ?: "")
+    }
+}
+
 /** Additive contract-2 acquire result field, kept separate from the plugin's own job implementation. */
 data class AcquireDownloadDescriptor(
     val url: String,
@@ -346,6 +407,8 @@ data class AcquireDownloadDescriptor(
     /** SHA-1 and MD5 for sources that publish no SHA-256; when several digests are given the strongest is checked. */
     val sha1: String? = null,
     val md5: String? = null,
+    /** True when the reply asked for `unpack: "archive"`: the zip, 7z or rar is unpacked into its own folder when placed. */
+    val unpack: Boolean = false,
     /** A download a page started in the plugin's web session, named by the one-use token `web.session open_in_session` gave (docs/plugin-api.md 3 G3). */
     val session: String? = null,
 ) {
@@ -355,8 +418,9 @@ data class AcquireDownloadDescriptor(
             val url = value.getString("url")
             val parsedUrl = URI(url)
             require(parsedUrl.scheme in setOf("http", "https") && !parsedUrl.host.isNullOrBlank())
-            val fileName = value.getString("fileName")
-            require(fileName.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))
+            val fileName = requireNotNull(AcquireFileName.clean(value.getString("fileName")))
+            val unpackWord = value.optString("unpack", "none")
+            require(unpackWord == "none" || unpackWord == DownloadJobs.UNPACK_ARCHIVE)
             val digest = value.optString("sha256").takeIf { it.isNotEmpty() }
             require(digest == null || digest.matches(Regex("[A-Fa-f0-9]{64}")))
             val sha1 = value.optString("sha1").takeIf { it.isNotEmpty() }
@@ -375,7 +439,7 @@ data class AcquireDownloadDescriptor(
             }
             val session = value.optString("session").takeIf { it.isNotEmpty() }
             require(session == null || session.matches(Regex("w-[0-9a-f-]{36}")))
-            AcquireDownloadDescriptor(url, headers, fileName, digest, size, sha1, md5, session)
+            AcquireDownloadDescriptor(url, headers, fileName, digest, size, sha1, md5, unpackWord == DownloadJobs.UNPACK_ARCHIVE, session)
         }.getOrNull()
     }
 }

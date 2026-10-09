@@ -49,8 +49,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.timber)
-    // 7z and RAR uploads (itch.io), through the libarchive build GameNative's mods importer used.
-    implementation(libs.libarchive.android)
     // LZMA and XZ, which Amazon's manifests are compressed with.
     implementation(libs.xz)
     // Steam (dev.droidtop.stores.steam): JavaSteam for the connection, the
