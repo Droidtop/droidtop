@@ -2,11 +2,17 @@ package dev.droidtop.app.settings
 
 import android.content.Context
 import dev.droidtop.library.LaunchDisplay
+import dev.droidtop.library.consoles.BiosDatabase
+import dev.droidtop.library.consoles.ConfigSetting
+import dev.droidtop.library.consoles.ConfigSpec
+import dev.droidtop.library.consoles.ConfigText
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.CustomPlayerPrefs
 import dev.droidtop.library.consoles.EmulatorDefaults
 import dev.droidtop.library.consoles.EmulatorResolution
+import dev.droidtop.library.consoles.EmulatorSetup
+import dev.droidtop.library.consoles.EmulatorSetupSpec
 import dev.droidtop.library.consoles.KnownPlayers
 import dev.droidtop.library.consoles.Player
 import dev.droidtop.library.consoles.PlayerOverridePrefs
@@ -35,10 +41,10 @@ import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.file.Files
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Settings > Emulators (Droidtop/tracker#248): the three levels of the
@@ -292,6 +298,7 @@ object EmulatorsCatalog {
                             ),
                         ),
                     ),
+                ) + listOfNotNull(resolved?.player?.let { setupGroup(context, system, it) }) + listOf(
                     knownEmulatorsGroup(context, system),
                     customPlayersGroup(context, system),
                 )
@@ -423,6 +430,144 @@ object EmulatorsCatalog {
             }
         },
     )
+
+    /**
+     * The emulator setup helper for the emulator in use (docs/SPEC.md "Emulator setup helper", Droidtop/tracker#248):
+     * its BIOS files and the options droidtop can set in its own config, from [EmulatorSetup.specFor], the one source
+     * of what an emulator needs. Where droidtop can reach the emulator's files (itself, or through Shizuku when the
+     * person runs it) a row does the job; where it cannot, the same row says where to do it inside the emulator and
+     * opens it. Built on IO with the file already read, so nothing is looked up while a row is drawn.
+     */
+    private fun setupGroup(context: Context, system: ConsoleSystemDef, player: Player.AmStart): CatalogGroup? {
+        val spec = EmulatorSetup.specFor(context, player) ?: return null
+        val name = appLabel(context, player.packageName)
+        val configText = spec.config?.let { EmulatorSetup.read(it.file) }
+        val items = buildList<CatalogItem> {
+            addAll(biosItems(context, system, player, name, spec, configText))
+            spec.config?.let { config ->
+                config.settings.forEach { add(settingItem(player, name, config, it, configText)) }
+            }
+        }
+        if (items.isEmpty()) return null
+        return CatalogGroup(id = "emulator_setup_${system.id}", title = "Set up $name", items = items)
+    }
+
+    private fun biosItems(
+        context: Context,
+        system: ConsoleSystemDef,
+        player: Player.AmStart,
+        name: String,
+        spec: EmulatorSetupSpec,
+        configText: String?,
+    ): List<CatalogItem> {
+        val bios = BiosDatabase.forSystem(context, system.id) ?: return emptyList()
+        val needed = bios.files.map { EmulatorSetup.biosRelative(it.file) }
+        if (needed.isEmpty()) return emptyList()
+        val shown = needed.take(4).joinToString(", ") + if (needed.size > 4) " and ${needed.size - 4} more" else ""
+        val folder = EmulatorSetup.biosFolder(spec, configText)
+            ?: return listOf(
+                openEmulatorRow(
+                    id = "emulator_bios_${system.id}",
+                    title = "BIOS files for ${system.displayName}",
+                    subtitle = "Needs $shown. Put them in $name's BIOS folder: " + (spec.biosManual ?: "$name's settings show where it is"),
+                    name = name,
+                    packageName = player.packageName,
+                ),
+            )
+        val present = EmulatorSetup.listFolder(folder)
+        val missing = present?.let { have -> needed.filter { want -> have.none { it.equals(want, ignoreCase = true) } } }
+        val writable = EmulatorSetup.writeReach("$folder/x") != EmulatorSetup.Reach.NONE
+        val status = ActionItem(
+            id = "emulator_bios_${system.id}",
+            title = "BIOS files for ${system.displayName}",
+            subtitle = when {
+                missing == null -> "Needs $shown in $folder. droidtop cannot look in that folder to check"
+                missing.isEmpty() -> "Every file droidtop knows of is in $folder"
+                else -> "Missing ${missing.take(4).joinToString(", ")} in $folder"
+            } + if (writable) "" else ". Copy them there with a file manager, or from $name's own settings",
+            value = when {
+                missing == null -> "Unknown"
+                missing.isEmpty() -> "All there"
+                else -> "${missing.size} missing"
+            },
+            run = {},
+        )
+        if (!writable) return listOf(status)
+        return listOf(
+            status,
+            DocumentPickItem(
+                id = "emulator_bios_add_${system.id}",
+                title = "Add a BIOS file",
+                subtitle = "Pick one of your own BIOS files; droidtop copies it into $name's BIOS folder under the name $name looks for",
+                mimeType = "*/*",
+                onPicked = { ctx, uri -> withContext(Dispatchers.IO) { placeBios(ctx, uri, bios, folder, name) } },
+            ),
+        )
+    }
+
+    // Reads the picked file (never past what a BIOS file can be), names it by the database, and writes it whole.
+    private fun placeBios(
+        context: Context,
+        uri: android.net.Uri,
+        bios: dev.droidtop.library.consoles.SystemBiosSpec,
+        folder: String,
+        name: String,
+    ): String = runCatching {
+        val picked = context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { if (it.moveToFirst()) it.getString(0) else null }
+            ?.substringAfterLast('/')
+            ?.takeIf { it.isNotBlank() && it != "." && it != ".." }
+            ?: "bios.bin"
+        val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(1 shl 16)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                out.write(buffer, 0, n)
+                require(out.size() <= dev.droidtop.runtime.tasks.ElevatedFiles.MAX_WRITE_BYTES) { "that file is too large to be a BIOS file" }
+            }
+            out.toByteArray()
+        } ?: error("the file could not be opened")
+        val target = EmulatorSetup.biosTarget(bios, picked, EmulatorSetup.md5(bytes))
+        if (EmulatorSetup.write("$folder/$target", bytes)) "Added $target to $name's BIOS folder" else "Not added: droidtop could not write to $folder"
+    }.getOrElse { "Not added: ${it.message ?: it.javaClass.simpleName}" }
+
+    private fun settingItem(player: Player.AmStart, name: String, config: ConfigSpec, setting: ConfigSetting, configText: String?): CatalogItem {
+        val writable = configText != null && EmulatorSetup.writeReach(config.file) != EmulatorSetup.Reach.NONE
+        if (!writable) {
+            return openEmulatorRow(
+                id = "emulator_setting_${setting.id}",
+                title = setting.label,
+                subtitle = "${setting.about}. To change it: ${setting.manual}",
+                name = name,
+                packageName = player.packageName,
+            )
+        }
+        val current = ConfigText.get(configText!!, config.format, setting.section, setting.key)
+        val currentLabel = setting.options.firstOrNull { it.value.equals(current, ignoreCase = true) }?.label
+        return AsyncActionItem(
+            id = "emulator_setting_${setting.id}",
+            title = setting.label,
+            subtitle = setting.about + if (config.writesOnExit) ". Close $name first if it is open: it writes its own settings back when it closes" else "",
+            value = currentLabel ?: "$name's default",
+            run = { _, _ ->
+                withContext(Dispatchers.IO) {
+                    val text = EmulatorSetup.read(config.file)
+                        ?: return@withContext "Not changed: droidtop could not read $name's settings. To change it: ${setting.manual}"
+                    val now = ConfigText.get(text, config.format, setting.section, setting.key)
+                    val index = setting.options.indexOfFirst { it.value.equals(now, ignoreCase = true) }
+                    val next = setting.options[(index + 1).mod(setting.options.size)]
+                    val changed = ConfigText.set(text, config.format, setting.section, setting.key, next.value)
+                    if (EmulatorSetup.write(config.file, changed.toByteArray())) {
+                        "${next.label}. $name uses it the next time it starts"
+                    } else {
+                        "Not changed: droidtop could not write $name's settings. To change it: ${setting.manual}"
+                    }
+                }
+            },
+        )
+    }
 
     /**
      * The system's custom players (Droidtop/tracker#248 item 3): any installed app wired to the

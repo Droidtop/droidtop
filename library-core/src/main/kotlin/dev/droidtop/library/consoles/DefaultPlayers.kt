@@ -97,9 +97,12 @@ object DefaultPlayers {
     }
 
     /** The launch arguments for [core] under [installedPackage]; pure, see the class comment. */
+    /** The config file every RetroArch launch names (CONFIGFILE), and the one the emulator setup helper edits. */
+    fun retroArchConfigFile(packageName: String): String = "/storage/emulated/0/Android/data/$packageName/files/retroarch.cfg"
+
     internal fun retroArchArguments(installedPackage: String, core: String): String =
         "-n $installedPackage/$RETROARCH_ACTIVITY " +
-            "--es CONFIGFILE /storage/emulated/0/Android/data/$installedPackage/files/retroarch.cfg " +
+            "--es CONFIGFILE ${retroArchConfigFile(installedPackage)} " +
             "--es LIBRETRO /data/user/0/$installedPackage/cores/${core}_libretro_android.so " +
             "--es ROM {file.path}"
 }

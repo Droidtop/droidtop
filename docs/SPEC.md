@@ -7502,6 +7502,40 @@ it alone showed whatever task Android had beneath it (a browser, on the
 rig). Showing the report also clears the running-game state, so the
 Quick Menu never offers Resume or Quit for a launch that is not running.
 
+### Emulator setup helper (owner, 2026-10-08, Droidtop/tracker#248)
+
+Owner: "Can we actually add root-based emulator and stuff configuration, privilege addition, and etc?"
+Decided: yes, as an enhancement that is never required. A system's emulator screen (Settings > Library >
+Emulators > the system) has a "Set up <Emulator>" group for the emulator in use, built from one source of
+what that emulator needs, `EmulatorSetup.specFor`: the players-database row's optional `setup` object
+(`biosFolder` or `biosFolderKey`, `biosManual`, and `config` with its `file`, `format` `ini` or `keyvalue`,
+`writesOnExit` and `settings`, each with the key, its options and `manual`, where the same option sits in
+the emulator's own menus), or for RetroArch, whose launch droidtop generates, `EmulatorSetup.retroArch`
+(retroarch.cfg as CONFIGFILE names it; keys and menu places from RetroArch 1.22.2's configuration.c,
+menu_displaylist.c and msg_hash_us.h). The rows and the manual steps read the same spec.
+
+- **BIOS files.** The files come from `bios-database.json` for the system; the folder is the spec's own, or
+  the value of its config key (RetroArch's `system_directory`; "default" is not a path, so droidtop then only
+  says where RetroArch shows it). The row says which files are there when droidtop can list the folder.
+  "Add a BIOS file" takes a file the person picks (the system picker; droidtop never downloads firmware),
+  names it by the database (an md5 match decides, then the file name), and writes it whole into the folder.
+- **Emulator options.** Each setting row shows the value the emulator's own config holds and cycles it on A,
+  changing only that key (`ConfigText`: every other line is kept; an INI key goes in its own section). An
+  emulator that writes its config back when it closes (`writesOnExit`, RetroArch) is named in the row, since
+  a change made while it runs is lost.
+- **Reaching the files.** droidtop writes a file itself when it can; an emulator's own files sit in its
+  `Android/data`, which only the shell user reaches since Android 11, so otherwise it goes through the
+  privileged helper's `readFile`/`writeFile` (the Shizuku app, or the provider plugin's `priv.shell`
+  `read_file`/`write_file`, docs/plugin-api.md 2.7), limited to shared storage by `ElevatedFiles`.
+  droidtop never calls `su`.
+- **Without the helper** each row stays and says what to do instead: where the option is in the emulator's
+  own menus, or which files to copy into which folder, with the emulator one press away. The rows never
+  name Shizuku or a tier; they say what will happen.
+- RetroArch cores keep their own row and path (`RetroArchCores`, 7e2c).
+- **Not built here:** granting an emulator All files access or a runtime permission from the helper.
+  The row "<Emulator> needs All files access" still opens Android's own screen for it (7e2's decision
+  stands until the owner confirms the grant from this session, Droidtop/tracker#248).
+
 ## 7f. Gaming mode: real, generic ES-DE theme engine
 
 **Status as of 2026-08-29 — this is Gaming's actual, current, singular

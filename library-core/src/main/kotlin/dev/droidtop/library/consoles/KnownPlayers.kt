@@ -34,6 +34,8 @@ data class KnownPlayerPreset(
     val label: String,
     val pkg: String,
     val player: Player.AmStart,
+    /** The row's optional `setup` object: what the emulator needs beyond the launch (docs/SPEC.md "Emulator setup helper"). */
+    val setup: EmulatorSetupSpec? = null,
 )
 
 object KnownPlayers {
@@ -58,6 +60,10 @@ object KnownPlayers {
             return loaded
         }
     }
+
+    /** The setup the database gives [packageName]'s emulator: the first of its rows that carries one. */
+    fun setupFor(context: Context, packageName: String): EmulatorSetupSpec? =
+        all(context).firstOrNull { it.pkg == packageName && it.setup != null }?.setup
 
     /** Drops the parse cache — called after [PlayersDatabaseUpdater] writes a fresh database. */
     fun invalidate() {
@@ -85,6 +91,7 @@ object KnownPlayers {
                     packageName = pkg,
                     storagePathTemplate = p.optString("storagePathTemplate").takeIf { it.isNotEmpty() },
                 ),
+                setup = EmulatorSetup.parse(p.optJSONObject("setup"), pkg),
             )
         }
     }
