@@ -15732,10 +15732,18 @@ Plugins, beside the JSON integrations §12 already built — the two are
 the same idea, "hook something into droidtop", at different trust
 levels, and belong on the same path for that reason).
 
-**Two tiers: contained by default, full trust by grant (redecided
-2026-10-08, Droidtop/tracker#378; `docs/plugin-api.md` §5).** The owner:
+**Tiers: contained by default, one hole per risky permission, full trust
+only for UID-level privilege (redecided 2026-10-08/10-09,
+Droidtop/tracker#378; `docs/plugin-api.md` §5).** The owner:
 "let plugins tell droidtop what permissions stuff they do will need, and
-let droidtop actually regulate their usage".
+let droidtop actually regulate their usage", and then, on containment being
+per-permission: "Granting a single risky permission does NOT automatically
+grant everything." Containment is the plugin system's job and is invisible
+to the person: the approval list shows plain lines ("Use the graphics chip
+to draw its screen"), sensible defaults and the single "Full access"
+warning (plus Official/Unofficial). There is no "contained" badge and no
+tier name anywhere a person reads; the Containment check stays under
+Advanced.
 
 - **Contained**, the default for a contract 2 plugin: an isolated process
   of its own (`android:isolatedProcess="true"`), with a random UID, no
@@ -15744,8 +15752,23 @@ let droidtop actually regulate their usage".
   beyond its process goes through its broker, where the caller's grant, the
   parameters it declared, the quota and the activity log apply. **For a
   contained plugin the permission model is a security boundary.**
+- **The graphics tier** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
+  a plugin that needs the GPU and nothing else declares `gpu.render` and the
+  person ticks it. Granting it runs the plugin in a droidtop-owned process
+  that is NOT `android:isolatedProcess` (slots `:plugin_gpu0..7`) — the only
+  process an app may run that can open the GPU, since Android gives apps no
+  `seccomp`, namespaces or per-process capability dropping and the one GPU-
+  capable isolated domain (`isolated_compute_app`) is system-only. Its code
+  still loads from descriptors through the guarded hooks with a broker-only
+  context, and it draws into a droidtop-owned surface with hardware instead
+  of software. The honest limit, stated in `docs/plugin-api.md` §5.3 and in
+  the Advanced Containment check: it shares droidtop's UID, so its own native
+  code could reach the network or droidtop's files below the broker, which no
+  app can prevent for one of its own processes. One permission opens one
+  hole; it never substitutes for the privilege a non-containable plugin
+  needs.
 - **Full trust** is only the critical `host.full_trust` grant, which a
-  plugin that needs privilege an isolated UID never has must declare
+  plugin that needs UID-level privilege must declare
   (`apps.bind`, the `priv.*`/`root.*` providers), and every contract 1
   plugin. Flutter plugins and native libraries run contained through
   droidtop's guarded hooks (`docs/plugin-api.md` §5.3, decided 2026-10-09). **For full-trust plugins the earlier decision stands:

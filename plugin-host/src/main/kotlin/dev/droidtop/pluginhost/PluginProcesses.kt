@@ -37,6 +37,10 @@ internal object PluginProcesses {
         PluginSandboxSlot0::class.java, PluginSandboxSlot1::class.java, PluginSandboxSlot2::class.java, PluginSandboxSlot3::class.java,
         PluginSandboxSlot4::class.java, PluginSandboxSlot5::class.java, PluginSandboxSlot6::class.java, PluginSandboxSlot7::class.java,
     )
+    private val GPU_SLOTS: List<Class<out PluginProcessService>> = listOf(
+        PluginGpuSlot0::class.java, PluginGpuSlot1::class.java, PluginGpuSlot2::class.java, PluginGpuSlot3::class.java,
+        PluginGpuSlot4::class.java, PluginGpuSlot5::class.java, PluginGpuSlot6::class.java, PluginGpuSlot7::class.java,
+    )
 
     private class Process(val key: String, val tier: PluginTier, val service: Class<out PluginProcessService>, val instance: String?) {
         var runtime: IPluginRuntime? = null
@@ -99,7 +103,14 @@ internal object PluginProcesses {
 
     /** Which plugin processes exist now and what each holds, for the containment check. */
     fun describe(pluginId: String): String? = synchronized(lock) {
-        byPlugin[pluginId]?.let { "${it.key} (${if (it.tier == PluginTier.CONTAINED) "isolated" else "droidtop's UID"})" }
+        byPlugin[pluginId]?.let {
+            val where = when (it.tier) {
+                PluginTier.CONTAINED -> "sealed, in a process of its own"
+                PluginTier.GPU_RENDER -> "a process of its own with graphics access, sharing droidtop's user id"
+                PluginTier.FULL_TRUST -> "a process of its own, sharing droidtop's user id"
+            }
+            "${it.key} ($where)"
+        }
     }
 
     private fun processFor(pluginId: String, tier: PluginTier): Process? {
@@ -112,6 +123,8 @@ internal object PluginProcesses {
             val key = "contained:$pluginId"
             processes.getOrPut(key) { Process(key, tier, PluginSandboxService::class.java, instanceName(pluginId)) }
         } else {
+            // GPU and full-trust processes are not isolated, so there is no per-instance bindIsolatedService form; below
+            // API 29 a contained plugin falls here too. All three draw from a fixed pool of declared slot services.
             pooled(tier) ?: return null
         }
         process.plugins += pluginId
@@ -121,8 +134,11 @@ internal object PluginProcesses {
 
     /** A free slot, else the least recently used idle one (its plugins leave it), else for full trust the least recently used one, shared. */
     private fun pooled(tier: PluginTier): Process? {
-        val services = if (tier == PluginTier.CONTAINED) SANDBOX_SLOTS else FULL_TRUST_SLOTS
-        val prefix = if (tier == PluginTier.CONTAINED) "contained-slot" else "full-slot"
+        val (services, prefix) = when (tier) {
+            PluginTier.CONTAINED -> SANDBOX_SLOTS to "contained-slot"
+            PluginTier.GPU_RENDER -> GPU_SLOTS to "gpu-slot"
+            PluginTier.FULL_TRUST -> FULL_TRUST_SLOTS to "full-slot"
+        }
         val slots = services.indices.map { processes["$prefix$it"] }
         val index = slots.indexOfFirst { it == null || it.plugins.isEmpty() }.takeIf { it >= 0 }
             ?: slots.indices.filter { slots[it]!!.users == 0 }.minByOrNull { slots[it]!!.lastUsedMs }?.also { i ->

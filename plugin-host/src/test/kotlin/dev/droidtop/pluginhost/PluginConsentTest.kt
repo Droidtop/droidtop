@@ -103,7 +103,7 @@ class PluginConsentTest {
         // An older plugin's permissions are shown as full access, not as tick boxes.
         assertTrue(view.asks.all { it.line.id == null } && view.can.all { it.id == null })
         assertTrue(view.asks.any { it.line.title.startsWith("Send information to listed apps / to any app") })
-        assertTrue(view.asks.any { it.line.title == "Run with droidtop's full access (not contained)" })
+        assertTrue(view.asks.any { it.line.title == "Run with droidtop's full access" })
         assertTrue(view.can.any { it.title.startsWith("Check whether listed apps are installed") })
         assertEquals(emptyList<String>(), view.unsupported)
     }

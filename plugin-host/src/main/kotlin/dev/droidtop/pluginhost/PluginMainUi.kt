@@ -61,9 +61,10 @@ object PluginMainUi {
         PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record, userKeys)?.let {
             return "${m.label} failed its check: ${it.reason}"
         }
-        // A contained plugin draws into a surface droidtop owns; one with full access runs its own activity (docs/plugin-api.md 5.3).
-        val contained = PluginTiers.of(record, PluginGrants.forContext(context).read(m.id)) == PluginTier.CONTAINED
-        val intent = if (contained) PluginScreenActivity.intentFor(context, m.id, entry) else PluginMainActivity.intentFor(context, m.id, entry)
+        // A plugin without its own activity draws into a surface droidtop owns (contained in software, gpu.render with
+        // hardware); only a full-access plugin runs its own activity in its own process (docs/plugin-api.md 5.3).
+        val ownActivity = PluginTiers.of(record, PluginGrants.forContext(context).read(m.id)) == PluginTier.FULL_TRUST
+        val intent = if (ownActivity) PluginMainActivity.intentFor(context, m.id, entry) else PluginScreenActivity.intentFor(context, m.id, entry)
         if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching { context.startActivity(intent) }.fold(onSuccess = { null }, onFailure = { "Could not open ${m.label}: ${it.message}" })
     }

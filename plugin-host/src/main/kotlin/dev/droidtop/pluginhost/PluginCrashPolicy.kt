@@ -94,8 +94,15 @@ class PluginCrashPolicy(
         missingRuntime(record)?.let { return it.message }
         loadFor(record, userInitiated = true)?.let { return "Did not load: $it" }
         val report = runner.reachability(record.manifest.id) ?: return "Loaded, but its process did not answer"
+        val grants = withContext(Dispatchers.IO) { PluginGrants.forContext(context).read(record.manifest.id) }
         return buildString {
-            append(if (report.optBoolean("isolated")) "Contained: an isolated process" else "Full access: droidtop's own UID")
+            append(
+                when (PluginTiers.of(record, grants)) {
+                    PluginTier.CONTAINED -> "Sealed in a process of its own: no network, no files, nothing but what droidtop does for it"
+                    PluginTier.GPU_RENDER -> "A process of its own with graphics access. It shares droidtop's user id, which Android does not let an app wall off, so its own code could reach the network or droidtop's files; everything it does through droidtop is still listed and limited"
+                    PluginTier.FULL_TRUST -> "Runs with droidtop's own access: it can do anything droidtop can"
+                },
+            )
             append(" (uid ").append(report.optInt("uid")).append(", Android API ").append(report.optInt("sdk")).append(")")
             PluginProcesses.describe(record.manifest.id)?.let { append("\nProcess: ").append(it) }
             append("\nNetwork: ").append(report.optString("network"))

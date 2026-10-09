@@ -1870,6 +1870,7 @@ wording the host uses, so it is identical in every mode.
 | `perf.read` | normal | See performance readings (CPU, temperature, battery) | B6 |
 | `perf.profile.set` | dangerous | Change performance and fan settings | B7 |
 | `overlay.toast` | normal | Show short messages during games | B4 |
+| `gpu.render` | dangerous | Use the graphics chip to draw its screen | §5.3 |
 | `notify.post` | normal | Send you notifications | C6 |
 | `net.state` | normal | See whether you are online | D1 |
 | `net.wifi_details` | dangerous | See the name of your Wi-Fi network | D1 |
@@ -1919,7 +1920,7 @@ wording the host uses, so it is identical in every mode.
 | `telemetry.send` | dangerous (opt-in) | Send usage data to *listed address* | H6 |
 | `plugins.export` | normal | Offer features to other plugins | §2.8 |
 | `plugins.export_privileged` | critical | Give other plugins root or system-level access | §2.7 |
-| `host.full_trust` | critical | Run with droidtop's full access (not contained) | §5.3 |
+| `host.full_trust` | critical | Run with droidtop's full access | §5.3 |
 | `priv.shell.adb` | critical | Run system commands with ADB-level access (through *provider*) | F7, §2 |
 | `priv.shell.root` | critical | Run commands as root (through *provider*) | F7, §2 |
 | `priv.packages` | critical | Install, remove and change permissions of apps without asking (through *provider*) | F7 |
@@ -2104,17 +2105,18 @@ tick.
 Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
 (§5.3), and what is enforced depends on which:
 
-| | Contained (the default for contract 2) | Full trust (`host.full_trust`, and contract 1) |
-| --- | --- | --- |
-| Process | an isolated process of its own: a random UID, no permissions, the `isolated_app` SELinux domain | a process of its own (one of eight slots) under droidtop's UID |
-| Network | none: not in the `inet` group, so `socket()` is refused; `net.http`/`net.download` only, checked against `net.domains`/`net.any`/`net.local` per hop and logged | droidtop's `INTERNET`: any socket, unseen by droidtop |
-| droidtop's files (databases, preferences, sign-in tokens, other plugins' data) | none | all of them |
-| Its own files | the `data` API on its own folder only | its own folder by path, and everything else droidtop's UID reaches |
-| Shared storage | `files.shared` within its declared folders, `files.pick` documents, logged | all of it (`MANAGE_EXTERNAL_STORAGE`) |
-| Installed apps, usage stats, secure settings, logs | through declared host APIs only | whatever droidtop's UID holds (`QUERY_ALL_PACKAGES`, `PACKAGE_USAGE_STATS`, `WRITE_SECURE_SETTINGS` and `READ_LOGS` if granted) |
-| Shizuku, `su` | none (no binder, no permission; it can reach privilege only through a `priv.*` provider, with its own grant) | Shizuku's binder if droidtop was allowed, and `su` if the root manager granted droidtop's UID |
-| Other plugins | only through the broker (§2) | other full-trust plugins' files (same UID); not their objects (separate processes) |
-| The broker | the caller is the binder object; grant, scope, quota and audit on every call | the same for what it asks droidtop to do |
+| | Contained (the default for contract 2) | Graphics (`gpu.render`) | Full trust (`host.full_trust`, and contract 1) |
+| --- | --- | --- | --- |
+| Process | an isolated process of its own: a random UID, no permissions, the `isolated_app` SELinux domain | a process of its own (one of eight slots) under droidtop's UID, **not** isolated, so it may open the GPU | a process of its own (one of eight slots) under droidtop's UID |
+| Graphics chip | no: an isolated process may not open `gpu_device` (sepolicy), so Flutter draws in software | yes: hardware rendering into a droidtop-owned surface | yes |
+| Network | none: not in the `inet` group, so `socket()` is refused; `net.http`/`net.download` only, checked against `net.domains`/`net.any`/`net.local` per hop and logged | the broker refuses network APIs it was not granted, **but** its own native code shares droidtop's `INTERNET` and Android gives an app no way to drop it per process: a hostile native library could open a socket unseen | droidtop's `INTERNET`: any socket, unseen by droidtop |
+| droidtop's files (databases, preferences, sign-in tokens, other plugins' data) | none | the broker hands over nothing, **but** its own native code shares droidtop's UID and could read them directly; this cannot be walled off by an app | all of them |
+| Its own files | the `data` API on its own folder only | the `data` API on its own folder only (same caveat as above for raw native syscalls) | its own folder by path, and everything else droidtop's UID reaches |
+| Shared storage | `files.shared` within its declared folders, `files.pick` documents, logged | the same as contained through the broker (same native caveat) | all of it (`MANAGE_EXTERNAL_STORAGE`) |
+| Installed apps, usage stats, secure settings, logs | through declared host APIs only | through declared host APIs only | whatever droidtop's UID holds (`QUERY_ALL_PACKAGES`, `PACKAGE_USAGE_STATS`, `WRITE_SECURE_SETTINGS` and `READ_LOGS` if granted) |
+| Shizuku, `su` | none (no binder, no permission; it can reach privilege only through a `priv.*` provider, with its own grant) | none through the broker; it holds no Shizuku binder and no `priv.*` grant of its own | Shizuku's binder if droidtop was allowed, and `su` if the root manager granted droidtop's UID |
+| Other plugins | only through the broker (§2) | only through the broker | other full-trust plugins' files (same UID); not their objects (separate processes) |
+| The broker | the caller is the binder object; grant, scope, quota and audit on every call | the same | the same for what it asks droidtop to do |
 
 **Enforced for every plugin:**
 
@@ -2145,10 +2147,15 @@ Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
 permissions are declarative consent plus host-side gating of what droidtop
 does for it; they do not bound what it can do on its own, and the Activity
 screen says so (§4.6). That is why full trust is a critical grant, needed
-only by what needs privilege an isolated UID never has (`apps.bind`, the
-`priv.*` and `root.*` providers) and by contract 1 plugins. Every kind of
+only by what needs UID-level privilege (`apps.bind`, the `priv.*` and
+`root.*` providers) and by contract 1 plugins. Every kind of
 plugin runs contained, Flutter and native libraries included (§5.3,
-"Guarded hooks").
+"Guarded hooks"). Where a plugin needs one risky capability and nothing
+more, it declares that one permission and the person ticks it on the usual
+list; granting it opens that one hole, never full access. The first such
+permission is `gpu.render` (§5.3, "The graphics tier"): one permission, one
+hole, following the rule the owner set on 2026-10-09 ("Granting a single
+risky permission does NOT automatically grant everything").
 Whether the contained tier holds on a given device is what the Containment
 check (§5.3) shows.
 
@@ -2207,7 +2214,7 @@ commit that built this) and are written here when they arrive.
 | `native_bundle`, dex only | `:app` opens `classes.jar` and hands the descriptor over; the sandbox reads its `classes*.dex` into memory and loads them with `InMemoryDexClassLoader`, parented to droidtop's own loader so the plugin sees the plugin API. API 27+ takes any number of dex files, API 26 one. | **Yes.** Needs no path at all. |
 | `native_bundle` with `.so` | Its libraries for the device's ABI reach the process as descriptors and get virtual paths (`/droidtop-sandbox/plugin/lib/<abi>/...`); the class loader's library path names that folder (the `InMemoryDexClassLoader` constructor from API 29, the loader's own `addNativePath` on API 28). The plugin's own `System.loadLibrary` then runs the ordinary way: libcore's `findLibrary` check and ART's `android_dlopen_ext` are answered by the guarded hooks, the library is mapped from a private memfd copy, and ART registers it with the plugin's class loader, so JNI binds by symbol name or `RegisterNatives` as usual. | **Built 2026-10-09 (plugin-enforce-3); the rig decides.** Needs Android 9 or later. A library whose `DT_NEEDED` names another of the plugin's own libraries loads only after that one (the linker resolves its dependencies by name, which the hooks do not see); load them in order. |
 | `python` | `:app` hands over libpython, the runtime's other libraries (OpenSSL, SQLite), the standard library as one zip (`python-stdlib.zip`, built once beside the runtime: pure Python, stored, no tests, IDLE or Tk) and every `lib-dynload` module. `libdroidtoppy.so` maps each library with `android_dlopen_ext` and `ANDROID_DLEXT_USE_LIBRARY_FD`, falling back to a private `memfd` copy when the file's own descriptor may not be mapped. Each extension module is registered as a built-in (`PyImport_AppendInittab`) before the interpreter starts, because the import system loads an extension only by path. The zip goes on `sys.path` as `/proc/self/fd/<n>`; `zipimport` stats that path and reads it through an open-code hook (`PyFile_SetOpenCodeHook`) that answers with the descriptor itself (later with `pread`, so threads importing at once never share a file offset), so nothing is opened by path. `plugin.py` is executed from its text. One interpreter per plugin process. | **Built; the rig decides.** AOSP's policy (below) answers the first question: an isolated process may never map code from droidtop's files, so the memfd copy is the path every library takes, and the report says so line by line ("memfd (fd refused: ...)"). It may `getattr` a file handed to it, so the zip is expected on `sys.path` through its own descriptor. Whether a device's kernel and policy match AOSP's is what the report shows; if contained Python fails on one, the report and logcat's `avc:` lines say exactly what was refused. |
-| `flutter_embed` | A headless `FlutterEngine` in the isolated service. `:app` hands over the downloaded engine, the plugin's `libapp.so`, its `flutter_assets` as one zip (built once per installed bundle in droidtop's cache) and its registrant dex. `System.load` of the engine and the asset manager opening the zip are answered by the guarded hooks; once the engine is in, its own imports are hooked too, so its `dlopen` of `libapp.so` maps the plugin's. The engine draws in software (`--enable-software-rendering`): an isolated process may not open the GPU. `ui.main`: an activity cannot run in an isolated process and the window manager is out of its reach, so droidtop's `PluginScreenActivity` owns a `SurfaceView` and hands its `Surface` across the binder; the plugin's main-UI engine renders into it, and droidtop forwards touch (`AndroidTouchProcessor`) and keys (`KeyEventChannel`); Back pops the plugin's route and its last route (`SystemNavigator.pop`) closes the screen. | **Built 2026-10-09 (plugin-enforce-3); the rig decides.** Plugin packages that need files (`path_provider`, `sqflite`) have none when contained: a Flutter plugin keeps its data through `hostCall` and the `data` API. Rendering a surface in software needs the isolated process to map the gralloc buffers the surface hands it, which only a device can confirm. |
+| `flutter_embed` | A headless `FlutterEngine` in the isolated service. `:app` hands over the downloaded engine, the plugin's `libapp.so`, its `flutter_assets` as one zip (built once per installed bundle in droidtop's cache) and its registrant dex. `System.load` of the engine and the asset manager opening the zip are answered by the guarded hooks; once the engine is in, its own imports are hooked too, so its `dlopen` of `libapp.so` maps the plugin's. The engine draws in software (`--enable-software-rendering`): an isolated process may not open the GPU (grant `gpu.render` and it runs in a non-isolated droidtop-owned process that draws with hardware, "The graphics tier"). `ui.main`: an activity cannot run in an isolated process and the window manager is out of its reach, so droidtop's `PluginScreenActivity` owns a `SurfaceView` and hands its `Surface` across the binder; the plugin's main-UI engine renders into it, and droidtop forwards touch (`AndroidTouchProcessor`) and keys (`KeyEventChannel`); Back pops the plugin's route and its last route (`SystemNavigator.pop`) closes the screen. | **Built 2026-10-09 (plugin-enforce-3); the rig decides.** Plugin packages that need files (`path_provider`, `sqflite`) have none when contained: a Flutter plugin keeps its data through `hostCall` and the `data` API. Rendering a surface in software needs the isolated process to map the gralloc buffers the surface hands it, which only a device can confirm. |
 
 What every contained process is, by Android's rules: a random UID from the
 isolated range, no permissions, not in the `inet` group (no sockets), the
@@ -2261,6 +2268,48 @@ library ART loads keeps its class-loader namespace and its JNI binding).
 A virtual path nobody registered is `ENOENT`; every other path reaches libc
 unchanged. The Containment check reports which libraries were hooked and how
 many import slots.
+**The graphics tier (`gpu.render`, built plugin-enforce-4, 2026-10-09).**
+Some plugins need the GPU and nothing else: a Flutter screen that janks in
+software, a small game engine. An isolated process may never open the GPU
+(the `gpu_device` neverallow above), so these would otherwise be pushed to
+full access, which the owner rejected: "We can grant GPU access if needed.
+We don't have to full isolate. Granting a single risky permission does NOT
+automatically grant everything." So `gpu.render` is a dangerous permission
+the plugin declares and the person ticks on the usual approval list, and it
+opens that one hole:
+
+- **The platform shape.** Granting it runs the plugin in a droidtop-owned
+  process (`PluginGpuService`, slots `:plugin_gpu0..7`) that is **not**
+  `android:isolatedProcess`. That is the only process an app may run that
+  can open the GPU: Android gives apps no `seccomp`, no user namespaces and
+  no per-process capability dropping, and `isolated_compute_app` (the one
+  isolated domain the sepolicy exempts from the GPU neverallow) is reserved
+  for the system's OnDevicePersonalization service and cannot be requested
+  by an ordinary app. So the non-isolated-but-locked-down process is the
+  workable shape; a droidtop-owned renderer that mediates every draw call
+  (Chrome's GPU-process model) is the only alternative and is far too large
+  for one permission.
+- **What is still locked down.** The plugin's code is loaded exactly as a
+  contained plugin's is: from descriptors through `InMemoryDexClassLoader`
+  and the guarded hooks, with a broker-only `PluginContext` (no private
+  folder, no root, no Shizuku). Every host API it uses goes through the
+  broker with the same grant, scope, quota and audit. It draws into a
+  droidtop-owned `Surface` (`PluginScreenActivity`), now with hardware
+  instead of `--enable-software-rendering`.
+- **What it cannot stop, stated plainly.** The process shares droidtop's
+  UID, so its own **native** code could open a socket (droidtop holds
+  `INTERNET`) or read droidtop's files directly, below the broker and the
+  class loader, and no app on Android can prevent that for one of its own
+  processes. `gpu.render` is therefore a real trust decision, not a free
+  one: for a Flutter or dex plugin whose Kotlin/Dart stays on the broker it
+  is a tight boundary; for a plugin shipping hostile native code it is close
+  to full access. The Containment check (Advanced) says so for the plugin in
+  front of the person, and only there — the person's approval list shows one
+  plain line, "Use the graphics chip to draw its screen", never the tier.
+- **The general rule.** One permission opens one hole. Full trust stays
+  reserved for UID-level privilege that no per-permission process can give:
+  Shizuku, root and `apps.bind`.
+
 - **Full trust, by grant.** droidtop's UID, but **one process per
   plugin** from eight declared slots (`:pluginhost`, `:pluginhost1` to
   `:pluginhost7`; beyond eight in use at once the least recently used slot

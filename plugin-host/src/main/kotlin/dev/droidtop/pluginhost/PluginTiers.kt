@@ -5,6 +5,15 @@ enum class PluginTier {
     /** An isolated process of its own: no permissions, no network, no files. Everything goes through the broker. */
     CONTAINED,
 
+    /**
+     * A process of its own under droidtop's UID, kept to the broker-only context and the sandbox class loader like a
+     * contained plugin, but NOT an isolated process, so the graphics chip is reachable (an isolated process may not open
+     * it: sepolicy isolated_app_all.te). The one hole `gpu.render` opens. What this process shares with droidtop's UID
+     * (its own native code could reach the network or droidtop's files) cannot be walled off by an app on Android; that
+     * is stated for the person under Advanced and in docs/plugin-api.md 5.3, never a default.
+     */
+    GPU_RENDER,
+
     /** A process of its own under droidtop's UID: anything droidtop can do, beyond the broker's sight. */
     FULL_TRUST,
 }
@@ -17,6 +26,7 @@ enum class PluginTier {
  */
 object PluginTiers {
     const val FULL_TRUST = "host.full_trust"
+    const val GPU_RENDER = "gpu.render"
 
     fun declaresFullTrust(manifest: PluginManifest): Boolean = manifest.v2.permissions.any { it.id == FULL_TRUST }
 
@@ -32,10 +42,20 @@ object PluginTiers {
         else -> null
     }
 
-    /** The tier [record] runs in with the grants in [grants]. */
+    fun declaresGpu(manifest: PluginManifest): Boolean = manifest.v2.permissions.any { it.id == GPU_RENDER }
+
+    /**
+     * The tier [record] runs in with the grants in [grants]. Full access is the `host.full_trust` grant and nothing
+     * else; the graphics chip is the `gpu.render` grant and nothing else (a plugin the broker keeps to its own data,
+     * now in a process that may draw with hardware). A plugin that cannot run contained at all ([containmentBlocker])
+     * is left CONTAINED here, where [refusal] blocks it until it is allowed full access; `gpu.render` never substitutes
+     * for the privilege such a plugin needs.
+     */
     fun of(record: PluginRecord, grants: PluginGrants.Snapshot): PluginTier = when {
         record.manifest.contractVersion < 2 -> PluginTier.FULL_TRUST
         declaresFullTrust(record.manifest) && PluginGrants.stateOf(record, grants, FULL_TRUST) == GrantState.GRANTED -> PluginTier.FULL_TRUST
+        containmentBlocker(record.manifest) != null -> PluginTier.CONTAINED
+        declaresGpu(record.manifest) && PluginGrants.stateOf(record, grants, GPU_RENDER) == GrantState.GRANTED -> PluginTier.GPU_RENDER
         else -> PluginTier.CONTAINED
     }
 
@@ -44,7 +64,7 @@ object PluginTiers {
      * has not been allowed it. It is not called and not disabled; its page says what to allow.
      */
     fun refusal(record: PluginRecord, grants: PluginGrants.Snapshot): String? {
-        if (of(record, grants) == PluginTier.FULL_TRUST) return null
+        if (of(record, grants) != PluginTier.CONTAINED) return null
         val blocker = containmentBlocker(record.manifest) ?: return null
         if (!declaresFullTrust(record.manifest)) {
             return "${record.manifest.label} needs full access ($blocker), and this version of it does not ask for it; it needs an update that does"
@@ -52,10 +72,15 @@ object PluginTiers {
         return "${record.manifest.label} needs full access ($blocker). Allow \"Run with droidtop's full access\" on its Permissions screen"
     }
 
-    /** The badge every surface shows for [manifest]'s access (docs/plugin-api.md 4.6, 5.3). */
-    fun badge(record: PluginRecord, grants: PluginGrants.Snapshot): String = when {
+    /**
+     * The only access badge the person ever sees (docs/plugin-api.md 4.6): "Full access", the single warning, or null for
+     * the safe default. There is deliberately no "contained" or "graphics" badge: the containment is the plugin system's
+     * job, not the person's to understand, so a plugin that is not full access simply carries no access badge, and what it
+     * may do is the one list on its Permissions screen.
+     */
+    fun badge(record: PluginRecord, grants: PluginGrants.Snapshot): String? = when {
         record.manifest.contractVersion < 2 -> "Full access (older plugin)"
         of(record, grants) == PluginTier.FULL_TRUST -> "Full access"
-        else -> "Contained"
+        else -> null
     }
 }

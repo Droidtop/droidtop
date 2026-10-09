@@ -41,7 +41,7 @@ object ExtensionPoints {
         ExtensionPoint("input.mapping", "Controller mapping", PointRisk.MEDIUM, lets = "Lets it supply controller mappings."),
         ExtensionPoint("perf.source", "Performance readings", PointRisk.LOW, lets = "Lets it report performance readings."),
         ExtensionPoint("ui.settings", "Settings", PointRisk.LOW, lets = "Lets it add its own page in Settings."),
-        ExtensionPoint("ui.main", "Its own full-screen app", PointRisk.LOW, lets = "Lets it run its own full-screen app, in its own process."),
+        ExtensionPoint("ui.main", "Its own full-screen app", PointRisk.LOW, lets = "Lets it run its own full-screen app."),
         ExtensionPoint("ui.panel", "Quick Menu panel", PointRisk.LOW, lets = "Lets it add its own panel to the Quick Menu, where you use and set it up."),
         ExtensionPoint("ui.game_section", "Rows on a game's page", PointRisk.MEDIUM, lets = "Lets it add its own rows to a game's page."),
         ExtensionPoint("ui.quick_tile", "Quick Menu tiles", PointRisk.LOW, lets = "Lets it add tiles to the Quick Menu."),

@@ -31,11 +31,21 @@ import org.json.JSONObject
 open class PluginSandboxService : PluginProcessService() {
     @Volatile private var pythonReport: JSONObject? = null
 
+    /**
+     * True for the isolated sandbox, false for a `gpu.render` process ([PluginGpuService]). A GPU process is the same
+     * broker-only loader in a process of droidtop's own UID that is NOT `android:isolatedProcess`, the only process an
+     * app may run that can open the graphics chip (docs/plugin-api.md 5.3).
+     */
+    protected open val requiresIsolation: Boolean get() = true
+
+    /** The contained default draws in software (an isolated process may not open the GPU); a `gpu.render` process draws with hardware. */
+    protected open val softwareRendering: Boolean get() = true
+
     override fun loadFromFolder(pluginId: String, dir: File, entryClass: String, rootApproved: Boolean, broker: IPluginHostBroker): Boolean =
         failLoad(pluginId, "a contained plugin is loaded from the files droidtop hands it, never from a folder")
 
     override fun loadFromFiles(pluginId: String, manifest: PluginManifest, files: Map<String, ParcelFileDescriptor>, broker: IPluginHostBroker): Boolean {
-        if (!dev.droidtop.runtime.util.IsolatedProcess.isIsolated()) return failLoad(pluginId, "the contained process is not isolated; refusing to run the plugin here")
+        if (requiresIsolation && !dev.droidtop.runtime.util.IsolatedProcess.isIsolated()) return failLoad(pluginId, "the contained process is not isolated; refusing to run the plugin here")
         val context = BrokerPluginContext(broker)
         return when (manifest.kind) {
             PluginKind.NATIVE_BUNDLE -> loadDex(pluginId, manifest, files, context)
@@ -95,7 +105,7 @@ open class PluginSandboxService : PluginProcessService() {
             val registrant = files.filterKeys { it.startsWith(ContainedFiles.FLUTTER_DEX) }.toSortedMap().values.map { fd ->
                 java.nio.ByteBuffer.wrap(FileInputStream(fd.fileDescriptor).readBytes())
             }
-            start(pluginId, FlutterDroidtopPlugin(pluginId, applicationContext, FlutterSource.contained(registrant), manifest.contractVersion), context)
+            start(pluginId, FlutterDroidtopPlugin(pluginId, applicationContext, FlutterSource.contained(registrant, softwareRendering), manifest.contractVersion), context)
         } catch (t: Throwable) {
             loadCrashed(pluginId, t)
         }
@@ -120,6 +130,23 @@ class PluginSandboxSlot4 : PluginSandboxService()
 class PluginSandboxSlot5 : PluginSandboxService()
 class PluginSandboxSlot6 : PluginSandboxService()
 class PluginSandboxSlot7 : PluginSandboxService()
+
+// A `gpu.render` plugin's process (docs/plugin-api.md 5.3): the same broker-only loader as the sandbox, but in a process
+// of droidtop's own UID that is NOT isolated, so the graphics chip is reachable and Flutter draws with hardware. Eight
+// slots `:plugin_gpu0` to `:plugin_gpu7` in this module's manifest; there is no API 29 per-instance form because
+// bindIsolatedService is for isolated processes only.
+open class PluginGpuService : PluginSandboxService() {
+    override val requiresIsolation: Boolean get() = false
+    override val softwareRendering: Boolean get() = false
+}
+class PluginGpuSlot0 : PluginGpuService()
+class PluginGpuSlot1 : PluginGpuService()
+class PluginGpuSlot2 : PluginGpuService()
+class PluginGpuSlot3 : PluginGpuService()
+class PluginGpuSlot4 : PluginGpuService()
+class PluginGpuSlot5 : PluginGpuService()
+class PluginGpuSlot6 : PluginGpuService()
+class PluginGpuSlot7 : PluginGpuService()
 
 /** Dex code from a descriptor, for a process that can open no file (docs/plugin-api.md 5.3). */
 internal object ContainedDex {

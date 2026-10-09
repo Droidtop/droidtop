@@ -1364,7 +1364,7 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "accounts_plugins_screen",
                         title = "Plugins",
-                        subtitle = "Installed plugin code: searched, approved and run in its own process, never in droidtop's databases",
+                        subtitle = "Extra features you install and approve, kept out of droidtop's own data",
                         registryId = SCREEN_PLUGINS,
                         valueLabel = { pluginsValueLabel },
                     ),
@@ -1473,7 +1473,7 @@ object AppSettingsCatalogs {
     private fun pluginsScreen() = CatalogScreen(
         id = SCREEN_PLUGINS,
         title = "Plugins",
-        subtitle = "Run in their own process, only after you approve them",
+        subtitle = "Run only after you approve them",
         groups = { context -> pluginsGroups(context) },
         // A plugin's own page opens the Permissions screen of one plugin through here (a denied plugin view's way to change it).
         forDeepLink = { pluginId -> pluginPermissionsScreen(pluginId) },
@@ -1610,7 +1610,7 @@ object AppSettingsCatalogs {
         return NestedScreenItem(
             id = "plugin_${m.id}",
             title = m.label,
-            subtitle = pluginSummary(m, enabledPoints) + " - " + trustBadge + " - " + PluginTiers.badge(record, grants),
+            subtitle = listOfNotNull(pluginSummary(m, enabledPoints), trustBadge, PluginTiers.badge(record, grants)).joinToString(" - "),
             inline = pluginDetailScreen(m.id, m.label),
             valueLabel = { state },
         )
@@ -1690,8 +1690,15 @@ object AppSettingsCatalogs {
             // are the action; keep the trust/status row for plugins that already have a decision.
             if (record.trust != PluginTrustState.PENDING) {
                 add(ActionItem(id = "plugin_${m.id}_status", title = statusLine, subtitle = trustLine, run = {}))
-                // docs/plugin-api.md 5.3: where its code runs decides what it can reach without asking droidtop.
-                add(ActionItem(id = "plugin_${m.id}_access", title = PluginTiers.badge(record, grantSnapshot), subtitle = accessLine(record, grantSnapshot), run = {}))
+                // The only access row the person ever sees is the full-access warning, or a plugin that needs it and has
+                // not been allowed it (docs/plugin-api.md 4.6). A plugin on the safe default carries no access row: what
+                // it may do is the one list on its Permissions screen, not a tier for the person to understand.
+                val refusal = PluginTiers.refusal(record, grantSnapshot)
+                val accessBadge = PluginTiers.badge(record, grantSnapshot)
+                when {
+                    refusal != null -> add(ActionItem(id = "plugin_${m.id}_access", title = "Needs full access to work", subtitle = refusal, run = {}))
+                    accessBadge != null -> add(ActionItem(id = "plugin_${m.id}_access", title = accessBadge, subtitle = accessLine(record, grantSnapshot), run = {}))
+                }
             }
             // The headline above is a plain sentence; what the plugin actually reported is one press away,
             // for its developer or a bug report (docs/SPEC.md 12a, Droidtop/tracker#167).
@@ -1782,7 +1789,7 @@ object AppSettingsCatalogs {
                         subtitle = if (m.requestsRoot) {
                             "Allows what is ticked above. This plugin can also use root as an optional enhancement when your device has it -- its core function must still work without it. Approving here does NOT grant root; use \"Approve and allow root\" for that."
                         } else {
-                            "Allows what is ticked above and runs in its own process from now on. You can change any of it later under Permissions."
+                            "Allows what is ticked above. You can change any of it later under Permissions."
                         },
                         run = { ctx -> approve(ctx, false) },
                     ),
@@ -2068,14 +2075,9 @@ object AppSettingsCatalogs {
     }
 
     /** What the access badge means for [record], in one sentence (docs/plugin-api.md 4.6, 5.3). */
-    private fun accessLine(record: dev.droidtop.pluginhost.PluginRecord, grants: PluginGrants.Snapshot): String {
-        PluginTiers.refusal(record, grants)?.let { return it }
-        return if (PluginTiers.of(record, grants) == PluginTier.FULL_TRUST) {
-            "Runs with droidtop's own access: it can do anything droidtop can, and only what it asks droidtop to do is listed under Activity"
-        } else {
-            "Runs sealed in a process of its own: no network, files or permissions except what droidtop does for it, as allowed under Permissions"
-        }
-    }
+    /** The subtitle of the full-access row (docs/plugin-api.md 4.6): the one warning, in plain words. */
+    private fun accessLine(record: dev.droidtop.pluginhost.PluginRecord, grants: PluginGrants.Snapshot): String =
+        "This plugin can do anything droidtop can. Only what it asks droidtop to do is listed under Activity. Allow it only if you trust the plugin."
 
     /** One line of the Permissions screen: a permission, a high-risk point it may provide, or an export, with its current state. */
     private data class PermissionRow(val id: String, val label: String, val reason: String?, val tier: PermissionTier, val state: GrantState)
@@ -2137,9 +2139,9 @@ object AppSettingsCatalogs {
         val note = when {
             record == null -> "This plugin was removed; its activity is kept for 7 days"
             PluginTiers.of(record, grants) == PluginTier.FULL_TRUST ->
-                "This plugin runs with full access; only what it asks droidtop to do is listed."
+                "This plugin has full access; only what it asks droidtop to do is listed."
             else ->
-                "This plugin runs contained: everything it does beyond its own process goes through droidtop. Its network and shared-file use and every sensitive call are listed; everyday calls (its own data, short messages) are not."
+                "droidtop carries out everything this plugin does. Its network and shared-file use and every sensitive action are listed here; everyday things (its own data, short messages) are not."
         }
         val format = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
         val entries = PluginAudit.forContext(context).entries(pluginId).asReversed().take(ACTIVITY_SHOWN)
@@ -2242,23 +2244,18 @@ object AppSettingsCatalogs {
                 )
             }
         val rest = rows
+        val accessRow = run {
+            val refusal = PluginTiers.refusal(record, snap)
+            val badge = PluginTiers.badge(record, snap)
+            when {
+                refusal != null -> ActionItem(id = "plugin_permissions_access_row", title = "Needs full access to work", subtitle = refusal, run = {})
+                record.manifest.contractVersion < 2 -> ActionItem(id = "plugin_permissions_access_row", title = badge ?: "Full access (older plugin)", subtitle = "Written before permissions existed: it can do anything droidtop can, and only what it asks droidtop to do is listed under Activity", run = {})
+                badge != null -> ActionItem(id = "plugin_permissions_access_row", title = badge, subtitle = accessLine(record, snap), run = {})
+                else -> null
+            }
+        }
         return listOfNotNull(
-            CatalogGroup(
-                id = "plugin_permissions_access",
-                title = "Access",
-                items = listOf(
-                    ActionItem(
-                        id = "plugin_permissions_access_row",
-                        title = PluginTiers.badge(record, snap),
-                        subtitle = if (record.manifest.contractVersion < 2) {
-                            "Written before permissions existed: it runs with droidtop's own access, and only what it asks droidtop to do is listed under Activity"
-                        } else {
-                            accessLine(record, snap)
-                        },
-                        run = {},
-                    ),
-                ),
-            ),
+            accessRow?.let { CatalogGroup(id = "plugin_permissions_access", title = "Access", items = listOf(it)) },
             modeItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_modes", "Where it appears", it) },
             backgroundItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_background", "Background tasks", it) },
             rest.filter { it.tier == PermissionTier.CRITICAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_critical", "Critical", it.map(::item)) },
@@ -2351,11 +2348,12 @@ object AppSettingsCatalogs {
             if (only != null) {
                 null
             } else if (view.olderPluginFullAccess) {
-                group("older", "Older plugin", listOf(info("older", "Full access (older plugin)", "Written before permissions existed: it can do everything it could before, and droidtop does not contain it")))
+                group("older", "Older plugin", listOf(info("older", "Full access (older plugin)", "Written before permissions existed: it can do everything it could before. Allow it only if you trust the plugin")))
             } else if (view.asksFullAccess) {
-                group("access", "Access", listOf(info("access", "Asks for full access", "Allowed, it runs with droidtop's own access and can do anything droidtop can; only what it asks droidtop to do is listed under Activity")))
+                group("access", "Access", listOf(info("access", "Asks for full access", "Allowed, it can do anything droidtop can; only what it asks droidtop to do is listed under Activity. Allow it only if you trust the plugin")))
             } else {
-                group("access", "Access", listOf(info("access", "Contained", "Runs sealed in a process of its own: it can reach only what is listed here, and only through droidtop")))
+                // The safe default carries no access line: the lists below are the one thing the person decides.
+                null
             },
             group(
                 "adds", "Adds",

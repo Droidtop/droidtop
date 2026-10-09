@@ -92,7 +92,9 @@ class NativePluginRunner(
                         PluginTier.FULL_TRUST ->
                             // entryClass is null for any kind but native_bundle; the AIDL parameter is a non-null placeholder there.
                             runtime.loadPlugin(id, installDir, record.manifest.entryClass ?: "", record.rootApproved, PluginBrokers.binderFor(appContext, id))
-                        PluginTier.CONTAINED -> loadContained(runtime, record)
+                        // A gpu.render process loads the plugin from the same descriptors as a contained one; it differs only
+                        // in being a non-isolated, GPU-capable process (docs/plugin-api.md 5.3, "The graphics tier").
+                        PluginTier.CONTAINED, PluginTier.GPU_RENDER -> loadContained(runtime, record)
                     }
                 }
             }

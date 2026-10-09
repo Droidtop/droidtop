@@ -12,11 +12,11 @@ import java.nio.ByteBuffer
  * Where one Flutter plugin's files come from (docs/SPEC.md 12a, docs/plugin-api.md 5.3).
  *
  * - [installed]: with full access, its install folder and the downloaded runtime, by their real paths.
- * - [contained]: in an isolated process, virtual paths under [SandboxFiles.ROOT] for the descriptors :app handed over.
+ * - [contained]: the plugin's code arrives as descriptors :app handed over, at virtual paths under [SandboxFiles.ROOT].
  *   The guarded hooks answer them: `System.load` of the engine, the engine's own `dlopen` of `libapp.so` (hooked once
  *   the engine is loaded) and the asset manager opening the asset zip. The plugin's generated plugin registrant, when
- *   it has one, is dex loaded from memory. No GPU: an isolated process may not open the GPU driver, so the engine draws
- *   with Flutter's software renderer.
+ *   it has one, is dex loaded from memory. [softwareRendering] is set for the isolated sandbox, which may not open the
+ *   GPU driver, and cleared for a `gpu.render` process, which may.
  */
 internal class FlutterSource private constructor(
     /** Absolute path `System.load` loads the engine from. */
@@ -28,6 +28,7 @@ internal class FlutterSource private constructor(
     /** The dex files with the plugin's generated plugin registrant, or none. */
     private val registrant: () -> ClassLoader?,
     val contained: Boolean,
+    val softwareRendering: Boolean,
 ) {
     fun registrantLoader(): ClassLoader? = registrant()
 
@@ -48,17 +49,21 @@ internal class FlutterSource private constructor(
                     val optimizedDir = File(appContext.cacheDir, "flutter-plugin-dex-opt/$pluginId").apply { mkdirs() }
                     DexClassLoader(dexFiles.joinToString(File.pathSeparator) { it.absolutePath }, optimizedDir.absolutePath, null, FlutterEngineHost::class.java.classLoader)
                 }
-            }, contained = false)
+            }, contained = false, softwareRendering = false)
         }
 
-        /** A contained plugin's files, already registered with [SandboxFiles] under these names ([ContainedFiles]). */
-        fun contained(registrantDex: List<ByteBuffer>): FlutterSource =
+        /**
+         * A contained plugin's files, already registered with [SandboxFiles] under these names ([ContainedFiles]).
+         * [softwareRendering] is true in the isolated sandbox and false in a `gpu.render` process.
+         */
+        fun contained(registrantDex: List<ByteBuffer>, softwareRendering: Boolean): FlutterSource =
             FlutterSource(
                 libflutter = SandboxFiles.RUNTIME + "libflutter.so",
                 libapp = SandboxFiles.PLUGIN + "libapp.so",
                 assetsZip = SandboxFiles.PLUGIN + "flutter_assets.zip",
                 registrant = { if (registrantDex.isEmpty()) null else ContainedDex.loader(registrantDex, FlutterEngineHost::class.java.classLoader!!, null) },
                 contained = true,
+                softwareRendering = softwareRendering,
             )
     }
 }
@@ -84,8 +89,9 @@ internal object FlutterEngineHost {
         val flutterLoader = loaders.getOrPut(source.libapp) { FlutterLoader(flutterJNI) }
         val dartVmArgs = buildList {
             add("--aot-shared-library-name=${source.libapp}")
-            // An isolated process may not open the GPU driver (sepolicy isolated_app_all.te): Flutter draws in software.
-            if (source.contained) add("--enable-software-rendering")
+            // An isolated process may not open the GPU driver (sepolicy isolated_app_all.te): Flutter draws in software
+            // there. A gpu.render process is not isolated and draws with hardware (docs/plugin-api.md 5.3).
+            if (source.softwareRendering) add("--enable-software-rendering")
         }.toTypedArray()
         // false, not true: automatic registration only looks on this process's own classloader, which never has the plugin's generated registrant (see registerGeneratedPlugins).
         val engine = FlutterEngine(appContext, flutterLoader, flutterJNI, dartVmArgs, false)

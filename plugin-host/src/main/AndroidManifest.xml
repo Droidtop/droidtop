@@ -47,6 +47,26 @@
         <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot7" android:process=":plugin_sandbox7" android:exported="false" android:isolatedProcess="true" />
 
         <!--
+          A gpu.render plugin: the same broker-only, descriptor-loaded plugin
+          as the contained sandbox, but in a process of droidtop's own UID that
+          is NOT isolated, so it may open the graphics chip (an isolated process
+          may not: sepolicy isolated_app_all.te). That is the one hole the
+          gpu.render permission opens. It shares droidtop's UID, which an app on
+          Android cannot wall off, so its own native code could still reach the
+          network or droidtop's files; that trade-off is in docs/plugin-api.md
+          5.3 and shown to the person only under Advanced, never as a default.
+          Eight slots, one plugin each.
+        -->
+        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot0" android:process=":plugin_gpu0" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot1" android:process=":plugin_gpu1" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot2" android:process=":plugin_gpu2" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot3" android:process=":plugin_gpu3" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot4" android:process=":plugin_gpu4" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot5" android:process=":plugin_gpu5" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot6" android:process=":plugin_gpu6" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot7" android:process=":plugin_gpu7" android:exported="false" android:isolatedProcess="false" />
+
+        <!--
           A plugin's own full-screen UI (ui.main, docs/plugin-api.md 1.7),
           hosted in a full-trust plugin process: an activity cannot run in an
           isolated process, and only a Flutter plugin, which needs full access

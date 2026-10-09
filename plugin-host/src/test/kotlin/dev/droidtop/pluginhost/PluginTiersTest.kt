@@ -14,6 +14,7 @@ import org.junit.Test
 
 class PluginTiersTest {
     private val fullTrust = obj("id" to PluginTiers.FULL_TRUST, "reason" to "Talks to Shizuku")
+    private val gpu = obj("id" to PluginTiers.GPU_RENDER, "reason" to "Draws with hardware")
 
     private fun grants(vararg states: Pair<String, GrantState>) = PluginGrants.Snapshot(states = states.toMap())
 
@@ -23,7 +24,7 @@ class PluginTiersTest {
         assertEquals(PluginTier.CONTAINED, PluginTiers.of(r, grants()))
         assertNull(PluginTiers.containmentBlocker(r.manifest))
         assertNull(PluginTiers.refusal(r, grants()))
-        assertEquals("Contained", PluginTiers.badge(r, grants()))
+        assertNull(PluginTiers.badge(r, grants()))
     }
 
     @Test
@@ -92,5 +93,36 @@ class PluginTiersTest {
         // An already installed version that never asked for it cannot be allowed it: it needs an update.
         val old = record(manifest { it.put("permissions", arr(obj("id" to "apps.bind"))) })
         assertTrue(PluginTiers.refusal(old, grants())!!.contains("update"))
+    }
+
+    @Test
+    fun `gpu render is one hole a granted permission opens, not full access`() {
+        val r = record(manifest { it.put("permissions", arr(gpu)) })
+        // Declared but not ticked: still the safe default, no badge, no refusal.
+        assertEquals(PluginTier.CONTAINED, PluginTiers.of(r, grants()))
+        assertEquals(PluginTier.CONTAINED, PluginTiers.of(r, grants(PluginTiers.GPU_RENDER to GrantState.DENIED)))
+        assertNull(PluginTiers.badge(r, grants()))
+        assertNull(PluginTiers.refusal(r, grants()))
+        // Ticked: it runs in a graphics process, still not full access and still no badge the person must read.
+        assertEquals(PluginTier.GPU_RENDER, PluginTiers.of(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+        assertNull(PluginTiers.badge(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+        assertNull(PluginTiers.refusal(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+    }
+
+    @Test
+    fun `gpu render never substitutes for the privilege a non-containable plugin needs`() {
+        // apps.bind cannot run contained; granting gpu.render does not let it dodge the full-access requirement.
+        val r = record(manifest { it.put("permissions", arr(obj("id" to "apps.bind"), gpu)) })
+        assertEquals(PluginTier.CONTAINED, PluginTiers.of(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+        assertNotNull(PluginTiers.refusal(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+    }
+
+    @Test
+    fun `full access still wins when both are granted`() {
+        val r = record(manifest { it.put("permissions", arr(fullTrust, gpu)) })
+        assertEquals(
+            PluginTier.FULL_TRUST,
+            PluginTiers.of(r, grants(PluginTiers.FULL_TRUST to GrantState.GRANTED, PluginTiers.GPU_RENDER to GrantState.GRANTED)),
+        )
     }
 }

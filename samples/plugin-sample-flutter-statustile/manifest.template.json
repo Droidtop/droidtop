@@ -3,11 +3,14 @@
   "origin": "droidtop",
   "label": "Sample status tile (Flutter)",
   "description": "Harmless flutter_embed-kind sample exercising the plugin API end to end (SPEC 12a); see build.sh in this folder.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "kind": "flutter_embed",
   "contractVersion": 2,
   "runtimeVersion": "af7e796e161ae0bb1ff0758c71a7105418bd9ded",
   "requestsRoot": false,
+  "permissions": [
+    {"id": "gpu.render", "reason": "Draw its screen with the graphics chip, so ui.main renders with hardware instead of software. Optional: without it the sample still runs and draws in software.", "required": false}
+  ],
   "provides": [
     {"point":"ui.status_tile","version":1,"id":"state","label":"Sample tile (Flutter)","surfaces":["gaming.quick_menu"]},
     {"point":"ui.settings","version":1,"target":"plugin"},
