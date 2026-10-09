@@ -4,6 +4,7 @@ import android.content.Context
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
+import dev.droidtop.library.consoles.CustomPlayerPrefs
 import dev.droidtop.library.consoles.EmulatorDefaults
 import dev.droidtop.library.consoles.EmulatorResolution
 import dev.droidtop.library.consoles.KnownPlayers
@@ -30,7 +31,10 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
+import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.library.settings.ToggleItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -152,13 +156,13 @@ object EmulatorsCatalog {
                         installed.flatMap { (app, label) ->
                             val names = app.systemIds.mapNotNull { systemNames[it] }.sorted()
                             val shown = names.take(4).joinToString(", ") + if (names.size > 4) " and more" else ""
-                            val row = ActionItem(
+                            val row = openEmulatorRow(
                                 id = "emulator_app_${app.packageName}",
                                 title = label,
                                 subtitle = "Can run ${names.size} " + (if (names.size == 1) "system" else "systems") +
-                                    (if (names.isEmpty()) "" else ": $shown"),
-                                value = "Installed",
-                                run = {},
+                                    (if (names.isEmpty()) "" else ": $shown") + ". Press A to open it for its own settings",
+                                name = label,
+                                packageName = app.packageName,
                             )
                             val needsAccess = app.packageName in pathPackages &&
                                 !emulatorReadsStoragePaths(context, app.packageName)
@@ -268,6 +272,18 @@ object EmulatorsCatalog {
                                     coreRow("emulator_core_${system.id}", need)
                                 },
                             ).toTypedArray(),
+                            *listOfNotNull(
+                                resolved?.player?.let { player ->
+                                    openEmulatorRow(
+                                        id = "emulator_open_${system.id}",
+                                        title = "${player.name} settings",
+                                        subtitle = "Opens ${player.name} for its own settings: graphics, controls, where it keeps BIOS files. " +
+                                            "droidtop does not change them",
+                                        name = player.name,
+                                        packageName = player.packageName,
+                                    )
+                                },
+                            ).toTypedArray(),
                             NestedScreenItem(
                                 id = "emulator_test_open_${system.id}",
                                 title = "Launch test",
@@ -277,6 +293,7 @@ object EmulatorsCatalog {
                         ),
                     ),
                     knownEmulatorsGroup(context, system),
+                    customPlayersGroup(context, system),
                 )
             }
         },
@@ -375,7 +392,7 @@ object EmulatorsCatalog {
                         id = "emulator_known_none_${system.id}",
                         title = "No known emulators",
                         subtitle = "droidtop's platform database has none for ${system.displayName}. " +
-                            "Add a custom player from the system's folder under Console systems.",
+                            "Add a custom player below.",
                         run = {},
                     ),
                 )
@@ -384,16 +401,263 @@ object EmulatorsCatalog {
     }
 
     /**
+     * Opens an installed emulator itself, for the settings only it can change (Droidtop/tracker#248
+     * item 4: droidtop shows an emulator's own options only where it can set them from outside, and
+     * otherwise opens the emulator). Through [LaunchDisplay.start], the one way droidtop starts an app.
+     */
+    private fun openEmulatorRow(id: String, title: String, subtitle: String, name: String, packageName: String) = AsyncActionItem(
+        id = id,
+        title = title,
+        subtitle = subtitle,
+        value = "Open",
+        run = { ctx, _ ->
+            val intent = withContext(Dispatchers.IO) {
+                ctx.packageManager.getLaunchIntentForPackage(packageName)
+                    ?: ctx.packageManager.getLeanbackLaunchIntentForPackage(packageName)
+            }
+            if (intent == null) {
+                "$name has no screen of its own to open"
+            } else {
+                withContext(Dispatchers.Main) { LaunchDisplay.start(ctx, intent) }
+                "Opened $name"
+            }
+        },
+    )
+
+    /**
+     * The system's custom players (Droidtop/tracker#248 item 3): any installed app wired to the
+     * system by its launch command, for an emulator droidtop's database does not know or a launch it
+     * gets wrong. Each opens its own screen to edit, check, test, share or remove it; new ones are
+     * typed in or loaded from a shared file. They are offered in the Emulator choice above like any
+     * other installed emulator ([availablePlayers] lists them first).
+     */
+    private fun customPlayersGroup(context: Context, system: ConsoleSystemDef): CatalogGroup {
+        val players = CustomPlayerPrefs.getForSystem(context, system.id)
+        return CatalogGroup(
+            id = "emulator_custom_players",
+            title = "Custom players",
+            items = players.map { player ->
+                NestedScreenItem(
+                    id = "emulator_custom_${player.id}",
+                    title = player.name,
+                    subtitle = player.packageName,
+                    inline = customPlayerScreen(system, player.id),
+                )
+            } + listOf(
+                NestedScreenItem(
+                    id = "emulator_custom_add_${system.id}",
+                    title = "Add a custom player",
+                    subtitle = "Point ${system.displayName} at any installed app by its launch command",
+                    inline = addCustomPlayerScreen(system),
+                ),
+                DocumentPickItem(
+                    id = "emulator_custom_import_${system.id}",
+                    title = "Add from a file",
+                    subtitle = "A custom player someone shared, or a players database file",
+                    mimeType = "*/*",
+                    onPicked = { ctx, uri ->
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                val text = ctx.contentResolver.openInputStream(uri)?.use { input ->
+                                    input.bufferedReader().readText()
+                                } ?: error("the file could not be opened")
+                                CustomPlayerPrefs.importJson(ctx, text).message
+                            }.getOrElse { "Not added: this is not a players file (${it.message ?: it.javaClass.simpleName})" }
+                        }
+                    },
+                ),
+            ),
+        )
+    }
+
+    // Pending-buffer form: fields buffer here, Save commits atomically, after the same check the
+    // edit screen shows, so a command that cannot launch is never saved silently.
+    private fun addCustomPlayerScreen(system: ConsoleSystemDef): CatalogScreen {
+        var name = ""
+        var pkg = ""
+        var args = "-a android.intent.action.VIEW\n-n org.example.app/.MainActivity\n-d {file.uri}"
+        var kill = false
+        return CatalogScreen(
+            id = "add_player_${system.id}",
+            title = "Add a player for ${system.displayName}",
+            subtitle = "Use {file.path} and {file.uri} in the arguments for the file being played",
+            groups = { _ ->
+                listOf(
+                    CatalogGroup(
+                        id = "add_player_form",
+                        title = null,
+                        items = listOf(
+                            TextInputItem(id = "add_player_name", title = "Player name", value = name, onChange = { _, v -> name = v }),
+                            TextInputItem(
+                                id = "add_player_pkg",
+                                title = "Package name",
+                                subtitle = "e.g. org.example.app",
+                                value = pkg,
+                                onChange = { _, v -> pkg = v.trim() },
+                            ),
+                            TextInputItem(
+                                id = "add_player_args",
+                                title = "am start arguments",
+                                value = args,
+                                multiline = true,
+                                onChange = { _, v -> args = v },
+                            ),
+                            ToggleItem(
+                                id = "add_player_kill",
+                                title = "Kill package processes before launch",
+                                current = kill,
+                                onToggle = { _, v -> kill = v },
+                            ),
+                            AsyncActionItem(
+                                id = "add_player_save",
+                                title = "Save player",
+                                subtitle = "Checks the command first; without a name it uses the package name",
+                                run = { ctx, _ ->
+                                    val faults = CustomPlayerPrefs.problems(pkg, args)
+                                    if (faults.isNotEmpty()) {
+                                        "Not saved: " + faults.joinToString(" ")
+                                    } else {
+                                        val saved = withContext(Dispatchers.IO) {
+                                            CustomPlayerPrefs.add(ctx, system.id, name.ifBlank { pkg }, args, pkg, kill)
+                                        }
+                                        name = ""
+                                        pkg = ""
+                                        kill = false
+                                        "Saved ${saved.name}. It is under Custom players, and in the Emulator choice once its app is installed"
+                                    }
+                                },
+                            ),
+                        ),
+                    ),
+                )
+            },
+        )
+    }
+
+    // One custom player: its fields write through (re-read on every entry, so the screen always
+    // shows what is stored), then the check, a launch test with just this player, sharing and removal.
+    private fun customPlayerScreen(system: ConsoleSystemDef, playerId: String): CatalogScreen = CatalogScreen(
+        id = "emulator_custom_screen_$playerId",
+        title = "Custom player",
+        subtitle = "Use {file.path} and {file.uri} in the arguments for the file being played",
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                val player = CustomPlayerPrefs.getForSystem(context, system.id).firstOrNull { it.id == playerId }
+                if (player == null) {
+                    return@withContext listOf(
+                        CatalogGroup(
+                            id = "emulator_custom_gone",
+                            title = null,
+                            items = listOf(ActionItem(id = "emulator_custom_gone_row", title = "This custom player was removed", run = {})),
+                        ),
+                    )
+                }
+                val edit: suspend (Context, (Player.AmStart) -> Player.AmStart) -> Unit = { ctx, change ->
+                    withContext(Dispatchers.IO) {
+                        CustomPlayerPrefs.getForSystem(ctx, system.id).firstOrNull { it.id == playerId }
+                            ?.let { CustomPlayerPrefs.update(ctx, system.id, change(it)) }
+                    }
+                }
+                val faults = CustomPlayerPrefs.problems(player.packageName, player.argumentsTemplate)
+                val installed = runCatching { context.packageManager.getApplicationInfo(player.packageName, 0) }.isSuccess
+                listOf(
+                    CatalogGroup(
+                        id = "emulator_custom_fields",
+                        title = null,
+                        items = listOf(
+                            TextInputItem(
+                                id = "emulator_custom_name",
+                                title = "Player name",
+                                value = player.name,
+                                onChange = { ctx, v -> edit(ctx) { it.copy(name = v.ifBlank { it.packageName }) } },
+                            ),
+                            TextInputItem(
+                                id = "emulator_custom_pkg",
+                                title = "Package name",
+                                value = player.packageName,
+                                onChange = { ctx, v -> edit(ctx) { it.copy(packageName = v.trim()) } },
+                            ),
+                            TextInputItem(
+                                id = "emulator_custom_args",
+                                title = "am start arguments",
+                                value = player.argumentsTemplate,
+                                multiline = true,
+                                onChange = { ctx, v -> edit(ctx) { it.copy(argumentsTemplate = v) } },
+                            ),
+                            ToggleItem(
+                                id = "emulator_custom_kill",
+                                title = "Kill package processes before launch",
+                                current = player.killPackageProcesses,
+                                onToggle = { ctx, v -> edit(ctx) { it.copy(killPackageProcesses = v) } },
+                            ),
+                        ),
+                    ),
+                    CatalogGroup(
+                        id = "emulator_custom_actions",
+                        title = null,
+                        items = listOf(
+                            ActionItem(
+                                id = "emulator_custom_check",
+                                title = "Check",
+                                subtitle = when {
+                                    faults.isNotEmpty() -> faults.joinToString(" ")
+                                    !installed -> "The command reads right, but ${player.packageName} is not installed"
+                                    else -> "The command reads right. The launch test shows whether the app takes it"
+                                },
+                                value = if (faults.isEmpty()) "OK" else "Fix it",
+                                run = {},
+                            ),
+                            NestedScreenItem(
+                                id = "emulator_custom_test",
+                                title = "Launch test",
+                                subtitle = "Start one of your games with this player",
+                                inline = launchTestScreen(system, player),
+                            ),
+                            DocumentPickItem(
+                                id = "emulator_custom_share",
+                                title = "Save as a file",
+                                subtitle = "A players database file to share, or to load on another device with Add from a file",
+                                mimeType = "application/json",
+                                createName = player.name.replace(Regex("[^A-Za-z0-9._-]+"), "-") + ".json",
+                                onPicked = { ctx, uri ->
+                                    withContext(Dispatchers.IO) {
+                                        runCatching {
+                                            val text = CustomPlayerPrefs.shareJson(system.id, listOf(player))
+                                            ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(text.toByteArray()) }
+                                                ?: error("the file could not be opened")
+                                            "Saved ${player.name}"
+                                        }.getOrElse { "Not saved: ${it.message ?: it.javaClass.simpleName}" }
+                                    }
+                                },
+                            ),
+                            AsyncActionItem(
+                                id = "emulator_custom_remove",
+                                title = "Remove",
+                                subtitle = "A system or game set to this player falls back to the next choice: your default emulator, then the first installed one",
+                                confirmTitle = "Remove ${player.name}?",
+                                run = { ctx, _ ->
+                                    withContext(Dispatchers.IO) { CustomPlayerPrefs.remove(ctx, system.id, playerId) }
+                                    "Removed ${player.name}"
+                                },
+                            ),
+                        ),
+                    ),
+                )
+            }
+        },
+    )
+
+    /**
      * The launch test: pick one of this system's games and start it with
      * the emulator that would run it, getting a plain-words reason back if
      * it cannot start. It goes through [prepareLaunch], the launcher's own
      * preparation, so a test that passes is the launch that will run. It
      * reads the game file's name only and never copies or moves anything.
      */
-    private fun launchTestScreen(system: ConsoleSystemDef): CatalogScreen = CatalogScreen(
-        id = "emulator_test_${system.id}",
-        title = "Launch test: ${system.displayName}",
-        subtitle = "Pick a game to start with the emulator set for it",
+    private fun launchTestScreen(system: ConsoleSystemDef, player: Player.AmStart? = null): CatalogScreen = CatalogScreen(
+        id = "emulator_test_${system.id}" + (player?.let { "_${it.id}" } ?: ""),
+        title = "Launch test: ${player?.name ?: system.displayName}",
+        subtitle = if (player == null) "Pick a game to start with the emulator set for it" else "Pick a game to start with ${player.name}",
         groups = { context ->
             withContext(Dispatchers.IO) {
                 val games = testGames(context, system)
@@ -416,7 +680,7 @@ object EmulatorsCatalog {
                                     id = "emulator_test_game_${system.id}_$index",
                                     title = file.nameWithoutExtension,
                                     subtitle = "Start it now and report whether it worked",
-                                    run = { ctx, onStatus -> runLaunchTest(ctx, system, file, onStatus) },
+                                    run = { ctx, onStatus -> runLaunchTest(ctx, system, file, onStatus, player) },
                                 )
                             }
                         },
@@ -453,21 +717,28 @@ object EmulatorsCatalog {
         system: ConsoleSystemDef,
         file: File,
         onStatus: (String) -> Unit,
+        only: Player.AmStart? = null,
     ): String {
         onStatus("Checking the emulator...")
         val (resolved, prepared, needsAccess) = withContext(Dispatchers.IO) {
-            val alt = runCatching { RomDatabase.get(context).romDao().getGameMetadataSingle(file.absolutePath)?.altEmulator }.getOrNull()
-            val resolved = resolveEmulator(context, system, alt)
+            // A custom player's own test runs that player; otherwise the game's emulator as a launch picks it.
+            val resolved = if (only != null) {
+                only to "custom player"
+            } else {
+                val alt = runCatching { RomDatabase.get(context).romDao().getGameMetadataSingle(file.absolutePath)?.altEmulator }.getOrNull()
+                resolveEmulator(context, system, alt)?.let { it.player to it.source.label }
+            }
             Triple(
                 resolved,
-                resolved?.let { prepareLaunch(context, system, it.player, file, checkGameFile = true) },
-                resolved?.let { playerNeedsAllFilesAccess(context, it.player) } == true,
+                resolved?.let { prepareLaunch(context, system, it.first, file, checkGameFile = true) },
+                resolved?.let { playerNeedsAllFilesAccess(context, it.first) } == true,
             )
         }
         if (resolved == null || prepared == null) {
             return "Test failed: no emulator for ${system.displayName} is installed. Install one from this screen's list."
         }
-        val name = resolved.player.name
+        val (player, source) = resolved
+        val name = player.name
         // A hint, never a blocker: the launch was or was not sent exactly as it would be from the shell.
         val accessHint = if (needsAccess) {
             " $name needs All files access: the row on this system's emulator screen opens Android's settings for it."
@@ -478,7 +749,7 @@ object EmulatorsCatalog {
             is PreparedLaunch.Blocked -> "Test failed: ${prepared.reason}$accessHint"
             is PreparedLaunch.Ready -> try {
                 withContext(Dispatchers.Main) { LaunchDisplay.start(context, prepared.intent) }
-                "Sent to $name (${resolved.source.label}). If it opened and showed the game, this system is set up. " +
+                "Sent to $name ($source). If it opened and showed the game, this system is set up. " +
                     "If $name opened without the game, its own settings need a look.$accessHint"
             } catch (e: Exception) {
                 "Test failed: ${explainLaunchFailure(e, name)}$accessHint"

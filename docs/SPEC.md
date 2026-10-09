@@ -9647,6 +9647,25 @@ each choice is made:
   - Launch data stays JSON: an emulator droidtop cannot launch correctly is
     fixed by a row in the players database (droidtop-platforms), not by
     Kotlin.
+  - **Custom players live on the system's emulator screen** (Droidtop/tracker#248),
+    in one group: each one opens a screen to edit its name, package, `am start`
+    arguments and kill toggle (written through), a Check line, a launch test
+    with just that player, Save as a file, and Remove; Add a custom player and
+    Add from a file sit below them. The Console systems folder screen no longer
+    has its own form; it links to this screen. The check
+    (`CustomPlayerPrefs.problems`, pure) reads the text only: it names the app it
+    is saved for (`-n <package>/<activity>` or `-p <package>`), and passes the
+    game (`{file.path}` or `{file.uri}`); whether the app takes it is the launch
+    test's job. Save refuses a command the check faults. A shared file is a
+    players-database document (`{"players":[...]}`, the same rows droidtop-platforms
+    publishes), read back by `KnownPlayers.parse`, the database's own parser, so a
+    preset someone made can be loaded on another device or proposed for the
+    database unchanged; imported rows get new ids and land in their own system.
+  - **An emulator's own settings stay its own.** Where droidtop cannot set an
+    emulator's options from outside, it opens the emulator: each emulator under
+    Found on this device, and "<Emulator> settings" on a system's screen for the
+    one in use, start the app through `LaunchDisplay.start`. droidtop writes no
+    emulator's private configuration (RetroArch's own surfaces are §7e2c).
 
 Wine is the declared fallback for Windows titles nothing else backs; a
 native Linux depot still wins where one exists (§5a).

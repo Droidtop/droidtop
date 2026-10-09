@@ -14,7 +14,6 @@ import dev.droidtop.library.consoles.canResolveFromFolder
 import dev.droidtop.library.consoles.ConsoleSystemEntity
 import dev.droidtop.library.consoles.ConsoleSystemsDatabase
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
-import dev.droidtop.library.consoles.CustomPlayerPrefs
 import dev.droidtop.library.consoles.PlatformDatabaseSnapshot
 import dev.droidtop.library.consoles.PlatformDatabaseSource
 import dev.droidtop.library.consoles.PlatformDatabases
@@ -530,14 +529,6 @@ object AppSettingsCatalogs {
                                                 ),
                                             )
                                             add(
-                                                NestedScreenItem(
-                                                    id = "folder_add_player_${resolved.id}",
-                                                    title = "Add a custom player",
-                                                    subtitle = "Point ${resolved.displayName} at any installed app by its launch command",
-                                                    inline = addCustomPlayerScreen(resolved),
-                                                ),
-                                            )
-                                            add(
                                                 ActionItem(
                                                     id = "folder_scrape_${folder.absolutePath}",
                                                     title = "Scrape missing artwork & metadata",
@@ -701,68 +692,6 @@ object AppSettingsCatalogs {
             SystemOverridePrefs.set(ctx, folder.absolutePath, value.ifEmpty { null })
         },
     )
-
-    // Pending-buffer form: fields buffer here, Save commits atomically.
-    private fun addCustomPlayerScreen(system: ConsoleSystemDef): CatalogScreen {
-        var name = ""
-        var pkg = ""
-        var args = "-a android.intent.action.VIEW\n-n org.example.app/.MainActivity\n-d {file.uri}"
-        var kill = false
-        return CatalogScreen(
-            id = "add_player_${system.id}",
-            title = "Add a player for ${system.displayName}",
-            subtitle = "Use {file.path} and {file.uri} in the arguments for the file being played",
-            groups = { _ ->
-                listOf(
-                    CatalogGroup(
-                        id = "add_player_form",
-                        title = null,
-                        items = listOf(
-                            TextInputItem(
-                                id = "add_player_name",
-                                title = "Player name",
-                                value = name,
-                                onChange = { _, v -> name = v },
-                            ),
-                            TextInputItem(
-                                id = "add_player_pkg",
-                                title = "Package name",
-                                subtitle = "e.g. org.example.app",
-                                value = pkg,
-                                onChange = { _, v -> pkg = v },
-                            ),
-                            TextInputItem(
-                                id = "add_player_args",
-                                title = "am start arguments",
-                                value = args,
-                                multiline = true,
-                                onChange = { _, v -> args = v },
-                            ),
-                            ToggleItem(
-                                id = "add_player_kill",
-                                title = "Kill package processes before launch",
-                                current = kill,
-                                onToggle = { _, v -> kill = v },
-                            ),
-                            ActionItem(
-                                id = "add_player_save",
-                                title = "Save player",
-                                subtitle = "Needs a package and arguments; without a name it uses the package name",
-                                run = { ctx ->
-                                    if (pkg.isNotBlank() && args.isNotBlank()) {
-                                        CustomPlayerPrefs.add(ctx, system.id, name.ifBlank { pkg }, args, pkg, kill)
-                                        name = ""
-                                        pkg = ""
-                                        kill = false
-                                    }
-                                },
-                            ),
-                        ),
-                    ),
-                )
-            },
-        )
-    }
 
     // ------------------------------------------------------------------
     // App integrations (docs/SPEC.md section 12).
