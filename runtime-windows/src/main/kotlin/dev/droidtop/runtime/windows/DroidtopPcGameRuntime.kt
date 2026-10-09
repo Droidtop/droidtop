@@ -296,10 +296,10 @@ class DroidtopPcGameRuntime(
                 // target is inside the ImageFs before deleting and its
                 // walk cannot follow a symlink at all -- containment is
                 // verified, not delegated to a helper that refuses.
-                if (!SafeDelete.deleteWithin(imageFs.rootDir, halfMade)) {
+                SafeDelete.clearWithin(imageFs.rootDir, halfMade)?.let { why ->
                     return@withContext PcProvisionResult(
                         false,
-                        "couldn't clear the unfinished setup at ${halfMade.absolutePath} -- nothing was deleted",
+                        "couldn't clear the unfinished setup at ${halfMade.absolutePath}: $why",
                     )
                 }
             }

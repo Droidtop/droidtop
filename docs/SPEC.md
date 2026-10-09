@@ -5097,6 +5097,13 @@ class -- a delete that can leave the tree it was pointed at:
   without `FOLLOW_LINKS`, which cannot enter a symlink. A refusal
   aborts provisioning, deleting nothing. Regression-tested against the
   incident's exact shape (`SafeDeleteTest`).
+  Refinement (Droidtop/tracker#249): the walk no longer stops at the first
+  entry that will not unlink. Each directory's owner bits are restored
+  before it is entered (a prefix unpacked read-only could not be emptied,
+  which made every retry fail within milliseconds), every other entry is
+  still removed, links stay plain entries that are unlinked and never
+  entered, and `SafeDelete.clearWithin` returns the first reason so setup
+  says why instead of "nothing was deleted".
 - **`DroidSpacesRuntime.destroy` / `CraneRootfsPuller` stale-rootfs
   wipe**: both previously hazardous. `destroy` used Kotlin's
   `deleteRecursively` on a Linux rootfs -- a tree full of symlinks,
