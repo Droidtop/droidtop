@@ -9003,6 +9003,12 @@ sleeps on idle, by the system's own timer; the screensaver keeps its own timer a
   handheld keeps the lock while the shell shows on the first. A game that ended unseen is found by
   Android's force-stopped flag, checked every 30 seconds while the lock is held. Droidtop's own Windows
   game screen no longer sets `FLAG_KEEP_SCREEN_ON`: it ignored the setting, and this is the one mechanism.
+- **Return to the game.** With a game running, a HOME press (the warm HOME Launcher forwards with the
+  reinit extra) and a wake with the shell in front (`MainActivity` sees `ACTION_SCREEN_OFF`, and its next
+  resume while a game runs is a wake) open the Quick Menu on its Game section, Resume first and focused:
+  one A resumes. This is the path Back in a Windows game already uses (`openQuickMenu`, the Resume
+  action); there is no second mechanism. A wake with the game in front never reaches the shell, because
+  Android wakes into the top window.
 - **Setting.** Settings > Shell > "While a game runs": Never sleep (default) or Use the system timer
   (`GameAwakePrefs`, observed, so a change applies to the game already running).
 

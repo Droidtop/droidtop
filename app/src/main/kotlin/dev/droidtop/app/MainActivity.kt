@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -192,11 +193,25 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         displayOrchestrator.reinitialize()
     }
 
+    /** The screen went off since the shell last lost the front: its next resume is a wake (see [onResume]). */
+    private var screenWentOff = false
+
+    private val screenOffReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            screenWentOff = true
+        }
+    }
+
     private fun applyGamingDeepLink(intent: Intent) {
         gamingStartSection = intent.getStringExtra(BackButtonMenu.EXTRA_GAMING_START_SECTION)
         gamingTriggerRescan = intent.getBooleanExtra(BackButtonMenu.EXTRA_GAMING_RESCAN, false)
         gamingTriggerBrowseThemes = intent.getBooleanExtra(BackButtonMenu.EXTRA_GAMING_BROWSE_THEMES, false)
-        gamingQuickMenu = intent.getBooleanExtra(dev.droidtop.library.OwnGameScreens.EXTRA_QUICK_MENU, false)
+        // Back from a game screen of droidtop's own asks for the menu; so does a HOME press while a game runs
+        // (the warm HOME forwarded by Launcher carries the reinit extra): the person is coming back from the
+        // game, and the menu's Game section has Resume first (docs/SPEC.md 7f, "Sleep and return to game").
+        gamingQuickMenu = intent.getBooleanExtra(dev.droidtop.library.OwnGameScreens.EXTRA_QUICK_MENU, false) ||
+            (intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, false) &&
+                dev.droidtop.library.LaunchDisplay.runningGame != null)
         gamingDeepLinkToken++
     }
 
@@ -258,6 +273,10 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // off, and this Activity does not run then (LibraryCore).
         library = LibraryCore.library(applicationContext)
         dev.droidtop.library.GameWakeLock.install(applicationContext)
+        androidx.core.content.ContextCompat.registerReceiver(
+            this, screenOffReceiver, android.content.IntentFilter(Intent.ACTION_SCREEN_OFF),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
 
         refreshModeIfUndecided()
 
@@ -534,6 +553,14 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun onResume() {
         super.onResume()
         refreshModeIfUndecided()
+        // Waking with the shell in front while a game runs: the game is what the person is waking to, so the
+        // Quick Menu opens on its Game section with Resume first (docs/SPEC.md 7f, "Sleep and return to
+        // game"). When the game itself was in front, Android wakes straight into it and this never resumes.
+        if (screenWentOff && mode == Mode.GAMING && dev.droidtop.library.LaunchDisplay.runningGame != null) {
+            gamingQuickMenu = true
+            gamingDeepLinkToken++
+        }
+        screenWentOff = false
         // Back from Desktop setup with an image chosen: the session the setup page stood in for starts now.
         if (mode == Mode.DESKTOP && !desktopSetUp) startDesktopSessionIfDesktop()
         // Where the second screen's trackpad sends navigation keys in
@@ -560,6 +587,10 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
         topResumed = isTopResumedActivity
+        // The shell left the front with the screen still on (a game took over): that is not a sleep.
+        if (!isTopResumedActivity && (getSystemService(Context.POWER_SERVICE) as android.os.PowerManager).isInteractive) {
+            screenWentOff = false
+        }
         // The wake lock a running game holds is released while the shell covers it (GameWakeLock).
         dev.droidtop.library.GameWakeLock.shellInFront(if (isTopResumedActivity) currentDisplayId() else null)
         if (!isTopResumedActivity) {
@@ -845,6 +876,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         }
         clipboardBridge?.stop()
         clipboardBridge = null
+        runCatching { unregisterReceiver(screenOffReceiver) }
         // A shell moved to the other screen has already reported from its new instance.
         if (live?.get().let { it === this || it == null }) dev.droidtop.library.GameWakeLock.shellInFront(null)
         super.onDestroy()
