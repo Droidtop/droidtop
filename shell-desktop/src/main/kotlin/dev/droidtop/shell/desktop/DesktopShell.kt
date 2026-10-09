@@ -892,9 +892,7 @@ private fun BoxScope.StartMenu(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                library.launchInBackground(entry.id) { result ->
-                                    if (result is LaunchResult.Refused) onLaunchFailure(result.reason)
-                                }
+                                onPlay(entry)
                                 onDismiss()
                             }
                             .padding(vertical = 4.dp, horizontal = 8.dp),
