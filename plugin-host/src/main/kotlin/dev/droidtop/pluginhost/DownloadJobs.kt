@@ -120,13 +120,14 @@ object DownloadJobs {
             "Added ${target.name}"
         }
         multiPosts[POST_PLACE_IN_FOLDER] = DownloadMultiPost { jobContext, files, parts ->
-            val placed = withContext(Dispatchers.IO) {
-                placeAllInFolder(files, parts).also { list ->
-                    runCatching { list.forEach { onPlaced(jobContext, it, parts.first()) } }
-                    LibraryPaths.report(jobContext, PathChange(added = list.map { it.absolutePath }))
-                }
+            val (placed, summary) = withContext(Dispatchers.IO) {
+                (if (parts.first()[ARG_UNPACK] == UNPACK_ARCHIVE) placeSplitSet(files, parts) else placeAllInFolder(files, parts).let { it to "Added ${it.size} files" })
+                    .also { (list, _) ->
+                        runCatching { list.forEach { onPlaced(jobContext, it, parts.first()) } }
+                        LibraryPaths.report(jobContext, PathChange(added = list.map { it.absolutePath }))
+                    }
             }
-            "Added ${placed.size} files"
+            summary
         }
         FlutterRuntimeManager.registerDownloadPost()
         PythonRuntimeManager.registerDownloadPost()
@@ -169,6 +170,34 @@ object DownloadJobs {
             throw e
         }
         return targets
+    }
+
+    /**
+     * Finishes a download whose files were asked to be unpacked and are the parts of one split archive
+     * ([SplitArchives]). Byte-split parts (`.7z.001`, `.zip.001`, `.rar.001`) are joined in order into one file, the parts
+     * deleted, and the joined archive unpacked like any single one ([unpackIntoFolder]); a failed unpack keeps the joined
+     * file. RAR volumes (`.part1.rar`) cannot be read by the extractor's libarchive binding, which opens one file, so
+     * unpacking only the first would silently drop the rest: they are placed together as they are and the summary says so.
+     * Returns what the library should look at, and the line the job shows.
+     */
+    internal suspend fun placeSplitSet(files: List<File>, parts: List<Map<String, String>>): Pair<List<File>, String> {
+        val set = requireNotNull(SplitArchives.detect(parts.map { it[ARG_TARGET].orEmpty() })) {
+            "unpacking takes one archive, or every part of one split archive"
+        }
+        if (set.volumes) {
+            val placed = placeAllInFolder(files, parts)
+            return placed to "Added ${placed.size} parts. droidtop cannot unpack split RAR files yet, so they are in the game folder as they are"
+        }
+        val joined = File(files.first().parentFile, "joined_${System.nanoTime()}.${set.extension}")
+        try {
+            joined.outputStream().buffered().use { out -> set.order.forEach { index -> files[index].inputStream().use { it.copyTo(out) } } }
+        } catch (e: java.io.IOException) {
+            joined.delete()
+            throw IllegalStateException("could not join the parts: ${e.message}", e)
+        }
+        files.forEach { it.delete() }
+        val folder = unpackIntoFolder(joined, mapOf("destinationPath" to requireNotNull(parts.first()["destinationPath"]), ARG_TARGET to set.baseName))
+        return listOf(folder) to "Added ${folder.name}"
     }
 
     /**
@@ -531,6 +560,43 @@ object DownloadJobs {
             }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+}
+
+/**
+ * Recognises the files of one split archive by name (Droidtop/tracker#419): byte-split parts `X.7z.001`, `X.zip.001`
+ * or `X.rar.001` with `.002`, ... (joined by concatenation), and RAR volumes `X.part1.rar`, `X.part2.rar`, ... All
+ * names must belong to one set and be numbered 1 to N without a gap or a repeat, in any order.
+ */
+object SplitArchives {
+    /** [order] lists the indexes of the names in part order; [baseName] is the archive's name (joined: `X.7z`; volumes: `X`). */
+    class SplitSet(val baseName: String, val extension: String?, val order: List<Int>, val volumes: Boolean)
+
+    private val NUMBERED = Regex("(?i)^(.+\\.(zip|7z|rar))\\.(\\d{3,})$")
+    private val VOLUME = Regex("(?i)^(.+)\\.part(\\d+)\\.rar$")
+
+    fun detect(names: List<String>): SplitSet? {
+        if (names.size < 2) return null
+        return numbered(names) ?: volumes(names)
+    }
+
+    private fun numbered(names: List<String>): SplitSet? {
+        val matches = names.map { NUMBERED.matchEntire(it) ?: return null }
+        if (matches.map { it.groupValues[1].lowercase() }.distinct().size != 1) return null
+        val order = order(matches.map { it.groupValues[3].toIntOrNull() ?: return null }) ?: return null
+        return SplitSet(matches.first().groupValues[1], matches.first().groupValues[2].lowercase(), order, volumes = false)
+    }
+
+    private fun volumes(names: List<String>): SplitSet? {
+        val matches = names.map { VOLUME.matchEntire(it) ?: return null }
+        if (matches.map { it.groupValues[1].lowercase() }.distinct().size != 1) return null
+        val order = order(matches.map { it.groupValues[2].toIntOrNull() ?: return null }) ?: return null
+        return SplitSet(matches.first().groupValues[1], "rar", order, volumes = true)
+    }
+
+    private fun order(numbers: List<Int>): List<Int>? {
+        val order = numbers.indices.sortedBy { numbers[it] }
+        return order.takeIf { list -> list.indices.all { numbers[list[it]] == it + 1 } }
     }
 }
 

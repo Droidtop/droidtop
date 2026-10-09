@@ -297,6 +297,57 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun theNamesOfASplitArchiveAreRecognisedInAnyOrderAndOnlyWhenComplete() {
+        val numbered = SplitArchives.detect(listOf("Game.7z.002", "Game.7z.001", "Game.7z.003"))!!
+        assertFalse(numbered.volumes)
+        assertEquals("Game.7z", numbered.baseName)
+        assertEquals("7z", numbered.extension)
+        assertEquals(listOf(1, 0, 2), numbered.order)
+        val volumes = SplitArchives.detect(listOf("Big Game.part2.rar", "Big Game.part1.rar"))!!
+        assertTrue(volumes.volumes)
+        assertEquals("Big Game", volumes.baseName)
+        assertEquals(listOf(1, 0), volumes.order)
+        assertNull("a gap", SplitArchives.detect(listOf("G.7z.001", "G.7z.003")))
+        assertNull("not from 1", SplitArchives.detect(listOf("G.7z.002", "G.7z.003")))
+        assertNull("a repeat", SplitArchives.detect(listOf("G.7z.001", "G.7z.001")))
+        assertNull("two sets", SplitArchives.detect(listOf("A.7z.001", "B.7z.002")))
+        assertNull("mixed", SplitArchives.detect(listOf("A.7z.001", "A.part2.rar")))
+        assertNull("one file is not a set", SplitArchives.detect(listOf("A.7z.001")))
+        assertNull("plain files", SplitArchives.detect(listOf("a.bin", "b.bin")))
+    }
+
+    @Test
+    fun theBytePartsOfASplitZipAreJoinedInOrderAndUnpackedOnce() = runBlocking {
+        val whole = zipOf(File(dir, "whole.zip"), "run.exe" to "exe", "data/level 1.txt" to "one")
+        val bytes = whole.readBytes()
+        val third = bytes.size / 3
+        val chunks = listOf(bytes.copyOfRange(0, third), bytes.copyOfRange(third, 2 * third), bytes.copyOfRange(2 * third, bytes.size))
+        val games = File(dir, "games/dos")
+        val files = chunks.mapIndexed { i, chunk -> File(dir, "downloads/acquire_${i + 1}.001").also { it.parentFile.mkdirs(); it.writeBytes(chunk) } }
+        // Handed over out of order: part 3, part 1, part 2.
+        val order = listOf(2, 0, 1)
+        val names = listOf("Split Game.zip.003", "Split Game.zip.001", "Split Game.zip.002")
+        val parts = names.map { mapOf("destinationPath" to games.path, "targetName" to it, "unpack" to "archive") }
+        val (placed, summary) = DownloadJobs.placeSplitSet(order.map { files[it] }, parts)
+        assertEquals(listOf(File(games, "Split Game")), placed)
+        assertEquals("Added Split Game", summary)
+        assertEquals("one", File(games, "Split Game/data/level 1.txt").readText())
+        assertTrue(files.none { it.exists() })
+        assertEquals(listOf("Split Game"), games.list()!!.toList())
+    }
+
+    @Test
+    fun rarVolumesArePlacedTogetherAndNotHalfUnpacked() = runBlocking {
+        val games = File(dir, "games/pc")
+        val files = (1..2).map { File(dir, "downloads/v$it.rar").also { f -> f.parentFile.mkdirs(); f.writeText("v$it") } }
+        val parts = listOf("Big.part1.rar", "Big.part2.rar").map { mapOf("destinationPath" to games.path, "targetName" to it, "unpack" to "archive") }
+        val (placed, summary) = DownloadJobs.placeSplitSet(files, parts)
+        assertEquals(2, placed.size)
+        assertTrue(summary.contains("cannot unpack split RAR"))
+        assertEquals("v2", File(games, "Big.part2.rar").readText())
+    }
+
+    @Test
     fun acquireDownloadDescriptorRejectsUnsafeOrInvalidFields() {
         assertNull(AcquireDownloadDescriptor.parse("""{"url":"file:///etc/passwd","fileName":"game.zip"}"""))
         assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"../game.zip"}"""))

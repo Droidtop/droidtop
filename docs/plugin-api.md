@@ -505,7 +505,20 @@ no destination, such as the PC library). Ops:
   with the file it was at), and places them together in the destination, all
   or nothing: if any name exists, or two share a name, nothing is placed. This
   is for a release that is several files (a cue sheet and its tracks). Parts
-  of one split archive are handled as in the paragraph on split sets below.
+  of one split archive are handled as in the next paragraph.
+  **Split releases** (Droidtop/tracker#419): with `downloads` and
+  `unpack: "archive"` on every descriptor, the files must be the parts of one
+  split archive, numbered 1 to N without a gap, in any order; otherwise the
+  job is refused before anything downloads. Byte-split parts (`X.7z.001`,
+  `X.zip.001`, `X.rar.001`, `.002`, ...) are joined in part order once the last
+  has arrived and been checked, the parts deleted, and the joined archive
+  unpacked into the folder `X` like a single archive. RAR volumes
+  (`X.part1.rar`, `X.part2.rar`, ...) cannot be unpacked by droidtop's
+  extractor (its libarchive binding opens one file, and the first volume alone
+  would silently drop the rest), so they are placed together as they are and
+  the job says so; the person unpacks them with an app that can. One
+  `open_in_session` still captures one download: a page that offers several
+  parts is one acquire per part, or the plugin returns the parts' direct links.
   **Headers across redirects:** `headers` (cookies, Referer, Origin and the
   credential headers) are sent on every hop that stays on the same host over
   the same or a stronger scheme, so a link that answers 302 to a signed address

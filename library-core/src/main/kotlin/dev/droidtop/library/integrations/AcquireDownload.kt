@@ -7,6 +7,7 @@ import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.DownloadPart
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginResult
+import dev.droidtop.pluginhost.SplitArchives
 import dev.droidtop.pluginhost.WebSessions
 import org.json.JSONObject
 
@@ -46,8 +47,10 @@ internal object AcquireDownload {
                 if (systemHint != null) "there is no games folder for $systemHint; add one under Settings > Game folders" else "the game folder is not available",
             )
         }
-        if (descriptors.size > 1 && descriptors.any { it.unpack }) {
-            return PluginResult.failure("${record.manifest.label} asked to unpack several files; unpacking takes one archive")
+        if (descriptors.size > 1 && descriptors.any { it.unpack } &&
+            (!descriptors.all { it.unpack } || SplitArchives.detect(descriptors.map { it.fileName }) == null)
+        ) {
+            return PluginResult.failure("${record.manifest.label} asked to unpack files that are not the parts of one split archive")
         }
         val parts = descriptors.mapIndexed { index, descriptor ->
             DownloadPart(
@@ -71,7 +74,7 @@ internal object AcquireDownload {
             sha256 = first.sha256,
             sha1 = first.sha1,
             md5 = first.md5,
-            unpack = if (descriptors.first().unpack) DownloadJobs.UNPACK_ARCHIVE else null,
+            unpack = if (descriptors.any { it.unpack }) DownloadJobs.UNPACK_ARCHIVE else null,
             maxBytes = first.maxBytes,
             headers = first.headers,
             more = parts.drop(1),
