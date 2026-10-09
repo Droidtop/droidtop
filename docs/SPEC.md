@@ -9009,6 +9009,12 @@ sleeps on idle, by the system's own timer; the screensaver keeps its own timer a
   one A resumes. This is the path Back in a Windows game already uses (`openQuickMenu`, the Resume
   action); there is no second mechanism. A wake with the game in front never reaches the shell, because
   Android wakes into the top window.
+- **Power rows.** The Quick Menu's System section carries Sleep, Power menu, Power off and Restart. With
+  a privilege provider (`priv.shell`: Shizuku or Sui) Sleep sends the screen-off key (`input keyevent
+  KEYCODE_SLEEP`, Android's own `goToSleep`; one command, so there is no second fallback path), Power off
+  and Restart are `svc power shutdown` and `svc power reboot` behind two presses (the first arms the tile),
+  and Power menu long-presses the power key. Without a provider Sleep is a plain row whose value reads
+  "Power button" (a label, not a sentence), and the other three are not drawn (`PowerAction`).
 - **Setting.** Settings > Shell > "While a game runs": Never sleep (default) or Use the system timer
   (`GameAwakePrefs`, observed, so a change applies to the game already running).
 

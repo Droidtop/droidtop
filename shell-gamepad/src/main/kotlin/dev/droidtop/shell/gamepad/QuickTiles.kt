@@ -229,7 +229,11 @@ object QuickTiles {
         GamingSettingsCatalog.ID_SYSTEM_VPN -> QuickGlyph.VPN
         GamingSettingsCatalog.ID_SYSTEM_BATTERY -> QuickGlyph.BATTERY
         GamingSettingsCatalog.ID_SYSTEM_AIRPLANE -> QuickGlyph.AIRPLANE
-        GamingSettingsCatalog.ID_SYSTEM_POWER_MENU -> QuickGlyph.POWER
+        GamingSettingsCatalog.ID_SYSTEM_SLEEP -> QuickGlyph.MOON
+        GamingSettingsCatalog.ID_SYSTEM_POWER_MENU,
+        GamingSettingsCatalog.ID_SYSTEM_POWER_OFF,
+        GamingSettingsCatalog.ID_SYSTEM_RESTART,
+        -> QuickGlyph.POWER
         GamingSettingsCatalog.ID_AUDIO_OUTPUT -> QuickGlyph.VOLUME
         GamingSettingsCatalog.ID_ORIENTATION -> QuickGlyph.ROTATE
         GamingSettingsCatalog.ID_SYSTEM_UPDATES -> QuickGlyph.UPDATE

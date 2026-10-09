@@ -11,6 +11,7 @@ import dev.droidtop.library.theme.ThemePrefs
 import dev.droidtop.runtime.LaunchSoundExperiment
 import dev.droidtop.runtime.LaunchSoundPlan
 import dev.droidtop.runtime.LaunchSoundVariant
+import dev.droidtop.runtime.systemstatus.PowerAction
 import dev.droidtop.runtime.tasks.text
 
 /**
@@ -90,6 +91,9 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_SOCIAL = "pref_gaming_system_social"
     const val ID_SYSTEM_AIRPLANE = "pref_gaming_system_airplane"
     const val ID_SYSTEM_POWER_MENU = "pref_gaming_system_power_menu"
+    const val ID_SYSTEM_SLEEP = "pref_gaming_system_sleep"
+    const val ID_SYSTEM_POWER_OFF = "pref_gaming_system_power_off"
+    const val ID_SYSTEM_RESTART = "pref_gaming_system_restart"
     const val ID_AUDIO_OUTPUT = "pref_gaming_audio_output"
     const val ID_ORIENTATION = "pref_screen_orientation_gaming"
 
@@ -693,11 +697,25 @@ object GamingSettingsCatalog {
                         run = { ctx -> SettingsLaunch.start(ctx, controls.airplaneModeSettingsIntent()) },
                     ),
                 )
+                // Sleep (docs/SPEC.md 7f, "Sleep and return to game"): with a privilege provider it puts the
+                // console to sleep, the game suspended in place; without one the row only says what to press.
+                val power = dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand
+                if (power) {
+                    add(
+                        AsyncActionItem(
+                            id = ID_SYSTEM_SLEEP,
+                            title = "Sleep",
+                            run = { _, _ -> PowerAction.SLEEP.run(dev.droidtop.runtime.tasks.TaskManager.shell) },
+                        ),
+                    )
+                } else {
+                    add(ActionItem(id = ID_SYSTEM_SLEEP, title = "Sleep", value = "Power button", run = {}))
+                }
                 // The power menu (shut down, restart) belongs to the system; a plain app has no call that
                 // opens it. With a privilege provider (Shizuku or Sui, the `priv.shell` capability) the
                 // shell's own long press of the power key does; without one the row is not drawn at all
                 // (docs/SPEC.md "Copy: labels and values", privileged controls).
-                if (dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand) {
+                if (power) {
                     add(
                         AsyncActionItem(
                             id = ID_SYSTEM_POWER_MENU,
@@ -707,6 +725,25 @@ object GamingSettingsCatalog {
                                     .exec(listOf("input", "keyevent", "--longpress", "KEYCODE_POWER"))
                                 if (out != null && out.exit == 0) "" else "Failed: the helper could not open it"
                             },
+                        ),
+                    )
+                }
+                // Power off and Restart: two presses, the first arms the tile (confirmTitle). Needs a provider.
+                if (power) {
+                    add(
+                        AsyncActionItem(
+                            id = ID_SYSTEM_POWER_OFF,
+                            title = "Power off",
+                            confirmTitle = "Power off?",
+                            run = { _, _ -> PowerAction.POWER_OFF.run(dev.droidtop.runtime.tasks.TaskManager.shell) },
+                        ),
+                    )
+                    add(
+                        AsyncActionItem(
+                            id = ID_SYSTEM_RESTART,
+                            title = "Restart",
+                            confirmTitle = "Restart?",
+                            run = { _, _ -> PowerAction.RESTART.run(dev.droidtop.runtime.tasks.TaskManager.shell) },
                         ),
                     )
                 }
