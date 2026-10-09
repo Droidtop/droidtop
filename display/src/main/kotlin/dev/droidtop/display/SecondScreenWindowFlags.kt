@@ -54,16 +54,14 @@ object TouchOnlySurfaceFocus {
 
     /**
      * A key that reached the surface while it was the top activity. The shell gets it when there is
-     * one. Otherwise a surface that [ownsPad] (the companion, whose controls the D-pad can move
-     * between) keeps the D-pad, Enter and A for its own focus; everything else of the pad, and Back
-     * (which would finish it), is swallowed; every other key (volume, media) is left to the system.
+     * one. Otherwise every pad button, D-pad key, Enter and Back (which would finish it) is
+     * swallowed, so the controller never drives a companion surface (Droidtop/tracker#186: an A
+     * meant for the game on the other screen must not press Quit or Play here); every other key
+     * (volume, media, a keyboard's letters) is left to the system.
      */
-    fun consumesKey(event: KeyEvent, ownsPad: Boolean = false): Boolean {
+    fun consumesKey(event: KeyEvent): Boolean {
         if (runCatching { forwardKeyToShell?.invoke(event) ?: false }.getOrDefault(false)) return true
         val code = event.keyCode
-        if (ownsPad && (code in KeyEvent.KEYCODE_DPAD_UP..KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_BUTTON_A)) {
-            return false
-        }
         return KeyEvent.isGamepadButton(code) ||
             code == KeyEvent.KEYCODE_BACK ||
             code == KeyEvent.KEYCODE_ENTER ||

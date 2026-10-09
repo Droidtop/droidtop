@@ -59,8 +59,7 @@ class CompanionActivity : AppCompatActivity() {
         widgetIds = CompanionWidgetPrefs.widgetIds(this)
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-                // No focus denial here: keys reach this window only while no shell is in front to take them
-                // (TouchOnlySurfaceFocus), and then the D-pad moves between the companion's own controls.
+                // Touch only: the D-pad never reaches these controls (dispatchKeyEvent below).
                 Box(Modifier.fillMaxSize()) {
                     // The same tab host every other second-screen host draws: with the
                     // shell relocated to the addon, THIS activity is what the remaining panel
@@ -164,19 +163,10 @@ class CompanionActivity : AppCompatActivity() {
         dev.droidtop.display.TouchOnlySurfaceFocus.onTopResumedChanged(this, isTopResumedActivity, displayIdCompat())
     }
 
-    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-        if (dev.droidtop.display.TouchOnlySurfaceFocus.consumesKey(event, ownsPad = true)) return true
-        // A pad's A selects, as D-pad centre does: Compose clicks on centre and Enter, not on the A button.
-        val key = if (event.keyCode == android.view.KeyEvent.KEYCODE_BUTTON_A) {
-            android.view.KeyEvent(
-                event.downTime, event.eventTime, event.action, android.view.KeyEvent.KEYCODE_DPAD_CENTER,
-                event.repeatCount, event.metaState, event.deviceId, event.scanCode, event.flags, event.source,
-            )
-        } else {
-            event
-        }
-        return super.dispatchKeyEvent(key)
-    }
+    // Touch only (Droidtop/tracker#186): a pad key that still reaches this window goes to the shell
+    // or nowhere, never to the companion's own controls.
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
+        dev.droidtop.display.TouchOnlySurfaceFocus.consumesKey(event) || super.dispatchKeyEvent(event)
 
     override fun onPause() {
         // Paused with something in front of it (an app launched onto this screen,

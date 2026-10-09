@@ -3006,11 +3006,12 @@ row of recent apps, became Home's Recent apps section for every mode.
   Input (section 6c, unchanged); every other mode opens on Home. Only the selected tab is composed.
 - **Touch first, screens independent.** The companion never takes the pad from the shell (tracker#186, #265):
   its window is focusable only while Android makes it the top activity, and then every key goes to the shell
-  if one is in front on another screen (`TouchOnlySurfaceFocus`). Only when there is no shell to hand it to
-  (a game owns the other screen and the person touched the companion) does `CompanionActivity` keep the
-  D-pad, Enter and A (as D-pad centre) for its own controls, which are all `CompanionTile`s with a ring in the
-  theme accent while focused (touch never shows a ring); B, Back and the rest of the pad are still swallowed.
-  The second-screen host (`SecondaryDisplayActivity`, the Presentation) still denies focus to its whole tree. Nothing here moves an app the user opened
+  if one is in front on another screen (`TouchOnlySurfaceFocus`). When there is no shell to hand it to (a game
+  owns the other screen), every pad button, the D-pad, Enter and Back are swallowed there too, so the pad never
+  drives a companion control (owner, 2026-10-01: "the companion display should NOT be drivable by the
+  controller. It's touch only", tracker#186). A build that let the D-pad, Enter and A work the companion's own
+  controls in that state was taken back: the person is holding the pad for the game on the other screen, and an
+  A there would press whatever the ring was on, Quit included. Nothing here moves an app the user opened
   (#243); Tasks' switch tap launches on the app's own screen and its arrow pair is an explicit request.
   The strip scrolls sideways and the Performance and System pages lay out in one column in portrait and two on
   a wide window, from the window's own bounds (#213).
