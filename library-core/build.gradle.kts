@@ -166,6 +166,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     // Reads the QR code of a plugin catalog's address from a picked image (PluginCatalogSources.qrText).
     implementation(libs.zxing.core)
+    // org.tukaani:xz: the LZMA decoder for CHD hunks (achievements/hash/ChdFile.kt); already the plugin host's.
+    implementation(libs.xz)
 
     testImplementation(libs.junit)
     // RomDatabaseMigrationTest walks the game_metadata migration chain over

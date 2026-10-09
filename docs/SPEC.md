@@ -11523,6 +11523,24 @@ subject they log), the app opts out of backups, Share diagnostics never includes
 settings backup exports them only in its opt-in encoded section, read from and restored into the
 store. Verified flags and "Stay signed in" are plain preferences: they are not secrets.
 
+**RetroAchievements: which game a file is (directed 2026-10-09, Droidtop/tracker#143).** RetroAchievements
+knows a game by the hash of its file, computed by the rules of rcheevos' `rc_hash` (`RaHasher`, from
+`rc_hash_rom.c` and `rc_hash_disc.c`): an MD5 over the whole file up to 64 MiB for most cartridge consoles; the
+16 byte iNES or FDS header skipped for NES, the 512 byte copier header for SNES (size 512 over a multiple of
+8 KiB) and PC Engine (bit 9 of the size), 64 bytes for Lynx and 128 for Atari 7800 when their magic is there; an
+N64 file read as big endian whatever its byte order; the Nintendo DS header, ARM9 and ARM7 code and icon block; an
+arcade game by its file name without extension (with FBNeo's console folder in front); a single file zip is
+hashed as the file inside it, because the emulator is handed the extracted ROM. Disc consoles are read from an
+ISO, a BIN behind a CUE or a CHD: a PlayStation disc by the name of the boot file in SYSTEM.CNF followed by that
+executable (a PS-X EXE by its own header's length plus 2048), PlayStation 2 by BOOT2 and the file's directory
+length, PSP by PARAM.SFO then EBOOT.BIN (a PBP by the whole file), Sega CD and Saturn by the first 512 bytes
+of the disc when its header says so, PC Engine CD by its title and program sectors. CHD is read by `ChdFile`
+(version 5 only, from libchdr's public source): the Huffman-coded hunk map and the zlib, LZMA, cdzl and cdlz
+codecs chdman writes by default. A hunk in FLAC, Huffman or zstd, an older CHD, a console whose rule droidtop
+does not implement (GameCube, Wii, Dreamcast, 3DO, PC-FX, Neo Geo CD, Jaguar CD) and any file the rule does not
+fit, hash to nothing; `RaConsoles.NONE` marks those consoles so the name can still match. Nothing here guesses a
+hash. Hashing reads the file, so it is never done on the main thread or while a list draws.
+
 **The whole library, and a scrape names what it missed (directed 2026-10-08, Droidtop/tracker#374).**
 "Scrape all systems" walked console folders only, so installed Windows and engine games stayed text-only
 cards, and its dialog said "no match for 2" without saying which two.
