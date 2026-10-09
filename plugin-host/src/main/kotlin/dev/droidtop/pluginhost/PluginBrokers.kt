@@ -337,6 +337,8 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         return PickedDocument(uri.toString(), display, size, writable)
     }
 
+    override fun webSession(request: WebSessionRequest): WebSessionResult? = PluginWebSessionActivity.show(appContext, request)
+
     override fun openDocument(uri: String, mode: String): android.os.ParcelFileDescriptor? = runCatching {
         val resolverMode = when (mode) {
             "w" -> "wt"

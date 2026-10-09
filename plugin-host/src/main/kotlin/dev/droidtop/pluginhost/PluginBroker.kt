@@ -114,6 +114,9 @@ interface BrokerEnvironment {
     /** D4: shows Android's document picker over droidtop and waits; null when the person backed out. Only during a call the person started. */
     fun pickDocument(pluginLabel: String, mode: String, mime: String, name: String?): PickedDocument? = null
 
+    /** docs/plugin-api.md 3 G3: droidtop's own web view for a plugin's session; blocks until the person is done. Null where there is none. */
+    fun webSession(request: WebSessionRequest): WebSessionResult? = null
+
     /** D4: opens a picked document (`r`, `w`, `rw`); null when it is gone or its grant was withdrawn. */
     fun openDocument(uri: String, mode: String): android.os.ParcelFileDescriptor? = null
 
@@ -426,7 +429,7 @@ object HostApis {
     )
 
     /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
-    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops }
+    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostWebApis.ops }
 
     private fun vaultOf(env: BrokerEnvironment): PluginVault =
         env.vault() ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop keeps no plugin secrets")

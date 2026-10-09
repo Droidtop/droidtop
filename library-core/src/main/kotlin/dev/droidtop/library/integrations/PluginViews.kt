@@ -123,8 +123,14 @@ object PluginViews {
                     } else {
                         val descriptor = AcquireDownloadDescriptor.parse(rawDescriptor)
                         val destination = hostContext.optString("destination").takeIf { it.isNotBlank() }
+                        // A download a page started in the plugin's web session: droidtop's own headers for it, by its token.
+                        val captured = descriptor?.session?.let {
+                            dev.droidtop.pluginhost.WebSessions.take(record.manifest.id, it, descriptor.url, System.currentTimeMillis())
+                        }
                         result = if (descriptor == null) {
                             PluginResult.failure("${record.manifest.label} returned an invalid download descriptor")
+                        } else if (descriptor.session != null && captured == null) {
+                            PluginResult.failure("the download from ${record.manifest.label}'s web page is no longer waiting; open it again")
                         } else if (destination == null) {
                             PluginResult.failure("the game folder is not available")
                         } else {
@@ -136,7 +142,7 @@ object PluginViews {
                                 name = "acquire_${System.currentTimeMillis()}_${descriptor.fileName}",
                                 sha256 = descriptor.sha256,
                                 maxBytes = descriptor.size ?: 0L,
-                                headers = descriptor.headers,
+                                headers = descriptor.headers + captured?.headers.orEmpty(),
                                 extra = mapOf("destinationPath" to destination, "targetName" to descriptor.fileName),
                                 onStatus = onStatus,
                             )

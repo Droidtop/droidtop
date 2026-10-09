@@ -142,6 +142,42 @@ internal object HostNetApis {
         return minOf(asked, left)
     }
 
+    /**
+     * One request and its answer, the body of `net.http` and of `web.session fetch` (G3): [added] headers are droidtop's
+     * own (a session's cookies) and replace any of the same name the plugin sent; [hopCheck] runs on every hop before
+     * the network checks do.
+     */
+    fun request(
+        env: BrokerEnvironment,
+        record: PluginRecord,
+        args: JSONObject,
+        added: Map<String, String> = emptyMap(),
+        hopCheck: (String) -> Unit = {},
+    ): JSONObject {
+        val method = args.optString("method", "GET").uppercase()
+        if (method !in METHODS) invalid("method must be one of ${METHODS.joinToString()}")
+        val replaced = added.keys.map { it.lowercase() }.toSet()
+        val sent = headers(args).filterKeys { it.lowercase() !in replaced } + added
+        val request = HttpCall(method, url(args), sent, body(args), timeout(env, record, args), MAX_BODY)
+        val answer = env.http(request) { hop ->
+            hopCheck(hop)
+            reach(env, record, hop)
+        }
+        val asBase64 = when (args.optString("as")) {
+            "base64" -> true
+            "text" -> false
+            else -> !answer.isText
+        }
+        return JSONObject()
+            .put("status", answer.status)
+            .put("url", answer.finalUrl)
+            .put("headers", JSONObject(answer.headers as Map<*, *>))
+            .put("truncated", answer.truncated)
+            .apply {
+                if (asBase64) put("bodyBase64", Base64.getEncoder().encodeToString(answer.body)) else put("body", answer.body.toString(Charsets.UTF_8))
+            }
+    }
+
     val ops: List<HostOp> = listOf(
         // D1: whether the device is online, and how.
         HostOp("net", "state", permission = "net.state") { env, _, _ -> env.netState() },
@@ -151,25 +187,7 @@ internal object HostNetApis {
             permissionFor = { declared, args, _ -> permissionOf(declared, args) },
             target = { NetScope.hostOf(it.optString("url")).orEmpty() },
             alwaysAudit = true,
-        ) { env, record, args ->
-            val method = args.optString("method", "GET").uppercase()
-            if (method !in METHODS) invalid("method must be one of ${METHODS.joinToString()}")
-            val request = HttpCall(method, url(args), headers(args), body(args), timeout(env, record, args), MAX_BODY)
-            val answer = env.http(request) { hop -> reach(env, record, hop) }
-            val asBase64 = when (args.optString("as")) {
-                "base64" -> true
-                "text" -> false
-                else -> !answer.isText
-            }
-            JSONObject()
-                .put("status", answer.status)
-                .put("url", answer.finalUrl)
-                .put("headers", JSONObject(answer.headers as Map<*, *>))
-                .put("truncated", answer.truncated)
-                .apply {
-                    if (asBase64) put("bodyBase64", Base64.getEncoder().encodeToString(answer.body)) else put("body", answer.body.toString(Charsets.UTF_8))
-                }
-        },
+        ) { env, record, args -> request(env, record, args) },
         // D2: a file of any size, as a job, into the plugin's own data (docs/plugin-api.md 3 H1).
         HostOp(
             "net", "download",

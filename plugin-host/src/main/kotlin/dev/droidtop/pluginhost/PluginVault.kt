@@ -68,7 +68,29 @@ class PluginVault(
     }
 
     @Synchronized
-    fun keys(pluginId: String): List<String> = read(pluginId).keys().asSequence().toList().sorted()
+    fun keys(pluginId: String): List<String> = read(pluginId).keys().asSequence().filter { !it.startsWith(HOST_PREFIX) }.toList().sorted()
+
+    /**
+     * droidtop's own entries in a plugin's vault (a signed-in web session, docs/plugin-api.md 3 G3): named `@...`,
+     * which no plugin key can be ([validKey]), so the plugin can neither read, list, change nor delete them.
+     */
+    @Synchronized
+    fun putHost(pluginId: String, key: String, value: String) {
+        require(HOST_KEY.matches(key)) { "not a host key" }
+        val json = read(pluginId)
+        json.put(key, Base64.getEncoder().encodeToString(cipherFor(pluginId).encrypt(value.toByteArray(Charsets.UTF_8))))
+        write(pluginId, json)
+    }
+
+    fun getHost(pluginId: String, key: String): String? {
+        require(HOST_KEY.matches(key)) { "not a host key" }
+        return get(pluginId, key)
+    }
+
+    fun deleteHost(pluginId: String, key: String): Boolean {
+        require(HOST_KEY.matches(key)) { "not a host key" }
+        return delete(pluginId, key)
+    }
 
     /** Uninstall: the values and the key go with the plugin. */
     @Synchronized
@@ -82,6 +104,8 @@ class PluginVault(
         const val MAX_KEYS = 256
         const val MAX_VALUE = 16 * 1024
         private val KEY = Regex("^[A-Za-z0-9._-]{1,128}$")
+        private const val HOST_PREFIX = "@"
+        private val HOST_KEY = Regex("^@[a-z.]{1,64}$")
 
         fun validKey(key: String): Boolean = KEY.matches(key)
 

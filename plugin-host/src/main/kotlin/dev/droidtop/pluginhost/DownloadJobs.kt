@@ -407,6 +407,8 @@ data class AcquireDownloadDescriptor(
     val fileName: String,
     val sha256: String?,
     val size: Long?,
+    /** A download a page started in the plugin's web session, named by the one-use token `web.session open_in_session` gave (docs/plugin-api.md 3 G3). */
+    val session: String? = null,
 ) {
     companion object {
         fun parse(json: String?): AcquireDownloadDescriptor? = runCatching {
@@ -428,7 +430,9 @@ data class AcquireDownloadDescriptor(
                     put(key, headerValue)
                 }
             }
-            AcquireDownloadDescriptor(url, headers, fileName, digest, size)
+            val session = value.optString("session").takeIf { it.isNotEmpty() }
+            require(session == null || session.matches(Regex("w-[0-9a-f-]{36}")))
+            AcquireDownloadDescriptor(url, headers, fileName, digest, size, session)
         }.getOrNull()
     }
 }
