@@ -50,6 +50,17 @@ class ContainerLayoutTest {
     }
 
     @Test
+    fun `the time zone is a POSIX rule a stock image reads without tzdata`() {
+        val summer = java.time.Instant.parse("2026-07-01T12:00:00Z")
+        assertEquals("<-05>5<-04>,M3.2.0,M11.1.0", ContainerLayout.posixTimeZone(java.time.ZoneId.of("America/New_York"), summer))
+        assertEquals("<+01>-1<+02>,M3.5.0,M10.5.0/3", ContainerLayout.posixTimeZone(java.time.ZoneId.of("Europe/Berlin"), summer))
+        assertEquals("<+10>-10<+11>,M10.1.0,M4.1.0/3", ContainerLayout.posixTimeZone(java.time.ZoneId.of("Australia/Sydney"), summer))
+        assertEquals("<+0530>-5:30", ContainerLayout.posixTimeZone(java.time.ZoneId.of("Asia/Kolkata"), summer))
+        assertEquals("<+00>0", ContainerLayout.posixTimeZone(java.time.ZoneOffset.UTC, summer))
+        assertEquals("<+09>-9", ContainerLayout.posixTimeZone(java.time.ZoneId.of("Asia/Tokyo"), summer))
+    }
+
+    @Test
     fun `menus find the distro's entries first, then the library's`() {
         assertEquals(
             "/usr/local/share:/usr/share:/run/droidtop-app-storage/desktop-launcher/share",

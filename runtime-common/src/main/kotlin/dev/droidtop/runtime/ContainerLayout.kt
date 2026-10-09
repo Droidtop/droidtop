@@ -1,6 +1,11 @@
 package dev.droidtop.runtime
 
 import java.io.File
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.zone.ZoneOffsetTransitionRule
 
 /**
  * What every droidtop container looks like from the inside, whichever
@@ -125,9 +130,14 @@ object ContainerLayout {
      * library entries after it ([ContainerLauncher.DATA_DIR], docs/SPEC.md
      * 2a), so every stock menu lists the library's games; the distro's own
      * entries come first and win a name clash.
+     *
+     * `TZ` is the device's time zone as a POSIX rule ([posixTimeZone]), so
+     * clocks and file times inside the desktop are local time rather than
+     * a stock image's UTC.
      */
     fun clientEnvironment(waylandSocketName: String?, audioShared: Boolean = true): Map<String, String> = buildMap {
         put("XDG_RUNTIME_DIR", SOCKET_DIR)
+        put("TZ", posixTimeZone(ZoneId.systemDefault()))
         put("XDG_DATA_DIRS", "/usr/local/share:/usr/share:${ContainerLauncher.DATA_DIR}")
         // CUPS clients take a socket path here. With printing off nothing
         // listens there, which to a program is the same as no CUPS.
@@ -220,6 +230,93 @@ object ContainerLayout {
         appendLine("unset WAYLAND_DISPLAY")
         appendLine("echo 'droidtop: starting ${provisioning.compositorCommand}'")
         appendLine("exec ${provisioning.compositorCommand}")
+    }
+
+    /**
+     * [zone] as a POSIX `TZ` rule (POSIX.1, 8.3 "TZ"): standard offset, and
+     * where the zone keeps daylight saving, the daylight offset and the
+     * yearly rule for each change, e.g. `<-05>5<-04>,M3.2.0/2,M11.1.0/2`.
+     * A rule rather than a zone name (`America/New_York`) because a name
+     * needs the image's tzdata, which Alpine does not ship, while a rule is
+     * read by glibc, musl and GLib alike with nothing installed. The names
+     * are the numeric `<+hhmm>` form: Android's and the JVM's short zone
+     * names are often "GMT+01:00", which is not a valid POSIX name.
+     *
+     * The yearly rules are java.time's own ([java.time.zone.ZoneRules.getTransitionRules]).
+     * A zone with none (no daylight saving now) is its current offset. A
+     * rule POSIX cannot say exactly ("the Sunday on or after the 2nd") is
+     * the nearest week; the tz database uses only "last" and multiples of
+     * seven plus one for the zones that keep daylight saving today.
+     */
+    fun posixTimeZone(zone: ZoneId, now: Instant = Instant.now()): String {
+        val rules = zone.rules
+        val yearly = rules.transitionRules
+        val toDaylight = yearly.singleOrNull { it.offsetAfter != it.standardOffset }
+        val toStandard = yearly.singleOrNull { it.offsetAfter == it.standardOffset }
+        if (yearly.size != 2 || toDaylight == null || toStandard == null) {
+            val offset = rules.getOffset(now)
+            return posixName(offset) + posixOffset(offset)
+        }
+        val standard = toStandard.offsetAfter
+        val daylight = toDaylight.offsetAfter
+        return posixName(standard) + posixOffset(standard) + posixName(daylight) +
+            (if (daylight.totalSeconds - standard.totalSeconds == 3600) "" else posixOffset(daylight)) +
+            "," + posixDate(toDaylight) + "," + posixDate(toStandard)
+    }
+
+    /** `<+0530>` or `<-05>`: the angle-bracket name form, any offset. */
+    private fun posixName(offset: ZoneOffset): String {
+        val total = offset.totalSeconds
+        val sign = if (total < 0) "-" else "+"
+        val minutes = Math.abs(total) / 60
+        val hh = "%02d".format(minutes / 60)
+        val mm = minutes % 60
+        return "<$sign$hh${if (mm == 0) "" else "%02d".format(mm)}>"
+    }
+
+    /** POSIX counts west of Greenwich positive: UTC+05:30 is `-5:30`. */
+    private fun posixOffset(offset: ZoneOffset): String {
+        val total = -offset.totalSeconds
+        return (if (total < 0) "-" else "") + posixTime(Math.abs(total))
+    }
+
+    /** `h[:mm[:ss]]`, the hours unbounded (a change at 25:00 is legal). */
+    private fun posixTime(seconds: Int): String {
+        val h = seconds / 3600
+        val m = seconds % 3600 / 60
+        val s = seconds % 60
+        return when {
+            s != 0 -> "%d:%02d:%02d".format(h, m, s)
+            m != 0 -> "%d:%02d".format(h, m)
+            else -> "$h"
+        }
+    }
+
+    /**
+     * One change as `Mm.w.d/time` (or `Jn/time` for a fixed date), the time
+     * in the wall clock in force before it, left out when it is POSIX's
+     * default 02:00.
+     */
+    private fun posixDate(rule: ZoneOffsetTransitionRule): String {
+        val month = rule.month.value
+        val dayOfWeek = rule.dayOfWeek
+        val date = if (dayOfWeek == null) {
+            // A fixed day of the month: POSIX's Jn counts days 1-365, never February 29.
+            "J" + LocalDate.of(2001, month, rule.dayOfMonthIndicator.coerceAtLeast(1)).dayOfYear
+        } else {
+            val indicator = rule.dayOfMonthIndicator
+            // java.time stores "last Sunday" as "Sunday on or after maxLength - 6" for every month but
+            // February (ZoneRulesBuilder), so that, like a negative indicator, is POSIX's week 5.
+            val week = if (indicator < 0 || indicator + 6 >= rule.month.maxLength()) 5 else ((indicator + 6) / 7).coerceIn(1, 5)
+            "M$month.$week.${dayOfWeek.value % 7}"
+        }
+        var seconds = if (rule.isMidnightEndOfDay) 86_400 else rule.localTime.toSecondOfDay()
+        seconds += when (rule.timeDefinition) {
+            ZoneOffsetTransitionRule.TimeDefinition.UTC -> rule.offsetBefore.totalSeconds
+            ZoneOffsetTransitionRule.TimeDefinition.STANDARD -> rule.offsetBefore.totalSeconds - rule.standardOffset.totalSeconds
+            else -> 0
+        }
+        return if (seconds == 7200) date else "$date/" + (if (seconds < 0) "-" + posixTime(-seconds) else posixTime(seconds))
     }
 
     /** How long after starting a daemon the boot script reports whether it is still running. */

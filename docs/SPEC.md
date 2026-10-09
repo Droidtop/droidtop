@@ -1617,6 +1617,16 @@ Diagnostics go to logcat (`droidtop.proot`) and
 `<external files>/logs/desktop-container.log`, readable on an unrooted
 device without `run-as`.
 
+**Local time in every container (Droidtop/tracker#385).** Every process
+droidtop starts in a container, the compositor included, gets `TZ` set to
+the device's time zone as a POSIX rule (`ContainerLayout.posixTimeZone`,
+e.g. `<-05>5<-04>,M3.2.0,M11.1.0`), read when the session or program
+starts. A rule, not a zone name, because a name needs the image's tzdata
+(Alpine ships none) and a rule is read by glibc, musl and GLib with
+nothing installed; the zone names are the numeric `<+hh>` form, since the
+JVM's and Android's short names are often "GMT+01:00", not a POSIX name.
+A stock image's clock was UTC before.
+
 **The compositor environment** is wlroots' own and holds for sway and labwc
 alike: `WLR_BACKENDS=headless`, `WLR_HEADLESS_OUTPUTS=1` (the headless
 backend starts with no output otherwise; sway's own FALLBACK output is
