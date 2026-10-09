@@ -2,6 +2,8 @@ package dev.droidtop.library.stores
 
 import android.content.Context
 import android.util.Log
+import dev.droidtop.library.computers.ComputerSaves
+import dev.droidtop.net.peer.Computers
 import dev.droidtop.pluginhost.PluginJobsCenter
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
@@ -15,7 +17,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /*
- * Cloud saves of a store's games (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313).
+ * Cloud saves of a store's games (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313),
+ * and the same seam for the person's paired computers (docs/SPEC.md 7o,
+ * [dev.droidtop.library.computers.ComputerSaves]): one launch path, two save
+ * sources, and a game whose store keeps its saves is left to the store.
  * A store that keeps a game's saves in its own cloud (Steam Cloud) syncs them
  * into the game's Wine prefix before the game starts and back after it ends.
  * The store knows the cloud; where the prefix is comes from the Windows
@@ -104,7 +109,7 @@ object StoreSaves {
                 work.join()
             } else {
                 work.cancel()
-                return@coroutineScope "Cloud saves took too long, so the game started on this device's files"
+                return@coroutineScope "Saves took too long to sync, so the game started on this device's files"
             }
         }
         val done = work.await() ?: return@coroutineScope null
@@ -117,7 +122,15 @@ object StoreSaves {
      * caller's thread.
      */
     suspend fun sync(context: Context, entryId: String, title: String, phase: SaveSyncPhase): SaveSyncResult? = withContext(Dispatchers.IO) {
-        val store = StoreLibraries.forKey(entryId)?.takeIf { it.hasCloudSaves } ?: return@withContext null
+        val store = StoreLibraries.forKey(entryId)?.takeIf { it.hasCloudSaves }
+        if (store == null) {
+            // No store cloud for this game: the paired computers, when there are any.
+            if (Computers.list(context).isEmpty()) return@withContext null
+            val prefix = locator?.locate(context, entryId) ?: return@withContext null
+            return@withContext runCatching { ComputerSaves.sync(context, entryId, title, phase, prefix, resolver) }
+                .onFailure { Log.w(TAG, "Computer save sync failed for $entryId", it) }
+                .getOrElse { SaveSyncResult("Saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
+        }
         val prefix = locator?.locate(context, entryId) ?: return@withContext null
         runCatching { store.syncSaves(context, entryId.substringAfter(':'), phase, prefix, title, resolver) }
             .onFailure { Log.w(TAG, "Cloud save sync failed for $entryId", it) }
@@ -129,8 +142,10 @@ object StoreSaves {
      * place so it survives the game's screen closing and shows what it did.
      */
     fun afterExit(context: Context, entryId: String, title: String = titles[entryId] ?: entryId.substringAfter(':')) {
-        val store = StoreLibraries.forKey(entryId)?.takeIf { it.hasCloudSaves } ?: return
-        PluginJobsCenter.startNative(context, JOB_KIND, "Saves: $title", mapOf(ARG_KEY to entryId, ARG_TITLE to title), owner = store.label, pausable = false)
+        // From memory only (this runs on the main thread): the launch read the computers list already.
+        val owner = StoreLibraries.forKey(entryId)?.takeIf { it.hasCloudSaves }?.label
+            ?: if (Computers.anyKnown()) "Computers" else return
+        PluginJobsCenter.startNative(context, JOB_KIND, "Saves: $title", mapOf(ARG_KEY to entryId, ARG_TITLE to title), owner = owner, pausable = false)
     }
 
     /** Registers the job runner; called once at process start with the store jobs. */
@@ -139,7 +154,7 @@ object StoreSaves {
         PluginJobsCenter.registerNative(JOB_KIND) { args, _, report ->
             val key = args[ARG_KEY] ?: error("This save sync names no game")
             report(-1, "Syncing saves", key)
-            sync(app, key, args[ARG_TITLE] ?: key.substringAfter(':'), SaveSyncPhase.AFTER_EXIT)?.line ?: "No cloud saves"
+            sync(app, key, args[ARG_TITLE] ?: key.substringAfter(':'), SaveSyncPhase.AFTER_EXIT)?.line ?: "No saves to sync"
         }
     }
 }

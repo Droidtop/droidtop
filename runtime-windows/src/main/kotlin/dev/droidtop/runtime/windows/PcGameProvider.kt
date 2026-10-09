@@ -466,7 +466,8 @@ class PcGameProvider(
                 // the person chooses, and the shell offers the choice on the spot.
                 val windows = WindowsLaunchResolver.forEntry(context, entry.id, gameRoot)
                     ?: throw dev.droidtop.library.ProgramNotIdentified(entry.id, entry.title, gameRoot.absolutePath)
-                // A store's cloud saves are brought up to date first (Steam Cloud); it never holds the game back for long.
+                // A store's cloud saves, or a paired computer's, are brought up to date first; neither holds the game back for long.
+                dev.droidtop.library.computers.ComputerSaves.rememberBase(entry.id, gameRoot)
                 dev.droidtop.library.stores.StoreSaves.beforeLaunch(context, entry.id, GameNaming.displayName(entry.title))
                     ?.let { Log.i("droidtop.PcGameProvider", it) }
                 runtime.launchWindows(windows.executable, gameRoot, windows.workingDir, windows.arguments, entry.id)
