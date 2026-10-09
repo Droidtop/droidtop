@@ -431,7 +431,7 @@ object PluginCatalog {
     // ------------------------------------------------------------------
 
     /** An added catalog's index that passed [checkAdded]; [signed] when its index signature verified under the catalog's master. */
-    private class Checked(val index: PluginCatalogIndex, val signed: Boolean)
+    internal class Checked(val index: PluginCatalogIndex, val signed: Boolean)
 
     /**
      * Everything an added catalog's index must be before droidtop keeps it:
@@ -446,6 +446,20 @@ object PluginCatalog {
      * Throws [IllegalStateException] with the sentence to show.
      */
     private fun checkAdded(context: Context, url: String, text: String, expected: PluginCatalogSource?): Checked {
+        val token = token(context)
+        return checkAddedIndex(url, text, expected, System.currentTimeMillis() / 1000) { name ->
+            runCatching { PlatformDatabaseTransport.getOrNull(PluginCatalogSources.siblingUrl(url, name), token) }.getOrNull()
+        }
+    }
+
+    /** [checkAdded] with the files beside the index read through [sibling] (by file name; null when missing), so a test can serve them. */
+    internal fun checkAddedIndex(
+        url: String,
+        text: String,
+        expected: PluginCatalogSource?,
+        nowEpochSeconds: Long,
+        sibling: (String) -> String?,
+    ): Checked {
         val index = PluginCatalogIndexParser.parse(text)
             ?: error("the catalog at $url is not in a format this build of droidtop reads")
         val info = index.catalog
@@ -478,14 +492,13 @@ object PluginCatalog {
             }
         }
         val master = PluginOriginKeys.parseSpki(declared)!!
-        val token = token(context)
-        val signature = runCatching { PlatformDatabaseTransport.getOrNull(PluginCatalogSources.siblingUrl(url, PluginCatalogSources.INDEX_SIGNATURE_FILE), token) }.getOrNull()
+        val signature = sibling(PluginCatalogSources.INDEX_SIGNATURE_FILE)
         if (signature == null) {
             if (expected?.indexSigned == true) error("the catalog's index was signed before and this copy is not, so it was not read")
             return Checked(index, signed = false)
         }
-        val certificate = runCatching { PlatformDatabaseTransport.getOrNull(PluginCatalogSources.siblingUrl(url, PluginCatalogSources.INDEX_CERTIFICATE_FILE), token) }.getOrNull()
-        val verdict = CatalogSignature.verify(text.toByteArray(Charsets.UTF_8), signature.trim(), certificate, master, System.currentTimeMillis() / 1000, info.id)
+        val certificate = sibling(PluginCatalogSources.INDEX_CERTIFICATE_FILE)
+        val verdict = CatalogSignature.verify(text.toByteArray(Charsets.UTF_8), signature.trim(), certificate, master, nowEpochSeconds, info.id)
         if (verdict is CatalogSignature.Verdict.Refused) error("the catalog's signature was refused: ${verdict.reason}")
         return Checked(index, signed = true)
     }
