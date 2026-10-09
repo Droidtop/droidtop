@@ -118,6 +118,7 @@ public class LatinKeyboard extends Keyboard {
 
     public LatinKeyboard(Context context, int xmlLayoutResId, int mode, float kbHeightPercent) {
         super(context, 0, xmlLayoutResId, mode, kbHeightPercent);
+        applyForm(LatinIME.sKeyboardSettings.form);
         final Resources res = context.getResources();
         //Log.i("PCKeyboard", "keyHeight=" + this.getKeyHeight());
         //this.setKeyHeight(30); // is useless, see http://code.google.com/p/android/issues/detail?id=4532

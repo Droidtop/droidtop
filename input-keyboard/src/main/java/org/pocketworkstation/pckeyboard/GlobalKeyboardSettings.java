@@ -65,6 +65,9 @@ public final class GlobalKeyboardSettings {
     //
     // Read by PointerTracker (droidtop, Droidtop/tracker#340)
     public boolean spaceDrag = true;
+    //
+    // Read by LatinKeyboard (droidtop, Droidtop/tracker#342)
+    public KeyboardForm.Form form = KeyboardForm.FULL;
     
     /* Updated by LatinIME */
     //
@@ -141,6 +144,12 @@ public final class GlobalKeyboardSettings {
             public void set(String val) { sendSlideKeys = Integer.valueOf(val); }
             public String getDefault() { return "0"; }
             public int getFlags() { return FLAG_PREF_NONE; }
+        });
+
+        addStringPref(KeyboardForm.PREF, new StringPref() {
+            public void set(String val) { form = KeyboardForm.of(val); }
+            public String getDefault() { return KeyboardForm.FULL.getId(); }
+            public int getFlags() { return FLAG_PREF_RESET_KEYBOARDS | FLAG_PREF_RECREATE_INPUT_VIEW; }
         });
 
         addBooleanPref("pref_space_drag", new BooleanPref() {

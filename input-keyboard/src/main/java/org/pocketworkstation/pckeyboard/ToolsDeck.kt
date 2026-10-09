@@ -29,6 +29,7 @@ class ToolsDeck private constructor(
     private val sink: KeyboardSink,
     private val typeText: (CharSequence) -> Unit,
     private val beforeInsert: Runnable?,
+    private val relayout: Runnable?,
 ) : LinearLayout(context) {
     private val stack = FrameLayout(context)
     private var overlay: View? = null
@@ -49,9 +50,12 @@ class ToolsDeck private constructor(
             visibility = GONE
         }
         addView(notice)
-        stack.addView(keyboard, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+        stack.addView(keyboard, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, formGravity()))
         addView(stack, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
     }
+
+    /** A grid narrower than the screen sits at the edge the form names. */
+    private fun formGravity(): Int = if (ToolsPrefs.form(context).atEnd) Gravity.END else Gravity.START
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
@@ -63,6 +67,7 @@ class ToolsDeck private constructor(
         if (ToolsPrefs.clipboardHistory(context)) row.addView(tool("Clipboard") { toggle("clipboard") { clipboardPanel() } })
         if (ToolsPrefs.emoji(context)) row.addView(tool("Emoji") { toggle("emoji") { emojiPanel() } })
         row.addView(tool("Macros") { toggle("macros") { macroPanel() } })
+        row.addView(formButton())
         incognitoButton = tool("") { toggleIncognito() }
         row.addView(incognitoButton)
         updateIncognito()
@@ -86,6 +91,23 @@ class ToolsDeck private constructor(
         setPadding(dp(12), dp(6), dp(12), dp(6))
         isFocusable = false
         setOnClickListener { onClick() }
+    }
+
+    /** Cycles the key grid between full width, split, and one-handed left and right. */
+    private fun formButton(): Button {
+        lateinit var button: Button
+        fun label() = "Layout: " + ToolsPrefs.form(context).id
+        button = tool(label()) {
+            val form = KeyboardForm.next(ToolsPrefs.form(context))
+            ToolsPrefs.prefs(context).edit().putString(KeyboardForm.PREF, form.id).apply()
+            LatinIME.sKeyboardSettings.form = form
+            button.text = label()
+            (keyboard.layoutParams as? FrameLayout.LayoutParams)?.let { it.gravity = formGravity() }
+            // The input method rebuilds itself when the setting changes; a panel is told to.
+            relayout?.run()
+            keyboard.requestLayout()
+        }
+        return button
     }
 
     private fun toggle(id: String, build: () -> View) {
@@ -315,7 +337,8 @@ class ToolsDeck private constructor(
         /**
          * [keyboard] wrapped with the tool strip, or [keyboard] itself when the strip is switched off. [typeText]
          * enters text a key cannot produce (default: the sink's own); [beforeInsert] runs before anything is typed
-         * for a tool, so an input method can finish the word it is composing.
+         * for a tool, so an input method can finish the word it is composing; [relayout] rebuilds the key grid
+         * after the layout form changed, for a surface that is not the input method (which rebuilds itself).
          */
         @JvmStatic
         @JvmOverloads
@@ -325,11 +348,12 @@ class ToolsDeck private constructor(
             sink: KeyboardSink,
             typeText: ((CharSequence) -> Unit)? = null,
             beforeInsert: Runnable? = null,
+            relayout: Runnable? = null,
         ): View {
             if (!ToolsPrefs.strip(context)) return keyboard
             (keyboard.parent as? ViewGroup)?.removeView(keyboard)
             ClipboardHistoryStore.start(context)
-            return ToolsDeck(context, keyboard, sink, typeText ?: { chars -> sink.text(chars) }, beforeInsert)
+            return ToolsDeck(context, keyboard, sink, typeText ?: { chars -> sink.text(chars) }, beforeInsert, relayout)
         }
     }
 }

@@ -905,6 +905,30 @@ public class Keyboard {
         setEdgeFlags();
     }
 
+    /**
+     * droidtop patch (Droidtop/tracker#342): scales and splits the loaded keys for the one-handed and split forms
+     * ({@link KeyboardForm}). Called once, right after the layout is loaded and before anything reads positions.
+     */
+    void applyForm(KeyboardForm.Form form) {
+        final int n = mKeys.size();
+        final int[] xs = new int[n];
+        final int[] widths = new int[n];
+        final int[] gaps = new int[n];
+        for (int i = 0; i < n; i++) {
+            final Key key = mKeys.get(i);
+            xs[i] = key.x;
+            widths[i] = key.width;
+            gaps[i] = key.gap;
+        }
+        mTotalWidth = KeyboardForm.layout(xs, widths, gaps, mTotalWidth, form);
+        for (int i = 0; i < n; i++) {
+            final Key key = mKeys.get(i);
+            key.x = xs[i];
+            key.width = widths[i];
+            key.gap = gaps[i];
+        }
+    }
+
     private void setEdgeFlags() {
         if (mRowCount == 0) mRowCount = 1; // Assume one row if not set
         int row = 0;

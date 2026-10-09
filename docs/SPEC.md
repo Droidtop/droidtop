@@ -5155,6 +5155,19 @@ proposal) is not built; these helpers are in the one settings tree that already 
   start a word of the emoji's name, or of a keyword; a name that equals or starts with the query ranks first,
   then data order. Picking a match types it and closes the search.
 
+### One-handed and split (Droidtop/tracker#342)
+
+- **One setting, four shapes.** "Key grid shape" (`KeyboardForm`, JVM tested): full width (the default), split, or
+  one-handed at the left or right edge. The Layout button on the tool strip cycles them. The key layouts are not
+  duplicated: `Keyboard.applyForm`, called from the `LatinKeyboard` constructor, scales the loaded keys and, for
+  split, opens a 20% gap in the middle (80% scale; a key across the middle, the space bar, is widened over it,
+  every key right of it moves), so every layout, locale and Fn layer has the shapes. One-handed uses 70% of the
+  width; the grid sits at its edge in the tool strip's key area, so with the strip off a right-hand grid is drawn
+  at the left. A change rebuilds the input method's view (the setting's flags) or, for a panel droidtop draws,
+  rebuilds its grid (`KeyboardPanel.rebuildKeys`).
+- **Floating is not built, by decision.** An input method cannot reliably own an overlay window, least of all on
+  a secondary display (the study's question 7).
+
 ## 6b. Desktop surface input (built 2026-09-01)
 
 The seat in §6 was a primitive with no caller. `:shell-desktop`'s

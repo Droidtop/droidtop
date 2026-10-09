@@ -327,6 +327,15 @@
             android:summary="@string/summary_tools_strip"
             />
 
+    <org.pocketworkstation.pckeyboard.AutoSummaryListPreference
+            android:key="pref_keyboard_form"
+            android:title="@string/title_keyboard_form"
+            android:entryValues="@array/keyboard_form_values"
+            android:entries="@array/keyboard_form_entries"
+            android:defaultValue="full"
+            android:persistent="true"
+            />
+
     <CheckBoxPreference
             android:key="pref_emoji"
             android:title="@string/title_emoji"

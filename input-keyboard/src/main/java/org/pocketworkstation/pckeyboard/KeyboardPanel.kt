@@ -50,12 +50,22 @@ class KeyboardPanel(
         onLayoutToggle = { toggleLayout() },
         deferSpace = ToolsPrefs.spaceDrag(context),
     )
-    private val keyboardView: LatinKeyboardView? =
+    private val keyboardView: LatinKeyboardView? = run {
+        // The key grid reads the form (full, split, one-handed) from the shared settings, which only the input method loads.
+        LatinIME.sKeyboardSettings.form = ToolsPrefs.form(context)
         runCatching { SecondScreenKeyboard.createView(context, listener, heightPercent) }.getOrNull()
+    }
 
     // The tool strip (clipboard history, macros, incognito) above the grid, or the grid alone when it is switched off.
     private val deck: View? = keyboardView?.let { grid ->
-        ToolsDeck.wrap(context, grid, sink, if (sink.takesText) null else ({ chars: CharSequence -> listener.onText(chars) }))
+        ToolsDeck.wrap(
+            context,
+            grid,
+            sink,
+            if (sink.takesText) null else ({ chars: CharSequence -> listener.onText(chars) }),
+            null,
+            Runnable { rebuildKeys() },
+        )
     }
 
     init {
@@ -74,6 +84,12 @@ class KeyboardPanel(
 
     /** Whether the key grid could be built at all (a broken keyboard resource leaves an empty panel). */
     val hasKeys: Boolean get() = keyboardView != null
+
+    /** The key grid again, for a form that changed: the same layer, built with the new shape. */
+    private fun rebuildKeys() {
+        val view = keyboardView ?: return
+        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent)
+    }
 
     private fun toggleLayout() {
         val view = keyboardView ?: return

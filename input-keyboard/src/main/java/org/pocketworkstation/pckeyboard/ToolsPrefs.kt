@@ -41,6 +41,8 @@ object ToolsPrefs {
 
     fun clipboardHistory(context: Context): Boolean = prefs(context).getBoolean(CLIPBOARD, true)
 
+    fun form(context: Context): KeyboardForm.Form = KeyboardForm.of(prefs(context).getString(KeyboardForm.PREF, null))
+
     fun emoji(context: Context): Boolean = prefs(context).getBoolean(EMOJI, true)
 
     fun spaceDrag(context: Context): Boolean = prefs(context).getBoolean(SPACE_DRAG, true)

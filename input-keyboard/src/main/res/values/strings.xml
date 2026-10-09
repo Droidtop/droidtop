@@ -678,6 +678,19 @@
     <string name="title_editing_helpers">Editing helpers</string>
     <string name="title_tools_strip">Tool strip</string>
     <string name="summary_tools_strip">A row of buttons above the keys: clipboard history, macros and incognito mode.</string>
+    <string name="title_keyboard_form">Key grid shape</string>
+    <string-array name="keyboard_form_entries">
+        <item>Full width</item>
+        <item>Split (a gap in the middle, for two thumbs)</item>
+        <item>One-handed, left</item>
+        <item>One-handed, right</item>
+    </string-array>
+    <string-array name="keyboard_form_values" translatable="false">
+        <item>full</item>
+        <item>split</item>
+        <item>left</item>
+        <item>right</item>
+    </string-array>
     <string name="title_emoji">Emoji panel</string>
     <string name="summary_emoji">An Emoji button on the tool strip: emoji by group, recently used, and search by name typed on the keyboard.</string>
     <string name="title_incognito">Incognito mode</string>
