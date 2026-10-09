@@ -96,7 +96,28 @@ object PluginStore {
     fun disableWithReason(context: Context, pluginId: String, reason: String, detail: String? = null) {
         val dir = root(context)
         val record = PluginBundleInstaller.readRecord(dir, pluginId) ?: return
-        PluginBundleInstaller.writeRecord(dir, record.copy(enabled = false, disabledReason = reason, disabledDetail = detail))
+        PluginBundleInstaller.writeRecord(dir, record.copy(enabled = false, disabledReason = reason, disabledDetail = detail, disabledBuild = hostBuild(context)))
+    }
+
+    /** This droidtop's build number (its version code), or 0 when the system will not say. */
+    @Suppress("DEPRECATION")
+    fun hostBuild(context: Context): Int =
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionCode }.getOrDefault(0)
+
+    /**
+     * Once per new droidtop build, on start: plugins an older droidtop disabled after a failure get another go
+     * ([PluginRecord.afterHostUpdate]). Rig 2026-10-09: build 1535 disabled the sample status tile (its Kotlin classes
+     * were shrunk away), build 1649 fixed that, and the plugin still read "Crashed" because nothing ever switched it
+     * back on. Disk: off the main thread. Returns the ids it switched on.
+     */
+    fun retryAfterHostUpdate(context: Context): List<String> {
+        val dir = root(context)
+        val build = hostBuild(context)
+        return installed(context).mapNotNull { record ->
+            val again = record.afterHostUpdate(build) ?: return@mapNotNull null
+            PluginBundleInstaller.writeRecord(dir, again)
+            record.manifest.id
+        }
     }
 
     /** The technical reason a plugin was last disabled for, or null. Reads the record: off the main thread. */

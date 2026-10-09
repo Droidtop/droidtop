@@ -36,6 +36,12 @@ data class PluginRecord(
     val disabledReason: String?,
     /** The technical reason behind [disabledReason] (the raw load failure), for a "Technical details" line and a bug report; never the headline, which is the plain sentence. */
     val disabledDetail: String? = null,
+    /**
+     * The droidtop build (version code) that disabled the plugin, 0 for a record written before the field existed.
+     * A disable is evidence about the plugin AND the droidtop that ran it, so a newer droidtop tries it once more
+     * ([afterHostUpdate]); without that a plugin stopped by a bug in an old droidtop stays stopped for ever.
+     */
+    val disabledBuild: Int = 0,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", manifest.id)
@@ -79,6 +85,7 @@ data class PluginRecord(
         put("rootApproved", rootApproved)
         put("disabledReason", disabledReason ?: JSONObject.NULL)
         put("disabledDetail", disabledDetail ?: JSONObject.NULL)
+        put("disabledBuild", disabledBuild)
     }
 
     companion object {
@@ -148,8 +155,19 @@ data class PluginRecord(
                 rootApproved = json.optBoolean("rootApproved", false),
                 disabledReason = optNullableString(json, "disabledReason"),
                 disabledDetail = optNullableString(json, "disabledDetail"),
+                disabledBuild = json.optInt("disabledBuild", 0),
             )
         }
+    }
+
+    /**
+     * This record as a newer droidtop [hostBuild] finds it: an approved plugin that an older droidtop disabled after a
+     * failure is switched back on, to be tried again and disabled again if it still fails; null when nothing changes.
+     * A plugin the person turned off (no [disabledReason]) is never touched.
+     */
+    fun afterHostUpdate(hostBuild: Int): PluginRecord? {
+        if (hostBuild <= 0 || disabledReason == null || disabledBuild == hostBuild || trust != PluginTrustState.APPROVED) return null
+        return copy(enabled = true, disabledReason = null, disabledDetail = null, disabledBuild = 0)
     }
 
     /** Whether this plugin is actually allowed to run right now, folding every gate into one check so a runner never has to re-derive it. */

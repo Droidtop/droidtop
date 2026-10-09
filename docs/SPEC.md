@@ -15988,6 +15988,22 @@ flight, while an idle death disables none so a system low-memory kill can
 reconnect on the next call. An ordinary plugin failure result does not
 disable it. The launcher keeps working.
 
+**A stopped plugin always has a way forward (owner, 2026-10-09,
+Droidtop/tracker#400).** A disable is evidence about the plugin and the
+droidtop that ran it, so the record keeps the build that disabled it
+(`PluginRecord.disabledBuild`) and a newer build switches the plugin back
+on once at start (`PluginStore.retryAfterHostUpdate`); if it fails again it
+is disabled again under the new build. Rig: build 1535 disabled the sample
+status tile because R8 had shrunk the Kotlin standard library it links
+against, build 1649 fixed that, and the plugin still read "Crashed" for ever
+because nothing re-enabled it. The list says "Stopped", or "Needs an update"
+when the catalog has a newer version of it (or when it is a contract 2 plugin
+that cannot run without full access and never asked for it, so only a newer
+version can); the page then offers that update as its first action, else
+"Try again". Installing a new version of a plugin that was stopped by a
+failure leaves it switched on (`PluginBundleInstaller.install`); it used to
+come back "Disabled" with nothing to press.
+
 **Plugin kinds, and the one that's built.** `PluginKind` is an open set,
 one runner per kind:
 
@@ -17022,7 +17038,7 @@ what the index says is display data, never a trust decision.
   the list", the owner's own words. The screen is now four groups:
   - **Installed** — one row per installed plugin (its capabilities in
     plain words and its trust badge as the subtitle, its state — Needs
-    approval / Running / Disabled / Crashed / Denied — as the value),
+    approval / Running / Disabled / Stopped / Needs an update / Denied — as the value),
     opening that plugin's own detail page (titled with the plugin's
     display name, never its `<origin>.<name>` id) rather than spreading
     its actions across the parent list. The detail page groups: status

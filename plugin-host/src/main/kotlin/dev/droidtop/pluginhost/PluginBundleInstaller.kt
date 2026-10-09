@@ -190,7 +190,9 @@ object PluginBundleInstaller {
                 carriedOver -> PluginTrustState.APPROVED
                 else -> PluginTrustState.PENDING
             },
-            enabled = carriedOver && existingState!!.enabled,
+            // A new version of a plugin that was stopped by a failure starts switched on: the update is the fix being
+            // offered, and installing it must not leave the plugin "Disabled" with nothing to press.
+            enabled = carriedOver && (existingState!!.enabled || (!sameBytes && existingState.disabledReason != null)),
             rootApproved = carriedOver && existingState!!.rootApproved && manifest.requestsRoot,
             disabledReason = null,
         )

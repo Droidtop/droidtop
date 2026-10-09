@@ -1610,7 +1610,11 @@ object AppSettingsCatalogs {
         val state = when {
             record.trust == PluginTrustState.PENDING -> "Needs approval"
             record.trust == PluginTrustState.DENIED -> "Denied"
-            record.disabledReason != null -> "Crashed"
+            // A plugin that stopped has a way forward on the list too: a newer version to install, or its page's "Try again".
+            record.disabledReason != null -> if (updateAvailable) "Needs an update" else "Stopped"
+            // Written before it could ask for the access it needs (PluginTiers.refusal): only a newer version can run.
+            record.trust == PluginTrustState.APPROVED && PluginTiers.refusal(record, grants) != null &&
+                !PluginTiers.declaresFullTrust(record.manifest) -> "Needs an update"
             record.trust == PluginTrustState.APPROVED && !record.enabled -> "Disabled"
             // Approved but its runtime is not on the device: it cannot run, so it is never "Running".
             runtimeNeed != null -> "Needs setup"
@@ -1687,11 +1691,14 @@ object AppSettingsCatalogs {
         val resolution = PluginApiResolver.current(context)
         val grantSnapshot = PluginGrants.forContext(context).read(m.id)
         val runtimeNeed = PluginRuntimeNeeds.missing(context, m)
+        val catalogListings = PluginCatalog.listings(context)
+        val catalogOffer = PluginCatalog.offerFor(catalogListings, record, userKeys)
         val statusGroup = buildList<CatalogItem> {
             val statusLine = when {
                 record.trust == PluginTrustState.PENDING -> "Awaiting approval"
                 record.trust == PluginTrustState.DENIED -> "Denied"
-                record.disabledReason != null -> "Disabled: ${record.disabledReason}"
+                record.disabledReason != null && catalogOffer != null -> "Needs an update: ${record.disabledReason}"
+                record.disabledReason != null -> "Stopped: ${record.disabledReason}"
                 record.trust == PluginTrustState.APPROVED && record.enabled && runtimeNeed != null ->
                     "Needs the ${runtimeNeed.runtime} runtime (${runtimeNeed.sizeLabel}) to run"
                 record.trust == PluginTrustState.APPROVED && record.enabled -> "Running"
@@ -1726,9 +1733,30 @@ object AppSettingsCatalogs {
                 val refusal = PluginTiers.refusal(record, grantSnapshot)
                 val accessBadge = PluginTiers.badge(record, grantSnapshot)
                 when {
-                    refusal != null -> add(ActionItem(id = "plugin_${m.id}_access", title = "Needs full access to work", subtitle = refusal, run = {}))
+                    refusal != null -> add(ActionItem(id = "plugin_${m.id}_access", title = if (PluginTiers.declaresFullTrust(m)) "Needs full access to work" else "Needs an update", subtitle = refusal, run = {}))
                     accessBadge != null -> add(ActionItem(id = "plugin_${m.id}_access", title = accessBadge, subtitle = accessLine(record, grantSnapshot), run = {}))
                 }
+            }
+            // A stopped plugin always has something to press: the newer version when the catalog has one (the row under
+            // "Version" below says which), otherwise another go. Switching it back on clears the reason; it stops again if it fails again.
+            if (record.disabledReason != null) {
+                add(
+                    if (catalogOffer != null) {
+                        AsyncActionItem(
+                            id = "plugin_${m.id}_retry",
+                            title = "Update ${m.label}",
+                            subtitle = "Version ${catalogOffer.release.version} is available",
+                            run = { ctx, onStatus -> PluginCatalog.install(ctx, catalogOffer.plugin, catalogOffer.release, onStatus) },
+                        )
+                    } else {
+                        ActionItem(
+                            id = "plugin_${m.id}_retry",
+                            title = "Try again",
+                            subtitle = "Turn it back on and run it once more",
+                            run = { ctx -> PluginStore.setEnabled(ctx, m.id, true); pluginsChanged(ctx) },
+                        )
+                    },
+                )
             }
             // The headline above is a plain sentence; what the plugin actually reported is one press away,
             // for its developer or a bug report (docs/SPEC.md 12a, Droidtop/tracker#167).
@@ -1978,8 +2006,8 @@ object AppSettingsCatalogs {
         val runtimeGroup: List<CatalogItem> = listOfNotNull(runtimeItem(context, m.kind, m.label, runtimeNeed))
 
         val updateGroup = buildList<CatalogItem> {
-            val listings = PluginCatalog.listings(context)
-            val offer = PluginCatalog.offerFor(listings, record, userKeys)
+            val listings = catalogListings
+            val offer = catalogOffer
             add(
                 if (offer != null) {
                     AsyncActionItem(
@@ -2277,7 +2305,7 @@ object AppSettingsCatalogs {
             val refusal = PluginTiers.refusal(record, snap)
             val badge = PluginTiers.badge(record, snap)
             when {
-                refusal != null -> ActionItem(id = "plugin_permissions_access_row", title = "Needs full access to work", subtitle = refusal, run = {})
+                refusal != null -> ActionItem(id = "plugin_permissions_access_row", title = if (PluginTiers.declaresFullTrust(record.manifest)) "Needs full access to work" else "Needs an update", subtitle = refusal, run = {})
                 record.manifest.contractVersion < 2 -> ActionItem(id = "plugin_permissions_access_row", title = badge ?: "Full access (older plugin)", subtitle = "Written before permissions existed: it can do anything droidtop can, and only what it asks droidtop to do is listed under Activity", run = {})
                 badge != null -> ActionItem(id = "plugin_permissions_access_row", title = badge, subtitle = accessLine(record, snap), run = {})
                 else -> null

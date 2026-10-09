@@ -78,6 +78,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // Plugins in every mode (docs/plugin-api.md 1.9): "Plugins" on Standard's home-screen menu, and the plugin
         // services and schedules the person switched on (E8, E9). Both read manifests off the main thread.
         dev.droidtop.library.integrations.PluginStandardHooks.install(this)
+        // A plugin an older droidtop disabled after a failure is tried again by this build (PluginStore.retryAfterHostUpdate).
+        kotlin.concurrent.thread(name = "plugin-retry") { dev.droidtop.pluginhost.PluginStore.retryAfterHostUpdate(this) }
         PluginBackgroundHost.install(this)
         // `library.read` `systems` (docs/plugin-api.md 3 A1): the broker runs on a binder thread, which may block here;
         // the answer comes from the library's in-memory index, never a folder walk.

@@ -2,6 +2,7 @@ package dev.droidtop.pluginhost
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -133,5 +134,24 @@ class PluginRecordTest {
         val manifest = PluginManifest.fromJson(json)!!
         assertNull(manifest.description)
         assertNull(manifest.entryClass)
+    }
+
+    @Test
+    fun `a plugin an older droidtop disabled is switched back on by a newer one, and only once per build`() {
+        val stopped = record(disabledReason = "The plugin crashed while loading.", enabled = false).copy(disabledDetail = "raw", disabledBuild = 1535)
+        val again = stopped.afterHostUpdate(1649)!!
+        assertTrue(again.enabled)
+        assertNull(again.disabledReason)
+        assertNull(again.disabledDetail)
+        assertNull("the same build keeps its verdict", stopped.afterHostUpdate(1535))
+        assertNotNull("a record from before the field existed is tried once", stopped.copy(disabledBuild = 0).afterHostUpdate(1649))
+        assertNull("a plugin the person turned off has no reason and is left alone", record(enabled = false).afterHostUpdate(1649))
+        assertNull("an unknown build changes nothing", stopped.afterHostUpdate(0))
+    }
+
+    @Test
+    fun `the build that disabled a plugin survives the record file`() {
+        val back = PluginRecord.fromJson(record(disabledReason = "x", enabled = false).copy(disabledBuild = 1535).toJson())!!
+        assertEquals(1535, back.disabledBuild)
     }
 }
