@@ -3590,6 +3590,16 @@ row of recent apps, became Home's Recent apps section for every mode.
   11 and later, any screen). The picture goes to Pictures/Screenshots (MediaStore), as Android's own do. Screenshot is
   a row on the Game tab, with Share after it, and a catalog item a person can pin on Home. Without either route the
   row says what would make it work.
+- **Power and performance (slice C16).** System > Power keeps performance mode and adds: the battery's health,
+  temperature and charge rate (the battery broadcast), Battery saver (Android's screen), and what `PowerProbe` finds
+  on this device rather than assumes per model. A fan mode or a charge limit is shown with its value where the device
+  keeps one as an Android setting (`settings list system|global|secure` through the helper app, keys naming a fan or a
+  charge limit, stop or protection); changing it opens the device's own page where one resolves, else Android's
+  battery page. Each CPU cluster's clock and governor (cpufreq) and the GPU's clock (kgsl or a devfreq node) are shown
+  where the kernel lets an app read them and left out where it does not. With Settings > Risky actions > Root-level
+  commands and a root provider, each cluster has its governor and its highest clock to pick (cpufreq's own
+  `scaling_governor` and `scaling_max_freq`, written as root, values checked against what the cluster lists). Owner
+  question 5's default (yes, behind Root-level commands, off by default).
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 
@@ -8222,7 +8232,8 @@ or the system through the privileged helper:
   of its own or one the person gave it, is not this class.
 - **Change display settings** (`DISPLAY_SETTINGS`): the helper app setting a screen's refresh rate for every app
   (`cmd display set-user-preferred-display-mode`, the companion's System > Display cards, Droidtop/tracker#414).
-- **Root-level commands** (`ROOT_COMMANDS`): commands run as root through a provider that holds it. Today that is
+- **Root-level commands** (`ROOT_COMMANDS`): commands run as root through a provider that holds it: a CPU cluster's
+  governor and highest clock from the companion's System > Power (`PowerProbe.write`), and
   placing a RetroArch core in RetroArch's private folder (`RetroArchCores`); with the class off droidtop does not
   even look at the cores folder through the root helper, and the core row opens RetroArch's Core Downloader as it
   does without root.

@@ -82,6 +82,8 @@ internal fun CompanionSystemTab() {
                         } else {
                             // One card per screen above the Quick Menu's Display items (slice C14).
                             if (card.id == "display") CompanionDisplayCards()
+                            // Battery, clocks and what the probe finds (slice C16), under performance mode.
+                            if (card.id == "power") CompanionPowerCard()
                             CompanionCatalogItems(
                                 card.items,
                                 onChanged = { version++ },

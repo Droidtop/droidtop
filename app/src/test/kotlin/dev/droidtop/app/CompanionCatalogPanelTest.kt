@@ -47,8 +47,9 @@ class CompanionCatalogPanelTest {
     @Test fun performanceModeIsOneCatalogIdOnPower() {
         val cards = companionSystemCards(::quick, performance, privacy)
         assertEquals(listOf(GamingSettingsCatalog.ID_PERFORMANCE_MODE), cards.first { it.id == "power" }.items.map { it.id })
-        // No provider or no game: no Power card at all, never a dead row.
-        assertFalse(companionSystemCards(::quick, null, privacy).any { it.id == "power" })
+        // No provider or no game: no performance mode row, never a dead one; the card stays for the battery and
+        // clocks it draws itself (slice C16).
+        assertEquals(emptyList<String>(), companionSystemCards(::quick, null, privacy).first { it.id == "power" }.items.map { it.id })
     }
 
     @Test fun onlyTheSystemCardStartsOpen() {
