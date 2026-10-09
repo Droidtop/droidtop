@@ -1,10 +1,7 @@
 name: Commit hygiene
 
-# Review gate: this repository's history carries no references to AI models
-# or AI coding tools: none in commit messages (co-author trailers,
-# "Generated with" lines, session links, tool or model names) and none in
-# author or committer identities. A push or pull request adding such a
-# commit fails here. It reads commit metadata only and needs no build.
+# The rule lives once, in Droidtop/droidtop-platforms, and is pinned by commit
+# (Droidtop/tracker#199).
 on:
   push:
   pull_request:
@@ -13,32 +10,5 @@ permissions:
   contents: read
 
 jobs:
-  no-model-references:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Reject commits that reference an AI model or tool
-        env:
-          BEFORE: ${{ github.event.before }}
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          if [ -n "$BASE" ]; then range="$BASE..$HEAD"
-          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE" 2>/dev/null; then range="$BEFORE..$HEAD"
-          else range="$HEAD~1..$HEAD"; fi
-          # Vendors, models and coding tools, matched as whole words in the
-          # author, committer and full message of every commit in the push.
-          words='anthropic|claude|openai|chatgpt|gpt-?[0-9o]+|codex|copilot|gemini|bard|llama|mistral|mixtral|deepseek|qwen|kimi|moonshot|glm-?[0-9]|zhipu|nemotron|grok|xai|cohere|ollama|openrouter|opencode|windsurf|tabnine|llms?|large language model'
-          pattern="(^|[^a-z0-9])(${words})([^a-z0-9]|\$)|🤖|co-authored-by:.*(noreply|bot)@"
-          bad=$(git log --format='%H%x09%an <%ae>%x09%s' "$range" | while IFS=$'\t' read -r sha who subj; do
-            if git log -1 --format='%an <%ae>%n%cn <%ce>%n%B' "$sha" | grep -Eiq "$pattern"; then echo "$sha $who: $subj"; fi
-          done)
-          if [ -n "$bad" ]; then
-            echo "These commits reference an AI model or tool, which this repository does not accept:"
-            echo "$bad"
-            exit 1
-          fi
-          echo "No AI model or tool references in $range."
+  hygiene:
+    uses: Droidtop/droidtop-platforms/.github/workflows/commit-hygiene.yml@84f44633fc5a8441abae8d6679d2fd27b39cd2ee
