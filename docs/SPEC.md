@@ -7942,8 +7942,9 @@ of Valve's is used. Each role plays the active ES-DE theme's own sample where
 it maps to one of ES-DE's seven navigation sounds (move and slider: scroll; tab:
 quicksysselect; system: systembrowse; confirm, open, page in and toggle on:
 select; back, close, page out and toggle off: back; launch; favourite), else
-droidtop's bundled set (`assets/ui-sounds/<role>.ogg` or `.wav`, a CC0 pack;
-not bundled yet, waiting on the owner's approval of the download), else nothing
+droidtop's bundled set (`assets/ui-sounds/<role>.ogg` or `.wav`: one file per
+role picked from Kenney's CC0 "Interface Sounds" pack, under 200 KB in all,
+credited in NOTICE.md; the owner approved the download, 2026-10-09), else nothing
 (`uiSoundSource`): the theme overrides the bundled set role by role (#211). At
 most one cue sounds per 50 ms, the launch cue excepted (`CueThrottle`); the
 direction roles (move, bump, tab, system, slider) are not played for a
@@ -7955,7 +7956,7 @@ theme's samples, so the launch hand-off below releases and reloads it too.
 **Toasts** go through one helper (`shellToast`): the toast cue, then Android's
 own toast, kept on purpose because Android draws it above every window, where a
 toast drawn in the shell's own window would sit under an open menu or the game
-page (so Steam's toast motion is not taken). **Dialogs** draw their choices with
+page (so Steam's toast motion is not taken; accepted by the owner, 2026-10-09). **Dialogs** draw their choices with
 one component (`DialogChoices`, Steam's power dialog): flat rows on one plate,
 groups split by a thin rule in the scrim role, the safe choices first and the
 way out (OK, Cancel, Decide later) last in a group of its own, the row under the

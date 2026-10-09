@@ -192,6 +192,12 @@ and keeps its own licence, named per file in that repository's
 file are theirs. The Turnip feed labels there follow DroidDeck's
 `gpu/TurnipReleases.kt` (https://github.com/Droid-Deck/DroidDeck, GPL-3.0).
 
+## Interface sounds
+
+The shell menu, dialog and toast sounds in `shell-gamepad/src/main/assets/ui-sounds/` are
+eighteen files picked from "Interface Sounds" by Kenney (https://kenney.nl/assets/interface-sounds),
+released under CC0 1.0 (public domain); used unmodified.
+
 ## Design references (not vendored, no code copied)
 
 Moonlight Android (input interaction model, LAN host discovery approach),
