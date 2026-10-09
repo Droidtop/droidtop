@@ -2967,6 +2967,25 @@ object AppSettingsCatalogs {
                     ),
                 ),
                 CatalogGroup(
+                    // The library-wide runs, as jobs under Downloads and installs (docs/SPEC.md 7h,
+                    // "The whole library"), honouring the "Scrape these games" filter below.
+                    id = "scraper_run",
+                    title = "Scrape now",
+                    items = listOf(
+                        ActionItem(
+                            id = "scrape_run_all",
+                            title = "Scrape the whole library",
+                            subtitle = "Console games, then PC and engine games, with the sources chosen above",
+                            run = { ctx -> LibraryScrapeJob.start(ctx, "Scrape the whole library") },
+                        ),
+                        ActionItem(
+                            id = "scrape_run_pc",
+                            title = "Scrape PC and engine games",
+                            run = { ctx -> LibraryScrapeJob.start(ctx, "Scrape PC and engine games", pcOnly = true) },
+                        ),
+                    ),
+                ),
+                CatalogGroup(
                     id = "scraper_options",
                     title = "Scrape options",
                     items = listOf(

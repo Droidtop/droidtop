@@ -102,6 +102,46 @@ class LibraryScrapeJobTest {
     }
 
     @Test
+    fun systemsWithNothingToDoShareOneLineThatNamesThem() {
+        val idle = "nothing matches the \"Games missing artwork or metadata\" scrape filter."
+        val summary = LibraryScrapeJob.summarize(
+            listOf(
+                "NES: $idle",
+                "GBA: found 0, no match for 1, 0 failed (of 1 targeted).\nNo match: Pokemon.gba.",
+                "SNES: $idle",
+                "PC and engine games: matched 4 of 5.",
+            ),
+            hasPc = true,
+        )
+        assertEquals(
+            "Scraped 3 systems and the PC and engine games\n" +
+                "GBA: found 0, no match for 1, 0 failed (of 1 targeted).\nNo match: Pokemon.gba.\n" +
+                "PC and engine games: matched 4 of 5.\n" +
+                "Nothing to scrape under the scrape filter: NES, SNES.",
+            summary,
+        )
+    }
+
+    @Test
+    fun theQueueSkipsAStepThatSaidNothing() = runBlocking {
+        val summary = LibraryScrapeJob.runQueue(queue, from = null, step = { index, _, _, _ ->
+            StepResult(if (index == 1) "" else "${queue[index].second}: done")
+        }, report = { _, _, _ -> })
+        assertEquals("Scraped 2 systems\nNES: done\nGBA: done", summary)
+    }
+
+    @Test
+    fun thePcItemResumesAfterTheLastEntryIdItFinished() = runBlocking {
+        val items = listOf("/g/nes" to "NES", LibraryScrapeJob.PC_ITEM to "PC and engine games")
+        val recorder = Recorder()
+        LibraryScrapeJob.runQueue(items, from = Position(LibraryScrapeJob.PC_ITEM, "wine:42"), step = { index, resumeAfter, _, _ ->
+            recorder.steps += index to resumeAfter
+            StepResult("ok")
+        }, report = recorder.report)
+        assertEquals(listOf(1 to "wine:42"), recorder.steps)
+    }
+
+    @Test
     fun progressWithinASystemMapsOntoTheWholeQueue() = runBlocking {
         val percents = mutableListOf<Int>()
         LibraryScrapeJob.runQueue(listOf("/g/a" to "A", "/g/b" to "B"), from = null, step = { index, _, _, progress ->

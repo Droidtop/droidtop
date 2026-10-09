@@ -10545,6 +10545,33 @@ subject they log), the app opts out of backups, Share diagnostics never includes
 settings backup exports them only in its opt-in encoded section, read from and restored into the
 store. Verified flags and "Stay signed in" are plain preferences: they are not secrets.
 
+**The whole library, and a scrape names what it missed (directed 2026-10-08, Droidtop/tracker#374).**
+"Scrape all systems" walked console folders only, so installed Windows and engine games stayed text-only
+cards, and its dialog said "no match for 2" without saying which two.
+- **One job, one queue.** `LibraryScrapeJob` (7h "Jobs", 12a) now ends its queue with one item for every
+  PC and engine game (`PC_ITEM`, scraped by `PcScraper.scrape` with the same filter, content toggles and
+  source selection as the per-game Scrape). "Scrape all systems" is the console folders and then that item;
+  "Scrape PC and engine games" (the Games options menu, and Settings > Library > Scraper > Scrape now) is
+  that item alone; "Scrape the whole library" on the Scraper page is the same as "Scrape all systems".
+  A single system or folder stays console only. The games come from the library's own index
+  (`LibraryScrapeJob.libraryGames`, set by :app; a walk only when the index is empty), sorted by id; the
+  checkpoint is the last id finished, so Pause, Resume and a restart carry on after it. A source that is not
+  ready (`ScraperReadiness`) leaves its half out with its own sentence; the other half still runs, and a
+  console source that refused everything does not stop the PC games, which ask a different source.
+- **Spacing.** Games in a PC pass are asked about at least 1.6 s apart (`PcScraper.GAME_PACE_MS`), because the
+  Steam store allows about 200 requests in five minutes and one game can ask several sources; metadata rows
+  are read in slices of 500 ids (a library has thousands of entries and SQLite caps variables). A pass over a
+  few thousand games therefore takes hours; it is a pausable job, not a screen to wait on.
+- **Names and reasons.** `ScrapeMisses` collects the games a pass did not fill, by name: no match, needs your
+  pick (with the candidate count), failed (with the message). The summary names up to six of each and counts
+  the rest, in the ROM and the PC pass alike. Every game leaves one `scrape:` line in `logs/scan.log`: what
+  was written and from which source, or `no match for "<searched title>"`, `N candidates, none exact ...:
+  needs a pick`, `refused, HTTP n: reason`, `failed: message`; each pass ends with one `scrape: ... summary:`
+  line. The result dialog is the shortest honest text: systems the filter left nothing to do for are one line
+  naming them (`LibraryScrapeJob.summarize`), not a sentence each.
+- **Not done here.** The options menu's result panel still scrolls by touch only; making the shared
+  `MenuPanel` scroll with the D-pad belongs with the shell-gamepad work (Droidtop/tracker, filed).
+
 ### PC and engine games: what the scrape asks, and of whom
 
 The ROM scrapers index console dumps by platform id and file hash; none of

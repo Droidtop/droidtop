@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.net.Uri
 import dev.droidtop.library.settings.Modes
+import kotlinx.coroutines.flow.lastOrNull
 import kotlinx.coroutines.launch
 
 /**
@@ -33,6 +34,11 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // Native jobs register before attach restores any, so a paused scrape found on
         // disk can be resumed (docs/SPEC.md 12a "Jobs").
         dev.droidtop.library.scraper.LibraryScrapeJob.register(appContext)
+        // The games the scrape of PC and engine games works through: the library's own index, walked
+        // only when it has none yet (never a second scan of its own).
+        dev.droidtop.library.scraper.LibraryScrapeJob.libraryGames = { ctx ->
+            dev.droidtop.app.LibraryCore.library(ctx).scanKindsProgressive(dev.droidtop.library.LibraryKinds.GAMES).lastOrNull().orEmpty()
+        }
         // The stores droidtop runs itself, then their installs and updates,
         // a job each (docs/SPEC.md 7g, "Stores").
         dev.droidtop.stores.BuiltInStores.register()

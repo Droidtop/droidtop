@@ -38,6 +38,9 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /** The one label for the PC/engine scrape action, shared by the list that offers it and the handler that runs it. */
 private const val SCRAPE_PC_GAMES = "Get artwork and details"
+
+/** The library-wide run over every PC and engine game, a job like "Scrape all systems" (Droidtop/tracker#374). */
+private const val SCRAPE_ALL_PC = "Scrape PC and engine games"
 // Renamed from "Stores and folders" (uisources agent, 2026-09-28): the
 // settings screen it opens now holds only Game folders, Windows games
 // and Downloads -- store accounts moved to the "Accounts and sources"
@@ -141,6 +144,7 @@ internal fun GamelistOptionsMenu(
             add(GetGamesEntry.LABEL)
             add("Rescan library")
             add("Scrape all systems")
+            add(SCRAPE_ALL_PC)
             add(orphansLabel)
             add("Update platform databases")
         } else {
@@ -202,8 +206,8 @@ internal fun GamelistOptionsMenu(
 
     // The scrape is a job (docs/SPEC.md 12a "Jobs"): this only starts it, or finds it already
     // running or paused. Its progress, Pause, Resume and Cancel live under Downloads and installs.
-    fun startScrapeJob(title: String, systemId: String?) {
-        val started = dev.droidtop.library.scraper.LibraryScrapeJob.start(context, title, systemId) { summary ->
+    fun startScrapeJob(title: String, systemId: String?, pcOnly: Boolean = false) {
+        val started = dev.droidtop.library.scraper.LibraryScrapeJob.start(context, title, systemId, pcOnly = pcOnly) { summary ->
             status = summary
             scope.launch { onScraped() }
         }
@@ -230,6 +234,9 @@ internal fun GamelistOptionsMenu(
             }
             "Scrape all systems" -> {
                 startScrapeJob(title = "Scrape all systems", systemId = null)
+            }
+            SCRAPE_ALL_PC -> {
+                startScrapeJob(title = SCRAPE_ALL_PC, systemId = null, pcOnly = true)
             }
             ORPHANS_FIND -> {
                 if (busy) return

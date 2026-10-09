@@ -13,6 +13,7 @@ import dev.droidtop.library.toLibraryEntryKind
 import dev.droidtop.runtime.prefs.PrefsFile
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 // The PC/engine half of the scrape engine, built on the same model as
@@ -290,6 +291,12 @@ val LibraryEntry.isPcOrEngineGame: Boolean
  */
 object PcScraper {
 
+    /** Games are asked about at least this far apart: the Steam store allows about 200 requests in five minutes. */
+    private const val GAME_PACE_MS = 1_600L
+
+    /** How many ids one metadata read asks for (SQLite's variable limit is 999 on older Android). */
+    private const val METADATA_READ_CHUNK = 500
+
     /** The live source for the current selection, or null when it is not usable (see [ScraperReadiness.pcSourceProblem]). */
     fun source(context: Context): PcMetadataSource? = when (PcScraperSourcePrefs.get(context)) {
         PcScraperSource.LUTRIS -> LutrisSource
@@ -402,9 +409,16 @@ object PcScraper {
     suspend fun scrape(
         context: Context,
         entries: List<LibraryEntry>,
+        // The library-scrape job's checkpoint (docs/SPEC.md 12a "Jobs"): [entries] arrive sorted by
+        // id and every entry up to and including this id was finished by the previous run.
+        resumeAfter: String? = null,
+        // Told after each game has been fully handled, never for one a pause or cancel interrupted.
+        onEntryDone: (String) -> Unit = {},
+        // Told when the source refused every request this pass made, so a combined run does not go on asking.
+        onRefusedEverything: () -> Unit = {},
         onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
     ): String = withContext(Dispatchers.IO) {
-        if (entries.isEmpty()) return@withContext "No PC or engine games to scrape."
+        if (entries.isEmpty()) return@withContext "PC and engine games: none in the library."
         ScraperReadiness.pcSourceProblem(context)?.let { return@withContext it }
         val source = source(context) ?: return@withContext "No PC scraper source is configured."
         val wantMetadata = ScrapeOptionsPrefs.scrapeMetadata(context)
@@ -414,9 +428,13 @@ object PcScraper {
         }
 
         val dao = RomDatabase.get(context).romDao()
-        val existing = dao.getGameMetadata(entries.map { it.id }).associateBy { it.id }
+        // A library is thousands of entries, and one IN list that long can pass SQLite's limit on
+        // variables; the rows are read in slices.
+        val existing = entries.map { it.id }.chunked(METADATA_READ_CHUNK)
+            .flatMap { dao.getGameMetadata(it) }.associateBy { it.id }
         val filter = ScrapeOptionsPrefs.filter(context)
-        val targets = entries.filter { entry ->
+        val candidates = if (resumeAfter == null) entries else entries.filter { it.id > resumeAfter }
+        val targets = candidates.filter { entry ->
             val row = existing[entry.id]
             val noMeta = row?.description == null && row?.genre == null && row?.developer == null
             val scrapedCover = row?.artworkPath?.let { File(it).isFile } == true
@@ -434,20 +452,32 @@ object PcScraper {
                 ScrapeFilter.ALL -> true
             }
         }
-        if (targets.isEmpty()) return@withContext "Nothing matches the \"${filter.label}\" scrape filter."
+        if (targets.isEmpty()) {
+            return@withContext if (resumeAfter != null && candidates.isEmpty()) {
+                "PC and engine games: nothing was left to scrape."
+            } else {
+                "PC and engine games: nothing matches the \"${filter.label}\" scrape filter."
+            }
+        }
 
         val counts = PcScrapeCounts(targeted = targets.size)
         val flavour = PcFlavour(context)
         var consecutiveRefusals = 0
         for ((index, entry) in targets.withIndex()) {
+            // A pause or cancel lands here, between games, never inside one.
+            kotlin.coroutines.coroutineContext.ensureActive()
             // The same rule as the ROM pass: several refusals in a row are
             // about the server, not about any game, and asking again only
             // spends the user's time to be told the same thing.
             if (consecutiveRefusals >= REFUSAL_ABORT_THRESHOLD) break
             onProgress(index, targets.size)
+            // The sources are public services with their own limits (the Steam store allows about
+            // 200 requests in five minutes) and one game can ask several of them: games are spaced.
+            if (index > 0) kotlinx.coroutines.delay(GAME_PACE_MS)
             counts.attempted++
             try {
                 val outcome = scrapeOne(context, entry, source, flavour)
+                logOutcome(source.label, entry, outcome)
                 if (outcome is PcOutcome.Refused) {
                     consecutiveRefusals++
                     counts.lastRefusal = outcome.refusal
@@ -457,26 +487,50 @@ object PcScraper {
                 when (outcome) {
                     PcOutcome.ByStoreId -> counts.byStoreId++
                     PcOutcome.ByName -> counts.byName++
-                    PcOutcome.NeedsPicking -> counts.needsPicking++
-                    PcOutcome.NoMatch -> counts.noMatch++
+                    is PcOutcome.NeedsPicking -> {
+                        counts.needsPicking++
+                        counts.misses.add(ScrapeMisses.Kind.NEEDS_PICKING, entry.title, "${outcome.candidates} candidates")
+                    }
+                    is PcOutcome.NoMatch -> {
+                        counts.noMatch++
+                        counts.misses.add(ScrapeMisses.Kind.NO_MATCH, entry.title)
+                    }
                     is PcOutcome.Refused -> counts.refused++
                 }
             } catch (t: Exception) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
                 counts.failed++
                 consecutiveRefusals = 0
+                counts.misses.add(ScrapeMisses.Kind.FAILED, entry.title, t.message)
+                dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] via ${source.label}: failed: ${t.message}")
                 android.util.Log.e("droidtop.Scraper", "Failed to scrape ${entry.title}", t)
             }
+            onEntryDone(entry.id)
         }
+        if (counts.attempted > 0 && counts.refused == counts.attempted) onRefusedEverything()
         counts.flavourNotes = flavour.notes()
-        formatPcScrapeSummary(source.label, counts)
+        formatPcScrapeSummary(source.label, counts).also {
+            dev.droidtop.library.ScanLog.write("scrape: PC and engine games summary: ${it.replace('\n', ' ')}")
+        }
+    }
+
+    /** One scan.log line per game that was not written, naming the game and why; a written game logs itself in [write]. */
+    private fun logOutcome(sourceLabel: String, entry: LibraryEntry, outcome: PcOutcome) {
+        val what = when (outcome) {
+            PcOutcome.ByStoreId, PcOutcome.ByName -> return
+            is PcOutcome.NoMatch -> "no match for \"${outcome.searched}\""
+            is PcOutcome.NeedsPicking -> "${outcome.candidates} candidates, none exact for \"${outcome.searched}\": needs a pick"
+            is PcOutcome.Refused -> "refused, HTTP ${outcome.refusal.httpStatus}" + (outcome.refusal.reason?.let { ": $it" } ?: "")
+        }
+        dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] via $sourceLabel: $what")
     }
 
     /** What happened to one game in the automatic pass; each lands in its own bucket of the summary. */
     private sealed interface PcOutcome {
         data object ByStoreId : PcOutcome
         data object ByName : PcOutcome
-        data object NeedsPicking : PcOutcome
-        data object NoMatch : PcOutcome
+        data class NeedsPicking(val searched: String, val candidates: Int) : PcOutcome
+        data class NoMatch(val searched: String) : PcOutcome
         data class Refused(val refusal: ScrapeLookup.Refused) : PcOutcome
     }
 
@@ -514,14 +568,14 @@ object PcScraper {
         val title = searchTitleFor(entry)
         return when (val lookup = source.search(title)) {
             is ScrapeLookup.Refused -> PcOutcome.Refused(lookup)
-            ScrapeLookup.NoMatch -> PcOutcome.NoMatch
+            ScrapeLookup.NoMatch -> PcOutcome.NoMatch(title)
             is ScrapeLookup.Found -> when (val decision = PcMatching.decide(title, lookup.value)) {
                 is PcMatching.Decision.Confident -> {
                     write(context, entry, flavour.complete(entry, decision.match), confidence = "name", replaceExisting = false)
                     PcOutcome.ByName
                 }
-                is PcMatching.Decision.Ambiguous -> PcOutcome.NeedsPicking
-                PcMatching.Decision.None -> PcOutcome.NoMatch
+                is PcMatching.Decision.Ambiguous -> PcOutcome.NeedsPicking(title, decision.matches.size)
+                PcMatching.Decision.None -> PcOutcome.NoMatch(title)
             }
         }
     }
@@ -622,6 +676,11 @@ object PcScraper {
             iconPath = iconPath ?: row?.iconPath,
         )
         dao.upsertGameMetadata(updated.copy(fieldSources = FieldSources.merge(had, sources)))
+        // Which source answered and what it wrote, for someone asking why a game shows what it shows.
+        dev.droidtop.library.ScanLog.write(
+            "scrape: ${entry.title} [pc] ($confidence): " +
+                "wrote ${sources.entries.joinToString(",") { "${it.key}=${it.value}" }.ifEmpty { "nothing" }}",
+        )
     }
 
     /**
@@ -690,6 +749,8 @@ internal class PcScrapeCounts(val targeted: Int) {
     var failed = 0
     var refused = 0
     var lastRefusal: ScrapeLookup.Refused? = null
+    /** The games behind [noMatch], [needsPicking] and [failed], by name. */
+    val misses = ScrapeMisses()
     /** What the flavour lookups for matched games ran into ([PcFlavour.notes]); empty when nothing. */
     var flavourNotes: String = ""
 }
@@ -716,5 +777,6 @@ internal fun formatPcScrapeSummary(sourceLabel: String, counts: PcScrapeCounts):
         append('.')
         if (counts.refused > 0) append(describeRefusal(counts.refused, counts.attempted, counts.lastRefusal))
         if (counts.flavourNotes.isNotEmpty()) append(' ').append(counts.flavourNotes)
+        append(counts.misses.sentences())
     }
 }

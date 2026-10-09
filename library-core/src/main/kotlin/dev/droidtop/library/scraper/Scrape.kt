@@ -132,6 +132,8 @@ suspend fun scrapeSystemArtwork(
     var hashMatched = 0
     var thumbnailed = 0
     var miximaged = 0
+    // The games the pass did not fill, by name (Droidtop/tracker#374).
+    val misses = ScrapeMisses()
     // Metadata plugins (docs/plugin-api.md 3 A3): asked per game for what the selected source did not find,
     // never for list rendering. Null when none is running, which is the usual case: nothing is bound then.
     val pluginSession = if (wantMetadata) dev.droidtop.library.integrations.PluginMetadataSources.open(context) else null
@@ -415,10 +417,20 @@ suspend fun scrapeSystemArtwork(
                 found++
             } else if (refusal != null) {
                 refused++
+                dev.droidtop.library.ScanLog.write(
+                    "scrape: ${romFile.name} [${system.id}] via ${source.name.lowercase()}: refused, HTTP ${refusal.httpStatus}" +
+                        (refusal.reason?.let { ": $it" } ?: ""),
+                )
+            } else {
+                // The source answered and has no such game: the one outcome that is a statement about the library.
+                misses.add(ScrapeMisses.Kind.NO_MATCH, romFile.name)
+                dev.droidtop.library.ScanLog.write("scrape: ${romFile.name} [${system.id}] via ${source.name.lowercase()}: no match")
             }
         } catch (t: Exception) {
             if (t is kotlinx.coroutines.CancellationException) throw t
             failed++
+            misses.add(ScrapeMisses.Kind.FAILED, romFile.name, t.message)
+            dev.droidtop.library.ScanLog.write("scrape: ${romFile.name} [${system.id}] via ${source.name.lowercase()}: failed: ${t.message}")
             android.util.Log.e("droidtop.Scraper", "Failed to scrape ${romFile.name}", t)
         }
         onRomDone(romFile)
@@ -439,7 +451,8 @@ suspend fun scrapeSystemArtwork(
         refused = refused,
         lastRefusal = lastRefusal,
         sourceRefused = sourceRefused,
-    )
+        misses = misses,
+    ).also { dev.droidtop.library.ScanLog.write("scrape: ${system.id} summary: ${it.replace('\n', ' ')}") }
 }
 
 /**
@@ -469,6 +482,8 @@ internal fun formatScrapeSummary(
     // Every request the source refused, including those whose game the
     // keyless thumbnails found anyway ([refused] counts only the rest).
     sourceRefused: Int = refused,
+    // The games behind "no match" and "failed", by name.
+    misses: ScrapeMisses = ScrapeMisses(),
 ): String {
     totalRefusalSummary(systemName, attempted, found, refused, lastRefusal)?.let { return it }
     // The source refused everything, but the keyless fallback found some
@@ -492,6 +507,7 @@ internal fun formatScrapeSummary(
         if (attempted < targeted) append(", $attempted asked for before giving up")
         append(").")
         if (sourceRefused > 0) append(describeRefusal(sourceRefused, attempted, lastRefusal))
+        append(misses.sentences())
     }
 }
 
