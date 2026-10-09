@@ -54,6 +54,18 @@ class SystemShizukuOps : ElevatedBackend {
         return run(argv, EXEC_TIMEOUT_MS)
     }
 
+    /**
+     * A long-lived process in Shizuku's server, for the rooted desktop stack
+     * (dev.droidtop.runtime.RootProcess): no timeout and no output cap, the
+     * caller owns its streams and its lifetime. Bounded only in size, so a
+     * shell script for a container still fits.
+     */
+    override fun spawn(argv: List<String>): Process? {
+        if (argv.isEmpty() || argv.size > MAX_ARGS || argv.sumOf { it.length } > MAX_SPAWN_CHARS || argv.any { it.isEmpty() }) return null
+        if (notReady() != null) return null
+        return newProcess(argv)
+    }
+
     override fun grantPermission(packageName: String, permission: String): Boolean {
         if (!PACKAGE_NAME.matches(packageName) || !PERMISSION_NAME.matches(permission)) return false
         if (notReady() != null) return false
@@ -87,18 +99,7 @@ class SystemShizukuOps : ElevatedBackend {
      * reflection, as the Shizuku provider plugin does; a user service would add a second process for the same effect.
      */
     private fun run(argv: List<String>, timeoutMs: Long): ShellOutput? {
-        val process = try {
-            val method = Shizuku::class.java.getDeclaredMethod(
-                "newProcess",
-                Array<String>::class.java,
-                Array<String>::class.java,
-                String::class.java,
-            )
-            method.isAccessible = true
-            method.invoke(null, argv.toTypedArray(), null, null) as Process
-        } catch (t: Throwable) {
-            return null
-        }
+        val process = newProcess(argv) ?: return null
         val out = Capture(process.inputStream)
         val err = Capture(process.errorStream)
         out.start()
@@ -114,6 +115,20 @@ class SystemShizukuOps : ElevatedBackend {
         } finally {
             runCatching { process.destroy() }
         }
+    }
+
+    /** [argv] started in Shizuku's server, or null when Shizuku cannot start it. */
+    private fun newProcess(argv: List<String>): Process? = try {
+        val method = Shizuku::class.java.getDeclaredMethod(
+            "newProcess",
+            Array<String>::class.java,
+            Array<String>::class.java,
+            String::class.java,
+        )
+        method.isAccessible = true
+        method.invoke(null, argv.toTypedArray(), null, null) as Process
+    } catch (t: Throwable) {
+        null
     }
 
     /** Reads one stream on its own thread so a full pipe never stalls the command, keeping the first [MAX_STREAM_CHARS] characters. */
@@ -140,6 +155,7 @@ class SystemShizukuOps : ElevatedBackend {
         private const val REQUEST_CODE = 1
         private const val MAX_ARGS = 64
         private const val MAX_ARG_LENGTH = 4096
+        private const val MAX_SPAWN_CHARS = 256 * 1024
         private const val MAX_STREAM_CHARS = 1024 * 1024
         private const val STREAM_JOIN_MS = 500L
         private const val STOP_TIMEOUT_MS = 8_000L

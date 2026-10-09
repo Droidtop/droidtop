@@ -121,18 +121,12 @@ open class PluginRuntimeService : PluginProcessService() {
     }
 
     /**
-     * Whether this device has a root solution at all, folded into [PluginContext.hasRootApproval] with the plugin's own
-     * approval. "su -c id" answering with exit 0; cached for the process, since a device does not gain or lose root
-     * between one call and the next.
+     * Whether this device has root at all, folded into [PluginContext.hasRootApproval] with the plugin's own
+     * approval: the elevated helper (Shizuku or Sui) running `id -u` as root ([dev.droidtop.runtime.RootProcess]);
+     * droidtop never runs `su` itself. Cached for the process, since a device does not gain or lose root between one
+     * call and the next.
      */
-    private val deviceHasRoot: Boolean by lazy {
-        runCatching {
-            val process = ProcessBuilder("sh", "-c", "su -c id").start()
-            process.inputStream.bufferedReader().readText()
-            process.errorStream.bufferedReader().readText()
-            process.waitFor() == 0
-        }.getOrDefault(false)
-    }
+    private val deviceHasRoot: Boolean by lazy { dev.droidtop.runtime.RootProcess.accessNow().available }
 
     companion object {
         // The permission Shizuku's manager grants once the user pairs and approves droidtop there.

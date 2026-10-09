@@ -44,15 +44,36 @@ class RootAccessTest {
     }
 
     @Test
-    fun `no su is ABSENT, a refusing su is DENIED, success is AVAILABLE`() {
+    fun `no helper is ABSENT, a helper not running as root is DENIED, uid 0 is AVAILABLE`() {
         assertEquals(
             RootAccess.ABSENT,
-            RootProcess.accessOf(RootProcessResult(ProcessRunner.NOT_LAUNCHED, "", "could not start su")),
+            RootProcess.accessOf(RootProcessResult(ProcessRunner.NOT_LAUNCHED, "", "no elevated helper")),
         )
+        assertEquals(RootAccess.DENIED, RootProcess.accessOf(RootProcessResult(0, "2000\n", "")))
         assertEquals(RootAccess.DENIED, RootProcess.accessOf(RootProcessResult(1, "", "permission denied")))
-        assertEquals(RootAccess.AVAILABLE, RootProcess.accessOf(RootProcessResult(0, "uid=0(root)", "")))
+        assertEquals(RootAccess.AVAILABLE, RootProcess.accessOf(RootProcessResult(0, "0\n", "")))
         assertFalse(RootAccess.ABSENT.available)
         assertFalse(RootAccess.DENIED.available)
         assertTrue(RootAccess.AVAILABLE.available)
+    }
+
+    @Test
+    fun `root commands go to the helper as an argv, and no helper is a result`() = runBlocking {
+        val asked = mutableListOf<List<String>>()
+        val helper = object : dev.droidtop.runtime.tasks.PrivilegedShell {
+            override fun forceStop(packageName: String): dev.droidtop.runtime.tasks.ForceStopResult =
+                dev.droidtop.runtime.tasks.ForceStopResult.NoProvider
+            override fun exec(argv: List<String>): dev.droidtop.runtime.tasks.ShellOutput? = null
+            override fun spawn(argv: List<String>): Process {
+                asked += argv
+                return ProcessBuilder("echo", "0").start()
+            }
+        }
+        val result = RootProcess.run(helper, listOf("sh", "-c", "printf %s \"\$1\"", "sh", "it's"), null)
+        assertEquals(listOf(listOf("sh", "-c", "printf %s \"\$1\"", "sh", "it's")), asked)
+        assertTrue(result.succeeded)
+
+        val none = RootProcess.run(dev.droidtop.runtime.tasks.NoPrivilegedOps, listOf("id", "-u"), null)
+        assertFalse(none.launched)
     }
 }

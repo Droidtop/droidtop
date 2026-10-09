@@ -104,6 +104,8 @@ class ElevatedShell(
 
     override fun grantPermission(packageName: String, permission: String): Boolean =
         target().grantPermission(packageName, permission)
+
+    override fun spawn(argv: List<String>): Process? = target().spawn(argv)
 }
 
 /** The user's pick, kept in droidtop's own preferences and read once. */

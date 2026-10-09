@@ -27,7 +27,8 @@ import java.util.UUID
  * Root-path Linux container backend, driving vendor/droidspaces' `droidspaces`
  * CLI binary (bundled as an APK asset, see [DroidSpacesBinary] — a static
  * musl binary, cross-compiled by build-scripts/build-vendor-deps.sh) as a
- * subprocess via `su -c` ([RootProcess]). Not a JNI/library integration —
+ * root subprocess of the elevated helper, Shizuku or Sui ([RootProcess];
+ * droidtop never runs `su`). Not a JNI/library integration —
  * droidspaces is designed and documented as a command-line tool
  * (Documentation/Linux-CLI.md), so that's the integration surface used here.
  *

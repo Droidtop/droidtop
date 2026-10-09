@@ -15,9 +15,10 @@ import dev.droidtop.runtime.linux.root.RootTarUnpacker
 /**
  * The one place backend selection happens — root gives
  * [DroidSpacesRuntime]'s real namespace/cgroup isolation, anything else
- * gets [ProotRuntime]. Root is checked by actually running a root shell
- * command rather than inferring from e.g. build tags — the only real
- * signal. Shared by [DesktopSessionService], [CatalogScreenActivity] and
+ * gets [ProotRuntime]. Root is checked by actually running `id -u` through
+ * the elevated helper the person chose (Shizuku or Sui, [RootProcess];
+ * droidtop never runs `su`) rather than inferring from e.g. build tags —
+ * the only real signal. Shared by [DesktopSessionService], [CatalogScreenActivity] and
  * onboarding's Desktop step (one mechanism, not a copy per caller).
  *
  * Both backends pull through the same [CraneRootfsPuller] into one
@@ -25,9 +26,10 @@ import dev.droidtop.runtime.linux.root.RootTarUnpacker
  * droidspaces, the app itself for proot).
  *
  * Selection REPORTS root as a state ([rootAccess]) and never fails on its
- * absence: on an unrooted device `su` cannot even be started, and that
- * used to escape this function as an IOException and crash droidtop at
- * launch in every non-Gaming mode (emulator rig, 2026-09-10). Root is
+ * absence: with no helper, or one running as the ADB shell, the answer is
+ * ABSENT or DENIED (an unstartable `su` used to escape this function as an
+ * IOException and crash droidtop at launch in every non-Gaming mode,
+ * emulator rig, 2026-09-10). Root is
  * desktop-only, and even in Desktop mode its absence only means the
  * proot backend.
  */

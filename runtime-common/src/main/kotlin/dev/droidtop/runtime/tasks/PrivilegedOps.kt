@@ -33,6 +33,15 @@ interface PrivilegedShell {
 
     /** Grant a runtime permission to an installed package when the provider supports it. */
     fun grantPermission(packageName: String, permission: String): Boolean = false
+
+    /**
+     * Starts [argv] as a long-lived process of the helper, its standard
+     * streams the returned [Process]'s, for a command that outlives one call
+     * or takes input ([dev.droidtop.runtime.RootProcess], the rooted desktop
+     * stack). Null when this helper cannot start one. Blocks on the helper:
+     * not for the main thread.
+     */
+    fun spawn(argv: List<String>): Process? = null
 }
 
 /** No helper installed: every call is "nothing to ask". */

@@ -1,9 +1,12 @@
 package dev.droidtop.runtime
 
+import dev.droidtop.runtime.tasks.PrivilegedShell
+import dev.droidtop.runtime.tasks.TaskManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -34,14 +37,14 @@ data class RootProcessResult(val exitCode: Int, val stdout: String, val stderr: 
  * (reproduced on the emulator rig, 2026-09-10).
  */
 enum class RootAccess(val description: String) {
-    /** `su -c id` ran and succeeded. */
-    AVAILABLE("Root access is available."),
+    /** The elevated helper ran `id -u` and it answered 0. */
+    AVAILABLE("Root access is available through Shizuku or Sui."),
 
-    /** A `su` exists and ran, but refused this app (denied, or no manager granted it). */
-    DENIED("A root manager is present but has not granted droidtop root access."),
+    /** The elevated helper runs commands, but not as root (Shizuku started over ADB). */
+    DENIED("Shizuku runs as the ADB shell, not as root. Start Shizuku with root, or use Sui, for the rooted desktop."),
 
-    /** No `su` on this device, or this uid may not execute it. Not an error: most devices. */
-    ABSENT("This device is not rooted (no su), so root-only backends are unavailable.");
+    /** No elevated helper droidtop may use, or none that can start a process. Not an error: most devices. */
+    ABSENT("No root through Shizuku or Sui here, so root-only backends are unavailable.");
 
     val available: Boolean get() = this == AVAILABLE
 }
@@ -91,7 +94,16 @@ object ProcessRunner {
             } catch (e: SecurityException) {
                 return@withContext notLaunched(command, e)
             }
+            collect(process, stdin)
+        }
 
+    /**
+     * Feeds [stdin] to an already started [process] and collects its
+     * output, as [run] does for a process it started itself. The elevated
+     * helper's processes ([RootProcess]) come through here.
+     */
+    suspend fun collect(process: Process, stdin: ((OutputStream) -> Unit)? = null): RootProcessResult =
+        withContext(Dispatchers.IO) {
             try {
                 coroutineScope {
                     val stdout = async { process.inputStream.bufferedReader().readText() }
@@ -113,7 +125,7 @@ object ProcessRunner {
             }
         }
 
-    private fun notLaunched(command: List<String>, cause: Exception): RootProcessResult =
+    internal fun notLaunched(command: List<String>, cause: Exception): RootProcessResult =
         RootProcessResult(
             exitCode = NOT_LAUNCHED,
             stdout = "",
@@ -122,37 +134,75 @@ object ProcessRunner {
 }
 
 /**
- * Runs a command as root via `su -c`, the standard interface every common
- * Android root solution (Magisk, KernelSU, APatch) provides. Its only
- * consumers are Desktop mode's rooted container stack: droidspaces in
- * :runtime-linux-root (namespace/cgroup/mount operations, see
- * vendor/droidspaces' `check` command) and the runtime selection in
- * :app that asks whether that stack can run. Nothing in Gaming or the
- * launcher may call it (docs/SPEC.md 7i, "Root never gates a Gaming game").
+ * Runs a command as root through the elevated helper the person chose
+ * (docs/SPEC.md "The task manager": the Shizuku app or Sui, through
+ * [TaskManager.shell]'s [PrivilegedShell.spawn]). droidtop itself never
+ * runs `su` (owner rule: root only through Shizuku); a helper started with
+ * root runs the command as root, one started over ADB runs it as the shell
+ * user, which [access] reports as [RootAccess.DENIED].
  *
- * UNVERIFIED against a real device: written against the documented `su -c`
- * contract every root solution follows, but never actually run against
- * KernelSU/Magisk/APatch here -- no rooted device attached to this
- * environment. See runtime-linux-root/README.md.
+ * Its only consumers are Desktop mode's rooted container stack: droidspaces
+ * in :runtime-linux-root (namespace/cgroup/mount operations) and the
+ * runtime selection in :app that asks whether that stack can run, plus the
+ * plugin host's root-approval check. Nothing in Gaming or the launcher may
+ * call it (docs/SPEC.md 7i, "Root never gates a Gaming game"). The command
+ * is an argv, never a shell line: the helper starts it directly.
  */
 object RootProcess {
-    /** [stdin] as for [ProcessRunner.run]: `su` hands its standard input to the command. */
-    suspend fun run(vararg args: String, workingDir: File? = null, stdin: ((OutputStream) -> Unit)? = null): RootProcessResult {
-        val shellCommand = args.joinToString(" ") { shellQuote(it) }
-        return ProcessRunner.run(listOf("su", "-c", shellCommand), workingDir, stdin)
+    /** How long [access] waits for the helper's binder, which reaches a new process shortly after it starts. */
+    private const val HELPER_WAIT_MS = 3_000L
+    private const val HELPER_POLL_MS = 250L
+
+    /**
+     * Runs [args] as root and collects its output; a long-lived command
+     * lives as long as the caller waits, and cancelling kills it. [stdin]
+     * as for [ProcessRunner.run]. With no helper that can start a process,
+     * the result is not [RootProcessResult.launched].
+     */
+    suspend fun run(vararg args: String, stdin: ((OutputStream) -> Unit)? = null): RootProcessResult =
+        run(TaskManager.shell, args.toList(), stdin)
+
+    internal suspend fun run(shell: PrivilegedShell, argv: List<String>, stdin: ((OutputStream) -> Unit)?): RootProcessResult {
+        if (argv.isEmpty()) return RootProcessResult(ProcessRunner.NOT_LAUNCHED, "", "no command to run")
+        val process = withContext(Dispatchers.IO) { runCatching { shell.spawn(argv) }.getOrNull() }
+            ?: return RootProcessResult(ProcessRunner.NOT_LAUNCHED, "", "no elevated helper (Shizuku or Sui) can start ${argv.first()}")
+        return ProcessRunner.collect(process, stdin)
     }
 
-    /** What root this device offers -- the question callers ask instead of inferring it from a failed command. */
-    suspend fun access(): RootAccess = accessOf(run("id"))
+    /**
+     * What root this device offers -- the question callers ask instead of
+     * inferring it from a failed command. Waits up to [HELPER_WAIT_MS] for
+     * the helper's binder, which arrives a moment after the process starts.
+     */
+    suspend fun access(): RootAccess = withContext(Dispatchers.IO) {
+        var result = run(TaskManager.shell, listOf("id", "-u"), null)
+        var waited = 0L
+        while (!result.launched && waited < HELPER_WAIT_MS) {
+            delay(HELPER_POLL_MS)
+            waited += HELPER_POLL_MS
+            result = run(TaskManager.shell, listOf("id", "-u"), null)
+        }
+        accessOf(result)
+    }
 
-    /** The mapping itself, separated so it is testable without a device. */
+    /**
+     * [access] for a caller that cannot suspend (the plugin host's root
+     * approval, already on a background thread): one try, no waiting.
+     * Blocks on the helper: never on the main thread.
+     */
+    fun accessNow(): RootAccess {
+        val process = runCatching { TaskManager.shell.spawn(listOf("id", "-u")) }.getOrNull() ?: return RootAccess.ABSENT
+        return runCatching {
+            val out = process.inputStream.bufferedReader().readText()
+            process.errorStream.bufferedReader().readText()
+            accessOf(RootProcessResult(process.waitFor(), out, ""))
+        }.getOrDefault(RootAccess.ABSENT)
+    }
+
+    /** The mapping itself, separated so it is testable without a device: root is `id -u` answering 0. */
     fun accessOf(idResult: RootProcessResult): RootAccess = when {
-        idResult.succeeded -> RootAccess.AVAILABLE
+        idResult.succeeded && idResult.stdout.trim() == "0" -> RootAccess.AVAILABLE
         idResult.launched -> RootAccess.DENIED
         else -> RootAccess.ABSENT
     }
-
-    /** Single-quotes an argument for a POSIX shell, escaping embedded single quotes. */
-    private fun shellQuote(arg: String): String =
-        "'" + arg.replace("'", "'\\''") + "'"
 }

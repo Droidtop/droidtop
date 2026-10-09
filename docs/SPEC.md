@@ -1467,7 +1467,8 @@ directory once targetSdk is above 28 (droidtop targets 34, §5b). proot and
 its loaders are packaged as `lib*.so` for that reason, and so is `crane`
 (`runtime-common`'s `libcrane.so`), which used to be an APK asset
 extracted into `filesDir` and only worked where root ran it. Only
-droidspaces, which always runs through `su`, remains an extracted asset.
+droidspaces, which always runs as root through the elevated helper,
+remains an extracted asset.
 
 **How a container is made (images kept as OCI, 2026-09-24).** Both
 backends pull through one `CraneRootfsPuller` (`runtime-common`) into one
@@ -1506,10 +1507,10 @@ differ only in the `RootfsUnpacker` that writes the tree.
   through it and extracted by toybox 0.8.14 as root matched `crane export`
   extracted by GNU tar path for path (mode, uid, link count, symlink
   target, content).
-- *droidspaces* streams the flattened image into `su -c tar -xf - -C
-  <rootfs>` (`RootTarUnpacker`, through `ProcessRunner`'s standard input),
+- *droidspaces* streams the flattened image into a root `tar -xf - -C
+  <rootfs>` (`RootTarUnpacker`, through the root process's standard input),
   keeping the image's real ownership and setuid bits. Root never reads the
-  image itself, so which `tar` `su` finds and how it treats hostile names no
+  image itself, so which `tar` the root process finds and how it treats hostile names no
   longer matters: it is only ever given the flattener's stream. This closed
   finding 7 of `docs/security/2026-09-24-droidtop-intents-updater.md`; the
   old root `tar -x` of crane's export let a hard link out of the rootfs
@@ -1700,8 +1701,24 @@ current plan, Printing included) and Stop ends the session; a raw
 `ContainerRuntime.start` from the manager used to boot the recorded plan
 with no host bridge attached, a second desktop nobody could see.
 
+**Root comes only from the elevated helper (owner rule, 2026-10-09).**
+droidtop never runs `su`. Every root command of the rooted desktop stack
+(droidspaces, `RootTarUnpacker`, `RootfsDelete`), the runtime selection's
+root check and the plugin host's root approval go through `RootProcess`,
+which asks `TaskManager.shell` (the task manager's one `ElevatedShell`:
+the Shizuku app or Sui, or the Shizuku provider plugin, as the person
+chose) to `spawn` the argv as a long-lived process with its standard
+streams; there is no shell line and no quoting. Root is `id -u` answering 0
+through it: a Shizuku started with root, or Sui, gives the rooted desktop;
+a Shizuku started over ADB answers 2000 and the desktop uses proot
+(`RootAccess.DENIED` says why); no helper, or "Elevated access" Off, is
+ABSENT. The provider plugin's `priv.shell` has no long-lived process op
+built yet (`exec_stream` is specified, not served), so only the Shizuku app
+or Sui can carry the rooted desktop today. It replaced `su -c` in
+`RootProcess` and in `PluginRuntimeService`'s device check.
+
 **Every external process droidtop runs is bounded.** crane, proot,
-droidspaces and `su` run through one `ProcessRunner` that drains stdout
+droidspaces and root commands run through one `ProcessRunner` that drains stdout
 and stderr concurrently (a full stderr pipe must never deadlock a read of
 stdout) and takes a timeout from its caller: a catalog listing or digest
 resolution is refused after a minute, a root probe after ten seconds, a
@@ -14458,7 +14475,7 @@ result is cached keyed on the vendor submodules' commits and
   cross library) for `:host-bridge`;
 - `droidspaces`, a static musl executable, into `:runtime-linux-root`'s
   assets (`assets/bin/droidspaces-<abi>`). It is the one binary that runs
-  through `su`, so it can be extracted to app storage; `BundledBinary`
+  as root (through the elevated helper), so it can be extracted to app storage; `BundledBinary`
   re-extracts it whenever the APK's `lastUpdateTime` changes and picks the
   asset for the device's primary ABI from `Build.SUPPORTED_ABIS`;
 - `crane` (vendor/go-containerregistry), built `CGO_ENABLED=1` against the
@@ -15954,7 +15971,8 @@ threaded `PluginRecord.rootApproved` across the `loadPlugin` binder call
 the settings screen could still never see it granted. `IPluginRuntime.
 loadPlugin` now carries `rootApproved` (`NativePluginRunner.load` already
 had the whole `PluginRecord`, just never passed the one field on); the
-process also checks the device itself (`su -c id`) before granting it,
+process also checks the device itself (`id -u` as root through the elevated
+helper, `RootProcess.accessNow`; it was `su -c id` until 2026-10-09) before granting it,
 cached for that process's lifetime, so `hasRootApproval()` finally means
 "device has root AND user approved" the way its own doc comment always
 said it did.
