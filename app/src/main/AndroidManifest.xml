@@ -331,6 +331,18 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!--
+          The passkey keypad for leaving Kid and Kiosk (UiModePasskey): opened by the
+          Quick Menu's Leave row when a passkey is set, worked by pad or touch.
+          Translucent over the shell, its own task like the mode switcher. Not exported.
+        -->
+        <activity
+            android:name="dev.droidtop.app.UiModePasskeyActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!--
           Standard mode's search: the launcher's drawer search field opens it
           by the action below (the launcher module cannot name this class).
           Translucent, so the drawer shows behind it. Not exported.

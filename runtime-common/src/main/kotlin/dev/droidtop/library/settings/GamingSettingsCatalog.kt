@@ -183,6 +183,25 @@ object GamingSettingsCatalog {
                         },
                     ),
                 )
+                // The optional passkey for leaving Kid and Kiosk (UiModePasskey): digits, stored hashed. Its row
+                // says whether one is set, never what it is, and how to get out when it is forgotten.
+                val passkeySet = UiModePasskey.isSet(context)
+                add(
+                    TextInputItem(
+                        id = ControlAccess.ID_UI_MODE_PASSKEY,
+                        title = "Passkey to leave Kid and Kiosk",
+                        subtitle = (
+                            if (passkeySet) {
+                                "Set: leaving asks for it. Clear the field to remove it. "
+                            } else {
+                                "None: leaving takes one press. Enter 4 to 8 digits to ask for them. "
+                            }
+                            ) + UiModePasskey.RECOVERY,
+                        value = "",
+                        secret = true,
+                        onChange = { ctx, value -> UiModePasskey.set(ctx, value.trim()) },
+                    ),
+                )
                 add(
                     ChoiceItem(
                         id = ID_SCREENSAVER,
@@ -635,14 +654,20 @@ object GamingSettingsCatalog {
                 // Only while restricted: a row offering to leave a mode
                 // nobody is in is noise, and this is the ONE way back
                 // once Settings is hidden.
+                // With a passkey set it opens the passkey screen (pad or touch) instead of asking yes or no.
                 if (UiModePrefs.get(context).hidesSettings) {
+                    val passkey = UiModePasskey.isSet(context)
                     add(
                         ActionItem(
                             id = ID_SYSTEM_LEAVE_UI_MODE,
                             title = "Leave ${UiModePrefs.get(context).label}",
                             subtitle = "Restores Settings and the full library",
-                            confirmTitle = "Leave restricted mode?",
-                            run = { ctx -> UiModeRefresh.set(ctx, UiMode.FULL) },
+                            confirmTitle = if (passkey) null else "Leave restricted mode?",
+                            run = if (passkey) {
+                                launchComponent(UiModePasskey.ENTRY_ACTIVITY)
+                            } else {
+                                { ctx -> UiModeRefresh.set(ctx, UiMode.FULL) }
+                            },
                         ),
                     )
                 }

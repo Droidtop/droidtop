@@ -9369,6 +9369,17 @@ sets, so an added mode fails until its sets are written.
   companion's own preferences (the Companion catalog group), Kid's volume
   cap, the passkey and the UI mode choice. The way out (Leave Kid, Leave
   Kiosk on the Quick Menu's System section) stays.
+- **Passkey (decided 2026-10-09, Droidtop/tracker#414 owner question 4,
+  on its default).** ES-DE asks for a passkey to leave its Kid and Kiosk
+  modes (`UIModeController`); droidtop had chosen no passcode. Now an
+  optional one, none by default (`UiModePasskey`): Settings > "Passkey to
+  leave Kid and Kiosk" takes 4 to 8 digits, stored as a salted SHA-256,
+  never the digits, and its row says only whether one is set, with the
+  recovery line "Forgot it? Android Settings > Apps > droidtop > Clear
+  storage resets droidtop's settings." With none set, Leave asks yes or no
+  as before. With one set, Leave opens a keypad (`UiModePasskeyActivity`)
+  worked by touch or by pad (D-pad between keys, A presses, B cancels): a
+  wrong passkey says "Wrong passkey" and stays, the right one leaves.
 
 **Screensaver.** ES-DE's four kinds — dim, black, slideshow and video —
 after Off/2/5/10/15/30 minutes (today: the slideshow only), with the
