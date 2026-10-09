@@ -1,6 +1,7 @@
 package dev.droidtop.runtime.windows.utils
 
 import android.content.Context
+import dev.droidtop.runtime.util.CatalogSignature
 import dev.droidtop.runtime.util.MasterKey
 import dev.droidtop.runtime.util.Sha256
 import dev.droidtop.runtime.windows.PrefManager

@@ -1,5 +1,6 @@
 package dev.droidtop.runtime.windows.utils
 
+import dev.droidtop.runtime.util.CatalogSignature
 import dev.droidtop.runtime.util.Sha256
 import dev.droidtop.runtime.windows.RuntimeDownloads
 import java.io.IOException

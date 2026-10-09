@@ -13,7 +13,7 @@ import java.util.Base64
  * catalog's signature"): pinned once, here, in the binary. It signs nothing
  * but certificates and revocation lists: plugin repository certificates
  * (`PluginCertificates`, `:plugin-host`) and the component catalog's
- * certificate (`CatalogSignature`, `:runtime-windows`), each over its own
+ * certificate (`CatalogSignature`, here), each over its own
  * domain-separated bytes so one can never stand in for the other.
  *
  * The key is derived from the owner's offline master seed, so only the owner

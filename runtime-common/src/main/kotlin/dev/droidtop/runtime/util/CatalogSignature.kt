@@ -1,7 +1,5 @@
-package dev.droidtop.runtime.windows.utils
+package dev.droidtop.runtime.util
 
-import dev.droidtop.runtime.util.EcP256
-import dev.droidtop.runtime.util.Sha256
 import java.security.PublicKey
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -25,6 +23,12 @@ import kotlinx.serialization.json.long
  * refused, whatever the catalog itself says about a signature, so removing
  * the files cannot downgrade a device to unsigned.
  *
+ * A plugin catalog the person added (docs/SPEC.md 12a "Added catalogs") is
+ * checked by the same [verify], with that catalog's own master as `master`
+ * (trusted on first use when the person accepted the catalog, never
+ * droidtop's) and its own id as `catalogId`: one certificate format and one
+ * decision for every signed catalog droidtop reads.
+ *
  *     {
  *       "formatVersion": 1,
  *       "certId": "Droidtop/droidtop-components#0",
@@ -40,7 +44,7 @@ object CatalogSignature {
     const val SIGNATURE_FILE = "catalog.json.sig"
     const val CERTIFICATE_FILE = "catalog.cert"
 
-    /** The catalog a certificate must name: the repository that publishes it. */
+    /** The component catalog's id, the one a certificate must name by default: the repository that publishes it. */
     const val CATALOG_ID = "Droidtop/droidtop-components"
 
     private const val PREFIX = "droidtop-catalog-cert-v1"
@@ -102,7 +106,8 @@ object CatalogSignature {
     /**
      * The one decision on a fetched catalog: [catalogBytes] exactly as
      * downloaded, [signatureBase64] and [certificateText] as fetched beside it
-     * (null when missing), [master] the pinned master or null.
+     * (null when missing), [master] the pinned master or null, [catalogId] the
+     * catalog the certificate must name.
      */
     fun verify(
         catalogBytes: ByteArray,
@@ -110,15 +115,16 @@ object CatalogSignature {
         certificateText: String?,
         master: PublicKey?,
         nowEpochSeconds: Long,
+        catalogId: String = CATALOG_ID,
     ): Verdict {
         if (master == null) return Verdict.Unpinned
         if (signatureBase64.isNullOrBlank() || certificateText.isNullOrBlank()) {
-            return Verdict.Refused("the catalog has no $SIGNATURE_FILE and $CERTIFICATE_FILE, and this build requires them")
+            return Verdict.Refused("the catalog has no signature and certificate beside it, and they are required")
         }
         val certificate = parseCertificate(certificateText, master)
-            ?: return Verdict.Refused("$CERTIFICATE_FILE is not a catalog certificate signed by droidtop's master key")
-        if (CATALOG_ID !in certificate.catalogs) {
-            return Verdict.Refused("the certificate is for ${certificate.catalogs.joinToString()}, not $CATALOG_ID")
+            ?: return Verdict.Refused("the catalog certificate is not signed by the catalog's master key")
+        if (catalogId !in certificate.catalogs) {
+            return Verdict.Refused("the certificate is for ${certificate.catalogs.joinToString()}, not $catalogId")
         }
         if (nowEpochSeconds !in certificate.notBefore..certificate.notAfter) {
             return Verdict.Refused("the catalog certificate \"${certificate.certId}\" is not valid now (check the device's date)")

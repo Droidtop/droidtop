@@ -14704,7 +14704,12 @@ redistributables downloaded to read their terms):
   `signature` field. `ComponentCatalog.refresh` (`CatalogSignature.verify`)
   accepts an unsigned catalog while no master is pinned; once one is, it
   requires both files whatever the catalog says, refuses a catalog that
-  fails, and does not trust a copy kept from before the pin. Owner steps:
+  fails, and does not trust a copy kept from before the pin.
+  `CatalogSignature` lives in `:runtime-common` (2026-10-08) because a
+  plugin catalog the person added (12a "Added catalogs") is checked by the
+  same `verify`, with that catalog's own master and id in place of
+  droidtop's: one certificate format and one decision for every signed
+  catalog. Owner steps:
   derive the catalog key from the master seed (HKDF as in 12a, info
   `droidtop/catalog-signing/v1\0droidtop/droidtop-components[\0generation=N]`),
   issue `catalog.cert` with certId `Droidtop/droidtop-components#<N>`, set
