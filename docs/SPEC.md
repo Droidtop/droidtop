@@ -307,11 +307,11 @@ nothing else of this section exists:
   container's desktop is Wine-in-the-container, §11's open risk, and no
   launch path assumes it. `WindowPlacement` therefore applies to
   container windows and to compositor outputs, not to Activities.
-  A PC or engine game's tap takes Gaming's primary-action rule and a long
-  press opens Gaming's page, from the Start menu (§7i "The game page,
-  outside Gaming"); the page and the install offer are drawn by the
-  Desktop shell itself, over the desktop, since the Start menu closes as
-  they open.
+  A PC or engine game's tap takes Gaming's primary-action rule, and its
+  page is a row of the entry's menu (Y, or a long press) in the Start menu
+  (§7i "The game page, outside Gaming"); the page and the install offer
+  are drawn by the Desktop shell itself, over the desktop, since the Start
+  menu closes as they open.
 
 ### Desktop chrome with a pad (Droidtop/tracker#350, decided 2026-10-08)
 
@@ -356,6 +356,35 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   the Quick Menu on Notifications once notification access is granted, on System before that (the
   Notifications section, a step along the rail, is where the access is asked for). Desktop keeps no
   notification list of its own.
+
+### The Start menu, as built (Droidtop/tracker#348, decided 2026-10-08)
+
+The three sections 2b decided are built, with Pinned, the places and Android apps around them. The menu is the
+`HostedListSheet` above (`DesktopStartMenu.kt`), top to bottom:
+
+- **Pinned**: what is on the taskbar, in the order it was pinned.
+- **droidtop**: the places (7j "Places in every mode").
+- **Linux apps**: the container's desktop entries (2a), each with its generic name; present while a session runs.
+- **A plugin's shelves**, as before.
+- **Games**, **Windows** and **Android apps**: the library, split by `StartMenuSections` (`:library-core`, with its
+  test): a Wine profile is a Windows shortcut, what `LibraryKinds.APPS` holds is an Android app, every other kind is a game.
+  Each section is in name order (the name a person reads, `GameNaming.displayName`, ignoring case), a hidden entry is
+  not listed, and the grouping and sorting run off the main thread. Each row wears the entry's artwork when it has any.
+  Android apps are a fourth section because the menu already listed them and nothing here removes a thing it listed;
+  they move out when Android apps become windows (2b, future).
+
+A row is a pad and touch target alike: A takes the row's own action (a PC or engine game takes Gaming's
+primary-action rule, so a store game that is not installed offers the install), X pins it to the taskbar or takes it
+off, and Y or a long press open the row's menu: Open, the game page of a PC or engine game, and Pin to or Unpin from
+the taskbar. A pinned row says "Pinned" in its value.
+
+**The taskbar's pins** (`TaskbarPins`, pure and tested): a Linux app or a library entry, each a key, a name and the
+entry's artwork, stored in the launcher preferences file (read and written off the main thread) and drawn after the
+Start button as the artwork and name, a tap starting it the way the menu does and a long press offering Unpin. The pin
+carries what the bar draws, so the bar shows it with no session and no scanned library; a Linux pin needs the session to
+start (it says so in a toast when there is none), an entry pin starts by id through `Library.launchInBackground`. The
+container's apps are read when a session goes live and again whenever the menu opens, so a pin can start one before the
+menu was ever opened. A pin whose app or entry is gone stays on the bar and is not listed in the menu.
 
 ### Emulators, and Android apps as windows
 
@@ -11212,8 +11241,9 @@ copied:
   place, in the screen host).
 - Standard's Games grid: A on a PC or engine game takes the rule; a long press
   or Options > Game page opens the page (a long press on any other game still
-  pins it). Desktop's Start menu: a tap takes the rule; a long press opens the
-  page over the desktop. Retro games keep their themed detail in Gaming only.
+  pins it). Desktop's Start menu: a tap takes the rule; Y or a long press opens
+  the row's menu, whose Game page row opens the page over the desktop. Retro
+  games keep their themed detail in Gaming only.
 
 Droidtop/tracker#254, 2026-10-02. The page keeps one job, "everything about
 this game and the one thing you most likely want to do", and has this
@@ -12918,8 +12948,8 @@ whatever the mode (with Gaming off, Desktop or nothing). Now:
 - **Standard**: the settings list has a "droidtop" group with the five places
   (`SettingsRootFragment` fills titles and links from `Place`), and droidtop's
   icon has Social, Downloads and Updates as app shortcuts beside Games.
-- **Desktop**: the Start menu lists the places first, under "droidtop", Social
-  with its unread count.
+- **Desktop**: the Start menu lists the places under "droidtop", after what is
+  pinned to the taskbar, Social with its unread count.
 - **Links from outside** (`PlaceLinks`): a notification opens Gaming on the
   place when Gaming is the mode in use (`Place.opensInGaming`: the last mode
   is Gaming and Gaming is on), else the host. Message notifications and the

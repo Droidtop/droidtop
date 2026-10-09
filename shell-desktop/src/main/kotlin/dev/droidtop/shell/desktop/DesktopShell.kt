@@ -38,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,6 +76,8 @@ import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PcGameStandalone
 import dev.droidtop.shell.gamepad.pc.PcLaunchOfferSheet
 import android.widget.Toast
+import dev.droidtop.library.TaskbarPin
+import dev.droidtop.library.TaskbarPins
 import dev.droidtop.library.tasks.TaskActions
 import dev.droidtop.runtime.systemstatus.NotificationsStore
 import dev.droidtop.runtime.tasks.CloseOutcome
@@ -84,6 +87,7 @@ import dev.droidtop.runtime.tasks.TaskPolicy
 import dev.droidtop.runtime.tasks.text
 import dev.droidtop.shell.gamepad.AppIcon
 import dev.droidtop.shell.gamepad.currentShellWindow
+import dev.droidtop.shell.gamepad.hosted.HostedArt
 import dev.droidtop.shell.gamepad.hosted.HostedListSheet
 import dev.droidtop.shell.gamepad.hosted.HostedRow
 import dev.droidtop.shell.gamepad.hosted.PadLegend
@@ -172,18 +176,64 @@ fun DesktopShell(
     val androidApps = rememberAndroidApps()
     // A library entry launches the way it launches everywhere (Library.launch, SPEC 2b). A PC or
     // engine game first takes Gaming's primary-action rule (a store game that is not installed offers
-    // the install) and has Gaming's page and menu, opened from the Start menu's long press
+    // the install) and has Gaming's page and menu, opened from the Start menu row's menu
     // (Droidtop/tracker#349). Both live here, not in the Start menu, which closes as they open.
     val context = LocalContext.current
     var pageId by remember { mutableStateOf<String?>(null) }
     val openDownloads: () -> Unit = { context.startActivity(Place.openIntent(context, Place.DOWNLOADS)) }
-    val launchEntry: (LibraryEntry) -> Unit = { entry ->
+    val launchById: (String) -> Unit = { id ->
         // In the library's scope: closing the menu, which the same tap does, must not cancel it.
-        library.launchInBackground(entry.id) { result ->
+        library.launchInBackground(id) { result ->
             if (result is LaunchResult.Refused) onLaunchFailure(result.reason)
         }
     }
+    val launchEntry: (LibraryEntry) -> Unit = { entry -> launchById(entry.id) }
     val pcLaunch = rememberPcLaunch(onLaunch = launchEntry, onOpenDownloads = openDownloads)
+    val playEntry: (LibraryEntry) -> Unit = { entry -> if (entry.isPcOrEngineGame) pcLaunch.launch(entry) else launchEntry(entry) }
+
+    // The container's own applications (docs/SPEC.md 2a), read when a session is live and again every time
+    // the Start menu opens, since what is installed in the container changes whenever the user installs
+    // something in it. They live here, not in the menu, because a pinned one on the taskbar needs them to start.
+    var linuxApps by remember { mutableStateOf<List<ContainerApp>>(emptyList()) }
+    var linuxAppsError by remember { mutableStateOf<String?>(null) }
+    val loadApps by rememberUpdatedState(loadLinuxApps)
+    val launchLinuxApp by rememberUpdatedState(onLaunchLinuxApp)
+    val sessionLive = loadLinuxApps != null
+    LaunchedEffect(sessionLive, startMenuOpen) {
+        val load = loadApps
+        if (load == null) {
+            linuxApps = emptyList()
+            linuxAppsError = null
+            return@LaunchedEffect
+        }
+        if (!startMenuOpen && linuxApps.isNotEmpty()) return@LaunchedEffect
+        try {
+            linuxApps = withContext(Dispatchers.IO) { load() }
+            linuxAppsError = null
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            linuxAppsError = t.message ?: t.toString()
+        }
+    }
+
+    // The taskbar's pins (docs/SPEC.md 2b): a Linux app or a library entry, started the way the Start menu starts it.
+    val pins = rememberPins()
+    val openPin: (TaskbarPin) -> Unit = { pin ->
+        val entryId = TaskbarPins.entryIdOf(pin.key)
+        if (entryId == null) {
+            val app = linuxApps.firstOrNull { TaskbarPins.linuxKey(it.id) == pin.key }
+            val launch = launchLinuxApp
+            if (app != null && launch != null) {
+                launch(app)
+            } else {
+                Toast.makeText(context, "${pin.title} runs on the desktop, which is not running.", Toast.LENGTH_LONG).show()
+            }
+        } else {
+            val entry = library.backgroundScanState(START_MENU_KINDS).value?.firstOrNull { it.id == entryId }
+            if (entry != null) playEntry(entry) else launchById(entryId)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup)
@@ -192,6 +242,9 @@ fun DesktopShell(
             hostBridge = hostBridge,
             toplevels = toplevels,
             androidApps = androidApps,
+            pins = pins.list,
+            onOpenPin = openPin,
+            onUnpin = { pins.toggle(it) },
             compositorCommand = compositorCommand,
             onOpenStartMenu = { startMenuOpen = true },
             onOpenQuickMenu = { quickMenuOpen = true },
@@ -208,9 +261,12 @@ fun DesktopShell(
         if (startMenuOpen) {
             StartMenu(
                 library = library,
-                loadLinuxApps = loadLinuxApps,
+                sessionLive = sessionLive,
+                linuxApps = linuxApps,
+                linuxAppsError = linuxAppsError,
+                pins = pins,
                 onLaunchLinuxApp = onLaunchLinuxApp,
-                onPlay = { entry -> if (entry.isPcOrEngineGame) pcLaunch.launch(entry) else launchEntry(entry) },
+                onPlay = playEntry,
                 onOpenPage = { entry -> pageId = entry.id },
                 onDismiss = { startMenuOpen = false },
             )
@@ -465,6 +521,9 @@ private fun BoxScope.Taskbar(
     hostBridge: HostBridge?,
     toplevels: List<Toplevel>,
     androidApps: List<RunningApp>,
+    pins: List<TaskbarPin>,
+    onOpenPin: (TaskbarPin) -> Unit,
+    onUnpin: (TaskbarPin) -> Unit,
     compositorCommand: String?,
     onOpenStartMenu: () -> Unit,
     onOpenQuickMenu: () -> Unit,
@@ -513,6 +572,7 @@ private fun BoxScope.Taskbar(
                 Text("Start")
             }
             Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
+            TaskbarPinChips(pins, onOpenPin, onUnpin)
             TaskbarWindowList(hostBridge, toplevels, androidApps, compositorCommand, modifier = Modifier.weight(1f))
             if (onOpenTerminal != null) {
                 TaskbarButton(onClick = onOpenTerminal) {
@@ -778,6 +838,45 @@ private fun TaskbarWindowRow(toplevel: Toplevel, showMinimize: Boolean, onTap: (
                 text = { Text("Close") },
                 onClick = { menuOpen = false; onClose() },
             )
+        }
+    }
+}
+
+/**
+ * What is pinned to the taskbar (docs/SPEC.md 2b, Droidtop/tracker#348): each pin as its picture, when it has
+ * one, and its name, ahead of the window list. A tap starts it, a long press offers Unpin. The pins sit in
+ * a row of their own that is capped, so a long list of them cannot take the window list's room.
+ */
+@Composable
+private fun TaskbarPinChips(pins: List<TaskbarPin>, onOpen: (TaskbarPin) -> Unit, onUnpin: (TaskbarPin) -> Unit) {
+    if (pins.isEmpty()) return
+    LazyRow(modifier = Modifier.widthIn(max = 260.dp), verticalAlignment = Alignment.CenterVertically) {
+        items(pins, key = { it.key }) { pin ->
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .widthIn(max = 140.dp)
+                        .combinedClickable(onClick = { onOpen(pin) }, onLongClick = { menuOpen = true })
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                ) {
+                    pin.art?.let { HostedArt(it, size = 24.dp) }
+                    Text(
+                        pin.title,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Unpin") },
+                        onClick = { menuOpen = false; onUnpin(pin) },
+                    )
+                }
+            }
         }
     }
 }
