@@ -25,6 +25,9 @@ import com.winlator.xenvironment.components.XServerComponent
 import com.winlator.xserver.XServer
 import java.io.File
 import java.util.ArrayDeque
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -91,6 +94,7 @@ class WineXSession(
         // A wineserver left behind by a previous launch owns the prefix
         // and will refuse this one's; killing stale guests first is what
         // gamenative does before every launch, for the same reason.
+        awaitTeardown()
         runCatching { ProcessHelper.hardKillStaleWineProcesses() }
 
         val imageFs = ImageFs.find(context)
@@ -262,15 +266,37 @@ class WineXSession(
         environment?.onResume()
     }
 
+    /**
+     * Ends the guest and everything started for it. Callable from the main
+     * thread: the work (killing Wine and the audio daemon, then `wineserver -k`)
+     * is process spawning and waiting, which on the main thread under memory
+     * pressure was an ANR with the game still running (Droidtop/tracker#357).
+     * It runs on [teardown], one thread in order; the next launch waits for it
+     * ([awaitTeardown]) so it never meets a half-stopped guest.
+     */
     fun stop() {
         val environment = this.environment ?: return
         this.environment = null
-        runCatching { xServer.winHandler?.stop() }
-        ProcessHelper.removeDebugCallback(outputCollector)
-        runCatching { environment.stopEnvironmentComponents() }
+        val winHandler = xServer.winHandler
+        teardown.execute {
+            runCatching { winHandler?.stop() }
+            ProcessHelper.removeDebugCallback(outputCollector)
+            runCatching { environment.stopEnvironmentComponents() }
+        }
     }
 
     private companion object {
+        /** One thread, so teardowns run one after another and in the order they were asked for. */
+        val teardown: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "droidtop-wine-stop")
+        }
+
+        /** Blocks (off the main thread: [start] only) until every earlier teardown has finished, or [TEARDOWN_WAIT_SECONDS]. */
+        fun awaitTeardown() {
+            runCatching { teardown.submit {}.get(TEARDOWN_WAIT_SECONDS, TimeUnit.SECONDS) }
+        }
+
+        const val TEARDOWN_WAIT_SECONDS = 20L
         const val OUTPUT_TAIL_LINES = 40
         const val EXEC_FAILED = -1
 

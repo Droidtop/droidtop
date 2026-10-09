@@ -138,14 +138,18 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
             if (pid != -1) {
                 Process.killProcess(pid);
                 Log.d("BionicProgramLauncherComponent", "Stopped process " + pid);
+                pid = -1;
                 List<ProcessHelper.ProcessInfo> subProcesses = ProcessHelper.listSubProcesses();
                 for (ProcessHelper.ProcessInfo subProcess : subProcesses) {
                     Process.killProcess(subProcess.pid);
                 }
             }
-            execShellCommand("wineserver -k");
+            // droidtop: bounded, so a wineserver that does not answer cannot hold the stop for ever.
+            execShellCommand("wineserver -k", true, WINESERVER_KILL_TIMEOUT_SECONDS);
         }
     }
+
+    private static final int WINESERVER_KILL_TIMEOUT_SECONDS = 5;
 
     public Callback<Integer> getTerminationCallback() {
         return terminationCallback;
@@ -522,6 +526,10 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
     }
 
     public String execShellCommand(String command, boolean includeStderr) {
+        return execShellCommand(command, includeStderr, -1);
+    }
+
+    public String execShellCommand(String command, boolean includeStderr, int timeoutSeconds) {
         Context context = environment.getContext();
         ImageFs imageFs = ImageFs.find(context);
         File rootDir = imageFs.getRootDir();
@@ -573,7 +581,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
 
         Log.d("BionicProgramLauncherComponent", "Shell command is " + finalCommand);
         return ProcessHelper.execWithOutput(finalCommand, envVars.toStringArray(),
-                workingDir != null ? workingDir : imageFs.getRootDir(), includeStderr);
+                workingDir != null ? workingDir : imageFs.getRootDir(), includeStderr, timeoutSeconds);
     }
 
     public void restartWineServer() {

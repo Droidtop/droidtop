@@ -5136,6 +5136,22 @@ keyboard" still toggles it. Back with it up closes the keyboard, not the game
 (`WineGameActivity.dispatchKeyEvent`); when the IME took Back itself and went
 away, the window insets say so and the next Back is the game's again.
 
+**Ending a game** (Droidtop/tracker#357, #358). Back (or the game quitting)
+finishes `WineGameActivity`, and `WineXSession.stop` ends the guest on its own
+`droidtop-wine-stop` thread, never the main one: killing Wine, the audio daemon
+and `wineserver -k` (bounded to 5 s) are process work, and on the main thread
+under memory pressure they were an ANR with the game still running. The next
+launch waits for the previous teardown. Every component's `stop` is attempted
+even when an earlier one throws, so the Wine launcher (added last) is always
+reached. What the stop kills is found from `/proc` (`ProcessHelper.listSubProcesses`):
+processes of the app's own user id that are not droidtop's own processes (the
+main one and its `:` siblings such as the plugin hosts, which the old `ps`
+listing would have killed too). The listing no longer forks `id` and `ps`, and
+it finds the PulseAudio daemon by its command line (`libpulseaudio.so`), which
+it also does before the next launch, so a daemon a stop missed ends there
+instead of accumulating. An in-game menu on Back is still the "Remaining" item
+above; until then Back ends the game.
+
 Desktop mode is **out of scope here**. There a Windows program should
 appear as a window among others inside the container's sway compositor,
 which is a different presentation problem with a different answer;

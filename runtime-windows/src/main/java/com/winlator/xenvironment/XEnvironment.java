@@ -80,7 +80,15 @@ public class XEnvironment implements Iterable<EnvironmentComponent> {
     }
 
     public void stopEnvironmentComponents() {
-        for (EnvironmentComponent environmentComponent : this) environmentComponent.stop();
+        // droidtop: one component failing to stop must not leave the rest, the
+        // game's launcher among them (it is added last), running.
+        for (EnvironmentComponent environmentComponent : this) {
+            try {
+                environmentComponent.stop();
+            } catch (RuntimeException e) {
+                Log.e("XEnvironment", "stopping " + environmentComponent.getClass().getSimpleName() + " failed", e);
+            }
+        }
     }
 
     public void onPause() {

@@ -1,6 +1,8 @@
 package com.winlator.core;
 
 import android.os.Process;
+import android.system.ErrnoException;
+import android.system.Os;
 import android.util.Log;
 
 import dev.droidtop.runtime.windows.BuildConfig;
@@ -356,62 +358,64 @@ public abstract class ProcessHelper {
         }
     }
 
+    /**
+     * Every other process of this app's user id that is not one of the app's
+     * own processes: the Wine guest and its helpers, and the audio daemon.
+     * droidtop: read from /proc rather than by running `id` and `ps`, which
+     * forked two processes on the caller's thread (the main thread, when a
+     * game screen ended) and matched the user by name. The app's own
+     * processes (the main one and its ":" siblings, such as the plugin hosts)
+     * are left out: ending a game must not end them.
+     */
     public static List<ProcessInfo> listSubProcesses() {
         List<ProcessInfo> processes = new ArrayList<>();
-        String myUser = null;
-
-        try {
-            java.lang.Process idProcess = Runtime.getRuntime().exec("id");
-            try (
-                InputStreamReader isr = new InputStreamReader(idProcess.getInputStream());
-                BufferedReader idReader = new BufferedReader(isr);
-            ) {
-                String idOutput = idReader.readLine();
-                if (idOutput != null) {
-                    int startIndex = idOutput.indexOf('(');
-                    int endIndex = idOutput.indexOf(')');
-                    if (startIndex != -1 && endIndex != -1) {
-                        myUser = idOutput.substring(startIndex + 1, endIndex);
-                    }
-                }
+        String[] pids = new File("/proc").list((dir, name) -> name.matches("[0-9]+"));
+        if (pids == null) return processes;
+        int myPid = Process.myPid();
+        int myUid = Process.myUid();
+        String appProcess = firstArgument(readCmdline(myPid));
+        String appPackage = appProcess.contains(":") ? appProcess.substring(0, appProcess.indexOf(':')) : appProcess;
+        for (String pidText : pids) {
+            int pid = Integer.parseInt(pidText);
+            if (pid == myPid) continue;
+            try {
+                if (Os.stat("/proc/" + pid).st_uid != myUid) continue;
+            } catch (ErrnoException e) {
+                continue;
             }
-        } catch (IOException e) {
-            Log.e("ProcessHelper", "Failed to retrieve user id in order to list processes: " + e);
-            return processes;
+            String cmdline = readCmdline(pid);
+            if (cmdline.isEmpty()) continue;
+            String first = firstArgument(cmdline);
+            if (!appPackage.isEmpty() && (first.equals(appPackage) || first.startsWith(appPackage + ":"))) continue;
+            processes.add(new ProcessInfo(pid, readParentPid(pid), cmdline.replace('\0', ' ').trim()));
         }
-
-        if (myUser == null) return processes;
-
-        try {
-            java.lang.Process process = Runtime.getRuntime().exec("ps -A -o USER,PID,PPID,VSZ,RSS,WCHAN,ADDR,S,NAME");
-            try (
-                InputStreamReader isr = new InputStreamReader(process.getInputStream());
-                BufferedReader reader = new BufferedReader(isr);
-            ) {
-                String line;
-                reader.readLine();
-
-                while ((line = reader.readLine()) != null) {
-                    String[] parts = line.trim().split("\\s+", 9);
-                    if (parts.length >= 9) {
-                        String user = parts[0];
-                        int pid = Integer.parseInt(parts[1]);
-                        int ppid = Integer.parseInt(parts[2]);
-                        long rssKb = Long.parseLong(parts[4]);
-                        String processName = parts[8];
-
-                        if (user.equals(myUser) && pid != Process.myPid()) {
-                            ProcessInfo info = new ProcessInfo(pid, ppid, processName, rssKb * 1024L);
-                            processes.add(info);
-                        }
-                    }
-                }
-            }
-        } catch (IOException e) {
-            Log.e("ProcessHelper", "Failed to list processes: " + e);
-        }
-
         return processes;
+    }
+
+    private static String readCmdline(int pid) {
+        try (FileInputStream in = new FileInputStream("/proc/" + pid + "/cmdline")) {
+            byte[] buffer = new byte[4096];
+            int length = in.read(buffer);
+            return length > 0 ? new String(buffer, 0, length, java.nio.charset.StandardCharsets.UTF_8) : "";
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    private static String firstArgument(String cmdline) {
+        int end = cmdline.indexOf('\0');
+        return end < 0 ? cmdline : cmdline.substring(0, end);
+    }
+
+    private static int readParentPid(int pid) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream("/proc/" + pid + "/stat")))) {
+            String line = reader.readLine();
+            if (line == null) return -1;
+            String[] rest = line.substring(line.lastIndexOf(')') + 1).trim().split("\\s+");
+            return rest.length > 1 ? Integer.parseInt(rest[1]) : -1;
+        } catch (IOException | NumberFormatException e) {
+            return -1;
+        }
     }
 
     private static void createDebugThread(final InputStream inputStream) {
