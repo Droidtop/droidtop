@@ -79,6 +79,16 @@ class PluginDataStore(val root: File) {
         return file.isFile && file.delete()
     }
 
+    /** Renames [from] to [to] inside the folder, replacing [to]: how a finished download or extraction takes its final name. */
+    fun move(from: String, to: String): Boolean {
+        val source = resolve(from)
+        val target = resolve(to)
+        if (!source.isFile) throw BrokerException(PluginErrorCode.NOT_FOUND, "no data named $from")
+        if (target.isDirectory) throw BrokerException(PluginErrorCode.INVALID_ARGS, "$to is a folder")
+        target.parentFile?.mkdirs()
+        return source.renameTo(target)
+    }
+
     companion object {
         const val LIMIT_BYTES = 512L * 1024 * 1024
         const val MAX_NAME = 255
@@ -120,6 +130,16 @@ internal object HostDataApis {
         },
         HostOp("data", "delete", target = { it.optString("name") }) { env, record, args ->
             JSONObject().put("deleted", storeOf(env, record).delete(args.optString("name")))
+        },
+        HostOp("data", "move", target = { it.optString("from") + " -> " + it.optString("to") }) { env, record, args ->
+            JSONObject().put("moved", storeOf(env, record).move(args.optString("from"), args.optString("to")))
+        },
+        // Where a file of the plugin's lives, as a path droidtop resolved: only to hand to a provider plugin (a root helper
+        // copying it somewhere), which runs with full access. The contained plugin itself can open no path.
+        HostOp("data", "path", target = { it.optString("name") }) { env, record, args ->
+            val file = storeOf(env, record).resolve(args.optString("name"))
+            if (!file.isFile) throw BrokerException(PluginErrorCode.NOT_FOUND, "no data named ${args.optString("name")}")
+            JSONObject().put("path", file.absolutePath)
         },
         HostOp("data", "usage") { env, record, _ ->
             JSONObject().put("bytes", storeOf(env, record).usage()).put("limit", PluginDataStore.LIMIT_BYTES)

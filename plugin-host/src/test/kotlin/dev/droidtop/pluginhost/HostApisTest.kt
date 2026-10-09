@@ -162,4 +162,21 @@ class HostApisTest {
         assertNull(fd)
         assertEquals(PluginErrorCode.UNSUPPORTED, PluginReply.parse(text).code)
     }
+
+    @Test
+    fun `a finished file takes its final name inside the plugin's data, and its path is droidtop's to give`() {
+        val env = FakeEnv(plugin())
+        assertTrue(call(env, "data", "write", obj("name" to "cores/x.so.part", "text" to "elf")).ok)
+        assertTrue(call(env, "data", "move", obj("from" to "cores/x.so.part", "to" to "cores/x.so")).data.getBoolean("moved"))
+        assertEquals("elf", call(env, "data", "read", obj("name" to "cores/x.so")).data.getString("text"))
+        assertEquals(PluginErrorCode.INVALID_ARGS, call(env, "data", "move", obj("from" to "cores/x.so", "to" to "../x.so")).code)
+        val path = call(env, "data", "path", obj("name" to "cores/x.so")).data.getString("path")
+        assertTrue(path.endsWith("/acme.net/cores/x.so"))
+    }
+
+    @Test
+    fun `a plugin can stop only its own job`() {
+        val env = FakeEnv(plugin())
+        assertFalse(call(env, "plugins", "job_cancel", obj("jobId" to "someone-elses")).data.getBoolean("cancelled"))
+    }
 }

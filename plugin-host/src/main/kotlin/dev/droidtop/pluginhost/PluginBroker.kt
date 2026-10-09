@@ -136,6 +136,9 @@ interface BrokerEnvironment {
     /** Starts a provider op that is a job, owned by [caller]; returns the job id or null when it could not start. */
     fun startBrokeredJob(caller: PluginRecord, provider: PluginRecord, call: PluginCall): String?
     fun brokeredJobStatus(caller: PluginRecord, jobId: String): PluginReply
+
+    /** Asks [caller]'s own job [jobId] to stop (a provider's job or a host download); false when it has no such running job. */
+    fun cancelBrokeredJob(caller: PluginRecord, jobId: String): Boolean = false
 }
 
 /** At most [perHour] uses per key in any hour (docs/plugin-api.md 8: notifications). */
@@ -284,6 +287,11 @@ object HostApis {
             val reply = env.brokeredJobStatus(record, id)
             if (!reply.ok) throw BrokerException(reply.code ?: PluginErrorCode.FAILED, reply.message.orEmpty())
             reply.data
+        },
+        // A job the plugin started through the broker (a provider's job op, a `net.download`), stopped at its next step.
+        HostOp("plugins", "job_cancel") { env, record, args ->
+            val id = args.optString("jobId").takeIf { it.isNotBlank() } ?: invalid("jobId is required")
+            JSONObject().put("cancelled", env.cancelBrokeredJob(record, id))
         },
         HostOp(
             "apps", "check",

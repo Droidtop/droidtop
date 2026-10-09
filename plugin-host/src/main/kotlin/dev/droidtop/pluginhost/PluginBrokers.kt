@@ -426,10 +426,16 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         }
     }
 
+    override fun cancelBrokeredJob(caller: PluginRecord, jobId: String): Boolean {
+        val entry = PluginJobsCenter.find(jobId)?.takeIf { it.pluginId == caller.manifest.id && !it.done } ?: return false
+        PluginJobsCenter.cancel(entry.jobId)
+        return true
+    }
+
     override fun brokeredJobStatus(caller: PluginRecord, jobId: String): PluginReply {
         val entry = PluginJobsCenter.find(jobId)?.takeIf { it.pluginId == caller.manifest.id }
             ?: return PluginReply.error(PluginErrorCode.NOT_FOUND, "no such job")
-        if (!entry.done) return PluginReply.ok(JSONObject().put("done", false).put("status", entry.statusLine))
+        if (!entry.done) return PluginReply.ok(JSONObject().put("done", false).put("status", entry.statusLine).put("percent", entry.percent))
         val reply = PluginJobsCenter.brokeredReply(caller.manifest.id, jobId)
             ?: return PluginReply.error(PluginErrorCode.NOT_FOUND, "no such brokered job")
         return if (reply.ok) {
