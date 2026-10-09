@@ -47,6 +47,32 @@ data class LaunchDisplayOption(val displayId: Int?, val label: String)
  */
 data class LaunchContext(val gameId: String, val systemId: String?)
 
+/**
+ * The game a launch would replace: the one droidtop last started, still believed running, in the same package as
+ * the new launch but a different game (docs/SPEC.md "One launch replaces the running game"). Pure, for tests.
+ */
+internal object LaunchReplace {
+    data class Running(val gameId: String, val packageName: String)
+
+    fun replaces(running: Running?, nextPackage: String?, nextGameId: String?): Boolean =
+        running != null && nextPackage != null && nextGameId != null &&
+            running.packageName == nextPackage && running.gameId != nextGameId
+
+    /**
+     * Whether a launch that could not end the running game first is delivered a second time. RetroArch's
+     * `RetroActivityFuture` is `singleInstance`, and its `onNewIntent` restarts itself for a different ROM or core with
+     * `startActivity` followed at once by `System.exit(0)` (RetroArch, pkg/android/phoenix, RetroActivityFuture.java),
+     * which loses the restart: the running game died and the new one never came (console, build 1649). A second
+     * delivery after the exit starts it; one that finds the new game already up carries the same ROM and core, which
+     * that `onNewIntent` takes as "same content" and only stores.
+     */
+    fun redeliver(packageName: String, ended: Boolean): Boolean =
+        !ended && packageName in dev.droidtop.library.consoles.DefaultPlayers.RETROARCH_PACKAGE_VARIANTS
+
+    /** How long after the first delivery the second one goes: the old process has exited well before. */
+    const val REDELIVER_MS = 1_500L
+}
+
 object LaunchDisplay {
     @Volatile
     var targetDisplayId: Int? = null
@@ -186,6 +212,8 @@ object LaunchDisplay {
 
     fun start(context: Context, intent: Intent) {
         val ctx = launchContext
+        // Read before this launch overwrites them: the game it may replace.
+        val replacing = runningFlow.value?.context?.gameId?.let { id -> runningPackageName?.let { LaunchReplace.Running(id, it) } }
         runningPackageName = null
         val remembered = ctx?.let { LaunchScreenMemory.choiceFor(context, it.gameId, it.systemId) }
         val options = askOptions
@@ -195,7 +223,7 @@ object LaunchDisplay {
         when (val decision = LaunchScreenResolution.decide(remembered, secondDisplayId, askable, targetDisplayId)) {
             is LaunchScreenResolution.Decision.Start -> {
                 runningGame = ctx
-                startOn(context, intent, decision.displayId)
+                startOn(context, intent, decision.displayId, replacing)
             }
             LaunchScreenResolution.Decision.Ask -> {
                 LaunchSoundExperiment.variant(context)
@@ -212,7 +240,7 @@ object LaunchDisplay {
                         )
                     }
                     runningGame = ctx
-                    startOn(context, intent, chosen.displayId)
+                    startOn(context, intent, chosen.displayId, replacing)
                 }
             }
         }
@@ -262,7 +290,7 @@ object LaunchDisplay {
      * then does the other app start. Opening the chooser hands nothing
      * over.
      */
-    private fun startOn(context: Context, intent: Intent, displayId: Int?) {
+    private fun startOn(context: Context, intent: Intent, displayId: Int?, replacing: LaunchReplace.Running? = null) {
         dispatchScope.launch {
             LaunchSoundExperiment.variant(context)
             AudioHandOff.mark("launch dispatch: display ${displayId ?: "default"}")
@@ -272,7 +300,7 @@ object LaunchDisplay {
             AudioHandOff.traceLaunch(context)
             AudioHandOff.release("launch")
             try {
-                dispatch(context, intent, displayId)
+                dispatch(context, intent, displayId, replacing)
             } catch (e: Exception) {
                 Log.e("droidtop.LaunchDisplay", "Launch failed", e)
                 AudioHandOff.reopen("launch failed")
@@ -281,13 +309,24 @@ object LaunchDisplay {
         }
     }
 
-    private suspend fun dispatch(context: Context, intent: Intent, displayId: Int?) {
+    private suspend fun dispatch(context: Context, intent: Intent, displayId: Int?, replacing: LaunchReplace.Running?) {
         val packageName = withContext(Dispatchers.IO) {
             intent.component?.packageName
                 ?: intent.`package`
                 ?: runCatching {
                     context.packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName
                 }.getOrNull()
+        }
+        // One launch replaces the running game in the same emulator (docs/SPEC.md "One launch replaces the running
+        // game"): the old one is ended by the task manager's one close path first, so the emulator starts clean. When
+        // nothing can end it, a RetroArch launch is delivered a second time below.
+        var redeliver = false
+        if (packageName != null && LaunchReplace.replaces(replacing, packageName, runningGame?.gameId)) {
+            LaunchWatchdog.cancel()
+            val outcome = withContext(Dispatchers.IO) { dev.droidtop.runtime.tasks.TaskManager.close(context, packageName) }
+            val ended = outcome is dev.droidtop.runtime.tasks.CloseOutcome.Closed
+            AudioHandOff.mark("replacing ${replacing?.gameId} in $packageName: ${if (ended) "ended" else "not ended"}")
+            redeliver = LaunchReplace.redeliver(packageName, ended)
         }
         coverVacatedDisplays?.invoke(displayId)
         // Always pin an explicit display, even for the "default display"
@@ -323,6 +362,13 @@ object LaunchDisplay {
         }
         parkedDisplayId = resolvedDisplayId
         onLaunched?.invoke(resolvedDisplayId)
+        if (redeliver) {
+            dispatchScope.launch {
+                kotlinx.coroutines.delay(LaunchReplace.REDELIVER_MS)
+                runCatching { context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(resolvedDisplayId).toBundle()) }
+                    .onFailure { Log.w("droidtop.LaunchDisplay", "Second delivery of the replacing launch failed", it) }
+            }
+        }
     }
 
     /** True when Android marked the target force-stopped or it has been uninstalled. */

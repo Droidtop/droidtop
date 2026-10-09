@@ -7409,6 +7409,18 @@ system page's "Emulators for <system>" list shows one row per emulator name: a p
 is not listed beside an installed one of the same name (ARMSX2 is published as `com.armsx2` and
 `come.nanodata.armsx2`).
 
+**One launch replaces the running game** (`LaunchReplace`, Droidtop/tracker#413). A launch of a different game in
+the package that runs the game droidtop last started (`LaunchDisplay.runningGame` and the package it resolved)
+first ends that game through the task manager's one close path (`TaskManager.close`), then dispatches, so the
+emulator starts clean on the first press. Resuming the same game is not a replacement, and an app of another
+package is left as Android leaves it. Console, build 1649: launching a RetroArch game while another ran killed the
+running one and the new one never came; a second A worked. RetroArch's `RetroActivityFuture` is `singleInstance`
+and its `onNewIntent` restarts itself for a different ROM or core with `startActivity` followed at once by
+`System.exit(0)` (RetroArch pkg/android/phoenix), which loses the restart. Without elevated access nothing can end
+it first, so a RetroArch launch is delivered a second time 1.5 s later (`LaunchReplace.redeliver`): after the exit
+it starts the game, and a RetroArch that did restart sees the same ROM and core and only stores the intent. The
+person is not asked: RetroArch itself replaces the game on a new launch, and droidtop only makes that reliable.
+
 **The launch watchdog** (`LaunchWatchdog`, `LaunchWatchPolicy`). `LaunchDisplay.dispatch`, the one point
 every launch passes, starts it for a game launch. It runs off the main thread, every 3 s for at most 90 s,
 and ends early when the launch ends (`clearRunning`, a quit, the shell coming back). A listed and live app
