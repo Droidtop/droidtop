@@ -313,6 +313,38 @@ nothing else of this section exists:
   Desktop shell itself, over the desktop, since the Start menu closes as
   they open.
 
+### Desktop chrome with a pad (Droidtop/tracker#350, decided 2026-10-08)
+
+Desktop's taskbar, Start menu and tray were stock Material buttons and drop-downs over the compositor
+surface: with no keyboard or mouse the pad reached whatever Compose focus landed on, with no selection
+mark and no hint row. Owner direction, 2026-10-08: "Still focus on gaming mode for now, just wire it in
+OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not a second set.
+
+- **Three buttons are droidtop's while Desktop shows;** every other pad button stays the container's as
+  6b has it. Start opens the Start menu (Gaming's left menu), Select or R2 the Quick Menu (Gaming's R2;
+  Select as well, because a pad whose triggers send no key still has it), L1 the list of windows.
+  `DesktopPadRoutes` (`:shell-desktop`) claims them in `MainActivity.dispatchKeyEvent`, before any view,
+  and only from a gamepad: a keyboard's keys are the container's. `DesktopShell` collects them.
+- **Each is a sheet that is a window of its own** (a Dialog), so the one input pipeline (6e) runs in it.
+  `HostedListSheet` (`:shell-gamepad`, `hosted/`) is `MenuPanel` over a lazy list of `MenuRow`s with
+  Gaming's sliding focus ring: Up and Down stop at the ends and keep the row on screen, A takes the row,
+  X its toggle, Y its menu, B closes, Start closes (the button that opened it), a long press is Y for a
+  finger, and Gaming's `HintRow` sits inside it, where a tap on a hint presses the real button into the
+  sheet's window. The Start menu and the windows list are two of them. A is "Bring to front" and X
+  "Close window" in the windows list.
+- **The tray is the Quick Menu** (`QuickMenuStandalone`): the same sheet Gaming's R2 opens, with Running
+  apps, Notifications, System, Audio, Display, Performance, Downloads and Plugins. The tray button keeps
+  its readout (network, VPN, battery) and opens it. The tray's own drop-down (volume, brightness, Do Not
+  Disturb, network, Bluetooth) is deleted: those are the Quick Menu's tiles over the settings catalog, so
+  there is one control panel, not two.
+- **The bar says which buttons.** With a pad attached (`ShellWindow.padPresent`) a strip beside the bar
+  (`PadLegend`, not tappable) names Start, Select and L1; it is a strip of its own so the bar keeps its
+  width for the window list on a 768 dp console. The bar's buttons stay for touch and a mouse. The Start
+  button only opens now: the menu is modal, so the "Close" label it wore while the menu floated over the
+  bar is gone.
+- **One listener feeds the container's window list.** The bridge has room for one change listener, so the
+  taskbar and the windows sheet read the same list.
+
 ### Emulators, and Android apps as windows
 
 Directed as the same problem: droidtop should be able to wire an ANDROID
@@ -5266,8 +5298,9 @@ Shift on top of it would cancel.
 **Gamepad.** The right stick drives the pointer and the two stick clicks are
 left/right button; the D-pad, face buttons, shoulders and left stick are left
 alone. The shell around the surface — taskbar, start menu, settings — is
-Compose focus navigation driven by D-pad and A, and claiming those would break
-navigation in exactly the case a gamepad pointer is for (no mouse attached).
+driven by the D-pad and A inside the sheets it opens, and claiming those would break
+navigation in exactly the case a gamepad pointer is for (no mouse attached). Start, Select, R2 and L1
+are droidtop's while Desktop shows and open those sheets (2b "Desktop chrome with a pad").
 The right stick and stick clicks are the controls that navigation does not use.
 
 Known gaps, stated rather than guessed at: no long-press-to-right-click on the

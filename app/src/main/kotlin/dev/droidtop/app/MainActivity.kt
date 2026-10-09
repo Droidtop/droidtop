@@ -37,6 +37,7 @@ import dev.droidtop.runtime.DualScreenOrchestration
 import dev.droidtop.display.SecondScreenHost
 import dev.droidtop.display.SecondScreenOrchestrator
 import dev.droidtop.shell.desktop.DesktopSessionMessage
+import dev.droidtop.shell.desktop.DesktopPadRoutes
 import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
 import dev.droidtop.shell.gamepad.ShellRestore
@@ -104,7 +105,10 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean =
         padGate.dispatchMotion(event) || super.dispatchGenericMotionEvent(event)
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean = padGate.dispatchKey(event)
+    // Desktop hands the pad to the container, but Start, Select, R2 and L1 are droidtop's chrome there
+    // (docs/SPEC.md 2b "Desktop chrome with a pad"): the Start menu, the Quick Menu and the windows list.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        (mode == Mode.DESKTOP && DesktopPadRoutes.claim(event)) || padGate.dispatchKey(event)
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         padGate.noteTouch(event)

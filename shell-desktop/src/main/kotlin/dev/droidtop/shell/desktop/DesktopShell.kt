@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -55,7 +54,6 @@ import dev.droidtop.input.InputSeats
 import dev.droidtop.input.PointerTransform
 import dev.droidtop.library.Library
 import dev.droidtop.library.LaunchResult
-import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.runtime.ContainerApp
 import dev.droidtop.runtime.DisplayOutput
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +61,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import dev.droidtop.library.integrations.PluginHub
 import dev.droidtop.library.integrations.PluginPanels
-import dev.droidtop.library.integrations.PluginShelves
 import dev.droidtop.pluginhost.PluginModes
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -71,12 +68,16 @@ import java.util.Locale
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.library.settings.CatalogScreenLink
 import dev.droidtop.library.settings.Place
-import dev.droidtop.library.settings.SocialBadge
-import dev.droidtop.library.settings.UiModePrefs
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PcGameStandalone
 import dev.droidtop.shell.gamepad.pc.PcLaunchOfferSheet
+import dev.droidtop.shell.gamepad.currentShellWindow
+import dev.droidtop.shell.gamepad.hosted.HostedListSheet
+import dev.droidtop.shell.gamepad.hosted.HostedRow
+import dev.droidtop.shell.gamepad.hosted.PadLegend
+import dev.droidtop.shell.gamepad.hosted.QuickMenuStandalone
+import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.pc.rememberPcLaunch
 
 /**
@@ -139,6 +140,22 @@ fun DesktopShell(
     onOpenSetup: () -> Unit = {},
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
+    // The Quick Menu is the tray's, and the windows sheet the taskbar's window list, each a sheet a pad
+    // drives (docs/SPEC.md 2b "Desktop chrome with a pad", Droidtop/tracker#350).
+    var quickMenuOpen by remember { mutableStateOf(false) }
+    var windowsOpen by remember { mutableStateOf(false) }
+    // The pad's buttons that belong to droidtop's chrome rather than to the desktop arrive from the activity.
+    LaunchedEffect(Unit) {
+        DesktopPadRoutes.requests.collect { route ->
+            when (route) {
+                DesktopPadRoutes.Route.START_MENU -> startMenuOpen = true
+                DesktopPadRoutes.Route.QUICK_MENU -> quickMenuOpen = true
+                DesktopPadRoutes.Route.WINDOWS -> windowsOpen = true
+            }
+        }
+    }
+    // One listener on the bridge feeds the taskbar and the windows sheet alike.
+    val toplevels = rememberToplevels(hostBridge)
     // A library entry launches the way it launches everywhere (Library.launch, SPEC 2b). A PC or
     // engine game first takes Gaming's primary-action rule (a store game that is not installed offers
     // the install) and has Gaming's page and menu, opened from the Start menu's long press
@@ -159,9 +176,10 @@ fun DesktopShell(
 
         Taskbar(
             hostBridge = hostBridge,
+            toplevels = toplevels,
             compositorCommand = compositorCommand,
-            startMenuOpen = startMenuOpen,
-            onToggleStartMenu = { startMenuOpen = !startMenuOpen },
+            onOpenStartMenu = { startMenuOpen = true },
+            onOpenQuickMenu = { quickMenuOpen = true },
             // Absent rather than disabled when there is no live session:
             // a Terminal button that cannot open a terminal is a lie about
             // what the desktop can do right now.
@@ -180,6 +198,24 @@ fun DesktopShell(
                 onPlay = { entry -> if (entry.isPcOrEngineGame) pcLaunch.launch(entry) else launchEntry(entry) },
                 onOpenPage = { entry -> pageId = entry.id },
                 onDismiss = { startMenuOpen = false },
+            )
+        }
+        if (quickMenuOpen) {
+            QuickMenuStandalone(
+                library = library,
+                onOpenStartMenu = {
+                    quickMenuOpen = false
+                    startMenuOpen = true
+                },
+                onDismiss = { quickMenuOpen = false },
+            )
+        }
+        if (windowsOpen) {
+            WindowsSheet(
+                hostBridge = hostBridge,
+                toplevels = toplevels,
+                compositorCommand = compositorCommand,
+                onDismiss = { windowsOpen = false },
             )
         }
 
@@ -411,9 +447,10 @@ private fun BoxScope.DesktopViewport(
 @Composable
 private fun BoxScope.Taskbar(
     hostBridge: HostBridge?,
+    toplevels: List<Toplevel>,
     compositorCommand: String?,
-    startMenuOpen: Boolean,
-    onToggleStartMenu: () -> Unit,
+    onOpenStartMenu: () -> Unit,
+    onOpenQuickMenu: () -> Unit,
     onOpenTerminal: (() -> Unit)?,
 ) {
     val context = LocalContext.current
@@ -424,46 +461,70 @@ private fun BoxScope.Taskbar(
             delay(30_000)
         }
     }
+    val atTop = DesktopPrefs.taskbarAtTop(context)
+    // With a pad in hand the bar names the three buttons that reach droidtop's chrome (the activity
+    // answers them, see DesktopPadRoutes), on a strip of its own so the bar keeps its width for the
+    // window list on a 768 dp console.
+    val padPresent = currentShellWindow().padPresent
+    val legend: @Composable () -> Unit = {
+        if (padPresent) {
+            PadLegend(
+                items = listOf(
+                    GamepadAction.START to "Start menu",
+                    GamepadAction.SELECT to "Quick menu",
+                    GamepadAction.L to "Windows",
+                ),
+                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 12.dp, vertical = 2.dp),
+            )
+        }
+    }
 
-    Row(
-        modifier = Modifier
-            .align(if (DesktopPrefs.taskbarAtTop(context)) Alignment.TopStart else Alignment.BottomStart)
-            .fillMaxWidth()
-             .heightIn(min = 48.dp)
-            .background(MaterialTheme.colorScheme.surface),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TaskbarButton(onClick = onToggleStartMenu) {
-            Text(if (startMenuOpen) "Close" else "Start")
-        }
-        Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
-        TaskbarWindowList(hostBridge, compositorCommand, modifier = Modifier.weight(1f))
-        if (onOpenTerminal != null) {
-            TaskbarButton(onClick = onOpenTerminal) {
-                Text("Terminal")
+    Column(modifier = Modifier.align(if (atTop) Alignment.TopStart else Alignment.BottomStart).fillMaxWidth()) {
+        if (!atTop) legend()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .background(MaterialTheme.colorScheme.surface),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TaskbarButton(onClick = onOpenStartMenu) {
+                Text("Start")
             }
+            Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
+            TaskbarWindowList(hostBridge, toplevels, compositorCommand, modifier = Modifier.weight(1f))
+            if (onOpenTerminal != null) {
+                TaskbarButton(onClick = onOpenTerminal) {
+                    Text("Terminal")
+                }
+            }
+            TaskbarButton(onClick = { openContainers(context) }) {
+                Text("Containers")
+            }
+            // The mode switcher, by name: Desktop's only other route to the
+            // Android home or Gaming was a long-press of Back (SPEC 2c).
+            TaskbarButton(onClick = { openModes(context) }) {
+                Text("Modes")
+            }
+            TaskbarButton(onClick = { openSettings(context) }) {
+                Text("Settings")
+            }
+            PluginTaskbarItems()
+            ClipboardNotice()
+            SystemTray(onClick = onOpenQuickMenu)
+            Text(
+                clockText,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
         }
-        TaskbarButton(onClick = { openContainers(context) }) {
-            Text("Containers")
-        }
-        // The mode switcher, by name: Desktop's only other route to the
-        // Android home or Gaming was a long-press of Back (SPEC 2c).
-        TaskbarButton(onClick = { openModes(context) }) {
-            Text("Modes")
-        }
-        TaskbarButton(onClick = { openSettings(context) }) {
-            Text("Settings")
-        }
-        PluginTaskbarItems()
-        ClipboardNotice()
-        SystemTray()
-        Text(
-            clockText,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier.padding(horizontal = 8.dp),
-        )
+        if (atTop) legend()
     }
 }
 
@@ -518,21 +579,10 @@ private fun TaskbarButton(onClick: () -> Unit, content: @Composable () -> Unit) 
  * change to stop claiming it as already built.
  */
 @Composable
-private fun TaskbarWindowList(hostBridge: HostBridge?, compositorCommand: String?, modifier: Modifier = Modifier) {
-    var toplevels by remember(hostBridge) { mutableStateOf(hostBridge?.toplevels() ?: emptyList()) }
-
+private fun TaskbarWindowList(hostBridge: HostBridge?, toplevels: List<Toplevel>, compositorCommand: String?, modifier: Modifier = Modifier) {
     // Sway's dead set_minimized (see the comment above) makes minimize a
     // compositor-dependent affordance, not a universal one.
     val minimizeSupported = compositorCommand != "sway"
-
-    DisposableEffect(hostBridge) {
-        val mainHandler = Handler(Looper.getMainLooper())
-        hostBridge?.toplevelsChangedListener = {
-            // Fires from a native worker thread (see HostBridge.kt).
-            mainHandler.post { toplevels = hostBridge.toplevels() }
-        }
-        onDispose { hostBridge?.toplevelsChangedListener = null }
-    }
 
     if (toplevels.isEmpty()) {
         Spacer(modifier = modifier)
@@ -556,6 +606,65 @@ private fun TaskbarWindowList(hostBridge: HostBridge?, compositorCommand: String
             )
         }
     }
+}
+
+/**
+ * The container's windows as the bridge reports them, kept current by the bridge's one change listener
+ * (it has room for just one, so the taskbar and the windows sheet share this list). Empty with no bridge.
+ */
+@Composable
+private fun rememberToplevels(hostBridge: HostBridge?): List<Toplevel> {
+    var toplevels by remember(hostBridge) { mutableStateOf(hostBridge?.toplevels() ?: emptyList()) }
+    DisposableEffect(hostBridge) {
+        val mainHandler = Handler(Looper.getMainLooper())
+        hostBridge?.toplevelsChangedListener = {
+            // Fires from a native worker thread (see HostBridge.kt).
+            mainHandler.post { toplevels = hostBridge.toplevels() }
+        }
+        onDispose { hostBridge?.toplevelsChangedListener = null }
+    }
+    return toplevels
+}
+
+/**
+ * The taskbar's window list as a sheet a pad drives (Droidtop/tracker#350): A raises a window (restoring it
+ * first when it is minimized), X closes it, and the rest of the rules are the taskbar's own, including
+ * that sway cannot minimize.
+ */
+@Composable
+private fun WindowsSheet(
+    hostBridge: HostBridge?,
+    toplevels: List<Toplevel>,
+    compositorCommand: String?,
+    onDismiss: () -> Unit,
+) {
+    val rows = remember(toplevels) {
+        toplevels.map { toplevel ->
+            HostedRow(
+                key = "window:" + toplevel.id,
+                title = toplevel.title.ifBlank { toplevel.appId.ifBlank { "(untitled window)" } },
+                subtitle = when {
+                    toplevel.minimized -> "Minimized"
+                    toplevel.activated -> "In front"
+                    else -> null
+                },
+                onSelect = {
+                    if (toplevel.minimized && compositorCommand != "sway") hostBridge?.setToplevelMinimized(toplevel.id, false)
+                    hostBridge?.activateToplevel(toplevel.id)
+                    onDismiss()
+                },
+                onToggle = { hostBridge?.closeToplevel(toplevel.id) },
+            )
+        }
+    }
+    HostedListSheet(
+        title = "Windows",
+        rows = rows,
+        onClose = onDismiss,
+        emptyText = "No windows are open on the desktop.",
+        selectLabel = "Bring to front",
+        toggleLabel = "Close window",
+    )
 }
 
 @Composable
@@ -632,95 +741,33 @@ private fun ClipboardNotice() {
 
 /**
  * The desktop's system tray, over the shared
- * [dev.droidtop.runtime.systemstatus.SystemStatus] core -- data shared,
- * chrome per surface, the same split the settings catalogs use (per
- * direction: wifi status and system controls in every mode except
- * Standard, which has Android's own status bar). Readout in the bar;
- * the honest controls in a popover: volume directly, brightness behind
- * the WRITE_SETTINGS grant, and the system's own internet panel for
- * Wi-Fi -- programmatic toggling left app reach in API 29, and opening
- * the real control beats faking one.
+ * [dev.droidtop.runtime.systemstatus.SystemStatus] core: the readout sits in the bar and the Quick Menu
+ * is behind it. Volume, brightness, Do Not Disturb, the network and Bluetooth panels and the notification
+ * list are that menu's sections, the same ones Gaming's R2 shows, so the tray keeps no control panel of
+ * its own (docs/SPEC.md 2b "Desktop chrome with a pad", Droidtop/tracker#350). Data shared, chrome per
+ * surface, the same split the settings catalogs use.
  */
 @Composable
-private fun SystemTray() {
+private fun SystemTray(onClick: () -> Unit) {
     val context = LocalContext.current
     val status by remember { dev.droidtop.runtime.systemstatus.SystemStatus.flow(context) }
         .collectAsState(initial = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context))
-    var open by remember { mutableStateOf(false) }
-    val controls = dev.droidtop.runtime.systemstatus.SystemControls
-
-    Box {
-        androidx.compose.material3.TextButton(onClick = { open = !open }) {
-            val network = when (status.network) {
-                dev.droidtop.runtime.systemstatus.NetworkKind.WIFI ->
-                    "\u25E4" + (status.wifiLevel?.let { " $it/4" } ?: "")
-                dev.droidtop.runtime.systemstatus.NetworkKind.ETHERNET -> "ETH"
-                dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "LTE"
-                dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "\u2715"
-            }
-            val noInternet = if (
-                status.network != dev.droidtop.runtime.systemstatus.NetworkKind.NONE && !status.validated
-            ) " !" else ""
-            val vpn = if (status.vpnActive) "  VPN" else ""
-            val battery = status.batteryPercent?.let { "  $it%" + if (status.charging) "\u26A1" else "" } ?: ""
-            // "!" = connected without validated internet (captive
-            // portal); the popover's Network entry opens the system
-            // sheet where signing in happens.
-            Text(network + noInternet + vpn + battery, color = MaterialTheme.colorScheme.onSurface)
+    androidx.compose.material3.TextButton(onClick = onClick) {
+        val network = when (status.network) {
+            dev.droidtop.runtime.systemstatus.NetworkKind.WIFI ->
+                "◤" + (status.wifiLevel?.let { " $it/4" } ?: "")
+            dev.droidtop.runtime.systemstatus.NetworkKind.ETHERNET -> "ETH"
+            dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "LTE"
+            dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "✕"
         }
-        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            var volume by remember { mutableStateOf(controls.volume(context).toFloat()) }
-            val volumeMax = remember { controls.volumeRange(context).last.toFloat() }
-            Text("Volume", modifier = Modifier.padding(horizontal = 16.dp))
-            androidx.compose.material3.Slider(
-                value = volume,
-                onValueChange = { volume = it; controls.setVolume(context, it.toInt()) },
-                valueRange = 0f..volumeMax,
-                modifier = Modifier.padding(horizontal = 16.dp).width(220.dp),
-            )
-            if (controls.canWriteBrightness(context)) {
-                var brightness by remember { mutableStateOf((controls.brightness(context) ?: 128).toFloat()) }
-                Text("Brightness", modifier = Modifier.padding(horizontal = 16.dp))
-                androidx.compose.material3.Slider(
-                    value = brightness,
-                    onValueChange = { brightness = it; controls.setBrightness(context, it.toInt()) },
-                    valueRange = 0f..255f,
-                    modifier = Modifier.padding(horizontal = 16.dp).width(220.dp),
-                )
-            } else {
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text("Allow brightness control\u2026") },
-                    onClick = { open = false; context.startActivity(controls.brightnessGrantIntent(context)) },
-                )
-            }
-            run {
-                var dnd by remember { mutableStateOf(controls.dndEnabled(context)) }
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(if (dnd) "Do Not Disturb: on" else "Do Not Disturb: off") },
-                    onClick = {
-                        if (controls.hasDndAccess(context)) {
-                            dnd = !dnd
-                            controls.setDnd(context, dnd)
-                        } else {
-                            open = false
-                            context.startActivity(controls.dndGrantIntent())
-                        }
-                    },
-                )
-            }
-            androidx.compose.material3.DropdownMenuItem(
-                text = { Text("Network\u2026") },
-                onClick = { open = false; context.startActivity(controls.internetPanelIntent()) },
-            )
-            androidx.compose.material3.DropdownMenuItem(
-                text = { Text("Bluetooth\u2026") },
-                onClick = { open = false; context.startActivity(controls.bluetoothSettingsIntent()) },
-            )
-            androidx.compose.material3.DropdownMenuItem(
-                text = { Text("All Android settings\u2026") },
-                onClick = { open = false; context.startActivity(controls.allSettingsIntent()) },
-            )
-        }
+        val noInternet = if (
+            status.network != dev.droidtop.runtime.systemstatus.NetworkKind.NONE && !status.validated
+        ) " !" else ""
+        val vpn = if (status.vpnActive) "  VPN" else ""
+        val battery = status.batteryPercent?.let { "  $it%" + if (status.charging) "⚡" else "" } ?: ""
+        // "!" = connected without validated internet (captive portal); the Quick Menu's System
+        // section opens the system sheet where signing in happens.
+        Text(network + noInternet + vpn + battery, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -768,193 +815,6 @@ private fun openSettings(context: Context) {
 
 private fun formatClock(): String =
     SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
-
-@Composable
-private fun BoxScope.StartMenu(
-    library: Library,
-    loadLinuxApps: (suspend () -> List<ContainerApp>)?,
-    onLaunchLinuxApp: ((ContainerApp) -> Unit)?,
-    onPlay: (LibraryEntry) -> Unit,
-    onOpenPage: (LibraryEntry) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val context = LocalContext.current
-    // The library as its index holds it (docs/SPEC.md 7g): shown at once
-    // from the saved index, walking only what the index does not cover
-    // (the app list), in the library's own scope rather than this menu's.
-    val entries by library.backgroundScanState(START_MENU_KINDS).collectAsState()
-    var linuxApps by remember { mutableStateOf<List<ContainerApp>>(emptyList()) }
-    var linuxAppsError by remember { mutableStateOf<String?>(null) }
-    val taskbarAtTop = DesktopPrefs.taskbarAtTop(context)
-
-    LaunchedEffect(library) {
-        library.scanInBackground(START_MENU_KINDS)
-    }
-    // Plugins' Home shelves, here as Start menu sections of the person's own entries (docs/plugin-api.md 1.9): the same
-    // gaming.rows answer Gaming's Home draws, asked for this surface off the main thread and kept 15 minutes.
-    var pluginShelves by remember { mutableStateOf<List<PluginShelves.Shelf>>(emptyList()) }
-    LaunchedEffect(entries) {
-        val list = entries ?: return@LaunchedEffect
-        pluginShelves = withContext(Dispatchers.IO) { PluginShelves.shelvesFor(context, list, surface = PluginModes.Surfaces.DESKTOP_START_MENU) }
-    }
-    // Read again every time the menu opens: what is installed in the
-    // container changes whenever the user installs something in it.
-    LaunchedEffect(loadLinuxApps) {
-        val load = loadLinuxApps ?: return@LaunchedEffect
-        try {
-            linuxApps = withContext(Dispatchers.IO) { load() }
-            linuxAppsError = null
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (t: Throwable) {
-            linuxAppsError = t.message ?: t.toString()
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .align(if (taskbarAtTop) Alignment.TopStart else Alignment.BottomStart)
-            .padding(top = if (taskbarAtTop) 48.dp else 0.dp, bottom = if (taskbarAtTop) 0.dp else 48.dp)
-            .width(320.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        val currentEntries = entries
-        // The places (Stores, Social, Downloads and installs, Updates, Plugins): Desktop has no left
-        // menu, so the Start menu lists them, from the one place list, each opened in droidtop's
-        // screen host (docs/SPEC.md 7j "Places in every mode", Droidtop/tracker#346). Read when the
-        // menu opens: the unread count is a plain number the social hub keeps current.
-        val places = remember { Place.visible(UiModePrefs.get(context)) }
-        val unread = remember { SocialBadge.unread }
-        LazyColumn(modifier = Modifier.padding(8.dp)) {
-            if (places.isNotEmpty()) {
-                item(key = "places-header") { StartMenuHeader("droidtop") }
-                items(places, key = { "place:" + it.screenId }) { place ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                context.startActivity(Place.openIntent(context, place))
-                                onDismiss()
-                            }
-                            .padding(vertical = 4.dp, horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(place.title, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                        if (place == Place.SOCIAL && unread > 0) {
-                            Text("$unread new", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-            // The primary container's own applications first: they are
-            // what the desktop runs. Launched into the session, so their
-            // windows appear on the desktop behind this menu.
-            if (loadLinuxApps != null) {
-                item(key = "linux-apps-header") { StartMenuHeader("Linux apps") }
-                linuxAppsError?.let { message ->
-                    item(key = "linux-apps-error") {
-                        Text(
-                            "Couldn't read the installed apps: $message",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        )
-                    }
-                }
-                items(linuxApps, key = { "linux:" + it.id }) { app ->
-                    // The app's own name, and under it what kind of program
-                    // it is when the entry says (foot: "Terminal").
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onLaunchLinuxApp?.invoke(app)
-                                onDismiss()
-                            }
-                            .padding(vertical = 4.dp, horizontal = 8.dp),
-                    ) {
-                        Text(app.name, color = MaterialTheme.colorScheme.onSurface)
-                        app.genericName?.let {
-                            Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-            val byId = currentEntries?.associateBy { it.id }.orEmpty()
-            pluginShelves.forEach { shelf ->
-                val shown = shelf.shelf.entryIds.mapNotNull { byId[it] }
-                if (shown.isEmpty()) return@forEach
-                item(key = "plugin-shelf:${shelf.pluginId}/${shelf.shelf.id}") { StartMenuHeader("${shelf.shelf.title}, from ${shelf.pluginLabel}") }
-                items(shown, key = { "plugin-shelf:${shelf.pluginId}/${shelf.shelf.id}/" + it.id }) { entry ->
-                    Text(
-                        entry.title,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onPlay(entry)
-                                onDismiss()
-                            }
-                            .padding(vertical = 4.dp, horizontal = 8.dp),
-                    )
-                }
-            }
-            if (loadLinuxApps != null || pluginShelves.isNotEmpty()) {
-                item(key = "library-header") { StartMenuHeader("Library") }
-            }
-            when {
-                currentEntries == null -> item(key = "library-loading") {
-                    Text("Loading…", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(8.dp))
-                }
-                currentEntries.isEmpty() -> item(key = "library-empty") {
-                    Text(
-                        "Nothing in the library yet.",
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(8.dp),
-                    )
-                }
-                else -> items(currentEntries, key = { it.id }) { entry ->
-                    // A tap plays; a long press on a PC or engine game opens its page.
-                    val hasPage = entry.isPcOrEngineGame
-                    Text(
-                        entry.title,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .combinedClickable(
-                                onClick = {
-                                    onPlay(entry)
-                                    onDismiss()
-                                },
-                                onLongClick = if (hasPage) {
-                                    {
-                                        onOpenPage(entry)
-                                        onDismiss()
-                                    }
-                                } else {
-                                    null
-                                },
-                            )
-                            .padding(vertical = 4.dp, horizontal = 8.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** Everything the library holds: the Start menu is the Desktop's one list of it. */
-private val START_MENU_KINDS: Set<LibraryEntryKind> = LibraryEntryKind.entries.toSet()
-
-@Composable
-private fun StartMenuHeader(title: String) {
-    Text(
-        title,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.labelMedium,
-        modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 4.dp),
-    )
-}
 
 /** How often the taskbar checks again whether any plugin has a panel for Desktop; also when the bar is first drawn. */
 private const val PLUGINS_RECHECK_MS = 60_000L
