@@ -4891,6 +4891,13 @@ source (now `:runtime-windows`, §9):
     prefix and the saves in it) is not built. gamenative's full dialog
     stays reachable as "All prefix settings" (for a game in the shared
     prefix, "All shared prefix settings", which apply to every game in it).
+    One source of truth for the build a launch uses: the container
+    `PcContainers.forGame` resolves, which is also the one the rows read, so
+    the shared Wine build row is the build of every game without a prefix of
+    its own. A game with one launches on that prefix's build, so the shared
+    screen names those builds ("Games on another Wine build") instead of
+    letting its row read as what every game runs, and each launch logs the
+    prefix and build it took (`Launching ... in prefix ... on Wine ...`).
   - **Defaults are upstream's, per device.** `ContainerUtils.
     deviceDefaultContainerData` (the fork) runs GameNative's own
     `setContainerDefaults`, which droidtop never ran before: on arm64 the

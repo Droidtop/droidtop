@@ -13,6 +13,7 @@ import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
 import dev.droidtop.runtime.windows.utils.X86_64Graphics
 import com.winlator.container.Container
 import com.winlator.container.ContainerData
+import com.winlator.container.ContainerManager
 import com.winlator.core.DefaultVersion
 import dev.droidtop.library.WineGameOptionsPrefs
 import com.winlator.core.KeyValueSet
@@ -59,6 +60,11 @@ data class WineOptionsState(
     val missing: List<String>,
     /** False before Set up Windows games: the rows then show the device's defaults and the choices made for the setup to use. */
     val setUp: Boolean = true,
+    /**
+     * For the shared environment: the Wine builds games with a prefix of their own run on, when they are not the
+     * shared one. Those games launch on that build, whatever the shared rows say, so the shared screen names them.
+     */
+    val otherBuilds: Map<String, Int> = emptyMap(),
 )
 
 /**
@@ -149,8 +155,15 @@ object WineOptions {
             ownChoices = choices.size,
             rows = rows(context, settings, Lists.load(context), choices.keys) + gameRows(context, entryId, gameRoot),
             missing = runCatching { WineComponents.missing(context, container) }.getOrDefault(emptyList()),
+            otherBuilds = if (entryId == null) otherBuilds(context, container) else emptyMap(),
         )
     }
+
+    /** The Wine builds of every prefix but [shared], each with how many prefixes run it. */
+    private fun otherBuilds(context: Context, shared: Container): Map<String, Int> =
+        runCatching { ContainerManager(context).containers }.getOrDefault(emptyList())
+            .filter { it.id != shared.id && it.wineVersion != shared.wineVersion }
+            .groupingBy { it.wineVersion.orEmpty() }.eachCount()
 
     /** A game's rows that are not prefix settings: frame generation and Steamworks. Disk work. */
     private suspend fun gameRows(context: Context, entryId: String?, gameRoot: String?): List<WineOptionRow> =

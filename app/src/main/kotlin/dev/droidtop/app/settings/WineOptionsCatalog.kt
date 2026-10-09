@@ -108,6 +108,19 @@ object WineOptionsCatalog {
                 )
             }
             state.rows.forEach { row -> add(item(row, entryId, title, overGame)) }
+            // A game with a prefix of its own starts on that prefix's Wine build, not on the shared row above.
+            if (state.otherBuilds.isNotEmpty()) {
+                add(
+                    ActionItem(
+                        id = "wine_options_other_builds",
+                        title = "Games on another Wine build",
+                        subtitle = "A game that chose its own Wine build runs in a prefix of its own and starts on that build, not the one above. " +
+                            "Change it under that game's Wine and graphics",
+                        value = state.otherBuilds.entries.joinToString(", ") { (build, games) -> if (games > 1) "$build x$games" else build },
+                        run = {},
+                    ),
+                )
+            }
             add(
                 NestedScreenItem(
                     id = "wine_component_sources",

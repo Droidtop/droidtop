@@ -432,6 +432,8 @@ class DroidtopPcGameRuntime(
         // x86_64 device a build older than Wine 10 stops on an assertion
         // inside ntdll (WineOptionPlan.runsOnX86Host).
         val wine = container.wineVersion.orEmpty()
+        // Which prefix and build the launch took, so a mismatch with a settings row can be read off the log.
+        android.util.Log.i(TAG, "Launching ${entryId ?: "a program"} in prefix ${container.id} on Wine $wine")
         if (X86_64GuestLibs.isX86_64Host() && !WineOptionPlan.runsOnX86Host(wine)) {
             return PcLaunchResult(
                 false,
