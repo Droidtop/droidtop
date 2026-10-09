@@ -718,15 +718,17 @@ private fun GamepadShellBody(
     // fresh each time the menu opens -- LaunchDisplay.runningGame is
     // plain process state, not a flow, read the same "ask when you need
     // it" way LaunchDisplay's chooser/askOptions already are elsewhere
-    // in this file, rather than a second observable copy of it.
+    // in this file, rather than a second observable copy of it. The left
+    // menu's Resume row reads the same answer (docs/SPEC.md 7j).
+    val sideMenuOpen = quickMenuOpen || leftMenuOpen
     val forceStoppedLaunch by produceState(
         initialValue = false,
-        quickMenuOpen,
+        sideMenuOpen,
         dev.droidtop.library.LaunchDisplay.runningPackageName,
     ) {
         value = false
         while (
-            quickMenuOpen &&
+            sideMenuOpen &&
             dev.droidtop.library.LaunchDisplay.runningGame != null &&
             dev.droidtop.library.LaunchDisplay.runningPackageName != null
         ) {
@@ -739,8 +741,8 @@ private fun GamepadShellBody(
             kotlinx.coroutines.delay(1_000)
         }
     }
-    val runningEntry = remember(quickMenuOpen, forceStoppedLaunch, gameEntries, appEntries) {
-        if (!quickMenuOpen) {
+    val runningEntry = remember(sideMenuOpen, forceStoppedLaunch, gameEntries, appEntries) {
+        if (!sideMenuOpen) {
             null
         } else if (forceStoppedLaunch) {
             null
@@ -808,6 +810,12 @@ private fun GamepadShellBody(
             entries = leftMenuEntries(menuSectionsFor(uiMode)),
             current = section,
             atHome = pcGames.home,
+            runningTitle = runningEntry?.let { dev.droidtop.library.GameNaming.displayName(it.title) },
+            // The Quick Menu Game section's Resume: the one launch path, reused.
+            onResume = {
+                leftMenuOpen = false
+                runningEntry?.let(onLaunch)
+            },
             onSelect = { entry ->
                 leftMenuOpen = false
                 // Home and PC Games are one section: the row says which view.

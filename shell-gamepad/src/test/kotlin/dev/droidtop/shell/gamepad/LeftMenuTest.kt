@@ -83,6 +83,21 @@ class LeftMenuTest {
     }
 
     @Test
+    fun `with a game running the Resume row leads and the cursor still opens on where the user is`() {
+        all.forEachIndexed { index, entry ->
+            assertEquals(index + 1, leftMenuStartIndex(all, entry.section, atHome = entry.home, rowsAbove = 1))
+        }
+    }
+
+    @Test
+    fun `Downloads has a dot while a job runs and Social while a message is unread`() {
+        assertEquals(emptySet<GamingSection>(), leftMenuAttention(runningJobs = 0, unreadMessages = 0))
+        assertEquals(setOf(GamingSection.DOWNLOADS), leftMenuAttention(runningJobs = 2, unreadMessages = 0))
+        assertEquals(setOf(GamingSection.SOCIAL), leftMenuAttention(runningJobs = 0, unreadMessages = 1))
+        assertEquals(setOf(GamingSection.DOWNLOADS, GamingSection.SOCIAL), leftMenuAttention(runningJobs = 1, unreadMessages = 3))
+    }
+
+    @Test
     fun `every row has its own icon`() {
         assertEquals(all.size, all.map { it.glyph().name }.toSet().size)
     }

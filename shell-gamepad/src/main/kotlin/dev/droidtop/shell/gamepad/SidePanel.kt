@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -35,11 +37,6 @@ import kotlinx.coroutines.launch
 /** The edge a [SidePanelFrame] slides in from. */
 internal enum class PanelEdge { LEFT, RIGHT, BOTTOM }
 
-// How dark the page behind goes. A plain scrim, not a blur: a real blur
-// of a themed canvas with video and animation on it is a per-frame cost
-// the handheld should not pay for a menu that is open for seconds.
-private const val SIDE_PANEL_SCRIM_ALPHA = 0.55f
-
 /** A panel width as a [fraction] of the screen, held between [min] and [max] and never past the screen. */
 internal fun sidePanelWidth(screen: Dp, fraction: Float, min: Dp, max: Dp): Dp =
     (screen * fraction).coerceIn(min, max).coerceAtMost(screen)
@@ -48,10 +45,11 @@ internal fun sidePanelWidth(screen: Dp, fraction: Float, min: Dp, max: Dp): Dp =
  * The one frame for the Gaming shell's side panels, the left menu and the
  * Quick Menu (docs/SPEC.md 7j, "Gaming controls"): a Compose [Dialog] on
  * purpose, so its window owns input while it is open and the shell underneath
- * needs no fencing; a dimmed page behind it (tap to close); the panel sliding in
- * from [edge] and sliding back out on close. [BOTTOM] is a full-width sheet at
- * most [bottomMaxHeight] of the screen tall (a screen held upright has no room
- * for a side panel); [LEFT] and [RIGHT] are full height and [panelWidth] wide.
+ * needs no fencing; a dimmed page behind it (tap to close; [scrim] says how
+ * dark); the panel sliding in from [edge] and sliding back out on close.
+ * [BOTTOM] is a full-width sheet at most [bottomMaxHeight] of the screen tall
+ * (a screen held upright has no room for a side panel); [LEFT] and [RIGHT] are
+ * full height and [panelWidth] wide.
  *
  * [content] draws inside the panel and is given the panel's width and the
  * `close` to call for every way out (B, Start, a hint-row tap, a tap on the page):
@@ -65,6 +63,13 @@ internal fun sidePanelWidth(screen: Dp, fraction: Float, min: Dp, max: Dp): Dp =
  * panel radius ([Corners.Panel]), a hairline of the text ink at 5 percent
  * ([MenuTokens.PanelBorder]) and the menu shadow. The width [content] is
  * given is the panel's own, inside the margins.
+ *
+ * [topInset] and [footer] are the other Steam shape, its main menu's: the
+ * panel stays flush with its edge but starts [topInset] below the top and
+ * ends where [footer] begins, a strip across the whole window under the
+ * dimmed page that holds the menu's own hint row (Steam draws the main
+ * menu's legend in the footer's place, not inside the panel). The footer
+ * fades with the panel; it is not part of the panel's slide.
  */
 @Composable
 internal fun SidePanelFrame(
@@ -73,6 +78,9 @@ internal fun SidePanelFrame(
     panelWidth: (screen: Dp) -> Dp = { it },
     bottomMaxHeight: Float = 0.72f,
     floatMargin: Dp = 0.dp,
+    scrim: Color = MenuTokens.Scrim.copy(alpha = MenuTokens.QuickPanelScrimAlpha),
+    topInset: Dp = 0.dp,
+    footer: (@Composable (close: () -> Unit) -> Unit)? = null,
     content: @Composable (width: Dp, close: () -> Unit) -> Unit,
 ) {
     val dismiss by rememberUpdatedState(onDismiss)
@@ -95,56 +103,75 @@ internal fun SidePanelFrame(
     ) {
         GatePadInThisDialog()
         HideSystemBarsInThisDialog()
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()) {
             // The dimmed page: tapping it closes, as B does.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer { alpha = shown.value }
-                    .background(MenuTokens.Scrim.copy(alpha = SIDE_PANEL_SCRIM_ALPHA))
+                    .background(scrim)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { close() },
             )
-            val floating = edge != PanelEdge.BOTTOM && floatMargin > 0.dp
-            val margin = if (floating) floatMargin else 0.dp
-            val width = if (edge == PanelEdge.BOTTOM) maxWidth else panelWidth(maxWidth) - margin * 2
-            Surface(
-                // The shell's own overlay surface, not the platform's colour scheme: every token
-                // the panels draw with is defined against it (a light device state once gave a
-                // white panel with white-on-white labels).
-                color = MenuTokens.OverlaySurface,
-                tonalElevation = 0.dp,
-                shape = if (floating) Corners.Panel else androidx.compose.ui.graphics.RectangleShape,
-                border = if (floating) androidx.compose.foundation.BorderStroke(1.dp, MenuTokens.PanelBorder) else null,
-                shadowElevation = if (floating) Elevation.Menu else 0.dp,
-                modifier = Modifier
-                    .padding(margin)
-                    .then(
-                        if (edge == PanelEdge.BOTTOM) {
-                            Modifier.fillMaxWidth().heightIn(max = maxHeight * bottomMaxHeight)
-                        } else {
-                            Modifier.fillMaxHeight().width(width)
-                        },
-                    )
-                    .align(
-                        when (edge) {
-                            PanelEdge.LEFT -> Alignment.CenterStart
-                            PanelEdge.RIGHT -> Alignment.CenterEnd
-                            PanelEdge.BOTTOM -> Alignment.BottomCenter
-                        },
-                    )
-                    .graphicsLayer {
-                        // Out past its own margin too, so a floating panel leaves the screen whole.
-                        val away = 1f - shown.value
-                        val gap = margin.toPx()
-                        when (edge) {
-                            PanelEdge.LEFT -> translationX = -away * (size.width + gap)
-                            PanelEdge.RIGHT -> translationX = away * (size.width + gap)
-                            PanelEdge.BOTTOM -> translationY = away * size.height
-                        }
-                    },
-            ) {
-                // The panel's own sliding focus ring, inside the surface so it travels with it.
-                FocusGlideHost { content(width, close) }
+            Column(Modifier.fillMaxSize()) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(top = if (edge == PanelEdge.BOTTOM) 0.dp else topInset),
+                ) {
+                    val floating = edge != PanelEdge.BOTTOM && floatMargin > 0.dp
+                    val margin = if (floating) floatMargin else 0.dp
+                    val width = if (edge == PanelEdge.BOTTOM) maxWidth else panelWidth(maxWidth) - margin * 2
+                    Surface(
+                        // The shell's own overlay surface, not the platform's colour scheme: every token
+                        // the panels draw with is defined against it (a light device state once gave a
+                        // white panel with white-on-white labels).
+                        color = MenuTokens.OverlaySurface,
+                        tonalElevation = 0.dp,
+                        shape = if (floating) Corners.Panel else androidx.compose.ui.graphics.RectangleShape,
+                        border = if (floating) androidx.compose.foundation.BorderStroke(1.dp, MenuTokens.PanelBorder) else null,
+                        // A panel that stops short of the window's edges floats over the page.
+                        shadowElevation = if (floating || topInset > 0.dp || footer != null) Elevation.Menu else 0.dp,
+                        modifier = Modifier
+                            .padding(margin)
+                            .then(
+                                if (edge == PanelEdge.BOTTOM) {
+                                    Modifier.fillMaxWidth().heightIn(max = maxHeight * bottomMaxHeight)
+                                } else {
+                                    Modifier.fillMaxHeight().width(width)
+                                },
+                            )
+                            .align(
+                                when (edge) {
+                                    PanelEdge.LEFT -> Alignment.CenterStart
+                                    PanelEdge.RIGHT -> Alignment.CenterEnd
+                                    PanelEdge.BOTTOM -> Alignment.BottomCenter
+                                },
+                            )
+                            .graphicsLayer {
+                                // Out past its own margin too, so a floating panel leaves the screen whole.
+                                val away = 1f - shown.value
+                                val gap = margin.toPx()
+                                when (edge) {
+                                    PanelEdge.LEFT -> translationX = -away * (size.width + gap)
+                                    PanelEdge.RIGHT -> translationX = away * (size.width + gap)
+                                    PanelEdge.BOTTOM -> translationY = away * size.height
+                                }
+                            },
+                    ) {
+                        // The panel's own sliding focus ring, inside the surface so it travels with it.
+                        FocusGlideHost { content(width, close) }
+                    }
+                }
+                if (footer != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = topInset)
+                            .graphicsLayer { alpha = shown.value },
+                        contentAlignment = Alignment.Center,
+                    ) { footer(close) }
+                }
             }
         }
     }

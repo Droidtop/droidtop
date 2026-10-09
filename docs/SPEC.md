@@ -12303,19 +12303,36 @@ The left menu's order is Home, PC Games, Retro Games, Apps, the places, then
 Settings. Home (the PC section's shelves, §7i "Home art") is the first row;
 the current-destination mark follows which of Home and PC Games is showing.
 
-The left menu is a real side menu (Droidtop/tracker#273, slice 4, compared with
-the Steam side menu): a full-height panel from the left edge, about 28% of a
-landscape window (224 to 360 dp; 72% in portrait), over the dimmed page. Each
-row is an icon and a label, 48 dp tall (one touch target in a touch window),
-with 24 dp of left padding and no prose: no "Go to" heading and no "Here" value.
-The destination the user is on is marked by a 4 dp accent bar and a filled row;
-the cursor is the shell's one selection frame and starts on that row. Icons come
-from the one Material set (`LeftMenuEntry.glyph`, CatalogIconGlyphs.kt). There is
-no Power row: Android gives an app no call that opens the power menu (the Quick
-Menu marks its Power menu tile as needing privilege), so a row would be a button that cannot work.
+The left menu is Steam's main menu, measured (Droidtop/tracker#273 slice 4;
+Droidtop/tracker#363 slice 7, 2026-10-08; values in `SideMenu`, DesignTokens.kt):
+a 240 dp panel flush with the left edge (72% of a window held upright) that
+starts 40 dp below the top and ends at the menu's own hint row, which is drawn
+across the bottom of the window where the footer is, as Steam draws its main
+menu's legend. The page behind is dimmed by the scrim role's own strength (80%;
+the Quick Menu keeps its lighter 55%, because the page behind it is still what
+the person is looking at). Each row is an icon and a label, 48 dp tall (one touch
+target in a touch window), 24 dp in from the left and 16 dp from the right, and no
+prose: no "Go to" heading and no "Here" value. The row under the cursor flashes
+its plate from 30% of the text ink to 10% over 0.5 s and its content grows by 10%
+from a point 12% in from its left edge (it grows rightwards), with the window's one
+sliding ring on it; motion off, the plate is simply 10% and nothing grows. The
+destination the user is on is marked by a short accent pill on the panel's edge
+(4 by 20 dp, Steam's "you are here"; the 4 dp bar and filled row it replaces are
+gone), and the cursor starts on that row. A destination with something waiting
+carries an accent dot after its label: Downloads while a job runs, Social while a
+message is unread (`leftMenuAttention`, read while the menu is open, never polled).
+While a game runs, a **Resume** row leads the menu (DroidDeck's Resume item, owner
+2026-10-08): a live dot in the affirmative colour whose ring pulses outwards while
+motion is on, over "Resume" and the game's name; A resumes it through the Quick
+Menu Game section's own path (the shell's `onLaunch`), and which game is running
+is resolved the same way, when either menu opens. Icons come from the one
+Material set (`LeftMenuEntry.glyph`, CatalogIconGlyphs.kt). There is no Power row:
+Android gives an app no call that opens the power menu (the Quick Menu marks its
+Power menu tile as needing privilege), so a row would be a button that cannot work.
 Up/Down move, A goes, B or Start closes, R2 swaps to the Quick Menu, a tap on a
 row goes and a tap on the dimmed page closes. The panel frame (scrim, slide in and
-out) is the one the Quick Menu uses on the other edge (`SidePanelFrame`).
+out) is the one the Quick Menu uses on the other edge (`SidePanelFrame`, with its
+`topInset` and `footer` for this shape).
 
 The status cluster (clock, connectivity and battery) floats at the top right
 over Gaming content on a soft token-based scrim. It is not focusable and a tap

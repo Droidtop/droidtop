@@ -139,6 +139,43 @@ object Elevation {
 }
 
 /**
+ * The left menu (Start; docs/SPEC.md 7j "Gaming controls"), as Steam's main
+ * menu measures (docs/SPEC.md 7k): a 240dp panel flush with the left edge that
+ * stops [VerticalInset] short of the top (the bottom is the menu's own hint
+ * row), so it reads as a panel over the page rather than a wall; rows
+ * [RowHeight] tall with [RowPaddingStart] and [RowPaddingEnd]. The row under
+ * the cursor grows by [FocusScale] from a point [FocusPivotX] in from its left
+ * edge (it grows rightwards, not outwards) and its plate flashes from
+ * [FlashFrom] of the text ink down to [FlashTo] ([Motion.FlashMs]); the
+ * destination the person is on carries a short accent pill at the panel's edge
+ * ([CurrentMarkWidth] by [CurrentMarkHeight]), and a destination with something
+ * waiting an accent dot ([AttentionDot]).
+ */
+object SideMenu {
+    val Width: Dp = 240.dp
+    /** A window held upright has no room for 240dp beside the page: the panel takes this share of it. */
+    const val PortraitFraction = 0.72f
+    val VerticalInset: Dp = 40.dp
+    val RowHeight: Dp = 48.dp
+    val RowPaddingStart: Dp = 24.dp
+    val RowPaddingEnd: Dp = 16.dp
+    val IconSize: Dp = 24.dp
+    val IconGap: Dp = 16.dp
+    val CurrentMarkWidth: Dp = 4.dp
+    val CurrentMarkHeight: Dp = 20.dp
+    val AttentionDot: Dp = 8.dp
+    /** The running game's live dot, and the ring that pulses out of it while motion is on. */
+    val LiveDot: Dp = 8.dp
+    val LiveRing: Dp = 16.dp
+    const val FocusScale = 1.1f
+    const val FocusPivotX = 0.12f
+    const val FlashFrom = 0.30f
+    const val FlashTo = 0.10f
+    /** How far the live ring grows before it has faded out, as a multiple of [LiveRing]. */
+    const val LiveRingGrowth = 1.6f
+}
+
+/**
  * The type scale, and the job of each role. droidtop's chrome supplies
  * this to [MaterialTheme] rather than inheriting the platform default, so
  * two screens in the same flow cannot use different roles for the same
@@ -407,6 +444,15 @@ object MenuTokens {
 
     /** The hairline round a floating side panel: the text ink at 5 percent (Steam's white-5% edge, in the theme's ink). */
     val PanelBorder: Color get() = OnSurface.copy(alpha = 0.05f)
+
+    /**
+     * How dark the page goes behind the Quick Menu: lighter than [Scrim]'s own strength, because the
+     * game or page behind a quick-management panel is still what the person is looking at. A plain
+     * scrim, not a blur: a real blur of a themed canvas with video and animation on it is a per-frame
+     * cost the handheld should not pay for a panel that is open for seconds. The left menu, which
+     * takes the person somewhere else, dims the page by [Scrim]'s own strength (Steam's 80 percent).
+     */
+    const val QuickPanelScrimAlpha = 0.55f
 
     val RowShape = Corners.Crisp
     val OverlayShape = Corners.Panel

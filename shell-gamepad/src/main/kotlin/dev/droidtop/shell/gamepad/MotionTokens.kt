@@ -66,6 +66,12 @@ object Motion {
      */
     const val ScreenMs = 160
 
+    /** A side-menu row taking the cursor: its plate flashes bright and settles back over this long. */
+    const val FlashMs = 500
+
+    /** The left menu's live dot for the running game: one pulse of its ring. */
+    const val LivePulseMs = 1600
+
     /** A press acknowledging itself: nearly instant on purpose. */
     const val PressMs = 50
 
@@ -159,6 +165,7 @@ object Motion {
         if (!enabled) snap() else spring(damping, stiffness)
 
     fun <T> focus(): FiniteAnimationSpec<T> = tw(FocusMs, easing = QuickOut)
+    fun <T> flash(): FiniteAnimationSpec<T> = tw(FlashMs, easing = QuickOut)
     fun <T> lift(): FiniteAnimationSpec<T> = tw(LiftMs, easing = Glide)
     fun <T> release(): FiniteAnimationSpec<T> = tw(ReleaseMs, easing = SoftLand)
     fun <T> panelIn(): FiniteAnimationSpec<T> = tw(PanelInMs, easing = Glide)
