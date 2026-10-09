@@ -310,6 +310,10 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun dataStore(pluginId: String): PluginDataStore = PluginDataStore(PluginStore.dataDirFor(appContext, pluginId))
 
+    private val contextStore by lazy { PluginContexts(appContext) }
+
+    override fun contexts(): PluginContexts = contextStore
+
     private val tokens by lazy { PluginFileTokens.forPluginsRoot(PluginStore.root(appContext)) }
 
     override fun fileTokens(): PluginFileTokens = tokens

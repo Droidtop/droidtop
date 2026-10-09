@@ -1727,6 +1727,59 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | F5 | Install apps | install or update an APK (an Obtainium-style updater) | `apps.install {file token}` → Android's own installer UI | Android's confirmation | `apps.install` (dangerous) | high | not built |
 | F6 | Bound connections | a live service or binder connection to another app | manifest `boundServiceTargets` (exists); the host binds, the plugin exchanges data through the broker (`apps.bound.call {package, method, args}` for AIDL surfaces the host knows) | — | `apps.bind` (dangerous, per package) | high | declared only |
 | F7 | Privileged operations | Shizuku / root | **plugin-provided** `priv.*`, `root.*` (§2.7) | — | `priv.shell.adb`, `priv.shell.root`, `priv.packages`, `priv.settings`, `root.modules` (all critical) | critical | host shim only |
+| F8 | Context sync | a plugin's supporting state kept in step, both ways, with a program on the person's paired computers (F95Checker's watch list for the F95 plugin is the first) | `context.open {context, fields: [{name, direction, rule}], presence}` → `{records, conflicts}`; `context.get {context, after?, limit ≤ 200}` → `{records, next, conflicts}`; `context.put {context, key, fields}`; `context.remove {context, key}`; `context.sync {context}` → `{lines, conflicts}`; `context.resolve {context, key, field, keep: device\|computer}` | the plugin's own UI; the computer under Settings → Accounts and sources → Computers | `context.sync` (dangerous: the data travels to your computers and changes an app's data there) | high | built (2026-10-08, `PluginContexts`, `HostContextApis`; see "F8 Context sync" below) |
+
+#### F8 Context sync
+
+Owner, 2026-10-08 (Droidtop/tracker#380): "It's context SYNC. It's meant to
+allow you to do things on the computer and have them synced." A context is a
+plugin's supporting state, not library data. It syncs both ways between the
+device and the person's paired computers (docs/SPEC.md 7o "Computers"), so
+something done in either place shows up in the other. Example: watch a
+thread or mark a version installed in F95Checker on the PC, and the F95
+plugin on the device shows it. Do the same in the plugin, and F95Checker's
+database on the PC follows.
+
+- **Contexts droidtop can carry.** Each context needs an adapter in
+  droidtop-agent that reads and writes the program's own store on the
+  computer. droidtop accepts only context ids the agent knows. The first is
+  `f95checker`: F95Checker's `db.sqlite3`, `games` table, one record per
+  watched thread, keyed by thread id. The adapter never reads the `cookies`
+  table or the settings' passwords and tokens.
+- **The plugin declares the context** with `context.open`. A record is a map
+  of fields. Each field has:
+  - a `direction`: `both`, `to_device` (computer to device) or
+    `to_computer`;
+  - a `rule` for when both sides changed it: `device`, `computer` or `ask`.
+
+  `presence` says which way adding and removing whole records travels. Only
+  declared fields travel. A field the computer's adapter cannot write stays
+  as it is there. For F95Checker the adapter writes `installed`, `finished`,
+  `archived`, `rating` and `notes`, and reads `name`, `url`, `version`,
+  `developer`, `status`, `type` and `last_updated` as well.
+- **droidtop keeps the records** in `plugins/<id>/contexts/`, outside the
+  plugin's own data folder, so every change goes through `context.put` or
+  `context.remove` and the next sync sees it.
+- **Change tracking is a three-way merge per field**, against the baseline
+  droidtop keeps for each computer and context (the agent core's
+  `context::merge`, the same code the computer runs):
+  - if only one side changed a field, that change wins;
+  - if both changed it differently, the field's `rule` decides;
+  - `ask` leaves both sides as they are, and the field is listed under
+    `conflicts` until the plugin calls `context.resolve`.
+
+  Records added or removed on one side travel when `presence` allows.
+- **A program that keeps its data in memory** (F95Checker does) is written
+  only while it is closed. While it runs, the computer answers that the
+  change waits. droidtop keeps that field's baseline at the computer's value,
+  so the next sync sends the change again.
+- **When it runs:** only when the plugin calls `context.sync` (from its own
+  UI, during a call the person started) or the person presses "Sync now" for
+  a computer. Nothing polls.
+- **How droidtop reaches the computer** is droidtop-agent's channel
+  (Droidtop/droidtop-agent, docs/DESIGN.md): LAN direct, a direct WireGuard
+  tunnel, or the person's own cloud share. The plugin never sees an address,
+  a key or the computer's files.
 
 ### G. Identity and accounts
 
@@ -1857,6 +1910,7 @@ wording the host uses, so it is identical in every mode.
 | `apps.install` | dangerous | Install and update apps (Android asks you each time) | F5 |
 | `apps.bind` | dangerous | Stay connected to *listed apps* in the background | F6, F1 |
 | `vault.own` | normal | Store its own passwords and keys securely | G1 |
+| `context.sync` | dangerous | Keep its data in step with apps on your paired computers | F8 |
 | `auth.oauth` | normal | Ask you to sign in to a service | G2 |
 | `web.session` | dangerous | Use your signed-in session on *listed sites* | G3 |
 | `github.api` | normal | Use your GitHub token for GitHub requests (the token stays in droidtop) | G4 |

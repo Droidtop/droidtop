@@ -85,6 +85,7 @@ object PluginPermissions {
         PluginPermission("apps.install", PermissionTier.DANGEROUS, "Install and update apps (Android asks you each time)"),
         PluginPermission("apps.bind", PermissionTier.DANGEROUS, "Stay connected to listed apps in the background"),
         PluginPermission("vault.own", PermissionTier.NORMAL, "Store its own passwords and keys securely"),
+        PluginPermission("context.sync", PermissionTier.DANGEROUS, "Keep its data in step with apps on your paired computers"),
         PluginPermission("auth.oauth", PermissionTier.NORMAL, "Ask you to sign in to a service"),
         PluginPermission("web.session", PermissionTier.DANGEROUS, "Use your signed-in session on listed sites"),
         PluginPermission("github.api", PermissionTier.NORMAL, "Use your GitHub token for GitHub requests (the token stays in droidtop)"),

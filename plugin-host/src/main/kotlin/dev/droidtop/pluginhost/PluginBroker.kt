@@ -105,6 +105,9 @@ interface BrokerEnvironment {
     /** H1: the plugin's own data folder. */
     fun dataStore(pluginId: String): PluginDataStore? = null
 
+    /** Plugin contexts kept in step with the person's paired computers (docs/plugin-api.md 3 F8); null in a host without them. */
+    fun contexts(): PluginContexts? = null
+
     /** D4: the tokens of the documents each plugin was handed. */
     fun fileTokens(): PluginFileTokens? = null
 
@@ -410,7 +413,7 @@ object HostApis {
     )
 
     /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
-    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops }
+    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops }
 
     private fun vaultOf(env: BrokerEnvironment): PluginVault =
         env.vault() ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop keeps no plugin secrets")
