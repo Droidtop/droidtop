@@ -2,7 +2,9 @@ package dev.droidtop.runtime.linux.noroot
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.LocalSocket
+import android.net.Network
 import android.net.LocalSocketAddress
 import android.util.Log
 import dev.droidtop.runtime.Container
@@ -110,6 +112,9 @@ class ProotRuntime(
     private val names = ContainerNames(File(baseDir, ContainerNames.FILE_NAME))
     private val audioServer = HostAudioServer(context)
 
+    /** Keeps resolv.conf on Android's default network while the primary runs ([watchNetwork]). */
+    @Volatile private var networkWatch: ConnectivityManager.NetworkCallback? = null
+
     override val siblingsNeedStart: Boolean = false
 
     override suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container =
@@ -199,6 +204,7 @@ class ProotRuntime(
             // look like a live compositor to the wait below.
             socketsDir.listFiles()?.forEach { if (!it.isDirectory) it.delete() }
             writeNetworkFiles()
+            watchNetwork()
             // Audio never holds up the desktop, same rule as a daemon
             // inside the container (ContainerLayout.primaryInitScript,
             // dq-desk2-01): a program that dials PULSE_SERVER before this
@@ -591,7 +597,10 @@ class ProotRuntime(
     private suspend fun stopProcess(name: String) = withContext(NonCancellable + Dispatchers.IO) {
         // The audio bridge is the PRIMARY's own, same lifetime as its
         // compositor -- a sibling's stopProcess() never touches it.
-        if (name == PRIMARY_NAME) audioServer.stop()
+        if (name == PRIMARY_NAME) {
+            audioServer.stop()
+            unwatchNetwork()
+        }
         val process = running.remove(name)
         val found = processes.ofContainer(name)
         if (process == null && found.isEmpty()) return@withContext
@@ -672,20 +681,13 @@ class ProotRuntime(
      * configuration of its own, and Android has no /etc/resolv.conf for it
      * to inherit. The nameservers are the active network's own, read from
      * Android at every session start, so the guest resolves exactly as the
-     * device does (none are invented when Android reports none).
+     * device does (none are invented when Android reports none), and kept
+     * current while the primary runs ([watchNetwork]).
      */
     private fun writeNetworkFiles() {
         val connectivity = context.getSystemService(ConnectivityManager::class.java)
-        val servers = connectivity?.activeNetwork
-            ?.let { connectivity.getLinkProperties(it) }
-            ?.dnsServers
-            .orEmpty()
-            .mapNotNull { it.hostAddress }
-        if (servers.isEmpty()) log.line("no DNS servers reported by Android for the active network")
-        File(etcDir, "resolv.conf").writeText(
-            "# Written by droidtop from Android's active network at session start.\n" +
-                servers.joinToString("") { "nameserver $it\n" },
-        )
+        val properties = connectivity?.activeNetwork?.let { connectivity.getLinkProperties(it) }
+        writeResolvConf(properties)
         File(etcDir, "hosts").writeText(
             "127.0.0.1 localhost\n::1 localhost ip6-localhost ip6-loopback\n",
         )
@@ -693,6 +695,49 @@ class ProotRuntime(
             writeText(BWRAP_SHIM)
             setExecutable(true, false)
         }
+    }
+
+    /**
+     * resolv.conf for [properties]' DNS servers, rewritten in place (the
+     * same file, so the bind every running guest has sees it) and only when
+     * it changes.
+     */
+    private fun writeResolvConf(properties: LinkProperties?) {
+        val servers = properties?.dnsServers.orEmpty().mapNotNull { it.hostAddress }
+        if (servers.isEmpty()) log.line("no DNS servers reported by Android for the active network")
+        val text = "# Written by droidtop from Android's active network.\n" + servers.joinToString("") { "nameserver $it\n" }
+        val file = File(etcDir, "resolv.conf")
+        if (file.isFile && file.readText() == text) return
+        file.writeText(text)
+    }
+
+    /**
+     * The desktop outlives a network: Wi-Fi to another network, mobile
+     * data, a VPN coming up. resolv.conf used to be written only when
+     * droidtop started something, so a program the person started from
+     * inside the desktop kept the nameservers of the network the session
+     * began on and stopped resolving names after a switch. Android's own
+     * default-network callback rewrites it on every change, on
+     * ConnectivityManager's thread, until [unwatchNetwork].
+     */
+    private fun watchNetwork() {
+        if (networkWatch != null) return
+        val connectivity = context.getSystemService(ConnectivityManager::class.java) ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+                runCatching { writeResolvConf(linkProperties) }
+                    .onFailure { log.line("could not rewrite resolv.conf: ${it.message}") }
+            }
+        }
+        runCatching { connectivity.registerDefaultNetworkCallback(callback) }
+            .onSuccess { networkWatch = callback }
+            .onFailure { log.line("not following network changes: ${it.message}") }
+    }
+
+    private fun unwatchNetwork() {
+        val callback = networkWatch ?: return
+        networkWatch = null
+        runCatching { context.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback) }
     }
 
     /** The last [maxLines] lines a process printed, and when it last printed anything. */

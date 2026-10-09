@@ -1608,6 +1608,11 @@ only the last plan and announce a first boot on every such switch
 The proot backend also binds a generated `/etc/resolv.conf` (the active
 Android network's own DNS servers, read at every start; a stock image has
 none and Android has no `/etc/resolv.conf` to inherit) and `/etc/hosts`.
+While the primary runs, a default-network callback rewrites resolv.conf in
+place whenever Android's default network changes (Wi-Fi to another network,
+mobile data, a VPN), so a program started from inside the desktop keeps
+resolving names after a switch; it used to keep the servers of the network
+the session began on.
 Diagnostics go to logcat (`droidtop.proot`) and
 `<external files>/logs/desktop-container.log`, readable on an unrooted
 device without `run-as`.
