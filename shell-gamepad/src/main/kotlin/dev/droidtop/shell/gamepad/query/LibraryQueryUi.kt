@@ -83,6 +83,8 @@ import kotlinx.coroutines.withContext
 /** One flattened row of a sheet: a section marker or a selectable row. */
 private sealed interface FilterEntry {
     data class Header(val text: String) : FilterEntry
+    /** A line of words under a facet's values (what "Engine" means); not a stop. */
+    data class Note(val text: String) : FilterEntry
     data class Row(
         val title: String,
         val value: String? = null,
@@ -90,6 +92,8 @@ private sealed interface FilterEntry {
         val chevron: Boolean = false,
         val danger: Boolean = false,
         val onLongClick: (() -> Unit)? = null,
+        /** What A does here, in the hint bar, where "Select" would not say it (a save row's own words). */
+        val hint: String? = null,
         val onClick: (() -> Unit)? = null,
     ) : FilterEntry
 }
@@ -122,11 +126,18 @@ internal fun LibraryFilterSheet(
     onDismiss: () -> Unit,
     facetActions: Map<LibraryFacet, List<SheetAction>> = emptyMap(),
     footerActions: List<SheetAction> = emptyList(),
+    // A list whose saved views can be tabs (PC Games, docs/SPEC.md 7i): "Save
+    // this view" becomes "Save as a tab" ([onSaveView]) and "Save only" (this).
+    onSaveOnly: ((String) -> Unit)? = null,
+    // Editing a pinned tab: one row saves the filters into that view as it is
+    // named, in place (same view, same tab position).
+    editingName: String? = null,
 ) {
     var focusIndex by remember { mutableIntStateOf(0) }
     var openFacet by remember { mutableStateOf<LibraryFacet?>(null) }
     var parentFocus by remember { mutableIntStateOf(0) }
-    var naming by remember { mutableStateOf(false) }
+    // Naming a view to save: null while not, else whether it becomes a tab.
+    var naming by remember { mutableStateOf<Boolean?>(null) }
 
     val counts by produceState<SheetCounts?>(null, base, scope, query) {
         value = withContext(Dispatchers.Default) {
@@ -134,7 +145,7 @@ internal fun LibraryFilterSheet(
         }
     }
 
-    val entries = remember(query, counts, scope, savedViews, openFacet, facetActions, footerActions) {
+    val entries = remember(query, counts, scope, savedViews, openFacet, facetActions, footerActions, editingName) {
         buildList<FilterEntry> {
             val facet = openFacet
             val offers = counts?.offers.orEmpty()
@@ -182,7 +193,16 @@ internal fun LibraryFilterSheet(
                     }
                 }
                 if (!query.isEmpty) add(FilterEntry.Row("Clear filters", danger = true, onClick = { onQueryChange(query.cleared) }))
-                add(FilterEntry.Row("Save this view", onClick = { naming = true }))
+                when {
+                    editingName != null -> add(
+                        FilterEntry.Row("Save \"$editingName\"", subtitle = "These filters and sort, in the same tab", hint = "Save") { onSaveView(editingName) },
+                    )
+                    onSaveOnly != null -> {
+                        add(FilterEntry.Row("Save as a tab", subtitle = "A tab on the strip, after the others", hint = "Save as a tab") { naming = true })
+                        add(FilterEntry.Row("Save only", subtitle = "Listed with your saved views in Collections", hint = "Save only") { naming = false })
+                    }
+                    else -> add(FilterEntry.Row("Save this view", hint = "Save") { naming = true })
+                }
                 footerActions.forEach { add(FilterEntry.Row(it.title, subtitle = it.subtitle, onClick = it.onClick)) }
             } else {
                 offers.firstOrNull { it.facet == facet }?.values?.forEach { entry ->
@@ -195,6 +215,7 @@ internal fun LibraryFilterSheet(
                         ),
                     )
                 }
+                facet.hint?.let { add(FilterEntry.Note(it)) }
                 facetActions[facet].orEmpty().forEach { add(FilterEntry.Row(it.title, subtitle = it.subtitle, onClick = it.onClick)) }
                 add(
                     FilterEntry.Row(
@@ -215,16 +236,16 @@ internal fun LibraryFilterSheet(
         focusIndex = focusIndex.coerceIn(0, (rows.size - 1).coerceAtLeast(0))
     }
 
-    if (naming) {
+    naming?.let { asTab ->
         TextEditDialog(
-            title = "Save this view",
+            title = if (onSaveOnly == null) "Save this view" else if (asTab) "Save as a tab" else "Save only",
             subtitle = "Current filters and sort",
             initial = query.text.takeIf { it.isNotBlank() } ?: "",
             onCommit = { name ->
-                naming = false
-                if (name.isNotBlank()) onSaveView(name.trim())
+                naming = null
+                if (name.isNotBlank()) if (asTab || onSaveOnly == null) onSaveView(name.trim()) else onSaveOnly(name.trim())
             },
-            onDismiss = { naming = false },
+            onDismiss = { naming = null },
         )
         return
     }
@@ -236,7 +257,7 @@ internal fun LibraryFilterSheet(
             focusLabel = "Filter",
             title = openFacet?.label ?: "Filter",
             hints = listOf(
-                HintBinding(GamepadAction.A, "Select"),
+                HintBinding(GamepadAction.A, rows.getOrNull(focusIndex)?.hint ?: "Select"),
                 HintBinding(GamepadAction.X, "Clear") { !query.isEmpty },
                 HintBinding(GamepadAction.B, if (openFacet != null) "Back" else "Close"),
             ),
@@ -267,6 +288,7 @@ internal fun LibraryFilterSheet(
             entries.forEach { entry ->
                 when (entry) {
                     is FilterEntry.Header -> MenuSectionLabel(entry.text)
+                    is FilterEntry.Note -> MenuHint(entry.text)
                     is FilterEntry.Row -> MenuRow(
                         title = entry.title,
                         value = entry.value,
@@ -347,14 +369,26 @@ internal class SavedViews(
         private set
 
     suspend fun load() {
-        views = withContext(Dispatchers.IO) { LibraryViewPrefs.savedViews(context, scopeId) }
+        views = withContext(Dispatchers.IO) {
+            LibraryViewPrefs.seedOnce(context, scopeId)
+            LibraryViewPrefs.savedViews(context, scopeId)
+        }
     }
 
-    fun save(name: String, query: LibraryQuery) {
+    fun save(name: String, query: LibraryQuery) = put(NamedLibraryView(name, query))
+
+    /** Saves [view]: in place when its id (or name) is saved already, else at the end. */
+    fun put(view: NamedLibraryView) {
         coroutines.launch {
-            withContext(Dispatchers.IO) { LibraryViewPrefs.saveView(context, scopeId, NamedLibraryView(name, query)) }
+            withContext(Dispatchers.IO) { LibraryViewPrefs.saveView(context, scopeId, view) }
             load()
         }
+    }
+
+    /** Every saved view at once, in this order (a move, a pin, an unpin); shown at once, written off the main thread. */
+    fun replaceAll(next: List<NamedLibraryView>) {
+        views = next
+        coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.writeViews(context, scopeId, next) } }
     }
 
     fun forget(name: String) {

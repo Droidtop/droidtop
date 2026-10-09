@@ -350,7 +350,7 @@ private fun preview(
                 executable = exe,
                 arguments = plan.args.orEmpty(),
                 workingDir = found.workingDir?.takeIf { it.isNotEmpty() },
-                source = "Lutris: $label",
+                source = dev.droidtop.library.PcLaunchers.importedSource(dev.droidtop.library.PcLaunchers.LUTRIS, label),
             )
         }
     }

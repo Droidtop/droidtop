@@ -57,6 +57,10 @@ enum class LibraryFacet(val key: String, val label: String) {
     SOURCE("source", "Source"),
     // How the account holds a store row ([StoreHolding], docs/SPEC.md 7g); values are the holding's name.
     OWNERSHIP("ownership", "Ownership"),
+    // PC or Engine, the word a capsule's badge leads with (docs/SPEC.md 7i).
+    KIND("kind", "Kind"),
+    // The launcher a game came to droidtop through (Lutris), by its id ([dev.droidtop.library.PcLaunchers]).
+    IMPORTED_FROM("via", "Imported from"),
     ENGINE("engine", "Engine"),
     RUNNER("runner", "Runner"),
     INSTALLED("installed", "Install state"),
@@ -90,6 +94,8 @@ enum class LibraryFacet(val key: String, val label: String) {
         SOURCE -> PcSource.of(entry, context.pcRoots)?.let { listOf(it.id) }.orEmpty()
         // A store row only: a folder game is no store's to hold.
         OWNERSHIP -> entry.holding()?.let { listOf(it.name) }.orEmpty()
+        KIND -> listOf(if (entry.kind in dev.droidtop.shell.gamepad.pc.NON_ENGINE_KINDS) KIND_PC else KIND_ENGINE)
+        IMPORTED_FROM -> context.viaOf(entry)?.let { listOf(it) }.orEmpty()
         ENGINE -> entry.engineLabel()?.let { listOf(it) }.orEmpty()
         RUNNER -> context.runnerLabelOf(entry)?.let { listOf(it) }.orEmpty()
         // The one answer the Installed shelf reads too (LibraryEntry.isInstalled): a
@@ -143,13 +149,23 @@ enum class LibraryFacet(val key: String, val label: String) {
     fun valueLabel(value: String): String = when (this) {
         SOURCE -> PcSource.fromId(value).label()
         OWNERSHIP -> StoreHolding.entries.firstOrNull { it.name == value }?.label ?: value
+        KIND -> if (value == KIND_ENGINE) "Engine" else "PC"
+        IMPORTED_FROM -> dev.droidtop.library.PcLaunchers.label(value)
         else -> value
     }
+
+    /** One line the Filter sheet shows under this facet's values, where its words need saying. */
+    val hint: String?
+        get() = when (this) {
+            KIND -> "Engine: games that run through an engine such as Ren'Py or RPG Maker"
+            else -> null
+        }
 
     /** The order a facet's values are listed in: sources in the registry's order ([PcSource.ORDER]), the rest by name. */
     fun valueOrder(): Comparator<FacetValueCount> = when (this) {
         SOURCE -> compareBy<FacetValueCount, PcSource>(PcSource.ORDER) { PcSource.fromId(it.value) }
         OWNERSHIP -> compareBy<FacetValueCount> { offer -> StoreHolding.entries.indexOfFirst { it.name == offer.value } }
+        KIND -> compareBy<FacetValueCount> { if (it.value == KIND_PC) 0 else 1 }
         else -> compareBy<FacetValueCount> { it.value.lowercase() }
     }
 
@@ -168,6 +184,9 @@ enum class LibraryFacet(val key: String, val label: String) {
 /** One value of a facet and how many entries have it. */
 data class FacetValueCount(val value: String, val count: Int)
 
+/** The Kind facet's values: ids, drawn as "PC" and "Engine". */
+const val KIND_PC = "pc"
+const val KIND_ENGINE = "engine"
 const val INSTALLED_YES = "Installed"
 const val INSTALLED_NO = "Not installed"
 const val READY_YES = "Ready"
@@ -214,6 +233,8 @@ data class LibraryQueryContext(
     val now: () -> Long = System::currentTimeMillis,
     /** The person's game folders (absolute paths), loaded once off the main thread: the Source facet's folder values. */
     val pcRoots: List<String> = emptyList(),
+    /** The launcher a game was imported through ([dev.droidtop.library.PcLaunchers]), read once off the main thread; null for none. */
+    val viaOf: (LibraryEntry) -> String? = { null },
 )
 
 /** What one list offers: which facets, which sorts, and how to read the facts. */
@@ -374,6 +395,13 @@ data class LibraryQuery(
  */
 data class OwnershipOptions(val showShared: Boolean = true, val showFree: Boolean = false)
 
+/**
+ * Which of PC Games' optional built-in tabs the strip shows (List options >
+ * Strip tabs, docs/SPEC.md 7i): Favourites and Collections may be hidden;
+ * Overview, All games and Installed cannot, and the order never changes.
+ */
+data class StripTabs(val favourites: Boolean = true, val collections: Boolean = true)
+
 /** Which kind of list asks [listExclusion]. */
 enum class ListPlace {
     /** An ordinary list: All games, a saved view, a shelf of the library, search. */
@@ -437,13 +465,21 @@ data class QueryChip(val facet: LibraryFacet?, val value: String) {
 }
 
 /**
- * The filters no strip view stands for, as the strip's ONE pill ("Running,
- * 2 of 40"), or null while nothing filters. PC Games and Apps both draw it.
+ * The filters no strip view stands for, as the strip's ONE pill, or null
+ * while nothing filters (docs/SPEC.md 7i): every active filter, the first two
+ * by name and the rest as a number ("Steam · Shared with you · +2, 40 of
+ * 3,300"), so it stays short enough for one line. PC Games and Apps both draw it.
  */
 fun LibraryQuery.pillText(scope: LibraryQueryScope, shown: Int, total: Int): String? {
     val chips = activeChips(scope)
-    return if (chips.isEmpty()) null else chips.joinToString(", ") { it.label } + ", $shown of $total"
+    if (chips.isEmpty()) return null
+    val named = chips.take(PILL_NAMED).joinToString(" · ") { it.label }
+    val more = (chips.size - PILL_NAMED).takeIf { it > 0 }?.let { " · +$it" }.orEmpty()
+    return "$named$more, ${"%,d".format(shown)} of ${"%,d".format(total)}"
 }
+
+/** How many filters the pill names before it counts the rest. */
+private const val PILL_NAMED = 2
 
 /** "12 of 80 apps" while something filters, "80 apps" while nothing does. Pure, for the header and the sheets. */
 fun queryCountLine(shown: Int, total: Int, filtering: Boolean, scope: LibraryQueryScope): String {
@@ -583,11 +619,18 @@ const val LAUNCHER_GAMES_SCOPE_ID = "launcher_games"
 const val APPS_SCOPE_ID = "apps"
 
 /**
- * A view saved by name: the chips the PC library leads with are built-in
- * ones (Continue playing, Installed, per store), and the same shape is
- * what a person's own saved views are -- one mechanism for both.
+ * A view saved by name: the tabs a list leads with are built-in ones (All
+ * games, Installed), and the same shape is what a person's own saved views
+ * are -- one mechanism for both. [id] stays the same when the view is renamed
+ * or edited, so it keeps its place; [pinned] puts it on the strip as a tab
+ * (docs/SPEC.md 7i), otherwise it is listed with the saved views only.
  */
-data class NamedLibraryView(val name: String, val query: LibraryQuery)
+data class NamedLibraryView(
+    val name: String,
+    val query: LibraryQuery,
+    val id: String = name,
+    val pinned: Boolean = true,
+)
 
 /**
  * Per-list persistence of saved views and of the query the list was left
@@ -611,18 +654,58 @@ object LibraryViewPrefs {
         return migrated
     }
 
-    /** Saving a name again replaces it, keeping the order it was first saved in. */
+    /**
+     * Saving a view whose id is already saved replaces it in place (an edit
+     * keeps its tab position); a new name is a new view at the end, and
+     * saving a name again replaces that view, keeping its place.
+     */
     fun saveView(context: Context, scopeId: String, view: NamedLibraryView) {
-        val views = savedViews(context, scopeId).filterNot { it.name == view.name } + view
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-            .edit().putString(VIEWS_PREFIX + scopeId, encodeViews(views)).apply()
+        writeViews(context, scopeId, withView(savedViews(context, scopeId), view))
+    }
+
+    /** Pure, for the JVM tests: [views] with [view] saved by the rule [saveView] states. */
+    internal fun withView(views: List<NamedLibraryView>, view: NamedLibraryView): List<NamedLibraryView> {
+        val index = views.indexOfFirst { it.id == view.id }.takeIf { it >= 0 } ?: views.indexOfFirst { it.name == view.name }
+        return if (index < 0) views + view else views.toMutableList().apply { set(index, view.copy(id = views[index].id)) }
     }
 
     fun removeView(context: Context, scopeId: String, name: String) {
-        val views = savedViews(context, scopeId).filterNot { it.name == name }
+        writeViews(context, scopeId, savedViews(context, scopeId).filterNot { it.name == name })
+    }
+
+    /** All of a list's saved views at once, in the order given: a reorder, a pin or an unpin. */
+    fun writeViews(context: Context, scopeId: String, views: List<NamedLibraryView>) {
         val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
         if (views.isEmpty()) prefs.remove(VIEWS_PREFIX + scopeId) else prefs.putString(VIEWS_PREFIX + scopeId, encodeViews(views))
         prefs.apply()
+    }
+
+    /** The PC library's scope id; its saved views are the strip's pinned tabs. */
+    const val PC_SCOPE_ID = "pc"
+
+    /** The id of the "Updates" view everyone was given once (docs/SPEC.md 7i). */
+    const val UPDATES_VIEW_ID = "updates"
+    private const val SEEDED_UPDATES = "droidtop_library_seeded_updates_view"
+
+    /**
+     * The pinned "Updates" view over the Update available facet, first among
+     * [views], given once when the Updates built-in tab went away. Pure, for
+     * the JVM tests; unpinning or removing it later is the person's choice.
+     */
+    internal fun withUpdatesView(views: List<NamedLibraryView>): List<NamedLibraryView> =
+        if (views.any { it.id == UPDATES_VIEW_ID }) {
+            views
+        } else {
+            listOf(NamedLibraryView("Updates", LibraryQuery(facets = mapOf(LibraryFacet.UPDATE.key to setOf(UPDATE_YES))), UPDATES_VIEW_ID)) + views
+        }
+
+    /** Gives the PC library its "Updates" view, once ever; off the main thread. */
+    fun seedOnce(context: Context, scopeId: String) {
+        if (scopeId != PC_SCOPE_ID) return
+        val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(SEEDED_UPDATES, false)) return
+        writeViews(context, scopeId, withUpdatesView(savedViews(context, scopeId)))
+        prefs.edit().putBoolean(SEEDED_UPDATES, true).apply()
     }
 
     /** The query the list was left showing, or [default] when it has never been changed (Last played opens by recency). */
@@ -684,6 +767,22 @@ object LibraryViewPrefs {
         )
     }
 
+    private const val TAB_FAVOURITES = "droidtop_library_pc_tab_favourites"
+    private const val TAB_COLLECTIONS = "droidtop_library_pc_tab_collections"
+
+    /** Which of the PC strip's optional built-in tabs show (List options > Strip tabs); a preferences read. */
+    fun stripTabs(context: Context): StripTabs {
+        val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+        return StripTabs(favourites = prefs.getBoolean(TAB_FAVOURITES, true), collections = prefs.getBoolean(TAB_COLLECTIONS, true))
+    }
+
+    fun setStripTabs(context: Context, tabs: StripTabs) {
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(TAB_FAVOURITES, tabs.favourites)
+            .putBoolean(TAB_COLLECTIONS, tabs.collections)
+            .apply()
+    }
+
     fun setOwnershipOptions(context: Context, options: OwnershipOptions) {
         context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
             .putBoolean(SHOW_SHARED, options.showShared)
@@ -740,7 +839,10 @@ object LibraryViewPrefs {
     internal fun encodeViews(views: List<NamedLibraryView>): String {
         val array = org.json.JSONArray()
         views.forEach { view ->
-            array.put(JSONObject().put("name", view.name).put("query", JSONObject(encodeQuery(view.query))))
+            array.put(
+                JSONObject().put("name", view.name).put("id", view.id).put("pinned", view.pinned)
+                    .put("query", JSONObject(encodeQuery(view.query))),
+            )
         }
         return array.toString()
     }
@@ -754,7 +856,8 @@ object LibraryViewPrefs {
                 val entry = array.optJSONObject(i) ?: return@mapNotNull null
                 val name = entry.optString("name").takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 val query = entry.optJSONObject("query")?.toString()?.let { decodeQuery(it) } ?: return@mapNotNull null
-                NamedLibraryView(name, query)
+                // A view saved before ids and pins is its own name, and was on the strip.
+                NamedLibraryView(name, query, id = entry.optString("id").ifBlank { name }, pinned = entry.optBoolean("pinned", true))
             }
         }.getOrDefault(emptyList())
     }

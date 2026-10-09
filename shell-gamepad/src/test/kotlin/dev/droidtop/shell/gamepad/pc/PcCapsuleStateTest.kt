@@ -9,6 +9,9 @@ import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryQuery
 import dev.droidtop.shell.gamepad.query.LibraryQueryScope
 import dev.droidtop.shell.gamepad.query.LibrarySortKey
+import dev.droidtop.shell.gamepad.query.LibraryViewPrefs
+import dev.droidtop.shell.gamepad.query.NamedLibraryView
+import dev.droidtop.shell.gamepad.query.StripTabs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -169,40 +172,77 @@ class PcCapsuleStateTest {
         folder("/games/a"),
     )
 
+    private val updates = LibraryViewPrefs.withUpdatesView(emptyList()).single()
+    private val mine = NamedLibraryView("Mine", LibraryQuery(facets = mapOf(LibraryFacet.FAVOURITES.key to setOf("Favourites"))), id = "mine")
+    private val hidden = NamedLibraryView("Saved only", LibraryQuery(), id = "saved", pinned = false)
+
+    private fun labels(tabs: List<PcTab>) = tabs.map { pcTabLabel(it, emptyMap()) }
+
     @Test
-    fun `the strip counts each built-in view`() {
-        val counts = pcViewCounts(library, scope)
-        assertEquals(4, counts[VIEW_ALL])
-        assertEquals(3, counts[VIEW_INSTALLED])
-        assertEquals(1, counts[VIEW_UPDATES])
-        assertEquals(1, counts[VIEW_FAVOURITES])
-        // A store is counted under its id; a folder game is no store's.
-        assertEquals(2, counts["steam"])
-        assertEquals(1, counts["gog"])
-        assertNull(counts["Folder"])
+    fun `the strip's built-in tabs are fixed, then the pinned views, Updates first`() {
+        val saved = LibraryViewPrefs.withUpdatesView(listOf(mine, hidden))
+        assertEquals(
+            listOf(VIEW_OVERVIEW, VIEW_ALL, VIEW_INSTALLED, VIEW_FAVOURITES, VIEW_COLLECTIONS, "Updates", "Mine"),
+            labels(pcStripTabs(saved)),
+        )
+        // Empty built-ins stay: there is no count to hide them by.
+        assertEquals(listOf(VIEW_OVERVIEW, VIEW_ALL, VIEW_INSTALLED, VIEW_FAVOURITES, VIEW_COLLECTIONS), labels(pcStripTabs(emptyList())))
+        // Strip tabs hides Favourites and Collections only, and the order stays.
+        assertEquals(
+            listOf(VIEW_OVERVIEW, VIEW_ALL, VIEW_INSTALLED, "Updates", "Mine"),
+            labels(pcStripTabs(saved, StripTabs(favourites = false, collections = false))),
+        )
     }
 
     @Test
-    fun `updates and favourites chips appear only when they hold something`() {
-        val none = pcStripViews(mapOf(VIEW_ALL to 2, VIEW_UPDATES to 0, VIEW_FAVOURITES to 0), emptyList()).map { it.name }
-        assertEquals(listOf(VIEW_ALL, VIEW_INSTALLED), none)
-
-        val some = pcStripViews(mapOf(VIEW_UPDATES to 1, VIEW_FAVOURITES to 3), emptyList()).map { it.name }
-        assertEquals(listOf(VIEW_ALL, VIEW_INSTALLED, VIEW_UPDATES, VIEW_FAVOURITES), some)
+    fun `everyone is given the pinned Updates view once, over the existing facet`() {
+        assertEquals(LibraryViewPrefs.UPDATES_VIEW_ID, updates.id)
+        assertTrue(updates.pinned)
+        assertEquals(setOf(dev.droidtop.shell.gamepad.query.UPDATE_YES), updates.query.selected(LibraryFacet.UPDATE))
+        // Seeding again changes nothing; a person's renamed Updates keeps its place.
+        val renamed = listOf(mine, updates.copy(name = "New builds"))
+        assertEquals(renamed, LibraryViewPrefs.withUpdatesView(renamed))
     }
 
     @Test
-    fun `each store gets a view after the built-in ones, largest first`() {
-        val counts = mapOf(VIEW_ALL to 9, VIEW_INSTALLED to 4, "GOG" to 2, "Steam" to 5)
-        val names = pcStripViews(counts, listOf(dev.droidtop.shell.gamepad.query.NamedLibraryView("Mine", LibraryQuery()))).map { it.name }
-        assertEquals(listOf(VIEW_ALL, VIEW_INSTALLED, "Steam", "GOG", "Mine"), names)
+    fun `every grid tab carries its count`() {
+        val tabs = pcStripTabs(listOf(updates, mine))
+        val counts = pcViewCounts(library, scope, tabs.filterIsInstance<PcTab.Grid>().map { it.view })
+        assertEquals(4, counts["builtin:all"])
+        assertEquals(3, counts["builtin:installed"])
+        assertEquals(1, counts["builtin:favourites"])
+        assertEquals(1, counts[LibraryViewPrefs.UPDATES_VIEW_ID])
+        assertEquals("Installed · 3", pcTabLabel(tabs[2], counts))
+        assertEquals("Mine · 1", pcTabLabel(tabs.last(), counts))
+        assertEquals(VIEW_COLLECTIONS, pcTabLabel(PcTab.Collections, counts))
     }
 
     @Test
-    fun `a built-in chip carries its count and a saved view only its name`() {
-        val counts = mapOf(VIEW_INSTALLED to 12)
-        assertEquals("Installed · 12", pcStripLabel(pcBuiltInViews.first { it.name == VIEW_INSTALLED }, counts))
-        assertEquals("Installed", pcStripLabel(pcBuiltInViews.first { it.name == VIEW_INSTALLED }, emptyMap()))
-        assertEquals("Mine", pcStripLabel(dev.droidtop.shell.gamepad.query.NamedLibraryView("Mine", LibraryQuery()), counts))
+    fun `pinned tabs move among themselves and to first, saved-only views stay put`() {
+        val a = NamedLibraryView("A", LibraryQuery(), id = "a")
+        val b = NamedLibraryView("B", LibraryQuery(), id = "b")
+        val c = NamedLibraryView("C", LibraryQuery(), id = "c")
+        val saved = listOf(a, hidden, b, c)
+        assertEquals(listOf("a", "saved", "c", "b"), movePinned(saved, "c", step = -1).map { it.id })
+        assertEquals(listOf("c", "saved", "a", "b"), movePinned(saved, "c", toFirst = true).map { it.id })
+        assertEquals(saved, movePinned(saved, "a", step = -1))
+    }
+
+    @Test
+    fun `an edited view is saved in place, a new name at the end`() {
+        val saved = listOf(updates, mine)
+        val edited = LibraryViewPrefs.withView(saved, updates.copy(name = "Builds", query = LibraryQuery()))
+        assertEquals(listOf("Builds", "Mine"), edited.map { it.name })
+        assertEquals(LibraryViewPrefs.UPDATES_VIEW_ID, edited.first().id)
+        assertEquals(listOf("Updates", "Mine", "New"), LibraryViewPrefs.withView(saved, NamedLibraryView("New", LibraryQuery(), id = "n")).map { it.name })
+    }
+
+    @Test
+    fun `views saved before ids and pins read back pinned, under their name`() {
+        val old = "[{\"name\":\"Mine\",\"query\":{\"sort\":\"NAME\",\"reversed\":false,\"text\":\"\",\"facets\":{}}}]"
+        val read = LibraryViewPrefs.decodeViews(old).single()
+        assertEquals("Mine", read.id)
+        assertTrue(read.pinned)
+        assertEquals(listOf(hidden), LibraryViewPrefs.decodeViews(LibraryViewPrefs.encodeViews(listOf(hidden))))
     }
 }

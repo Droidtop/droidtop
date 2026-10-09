@@ -180,7 +180,7 @@ class PcShelvesTest {
     }
 
     @Test
-    fun `store rows shelve per store, folder games per engine family, largest first`() {
+    fun `more than one source shelves per source, one source per engine family`() {
         val shelves = pcShelves(
             listOf(
                 game("steam:1", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(installed = true)),
@@ -193,9 +193,13 @@ class PcShelvesTest {
             now,
         )
 
-        assertEquals(listOf("store:gog", "store:steam", "kind:Visual Novels", "kind:RPG Maker"), shelves.map { it.id })
-        assertEquals(dev.droidtop.library.PcSource.Store("gog").label(), shelves[0].title)
-        assertEquals("Visual Novels", shelves[2].title)
+        // Stores in the registry's order (which other tests may fill), then the folders.
+        assertEquals(setOf("source:gog", "source:steam", "source:folder:"), shelves.map { it.id }.toSet())
+        assertEquals("source:folder:", shelves.last().id)
+        assertEquals("Folder", shelves.last().title)
+
+        val foldersOnly = pcShelves(listOf(game("/vn1"), game("/vn2"), game("/rm", kind = LibraryEntryKind.RPG_MAKER_MV)), now)
+        assertEquals(listOf("kind:Visual Novels", "kind:RPG Maker"), foldersOnly.map { it.id })
     }
 
     @Test

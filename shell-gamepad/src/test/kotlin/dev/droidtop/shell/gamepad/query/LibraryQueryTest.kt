@@ -504,4 +504,40 @@ class LibraryQueryTest {
         assertFalse(LibraryFacet.SOURCE in retroQueryScope("snes").facets)
         assertFalse(LibraryFacet.SOURCE in launcherGamesQueryScope().facets)
     }
+
+    @Test
+    fun `the pill names two filters and counts the rest, on one line`() {
+        val pcScope = scope.copy(facets = listOf(LibraryFacet.SOURCE, LibraryFacet.OWNERSHIP, LibraryFacet.PLAYED, LibraryFacet.INSTALLED))
+        val two = LibraryQuery(facets = mapOf(LibraryFacet.SOURCE.key to setOf("steam"), LibraryFacet.OWNERSHIP.key to setOf("FAMILY")))
+        assertEquals("${PcSource.Store("steam").label()} · Shared with you, 412 of 3,300", two.pillText(pcScope, 412, 3300))
+        val four = two.withToggled(LibraryFacet.PLAYED, PLAYED_NO, true).withToggled(LibraryFacet.INSTALLED, INSTALLED_YES, true)
+        assertEquals("${PcSource.Store("steam").label()} · Shared with you · +2, 40 of 3,300", four.pillText(pcScope, 40, 3300))
+        assertNull(LibraryQuery().pillText(pcScope, 1, 1))
+    }
+
+    @Test
+    fun `Kind is PC or Engine, offered only when both have rows, with what Engine means`() {
+        val pc = game("steam:1", pcInfo = PcInfo(storeId = "steam:1", installed = true))
+        val engine = pc.copy(id = "/games/vn", kind = LibraryEntryKind.RENPY, pcInfo = null)
+        assertEquals(listOf(KIND_PC), LibraryFacet.KIND.valuesOf(pc, scope.context))
+        assertEquals(listOf(KIND_ENGINE), LibraryFacet.KIND.valuesOf(engine, scope.context))
+        assertEquals("Engine", LibraryFacet.KIND.valueLabel(KIND_ENGINE))
+        assertTrue(LibraryFacet.KIND.hint!!.startsWith("Engine: "))
+        val kindScope = scope.copy(facets = listOf(LibraryFacet.KIND))
+        assertTrue(LibraryQuery().facetOffers(listOf(pc, pc.copy(id = "steam:2")), kindScope).isEmpty())
+        assertEquals(1, LibraryQuery().facetOffers(listOf(pc, engine), kindScope).size)
+    }
+
+    @Test
+    fun `Imported from reads the launcher a game came through, and only that`() {
+        val viaScope = scope.copy(
+            facets = listOf(LibraryFacet.IMPORTED_FROM),
+            context = LibraryQueryContext(viaOf = { if (it.id == "a") "lutris" else null }),
+        )
+        val offers = LibraryQuery().facetOffers(listOf(game("a"), game("b")), viaScope)
+        assertEquals(listOf(FacetValueCount("lutris", 1)), offers.single().values)
+        assertEquals("Lutris", LibraryFacet.IMPORTED_FROM.valueLabel("lutris"))
+        assertEquals("lutris", dev.droidtop.library.PcLaunchers.viaOf("Lutris: GOG installer"))
+        assertNull(dev.droidtop.library.PcLaunchers.viaOf("Chosen by you"))
+    }
 }

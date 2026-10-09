@@ -231,6 +231,8 @@ internal fun ShellChip(
         },
         fontWeight = if (large || tab) FontWeight.Bold else FontWeight.SemiBold,
         maxLines = 1,
+        // A chip held to a width (the strip's filter pill) shortens its own text, never wraps.
+        overflow = TextOverflow.Ellipsis,
         textAlign = TextAlign.Center,
         modifier = modifier
             .then(

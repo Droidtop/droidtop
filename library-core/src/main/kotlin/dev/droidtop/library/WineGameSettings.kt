@@ -58,6 +58,14 @@ object WineGameSettingsPrefs {
             .getString(KEY_PREFIX + entryId, null)
             ?.let { runCatching { json.decodeFromString(WineGameSettings.serializer(), it) }.getOrNull() }
 
+    /** Every game's settings by entry id, in one preferences read: for a list's lookup, never one per game. */
+    fun all(context: Context): Map<String, WineGameSettings> =
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).all.mapNotNull { (key, value) ->
+            if (!key.startsWith(KEY_PREFIX)) return@mapNotNull null
+            val settings = (value as? String)?.let { runCatching { json.decodeFromString(WineGameSettings.serializer(), it) }.getOrNull() }
+            settings?.let { key.removePrefix(KEY_PREFIX) to it }
+        }.toMap()
+
     fun set(context: Context, entryId: String, settings: WineGameSettings?) {
         val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
         if (settings == null || settings.isEmpty) {

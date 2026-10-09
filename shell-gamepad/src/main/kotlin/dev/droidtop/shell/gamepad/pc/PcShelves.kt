@@ -13,7 +13,7 @@ import dev.droidtop.shell.gamepad.query.ListPlace
 import dev.droidtop.shell.gamepad.query.OwnershipOptions
 import dev.droidtop.shell.gamepad.query.listExclusion
 import dev.droidtop.shell.gamepad.query.NamedLibraryView
-import dev.droidtop.shell.gamepad.query.UPDATE_YES
+import dev.droidtop.shell.gamepad.query.StripTabs
 
 /**
  * One row of the PC Games home (docs/SPEC.md 7i): a title, the games on
@@ -22,7 +22,8 @@ import dev.droidtop.shell.gamepad.query.UPDATE_YES
  * 171" while the row holds the first [SHELF_LIMIT].
  */
 internal data class PcShelf(val id: String, val title: String, val entries: List<LibraryEntry>, val total: Int) {
-    val heading: String get() = if (total > entries.size) "$title · $total" else title
+    // Update available always says how many: it leads Overview, and its count is the point of it.
+    val heading: String get() = if (total > entries.size || id == SHELF_UPDATES) "$title · $total" else title
 }
 
 /**
@@ -103,10 +104,14 @@ internal fun pluginHomeShelves(
  * - **Installed**, only when something is NOT installed: on a library of
  *   folder games alone every game is installed, and a shelf that repeats
  *   the whole library says nothing.
- * - **One shelf per store** (Steam, GOG, ...) for store rows, largest
- *   first, then **one per engine family** (Visual Novels, RPG Maker,
- *   Windows, ...) for the rest: a library of 170 folder games is not one
- *   row, it is the handful of kinds the person collects.
+ * - With more than one source ([PcSource]: a store, a game folder, the Wine
+ *   shortcuts), **one shelf per source**, in the Source filter's order.
+ *   With one, **one per engine family** (Visual Novels, RPG Maker,
+ *   Windows, ...): a library of 170 folder games is not one row, it is the
+ *   handful of kinds the person collects.
+ *
+ * On PC Games' Overview ([updatesFirst]) Update available, when it has rows,
+ * leads, above Continue playing (docs/SPEC.md 7i); Home keeps its own order.
  *
  * Within a shelf: most recently played first, then by name, so a long
  * shelf shows what the person touches rather than the start of the
@@ -125,6 +130,8 @@ internal fun pcShelves(
     others: List<LibraryEntry> = emptyList(),
     options: OwnershipOptions = OwnershipOptions(),
     isRecentlyAdded: (LibraryEntry) -> Boolean = { true },
+    updatesFirst: Boolean = false,
+    roots: List<String> = emptyList(),
 ): List<PcShelf> {
     val listed = games.filter { listExclusion(it, ListPlace.LIST, options) == null }
     val active = games.filter { listExclusion(it, ListPlace.ACTIVITY, options) == null }
@@ -134,7 +141,9 @@ internal fun pcShelves(
         val ordered = all.sortedWith(byRecency)
         return PcShelf(id, title, ordered.take(SHELF_LIMIT), ordered.size)
     }
+    val updates = shelf(SHELF_UPDATES, "Update available", listed.filter { it.availableUpdate != null })
     return buildList {
+        if (updatesFirst) updates?.let(::add)
         // Continue playing leads: its first card is the hero card (PcCapsule
         // with `hero`), the game the person most likely wants.
         // Local vals, not smart casts: LibraryEntry's properties are
@@ -153,7 +162,7 @@ internal fun pcShelves(
         if (recentlyAdded.isNotEmpty()) {
             add(PcShelf(SHELF_RECENTLY_ADDED, "Recently added", recentlyAdded.take(SHELF_LIMIT), recentlyAdded.size))
         }
-        shelf(SHELF_UPDATES, "Update available", listed.filter { it.availableUpdate != null })?.let(::add)
+        if (!updatesFirst) updates?.let(::add)
         shelf(SHELF_FAVOURITES, "Favourites", listed.filter { it.favorite })?.let(::add)
         if (listed.any { it.lastPlayedEpochMs != null }) {
             val unplayed = listed.filter { it.lastPlayedEpochMs == null && it.isInstalled }
@@ -162,17 +171,17 @@ internal fun pcShelves(
         }
         val installed = active.filter { it.isInstalled }
         if (installed.size < listed.size) shelf(SHELF_INSTALLED, "Installed", installed)?.let(::add)
-        fun storeOf(entry: LibraryEntry): PcSource.Store? = PcSource.of(entry) as? PcSource.Store
-        listed.filter { storeOf(it) != null }
-            .groupBy { storeOf(it)!! }
-            .entries
-            .sortedWith(compareByDescending<Map.Entry<PcSource.Store, List<LibraryEntry>>> { it.value.size }.thenBy { it.key.label() })
-            .forEach { (store, rows) -> shelf("store:${store.id}", store.label(), rows)?.let(::add) }
-        listed.filter { storeOf(it) == null }
-            .groupBy { it.kind.displayName() }
-            .entries
-            .sortedWith(compareByDescending<Map.Entry<String, List<LibraryEntry>>> { it.value.size }.thenBy { it.key })
-            .forEach { (family, rows) -> shelf("kind:$family", family, rows)?.let(::add) }
+        val bySource = listed.groupBy { PcSource.of(it, roots) }
+        if (bySource.keys.filterNotNull().size > 1) {
+            bySource.entries.filter { it.key != null }
+                .sortedWith(compareBy<Map.Entry<PcSource?, List<LibraryEntry>>, PcSource>(PcSource.ORDER) { it.key!! })
+                .forEach { (source, rows) -> shelf("source:${source!!.id}", source.label(), rows)?.let(::add) }
+        } else {
+            listed.groupBy { it.kind.displayName() }
+                .entries
+                .sortedWith(compareByDescending<Map.Entry<String, List<LibraryEntry>>> { it.value.size }.thenBy { it.key })
+                .forEach { (family, rows) -> shelf("kind:$family", family, rows)?.let(::add) }
+        }
     }
 }
 
@@ -198,7 +207,7 @@ internal data class KindBadge(val kind: BadgeKind, val detail: String?) {
 }
 
 /** The kinds that are neither a Windows or Linux program, a remote PC, an app nor a console ROM: an engine game. */
-private val NON_ENGINE_KINDS = setOf(
+internal val NON_ENGINE_KINDS = setOf(
     LibraryEntryKind.NATIVE_ANDROID_APP,
     LibraryEntryKind.WINE_PROFILE,
     LibraryEntryKind.LINUX_CONTAINER_APP,
@@ -271,60 +280,83 @@ internal fun cursorAfter(old: List<PcShelf>, new: List<PcShelf>, shelf: Int, ite
     return newShelf to newItem
 }
 
-/**
- * The first chip on PC Games' strip: the PC library's own shelves, which the
- * page opens on (docs/SPEC.md 7i). Not a [NamedLibraryView]: it is no filter
- * over the grid, so it never appears in the filter dialog's saved views.
- */
+/** The names of PC Games' built-in tabs (docs/SPEC.md 7i), in the strip's fixed order. */
 internal const val VIEW_OVERVIEW = "Overview"
-
-/** The strip's built-in view names, which the counts below are keyed by. */
 internal const val VIEW_ALL = "All games"
 internal const val VIEW_INSTALLED = "Installed"
-internal const val VIEW_UPDATES = "Updates"
 internal const val VIEW_FAVOURITES = "Favourites"
+internal const val VIEW_COLLECTIONS = "Collections"
 
 /**
- * The built-in views the strip offers, in the strip's order: the whole
- * library, what is installed, what has an update, the favourites. The same
- * shape as a person's own saved view ([NamedLibraryView]), so the strip, the
- * filter dialog and the saved views are one mechanism. Updates and
- * Favourites appear only when there is something in them ([pcStripViews]),
- * like their shelves. One view per store follows them, and the person's own.
+ * The built-in grid tabs: the whole library, what is installed, the
+ * favourites. The same shape as a person's own saved view
+ * ([NamedLibraryView]), so a tab, the Filter sheet and the saved views are
+ * one mechanism. Their ids never collide with a saved view's (`builtin:`).
  */
 internal val pcBuiltInViews: List<NamedLibraryView> = listOf(
-    NamedLibraryView(VIEW_ALL, LibraryQuery()),
-    NamedLibraryView(VIEW_INSTALLED, LibraryQuery(facets = mapOf(LibraryFacet.INSTALLED.key to setOf(INSTALLED_YES)))),
-    NamedLibraryView(VIEW_UPDATES, LibraryQuery(facets = mapOf(LibraryFacet.UPDATE.key to setOf(UPDATE_YES)))),
-    NamedLibraryView(VIEW_FAVOURITES, LibraryQuery(facets = mapOf(LibraryFacet.FAVOURITES.key to setOf(FAVOURITES_YES)))),
+    NamedLibraryView(VIEW_ALL, LibraryQuery(), id = "builtin:all"),
+    NamedLibraryView(VIEW_INSTALLED, LibraryQuery(facets = mapOf(LibraryFacet.INSTALLED.key to setOf(INSTALLED_YES))), id = "builtin:installed"),
+    NamedLibraryView(VIEW_FAVOURITES, LibraryQuery(facets = mapOf(LibraryFacet.FAVOURITES.key to setOf(FAVOURITES_YES))), id = "builtin:favourites"),
 )
 
-/**
- * How many games each built-in view and each store holds, worked out once per
- * library change off the main thread (one pass of the view's own filter over
- * the folded library, no sort): the strip's counts (docs/SPEC.md 7i). A
- * built-in view is keyed by its name, a store by its [PcSource] id.
- */
-internal fun pcViewCounts(games: List<LibraryEntry>, scope: LibraryQueryScope): Map<String, Int> =
-    pcBuiltInViews.associate { view -> view.name to games.count { view.query.matches(it, scope) } } +
-        games.filter { listExclusion(it, ListPlace.LIST, scope.ownership) == null }
-            .mapNotNull { (PcSource.of(it) as? PcSource.Store)?.id }
-            .groupingBy { it }
-            .eachCount()
+/** One tab of PC Games' strip (docs/SPEC.md 7i). */
+internal sealed interface PcTab {
+    /** The PC library's own shelves, which the page opens on: no filter over the grid. */
+    data object Overview : PcTab
+
+    /** A grid over a query: a built-in view, or one of the person's pinned views ([builtIn] false). */
+    data class Grid(val view: NamedLibraryView, val builtIn: Boolean) : PcTab
+
+    /** The collections and the saved views, as tiles. */
+    data object Collections : PcTab
+}
 
 /**
- * The strip's views: the built-in ones that have something in them, one per
- * store (largest first, from [counts]), then the person's own saved views.
+ * The strip, in its fixed order (docs/SPEC.md 7i): Overview, All games,
+ * Installed, Favourites, Collections, then the person's pinned views in their
+ * own order (the "Updates" view everyone was given first). Built-in tabs do
+ * not come and go with what is in them; only Favourites and Collections can be
+ * hidden ([StripTabs]). Store tabs are gone: a store is a Source filter, and
+ * any filter can be saved as a tab. Pure.
  */
-internal fun pcStripViews(counts: Map<String, Int>, saved: List<NamedLibraryView>): List<NamedLibraryView> {
-    val builtIn = pcBuiltInViews.filter { view ->
-        (view.name != VIEW_UPDATES && view.name != VIEW_FAVOURITES) || (counts[view.name] ?: 0) > 0
-    }
-    val names = pcBuiltInViews.map { it.name }.toSet()
-    val stores = counts.filter { (key, count) -> key !in names && count > 0 }.entries
-        .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
-        .map { NamedLibraryView(PcSource.fromId(it.key).label(), LibraryQuery().withToggled(LibraryFacet.SOURCE, it.key, true)) }
-    return builtIn + stores + saved
+internal fun pcStripTabs(saved: List<NamedLibraryView>, shown: StripTabs = StripTabs()): List<PcTab> = buildList {
+    add(PcTab.Overview)
+    add(PcTab.Grid(pcBuiltInViews[0], builtIn = true))
+    add(PcTab.Grid(pcBuiltInViews[1], builtIn = true))
+    if (shown.favourites) add(PcTab.Grid(pcBuiltInViews[2], builtIn = true))
+    if (shown.collections) add(PcTab.Collections)
+    saved.filter { it.pinned }.forEach { add(PcTab.Grid(it, builtIn = false)) }
+}
+
+/**
+ * How many games each grid tab holds, by view id, worked out once per library
+ * change off the main thread (one pass of each view's own filter over the
+ * folded library, no sort): the strip's counts (docs/SPEC.md 7i).
+ */
+internal fun pcViewCounts(games: List<LibraryEntry>, scope: LibraryQueryScope, views: List<NamedLibraryView>): Map<String, Int> =
+    views.associate { view -> view.id to games.count { view.query.matches(it, scope) } }
+
+/** A tab's label: a grid tab carries its count ("Installed · 12") once it is known. */
+internal fun pcTabLabel(tab: PcTab, counts: Map<String, Int>): String = when (tab) {
+    PcTab.Overview -> VIEW_OVERVIEW
+    PcTab.Collections -> VIEW_COLLECTIONS
+    is PcTab.Grid -> counts[tab.view.id]?.let { "${tab.view.name} · ${"%,d".format(it)}" } ?: tab.view.name
+}
+
+/**
+ * [saved] with the pinned view [id] moved [step] places among the pinned views
+ * (Move left -1, Move right +1), or to the first place after the built-in
+ * tabs ([toFirst]). Unpinned views keep their places. Pure.
+ */
+internal fun movePinned(saved: List<NamedLibraryView>, id: String, step: Int = 0, toFirst: Boolean = false): List<NamedLibraryView> {
+    val pinned = saved.filter { it.pinned }
+    val from = pinned.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return saved
+    val to = if (toFirst) 0 else (from + step).coerceIn(0, pinned.lastIndex)
+    if (to == from) return saved
+    val reordered = pinned.toMutableList().apply { add(to, removeAt(from)) }
+    // The pinned views take the pinned slots in their new order; the rest stay put.
+    val queue = ArrayDeque(reordered)
+    return saved.map { if (it.pinned) queue.removeFirst() else it }
 }
 
 /**
@@ -337,9 +369,4 @@ internal fun freeRowText(count: Int, showing: Boolean): String {
     return if (showing) "Showing $games. Hide them" else "$games ${if (count == 1) "is" else "are"} not shown. Show them"
 }
 
-/** A chip's label: a built-in view or a store carries its count ("Installed · 12"), a saved view is just its name. */
-internal fun pcStripLabel(view: NamedLibraryView, counts: Map<String, Int>): String {
-    val count = counts[view.name]
-        ?: view.query.selected(LibraryFacet.SOURCE).singleOrNull()?.takeIf { view.query.facets.size == 1 }?.let { counts[it] }
-    return count?.let { "${view.name} · $it" } ?: view.name
-}
+

@@ -74,7 +74,11 @@ import dev.droidtop.shell.gamepad.keepCentred
 import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryViewPrefs
+import dev.droidtop.shell.gamepad.query.NamedLibraryView
 import dev.droidtop.shell.gamepad.query.OwnershipOptions
+import dev.droidtop.shell.gamepad.query.StripTabs
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
 import dev.droidtop.library.PcSource
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.runtime.rememberCoroutineScope
@@ -109,8 +113,8 @@ internal class PcGamesState {
     /** Home, the cross-library shelves the left menu's first row opens. */
     val home: Boolean get() = view == PcView.HOME
 
-    /** Shelves of capsules (Home or PC Games' Overview), not the grid. */
-    val onShelves: Boolean get() = view != PcView.GRID
+    /** Shelves of capsules (Home or PC Games' Overview), not the grid or the collections. */
+    val onShelves: Boolean get() = view == PcView.HOME || view == PcView.OVERVIEW
 
     /** The grid's filter, sort and search; loaded from the list's prefs once, written back on change. */
     var query by mutableStateOf(LibraryQuery())
@@ -154,7 +158,7 @@ internal class PcGamesState {
      */
     fun open(home: Boolean) {
         if (home == this.home) return
-        if (!home && view == PcView.GRID) return
+        if (!home && (view == PcView.GRID || view == PcView.COLLECTIONS)) return
         view = if (home) PcView.HOME else PcView.OVERVIEW
         stripFocused = false
         stripIndex = 0
@@ -172,6 +176,12 @@ internal class PcGamesState {
         shelfIndex = 0
         itemIndex = 0
         shelfItems.clear()
+    }
+
+    /** The Collections tab: the person's collections and saved views as tiles. */
+    fun showCollections() {
+        view = PcView.COLLECTIONS
+        itemIndex = 0
     }
 
     /** One of the strip's grid views, over [query]. */
@@ -220,8 +230,9 @@ internal class PcGamesState {
  * - [OVERVIEW]: what "PC Games" opens on, the PC library's own shelves
  *   ([pcShelves]) led by a hero card, under the view strip's first chip.
  * - [GRID]: one of the strip's grid views over the shared [LibraryQuery].
+ * - [COLLECTIONS]: the Collections tab.
  */
-internal enum class PcView { HOME, OVERVIEW, GRID }
+internal enum class PcView { HOME, OVERVIEW, GRID, COLLECTIONS }
 
 
 /**
@@ -305,27 +316,37 @@ internal fun PcGamesSection(
     // the main thread. Null until read.
     var pcRoots by remember { mutableStateOf<List<String>?>(null) }
     var ownership by remember { mutableStateOf(OwnershipOptions()) }
+    var stripTabs by remember { mutableStateOf(StripTabs()) }
+    // Which games came through a launcher (Lutris): one read of the game settings.
+    var viaByEntry by remember { mutableStateOf(emptyMap<String, String>()) }
     LaunchedEffect(Unit) {
         val (roots, options) = withContext(Dispatchers.IO) {
             runCatching { dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath } }.getOrDefault(emptyList()) to
                 LibraryViewPrefs.ownershipOptions(context)
         }
         ownership = options
+        stripTabs = withContext(Dispatchers.IO) { LibraryViewPrefs.stripTabs(context) }
+        viaByEntry = withContext(Dispatchers.IO) { runCatching { dev.droidtop.library.PcLaunchers.viaByEntry(context) }.getOrDefault(emptyMap()) }
         pcRoots = roots
+    }
+    fun setStripTabs(next: StripTabs) {
+        stripTabs = next
+        coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setStripTabs(context, next) } }
     }
     fun setOwnership(next: OwnershipOptions) {
         ownership = next
         coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setOwnershipOptions(context, next) } }
     }
-    val scope = remember(pcRoots, ownership) {
+    val scope = remember(pcRoots, ownership, viaByEntry) {
         LibraryQueryScope(
-            id = "pc",
-            context = dev.droidtop.shell.gamepad.query.LibraryQueryContext(pcRoots = pcRoots.orEmpty()),
+            id = LibraryViewPrefs.PC_SCOPE_ID,
+            context = dev.droidtop.shell.gamepad.query.LibraryQueryContext(pcRoots = pcRoots.orEmpty(), viaOf = { viaByEntry[it.id] }),
             ownership = ownership,
             // Runner, ready and ProtonDB are left off: they cost a folder
             // walk or a network ask per entry, which a list never pays.
             facets = listOf(
-                LibraryFacet.SOURCE, LibraryFacet.OWNERSHIP, LibraryFacet.ENGINE, LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES,
+                LibraryFacet.SOURCE, LibraryFacet.OWNERSHIP, LibraryFacet.KIND, LibraryFacet.IMPORTED_FROM,
+                LibraryFacet.ENGINE, LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES,
                 LibraryFacet.PLAYED, LibraryFacet.RECENTLY_PLAYED, LibraryFacet.GENRE, LibraryFacet.DEVELOPER,
                 LibraryFacet.YEAR, LibraryFacet.UPDATE, LibraryFacet.MISSING_ART, LibraryFacet.HIDDEN,
             ),
@@ -339,11 +360,16 @@ internal fun PcGamesSection(
         state.query = it
         state.queryLoaded = true
     }
-    // The strip's counts (All, Installed, Updates, Favourites), worked out with
-    // the shelves; Updates and Favourites show only when they hold something.
+    // The strip (docs/SPEC.md 7i): the fixed built-in tabs, then the person's
+    // pinned views, each grid tab with its count, worked out with the shelves.
     var counts by remember { mutableStateOf(emptyMap<String, Int>()) }
     val savedViews = rememberSavedViews(scope.id)
-    val views = pcStripViews(counts, savedViews.views)
+    val tabs = remember(savedViews.views, stripTabs) { pcStripTabs(savedViews.views, stripTabs) }
+    val gridViews = remember(tabs) { tabs.filterIsInstance<PcTab.Grid>().map { it.view } }
+    // A pinned tab being edited (Select > Edit): its new name, saved in place from the Filter sheet.
+    var editing by remember { mutableStateOf<NamedLibraryView?>(null) }
+    var tabMenu by remember { mutableStateOf<NamedLibraryView?>(null) }
+    var renaming by remember { mutableStateOf<NamedLibraryView?>(null) }
 
     // What Home's Continue playing and Recently added take besides PC games:
     // Retro games that have a time to be placed by, and the launcher apps that
@@ -421,16 +447,18 @@ internal fun PcGamesSection(
             homeShelfList = own + fresh
         }
     }
-    LaunchedEffect(games, ownership, recentlyAdded) {
+    LaunchedEffect(games, ownership, recentlyAdded, pcRoots) {
         val all = games ?: return@LaunchedEffect
-        val next = withContext(Dispatchers.Default) { pcShelves(all, options = ownership, isRecentlyAdded = recentlyAdded) }
+        val next = withContext(Dispatchers.Default) {
+            pcShelves(all, options = ownership, isRecentlyAdded = recentlyAdded, updatesFirst = true, roots = pcRoots.orEmpty())
+        }
         if (state.view == PcView.OVERVIEW && !state.stripFocused) keepCursor(pcShelfList, next)
         pcShelfList = next
     }
     val shelves = if (state.home) homeShelfList else pcShelfList
-    LaunchedEffect(games, scope) {
+    LaunchedEffect(games, scope, gridViews) {
         val all = games ?: return@LaunchedEffect
-        counts = withContext(Dispatchers.Default) { pcViewCounts(all, scope) }
+        counts = withContext(Dispatchers.Default) { pcViewCounts(all, scope, gridViews) }
     }
     var grid by remember { mutableStateOf(emptyList<LibraryEntry>()) }
     // The free-to-play rows not in the library that this view keeps out (or,
@@ -444,7 +472,7 @@ internal fun PcGamesSection(
         grid = shown
         freeRows = free
     }
-    val hasFreeRow = !state.onShelves && freeRows > 0
+    val hasFreeRow = state.view == PcView.GRID && freeRows > 0
     val onFreeRow = hasFreeRow && !state.stripFocused && state.itemIndex == grid.size
     fun toggleFree() {
         EsDeNavigationSounds.play(UiSound.CONFIRM)
@@ -453,7 +481,11 @@ internal fun PcGamesSection(
 
     // The library, as this tab shows it right now, and the game under the cursor.
     val currentShelf = shelves.getOrNull(state.shelfIndex)
-    val currentList: List<LibraryEntry> = if (state.onShelves) currentShelf?.entries.orEmpty() else grid
+    val currentList: List<LibraryEntry> = when {
+        state.onShelves -> currentShelf?.entries.orEmpty()
+        state.view == PcView.COLLECTIONS -> emptyList()
+        else -> grid
+    }
     LaunchedEffect(shelves.size, currentList.size, hasFreeRow) {
         state.shelfIndex = state.shelfIndex.coerceIn(0, (shelves.size - 1).coerceAtLeast(0))
         // The grid's free-to-play row is one more stop after the last game.
@@ -509,34 +541,40 @@ internal fun PcGamesSection(
     LaunchedEffect(focusedEntry?.id) { focusedEntry?.let { backdropArt = it.backdropArt() } }
     PreloadBackdrops(remember(currentList, state.itemIndex) { neighbourBackdrops(currentList, state.itemIndex) })
 
-    // The strip: Overview (the shelves) first, then one chip per grid view
-    // (built-in, store, saved). Chip 0 is Overview and chip i is views[i - 1].
-    // Home has no strip; B from a grid view returns to Overview.
-    val stripCount = views.size + 1
+    // The strip: one chip per tab ([pcStripTabs]). Home has no strip; B from a
+    // grid view or Collections returns to Overview.
+    val stripCount = tabs.size
     fun activateChip(index: Int) {
         if (index !in 0 until stripCount) return
         state.stripIndex = index
-        if (index == 0) {
-            state.showOverview()
-            return
+        when (val tab = tabs[index]) {
+            PcTab.Overview -> state.showOverview()
+            PcTab.Collections -> state.showCollections()
+            is PcTab.Grid -> if (state.view != PcView.GRID || state.query != tab.view.query) state.showGrid(tab.view.query)
         }
-        val view = views[index - 1]
-        if (state.view == PcView.GRID && state.query == view.query) return
-        state.showGrid(view.query)
     }
-    val currentView = views.firstOrNull { it.query == state.query }
-    // The chip that is lit: Overview on the shelves, the grid's view when one
+    // The chip that is lit: the surface's own tab, the grid's view when one
     // stands for its query, none when only the pill describes it.
-    val activeChip = when {
-        state.onShelves -> 0
-        currentView != null -> views.indexOf(currentView) + 1
-        else -> -1
+    val activeChip = when (state.view) {
+        PcView.HOME -> -1
+        PcView.OVERVIEW -> tabs.indexOf(PcTab.Overview)
+        PcView.COLLECTIONS -> tabs.indexOf(PcTab.Collections)
+        PcView.GRID -> tabs.indexOfFirst { it is PcTab.Grid && it.view.query == state.query }
     }
     // The filters the person set that no strip view stands for, as the one
-    // pill at the strip's end: its text and a count, cleared by one press.
-    val filterPill = remember(grid, games, state.query, state.view, currentView != null) {
-        if (state.onShelves || currentView != null) return@remember null
+    // pill at the strip's end: every filter, shortened past two, and a
+    // count, cleared by one press.
+    val filterPill = remember(grid, games, state.query, state.view, activeChip, scope) {
+        if (state.view != PcView.GRID || activeChip >= 0) return@remember null
         state.query.pillText(scope, grid.size, state.query.totalIn(games.orEmpty(), scope))
+    }
+    // Update available's heading opens the Updates tab (the view everyone was given), else the same filter.
+    fun openUpdates() {
+        val updates = savedViews.views.firstOrNull { it.id == LibraryViewPrefs.UPDATES_VIEW_ID }?.query
+            ?: LibraryQuery(facets = mapOf(LibraryFacet.UPDATE.key to setOf(dev.droidtop.shell.gamepad.query.UPDATE_YES)))
+        state.stripFocused = false
+        state.showGrid(updates)
+        state.stripIndex = tabs.indexOfFirst { it is PcTab.Grid && it.view.query == updates }.coerceAtLeast(0)
     }
 
     // Which level B leaves (docs/SPEC.md 6e: B always goes back one level).
@@ -555,8 +593,8 @@ internal fun PcGamesSection(
     BackHandler(enabled = canGoBack && !showingSetup) {
         EsDeNavigationSounds.play(UiSound.BACK)
         state.stripIndex = 0
-        // A grid view goes back to Overview, Overview back to Home, the hub.
-        if (state.view == PcView.GRID) state.showOverview() else state.open(home = true)
+        // A grid view or Collections goes back to Overview, Overview back to Home, the hub.
+        if (state.view == PcView.GRID || state.view == PcView.COLLECTIONS) state.showOverview() else state.open(home = true)
     }
 
     if (showingSetup) {
@@ -672,6 +710,7 @@ internal fun PcGamesSection(
                             } else if (!state.home) {
                                 state.stripFocused = true
                             }
+                            state.view == PcView.COLLECTIONS -> state.stripFocused = true
                             // From the free-to-play row back to the last game.
                             onFreeRow -> if (grid.isNotEmpty()) moveTo(state.shelfIndex, grid.lastIndex) else state.stripFocused = true
                             else -> {
@@ -689,7 +728,7 @@ internal fun PcGamesSection(
                                 EsDeNavigationSounds.play(UiSound.MOVE)
                                 state.destFocused = true
                             }
-                            onFreeRow -> Unit
+                            onFreeRow || state.view == PcView.COLLECTIONS -> Unit
                             // Down from the last row reaches the free-to-play row; nothing wraps onto it.
                             else -> gridPadTarget(state.itemIndex, grid.size, gridColumns(), FocusDirection.Down)
                                 ?.let { moveTo(state.shelfIndex, it) }
@@ -709,7 +748,7 @@ internal fun PcGamesSection(
                                     state.stripIndex = next
                                 }
                                 state.onShelves -> moveTo(state.shelfIndex, menuStep(state.itemIndex, currentList.size, step))
-                                onFreeRow -> Unit
+                                onFreeRow || state.view == PcView.COLLECTIONS -> Unit
                                 else -> gridPadTarget(
                                     state.itemIndex, grid.size, gridColumns(),
                                     if (step < 0) FocusDirection.Left else FocusDirection.Right,
@@ -727,8 +766,11 @@ internal fun PcGamesSection(
                         // Options is the focused game's menu (L2 stays its
                         // alias); with no game under the cursor it is the
                         // list's own options.
-                        GamepadAction.SELECT, GamepadAction.L2 ->
-                            focusedEntry?.let(::openOptions) ?: run { state.optionsOpen = true }
+                        // On a pinned tab, Select is that tab's Options (Edit, Unpin, Move).
+                        GamepadAction.SELECT, GamepadAction.L2 -> {
+                            val pinned = (tabs.getOrNull(state.stripIndex) as? PcTab.Grid)?.takeIf { state.stripFocused && !it.builtIn }
+                            if (pinned != null) tabMenu = pinned.view else focusedEntry?.let(::openOptions) ?: run { state.optionsOpen = true }
+                        }
                         else -> return@onPad false
                     }
                     true
@@ -738,7 +780,7 @@ internal fun PcGamesSection(
             // its ends: it owns the shoulders while this tab is up
             // (OwnShoulders above), and the active filter is its last pill.
             if (!state.home) ViewStrip(
-                labels = listOf(VIEW_OVERVIEW) + views.map { pcStripLabel(it, counts) },
+                labels = tabs.map { pcTabLabel(it, counts) },
                 active = activeChip,
                 focused = if (state.stripFocused) state.stripIndex else null,
                 pill = filterPill,
@@ -755,6 +797,9 @@ internal fun PcGamesSection(
             when {
                 games == null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MenuTokens.OnSurface)
+                }
+                state.view == PcView.COLLECTIONS -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(COLLECTIONS_EMPTY, color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
                 }
                 state.onShelves -> PcShelvesHome(
                     shelves = shelves,
@@ -776,6 +821,7 @@ internal fun PcGamesSection(
                     partsOf = ::partsOf,
                     systemNames = systemNames,
                     mixed = state.home,
+                    onOpenShelf = { shelf -> if (shelf.id == SHELF_UPDATES && !state.home) openUpdates() },
                 )
                 else -> {
                     if (grid.isEmpty() && !hasFreeRow) {
@@ -848,15 +894,31 @@ internal fun PcGamesSection(
             scope = scope,
             base = games.orEmpty(),
             query = state.query,
-            savedViews = views,
+            savedViews = pcBuiltInViews + savedViews.views,
             onQueryChange = { query -> state.showGrid(query) },
             onSearch = {
                 state.filterOpen = false
                 state.searchOpen = true
             },
-            onSaveView = { name -> savedViews.save(name, state.query) },
+            onSaveView = { name ->
+                val edited = editing
+                if (edited != null) {
+                    savedViews.put(edited.copy(query = state.query))
+                    editing = null
+                    state.filterOpen = false
+                } else {
+                    savedViews.put(NamedLibraryView(name, state.query, id = java.util.UUID.randomUUID().toString(), pinned = true))
+                }
+            },
+            onSaveOnly = { name ->
+                savedViews.put(NamedLibraryView(name, state.query, id = java.util.UUID.randomUUID().toString(), pinned = false))
+            },
+            editingName = editing?.name,
             onForgetView = { name -> savedViews.forget(name) },
-            onDismiss = { state.filterOpen = false },
+            onDismiss = {
+                state.filterOpen = false
+                editing = null
+            },
             // The list's own options (jump to a letter, scrape, PC setup and
             // the stores) are one row from here, and from Select when no
             // game is under the cursor.
@@ -905,8 +967,15 @@ internal fun PcGamesSection(
             onScraped = onRequestRescan,
             onDismiss = { state.optionsOpen = false },
             games = listed,
-            // The ownership List options (docs/SPEC.md 7j): global, not part of a view.
+            // The ownership List options (docs/SPEC.md 7j) and the strip's
+            // optional tabs (7i): global, not part of a view.
             listOptions = listOf(
+                ("Favourites tab: " + if (stripTabs.favourites) "Shown" else "Hidden") to {
+                    setStripTabs(stripTabs.copy(favourites = !stripTabs.favourites))
+                },
+                ("Collections tab: " + if (stripTabs.collections) "Shown" else "Hidden") to {
+                    setStripTabs(stripTabs.copy(collections = !stripTabs.collections))
+                },
                 ("Show games shared with you: " + if (ownership.showShared) "On" else "Off") to {
                     setOwnership(ownership.copy(showShared = !ownership.showShared))
                 },
@@ -993,6 +1062,93 @@ internal fun PcGamesSection(
     }
     // The free-space offer before a store install or update.
     PcLaunchOfferSheet(pcLaunch)
+
+    // A pinned tab's Options (Select on it): Edit, Unpin, Move.
+    tabMenu?.let { view ->
+        PinnedTabMenu(
+            view = view,
+            onEdit = {
+                tabMenu = null
+                renaming = view
+            },
+            onUnpin = {
+                tabMenu = null
+                savedViews.replaceAll(savedViews.views.map { if (it.id == view.id) it.copy(pinned = false) else it })
+                state.stripIndex = state.stripIndex.coerceAtMost((tabs.size - 2).coerceAtLeast(0))
+            },
+            onMove = { step, toFirst ->
+                tabMenu = null
+                val moved = movePinned(savedViews.views, view.id, step, toFirst)
+                savedViews.replaceAll(moved)
+                val tab = pcStripTabs(moved, stripTabs).indexOfFirst { it is PcTab.Grid && it.view.id == view.id }
+                if (tab >= 0) state.stripIndex = tab
+            },
+            onDismiss = { tabMenu = null },
+        )
+    }
+    // Edit: the name first, then the Filter sheet over the tab's own filters and sort.
+    renaming?.let { view ->
+        dev.droidtop.shell.gamepad.TextEditDialog(
+            title = "Rename tab",
+            subtitle = "Then change its filters and sort, and save",
+            initial = view.name,
+            onCommit = { name ->
+                renaming = null
+                editing = view.copy(name = name.trim().ifBlank { view.name })
+                state.showGrid(view.query)
+                state.filterOpen = true
+            },
+            onDismiss = { renaming = null },
+        )
+    }
+}
+
+/** What the Collections tab says while it holds nothing (docs/SPEC.md 7i). */
+internal const val COLLECTIONS_EMPTY =
+    "Add a game to a collection from its menu (Select). Collections a store keeps appear here after it syncs."
+
+/**
+ * A pinned tab's Options (docs/SPEC.md 7i): Edit (a new name, then the Filter
+ * sheet over its filters, saved in place), Unpin (it stays a saved view in
+ * Collections), Move left, Move right, Move to first.
+ */
+@Composable
+private fun PinnedTabMenu(
+    view: NamedLibraryView,
+    onEdit: () -> Unit,
+    onUnpin: () -> Unit,
+    onMove: (step: Int, toFirst: Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val rows: List<Pair<String, () -> Unit>> = listOf(
+        "Edit" to onEdit,
+        "Unpin" to onUnpin,
+        "Move left" to { onMove(-1, false) },
+        "Move right" to { onMove(1, false) },
+        "Move to first" to { onMove(0, true) },
+        "Close" to onDismiss,
+    )
+    var focusIndex by remember { mutableIntStateOf(0) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        dev.droidtop.shell.gamepad.MenuPanel(
+            modifier = Modifier.width(LocalShellWindow.current.panelWidth(420.dp)),
+            focusLabel = "Tab options",
+            title = view.name,
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = dev.droidtop.shell.gamepad.menuMove(focusIndex, rows.size, press)
+                    GamepadAction.A -> rows.getOrNull(focusIndex)?.second?.invoke()
+                    GamepadAction.B, GamepadAction.SELECT -> onDismiss()
+                    else -> Unit
+                }
+                true
+            },
+        ) {
+            rows.forEachIndexed { index, (title, action) ->
+                dev.droidtop.shell.gamepad.MenuRow(title = title, selected = index == focusIndex, onClick = action)
+            }
+        }
+    }
 }
 
 /**
@@ -1014,6 +1170,8 @@ private fun PcShelvesHome(
     partsOf: (LibraryEntry) -> Int,
     systemNames: Map<String, String>,
     mixed: Boolean,
+    // A tap on a shelf's heading (Update available's opens the Updates tab).
+    onOpenShelf: (PcShelf) -> Unit = {},
 ) {
     val window = LocalShellWindow.current
     if (shelves.isEmpty()) {
@@ -1062,11 +1220,13 @@ private fun PcShelvesHome(
                     style = TypeRole.screenTitle,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(
-                        start = window.edgePadding,
-                        end = window.edgePadding,
-                        bottom = Space.Sm,
-                    ),
+                    modifier = Modifier
+                        .padding(
+                            start = window.edgePadding,
+                            end = window.edgePadding,
+                            bottom = Space.Sm,
+                        )
+                        .clickable { onOpenShelf(shelf) },
                 )
                 LazyRow(
                     state = rowState(shelf.id),
