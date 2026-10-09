@@ -32,6 +32,13 @@
       },
       "additionalProperties": false
     },
+    "acquireDownloads": {
+      "description": "The value of `downloads` in an acquire reply, instead of `download`: one to sixteen descriptors that droidtop fetches and checks one after the other as a single entry in Downloads and places together in one folder, all or nothing. Each keeps its own fileName and digests. `unpack` is not combined with several files.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/acquireDownload" }
+    },
     "shelvesReply": {
       "description": "The data of a gaming.rows@1 rows reply (docs/plugin-api.md 3 C11): at most 2 shelves of 24 entry ids each; droidtop keeps only ids of real library entries and cuts titles to 60 characters.",
       "type": "object",

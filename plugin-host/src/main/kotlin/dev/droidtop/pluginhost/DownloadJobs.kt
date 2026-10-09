@@ -19,6 +19,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** What a finished download hands to its post-processing step; the step that moves, unpacks or installs it. */
@@ -28,7 +29,29 @@ fun interface DownloadPost {
 }
 
 /**
- * The one runner for a single-file HTTP(S) download (docs/SPEC.md 12a "Downloads", Droidtop/tracker#181):
+ * What a finished download with several files hands to its post-processing step: every file, in order, with the
+ * job arguments of each (its own `name`, `targetName`, digests and headers over the arguments they share).
+ */
+fun interface DownloadMultiPost {
+    suspend fun process(context: Context, files: List<File>, parts: List<Map<String, String>>): String
+}
+
+/** One file of a download job that has several: the first is the job's own, the others travel in its `more` argument. */
+class DownloadPart(
+    val url: String,
+    /** The bare name in droidtop's downloads area ([DownloadJobs.fileFor]). */
+    val name: String,
+    /** The name the file is placed under. */
+    val targetName: String,
+    val sha256: String? = null,
+    val sha1: String? = null,
+    val md5: String? = null,
+    val maxBytes: Long = 0L,
+    val headers: Map<String, String> = emptyMap(),
+)
+
+/**
+ * The one runner for a HTTP(S) download of one file, or of several as one entry (docs/SPEC.md 12a "Downloads", Droidtop/tracker#181):
  * droidtop's own downloader ([ResumableDownload], the one that store installs' sibling jobs share the policy with)
  * does the transfer into a `.part` file and carries on from it with a Range request, so the job is a native job in
  * the one [PluginJobsCenter] list that can Pause and Resume, and survives a lost connection, a network change or
@@ -52,6 +75,9 @@ object DownloadJobs {
     private const val ARG_SHA1 = "sha1"
     private const val ARG_MD5 = "md5"
     private const val ARG_UNPACK = "unpack"
+    private const val ARG_MORE = "more"
+    private const val ARG_TARGET = "targetName"
+    private val PART_KEYS = listOf(ARG_URL, ARG_NAME, ARG_TARGET, ARG_SHA256, ARG_SHA1, ARG_MD5, ARG_MAX_BYTES, ARG_HEADERS)
 
     /** The job argument value that unpacks the downloaded archive into a folder instead of placing the file. */
     const val UNPACK_ARCHIVE = "archive"
@@ -59,6 +85,9 @@ object DownloadJobs {
     private const val ARG_HEADERS = "headers"
 
     private val posts = ConcurrentHashMap<String, DownloadPost>().apply { put(POST_KEEP, DownloadPost { _, _, _ -> "Downloaded" }) }
+
+    /** The post steps that can finish a download of several files; the others take exactly one. */
+    private val multiPosts = ConcurrentHashMap<String, DownloadMultiPost>()
 
     /**
      * Credential headers are never written to the persisted job arguments (they would sit in
@@ -90,6 +119,15 @@ object DownloadJobs {
             }
             "Added ${target.name}"
         }
+        multiPosts[POST_PLACE_IN_FOLDER] = DownloadMultiPost { jobContext, files, parts ->
+            val placed = withContext(Dispatchers.IO) {
+                placeAllInFolder(files, parts).also { list ->
+                    runCatching { list.forEach { onPlaced(jobContext, it, parts.first()) } }
+                    LibraryPaths.report(jobContext, PathChange(added = list.map { it.absolutePath }))
+                }
+            }
+            "Added ${placed.size} files"
+        }
         FlutterRuntimeManager.registerDownloadPost()
         PythonRuntimeManager.registerDownloadPost()
         PluginJobsCenter.registerNative(
@@ -108,6 +146,29 @@ object DownloadJobs {
         require(!target.exists()) { "a file with that name already exists" }
         require(file.renameTo(target)) { "the download could not be placed in the game folder" }
         return target
+    }
+
+    /**
+     * Moves every file of a download to its own target name in the destination, all or nothing: nothing is moved if
+     * any target exists or two share a name, and a move that fails puts the ones already moved back. Returns the targets.
+     */
+    internal fun placeAllInFolder(files: List<File>, parts: List<Map<String, String>>): List<File> {
+        val destination = File(requireNotNull(parts.first()["destinationPath"]) { "the game folder is missing" })
+        require(destination.isDirectory || destination.mkdirs()) { "the game folder is not available" }
+        val targets = parts.map { File(destination, requireNotNull(it[ARG_TARGET]) { "the file name is missing" }) }
+        require(targets.map { it.name }.distinct().size == targets.size) { "two of the files have the same name" }
+        require(targets.none { it.exists() }) { "a file with that name already exists" }
+        val moved = mutableListOf<Pair<File, File>>()
+        try {
+            for ((file, target) in files.zip(targets)) {
+                require(file.renameTo(target)) { "the download could not be placed in the game folder" }
+                moved += file to target
+            }
+        } catch (e: Exception) {
+            moved.forEach { (file, target) -> target.renameTo(file) }
+            throw e
+        }
+        return targets
     }
 
     /**
@@ -136,6 +197,11 @@ object DownloadJobs {
     /** The name of an archive less its extension, or null when [name] is not a zip, 7z or rar file. */
     internal fun archiveStem(name: String): String? =
         Regex("(?i)^(.+)\\.(zip|7z|rar)$").matchEntire(name)?.groupValues?.get(1)
+
+    /** Names the post step that finishes a download of several files, as [registerPost] names one for a single file. */
+    fun registerMultiPost(name: String, post: DownloadMultiPost) {
+        multiPosts[name] = post
+    }
 
     /** Names the post-processing step a job's `post` argument refers to. Registered at process start, so a restored job finds it. */
     fun registerPost(name: String, post: DownloadPost) {
@@ -168,6 +234,8 @@ object DownloadJobs {
         unpack: String? = null,
         maxBytes: Long = 0L,
         headers: Map<String, String> = emptyMap(),
+        /** Further files (1 to 15) fetched and placed together with the first, all or nothing, as one entry in Downloads. */
+        more: List<DownloadPart> = emptyList(),
         extra: Map<String, String> = emptyMap(),
         /** The file's size when the caller knows it: the download policy lets a small one use mobile data. */
         sizeBytes: Long = 0L,
@@ -175,11 +243,9 @@ object DownloadJobs {
         automatic: Boolean = false,
         onStatus: (String) -> Unit = {},
     ): PluginResult {
-        val (secret, plain) = headers.entries.partition { entry ->
-            listOf("authorization", "proxy-authorization", "cookie", "credential", "token", "api-key", "secret")
-                .any { marker -> entry.key.contains(marker, ignoreCase = true) }
-        }
-        if (secret.isNotEmpty()) secretHeaders[name] = secret.associate { it.key to it.value }
+        require(more.size < MAX_FILES) { "a download has at most $MAX_FILES files" }
+        val plain = holdSecrets(name, headers)
+        val morePlain = more.map { holdSecrets(it.name, it.headers) }
         val args = buildMap {
             putAll(extra)
             put(ARG_URL, url)
@@ -191,7 +257,18 @@ object DownloadJobs {
             md5?.let { put(ARG_MD5, it) }
             unpack?.let { put(ARG_UNPACK, it) }
             if (maxBytes > 0) put(ARG_MAX_BYTES, maxBytes.toString())
-            if (plain.isNotEmpty()) put(ARG_HEADERS, JSONObject(plain.associate { it.key to it.value }).toString())
+            if (plain.isNotEmpty()) put(ARG_HEADERS, JSONObject(plain).toString())
+            if (more.isNotEmpty()) {
+                put(ARG_MORE, JSONArray(more.mapIndexed { index, part ->
+                    JSONObject().put(ARG_URL, part.url).put(ARG_NAME, part.name).put(ARG_TARGET, part.targetName).also { o ->
+                        part.sha256?.let { o.put(ARG_SHA256, it) }
+                        part.sha1?.let { o.put(ARG_SHA1, it) }
+                        part.md5?.let { o.put(ARG_MD5, it) }
+                        if (part.maxBytes > 0) o.put(ARG_MAX_BYTES, part.maxBytes.toString())
+                        if (morePlain[index].isNotEmpty()) o.put(ARG_HEADERS, JSONObject(morePlain[index]).toString())
+                    }
+                }).toString())
+            }
             if (sizeBytes > 0) put(DownloadGate.ARG_BYTES, sizeBytes.toString())
             if (automatic) put(DownloadGate.ARG_AUTOMATIC, "1")
         }
@@ -212,8 +289,39 @@ object DownloadJobs {
             } finally {
                 narrator.cancel()
                 secretHeaders.remove(name)
+                more.forEach { secretHeaders.remove(it.name) }
             }
         }
+    }
+
+    /** Splits [headers] of the download file [name]: the credential ones stay in memory, the rest are returned to be persisted. */
+    private fun holdSecrets(name: String, headers: Map<String, String>): Map<String, String> {
+        val (secret, plain) = headers.entries.partition { entry ->
+            listOf("authorization", "proxy-authorization", "cookie", "credential", "token", "api-key", "secret")
+                .any { marker -> entry.key.contains(marker, ignoreCase = true) }
+        }
+        if (secret.isNotEmpty()) secretHeaders[name] = secret.associate { it.key to it.value }
+        return plain.associate { it.key to it.value }
+    }
+
+    /** The most files one download job has. */
+    const val MAX_FILES = 16
+
+    /** The job's files as one argument map each: the first is [args] itself; the others take their own over what the job shares. */
+    internal fun partsOf(args: Map<String, String>): List<Map<String, String>> {
+        val more = args[ARG_MORE] ?: return listOf(args)
+        val array = JSONArray(more)
+        val first = args - ARG_MORE
+        val shared = first - PART_KEYS
+        return listOf(first) + List(array.length()) { index ->
+            val o = array.getJSONObject(index)
+            shared + o.keys().asSequence().associateWith { o.getString(it) }
+        }
+    }
+
+    private fun headersOf(part: Map<String, String>): Map<String, String> = buildMap {
+        part[ARG_HEADERS]?.let { raw -> JSONObject(raw).let { o -> o.keys().forEach { put(it, o.getString(it)) } } }
+        part[ARG_NAME]?.let { secretHeaders[it] }?.let { putAll(it) }
     }
 
     /** The checkpoint once every byte is in the file: a restart then goes on to the post step and never downloads again. */
@@ -221,11 +329,13 @@ object DownloadJobs {
     private const val REPORT_EVERY_NS = 1_000_000_000L
 
     private fun cancelDownload(context: Context, args: Map<String, String>, checkpoint: String?) {
-        args[ARG_NAME]?.let { name ->
-            runCatching {
-                val file = fileFor(context, name)
-                file.delete()
-                ResumableDownload.discard(file)
+        partsOf(args).forEach { part ->
+            part[ARG_NAME]?.let { name ->
+                runCatching {
+                    val file = fileFor(context, name)
+                    file.delete()
+                    ResumableDownload.discard(file)
+                }
             }
         }
     }
@@ -236,13 +346,12 @@ object DownloadJobs {
         checkpoint: String?,
         report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
     ): String {
+        val parts = partsOf(args)
+        if (parts.size > 1) return executeMany(context, parts, checkpoint, report)
         val name = requireNotNull(args[ARG_NAME]) { "the download has no file name" }
         val postName = args[ARG_POST] ?: POST_KEEP
         val post = posts[postName] ?: throw IllegalStateException("this version of droidtop cannot finish that download")
-        val headers = buildMap {
-            args[ARG_HEADERS]?.let { raw -> JSONObject(raw).let { o -> o.keys().forEach { put(it, o.getString(it)) } } }
-            secretHeaders[name]?.let { putAll(it) }
-        }
+        val headers = headersOf(args)
         val url = requireNotNull(args[ARG_URL]) { "the download has no address" }
         val file = fileFor(context, name)
         placedBeforeTheProcessEnded(file, postName, args, checkpoint) { LibraryPaths.report(context, PathChange.added(it)) }?.let { return it }
@@ -255,6 +364,58 @@ object DownloadJobs {
         val summary = post.process(context, file, args)
         if (postName != POST_KEEP) withContext(Dispatchers.IO) { file.delete() }
         return summary
+    }
+
+    /**
+     * A job of several files: each is fetched and checked in turn into the downloads area, the checkpoint
+     * `fetched:<n>` saying how many are whole (a restart carries on with the next, from its partial file), and only
+     * then does the post step place them all together. A file that fails its digest fails the whole job; nothing is placed.
+     */
+    private suspend fun executeMany(
+        context: Context,
+        parts: List<Map<String, String>>,
+        checkpoint: String?,
+        report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
+    ): String {
+        val postName = parts.first()[ARG_POST] ?: POST_KEEP
+        val multi = multiPosts[postName] ?: throw IllegalStateException("this version of droidtop cannot finish that download")
+        val files = parts.map { fileFor(context, requireNotNull(it[ARG_NAME]) { "the download has no file name" }) }
+        val done = checkpoint?.takeIf { it.startsWith("$FETCHED:") }?.substringAfter(':')?.toIntOrNull() ?: 0
+        placedManyBeforeTheProcessEnded(files, parts, postName, done) { LibraryPaths.report(context, PathChange(added = it.map(File::getAbsolutePath))) }?.let { return it }
+        for ((index, part) in parts.withIndex()) {
+            if (index < done && files[index].isFile) continue
+            val url = requireNotNull(part[ARG_URL]) { "the download has no address" }
+            val prefix = "File ${index + 1} of ${parts.size}. "
+            withContext(Dispatchers.IO) {
+                fetch(url, headersOf(part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, { percent, line, _ ->
+                    report(if (percent < 0) -1 else (index * 100 + percent) / parts.size, prefix + line, null)
+                })
+            }
+            verifyDigest(files[index], part)
+            report((index + 1) * 100 / parts.size, "Checking the download…", "$FETCHED:${index + 1}")
+        }
+        report(100, "Finishing…", null)
+        val summary = multi.process(context, files, parts)
+        withContext(Dispatchers.IO) { files.forEach { it.delete() } }
+        return summary
+    }
+
+    /** The several-file counterpart of [placedBeforeTheProcessEnded]: every file is whole, none is in the downloads area, every target is in the game folder. */
+    internal suspend fun placedManyBeforeTheProcessEnded(
+        files: List<File>,
+        parts: List<Map<String, String>>,
+        postName: String,
+        done: Int,
+        reportPlaced: (List<File>) -> Unit,
+    ): String? {
+        if (postName != POST_PLACE_IN_FOLDER || done < parts.size) return null
+        return withContext(Dispatchers.IO) {
+            val destination = File(parts.first()["destinationPath"] ?: return@withContext null)
+            val targets = parts.map { File(destination, it[ARG_TARGET] ?: return@withContext null) }
+            if (files.any { it.exists() } || !targets.all { it.isFile }) return@withContext null
+            reportPlaced(targets)
+            "Added ${targets.size} files"
+        }
     }
 
     /**
@@ -370,6 +531,23 @@ object DownloadJobs {
             }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+}
+
+/** The download part of an acquire reply: one `download` descriptor, or `downloads`, a list of 1 to [DownloadJobs.MAX_FILES]. */
+object AcquireDownloads {
+    /** Null when the reply carries no download; an empty list when it carries an invalid one (or both forms). */
+    fun parse(values: Map<String, String>): List<AcquireDownloadDescriptor>? {
+        val single = values["download"]
+        val many = values["downloads"]
+        if (single == null && many == null) return null
+        if (single != null && many != null) return emptyList()
+        if (single != null) return listOfNotNull(AcquireDownloadDescriptor.parse(single))
+        return runCatching {
+            val array = JSONArray(many)
+            require(array.length() in 1..DownloadJobs.MAX_FILES)
+            List(array.length()) { requireNotNull(AcquireDownloadDescriptor.parse(array.getJSONObject(it).toString())) }
+        }.getOrDefault(emptyList())
     }
 }
 

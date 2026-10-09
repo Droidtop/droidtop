@@ -497,6 +497,15 @@ no destination, such as the PC library). Ops:
   filled under a hidden name and renamed when whole, an existing folder is never
   touched, and a failed unpack keeps the download and fails the job with a
   sentence. An engine hint pins the unpacked folder like it pins a placed file.
+  **Several files:** instead of `download` the reply may return `downloads`,
+  a JSON string holding a list of 1 to 16 descriptors (each as above, with its
+  own `fileName`, digests and headers; both `download` and `downloads`, or an
+  invalid descriptor in the list, fail the job). droidtop shows them as one
+  entry in Downloads, fetches and checks them in turn (a restart carries on
+  with the file it was at), and places them together in the destination, all
+  or nothing: if any name exists, or two share a name, nothing is placed. This
+  is for a release that is several files (a cue sheet and its tracks). Parts
+  of one split archive are handled as in the paragraph on split sets below.
   **Headers across redirects:** `headers` (cookies, Referer, Origin and the
   credential headers) are sent on every hop that stays on the same host over
   the same or a stronger scheme, so a link that answers 302 to a signed address

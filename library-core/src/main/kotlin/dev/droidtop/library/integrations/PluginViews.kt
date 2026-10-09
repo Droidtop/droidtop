@@ -23,9 +23,7 @@ import dev.droidtop.pluginhost.PluginResult
 import dev.droidtop.pluginhost.PluginRunner
 import dev.droidtop.pluginhost.PluginView
 import dev.droidtop.pluginhost.PluginViewCall
-import dev.droidtop.pluginhost.AcquireDownloadDescriptor
-import dev.droidtop.pluginhost.AcquireFileName
-import dev.droidtop.pluginhost.DownloadJobs
+import dev.droidtop.pluginhost.AcquireDownloads
 import dev.droidtop.pluginhost.ViewAction
 import dev.droidtop.pluginhost.ViewNode
 import java.io.File
@@ -116,53 +114,13 @@ object PluginViews {
                 val startedAt = System.currentTimeMillis()
                 var result = runJob(context, record, point, action.op, callArgs, action.title ?: label, onStatus)
                 if (result.ok && point == "library.sources" && action.op == "acquire") {
-                    val rawDescriptor = result.values["download"]
-                    if (rawDescriptor == null) {
+                    val descriptors = AcquireDownloads.parse(result.values)
+                    if (descriptors == null) {
                         // The plugin put the file there itself: it says which, or the library is told what is known.
                         val destination = hostContext.optString("destination").takeIf { it.isNotBlank() }?.let(::File)
                         withContext(Dispatchers.IO) { AcquireIndexing.afterAcquire(context, record.manifest.id, startedAt, destination, result.values) }
                     } else {
-                        val descriptor = AcquireDownloadDescriptor.parse(rawDescriptor)
-                        // The source's system hint: the game's own system folder, unless this screen is already that system's.
-                        val systemHint = AcquireSystemHint.valid(result.values[AcquireSystemHint.KEY])
-                        val destination = if (AcquireSystemHint.overrides(systemHint, hostContext)) {
-                            AcquireSystemHint.folderFor(context, systemHint!!)?.absolutePath
-                        } else {
-                            hostContext.optString("destination").takeIf { it.isNotBlank() }
-                        }
-                        // A download a page started in the plugin's web session: droidtop's own headers for it, by its token.
-                        val captured = descriptor?.session?.let {
-                            dev.droidtop.pluginhost.WebSessions.take(record.manifest.id, it, descriptor.url, System.currentTimeMillis())
-                        }
-                        result = if (descriptor == null) {
-                            PluginResult.failure("${record.manifest.label} returned an invalid download descriptor")
-                        } else if (descriptor.session != null && captured == null) {
-                            PluginResult.failure("the download from ${record.manifest.label}'s web page is no longer waiting; open it again")
-                        } else if (destination == null) {
-                            PluginResult.failure(
-                                if (systemHint != null) "there is no games folder for $systemHint; add one under Settings > Game folders" else "the game folder is not available",
-                            )
-                        } else {
-                            DownloadJobs.run(
-                                context = context,
-                                title = action.title ?: label,
-                                post = DownloadJobs.POST_PLACE_IN_FOLDER,
-                                url = descriptor.url,
-                                name = AcquireFileName.areaName(System.currentTimeMillis(), descriptor.fileName),
-                                sha256 = descriptor.sha256,
-                                sha1 = descriptor.sha1,
-                                md5 = descriptor.md5,
-                                unpack = if (descriptor.unpack) DownloadJobs.UNPACK_ARCHIVE else null,
-                                maxBytes = descriptor.size ?: 0L,
-                                headers = descriptor.headers + captured?.headers.orEmpty(),
-                                extra = buildMap {
-                                    put("destinationPath", destination)
-                                    put("targetName", descriptor.fileName)
-                                    AcquireEngineHint.valid(result.values[AcquireEngineHint.KEY])?.let { put(AcquireEngineHint.KEY, it) }
-                                },
-                                onStatus = onStatus,
-                            )
-                        }
+                        result = AcquireDownload.run(context, record, action.title ?: label, hostContext, result.values, descriptors, onStatus)
                     }
                 }
                 onJobDone(context, result)

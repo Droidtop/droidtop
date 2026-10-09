@@ -222,6 +222,81 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun theReplyCarriesOneDownloadOrAListOfUpToSixteenButNotBoth() {
+        val one = """{"url":"https://h.example/a.bin","fileName":"A one.bin"}"""
+        val two = """{"url":"https://h.example/b.bin","fileName":"B two.bin","md5":"d41d8cd98f00b204e9800998ecf8427e"}"""
+        assertNull(AcquireDownloads.parse(emptyMap()))
+        assertEquals(listOf("A one.bin"), AcquireDownloads.parse(mapOf("download" to one))!!.map { it.fileName })
+        assertEquals(listOf("A one.bin", "B two.bin"), AcquireDownloads.parse(mapOf("downloads" to "[$one,$two]"))!!.map { it.fileName })
+        assertTrue("both forms are invalid", AcquireDownloads.parse(mapOf("download" to one, "downloads" to "[$two]"))!!.isEmpty())
+        assertTrue("an empty list is invalid", AcquireDownloads.parse(mapOf("downloads" to "[]"))!!.isEmpty())
+        assertTrue("one bad descriptor spoils the list", AcquireDownloads.parse(mapOf("downloads" to "[$one,{\"url\":\"file:///x\",\"fileName\":\"x\"}]"))!!.isEmpty())
+        val seventeen = List(DownloadJobs.MAX_FILES + 1) { one }.joinToString(",", "[", "]")
+        assertTrue(AcquireDownloads.parse(mapOf("downloads" to seventeen))!!.isEmpty())
+        assertEquals(DownloadJobs.MAX_FILES, AcquireDownloads.parse(mapOf("downloads" to List(DownloadJobs.MAX_FILES) { one }.joinToString(",", "[", "]")))!!.size)
+    }
+
+    @Test
+    fun theFilesOfAJobComeBackOneArgumentMapEachWithTheirOwnNamesAndDigests() {
+        val args = mapOf(
+            "url" to "https://h.example/1", "name" to "acquire_1.bin", "targetName" to "Disc 1.bin", "md5" to "aa",
+            "more" to """[{"url":"https://h.example/2","name":"acquire_2.bin","targetName":"Disc 2.bin"}]""",
+            "destinationPath" to "/games/psx", "post" to "place_in_folder",
+        )
+        val parts = DownloadJobs.partsOf(args)
+        assertEquals(2, parts.size)
+        assertEquals("Disc 1.bin", parts[0]["targetName"])
+        assertEquals("aa", parts[0]["md5"])
+        assertEquals("Disc 2.bin", parts[1]["targetName"])
+        assertNull("a digest belongs to its own file", parts[1]["md5"])
+        assertEquals("/games/psx", parts[1]["destinationPath"])
+        assertEquals("place_in_folder", parts[1]["post"])
+        assertEquals(listOf(mapOf("url" to "u")), DownloadJobs.partsOf(mapOf("url" to "u")))
+    }
+
+    @Test
+    fun severalFilesArePlacedTogetherAndAnExistingNameStopsAllOfThem() {
+        val games = File(dir, "games/psx")
+        val a = File(dir, "downloads/acquire_1.bin").also { it.parentFile.mkdirs(); it.writeText("a") }
+        val b = File(dir, "downloads/acquire_2.cue").also { it.writeText("b") }
+        val parts = listOf(
+            mapOf("destinationPath" to games.path, "targetName" to "Disc (Track 1).bin"),
+            mapOf("destinationPath" to games.path, "targetName" to "Disc.cue"),
+        )
+        File(games, "Disc.cue").also { it.parentFile.mkdirs(); it.writeText("mine") }
+        try {
+            DownloadJobs.placeAllInFolder(listOf(a, b), parts)
+            fail("an existing name stops them all")
+        } catch (e: IllegalArgumentException) {
+            assertEquals("a file with that name already exists", e.message)
+        }
+        assertTrue(a.exists() && b.exists())
+        assertFalse(File(games, "Disc (Track 1).bin").exists())
+        assertEquals("mine", File(games, "Disc.cue").readText())
+
+        File(games, "Disc.cue").delete()
+        val placed = DownloadJobs.placeAllInFolder(listOf(a, b), parts)
+        assertEquals(listOf(File(games, "Disc (Track 1).bin"), File(games, "Disc.cue")), placed)
+        assertFalse(a.exists() || b.exists())
+        assertEquals("b", File(games, "Disc.cue").readText())
+    }
+
+    @Test
+    fun twoFilesWithTheSameNameAreRefused() {
+        val games = File(dir, "games/x")
+        val a = File(dir, "downloads/a").also { it.parentFile.mkdirs(); it.writeText("a") }
+        val b = File(dir, "downloads/b").also { it.writeText("b") }
+        val part = mapOf("destinationPath" to games.path, "targetName" to "Same.bin")
+        try {
+            DownloadJobs.placeAllInFolder(listOf(a, b), listOf(part, part))
+            fail("two files cannot share a name")
+        } catch (e: IllegalArgumentException) {
+            assertEquals("two of the files have the same name", e.message)
+        }
+        assertTrue(a.exists() && b.exists())
+    }
+
+    @Test
     fun acquireDownloadDescriptorRejectsUnsafeOrInvalidFields() {
         assertNull(AcquireDownloadDescriptor.parse("""{"url":"file:///etc/passwd","fileName":"game.zip"}"""))
         assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"../game.zip"}"""))
