@@ -29,6 +29,8 @@ internal class FlutterSource private constructor(
     private val registrant: () -> ClassLoader?,
     val contained: Boolean,
     val softwareRendering: Boolean,
+    /** True when the assets are already in the context's AssetManager ([ContainedAssets]), so [assetsZip] is not added by path. */
+    val assetsServed: Boolean = false,
 ) {
     fun registrantLoader(): ClassLoader? = registrant()
 
@@ -56,7 +58,7 @@ internal class FlutterSource private constructor(
          * A contained plugin's files, already registered with [SandboxFiles] under these names ([ContainedFiles]).
          * [softwareRendering] is true in the isolated sandbox and false in a `gpu.render` process.
          */
-        fun contained(registrantDex: List<ByteBuffer>, softwareRendering: Boolean): FlutterSource =
+        fun contained(registrantDex: List<ByteBuffer>, softwareRendering: Boolean, assetsServed: Boolean): FlutterSource =
             FlutterSource(
                 libflutter = SandboxFiles.RUNTIME + "libflutter.so",
                 libapp = SandboxFiles.PLUGIN + "libapp.so",
@@ -64,6 +66,7 @@ internal class FlutterSource private constructor(
                 registrant = { if (registrantDex.isEmpty()) null else ContainedDex.loader(registrantDex, FlutterEngineHost::class.java.classLoader!!, null) },
                 contained = true,
                 softwareRendering = softwareRendering,
+                assetsServed = assetsServed,
             )
     }
 }
@@ -84,15 +87,13 @@ internal object FlutterEngineHost {
 
     /** Builds an engine for [source]; must run on the main thread (FlutterEngine is @UiThread). Throws when a file is missing. */
     fun build(appContext: Context, pluginId: String, source: FlutterSource): Built {
-        addAssets(appContext, source.assetsZip)
-        val flutterJNI = DownloadedFlutterJNI(source.libflutter, source.contained)
+        if (!source.assetsServed) addAssets(appContext, source.assetsZip)
+        val flutterJNI = DownloadedFlutterJNI(source.libflutter, source.contained, containedShellArgs(source))
         val flutterLoader = loaders.getOrPut(source.libapp) { FlutterLoader(flutterJNI) }
-        val dartVmArgs = buildList {
-            add("--aot-shared-library-name=${source.libapp}")
-            // An isolated process may not open the GPU driver (sepolicy isolated_app_all.te): Flutter draws in software
-            // there. A gpu.render process is not isolated and draws with hardware (docs/plugin-api.md 5.3).
-            if (source.softwareRendering) add("--enable-software-rendering")
-        }.toTypedArray()
+        // A plugin loaded from its install folder names its snapshot here; FlutterLoader accepts it because the folder is
+        // under getFilesDir(). A contained plugin's snapshot is a virtual path FlutterLoader would reject, so it goes in
+        // through DownloadedFlutterJNI.init instead ([containedShellArgs]).
+        val dartVmArgs = if (source.contained) emptyArray() else arrayOf("--aot-shared-library-name=${source.libapp}")
         // false, not true: automatic registration only looks on this process's own classloader, which never has the plugin's generated registrant (see registerGeneratedPlugins).
         val engine = FlutterEngine(appContext, flutterLoader, flutterJNI, dartVmArgs, false)
         registerGeneratedPlugins(source, engine)
@@ -127,18 +128,65 @@ internal object FlutterEngineHost {
         } catch (e: ClassNotFoundException) {
             return
         }
-        registrantClass.getMethod("registerWith", FlutterEngine::class.java).invoke(null, engine)
+        // A registrant without registerWith(FlutterEngine) (the sample's, whose Dart code uses no plugin package, once its
+        // dex was in the bundle: emulator-5560) registers nothing; that is not a failed load. What it does have is logged.
+        val register = try {
+            registrantClass.getMethod("registerWith", FlutterEngine::class.java)
+        } catch (e: NoSuchMethodException) {
+            android.util.Log.i(
+                "droidtop.plugin",
+                "GeneratedPluginRegistrant has no registerWith(FlutterEngine); no Flutter plugins registered. It has: " +
+                    registrantClass.declaredMethods.joinToString { m -> m.name + m.parameterTypes.joinToString(",", "(", ")") { it.name } },
+            )
+            return
+        }
+        register.invoke(null, engine)
+    }
+
+    /**
+     * The shell arguments a contained engine needs that FlutterLoader will not pass on (rig, emulator-5560 Android 14):
+     * it rejects an `--aot-shared-library-name` outside `getFilesDir()` ("External path ... rejected; not overriding
+     * aot-shared-library-name"), and drops `--enable-software-rendering` in a release build ("is not allowed in release
+     * builds and will be ignored"; FlutterLoader.ensureInitializationComplete). Both are added at [FlutterJNI.init],
+     * which hands its arguments to the engine unchanged. Software rendering only in the isolated sandbox, where the GPU is
+     * out of reach; a `gpu.render` process draws with hardware.
+     */
+    private fun containedShellArgs(source: FlutterSource): List<String> = if (!source.contained) {
+        emptyList()
+    } else {
+        // Software rendering is Skia's; Impeller, on by default, refuses it outright ("Check failed: !settings.enable_impeller.
+        // Impeller does not support software rendering", flutter_main.cc, emulator-5560), so it is switched off with it.
+        listOf("--aot-shared-library-name=${source.libapp}") +
+            if (source.softwareRendering) listOf("--enable-software-rendering", "--enable-impeller=false") else emptyList()
     }
 
     /**
      * Overrides the one method [FlutterJNI] uses to load `libflutter.so`, so it loads the downloaded runtime instead of a
      * library in droidtop's own APK. Contained, the path is virtual; once the engine is in, its own imports are hooked
-     * too, because the engine opens the plugin's `libapp.so` itself.
+     * too, because the engine opens the plugin's `libapp.so` itself. [extraArgs] are appended at [init] (see
+     * [containedShellArgs]).
      */
-    private class DownloadedFlutterJNI(private val libflutterSo: String, private val contained: Boolean) : FlutterJNI() {
+    private class DownloadedFlutterJNI(
+        private val libflutterSo: String,
+        private val contained: Boolean,
+        private val extraArgs: List<String>,
+    ) : FlutterJNI() {
         override fun loadLibrary(context: Context) {
             System.load(libflutterSo)
             if (contained) SandboxFiles.hook("/libflutter.so")
+        }
+
+        override fun init(
+            context: Context,
+            args: Array<String>,
+            bundlePath: String?,
+            appStoragePath: String,
+            engineCachesPath: String,
+            initTimeMillis: Long,
+            apiLevel: Int,
+        ) {
+            val shellArgs = if (extraArgs.isEmpty()) args else args.filterNot { it.startsWith("--aot-shared-library-name=") }.toTypedArray() + extraArgs
+            super.init(context, shellArgs, bundlePath, appStoragePath, engineCachesPath, initTimeMillis, apiLevel)
         }
     }
 }

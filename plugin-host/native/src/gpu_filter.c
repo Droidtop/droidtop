@@ -71,7 +71,7 @@ static int installed = 0;
 static char report[160];
 
 JNIEXPORT jstring JNICALL
-Java_dev_droidtop_pluginhost_GpuSyscallFilter_nativeInstall(JNIEnv *env, jclass clazz) {
+Java_dev_droidtop_pluginhost_PluginSyscallFilter_nativeInstall(JNIEnv *env, jclass clazz) {
     (void) clazz;
     if (installed) return (*env)->NewStringUTF(env, report);
 

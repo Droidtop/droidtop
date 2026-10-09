@@ -44,8 +44,24 @@ open class PluginSandboxService : PluginProcessService() {
     override fun loadFromFolder(pluginId: String, dir: File, entryClass: String, rootApproved: Boolean, broker: IPluginHostBroker): Boolean =
         failLoad(pluginId, "a contained plugin is loaded from the files droidtop hands it, never from a folder")
 
+    /** What the system-call filter reported in this process ([PluginSyscallFilter]), for the containment check. */
+    @Volatile private var filter: String? = null
+
     override fun loadFromFiles(pluginId: String, manifest: PluginManifest, files: Map<String, ParcelFileDescriptor>, broker: IPluginHostBroker): Boolean {
         if (requiresIsolation && !dev.droidtop.runtime.util.IsolatedProcess.isIsolated()) return failLoad(pluginId, "the contained process is not isolated; refusing to run the plugin here")
+        // The same seccomp filter for both kinds of plugin process, before any plugin code (docs/plugin-api.md 5.3). In a
+        // graphics process it is the only network wall, so a process that cannot take it does not run the plugin. In the
+        // isolated sandbox Android's own rules already refuse sockets, except where a device does not enforce them: the
+        // BlueStacks rig runs with SELinux disabled and let an isolated UID open a socket (rig, v0.2.0-dev.1649). There the
+        // filter is the wall; where it cannot be installed, the isolated process still stands, so the plugin runs.
+        // The first native call of the process, which loads droidtop's own libdroidtoppy.so; timed in logcat because on the
+        // BlueStacks rig that first library load waits 10 s inside its native bridge (docs/plugin-api.md 5.3, "The rigs").
+        val before = android.os.SystemClock.uptimeMillis()
+        val report = PluginSyscallFilter.install().also { filter = it }
+        android.util.Log.i("droidtop.plugin", "$pluginId: system-call filter ${report.substringBefore(':')} in ${android.os.SystemClock.uptimeMillis() - before} ms (first native call)")
+        if (!requiresIsolation && !PluginSyscallFilter.isOn(report)) {
+            return failLoad(pluginId, "its process could not take droidtop's system-call filter ($report), so it is not run with the graphics chip")
+        }
         val context = BrokerPluginContext(broker)
         return when (manifest.kind) {
             PluginKind.NATIVE_BUNDLE -> loadDex(pluginId, manifest, files, context)
@@ -98,14 +114,26 @@ open class PluginSandboxService : PluginProcessService() {
         val libapp = files[ContainedFiles.FLUTTER_APP] ?: return failLoad(pluginId, "its libapp.so was not handed over")
         val assets = files[ContainedFiles.FLUTTER_ASSETS] ?: return failLoad(pluginId, "its flutter_assets were not handed over")
         return try {
+            // docs/plugin-api.md 5.3, "Flutter assets": AssetManager opens a path itself, which the guarded hooks do not
+            // reach, so from API 30 the assets are served from a memfd through a ResourcesLoader. Read before any
+            // SandboxFiles.register, which takes the descriptor over.
+            val served = if (Build.VERSION.SDK_INT >= 30) {
+                val served = ContainedAssets.from(assets)
+                served.installInto(applicationContext)
+                assetsNote = "served from memory to AssetManager (${served.count} files)"
+                true
+            } else {
+                SandboxFiles.register(SandboxFiles.PLUGIN + "flutter_assets.zip", assets)
+                assetsNote = "added by its virtual path (Android 10 and older)"
+                false
+            }
             SandboxFiles.register(SandboxFiles.RUNTIME + "libflutter.so", libflutter)
             SandboxFiles.register(SandboxFiles.PLUGIN + "libapp.so", libapp)
-            SandboxFiles.register(SandboxFiles.PLUGIN + "flutter_assets.zip", assets)
             hooks = SandboxFiles.ensureHooks()
             val registrant = files.filterKeys { it.startsWith(ContainedFiles.FLUTTER_DEX) }.toSortedMap().values.map { fd ->
                 java.nio.ByteBuffer.wrap(FileInputStream(fd.fileDescriptor).readBytes())
             }
-            start(pluginId, FlutterDroidtopPlugin(pluginId, applicationContext, FlutterSource.contained(registrant, softwareRendering), manifest.contractVersion), context)
+            start(pluginId, FlutterDroidtopPlugin(pluginId, applicationContext, FlutterSource.contained(registrant, softwareRendering, served), manifest.contractVersion), context)
         } catch (t: Throwable) {
             loadCrashed(pluginId, t)
         }
@@ -114,9 +142,14 @@ open class PluginSandboxService : PluginProcessService() {
     /** What the guarded hooks rewrote, for the containment check. */
     @Volatile private var hooks: String? = null
 
+    /** How a Flutter plugin's assets reached AssetManager, for the containment check. */
+    @Volatile private var assetsNote: String? = null
+
     override fun loadNotes(): JSONObject = JSONObject().apply {
         pythonReport?.let { put("python", it) }
         hooks?.let { put("hooks", it) }
+        assetsNote?.let { put("assets", it) }
+        filter?.let { put("syscallFilter", it) }
     }
 }
 
@@ -135,23 +168,11 @@ class PluginSandboxSlot7 : PluginSandboxService()
 // of droidtop's own UID that is NOT isolated, so the graphics chip is reachable and Flutter draws with hardware. Eight
 // slots `:plugin_gpu0` to `:plugin_gpu7` in this module's manifest; there is no API 29 per-instance form because
 // bindIsolatedService is for isolated processes only. Before any of the plugin's code loads, the process takes
-// droidtop's system-call filter ([GpuSyscallFilter]), which takes away the network droidtop's UID would otherwise give
+// droidtop's system-call filter ([PluginSyscallFilter]), which takes away the network droidtop's UID would otherwise give
 // it; a process that cannot take the filter does not run the plugin.
 open class PluginGpuService : PluginSandboxService() {
     override val requiresIsolation: Boolean get() = false
     override val softwareRendering: Boolean get() = false
-
-    @Volatile private var filter: String? = null
-
-    override fun loadFromFiles(pluginId: String, manifest: PluginManifest, files: Map<String, ParcelFileDescriptor>, broker: IPluginHostBroker): Boolean {
-        val report = GpuSyscallFilter.install().also { filter = it }
-        if (!GpuSyscallFilter.isOn(report)) {
-            return failLoad(pluginId, "its process could not take droidtop's system-call filter ($report), so it is not run with the graphics chip")
-        }
-        return super.loadFromFiles(pluginId, manifest, files, broker)
-    }
-
-    override fun loadNotes(): JSONObject = super.loadNotes().apply { filter?.let { put("syscallFilter", it) } }
 }
 class PluginGpuSlot0 : PluginGpuService()
 class PluginGpuSlot1 : PluginGpuService()
@@ -163,12 +184,12 @@ class PluginGpuSlot6 : PluginGpuService()
 class PluginGpuSlot7 : PluginGpuService()
 
 /**
- * The seccomp-bpf filter of a `gpu.render` process (docs/plugin-api.md 5.3, "The graphics tier";
- * `native/src/gpu_filter.c`): no socket but a local datagram one (so no internet and no DNS), no io_uring, no ptrace,
+ * The seccomp-bpf filter of every plugin process droidtop loads from descriptors, the isolated sandbox and a
+ * `gpu.render` process alike (docs/plugin-api.md 5.3; `native/src/gpu_filter.c`): no socket but a local datagram one (so no internet and no DNS), no io_uring, no ptrace,
  * on every thread and for good. An app may add such a filter to its own process (Chrome does for its renderers); it
  * cannot filter by path or look inside a binder call, which is what the permission's warning is about.
  */
-internal object GpuSyscallFilter {
+internal object PluginSyscallFilter {
     init {
         System.loadLibrary("droidtoppy")
     }

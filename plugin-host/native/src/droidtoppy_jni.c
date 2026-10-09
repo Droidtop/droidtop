@@ -26,8 +26,8 @@
  * - Contained (nativeInitContained): the process is isolated and can open no
  *   file of droidtop's, so everything arrives as a descriptor. libpython and
  *   the runtime's other libraries are mapped with android_dlopen_ext and
- *   ANDROID_DLEXT_USE_LIBRARY_FD (or, when mapping the file's own descriptor
- *   is refused, from a private memfd copy); each lib-dynload extension module
+ *   ANDROID_DLEXT_USE_LIBRARY_FD from a private memfd copy of each
+ *   descriptor (never the descriptor itself); each lib-dynload extension module
  *   is mapped the same way and registered as a built-in before the
  *   interpreter starts, because the import system can only load an extension
  *   by path; the standard library is one zip on sys.path as /proc/self/fd/N,
@@ -656,33 +656,27 @@ static int copy_to_memfd(const char *name, int src) {
 #endif
 }
 
-/* Maps the library behind [fd] as [name]: its own descriptor first, then a memfd copy. [how] says which worked, or why
- * neither did. A library whose soname is already loaded is that one: the linker matches DT_NEEDED entries by soname. */
+/* Maps the library behind [fd] as [name] from a private memfd copy, never from [fd] itself: [fd] is droidtop's file
+ * (app_data_file), which an isolated process may never map as code (system/sepolicy private/app.te, no_x_file_perms),
+ * so trying it first only logged an avc { execute } denial per library (rig, v0.2.0-dev.1649, Android 14). The memfd is
+ * the process's own tmpfs (appdomain_tmpfs), which app_domain() lets it execute. [how] says what happened. A library
+ * whose soname is already loaded is that one: the linker matches DT_NEEDED entries by soname. */
 static void *load_from_fd(const char *name, int fd, char *how, size_t how_len) {
+    int copy = copy_to_memfd(name, fd);
+    if (copy < 0) {
+        snprintf(how, how_len, "memfd copy failed (%s)", strerror(errno));
+        return NULL;
+    }
     android_dlextinfo info;
     memset(&info, 0, sizeof info);
     info.flags = ANDROID_DLEXT_USE_LIBRARY_FD;
-    info.library_fd = fd;
+    info.library_fd = copy;
     void *handle = android_dlopen_ext(name, RTLD_NOW | RTLD_GLOBAL, &info);
     if (handle != NULL) {
-        snprintf(how, how_len, "fd");
-        return handle;
-    }
-    char first[512];
-    const char *e1 = dlerror();
-    snprintf(first, sizeof first, "%s", e1 != NULL ? e1 : "unknown");
-    int copy = copy_to_memfd(name, fd);
-    if (copy < 0) {
-        snprintf(how, how_len, "fd refused (%s); memfd copy failed (%s)", first, strerror(errno));
-        return NULL;
-    }
-    info.library_fd = copy;
-    handle = android_dlopen_ext(name, RTLD_NOW | RTLD_GLOBAL, &info);
-    if (handle != NULL) {
-        snprintf(how, how_len, "memfd (fd refused: %s)", first);
+        snprintf(how, how_len, "memfd");
     } else {
-        const char *e2 = dlerror();
-        snprintf(how, how_len, "fd refused (%s); memfd refused (%s)", first, e2 != NULL ? e2 : "unknown");
+        const char *e = dlerror();
+        snprintf(how, how_len, "memfd refused (%s)", e != NULL ? e : "unknown");
     }
     close(copy);
     return handle;
@@ -738,6 +732,15 @@ Java_dev_droidtop_pluginhost_PythonBridge_nativeInitContained(JNIEnv *env, jobje
             free(name);
         }
     }
+    /* 2. libpython itself. */
+    char *libpythonName = jstring_copy(env, jLibpythonName);
+    void *handle = load_from_fd(libpythonName, libpythonFd, how, sizeof how);
+    free(libpythonName);
+    close(libpythonFd);
+    report_field(&r, "libpython", how);
+
+    /* 1b. What still did not load needs libpython (libpython3.so, the stable-ABI forwarder, names libpython3.14.so):
+     *     one more try now that it is in, and only then is a failure reported. */
     for (jsize i = 0; i < deps; i++) {
         if (!depDone[i]) {
             char *name = jstring_copy(env, (jstring) (*env)->GetObjectArrayElement(env, jDepNames, i));
@@ -751,13 +754,6 @@ Java_dev_droidtop_pluginhost_PythonBridge_nativeInitContained(JNIEnv *env, jobje
     }
     if (depFds != NULL) (*env)->ReleaseIntArrayElements(env, jDepFds, depFds, JNI_ABORT);
     free(depDone);
-
-    /* 2. libpython itself. */
-    char *libpythonName = jstring_copy(env, jLibpythonName);
-    void *handle = load_from_fd(libpythonName, libpythonFd, how, sizeof how);
-    free(libpythonName);
-    close(libpythonFd);
-    report_field(&r, "libpython", how);
     if (handle == NULL) return finish_report(env, &r, 0, "libpython could not be mapped from its descriptor");
     const char *missing = NULL;
     if (!resolve_symbols(handle, &missing)) return finish_report(env, &r, 0, missing);

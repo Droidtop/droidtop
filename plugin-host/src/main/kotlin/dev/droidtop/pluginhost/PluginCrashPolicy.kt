@@ -94,6 +94,7 @@ class PluginCrashPolicy(
         missingRuntime(record)?.let { return it.message }
         loadFor(record, userInitiated = true)?.let { return "Did not load: $it" }
         val report = runner.reachability(record.manifest.id) ?: return "Loaded, but its process did not answer"
+        report.optString("error").takeIf { it.isNotEmpty() }?.let { return "Loaded, but its report failed: $it" }
         val grants = withContext(Dispatchers.IO) { PluginGrants.forContext(context).read(record.manifest.id) }
         return buildString {
             append(
@@ -109,6 +110,8 @@ class PluginCrashPolicy(
             append("\ndroidtop's files: ").append(report.optString("droidtopFiles"))
             append("\nShared storage: ").append(report.optString("sharedStorage"))
             report.optJSONObject("notes")?.optString("syscallFilter")?.takeIf { it.isNotEmpty() }?.let { append("\nSystem-call filter: ").append(it) }
+            report.optJSONObject("notes")?.optString("hooks")?.takeIf { it.isNotEmpty() }?.let { append("\nGuarded hooks: ").append(it) }
+            report.optJSONObject("notes")?.optString("assets")?.takeIf { it.isNotEmpty() }?.let { append("\nFlutter assets: ").append(it) }
             report.optJSONObject("notes")?.optJSONObject("python")?.let { python ->
                 append("\nPython: ").append(if (python.optBoolean("ok")) "started" else "did not start: ${python.optString("error")}")
                 append("\n").append(python.toString(1))

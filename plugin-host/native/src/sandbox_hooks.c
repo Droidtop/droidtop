@@ -316,12 +316,32 @@ static int patch_relocations(uintptr_t bias, const ElfW(Rela) *rel, size_t count
     return patched;
 }
 
+/* True when the loaded library [name] is the one [suffix] ("/libflutter.so") names. A library this file mapped from its
+ * memfd copy is known to the linker by the memfd's own path, "/memfd:libflutter.so (deleted)", not by the virtual path
+ * it was asked for, so that form matches on the name after "/memfd:" (emulator-5560: the engine was never hooked, its
+ * dlopen of the plugin's libapp.so went unanswered and Dart found no snapshot). */
+static int names_library(const char *name, const char *suffix) {
+    char buf[512];
+    snprintf(buf, sizeof buf, "%s", name);
+    size_t n = strlen(buf);
+    static const char deleted[] = " (deleted)";
+    size_t d = sizeof deleted - 1;
+    if (n >= d && strcmp(buf + n - d, deleted) == 0) buf[n -= d] = '\0';
+    const char *effective = buf;
+    char memfd[512];
+    if (strncmp(buf, "/memfd:", 7) == 0) {
+        snprintf(memfd, sizeof memfd, "/%s", buf + 7);
+        effective = memfd;
+        n = strlen(memfd);
+    }
+    size_t s = strlen(suffix);
+    return n >= s && strcmp(effective + n - s, suffix) == 0;
+}
+
 static int patch_library(struct dl_phdr_info *info, size_t size, void *data) {
     Pass *pass = (Pass *) data;
     const char *name = info->dlpi_name;
-    if (name == NULL) return 0;
-    size_t n = strlen(name), s = strlen(pass->suffix);
-    if (n < s || strcmp(name + n - s, pass->suffix) != 0) return 0;
+    if (name == NULL || !names_library(name, pass->suffix)) return 0;
     uintptr_t bias = info->dlpi_addr;
     const ElfW(Dyn) *dyn = NULL;
     for (int p = 0; p < info->dlpi_phnum; p++) {

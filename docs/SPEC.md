@@ -16711,7 +16711,12 @@ Advanced.
   storage. Its code arrives as file descriptors, and everything it does
   beyond its process goes through its broker, where the caller's grant, the
   parameters it declared, the quota and the activity log apply. **For a
-  contained plugin the permission model is a security boundary.**
+  contained plugin the permission model is a security boundary.** The
+  sandbox also takes droidtop's seccomp filter (sockets only as local
+  datagrams), the same one a `gpu.render` process takes, so the wall holds
+  on a device that does not enforce Android's own rules (the BlueStacks
+  rig runs with SELinux disabled; plugin-enforce-7, `docs/plugin-api.md`
+  §5.3 "The rigs").
 - **The graphics tier** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
   a plugin that needs the GPU and nothing else declares `gpu.render` and the
   person ticks it. Granting it runs the plugin in a droidtop-owned process

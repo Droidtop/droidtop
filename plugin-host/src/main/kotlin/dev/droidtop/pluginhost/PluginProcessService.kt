@@ -3,7 +3,6 @@ package dev.droidtop.pluginhost
 import android.app.Service
 import android.content.Intent
 import android.os.Build
-import android.os.Environment
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.os.Process
@@ -116,7 +115,11 @@ abstract class PluginProcessService : Service() {
                     val fds = files.orEmpty()
                     val labels = names.orEmpty()
                     if (fds.size != labels.size) return failLoad(pluginId, "its files arrived without names")
-                    return loadFromFiles(pluginId, manifest, labels.zip(fds).toMap(), broker)
+                    val started = android.os.SystemClock.uptimeMillis()
+                    Log.i("droidtop.plugin", "$pluginId: loading ${manifest.kind.id} from ${fds.size} descriptors, ${started - android.os.Process.getStartUptimeMillis()} ms after this process started")
+                    return loadFromFiles(pluginId, manifest, labels.zip(fds).toMap(), broker).also {
+                        Log.i("droidtop.plugin", "$pluginId: load ${if (it) "done" else "refused"} in ${android.os.SystemClock.uptimeMillis() - started} ms")
+                    }
                 } finally {
                     files?.forEach { runCatching { it.close() } }
                 }
@@ -125,7 +128,12 @@ abstract class PluginProcessService : Service() {
 
         override fun lastLoadError(pluginId: String): String = loadErrors[pluginId].orEmpty()
 
-        override fun reachability(): String = reachabilityReport().toString()
+        override fun reachability(): String = try {
+            reachabilityReport().toString()
+        } catch (t: Throwable) {
+            Log.w("droidtop.plugin", "containment report failed", t)
+            JSONObject().put("error", t.toString()).toString()
+        }
 
         override fun unloadPlugin(pluginId: String) {
             runCatching { loaded.remove(pluginId)?.onUnload() }
@@ -230,7 +238,12 @@ abstract class PluginProcessService : Service() {
         }
     }
 
-    override fun onBind(intent: Intent?): IBinder = binder
+    override fun onBind(intent: Intent?): IBinder {
+        // When this process started and when it was first asked for: anything the framework does before (on BlueStacks
+        // Android 13 a 10 s "Waiting for permission service" in bindApplication) shows up as the gap between the two.
+        Log.i("droidtop.plugin", "plugin process bound ${android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis()} ms after it started")
+        return binder
+    }
 
     /** Releases every still-registered callback's binder reference. */
     override fun onDestroy() {
@@ -282,12 +295,13 @@ abstract class PluginProcessService : Service() {
                 "a socket opened"
             }.getOrElse { "refused (${it.message})" },
         )
-        out.put("droidtopFiles", listing(File(applicationInfo.dataDir, "files")))
-        @Suppress("DEPRECATION")
-        val shared = Environment.getExternalStorageDirectory()
-        out.put("sharedStorage", listing(shared))
+        out.put("droidtopFiles", runCatching { listing(File(applicationInfo.dataDir, "files")) }.getOrElse { "refused (${it.message})" })
+        // A fixed path, not Environment.getExternalStorageDirectory(): that asks StorageManager over binder for the volume
+        // list, and an isolated process may not look up the "mount" service (sepolicy isolated_app_all.te), so the call
+        // threw inside the binder stub and the check read "did not answer" (rig, v0.2.0-dev.1649, Android 13 and 14).
+        out.put("sharedStorage", listing(File("/storage/emulated/${Process.myUid() / 100_000}")))
         out.put("loaded", org.json.JSONArray(loaded.keys.toList()))
-        out.put("notes", loadNotes())
+        out.put("notes", runCatching { loadNotes() }.getOrElse { JSONObject().put("error", it.toString()) })
         return out
     }
 
