@@ -43,6 +43,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // a job each (docs/SPEC.md 7g, "Stores").
         dev.droidtop.stores.BuiltInStores.register()
         dev.droidtop.library.stores.StoreInstallJob.register(appContext)
+        // The desktop's fonts for all languages, a job of its own (Droidtop/tracker#390).
+        dev.droidtop.app.DesktopFontsJob.register(appContext)
         // A store game's cloud saves, uploaded when the game ends, a job each (7g, "Stores").
         dev.droidtop.library.stores.StoreSaves.register(appContext)
         // Every social provider's message notifications and the Quick Menu's unread count

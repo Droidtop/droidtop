@@ -22,24 +22,6 @@ class CompositorProvisioningTest {
     }
 
     @Test
-    fun `fonts for all languages add each distro's Noto packages, and only when asked`() {
-        val alpine = CompositorProvisioning.plan("alpine", "sway", allLanguageFonts = true)!!.installCommand
-        assertTrue(alpine.endsWith("&& apk add --no-cache font-noto-cjk font-noto-emoji"))
-        val debian = CompositorProvisioning.plan("debian", "sway", allLanguageFonts = true)!!.installCommand
-        assertTrue(debian.endsWith("&& apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-color-emoji"))
-        assertFalse(CompositorProvisioning.plan("alpine", "sway")!!.installCommand.contains("noto"))
-        // A different plan, so a desktop made before the switch installs them on its next start.
-        assertFalse(
-            ContainerLayout.planId(CompositorProvisioning.plan("alpine", "sway")!!) ==
-                ContainerLayout.planId(CompositorProvisioning.plan("alpine", "sway", allLanguageFonts = true)!!),
-        )
-        // Printing still lands after the fonts and still adds its daemon.
-        val both = CompositorProvisioning.plan("alpine", "sway", printing = true, allLanguageFonts = true)!!
-        assertTrue(both.installCommand.contains("font-noto-cjk") && both.installCommand.contains(" cups"))
-        assertEquals(listOf(CompositorProvisioning.PRINTING_DAEMON), both.daemons)
-    }
-
-    @Test
     fun `the Waybar panel installs waybar and wofi and starts sway with droidtop's config`() {
         val plan = CompositorProvisioning.plan("alpine", "sway", panel = DesktopPanel.WAYBAR)!!
         assertTrue(plan.installCommand.endsWith("&& apk add --no-cache waybar wofi"))

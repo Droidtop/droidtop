@@ -221,6 +221,16 @@ class DesktopSessionService : Service() {
             primary,
         )
         libraryEntries = DesktopLibraryEntries(applicationContext, LibraryCore.library(applicationContext)).also { it.start(scope) }
+        // Fonts for all languages are a Downloads job, not part of the boot (Droidtop/tracker#390): started only
+        // when this desktop does not have them yet, which one cheap test in the container answers.
+        if (DesktopSetupPrefs.allLanguageFonts(applicationContext)) {
+            scope.launch {
+                val installed = runCatching {
+                    runtime.exec(primary, listOf("test", "-f", dev.droidtop.runtime.DesktopFonts.MARKER), emptyMap()).exitCode == 0
+                }.getOrDefault(true)
+                if (!installed) DesktopFontsJob.ensure(applicationContext)
+            }
+        }
     }
 
     /**
@@ -278,7 +288,6 @@ class DesktopSessionService : Service() {
             repository.os,
             desktopEnvironment,
             printing = DesktopSetupPrefs.printing(applicationContext),
-            allLanguageFonts = DesktopSetupPrefs.allLanguageFonts(applicationContext),
             panel = DesktopSetupPrefs.panel(applicationContext),
         )
             ?: error("No known compositor provisioning for ${repository.os}/$desktopEnvironment")

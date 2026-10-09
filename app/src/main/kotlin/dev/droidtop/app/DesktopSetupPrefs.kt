@@ -20,6 +20,15 @@ object DesktopSetupPrefs {
     private const val KEY_MICROPHONE = "droidtop_desktop_microphone"
     private const val KEY_ALL_LANGUAGE_FONTS = "droidtop_desktop_all_language_fonts"
     private const val KEY_PANEL = "droidtop_desktop_panel"
+    private const val KEY_FONTS_ON_METERED = "droidtop_desktop_fonts_on_metered"
+
+    /** Whether the fonts download may use a metered network (mobile data); off by default (Droidtop/tracker#390). */
+    fun fontsOnMetered(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_FONTS_ON_METERED, false)
+
+    fun setFontsOnMetered(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_FONTS_ON_METERED, on).apply()
+    }
     private const val KEY_KEEP_RUNNING = "droidtop_desktop_keep_running"
 
     /**
