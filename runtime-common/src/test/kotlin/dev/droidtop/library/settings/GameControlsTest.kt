@@ -39,11 +39,14 @@ class GameControlsTest {
         assertEquals(listOf(GameRow.RESUME, GameRow.QUIT), GameControls.rows(UiMode.KID, GameRunner.LOCAL))
         assertEquals(listOf(GameRow.RESUME, GameRow.QUIT), GameControls.rows(UiMode.KIOSK, GameRunner.LOCAL))
         assertEquals(GameRow.entries, GameControls.rows(UiMode.FULL, GameRunner.LOCAL))
+        // The emulator choice is not Kid's to change.
+        assertFalse(GameRow.EMULATOR in GameControls.rows(UiMode.KID, GameRunner.LOCAL))
     }
 
     @Test fun `a stream hides Restart and Kill and uses its own Quit label`() {
         val rows = GameControls.rows(UiMode.FULL, GameRunner.STREAM)
         assertFalse(GameRow.RESTART in rows || GameRow.KILL in rows)
+        assertFalse(GameRow.EMULATOR in rows)
         assertEquals("Disconnect", GameControls.label(GameRow.QUIT, GameRunner.STREAM))
         assertEquals("Disconnect from the PC?", GameControls.question(GameRow.QUIT, GameRunner.STREAM, "Desktop"))
         assertEquals("Quit", GameControls.label(GameRow.QUIT, GameRunner.LOCAL))

@@ -183,7 +183,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
                 }
                 if (entry.systemId != null) {
                     item {
-                        MetadataPickerRow("Emulator", gameEmulatorSummary(emulators, current.altEmulator)) {
+                        MetadataPickerRow("Emulator", dev.droidtop.library.consoles.GameEmulatorChoice.summary(emulators, current.altEmulator)) {
                             if (emulators != null) pickingEmulator = true
                         }
                     }

@@ -26,11 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.library.consoles.EmulatorResolution
-import dev.droidtop.library.consoles.EmulatorSource
-import dev.droidtop.library.consoles.Player
+import dev.droidtop.library.consoles.GameEmulatorChoice
 import dev.droidtop.library.consoles.SystemEmulators
-import dev.droidtop.library.consoles.libretroCoreId
 import dev.droidtop.library.consoles.loadSystemEmulators
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.onPad
@@ -40,27 +37,20 @@ import dev.droidtop.shell.gamepad.input.onPad
  * system, then global default (docs/SPEC.md "Launch resolution: keep the
  * default, expose it"). The stored value is a player id in the game's
  * `altEmulator` field (ES-DE's own per-game field, read by the launch
- * path through [EmulatorResolution]); empty means "follow the system".
+ * path through `EmulatorResolution`); empty means "follow the system".
+ * The options and the summary are [GameEmulatorChoice], the one model the
+ * Quick Menu and the companion draw too.
  */
 
 /** The installed emulators for [entry]'s system, loaded off the main thread; null while loading or for a non-console game. */
 @Composable
-internal fun rememberSystemEmulators(entry: LibraryEntry): SystemEmulators? {
+fun rememberSystemEmulators(entry: LibraryEntry): SystemEmulators? {
     val context = LocalContext.current
     var loaded by remember(entry.id) { mutableStateOf<SystemEmulators?>(null) }
     LaunchedEffect(entry.id) {
         loaded = entry.systemId?.let { loadSystemEmulators(context, it) }
     }
     return loaded
-}
-
-/** What the editor row shows: the emulator that will run, and where that was decided. */
-internal fun gameEmulatorSummary(emulators: SystemEmulators?, choice: String?): String {
-    emulators ?: return "Loading..."
-    val own = EmulatorResolution.matchGameChoice(emulators.candidates, choice)
-    if (own != null) return "${own.name} (${EmulatorSource.GAME.label})"
-    val inherited = emulators.withoutGameChoice ?: return "No emulator installed for ${emulators.system.displayName}"
-    return "${inherited.player.name} (${inherited.source.label})"
 }
 
 @Composable
@@ -73,8 +63,7 @@ internal fun GameEmulatorPicker(
 ) {
     // The system back key; the pad's B is the onPad handler below.
     androidx.activity.compose.BackHandler { onDismiss() }
-    val own = EmulatorResolution.matchGameChoice(emulators.candidates, choice)
-    val inherited = emulators.withoutGameChoice
+    val options = GameEmulatorChoice.options(emulators, choice)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -96,32 +85,16 @@ internal fun GameEmulatorPicker(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(bottom = MenuTokens.HintBarRoom),
         ) {
-            item {
+            items(options, key = { it.id ?: "" }) { option ->
                 EmulatorRow(
-                    title = "Follow the system" + if (own == null) " (current)" else "",
-                    detail = inherited?.let { "${it.player.name}, ${it.source.label}" }
-                        ?: "No emulator installed for ${emulators.system.displayName}",
-                    onPick = { onPick(null) },
-                )
-            }
-            items(emulators.candidates, key = { it.id }) { player ->
-                EmulatorRow(
-                    title = player.name + if (own?.id == player.id) " (current)" else "",
-                    detail = emulatorDetail(player, emulators),
-                    onPick = { onPick(player.id) },
+                    title = option.label + if (option.current) " (current)" else "",
+                    detail = option.detail,
+                    onPick = { onPick(option.id) },
                 )
             }
         }
     }
 }
-
-/** Core for a RetroArch entry, otherwise the app it opens: what tells two same-named rows apart. */
-private fun emulatorDetail(player: Player.AmStart, emulators: SystemEmulators): String =
-    if (player.packageName.startsWith("com.retroarch")) {
-        "RetroArch core: " + (libretroCoreId(player, emulators.system.retroArchCore) ?: "not named")
-    } else {
-        player.packageName
-    }
 
 @Composable
 private fun EmulatorRow(title: String, detail: String, onPick: () -> Unit) {

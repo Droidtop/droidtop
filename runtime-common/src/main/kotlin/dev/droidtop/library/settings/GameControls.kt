@@ -5,7 +5,7 @@ package dev.droidtop.library.settings
  * tabs" and "Quick Menu: a branching panel", Droidtop/tracker#414). Pure state: the companion's Game tab and the
  * Quick Menu's Game section both read it, so turning Ask before stopping off changes both the same way.
  */
-enum class GameRow { RESUME, QUIT, RESTART, KILL, OVERLAY, PERFORMANCE_MODE }
+enum class GameRow { RESUME, QUIT, RESTART, KILL, EMULATOR, OVERLAY, PERFORMANCE_MODE }
 
 /**
  * What the runner says about itself: a stream (windowcast) disconnects rather than quits and has no restart or kill;
@@ -30,7 +30,10 @@ data class AskFirst(val beforeStopping: Boolean = true, val beforeLoadAndOverwri
 object GameControls {
     private val STOPPING = setOf(GameRow.QUIT, GameRow.RESTART, GameRow.KILL)
 
-    /** The rows a game shows, in order: Resume and Quit only in Kid and Kiosk; a stream without Restart and Kill. */
+    /**
+     * The rows a game shows, in order: Resume and Quit only in Kid and Kiosk; a stream without Restart and Kill, and
+     * without the emulator choice (a surface draws that row only for a console game with an emulator to choose).
+     */
     fun rows(mode: UiMode, runner: GameRunner): List<GameRow> {
         val all = buildList {
             add(GameRow.RESUME)
@@ -39,6 +42,7 @@ object GameControls {
                 add(GameRow.RESTART)
                 add(GameRow.KILL)
             }
+            if (!runner.stream) add(GameRow.EMULATOR)
             add(GameRow.OVERLAY)
             add(GameRow.PERFORMANCE_MODE)
         }
@@ -50,6 +54,7 @@ object GameControls {
         GameRow.QUIT -> ControlRow.GAME_QUIT
         GameRow.RESTART -> ControlRow.GAME_RESTART
         GameRow.KILL -> ControlRow.GAME_KILL
+        GameRow.EMULATOR -> ControlRow.GAME_EMULATOR
         GameRow.OVERLAY -> ControlRow.GAME_OVERLAY
         GameRow.PERFORMANCE_MODE -> ControlRow.GAME_PERFORMANCE_MODE
     }
@@ -59,6 +64,7 @@ object GameControls {
         GameRow.QUIT -> runner.quitLabel ?: "Quit"
         GameRow.RESTART -> "Restart"
         GameRow.KILL -> "Kill"
+        GameRow.EMULATOR -> "Emulator"
         GameRow.OVERLAY -> "Overlay"
         GameRow.PERFORMANCE_MODE -> "Performance mode"
     }

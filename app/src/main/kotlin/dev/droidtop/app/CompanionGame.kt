@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,6 +30,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,6 +39,7 @@ import dev.droidtop.display.secondScreenScroll
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
+import dev.droidtop.library.consoles.GameEmulatorChoice
 import dev.droidtop.library.settings.CompanionPrefs
 import dev.droidtop.library.settings.GameControls
 import dev.droidtop.library.settings.GameRow
@@ -164,6 +167,7 @@ internal fun CompanionGameTab() {
                         }
                     }
                 }
+                GameRow.EMULATOR -> CompanionEmulatorChoice(entry)
                 GameRow.OVERLAY -> GameButton("$label: ${overlay.label}") {
                     if (PerformanceOverlay.canDraw(context)) PerformanceOverlay.setLevel(context, overlay.next())
                 }
@@ -172,6 +176,55 @@ internal fun CompanionGameTab() {
                 }
             }
         }
+    }
+}
+
+/**
+ * The game's own emulator: the model the Quick Menu's Game section cycles with A ([GameEmulatorChoice]), drawn for
+ * touch: the row says what will run and where that was decided, and a tap lays the choices out under it, Follow the
+ * system first. Only for a console game with an emulator installed to choose from; it applies from the next start.
+ */
+@Composable
+private fun CompanionEmulatorChoice(entry: LibraryEntry) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val emulators = dev.droidtop.shell.gamepad.rememberSystemEmulators(entry)
+    // The library is built once per process, and the stored choice is a database read: both off the main thread.
+    val library by produceState<dev.droidtop.library.Library?>(null) {
+        value = withContext(Dispatchers.IO) { LibraryCore.library(context.applicationContext) }
+    }
+    var choice by remember(entry.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(entry.id, library) { library?.let { choice = it.getMetadataForEditing(entry)?.altEmulator } }
+    var open by remember(entry.id) { mutableStateOf(false) }
+    val loaded = emulators ?: return
+    if (!GameEmulatorChoice.offered(loaded)) return
+    GameButton("Emulator: ${GameEmulatorChoice.summary(loaded, choice)}") { open = !open }
+    if (!open) return
+    val colors = MaterialTheme.colorScheme
+    Column(modifier = Modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        GameEmulatorChoice.options(loaded, choice).forEach { option ->
+            CompanionTile(
+                onClick = {
+                    open = false
+                    val lib = library ?: return@CompanionTile
+                    scope.launch { if (GameEmulatorChoice.save(lib, entry, option.id)) choice = option.id }
+                },
+                modifier = Modifier.fillMaxWidth().semantics { selected = option.current },
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 56.dp)
+                        .background(if (option.current) colors.primaryContainer else colors.surface)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Text(option.label, style = MaterialTheme.typography.titleSmall, color = if (option.current) colors.onPrimaryContainer else colors.onSurface)
+                    Text(option.detail, style = MaterialTheme.typography.bodySmall, color = if (option.current) colors.onPrimaryContainer else colors.onSurfaceVariant)
+                }
+            }
+        }
+        CompanionNote("From the next start")
     }
 }
 

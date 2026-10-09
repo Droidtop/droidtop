@@ -852,20 +852,18 @@ private fun GameTab(
             )
             // Only for a console game with something installed to choose from. A cycles Follow the
             // system, then each installed emulator; the launch reads it, so it applies from the next start.
-            if (emulators != null && emulators.candidates.isNotEmpty()) {
+            // The model is GameEmulatorChoice, which the companion's Game tab draws too.
+            if (emulators != null && dev.droidtop.library.consoles.GameEmulatorChoice.offered(emulators) &&
+                dev.droidtop.library.settings.ControlAccess.shows(uiMode, dev.droidtop.library.settings.ControlRow.GAME_EMULATOR)
+            ) {
                 add(
                     GameQuickTile(
                         title = "Emulator",
-                        subtitle = gameEmulatorSummary(emulators, emulatorChoice),
+                        subtitle = dev.droidtop.library.consoles.GameEmulatorChoice.summary(emulators, emulatorChoice),
                         action = {
-                            val ids = listOf<String?>(null) + emulators.candidates.map { it.id }
-                            val own = dev.droidtop.library.consoles.EmulatorResolution
-                                .matchGameChoice(emulators.candidates, emulatorChoice)?.id
-                            val next = ids[(ids.indexOf(own).coerceAtLeast(0) + 1) % ids.size]
+                            val next = dev.droidtop.library.consoles.GameEmulatorChoice.next(emulators, emulatorChoice)
                             scope.launch {
-                                val meta = library.getMetadataForEditing(entry)
-                                    ?: dev.droidtop.library.consoles.GameMetadataEntity(id = entry.id)
-                                if (library.saveMetadata(entry, meta.copy(altEmulator = next))) emulatorChoice = next
+                                if (dev.droidtop.library.consoles.GameEmulatorChoice.save(library, entry, next)) emulatorChoice = next
                             }
                         },
                     ),

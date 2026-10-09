@@ -128,6 +128,66 @@ suspend fun loadSystemEmulators(context: Context, systemId: String): SystemEmula
 }
 
 /**
+ * The per-game emulator choice as one control model (docs/SPEC.md "Launch resolution: keep the default, expose
+ * it"), drawn by the Quick Menu's Game section (A cycles it), the game's metadata editor and the companion's Game
+ * tab (a tap lays the options out): Follow the system first, then each installed emulator. The stored value is a
+ * player id in the game's `altEmulator` field; null follows the system. Pure, except [save].
+ */
+object GameEmulatorChoice {
+    /** One choice: [id] null is Follow the system. [detail] tells two same-named rows apart. */
+    data class Option(val id: String?, val label: String, val detail: String, val current: Boolean)
+
+    /** The game's own choice among [emulators]' candidates, or null when it follows the system (or names nothing installed). */
+    fun current(emulators: SystemEmulators, choice: String?): String? =
+        EmulatorResolution.matchGameChoice(emulators.candidates, choice)?.id
+
+    fun options(emulators: SystemEmulators, choice: String?): List<Option> {
+        val own = current(emulators, choice)
+        val inherited = emulators.withoutGameChoice
+        return listOf(
+            Option(
+                id = null,
+                label = "Follow the system",
+                detail = inherited?.let { "${it.player.name}, ${it.source.label}" }
+                    ?: "No emulator installed for ${emulators.system.displayName}",
+                current = own == null,
+            ),
+        ) + emulators.candidates.map { player -> Option(player.id, player.name, detail(player, emulators), own == player.id) }
+    }
+
+    /** The choice after [choice] in [options] order, wrapping: the Quick Menu's A. */
+    fun next(emulators: SystemEmulators, choice: String?): String? {
+        val ids = listOf<String?>(null) + emulators.candidates.map { it.id }
+        return ids[(ids.indexOf(current(emulators, choice)).coerceAtLeast(0) + 1) % ids.size]
+    }
+
+    /** What a row shows: the emulator that will run, and where that was decided. Null [emulators] is still loading. */
+    fun summary(emulators: SystemEmulators?, choice: String?): String {
+        emulators ?: return "Loading..."
+        EmulatorResolution.matchGameChoice(emulators.candidates, choice)?.let { return "${it.name} (${EmulatorSource.GAME.label})" }
+        val inherited = emulators.withoutGameChoice ?: return "No emulator installed for ${emulators.system.displayName}"
+        return "${inherited.player.name} (${inherited.source.label})"
+    }
+
+    /** Only a console game with something installed to choose from shows the control. */
+    fun offered(emulators: SystemEmulators?): Boolean = emulators != null && emulators.candidates.isNotEmpty()
+
+    /** Core for a RetroArch entry, otherwise the app it opens: what tells two same-named rows apart. */
+    fun detail(player: Player.AmStart, emulators: SystemEmulators): String =
+        if (player.packageName.startsWith("com.retroarch")) {
+            "RetroArch core: " + (libretroCoreId(player, emulators.system.retroArchCore) ?: "not named")
+        } else {
+            player.packageName
+        }
+
+    /** Stores [id] as [entry]'s own choice (null follows the system), off the main thread; true when it was saved. */
+    suspend fun save(library: dev.droidtop.library.Library, entry: dev.droidtop.library.LibraryEntry, id: String?): Boolean {
+        val meta = library.getMetadataForEditing(entry) ?: GameMetadataEntity(id = entry.id)
+        return library.saveMetadata(entry, meta.copy(altEmulator = id))
+    }
+}
+
+/**
  * One emulator app found for some systems, for the global Emulators page:
  * the app, whether it is on this device, and what it can run.
  */

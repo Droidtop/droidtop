@@ -3496,7 +3496,8 @@ row of recent apps, became Home's Recent apps section for every mode.
   command for the windowing mode that has not been checked on the console).
 - **Game (slice C8).** `CompanionGameTab`: a header (art, name, this session's play time), then the rows
   `GameControls` (`:runtime-common`, pure) gives for the UI mode and the runner: Resume, Quit, Restart, Kill, the
-  overlay level and performance mode. Kid and Kiosk get Resume and Quit. A stream (`REMOTE_STREAM`, windowcast)
+  game's emulator (`GameEmulatorChoice`, the model the Quick Menu's Emulator row cycles; only for a console game
+  with an emulator to choose, from the next start; see "Launch resolution"), the overlay level and performance mode. Kid and Kiosk get Resume and Quit. A stream (`REMOTE_STREAM`, windowcast)
   hides Restart and Kill unless its runner says they apply and uses its own Quit label and question
   ("Disconnect"). `GameControls.asks` is the one decision whether a row asks first: the runner's or a plugin's
   `confirm` flag; **Ask before stopping** (Companion group, on by default) for Quit, Restart, Kill, an Apps row's
@@ -10802,7 +10803,11 @@ each choice is made:
     emulators for that game's system, whose first row ("Follow the system")
     is the one-press reset. The row shows the emulator that will run and
     which level decided it. The stored value is a player id; a hand-typed
-    name is matched too.
+    name is matched too. The same choice is a row of the Quick Menu's Game
+    section (A cycles it) and of the companion's Game tab (a tap lays the
+    options out), all three drawing one model, `GameEmulatorChoice`
+    (options, next, summary, save); it applies from the next start, and
+    Kid and Kiosk do not show it (`ControlAccess` row `GAME_EMULATOR`).
   - **Detected state is on the screen, not guessed.** Settings > Emulators
     lists every emulator found on the device and what it can run, then the
     systems that have games, those with no usable emulator first. A
