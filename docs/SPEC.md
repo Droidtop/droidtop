@@ -12994,7 +12994,10 @@ Settings tab, the left menu's places, Console systems and Containers.
   that opens something. No explanation is drawn on a row: it is the row's
   HintTip, shown while the pad rests on the row, and the Y Info sheet (a
   long press on touch). A live status (working, a failure) takes the value
-  column while it lasts. Rows are `uniformRowHeight(0)` tall.
+  column while it lasts. Rows are `uniformRowHeight(0)` tall. The bubble sits under the row it explains
+  (above it only when the window has no room below), never over the row's own title: a Popup aligned
+  BottomStart is drawn inside its anchor, which is what the console showed as a clipped pill on the row
+  (`tipPosition`, Droidtop/tracker#366).
 - **The page has no dead space.** The pane's list runs to the bottom of the
   view (the hint bar is drawn below the view, so no room is kept for it),
   with no strip under it. A row the viewport cuts fades out at that edge

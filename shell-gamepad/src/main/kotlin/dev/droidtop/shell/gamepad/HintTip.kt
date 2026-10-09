@@ -20,8 +20,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import kotlinx.coroutines.delay
 
 /**
@@ -86,10 +91,14 @@ fun HintTip(text: String?, modifier: Modifier = Modifier, shown: Boolean? = null
     }
 }
 
-/** The bubble itself, below the wrapped content. */
+/**
+ * The bubble itself, below the wrapped content. Popup(alignment = BottomStart) places a popup INSIDE its
+ * anchor's bounds, bottom-aligned, so the bubble was drawn over the bottom of the row and its title
+ * (Droidtop/tracker#366); [tipPosition] puts it under the anchor, or above when there is no room below.
+ */
 @Composable
 private fun TipBubble(text: String) {
-    Popup(alignment = Alignment.BottomStart) {
+    Popup(popupPositionProvider = TipPositionProvider) {
         Surface(
             shape = RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.inverseSurface,
@@ -103,6 +112,22 @@ private fun TipBubble(text: String) {
             )
         }
     }
+}
+
+private object TipPositionProvider : PopupPositionProvider {
+    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset =
+        tipPosition(anchorBounds, windowSize, popupContentSize)
+}
+
+/**
+ * Where a tip bubble goes: its left edge on the anchor's, directly under it, kept inside the window sideways;
+ * above the anchor when it would run off the bottom and there is room above. Pure, for the tests.
+ */
+internal fun tipPosition(anchor: IntRect, window: IntSize, bubble: IntSize): IntOffset {
+    val x = anchor.left.coerceIn(0, (window.width - bubble.width).coerceAtLeast(0))
+    val below = anchor.bottom
+    val y = if (below + bubble.height <= window.height || anchor.top - bubble.height < 0) below else anchor.top - bubble.height
+    return IntOffset(x, y)
 }
 
 private const val TIP_DELAY_MS = 600L
