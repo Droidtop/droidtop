@@ -1613,6 +1613,8 @@ object AppSettingsCatalogs {
                         title = "Install plugin file",
                         subtitle = "A signed .droidplugin.tar.xz bundle",
                         mimeType = "*/*",
+                        // A downloaded bundle is in Downloads; the picker otherwise opened on an empty Documents (rig, build 1535).
+                        startIn = "Download",
                         onPicked = { ctx, uri -> PluginStore.importFromPicker(ctx, uri) },
                     ),
                 ),

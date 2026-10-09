@@ -207,6 +207,8 @@ class DocumentPickItem(
     override val subtitle: String? = null,
     val mimeType: String,
     val createName: String? = null,
+    /** A folder of the primary shared storage the picker opens in ("Download"), instead of wherever it last was. */
+    val startIn: String? = null,
     val onPicked: suspend (Context, Uri) -> String,
 ) : CatalogItem {
     fun pickerIntent(): Intent =
@@ -214,6 +216,12 @@ class DocumentPickItem(
             addCategory(Intent.CATEGORY_OPENABLE)
             type = mimeType
             createName?.let { putExtra(Intent.EXTRA_TITLE, it) }
+            startIn?.let {
+                putExtra(
+                    android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+                    android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:$it"),
+                )
+            }
         }
 }
 
