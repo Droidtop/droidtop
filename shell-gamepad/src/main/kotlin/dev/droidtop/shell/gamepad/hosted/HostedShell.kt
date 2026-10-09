@@ -81,6 +81,14 @@ class HostedRow(
     val onDetail: (() -> Unit)? = null,
 )
 
+/**
+ * Where a [HostedListSheet]'s cursor stands, for a caller that takes the sheet away and brings it back (a
+ * menu opened from a row is the only window shown, and closing it returns to the same row, Droidtop/tracker#371).
+ */
+class HostedCursor {
+    var index: Int = 0
+}
+
 private sealed interface HostedItem {
     data class Header(val text: String) : HostedItem
     data class Entry(val index: Int, val row: HostedRow) : HostedItem
@@ -125,10 +133,12 @@ fun HostedListSheet(
     detailLabel: String = "Options",
     onExtraPad: (PadPress) -> Boolean = { false },
     extraBindings: List<HintBinding> = emptyList(),
+    cursor: HostedCursor = remember { HostedCursor() },
 ) {
     val window = currentShellWindow()
     val currentRows by rememberUpdatedState(rows)
-    var selected by remember { mutableIntStateOf(0) }
+    var selected by remember { mutableIntStateOf(cursor.index) }
+    LaunchedEffect(selected) { cursor.index = selected }
     var repeating by remember { mutableStateOf(false) }
     LaunchedEffect(rows.size) { selected = selected.coerceIn(0, maxOf(0, rows.size - 1)) }
     val flat = remember(rows) { flatten(rows) }

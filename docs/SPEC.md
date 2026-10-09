@@ -391,7 +391,8 @@ The three sections 2b decided are built, with Pinned, the places and Android app
 A row is a pad and touch target alike: A takes the row's own action (a PC or engine game takes Gaming's
 primary-action rule, so a store game that is not installed offers the install), X pins it to the taskbar or takes it
 off, and Y or a long press open the row's menu: Open, the game page of a PC or engine game, and Pin to or Unpin from
-the taskbar. A pinned row says "Pinned" in its value.
+the taskbar. A pinned row says "Pinned" in its value. One window at a time: while a row's menu is open the
+Start menu is not drawn, and closing the menu brings it back on the same row (`HostedCursor`).
 
 **The taskbar's pins** (`TaskbarPins`, pure and tested): a Linux app or a library entry, each a key, a name and the
 entry's artwork, stored in the launcher preferences file (read and written off the main thread) and drawn after the

@@ -27,6 +27,7 @@ import dev.droidtop.library.settings.UiModePrefs
 import dev.droidtop.pluginhost.PluginModes
 import dev.droidtop.runtime.ContainerApp
 import dev.droidtop.shell.gamepad.hosted.HostedArt
+import dev.droidtop.shell.gamepad.hosted.HostedCursor
 import dev.droidtop.shell.gamepad.hosted.HostedListSheet
 import dev.droidtop.shell.gamepad.hosted.HostedRow
 import kotlinx.coroutines.Dispatchers
@@ -238,17 +239,22 @@ internal fun StartMenu(
         }
         out
     }
-    HostedListSheet(
-        title = "Start",
-        rows = rows,
-        onClose = onDismiss,
-        selectLabel = "Open",
-        toggleLabel = "Pin or unpin",
-        detailLabel = "Options",
-    )
-
-    // The row's menu, over the Start menu: the one place a finger or Y reaches pinning and the game page.
-    menuFor?.let { target ->
+    // One window at a time (Droidtop/tracker#371): while a row's menu is open the Start menu is not drawn, and
+    // it comes back on the same row.
+    val cursor = remember { HostedCursor() }
+    val target = menuFor
+    if (target == null) {
+        HostedListSheet(
+            title = "Start",
+            rows = rows,
+            onClose = onDismiss,
+            selectLabel = "Open",
+            toggleLabel = "Pin or unpin",
+            detailLabel = "Options",
+            cursor = cursor,
+        )
+    } else {
+        // The row's menu: the one place a finger or Y reaches pinning and the game page.
         val pinned = TaskbarPins.isPinned(pins.list, target.pin.key)
         val page = target.entry?.takeIf { it.isPcOrEngineGame }
         val menuRows = ArrayList<HostedRow>()
