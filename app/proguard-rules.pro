@@ -45,6 +45,14 @@
 # (IPluginHostBroker, IPluginRuntime, IPluginRuntimeCallback) and their Stub
 # classes are in dev.droidtop.pluginhost above.
 -keep class dev.droidtop.runtime.tasks.** { *; }
+# The Kotlin standard library is part of that contract: a Kotlin plugin is
+# compiled against the plugin API and links kotlin.* from droidtop's own class
+# loader (its loader is parented to droidtop's), so droidtop provides all of
+# it, not only the parts its own code happens to call. Shrinking it removed
+# kotlin.collections.MapsKt from build 1535, and the CI-signed status tile
+# sample was disabled at once with "Failed resolution of:
+# Lkotlin/collections/MapsKt;" (BlueStacks, Droidtop/tracker#378).
+-keep class kotlin.** { *; }
 
 # Custom widget plugins. Launcher3's CustomWidgetManager reads their class
 # names from the custom_widget_providers array (shell-default/res/values/config.xml)

@@ -209,6 +209,14 @@ The reply uses the same `{ok, data|error}` shape.
 | `python` | module-level `handle(call_json) -> reply_json` (JSON text both ways, like `invoke`; called for a contract 2 manifest, built 2026-10-01); v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args=None, version=1) -> dict`: the modules `droidtop` and `droidtop.host`, which the bootstrap puts in `sys.modules` before `plugin.py` is imported (built 2026-10-07); the dict is the parsed broker reply, `{"ok": true, "data": ...}` or `{"ok": false, "error": {...}}`, and a call never raises for a refusal | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: the bridge runs jobs on Python worker threads, forwards progress live, and calls `cancel_job(job_id)` cooperatively |
 | `flutter_embed` | the plugin's `MethodChannel("dev.droidtop.pluginhost/<plugin id>")`, method `handle`, envelope and reply as JSON strings (called for a contract 2 manifest, built 2026-10-01) | the same channel's `hostCall`, with `{api, version, op, args}` as JSON text and the broker reply as JSON text | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
 
+**What a `native_bundle` plugin links against.** Its dex is loaded with
+droidtop's own class loader as parent, so the plugin API
+(`dev.droidtop.pluginhost`) and the Kotlin standard library (`kotlin.*`, the
+version in droidtop's `gradle/libs.versions.toml`) come from droidtop and the
+release build keeps both whole (`app/proguard-rules.pro`). Anything else a
+plugin uses (coroutines, other libraries) it bundles in its own
+`classes.jar`.
+
 The rules that make this "no kind-specific features":
 
 1. **An adapter serialises the envelope and does nothing else.** It
