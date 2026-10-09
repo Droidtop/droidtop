@@ -135,6 +135,22 @@ object WindowsInstalls {
         "Added ${folder.name} to your library. It starts in the prefix this installer made"
     }
 
+    /**
+     * Makes [folder], a folder of game files that exists already (what "Unpack an installer" took out of
+     * one), a library game that starts in the shared prefix like any folder game. The folder stays where
+     * it is. Returns the line the settings row shows.
+     */
+    suspend fun addFolderGame(context: Context, folder: File): String = withContext(Dispatchers.IO) {
+        if (!folder.isDirectory) return@withContext "${folder.name} is not a folder on this device"
+        WindowsBackbone.awaitReady(context)
+        DroidtopGameIdStore.install(context)
+        val manager = ContainerManager(context)
+        val gameId = CustomGameScanner.reserveGameId { !manager.hasContainer(containerIdOf(it)) }
+        CustomGameScanner.adopt(folder, gameId) ?: return@withContext "droidtop could not take ${folder.name} as a game"
+        LibraryPaths.report(context, PathChange(added = listOf(folder.absolutePath)))
+        "Added ${folder.name} to your library. It starts in the shared Windows prefix"
+    }
+
     /** Deletes the prefix of [id] and ends its listing: the install is thrown away. Refused while Wine runs. */
     suspend fun discard(context: Context, id: String): String = withContext(Dispatchers.IO) {
         WinePrefixTools.runningMessage()?.let { return@withContext it }

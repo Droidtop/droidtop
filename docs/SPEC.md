@@ -6970,10 +6970,20 @@ Two concrete references to build from rather than design blind:
     scanner was told about by hand outside the roots with the store part, which reads those folders). The
     folder stays where the installer put it. `addGame` is the function #407's flow calls to make a
     row; it takes a prefix made here.
-  - **"Unpack" is not built.** Unpacking a Windows installer without running it (innoextract) needs a
-    native binary for arm64-v8a and x86_64 that nothing in the tree carries, and a decision on where
-    one comes from (every bundle carries both ABIs, CLAUDE.md). Running the installer in Wine is the
-    one way, until that is decided.
+  - **Unpack an installer (2026-10-09, Droidtop/tracker#10).** The same screen takes the files out of
+    an Inno Setup installer (GOG's offline installers are) without running it: `InnoExtract` runs
+    innoextract 1.9 over the installer into a NEW folder (the installer's name, never an existing
+    folder; inside the folder chosen as the install target if one is, else in droidtop's own
+    storage), then `WindowsInstalls.addFolderGame` makes that folder a library game in the shared
+    prefix. No Wine, no prefix of its own, and the installer is only read. A failed unpack removes
+    the folder it made. innoextract comes from droidtop's component catalog like every other runtime
+    binary: Droidtop/droidtop-components builds it from its upstream source release (`tools/innoextract`,
+    Boost, xz, zlib and bzip2 from their own releases, SHA-256 pinned, one position-independent
+    executable per ABI, API 28 for iconv), offers it as `tools/innoextract-1.9-<abi>`, and droidtop
+    fetches it on first use, checking the SHA-256 the catalog lists and re-fetching a copy that no
+    longer matches. Android will not let an app start a program it has written to its own storage,
+    so it is started through `/system/bin/linker64` as Wine is, never with root. "Check the unpacker"
+    asks it for its version, which shows the fetch and the start work on a device.
 
 - **Linux container management**: distrobox itself is CLI-only (no
   official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
