@@ -293,7 +293,7 @@ object PluginCatalog {
         onStatus: (String) -> Unit = {},
     ): String = withContext(Dispatchers.IO) {
         // A token host is resolved to its signed address here (see GitHubAuth.downloadRequestFor);
-        // the transfer itself is one DownloadManager job in "Downloads and installs".
+        // the transfer itself is one resumable download job in "Downloads and installs".
         val (url, headers) = try {
             GitHubAuth.downloadRequestFor(release.bundle.url, token(context))
         } catch (failure: Exception) {

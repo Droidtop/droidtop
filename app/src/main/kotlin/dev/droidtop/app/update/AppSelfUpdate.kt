@@ -399,7 +399,7 @@ object AppSelfUpdate {
         runCatching { outcomes[sessionId]?.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) }.getOrNull()
 
     /**
-     * The APK as one DownloadManager job in "Downloads and installs" ([DownloadJobs], digest checked
+     * The APK as one resumable download job in "Downloads and installs" ([DownloadJobs], digest checked
      * there against the one published next to it: bytes that do not match are discarded, whatever
      * served them). The file stays where it landed for [commitSession]; a copy already there that
      * matches is used as it is. Blocking, like the rest of the update path.

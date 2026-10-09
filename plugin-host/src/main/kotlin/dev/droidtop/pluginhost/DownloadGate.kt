@@ -72,9 +72,6 @@ object DownloadGate {
         conditions: Conditions,
     ): List<Move> = entries.mapNotNull { entry ->
         if (entry.done || entry.policyOverride || !PluginJobsCenter.isDownloadKind(entry.nativeKind)) return@mapNotNull null
-        // A download that cannot pause (a single file Android's download service has) is held only before it starts;
-        // once queued, Android's own network rule, set from the policy at enqueue, makes it wait for Wi-Fi.
-        if (!entry.paused && !entry.pausable) return@mapNotNull null
         val verdict = DownloadPolicy.decide(settings, conditions, facts(entry))
         when {
             !entry.paused && verdict is Verdict.Hold -> Move.Hold(entry.jobId, verdict.reason)

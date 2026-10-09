@@ -159,8 +159,8 @@ object PluginJobsCenter {
     /** Adds interrupted resumable jobs, as paused, to the live list; a job already tracked is left as it is. */
     internal fun restore(restored: List<Entry>) {
         state.update { current -> (restored.filter { old -> current.none { it.jobId == old.jobId } } + current).distinctBy { it.jobId } }
-        // A job whose own system service kept going while the process was dead (a DownloadManager
-        // download) is not left paused for the person to resume: it re-attaches to its checkpoint.
+        // A job that carries on from what it left on disk (a download's partial file) is not left paused for
+        // the person to resume: it runs again from its checkpoint.
         restored.filter { it.nativeKind in nativeReattachKinds && it.paused && !it.done && nativeSpecs.containsKey(it.jobId) }.forEach { entry ->
             // A download the policy was holding stays held while the policy still says wait.
             val kind = entry.nativeKind

@@ -100,7 +100,7 @@ object PythonRuntimeManager {
 
     /**
      * Downloads (if not already verified-installed) the pinned runtime as a job in "Downloads and
-     * installs" ([DownloadJobs]: DownloadManager transfers, the SHA-256 is checked, then
+     * installs" ([DownloadJobs]: resumable transfers, the SHA-256 is checked, then
      * [installFrom] extracts), narrating through [onStatus] -- driven from the
      * `AsyncActionItem` settings-row shape, droidtop's "long action with live text". Returns null
      * on success, an error message otherwise; throws nothing.

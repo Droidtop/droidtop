@@ -42,10 +42,9 @@ class DownloadGateTest {
         override: Boolean = false,
         done: Boolean = false,
         nativeKind: String? = kind,
-        pausable: Boolean = true,
     ) = PluginJobsCenter.Entry(
         jobId = id, pluginId = "droidtop", pluginLabel = "Test", capability = null, title = "t", startedAtMs = 0,
-        done = done, paused = paused, hold = hold, policyOverride = override, nativeKind = nativeKind, pausable = pausable,
+        done = done, paused = paused, hold = hold, policyOverride = override, nativeKind = nativeKind,
     )
 
     @Test
@@ -74,7 +73,6 @@ class DownloadGateTest {
             entry("overridden", override = true),
             entry("done", done = true),
             entry("plugin", nativeKind = "something_else"),
-            entry("single_file", pausable = false),
         )
         assertTrue(DownloadGate.plan(entries, facts, settings, offline).isEmpty())
     }

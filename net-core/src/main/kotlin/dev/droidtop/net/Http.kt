@@ -97,21 +97,22 @@ object Http {
         throw IOException("more than $maxRedirects redirects from $url")
     }
 
+    /** A whole file from the start, through [ResumableDownload] (the one downloader); [file] appears only when complete and, if given, matching [expectedSha256]. */
     fun downloadTo(url: String, file: File, expectedSha256: String? = null, onProgress: (Long, Long) -> Unit = { _, _ -> }, isCancelled: () -> Boolean = { false }, headers: Map<String, String> = emptyMap(), timeouts: Timeouts = BigFile.timeouts) {
-        val part = File(file.parentFile, file.name + ".part")
-        part.delete()
+        val handle = ResumableDownload.Handle()
         try {
-            val c = URL(url).openConnection() as HttpURLConnection
-            c.connectTimeout = timeouts.connectMs; c.readTimeout = timeouts.readMs; c.setRequestProperty("User-Agent", USER_AGENT); headers.forEach(c::setRequestProperty)
-            try {
-                val status = c.responseCode
-                if (status !in 200..299) throw HttpException(status, c.headerFields.entries.mapNotNull { (name, values) -> name?.takeIf { it.startsWith("X-RateLimit-", true) }?.lowercase()?.let { it to values.firstOrNull() } }.toMap(), "HTTP $status from $url")
-                val total = c.contentLengthLong; val digest = MessageDigest.getInstance("SHA-256"); var count = 0L
-                c.inputStream.use { input -> part.outputStream().buffered().use { out -> val b = ByteArray(64 * 1024); while (true) { if (isCancelled()) throw IOException("download cancelled"); val n = input.read(b); if (n < 0) break; out.write(b, 0, n); digest.update(b, 0, n); count += n; onProgress(count, total) } } }
-                if (expectedSha256 != null && digest.digest().joinToString("") { "%02x".format(it) }.equals(expectedSha256, true).not()) throw IOException("SHA-256 mismatch")
-            } finally { c.disconnect() }
-            file.parentFile?.mkdirs()
-            if (!part.renameTo(file)) throw IOException("could not move downloaded file into place")
-        } catch (t: Throwable) { part.delete(); throw t }
+            ResumableDownload.fetch(
+                url, file, headers, timeouts, resume = false, handle = handle, retries = 0,
+                onProgress = { if (isCancelled()) handle.cancel(); onProgress(it.bytes, it.total) },
+            )
+            if (expectedSha256 != null) {
+                val digest = MessageDigest.getInstance("SHA-256")
+                file.inputStream().use { input -> val b = ByteArray(64 * 1024); while (true) { val n = input.read(b); if (n < 0) break; digest.update(b, 0, n) } }
+                if (!digest.digest().joinToString("") { "%02x".format(it) }.equals(expectedSha256, true)) { file.delete(); throw IOException("SHA-256 mismatch") }
+            }
+        } catch (t: Throwable) {
+            ResumableDownload.discard(file)
+            throw t
+        }
     }
 }

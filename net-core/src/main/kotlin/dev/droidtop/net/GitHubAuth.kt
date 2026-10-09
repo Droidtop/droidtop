@@ -69,9 +69,9 @@ object GitHubAuth {
     }
 
     /**
-     * The address and headers a DownloadManager request for [url] must use. A request for a token
+     * The address and headers a download request for [url] must use. A request for a token
      * host is resolved here, by hand, to its final address (a private release asset redirects to a
-     * pre-signed URL that must not get the token, and DownloadManager would re-send its headers to
+     * pre-signed URL that must not get the token, and the token must not be sent to
      * every hop); the headers are then decided for that final address alone. With no token the
      * address is returned as it is. Makes a network round trip: call off the main thread.
      */
