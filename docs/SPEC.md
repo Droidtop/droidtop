@@ -4600,7 +4600,7 @@ source (now `:runtime-windows`, §9):
     environment from (`WineOptions.withSetupChoices`) and then drops them
     (`setupDone`); afterwards the container's own fields are the truth. A
     game's page also offers "Set up Windows games" as its first row, the
-    same row (`WineOptionsCatalog.windowsSetupItem`) as Settings. A game's
+    same row (the top-level `windowsSetupItem`, §7i) as Settings. A game's
     own choices, Steamworks and Frame generation work before setup as after;
     its Wine build row only says a prefix of its own exists after setup
     (that needs a prefix and a download). Rows that need a prefix (all
@@ -12101,9 +12101,9 @@ starts; a second ask during an install waits for the first, never runs two.
 
 The same row (`windowsSetupItem`, with a tooltip saying what it downloads, that it asks first and that it uses the
 game folders already added) is the first row of a game's Wine and graphics page while there is no environment, so
-the page is never a dead end (Droidtop/tracker#372), and Wine builds and sources, which need no environment, are
-offered there and on Settings > Library > Windows games before setup. The Wine build, emulation and graphics
-choices themselves are rows of an environment and appear once it exists. The runner reason for a Windows game
+the page is never a dead end (Droidtop/tracker#372). The Wine build, emulation and graphics rows, and Wine builds
+and sources, appear on both pages before setup too, as 5a "Reachable before setup" describes: one set of rows
+(`WineOptions.state`) that starts from the device's defaults and keeps the choices for setup to use. The runner reason for a Windows game
 without an environment is "The Windows environment is not set up yet", never the action's own name
 (Droidtop/tracker#367).
 
