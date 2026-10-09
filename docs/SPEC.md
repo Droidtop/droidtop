@@ -15190,6 +15190,13 @@ app gets it too:
     server GLX check) and `XLIB_NO_SHM=1` (the same SysV reason as
     `noshm` above) are set. WineD3D is then a working choice on x86_64;
     DXVK stays the default.
+    Limits that are the components', not droidtop's (rig, 2026-10-03,
+    Droidtop/tracker#304): WineD3D with its Vulkan renderer
+    (`renderer=vulkan`, Wine's experimental one) over lavapipe stays black,
+    so WineD3D means its OpenGL renderer here; and one Unity game draws only
+    two calls under DXVK for a game-specific reason (Steamworks, split to
+    tracker#310) while two other Direct3D 11 games draw. VKD3D (Direct3D 12)
+    and Direct3D 9 titles have not been run on this path yet.
   - **A window's pixels must reach the GPU (2026-10-03, Droidtop/tracker#242).**
     Mesa's X11 WSI selects Present events on the window it presents to, and
     the X server then keeps that window's content in a `GPUImage`: an
