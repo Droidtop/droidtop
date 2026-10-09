@@ -1928,6 +1928,12 @@ object AppSettingsCatalogs {
                         inline = pluginPermissionsScreen(m.id),
                         valueLabel = { summary },
                     ),
+                    NestedScreenItem(
+                        id = "plugin_${m.id}_activity",
+                        title = "Activity",
+                        subtitle = "What it asked droidtop to do, newest first",
+                        inline = pluginActivityScreen(m.id),
+                    ),
                 ),
             )
         }
@@ -2187,6 +2193,52 @@ object AppSettingsCatalogs {
         groups = { context -> withContext(Dispatchers.IO) { pluginPermissionGroups(context, pluginId) } },
     )
 
+    /**
+     * Accounts and sources > Plugins > one plugin > Activity (docs/plugin-api.md 4.6): the activity log, newest first. For a
+     * contained plugin that is everything it reached beyond its own process that is logged; a full-trust plugin can also
+     * act directly, which nothing can list, and the screen says so.
+     */
+    private fun pluginActivityScreen(pluginId: String) = CatalogScreen(
+        id = "plugin_activity_$pluginId",
+        title = "Activity",
+        groups = { context -> withContext(Dispatchers.IO) { pluginActivityGroups(context, pluginId) } },
+    )
+
+    private fun pluginActivityGroups(context: Context, pluginId: String): List<CatalogGroup> {
+        val record = PluginStore.installed(context).firstOrNull { it.manifest.id == pluginId }
+        val grants = PluginGrants.forContext(context).read(pluginId)
+        val note = when {
+            record == null -> "This plugin was removed; its activity is kept for 7 days"
+            PluginTiers.of(record, grants) == PluginTier.FULL_TRUST ->
+                "This plugin runs with full access; only what it asks droidtop to do is listed."
+            else ->
+                "This plugin runs contained: everything it does beyond its own process goes through droidtop. Its network and shared-file use and every sensitive call are listed; everyday calls (its own data, short messages) are not."
+        }
+        val format = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+        val entries = PluginAudit.forContext(context).entries(pluginId).asReversed().take(ACTIVITY_SHOWN)
+        val rows = entries.mapIndexed { i, e ->
+            ActionItem(
+                id = "plugin_${pluginId}_activity_$i",
+                title = (PluginPermissions.labelFor(e.permission) ?: e.permission) + ": " + e.api + " " + e.op,
+                subtitle = listOfNotNull(
+                    format.format(java.util.Date(e.atMs)),
+                    e.target.takeIf { it.isNotBlank() },
+                    if (e.result == "ok") null else "refused or failed: ${e.result}",
+                    e.via.takeIf { it.isNotEmpty() }?.let { "via ${it.joinToString(" > ")}" },
+                ).joinToString(" - "),
+                run = {},
+            )
+        }
+        return listOfNotNull(
+            CatalogGroup(id = "plugin_activity_note", title = null, items = listOf(ActionItem(id = "plugin_activity_note_row", title = note, run = {}))),
+            CatalogGroup(
+                id = "plugin_activity_entries",
+                title = "Newest first",
+                items = rows.ifEmpty { listOf(ActionItem(id = "plugin_activity_empty", title = "Nothing logged yet", run = {})) },
+            ),
+        )
+    }
+
     /** After anything that changes which plugins run or what they may do: the status widget and background work follow. */
     private fun pluginsChanged(context: Context) {
         PluginStatusWidgetProvider.requestUpdate(context)
@@ -2407,6 +2459,9 @@ object AppSettingsCatalogs {
             group("unsupported", "Not supported by this version of droidtop", view.unsupported.mapIndexed { i, t -> info("unsupported_$i", t) }),
         )
     }
+
+    /** The most activity lines one plugin's Activity screen shows; the log keeps up to 2,000. */
+    private const val ACTIVITY_SHOWN = 200
 
     /** The tick boxes of one approval list, kept between redraws until the user answers. Keyed by plugin, and by plugin plus "#new" for an update's list. */
     private val pendingTicks = java.util.concurrent.ConcurrentHashMap<String, MutableSet<String>>()
