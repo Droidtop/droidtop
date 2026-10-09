@@ -14,6 +14,7 @@ import android.view.WindowManager
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.TextView
+import dev.droidtop.library.OwnGameScreens
 import dev.droidtop.runtime.windows.data.TouchGestureConfig
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
@@ -88,6 +89,18 @@ class WineGameActivity : Activity() {
     /** The library game this screen runs, when it is one (its cloud saves are synced when the screen ends). */
     private var entryId: String? = null
 
+    /** What the Quick Menu's Game section reaches this screen through (Resume is a relaunch, Stop is [stop]). */
+    private val ownScreen = object : OwnGameScreens.Screen {
+        override val entryId: String? get() = this@WineGameActivity.entryId
+        override fun stop() {
+            // The guest's teardown is queued now (off the main thread), so a relaunch that follows
+            // (Restart) waits for it; the screen then closes.
+            session?.stop()
+            session = null
+            runOnUiThread { if (!isFinishing) finish() }
+        }
+    }
+
     private val startupExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "droidtop-wine-start")
     }
@@ -115,6 +128,7 @@ class WineGameActivity : Activity() {
         val workingDir = intent.getStringExtra(EXTRA_WORKING_DIR)?.let(::File)
         val arguments = intent.getStringArrayListExtra(EXTRA_ARGUMENTS).orEmpty()
         entryId = intent.getStringExtra(EXTRA_ENTRY_ID)
+        OwnGameScreens.register(ownScreen)
         val prefix = containerId?.let { id ->
             runCatching { ContainerManager(this).getContainerById(id) }.getOrNull()
         }
@@ -320,14 +334,24 @@ class WineGameActivity : Activity() {
         }
         if (winHandler?.onKeyEvent(event) == true) return true
         if (keyboard?.onKeyEvent(event) == true) return true
-        // Only a back press nothing else wanted ends the session. The
-        // order matters: several pads report their B button as
-        // KEYCODE_BACK, and quitting the game on B would be unusable.
-        if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
-            finish()
+        // Only a back press nothing else wanted leaves the game, and it does not end it: the shell
+        // comes forward with its Quick Menu on the Game section (Resume, Restart, Stop). The order
+        // matters: several pads report their B button as KEYCODE_BACK.
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_UP) openQuickMenu()
             return true
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    /** A back gesture or button that did not arrive as a key event behaves as the key does. */
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (failed) finish() else openQuickMenu()
+    }
+
+    private fun openQuickMenu() {
+        startActivity(OwnGameScreens.shellIntent(this))
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
@@ -353,6 +377,7 @@ class WineGameActivity : Activity() {
 
     override fun onDestroy() {
         // The game is over for good (not a rotation): its cloud saves go up.
+        OwnGameScreens.unregister(ownScreen)
         if (isFinishing) entryId?.let { dev.droidtop.library.stores.StoreSaves.afterExit(applicationContext, it) }
         session?.stop()
         session = null
@@ -391,6 +416,14 @@ class WineGameActivity : Activity() {
          * from the same [ContainerManager] that owns it, so there is one
          * source of prefix state and no copy to fall out of date.
          */
+        /**
+         * Brings the running game screen forward without touching it: the Quick Menu's Resume
+         * relaunches the entry, and for a Windows game that already runs this is that relaunch.
+         */
+        fun bringToFront(context: Context): Intent =
+            Intent(context, WineGameActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+
         fun intent(
             context: Context,
             prefix: Container,

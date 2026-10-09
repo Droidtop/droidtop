@@ -1906,7 +1906,12 @@ class Library(
     suspend fun quitRunning(context: android.content.Context, entry: LibraryEntry): QuitResult {
         val outcome = runCatching {
             val running = dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName
-            if (running != null) {
+            if (running == context.packageName) {
+                // A game screen of droidtop's own (a Windows game): the task manager never closes
+                // droidtop's own tasks, so the screen itself ends it (OwnGameScreens).
+                OwnGameScreens.stop()
+                QuitResult.Ended
+            } else if (running != null) {
                 dev.droidtop.runtime.tasks.TaskManager.close(context, running).toQuitResult()
             } else {
                 quit(entry)

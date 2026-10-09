@@ -11,6 +11,7 @@ import com.winlator.core.KeyValueSet
 import com.winlator.core.envvars.EnvVars
 import com.winlator.xenvironment.ImageFs
 import com.winlator.xenvironment.ImageFsInstaller
+import dev.droidtop.library.OwnGameScreens
 import dev.droidtop.library.PcGameRuntime
 import dev.droidtop.library.PcLaunchResult
 import dev.droidtop.library.PcPrefixState
@@ -403,6 +404,14 @@ class DroidtopPcGameRuntime(
         arguments: List<String>,
         entryId: String?,
     ): PcLaunchResult {
+        // The game is already running (Back left it for the Quick Menu): launching it again is
+        // Resume, which returns to the screen and leaves Wine alone. Stop is what ends it.
+        if (OwnGameScreens.isRunning(entryId)) {
+            return runCatching { context.startActivity(WineGameActivity.bringToFront(context)) }.fold(
+                onSuccess = { PcLaunchResult(true, "resumed") },
+                onFailure = { PcLaunchResult(false, it.message ?: "couldn't return to the running game") },
+            )
+        }
         // The same rule the game's Wine settings resolve with, so the
         // prefix somebody edited is the prefix this starts in: the game's
         // own when it has one, droidtop's shared one otherwise. (This used

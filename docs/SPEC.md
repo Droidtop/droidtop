@@ -5136,8 +5136,23 @@ keyboard" still toggles it. Back with it up closes the keyboard, not the game
 (`WineGameActivity.dispatchKeyEvent`); when the IME took Back itself and went
 away, the window insets say so and the next Back is the game's again.
 
-**Ending a game** (Droidtop/tracker#357, #358). Back (or the game quitting)
-finishes `WineGameActivity`, and `WineXSession.stop` ends the guest on its own
+**Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
+Back in a Windows game does **not** end it: it brings the shell forward with
+the Gaming Quick Menu open on its Game section (Resume, Restart, Stop with two
+presses; §7f, tracker#258), the one in-game menu, with no menu of its own in the
+game screen. `WineGameActivity` registers itself with `OwnGameScreens`
+(`:library-core`) while it runs. Back starts MainActivity with
+`OwnGameScreens.EXTRA_QUICK_MENU` (and the home-press reinit extra, so the shell
+does not clear the running game); `GamepadShell` opens the menu on that
+delivery, and the game, paused like any backgrounded screen, stays alive. Resume
+is the entry's relaunch, which `DroidtopPcGameRuntime.launchWindows` answers for
+a game that is already running by bringing its screen to the front, never by
+starting a second Wine. Stop (and the stop half of Restart) is
+`Library.quitRunning`, which for droidtop's own package (the task manager never
+closes droidtop's own tasks) calls `OwnGameScreens.stop`: the screen's session
+teardown is queued and the screen finishes. The game quitting by itself still
+closes the screen, and Back on the failure screen leaves it.
+`WineXSession.stop` ends the guest on its own
 `droidtop-wine-stop` thread, never the main one: killing Wine, the audio daemon
 and `wineserver -k` (bounded to 5 s) are process work, and on the main thread
 under memory pressure they were an ANR with the game still running. The next
@@ -5149,8 +5164,7 @@ main one and its `:` siblings such as the plugin hosts, which the old `ps`
 listing would have killed too). The listing no longer forks `id` and `ps`, and
 it finds the PulseAudio daemon by its command line (`libpulseaudio.so`), which
 it also does before the next launch, so a daemon a stop missed ends there
-instead of accumulating. An in-game menu on Back is still the "Remaining" item
-above; until then Back ends the game.
+instead of accumulating.
 
 Desktop mode is **out of scope here**. There a Windows program should
 appear as a window among others inside the container's sway compositor,
@@ -5158,11 +5172,10 @@ which is a different presentation problem with a different answer;
 nothing in this path assumes it and nothing in it should be stretched to
 cover it.
 
-Remaining: one Windows launch on hardware that is seen and played, and
-an in-game menu over a running Windows game -- gamenative's own is a
-Compose radial/quick menu wired through its game screen's state, so it is
-a port rather than a move, and droidtop has no host hotkey of its own on
-this path yet.
+Remaining: one Windows launch on hardware that is seen and played. The
+in-game menu over a running Windows game is the Gaming Quick Menu's Game
+section, reached with Back (see "Back, and ending a game" above); porting
+gamenative's own Compose radial menu is superseded by it.
 
 ## 5c. Frame generation (LSFG)
 

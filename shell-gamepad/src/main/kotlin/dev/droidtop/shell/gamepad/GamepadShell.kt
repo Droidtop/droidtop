@@ -202,6 +202,7 @@ fun GamepadShell(
     onHomeActivityChanged: (List<LibraryEntry>) -> Unit = {},
     deepLinkToken: Int = 0,
     startSectionName: String? = null,
+    openQuickMenu: Boolean = false,
     triggerRescan: Boolean = false,
     triggerBrowseThemes: Boolean = false,
 ) {
@@ -218,6 +219,7 @@ fun GamepadShell(
                 onHomeActivityChanged = onHomeActivityChanged,
                 deepLinkToken = deepLinkToken,
                 startSectionName = startSectionName,
+                openQuickMenu = openQuickMenu,
                 triggerRescan = triggerRescan,
                 triggerBrowseThemes = triggerBrowseThemes,
             )
@@ -258,6 +260,7 @@ private fun GamepadShellBody(
     // regardless of whether the values themselves repeat.
     deepLinkToken: Int = 0,
     startSectionName: String? = null,
+    openQuickMenu: Boolean = false,
     triggerRescan: Boolean = false,
     triggerBrowseThemes: Boolean = false,
 ) {
@@ -476,8 +479,10 @@ private fun GamepadShellBody(
     // The left menu (Start; docs/SPEC.md 7j "Gaming controls") closes for
     // the same reason.
     var leftMenuOpen by remember { mutableStateOf(false) }
+    // The game screen of a Windows game sends Back here with openQuickMenu set (OwnGameScreens): the
+    // menu opens on its Game section, since the game is running.
     LaunchedEffect(deepLinkToken) {
-        quickMenuOpen = false
+        quickMenuOpen = openQuickMenu
         leftMenuOpen = false
     }
     // The face-button layout of the pad in use (SPEC 7b, "Console and controller detection"),

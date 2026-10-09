@@ -135,6 +135,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     // repeat (e.g. "Rescan library" pressed twice).
     private var gamingDeepLinkToken by mutableStateOf(0)
     private var gamingStartSection by mutableStateOf<String?>(null)
+    private var gamingQuickMenu by mutableStateOf(false)
     private var gamingTriggerRescan by mutableStateOf(false)
     private var gamingTriggerBrowseThemes by mutableStateOf(false)
 
@@ -191,6 +192,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         gamingStartSection = intent.getStringExtra(BackButtonMenu.EXTRA_GAMING_START_SECTION)
         gamingTriggerRescan = intent.getBooleanExtra(BackButtonMenu.EXTRA_GAMING_RESCAN, false)
         gamingTriggerBrowseThemes = intent.getBooleanExtra(BackButtonMenu.EXTRA_GAMING_BROWSE_THEMES, false)
+        gamingQuickMenu = intent.getBooleanExtra(dev.droidtop.library.OwnGameScreens.EXTRA_QUICK_MENU, false)
         gamingDeepLinkToken++
     }
 
@@ -333,6 +335,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                     onHomeActivityChanged = { CompanionState.homeActivity.value = it },
                     deepLinkToken = gamingDeepLinkToken,
                     startSectionName = gamingStartSection,
+                    openQuickMenu = gamingQuickMenu,
                     triggerRescan = gamingTriggerRescan,
                     triggerBrowseThemes = gamingTriggerBrowseThemes,
                 )
