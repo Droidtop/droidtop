@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 import dev.droidtop.app.LauncherGamesActivity
 import dev.droidtop.library.PcStoreNames
+import dev.droidtop.library.StoreLinkPrefs
 import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -16,6 +17,7 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.stores.StoreHolding
 import dev.droidtop.library.stores.StoreChanges
 import dev.droidtop.library.stores.StoreInstallJob
@@ -241,6 +243,19 @@ internal object StoresCatalog {
                         subtitle = "What installed store games take, the room left, and uninstalling",
                         inline = StorageCatalog.screen(),
                         icon = CatalogIcon.GLOBAL,
+                    ),
+                ),
+            ),
+            CatalogGroup(
+                id = "stores_links_group",
+                title = null,
+                items = listOf(
+                    ToggleItem(
+                        id = "stores_links",
+                        title = "Get it on and Support the developer",
+                        subtitle = "On a game no store owns, its menu points to where it can be bought and where its developer takes support",
+                        current = !StoreLinkPrefs.hiddenEverywhere(context),
+                        onToggle = { ctx, on -> StoreLinkPrefs.setHiddenEverywhere(ctx, !on) },
                     ),
                 ),
             ),

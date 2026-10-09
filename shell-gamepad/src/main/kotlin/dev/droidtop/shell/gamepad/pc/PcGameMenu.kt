@@ -843,6 +843,14 @@ internal fun PcGameMenu(
                         },
                     ),
                 )
+                add(
+                    PcMenuEntry.Row(
+                        PcActionRow("Hide these for every game", "Brought back under Stores") {
+                            dev.droidtop.library.StoreLinkPrefs.setHiddenEverywhere(context, true)
+                            storeLinksHidden = true
+                        },
+                    ),
+                )
             }
             actions.about.forEach { add(PcMenuEntry.Row(it)) }
             compat?.let {

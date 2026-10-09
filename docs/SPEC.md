@@ -13969,8 +13969,10 @@ plain rows: "Get it on Steam", "Get it on GOG", "Get it on itch.io",
 (`StorePages`). They read the links a scrape already wrote and nothing
 else, so no lookup happens as the menu opens. They are information, not a
 pitch: no popups, no grid badges, and one "Hide these for this game" row
-dismisses them for that game (`StoreLinkPrefs`). A game a store owns gets
-none of it, and its scraped links stay as the plain Links rows.
+dismisses them for that game, "Hide these for every game" for all of them,
+and a switch on the Stores place brings them back (`StoreLinkPrefs`,
+Droidtop/tracker#11). A game a store owns gets none of it, and its scraped
+links stay as the plain Links rows.
 
 ### One game across stores (decided 2026-09-30, Droidtop/tracker#133)
 

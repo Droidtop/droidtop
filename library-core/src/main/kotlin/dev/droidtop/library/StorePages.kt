@@ -94,17 +94,28 @@ object StorePages {
 }
 
 /**
- * The games whose "Get it on" and "Support the developer" rows the owner
- * hid with the menu's own "Hide these for this game" row (docs/SPEC.md 7m).
- * A preference about what droidtop shows, not a library fact.
+ * Whether the "Get it on" and "Support the developer" rows show, for one game
+ * (the menu's "Hide these for this game" row) or for every game (the menu's
+ * "Hide these for every game" row, and the switch on the Stores place;
+ * docs/SPEC.md 7m). A preference about what droidtop shows, not a library
+ * fact.
  */
 object StoreLinkPrefs {
     private const val KEY_HIDDEN = "droidtop_store_links_hidden"
+    private const val KEY_HIDDEN_EVERYWHERE = "droidtop_store_links_hidden_everywhere"
 
     private fun prefs(context: Context) = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
 
-    /** Whether the rows are hidden for the game these entry ids are. */
+    /** Whether the rows are hidden for every game. */
+    fun hiddenEverywhere(context: Context): Boolean = prefs(context).getBoolean(KEY_HIDDEN_EVERYWHERE, false)
+
+    fun setHiddenEverywhere(context: Context, hidden: Boolean) {
+        prefs(context).edit().putBoolean(KEY_HIDDEN_EVERYWHERE, hidden).apply()
+    }
+
+    /** Whether the rows are hidden for the game these entry ids are, or for every game. */
     fun hidden(context: Context, ids: Collection<String>): Boolean {
+        if (hiddenEverywhere(context)) return true
         val hidden = prefs(context).getStringSet(KEY_HIDDEN, null) ?: return false
         return ids.any { it in hidden }
     }
