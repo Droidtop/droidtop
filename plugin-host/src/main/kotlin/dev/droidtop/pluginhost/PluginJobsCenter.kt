@@ -368,14 +368,14 @@ object PluginJobsCenter {
      * runs the provider's `handle` with no per-call bound; the job ends with
      * its reply, which [brokeredReply] returns to the caller that started it.
      */
-    fun startBrokered(callerId: String, callerLabel: String, providerLabel: String, title: String, block: suspend () -> PluginReply): String {
+    fun startBrokered(callerId: String, callerLabel: String, providerLabel: String, title: String, block: suspend (jobId: String) -> PluginReply): String {
         val jobId = UUID.randomUUID().toString()
         state.update { current ->
             listOf(Entry(jobId, callerId, callerLabel, null, title, System.currentTimeMillis(), via = providerLabel)) + current
         }
         brokeredJobs[jobId] = brokeredScope.launch {
             val reply = try {
-                block()
+                block(jobId)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 PluginReply.error(PluginErrorCode.CANCELLED, "cancelled")
             } catch (t: Throwable) {
@@ -392,6 +392,11 @@ object PluginJobsCenter {
             prune()
         }
         return jobId
+    }
+
+    /** How far a brokered job is, for one that can tell (a host download, docs/plugin-api.md 3 D2); [percent] is -1 when it cannot. */
+    fun progressBrokered(jobId: String, percent: Int, statusLine: String) {
+        update(jobId) { it.copy(percent = percent, statusLine = statusLine) }
     }
 
     /** The reply of a brokered job, or null while it still runs or when [jobId] is not one of [callerId]'s. */

@@ -6,6 +6,7 @@ import android.os.Build
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
@@ -177,6 +178,200 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun socialChanged(pluginId: String, change: JSONObject): Boolean = PluginBrokers.socialChanged(pluginId, change)
 
+    // ---- Android permissions droidtop holds for plugins (docs/plugin-api.md 4.1) ----
+
+    override fun holdsAndroid(need: AndroidNeed): Boolean =
+        Build.VERSION.SDK_INT < need.fromSdk || appContext.checkSelfPermission(need.permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    override fun requestAndroid(need: AndroidNeed): Boolean = BrokerAskActivity.requestPermission(appContext, need.permission)
+
+    // ---- Network (docs/plugin-api.md 3 D1, D2) ----
+
+    override fun netState(): JSONObject {
+        val cm = appContext.getSystemService(android.net.ConnectivityManager::class.java)
+        val caps = cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        val type = when {
+            caps == null -> "none"
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH) -> "bluetooth"
+            else -> "other"
+        }
+        val online = caps != null &&
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        return JSONObject()
+            .put("online", online)
+            .put("type", type)
+            .put("metered", cm?.isActiveNetworkMetered ?: false)
+            .put("vpn", caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) == true)
+    }
+
+    override fun addressesOf(host: String): List<java.net.InetAddress> =
+        runCatching { java.net.InetAddress.getAllByName(host).toList() }.getOrDefault(emptyList())
+
+    override fun http(call: HttpCall, allow: (String) -> Unit): HttpAnswer {
+        val ms = call.timeoutMs.toInt()
+        val connection = dev.droidtop.net.Http.openGuarded(call.method, call.url, call.headers, call.body, dev.droidtop.net.Http.Timeouts(ms, ms), allow = allow)
+        try {
+            val status = connection.responseCode
+            val headers = connection.headerFields.entries
+                .mapNotNull { (name, values) -> name?.lowercase()?.let { it to values.joinToString(", ") } }
+                .toMap()
+            val stream = (if (status >= 400) connection.errorStream else runCatching { connection.inputStream }.getOrNull())
+            val (body, truncated) = stream?.use { readCapped(it, call.maxBytes) } ?: (ByteArray(0) to false)
+            return HttpAnswer(status, connection.url.toString(), headers, body, truncated)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun readCapped(input: java.io.InputStream, max: Int): Pair<ByteArray, Boolean> {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(16 * 1024)
+        while (true) {
+            val n = input.read(buffer)
+            if (n < 0) return out.toByteArray() to false
+            if (out.size() + n > max) {
+                out.write(buffer, 0, max - out.size())
+                return out.toByteArray() to true
+            }
+            out.write(buffer, 0, n)
+        }
+    }
+
+    override fun startDownload(record: PluginRecord, url: String, file: java.io.File, store: PluginDataStore, allow: (String) -> Unit): String {
+        val name = file.relativeTo(store.root).path.replace(java.io.File.separatorChar, '/')
+        return PluginJobsCenter.startBrokered(record.manifest.id, record.manifest.label, "droidtop", "Download $name") { jobId ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val part = java.io.File(file.parentFile, ".${file.name}.part")
+                try {
+                    val connection = dev.droidtop.net.Http.openGuarded("GET", url, emptyMap(), null, dev.droidtop.net.Http.BigFile.timeouts, allow = allow)
+                    try {
+                        val status = connection.responseCode
+                        if (status !in 200..299) return@withContext PluginReply.error(PluginErrorCode.FAILED, "HTTP $status from ${NetScope.hostOf(connection.url.toString())}")
+                        val total = connection.contentLengthLong
+                        if (total > 0) store.requireRoom(total, file)
+                        file.parentFile?.mkdirs()
+                        var count = 0L
+                        var reported = 0L
+                        connection.inputStream.use { input ->
+                            part.outputStream().use { out ->
+                                val buffer = ByteArray(64 * 1024)
+                                while (true) {
+                                    ensureActive()
+                                    val n = input.read(buffer)
+                                    if (n < 0) break
+                                    count += n
+                                    if (total <= 0 && count > PluginDataStore.LIMIT_BYTES) store.requireRoom(count, file)
+                                    out.write(buffer, 0, n)
+                                    if (count - reported >= PROGRESS_STEP) {
+                                        reported = count
+                                        val percent = if (total > 0) (count * 100 / total).toInt() else -1
+                                        PluginJobsCenter.progressBrokered(jobId, percent, "${count / (1024 * 1024)} MiB")
+                                    }
+                                }
+                            }
+                        }
+                        if (!part.renameTo(file)) return@withContext PluginReply.error(PluginErrorCode.FAILED, "$name could not be moved into place")
+                        PluginReply.ok(JSONObject().put("name", name).put("size", count))
+                    } finally {
+                        connection.disconnect()
+                    }
+                } catch (e: BrokerException) {
+                    PluginReply.error(e.code, e.message.orEmpty())
+                } catch (e: java.io.IOException) {
+                    PluginReply.error(PluginErrorCode.FAILED, e.message ?: "the download failed")
+                } finally {
+                    part.delete()
+                }
+            }
+        }
+    }
+
+    // ---- A plugin's own data and the files it was handed (docs/plugin-api.md 3 H1, D3, D4, D5) ----
+
+    override fun dataStore(pluginId: String): PluginDataStore = PluginDataStore(PluginStore.dataDirFor(appContext, pluginId))
+
+    private val tokens by lazy { PluginFileTokens.forPluginsRoot(PluginStore.root(appContext)) }
+
+    override fun fileTokens(): PluginFileTokens = tokens
+
+    override fun pickDocument(pluginLabel: String, mode: String, mime: String, name: String?): PickedDocument? {
+        val (uri, flags) = BrokerAskActivity.pick(appContext, mode, mime, name) ?: return null
+        val writable = mode == "create" || (flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0
+        val keep = Intent.FLAG_GRANT_READ_URI_PERMISSION or (if (writable) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0)
+        // Kept across restarts, so the token the plugin holds still opens the file tomorrow.
+        runCatching { appContext.contentResolver.takePersistableUriPermission(uri, keep) }
+        var display = name ?: uri.lastPathSegment.orEmpty()
+        var size: Long? = null
+        runCatching {
+            appContext.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                if (c.moveToFirst()) {
+                    c.getString(0)?.let { display = it }
+                    if (!c.isNull(1)) size = c.getLong(1)
+                }
+            }
+        }
+        return PickedDocument(uri.toString(), display, size, writable)
+    }
+
+    override fun openDocument(uri: String, mode: String): android.os.ParcelFileDescriptor? = runCatching {
+        val resolverMode = when (mode) {
+            "w" -> "wt"
+            "a" -> "wa"
+            "rw" -> "rw"
+            else -> "r"
+        }
+        appContext.contentResolver.openFileDescriptor(android.net.Uri.parse(uri), resolverMode)
+    }.getOrNull()
+
+    override fun sharedFilesAllowed(): Boolean =
+        if (Build.VERSION.SDK_INT >= 30) {
+            android.os.Environment.isExternalStorageManager()
+        } else {
+            appContext.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+
+    /**
+     * Each mounted volume's root by id ("primary", or the volume's own id). Found from droidtop's own app folder on each
+     * volume, which exists on every API level this build runs on, rather than from a call only API 30 has.
+     */
+    override fun storageRoots(): Map<String, java.io.File> {
+        val storage = appContext.getSystemService(android.os.storage.StorageManager::class.java)
+        val out = LinkedHashMap<String, java.io.File>()
+        @Suppress("DEPRECATION")
+        out["primary"] = android.os.Environment.getExternalStorageDirectory()
+        appContext.getExternalFilesDirs(null).filterNotNull().forEach { dir ->
+            val root = dir.absolutePath.substringBefore("/Android/data/").takeIf { it != dir.absolutePath }?.let { java.io.File(it) } ?: return@forEach
+            val volume = storage?.getStorageVolume(dir) ?: return@forEach
+            if (volume.isPrimary) return@forEach
+            out[volume.uuid ?: root.name] = root
+        }
+        return out
+    }
+
+    override fun storageVolumes(): JSONArray {
+        val storage = appContext.getSystemService(android.os.storage.StorageManager::class.java)
+        val out = JSONArray()
+        storageRoots().forEach { (id, root) ->
+            val volume = storage?.getStorageVolume(root)
+            val stat = runCatching { android.os.StatFs(root.path) }.getOrNull()
+            out.put(
+                JSONObject()
+                    .put("id", id)
+                    .put("label", volume?.getDescription(appContext) ?: id)
+                    .put("primary", id == "primary")
+                    .put("removable", volume?.isRemovable ?: false)
+                    .put("state", volume?.state ?: "unknown")
+                    .put("freeBytes", stat?.availableBytes ?: 0L)
+                    .put("totalBytes", stat?.totalBytes ?: 0L),
+            )
+        }
+        return out
+    }
+
     override fun chainServedBy(pluginId: String): List<String> = PluginBrokers.chainServedBy(pluginId)
 
     override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply {
@@ -231,6 +426,9 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
     private companion object {
         /** A job has no per-call bound (docs/plugin-api.md 8); this is the ceiling that still catches a provider that never answers. */
         const val JOB_CALL_TIMEOUT_MS = 30L * 60 * 1000
+
+        /** How often a download says how far it is. */
+        const val PROGRESS_STEP = 1024L * 1024
     }
 }
 

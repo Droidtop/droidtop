@@ -86,6 +86,40 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
         return forwardReply
     }
     var lastTimeout = 0L
+
+    /** Each plugin's data in a temporary folder of its own. */
+    val dataRoot: java.io.File by lazy { kotlin.io.path.createTempDirectory("plugin-data").toFile() }
+    override fun dataStore(pluginId: String) = PluginDataStore(java.io.File(dataRoot, pluginId))
+
+    /** net.http: every call, every hop the broker was asked to allow, and a redirect to follow when set. */
+    val httpCalls = mutableListOf<HttpCall>()
+    val hops = mutableListOf<String>()
+    var redirectTo: String? = null
+    var httpAnswer = HttpAnswer(200, "", mapOf("content-type" to "application/json"), "{\"a\":1}".toByteArray(), false)
+    override fun http(call: HttpCall, allow: (String) -> Unit): HttpAnswer {
+        httpCalls += call
+        allow(call.url)
+        hops += call.url
+        redirectTo?.let {
+            allow(it)
+            hops += it
+        }
+        return httpAnswer.copy(finalUrl = redirectTo ?: call.url)
+    }
+    var resolved: Map<String, List<java.net.InetAddress>> = emptyMap()
+    override fun addressesOf(host: String) = resolved[host].orEmpty()
+
+    /** Android's permissions droidtop holds, and what asking for one answers. */
+    var androidHeld = true
+    var androidAnswer = false
+    val androidAsks = mutableListOf<AndroidNeed>()
+    override fun holdsAndroid(need: AndroidNeed) = androidHeld
+    override fun requestAndroid(need: AndroidNeed): Boolean {
+        androidAsks += need
+        if (androidAnswer) androidHeld = true
+        return androidAnswer
+    }
+
     override fun startBrokeredJob(caller: PluginRecord, provider: PluginRecord, call: PluginCall) = jobId
     override fun brokeredJobStatus(caller: PluginRecord, jobId: String) = PluginReply.error(PluginErrorCode.NOT_FOUND, "no such job")
 }

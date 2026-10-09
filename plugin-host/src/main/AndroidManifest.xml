@@ -64,6 +64,19 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" />
 
         <!--
+          What the broker asks Android for on a plugin's behalf, in droidtop's
+          own process and under droidtop's own permissions (docs/plugin-api.md
+          3 D4, 4.1): the system file picker for files.pick and Android's
+          runtime permission prompt. Never on its own: only during a call the
+          person started. Not exported.
+        -->
+        <activity
+            android:name="dev.droidtop.pluginhost.BrokerAskActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!--
           Where Shizuku hands droidtop its binder. Shizuku's server looks for a
           provider named "applicationId.shizuku" in every app the user allowed
           and calls sendBinder on it, so the provider has to exist for the

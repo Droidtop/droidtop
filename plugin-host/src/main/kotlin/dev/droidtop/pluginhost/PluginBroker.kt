@@ -85,6 +85,40 @@ interface BrokerEnvironment {
     /** Shows Android's own prompt for [need] and waits for the answer; true when droidtop holds it afterwards. Only called during a call the person started. */
     fun requestAndroid(need: AndroidNeed): Boolean = false
 
+    /** D1 (docs/plugin-api.md 3): `{online, type, metered, vpn}`. */
+    fun netState(): JSONObject = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop reports no network state")
+
+    /** The addresses [host] resolves to; asked only once the plugin may reach [host]. */
+    fun addressesOf(host: String): List<java.net.InetAddress> = emptyList()
+
+    /** D2: runs [call], passing every URL it is about to connect to (the first and each redirect) to [allow], which throws to stop it. */
+    fun http(call: HttpCall, allow: (String) -> Unit): HttpAnswer =
+        throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop makes no requests for plugins")
+
+    /** D2: downloads [url] into [file] of the plugin's [store] as a job owned by [record]; the job id, or null when it could not start. */
+    fun startDownload(record: PluginRecord, url: String, file: java.io.File, store: PluginDataStore, allow: (String) -> Unit): String? = null
+
+    /** H1: the plugin's own data folder. */
+    fun dataStore(pluginId: String): PluginDataStore? = null
+
+    /** D4: the tokens of the documents each plugin was handed. */
+    fun fileTokens(): PluginFileTokens? = null
+
+    /** D4: shows Android's document picker over droidtop and waits; null when the person backed out. Only during a call the person started. */
+    fun pickDocument(pluginLabel: String, mode: String, mime: String, name: String?): PickedDocument? = null
+
+    /** D4: opens a picked document (`r`, `w`, `rw`); null when it is gone or its grant was withdrawn. */
+    fun openDocument(uri: String, mode: String): android.os.ParcelFileDescriptor? = null
+
+    /** D5: whether droidtop itself has all-files access, which every shared-files op runs under. */
+    fun sharedFilesAllowed(): Boolean = false
+
+    /** D3, D5: each mounted storage volume's root folder by id, the primary one first. */
+    fun storageRoots(): Map<String, java.io.File> = emptyMap()
+
+    /** D3: `[{id, label, primary, removable, state, freeBytes, totalBytes}]`. */
+    fun storageVolumes(): JSONArray = JSONArray()
+
     /** The chain of plugins the call [pluginId] is currently serving came through (empty when it serves none). */
     fun chainServedBy(pluginId: String): List<String>
 
@@ -193,7 +227,7 @@ object HostApis {
         return outside?.let { "$it is not in the package list this plugin declared" }
     }
 
-    val ops: List<HostOp> = listOf(
+    private val core: List<HostOp> = listOf(
         HostOp("host", "info") { env, record, _ ->
             val points = JSONObject()
             ExtensionPoints.all.forEach { points.put(it.id, JSONArray(it.versions.sorted())) }
@@ -331,6 +365,9 @@ object HostApis {
             JSONObject().put("keys", JSONArray(vaultOf(env).keys(record.manifest.id)))
         },
     )
+
+    /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
+    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops }
 
     private fun vaultOf(env: BrokerEnvironment): PluginVault =
         env.vault() ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop keeps no plugin secrets")

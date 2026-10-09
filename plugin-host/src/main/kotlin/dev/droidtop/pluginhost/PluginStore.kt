@@ -109,8 +109,9 @@ object PluginStore {
         audit.markRemoved(pluginId)
         audit.purgeExpired()
         PluginGrants.forContext(context).delete(pluginId)
-        // Its secrets and their key go with it (docs/plugin-api.md 3 G1).
+        // Its secrets and their key go with it (docs/plugin-api.md 3 G1), and so do the files it was handed (D4).
         PluginVault.forContext(context).clear(pluginId)
+        PluginFileTokens.forPluginsRoot(root(context)).delete(pluginId)
         PluginBrokers.forget(pluginId)
         File(root(context), pluginId).deleteRecursively()
         PluginEpoch.bump()

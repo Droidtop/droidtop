@@ -49,6 +49,54 @@ object Http {
 
     fun getJson(url: String, headers: Map<String, String> = emptyMap(), timeouts: Timeouts = Api.timeouts, maxBytes: Long = 8L * 1024 * 1024) = JSONObject(get(url, headers, timeouts, maxBytes).text())
 
+    /**
+     * Opens one request for code droidtop does not trust (a plugin's, docs/plugin-api.md 3 D2) and returns the connection
+     * with its response ready, for the caller to read and disconnect. Redirects are followed here, never by
+     * HttpURLConnection: every URL, the first one included, is passed to [allow] before anything connects to it, and
+     * [allow] throws to stop the request. At most [maxRedirects] hops; a redirect turns POST and the rest into GET, as
+     * browsers do, except 307 and 308.
+     */
+    fun openGuarded(
+        method: String,
+        url: String,
+        headers: Map<String, String>,
+        body: ByteArray?,
+        timeouts: Timeouts,
+        userAgent: String = USER_AGENT,
+        maxRedirects: Int = 5,
+        allow: (String) -> Unit,
+    ): HttpURLConnection {
+        var current = url
+        var verb = method
+        var payload = body
+        repeat(maxRedirects + 1) {
+            allow(current)
+            val c = URL(current).openConnection() as HttpURLConnection
+            c.instanceFollowRedirects = false
+            c.connectTimeout = timeouts.connectMs
+            c.readTimeout = timeouts.readMs
+            c.requestMethod = verb
+            c.setRequestProperty("User-Agent", userAgent)
+            headers.forEach(c::setRequestProperty)
+            val sending = payload
+            if (sending != null && verb != "GET" && verb != "HEAD") {
+                c.doOutput = true
+                c.setFixedLengthStreamingMode(sending.size)
+                c.outputStream.use { it.write(sending) }
+            }
+            val status = c.responseCode
+            val location = c.getHeaderField("Location")
+            if (status !in 300..399 || status == 304 || location == null) return c
+            c.disconnect()
+            current = URL(URL(current), location).toString()
+            if (status != 307 && status != 308) {
+                verb = if (verb == "HEAD") "HEAD" else "GET"
+                payload = null
+            }
+        }
+        throw IOException("more than $maxRedirects redirects from $url")
+    }
+
     fun downloadTo(url: String, file: File, expectedSha256: String? = null, onProgress: (Long, Long) -> Unit = { _, _ -> }, isCancelled: () -> Boolean = { false }, headers: Map<String, String> = emptyMap(), timeouts: Timeouts = BigFile.timeouts) {
         val part = File(file.parentFile, file.name + ".part")
         part.delete()
