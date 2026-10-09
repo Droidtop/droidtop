@@ -60,6 +60,7 @@ import dev.droidtop.library.LaunchResult
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.runtime.ContainerApp
 import dev.droidtop.runtime.DesktopLaunchRequests
+import dev.droidtop.runtime.DesktopScale
 import dev.droidtop.runtime.DisplayOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -449,7 +450,9 @@ private fun BoxScope.DesktopViewport(
                             width: Int,
                             height: Int,
                         ) {
-                            val sized = hostBridge.setOutputSize(width, height)
+                            val metrics = context.resources.displayMetrics
+                            val scale = DesktopScale.resolve(DesktopPrefs.scale(context), metrics.xdpi, metrics.densityDpi)
+                            val sized = hostBridge.setOutputSize(width, height, scale)
                             router.transform = PointerTransform(
                                 viewWidth = width,
                                 viewHeight = height,
@@ -1064,6 +1067,10 @@ private object DesktopPrefs {
 
     fun taskbarAtTop(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_TASKBAR_TOP, false)
+
+    /** The Desktop scale setting as stored ([DesktopScale.KEY]); null when never set. */
+    fun scale(context: Context): String? =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(DesktopScale.KEY, null)
 }
 
 // The container manager in droidtop's screen host (CatalogScreenLink): an

@@ -73,6 +73,9 @@ struct WaylandGlobals {
     int32_t wanted_height = 0;
     int32_t applied_width = 0;
     int32_t applied_height = 0;
+    // The output's scale, sent with its size (0: leave the compositor's own).
+    double wanted_scale = 0;
+    double applied_scale = 0;
 
     // Clipboard. NOT required at connect() time, unlike the five above: a
     // compositor without it still gives a usable desktop, just one whose
@@ -312,6 +315,7 @@ void head_finished(void* data, zwlr_output_head_v1* head) {
     if (globals->head == head) {
         globals->head = nullptr;
         globals->applied_width = globals->applied_height = 0;
+        globals->applied_scale = 0;
     }
     if (globals->output_manager_version >= 3) zwlr_output_head_v1_release(head); else zwlr_output_head_v1_destroy(head);
 }
@@ -365,8 +369,9 @@ void configuration_succeeded(void*, zwlr_output_configuration_v1* config) {
 }
 void configuration_failed(void* data, zwlr_output_configuration_v1* config) {
     auto* globals = static_cast<WaylandGlobals*>(data);
-    LOGW("compositor refused output size %dx%d", globals->wanted_width, globals->wanted_height);
+    LOGW("compositor refused output size %dx%d scale %.2f", globals->wanted_width, globals->wanted_height, globals->wanted_scale);
     globals->applied_width = globals->applied_height = 0;
+    globals->applied_scale = 0;
     zwlr_output_configuration_v1_destroy(config);
 }
 void configuration_cancelled(void* data, zwlr_output_configuration_v1* config) {
@@ -374,6 +379,7 @@ void configuration_cancelled(void* data, zwlr_output_configuration_v1* config) {
     // next `done` carries a fresh serial and re-applies the wanted size.
     auto* globals = static_cast<WaylandGlobals*>(data);
     globals->applied_width = globals->applied_height = 0;
+    globals->applied_scale = 0;
     zwlr_output_configuration_v1_destroy(config);
 }
 constexpr zwlr_output_configuration_v1_listener kConfigurationListener = {
@@ -385,15 +391,23 @@ constexpr zwlr_output_configuration_v1_listener kConfigurationListener = {
 void applyOutputSize(WaylandGlobals* globals) {
     if (!globals->output_manager || !globals->head || !globals->output_serial_known) return;
     if (globals->wanted_width <= 0 || globals->wanted_height <= 0) return;
-    if (globals->wanted_width == globals->applied_width && globals->wanted_height == globals->applied_height) return;
+    if (globals->wanted_width == globals->applied_width && globals->wanted_height == globals->applied_height &&
+        globals->wanted_scale == globals->applied_scale) return;
     auto* config = zwlr_output_manager_v1_create_configuration(globals->output_manager, globals->output_serial);
     zwlr_output_configuration_v1_add_listener(config, &kConfigurationListener, globals);
     auto* configHead = zwlr_output_configuration_v1_enable_head(config, globals->head);
     zwlr_output_configuration_head_v1_set_custom_mode(configHead, globals->wanted_width, globals->wanted_height, 0);
+    // The size stays the surface's pixels (screencopy still captures every
+    // one of them); the scale only sets how many of them a logical pixel is,
+    // which is what makes text and controls readable on a dense screen.
+    if (globals->wanted_scale > 0) {
+        zwlr_output_configuration_head_v1_set_scale(configHead, wl_fixed_from_double(globals->wanted_scale));
+    }
     zwlr_output_configuration_v1_apply(config);
     globals->applied_width = globals->wanted_width;
     globals->applied_height = globals->wanted_height;
-    LOGI("requested output size %dx%d", globals->wanted_width, globals->wanted_height);
+    globals->applied_scale = globals->wanted_scale;
+    LOGI("requested output size %dx%d scale %.2f", globals->wanted_width, globals->wanted_height, globals->wanted_scale);
 }
 
 // ---- windows (wlr-foreign-toplevel-management-unstable-v1) ----
@@ -1484,12 +1498,13 @@ namespace {
 struct SizeRequest {
     int32_t width;
     int32_t height;
+    double scale;
     bool supported = false;
 };
 } // namespace
 
-bool WaylandClient::setOutputSize(int32_t width, int32_t height) {
-    SizeRequest request{width, height};
+bool WaylandClient::setOutputSize(int32_t width, int32_t height, double scale) {
+    SizeRequest request{width, height, scale};
     runOnDispatchThread([](WaylandClient* self, void* arg) {
         auto* req = static_cast<SizeRequest*>(arg);
         auto* globals = self->globals_;
@@ -1499,6 +1514,7 @@ bool WaylandClient::setOutputSize(int32_t width, int32_t height) {
         }
         globals->wanted_width = req->width;
         globals->wanted_height = req->height;
+        globals->wanted_scale = req->scale;
         self->applyOutputSizeOnDispatchThread();
         req->supported = true;
     }, &request);

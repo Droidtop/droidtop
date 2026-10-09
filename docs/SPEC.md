@@ -5391,6 +5391,20 @@ present path grows an aspect-preserving mode; that mode makes the aspect
 ratio load-bearing, so taking it requires plumbing the real output size up
 from native first.
 
+**Desktop scale (decided 2026-10-08, Droidtop/tracker#386).** The same
+output-management request also sets the output's scale
+(`zwlr_output_configuration_head_v1.set_scale`). The output keeps the
+surface's full pixel size, so screencopy and the pointer ratios are
+unchanged; the scale only sets how many pixels a logical pixel is. At scale
+1 the console's 5.5-inch 1080p screen (about 400 dpi) drew the desktop at a
+quarter of a laptop's area, too small to read. Desktop settings has
+"Desktop scale": Automatic (default) or 1x to 3x (`DesktopScale`).
+Automatic is one logical pixel per 1/200 inch of the screen's physical
+density (`DisplayMetrics.xdpi`, the density bucket when xdpi is not
+believable), rounded to a quarter and never below 1: 2x on the console, 1x
+on a desktop monitor. The viewport sends it with every size, so a change
+applies the next time the desktop is shown.
+
 **The frame path's threading (rebuilt 2026-09-24).** `:host-bridge`'s native
 client has one dispatch thread, and it owns everything the compositor's
 events touch: the capture loop and the output configuration. It waits on

@@ -86,9 +86,14 @@ class HostBridge : HostBridgeInput {
      * with its surface's real size on every layout change. Returns false
      * when the compositor offers no output management, in which case the
      * desktop keeps its own size and is scaled to fit.
+     *
+     * [scale] is the output's scale in the same request: how many of those
+     * pixels one logical pixel is (2.0 draws everything twice as large), so
+     * a dense handheld screen is readable (Droidtop/tracker#386). 0 leaves
+     * the compositor's own.
      */
-    fun setOutputSize(width: Int, height: Int): Boolean =
-        width > 0 && height > 0 && nativeSetOutputSize(width, height)
+    fun setOutputSize(width: Int, height: Int, scale: Double = 0.0): Boolean =
+        width > 0 && height > 0 && nativeSetOutputSize(width, height, scale)
 
     // ---- Input injection, called from :input-seat's InputSeat ----
 
@@ -187,7 +192,7 @@ class HostBridge : HostBridgeInput {
     private external fun nativeDisconnect()
     private external fun nativePresentOutput(surface: Surface): Boolean
     private external fun nativeStopPresenting()
-    private external fun nativeSetOutputSize(width: Int, height: Int): Boolean
+    private external fun nativeSetOutputSize(width: Int, height: Int, scale: Double): Boolean
     private external fun nativeInjectPointerMotion(dx: Double, dy: Double)
     private external fun nativeInjectPointerMotionAbsolute(x: Double, y: Double, extentWidth: Int, extentHeight: Int)
     private external fun nativeInjectPointerButton(linuxButtonCode: Int, pressed: Boolean)

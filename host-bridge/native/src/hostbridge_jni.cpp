@@ -372,10 +372,10 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeInjectKey(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_dev_droidtop_hostbridge_HostBridge_nativeSetOutputSize(JNIEnv* env, jobject thiz, jint width, jint height) {
+Java_dev_droidtop_hostbridge_HostBridge_nativeSetOutputSize(JNIEnv* env, jobject thiz, jint width, jint height, jdouble scale) {
     std::lock_guard<std::mutex> lock(g_clientsMutex);
     if (auto* client = findClient(identityHash(env, thiz))) {
-        return client->setOutputSize(width, height) ? JNI_TRUE : JNI_FALSE;
+        return client->setOutputSize(width, height, scale) ? JNI_TRUE : JNI_FALSE;
     }
     return JNI_FALSE;
 }

@@ -105,8 +105,10 @@ public:
     // Android view showing the desktop calls this with its own size, so a
     // captured frame maps 1:1 onto the view instead of being stretched.
     // Applied as soon as the compositor has announced its output; returns
-    // false only when it offers no output management at all.
-    bool setOutputSize(int32_t width, int32_t height);
+    // false only when it offers no output management at all. [scale] is the
+    // output's scale (logical pixel to physical pixels); 0 leaves the
+    // compositor's own.
+    bool setOutputSize(int32_t width, int32_t height, double scale);
 
     // Input injection — safe to call from a thread other than the one that
     // called connect()/runs the dispatch loop. libwayland-client's requests

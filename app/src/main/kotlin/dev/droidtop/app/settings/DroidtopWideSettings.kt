@@ -260,6 +260,7 @@ object DroidtopWideSettings {
                             current = CatalogPrefs.prefs(context).getBoolean(KEY_TASKBAR_TOP, false),
                             onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_TASKBAR_TOP, on).apply() },
                         ),
+                        desktopScaleChoice(context),
                         ActionItem(
                             id = "pref_desktop_root_compositor_setup",
                             title = "Desktop setup",
@@ -294,6 +295,28 @@ object DroidtopWideSettings {
         // "Settings layout").
         merged = true,
     )
+
+    /**
+     * How large the Linux desktop draws (dev.droidtop.runtime.DesktopScale,
+     * Droidtop/tracker#386). Automatic names the scale it works out for this
+     * screen; the desktop takes a change the next time it is shown.
+     */
+    private fun desktopScaleChoice(context: Context): ChoiceItem {
+        val metrics = context.resources.displayMetrics
+        val automatic = dev.droidtop.runtime.DesktopScale.automatic(metrics.xdpi, metrics.densityDpi)
+        return ChoiceItem(
+            id = dev.droidtop.runtime.DesktopScale.KEY,
+            title = "Desktop scale",
+            subtitle = "How large the Linux desktop's text and windows are on this screen",
+            options = listOf(
+                ChoiceOption(dev.droidtop.runtime.DesktopScale.AUTOMATIC, "Automatic (${dev.droidtop.runtime.DesktopScale.label(automatic)})"),
+            ) + dev.droidtop.runtime.DesktopScale.CHOICES.map { value ->
+                ChoiceOption(value, dev.droidtop.runtime.DesktopScale.label(value.toDouble()))
+            },
+            current = CatalogPrefs.prefs(context).getString(dev.droidtop.runtime.DesktopScale.KEY, dev.droidtop.runtime.DesktopScale.AUTOMATIC),
+            onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(dev.droidtop.runtime.DesktopScale.KEY, value).apply() },
+        )
+    }
 
     private fun orientationChoice(context: Context, mode: Mode): ChoiceItem {
         val values = ScreenOrientationPrefs.options(mode)
