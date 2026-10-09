@@ -88,6 +88,9 @@ import dev.droidtop.runtime.tasks.text
 import dev.droidtop.shell.gamepad.AppIcon
 import dev.droidtop.shell.gamepad.currentShellWindow
 import dev.droidtop.shell.gamepad.hosted.HostedArt
+import dev.droidtop.shell.gamepad.query.LauncherSearchApp
+import dev.droidtop.shell.gamepad.query.LauncherSearchScreen
+import dev.droidtop.library.StartMenuSections
 import dev.droidtop.shell.gamepad.hosted.HostedListSheet
 import dev.droidtop.shell.gamepad.hosted.HostedRow
 import dev.droidtop.shell.gamepad.hosted.PadLegend
@@ -159,6 +162,7 @@ fun DesktopShell(
     // drives (docs/SPEC.md 2b "Desktop chrome with a pad", Droidtop/tracker#350).
     var quickMenuOpen by remember { mutableStateOf(false) }
     var windowsOpen by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }
     // The pad's buttons that belong to droidtop's chrome rather than to the desktop arrive from the activity.
     LaunchedEffect(Unit) {
         DesktopPadRoutes.requests.collect { route ->
@@ -166,6 +170,7 @@ fun DesktopShell(
                 DesktopPadRoutes.Route.START_MENU -> startMenuOpen = true
                 DesktopPadRoutes.Route.QUICK_MENU -> quickMenuOpen = true
                 DesktopPadRoutes.Route.WINDOWS -> windowsOpen = true
+                DesktopPadRoutes.Route.SEARCH -> searchOpen = true
             }
         }
     }
@@ -268,7 +273,18 @@ fun DesktopShell(
                 onLaunchLinuxApp = onLaunchLinuxApp,
                 onPlay = playEntry,
                 onOpenPage = { entry -> pageId = entry.id },
+                onOpenTerminal = onOpenTerminal,
+                onSearch = { searchOpen = true },
                 onDismiss = { startMenuOpen = false },
+            )
+        }
+        if (searchOpen) {
+            DesktopSearch(
+                library = library,
+                linuxApps = linuxApps,
+                onLaunchLinuxApp = onLaunchLinuxApp,
+                onPlay = playEntry,
+                onDismiss = { searchOpen = false },
             )
         }
         if (quickMenuOpen) {
@@ -538,7 +554,7 @@ private fun BoxScope.Taskbar(
         }
     }
     val atTop = DesktopPrefs.taskbarAtTop(context)
-    // With a pad in hand the bar names the three buttons that reach droidtop's chrome (the activity
+    // With a pad in hand the bar names the four buttons that reach droidtop's chrome (the activity
     // answers them, see DesktopPadRoutes), on a strip of its own so the bar keeps its width for the
     // window list on a 768 dp console.
     val padPresent = currentShellWindow().padPresent
@@ -549,6 +565,7 @@ private fun BoxScope.Taskbar(
                     GamepadAction.START to "Start menu",
                     GamepadAction.SELECT to "Quick menu",
                     GamepadAction.L to "Windows",
+                    GamepadAction.R to "Search",
                 ),
                 labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
@@ -717,6 +734,38 @@ private fun rememberToplevels(hostBridge: HostBridge?): List<Toplevel> {
         onDispose { hostBridge?.toplevelsChangedListener = null }
     }
     return toplevels
+}
+
+/**
+ * Desktop's search (docs/SPEC.md 12a "One search", Droidtop/tracker#351): the same dialog the PC library, the
+ * console lists and Standard's drawer open, with this surface's local rows: the library's entries (the
+ * scan the Start menu observes, only while the search is open) and the container's own desktop entries as the
+ * apps. A Linux app starts in the session, a game takes the one launch rule, a download source's result opens
+ * its detail. Nothing here loads the launcher's model (Desktop does not have one).
+ */
+@Composable
+private fun DesktopSearch(
+    library: Library,
+    linuxApps: List<ContainerApp>,
+    onLaunchLinuxApp: ((ContainerApp) -> Unit)?,
+    onPlay: (LibraryEntry) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val games by library.backgroundScanState(START_MENU_KINDS).collectAsState()
+    LaunchedEffect(library) { library.scanInBackground(START_MENU_KINDS) }
+    val apps by rememberUpdatedState(linuxApps)
+    val launch by rememberUpdatedState(onLaunchLinuxApp)
+    LauncherSearchScreen(
+        initialText = "",
+        games = games,
+        findApps = { text ->
+            apps.filter { StartMenuSections.appMatches(it.name, it.genericName, text) }.map { app ->
+                LauncherSearchApp(key = "linux:" + app.id, title = app.name, icon = null, open = { launch?.invoke(app) })
+            }
+        },
+        onPlay = onPlay,
+        onDismiss = onDismiss,
+    )
 }
 
 /**
@@ -997,14 +1046,14 @@ private object DesktopPrefs {
 
 // The container manager in droidtop's screen host (CatalogScreenLink): an
 // action, because :shell-desktop has no compile-time dependency on :app.
-private fun openContainers(context: Context) {
+internal fun openContainers(context: Context) {
     context.startActivity(CatalogScreenLink.intent(context, CONTAINERS_SCREEN_ID))
 }
 
 /** `ContainersCatalog.SCREEN_ID` in :app, which this module cannot see. */
 private const val CONTAINERS_SCREEN_ID = "containers"
 
-private fun openModes(context: Context) {
+internal fun openModes(context: Context) {
     val intent = Intent(Intent.ACTION_MAIN).apply {
         component = ComponentName(context.packageName, "dev.droidtop.app.ModeSwitcherActivity")
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1012,7 +1061,7 @@ private fun openModes(context: Context) {
     context.startActivity(intent)
 }
 
-private fun openSettings(context: Context) {
+internal fun openSettings(context: Context) {
     val intent = Intent(Intent.ACTION_MAIN).apply {
         component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
         putExtra(":settings:fragment", "app.murinelauncher.settings.SettingsDesktopFragment")

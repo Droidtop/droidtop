@@ -92,6 +92,21 @@ class StartMenuSectionsTest {
     }
 
     @Test
+    fun `a container app answers the search by its name or its generic name`() {
+        assertTrue(StartMenuSections.appMatches("Foot", "Terminal", "foo"))
+        assertTrue(StartMenuSections.appMatches("Foot", "Terminal", " TERM "))
+        assertFalse(StartMenuSections.appMatches("Foot", "Terminal", "browser"))
+        assertTrue(StartMenuSections.appMatches("Firefox", null, "fire"))
+        assertFalse(StartMenuSections.appMatches("Firefox", null, "term"))
+    }
+
+    @Test
+    fun `blank search text answers nothing`() {
+        assertFalse(StartMenuSections.appMatches("Foot", "Terminal", ""))
+        assertFalse(StartMenuSections.appMatches("Foot", "Terminal", "   "))
+    }
+
+    @Test
     fun `a key says what it is`() {
         assertTrue(TaskbarPins.isLinux(TaskbarPins.linuxKey("foot")))
         assertFalse(TaskbarPins.isLinux(TaskbarPins.entryKey("foot")))

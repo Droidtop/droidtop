@@ -27,6 +27,17 @@ object StartMenuSections {
     }
 
     /**
+     * Whether a container app named [name], with [genericName] under it, answers the search [text]: the text is
+     * a part of either, ignoring case. Blank text answers nothing, since the search shows its suggestions then.
+     * The container's apps are one more local source of the one search (docs/SPEC.md 12a, Droidtop/tracker#351).
+     */
+    fun appMatches(name: String, genericName: String?, text: String): Boolean {
+        val wanted = text.trim()
+        if (wanted.isEmpty()) return false
+        return name.contains(wanted, ignoreCase = true) || genericName?.contains(wanted, ignoreCase = true) == true
+    }
+
+    /**
      * [entries] split into the sections, each in name order (the name a person reads, [GameNaming.displayName],
      * compared ignoring case). An entry the person hid is not listed. A section with nothing in it is absent.
      * Reads only the titles, so it is cheap to run on a background dispatcher for a large library.

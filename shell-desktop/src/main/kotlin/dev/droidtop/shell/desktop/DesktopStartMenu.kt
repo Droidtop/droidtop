@@ -57,6 +57,8 @@ internal fun StartMenu(
     onLaunchLinuxApp: ((ContainerApp) -> Unit)?,
     onPlay: (LibraryEntry) -> Unit,
     onOpenPage: (LibraryEntry) -> Unit,
+    onOpenTerminal: (() -> Unit)?,
+    onSearch: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -68,6 +70,8 @@ internal fun StartMenu(
     val openPage by rememberUpdatedState(onOpenPage)
     val launchLinux by rememberUpdatedState(onLaunchLinuxApp)
     val dismiss by rememberUpdatedState(onDismiss)
+    val search by rememberUpdatedState(onSearch)
+    val terminal by rememberUpdatedState(onOpenTerminal)
     var menuFor by remember { mutableStateOf<StartTarget?>(null) }
 
     LaunchedEffect(library) {
@@ -92,10 +96,23 @@ internal fun StartMenu(
     val places = remember { Place.visible(UiModePrefs.get(context)) }
     val unread = remember { SocialBadge.unread }
 
-    val rows = remember(grouped, entries, linuxApps, linuxAppsError, sessionLive, pluginShelves, places, pins.list) {
+    val rows = remember(grouped, entries, linuxApps, linuxAppsError, sessionLive, pluginShelves, places, pins.list, onOpenTerminal != null) {
         val pinned = pins.list.map { it.key }.toSet()
         val byId = entries?.associateBy { it.id }.orEmpty()
         val out = ArrayList<HostedRow>()
+        // The one search (docs/SPEC.md 12a), opened from the first row: apps, games and download sources in
+        // one ranked list, with the container's apps among them (Droidtop/tracker#351).
+        out.add(
+            HostedRow(
+                key = "search",
+                title = "Search",
+                subtitle = "Apps, games and download sources",
+                onSelect = {
+                    dismiss()
+                    search()
+                },
+            ),
+        )
 
         fun open(target: StartTarget) {
             target.linux?.let { launchLinux?.invoke(it) }
@@ -143,6 +160,23 @@ internal fun StartMenu(
                 out.add(rowFor(target, key = "pinned:" + pin.key, section = "Pinned", art = pin.art != null, showPinned = false))
             }
         }
+        // The taskbar's own buttons, for a pad that has no way to the bar itself.
+        terminal?.let { openTerminal ->
+            out.add(
+                HostedRow(
+                    key = "system:terminal",
+                    title = "Terminal",
+                    section = "System",
+                    onSelect = {
+                        openTerminal()
+                        dismiss()
+                    },
+                ),
+            )
+        }
+        out.add(HostedRow(key = "system:containers", title = "Containers", section = "System", onSelect = { openContainers(context); dismiss() }))
+        out.add(HostedRow(key = "system:modes", title = "Modes", subtitle = "Switch to Gaming, Android or Desktop", section = "System", onSelect = { openModes(context); dismiss() }))
+        out.add(HostedRow(key = "system:settings", title = "Settings", section = "System", onSelect = { openSettings(context); dismiss() }))
         places.forEach { place ->
             out.add(
                 HostedRow(

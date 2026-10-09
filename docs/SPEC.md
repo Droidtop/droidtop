@@ -320,9 +320,10 @@ surface: with no keyboard or mouse the pad reached whatever Compose focus landed
 mark and no hint row. Owner direction, 2026-10-08: "Still focus on gaming mode for now, just wire it in
 OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not a second set.
 
-- **Three buttons are droidtop's while Desktop shows;** every other pad button stays the container's as
+- **Four buttons are droidtop's while Desktop shows;** every other pad button stays the container's as
   6b has it. Start opens the Start menu (Gaming's left menu), Select or R2 the Quick Menu (Gaming's R2;
-  Select as well, because a pad whose triggers send no key still has it), L1 the list of windows.
+  Select as well, because a pad whose triggers send no key still has it), L1 the list of windows, R1 the
+  search.
   `DesktopPadRoutes` (`:shell-desktop`) claims them in `MainActivity.dispatchKeyEvent`, before any view,
   and only from a gamepad: a keyboard's keys are the container's. `DesktopShell` collects them.
 - **Each is a sheet that is a window of its own** (a Dialog), so the one input pipeline (6e) runs in it.
@@ -338,7 +339,7 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   Disturb, network, Bluetooth) is deleted: those are the Quick Menu's tiles over the settings catalog, so
   there is one control panel, not two.
 - **The bar says which buttons.** With a pad attached (`ShellWindow.padPresent`) a strip beside the bar
-  (`PadLegend`, not tappable) names Start, Select and L1; it is a strip of its own so the bar keeps its
+  (`PadLegend`, not tappable) names Start, Select, L1 and R1; it is a strip of its own so the bar keeps its
   width for the window list on a 768 dp console. The bar's buttons stay for touch and a mouse. The Start
   button only opens now: the menu is modal, so the "Close" label it wore while the menu floated over the
   bar is gone.
@@ -351,6 +352,20 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   only while Desktop shows). An entry wears the app's icon; a tap opens it where it runs (`TaskActions.bringTo`),
   a long press, or X in the sheet, closes it by the task manager's strongest path and says so only when that
   could not end it. Without Shizuku the list holds the apps droidtop opened itself, as everywhere else.
+- **The Start menu reaches the bar's buttons.** A System section (Terminal while a session runs, Containers,
+  Modes, Settings) is the bar's own four buttons as rows, so a pad with no way to the bar can still open
+  Settings or the mode switcher and then give the pad back to the container by closing the sheet.
+- **Search is the one search** (12a "One search"; Droidtop/tracker#351). The Start menu's first row, and R1,
+  open `LauncherSearchScreen`, the dialog the launcher's drawer and Standard use, with the local rows of this
+  surface: the library's entries (the scan the Start menu observes, collected only while the search is open)
+  and the container's desktop entries (`ContainerApplications`, already read for the menu) as the apps,
+  matched by `StartMenuSections.appMatches` on the name or generic name. A Linux app starts in the session, a
+  game takes the one launch rule (a store game that is not installed offers the install), a download source's
+  result opens its detail. Nothing in it loads the launcher's model. The owner's issue for the Start menu
+  (Droidtop/tracker#348) asked for a field that filters every section in place; a second filter beside the
+  one search would be a second mechanism for one job, so the menu's search is the one search, which already
+  lists every source of the menu. Typing on a hardware keyboard while the menu is open is not routed to it:
+  a keyboard is the container's, and the search is a row and a button away.
 - **Notifications are the Quick Menu's section.** The tray readout counts the notifications waiting
   (`NotificationsStore`, the dismissible ones; an ongoing notification waits for nobody), and the tray opens
   the Quick Menu on Notifications once notification access is granted, on System before that (the
@@ -17046,7 +17061,8 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   the match count above the sources' rows (the Select row reads "Search: <text>"
   while a search is on, and the search lasts as long as the gamelist stays open;
   the PC Games tab keeps its own query, 7i); the launcher has no list under it,
-  so the device's rows are in the one list. Settings has its own search over
+  so the device's rows are in the one list; so are Desktop's (its Start menu and R1 open
+  it, with the library and the container's apps as the device's rows, 2b "Desktop chrome with a pad"). Settings has its own search over
   settings rows (`SettingsSearchIndex`, 7k), which is a different thing being
   searched, not a plugin mode.
 - **Picking.** A device row opens the app or plays the game. A source row opens
