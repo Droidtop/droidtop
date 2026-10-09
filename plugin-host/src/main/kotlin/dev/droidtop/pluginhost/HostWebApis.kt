@@ -84,7 +84,10 @@ internal object HostWebApis {
             target = { NetScope.hostOf(it.optString("url")).orEmpty() },
         ) { env, record, args ->
             val domains = domains(record)
-            val url = sessionUrl(args, domains)
+            // Any https link: a source's download link is often a file host the forum links to. The session's cookies
+            // still go only to the declared sites; the person sees the site the page is on in the view's header.
+            val url = args.optString("url").trim().takeIf { NetScope.isHttps(it) && NetScope.hostOf(it) != null }
+                ?: invalid("url must be an https address")
             val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, stored(env, record), null))
             // The site may have renewed the session while the person was there.
             result.session?.takeIf { it.cookies.isNotEmpty() }?.let { save(env, record, it) }

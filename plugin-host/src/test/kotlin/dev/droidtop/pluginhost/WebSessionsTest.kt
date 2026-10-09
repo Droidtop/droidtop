@@ -87,6 +87,7 @@ class WebSessionsTest {
     fun `a captured download is handed to the plugin as a token, claimed once, by that plugin, for that address`() {
         val download = WebSessionDownload("https://files.example/get/1", "UA", "attachment; filename=\"Game v1.zip\"", "application/zip", 42L, "https://forum.example/t/1", "s=1")
         val (fake, env) = env { WebSessionResult(true, null, download) }
+        assertEquals(PluginErrorCode.INVALID_ARGS, call(env, "web.session", "open_in_session", JSONObject().put("url", "http://files.example/x")).code)
         val reply = call(env, "web.session", "open_in_session", JSONObject().put("url", "https://forum.example/masked/1"))
         assertTrue(reply.data.getBoolean("captured"))
         val token = reply.data.getJSONObject("download").getString("session")
