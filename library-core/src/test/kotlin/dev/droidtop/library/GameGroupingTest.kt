@@ -212,7 +212,7 @@ class GameGroupingTest {
     fun `an entry title still says which part it is, for the surfaces that list entries`() {
         assertEquals("Fetish Locator - Week 1", qualifiedFolderTitle(File("/games/renpy/Fetish Locator/Week 1")))
         assertEquals("Thief of Hearts - Part1", qualifiedFolderTitle(File("/games/renpy/Thief of Hearts/Part1")))
-        assertEquals("ThiefofHeartsPart3-0.0.9-pc", qualifiedFolderTitle(File("/games/renpy/Thief of Hearts/ThiefofHeartsPart3-0.0.9-pc")))
+        assertEquals("ThiefofHearts - Part 3", qualifiedFolderTitle(File("/games/renpy/Thief of Hearts/ThiefofHeartsPart3-0.0.9-pc")))
         assertEquals("Part Time Job", qualifiedFolderTitle(File("/games/renpy/Part Time Job")))
     }
 

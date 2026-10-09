@@ -60,36 +60,39 @@ private fun relativeLabel(file: File, scannedFolder: File): String {
 }
 
 /**
- * A game folder's name as a title, with the one shape a folder name is
- * not a title: an episode folder.
+ * A game folder's name as the entry's title: what the one title parser says
+ * ([GameTitleParser], docs/SPEC.md 7n), so the engine walk's entries read
+ * like the PC walk's. The rig showed the textlist drawing `12.0-SCRAPPY`,
+ * `Eternum-0.9.5-pc` and `Name_ver1.1-eng` because the entry stored the
+ * folder name as it is on disk (Droidtop/tracker#174, #282); the raw name
+ * stays on the game page and in the entry id.
  *
- * Seen on the rig: a Ren'Py series ships one runnable game per episode
- * (`Thief of Hearts/Part1`, `Fetish Locator/Week 1`, `BeingADik/Chap3+`),
- * so the library listed "PART1", "WEEK 1" and "CHAP3+" as games with
- * nothing to say which series they belong to -- and "PART 1" and "PART1",
- * two different series, sat beside each other. These are real separate
- * games and must stay separate entries; only the name was wrong.
+ * The one shape a folder name is not a title is an episode folder. Seen on
+ * the rig: a Ren'Py series ships one runnable game per episode
+ * (`Thief of Hearts/Part1`, `Fetish Locator/Week 1`, `BeingADik/Chap3+`,
+ * `ThiefofHeartsPart3-0.0.9-pc`), so the library listed "PART1", "WEEK 1"
+ * and "CHAP3+" as games with nothing to say which series they belong to.
+ * These are real separate games and must stay separate entries, so the
+ * segment the parser read is appended to the series title. Unlike
+ * [disambiguateTitles], which repairs a collision after the fact, this is a
+ * naming rule that does not need two entries to notice the problem.
  *
- * Deliberately narrow: the whole name has to be a sequence word plus its
- * number, so a game actually called "Part Time Job" or "Seasons" keeps
- * its own name. Unlike [disambiguateTitles], which repairs a collision
- * after the fact, this is a naming rule that does not need two entries to
- * notice the problem.
+ * A folder that is only a version (`Some Game/12.0-scrappy`) is titled by
+ * the game above it plus that version, so sibling versions stay told apart.
+ * [root] is the games root the folder is under, when known: nothing at or
+ * above it is read as a title.
  *
  * Which folder names are sequence markers is [GameNaming]'s answer, not a
- * second list here: the same folders are read as a game's SEGMENTS when
- * the library groups its entries into games (docs/SPEC.md 7m), and two
- * lists of sequence words would be two answers to one question. This
- * names ONE entry, which is what a surface listing entries (a themed
- * ES-DE gamelist, by ES-DE's own schema) still needs; grouping decides
- * how many entries a game is.
+ * second list here (docs/SPEC.md 7m). This names ONE entry, which is what a
+ * surface listing entries (a themed ES-DE gamelist, by ES-DE's own schema)
+ * needs; grouping decides how many entries a game is.
  */
-fun qualifiedFolderTitle(folder: File): String {
-    val name = folder.name
-    val segment = GameNaming.derive(folder.absolutePath).segment ?: return name
-    val parent = folder.parentFile?.name?.takeIf { it.isNotBlank() } ?: return name
-    // Only a folder that is NOTHING but the marker takes its parent's
-    // name: a folder called `ThiefofHeartsPart3-0.0.9-pc` already says
-    // which game it is.
-    return if (segment.label.equals(name, ignoreCase = true)) "$parent - $name" else name
+fun qualifiedFolderTitle(folder: File, root: File? = null): String {
+    val parsed = GameTitleParser.parse(folder.absolutePath, root?.absolutePath)
+    // A folder nothing identifies keeps the only name it has.
+    if (parsed.unidentified || parsed.title.isBlank()) return folder.name
+    val segment = parsed.part?.label?.takeIf { it.isNotBlank() }
+    if (segment != null) return "${parsed.title} - $segment"
+    val ownTitle = GameTitleParser.parseName(folder.name).title
+    return if (parsed.version.isNotEmpty() && ownTitle != parsed.title) "${parsed.title} ${parsed.version}" else parsed.title
 }

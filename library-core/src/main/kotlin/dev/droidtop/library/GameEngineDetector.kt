@@ -1592,7 +1592,7 @@ class EngineGameProvider(
     private fun DetectedGame.toEntry(root: File, part: File, installsByDir: Map<String, StoreInstall>): LibraryEntry {
         val entry = LibraryEntry(
             id = displayFolder.absolutePath,
-            title = qualifiedFolderTitle(displayFolder),
+            title = qualifiedFolderTitle(displayFolder, root),
             kind = engine.toLibraryEntryKind(),
             artworkUri = EsDeArtwork.resolve(root, engine.esDeSystemName(), displayFolder.name),
             // Same three arguments the resolve() above already takes --

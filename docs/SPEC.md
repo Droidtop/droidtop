@@ -13631,6 +13631,19 @@ The person's own title (`Library.renameGame`, the menu's "Title" row) is
 the existing `GameLinksStore` game name, keyed by entry id, so it survives
 every rescan; clearing it returns to the parsed one.
 
+**Entry titles are the parsed title at the source (Droidtop/tracker#174,
+#282).** Every provider stores `LibraryEntry.title` already parsed, so every
+surface that draws it (a themed ES-DE textlist or card, the capsules, the
+launcher shortcuts) shows the same clean name with no per-surface cleaning.
+The PC walk does it in `PcLibrary`; the engine walk does it through
+`qualifiedFolderTitle`, which is `GameTitleParser.parse` plus the one case a
+title alone cannot tell apart: an episode folder keeps its series as
+`Series - Part1` so separate episodes stay separate entries, and a folder
+that is only a version (`Game/12.0-scrappy`) is `Game 12.0`. The version and
+build tags stay out of the title; the raw folder name stays in the entry id
+and on the game page. The first-scrape question after the first walk is
+`ScrapeOffer` (7h); the scrape it starts is `ScrapeOffer.starter`.
+
 **Multi-part games are ONE entry.** A parent folder with ordered part
 folders (`book1`..., `episode`, `chapter`, `part`, `volume`, `season N`,
 `Vol 2`, `Act II`, spelled-out numbers) is one game titled after the

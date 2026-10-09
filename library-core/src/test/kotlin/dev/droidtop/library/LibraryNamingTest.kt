@@ -106,9 +106,19 @@ class LibraryNamingTest {
     }
 
     @Test
+    fun `a folder that is only a version is titled by its game and that version`() {
+        assertEquals(
+            "BeingADIK 12.0",
+            qualifiedFolderTitle(File("/games/renpy/BeingADIK/12.0-scrappy"), root = File("/games/renpy")),
+        )
+    }
+
+    @Test
     fun `a game whose own name starts with a sequence word keeps it`() {
         assertEquals("Part Time Job", qualifiedFolderTitle(File("/games/renpy/Part Time Job")))
-        assertEquals("Eternum-0.9.5-pc", qualifiedFolderTitle(File("/games/renpy/Eternum-0.9.5-pc")))
+        assertEquals("Eternum", qualifiedFolderTitle(File("/games/renpy/Eternum-0.9.5-pc")))
+        assertEquals("Some Game", qualifiedFolderTitle(File("/games/renpy/Some_Game_ver1.1-eng")))
+        assertEquals("Some Game", qualifiedFolderTitle(File("/games/Some_Game_v1.2_win64")))
     }
 
     @Test
