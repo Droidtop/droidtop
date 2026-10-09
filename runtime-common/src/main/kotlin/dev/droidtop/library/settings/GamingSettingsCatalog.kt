@@ -75,6 +75,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_VOLUME = "pref_gaming_system_volume"
     const val ID_SYSTEM_BRIGHTNESS = "pref_gaming_system_brightness"
     const val ID_COMPANION_WAKE = "pref_companion_screen_wake"
+    const val ID_SCREENSHOT = "pref_screenshot"
     const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_gaming_system_brightness_grant"
     const val ID_SYSTEM_BLUETOOTH = "pref_gaming_system_bluetooth"
     const val ID_SYSTEM_VPN = "pref_gaming_system_vpn"
@@ -569,6 +570,15 @@ object GamingSettingsCatalog {
                         },
                         value = degraded?.modeSummary(),
                         run = { _ -> dev.droidtop.runtime.DisplayArrangement.reinitialize() },
+                    ),
+                )
+                // A screenshot of the main screen, pinnable on the companion's Home (slice C15, Capture).
+                add(
+                    AsyncActionItem(
+                        id = ID_SCREENSHOT,
+                        title = "Screenshot",
+                        subtitle = "Saves a picture of the main screen to Pictures/Screenshots",
+                        run = { ctx, _ -> dev.droidtop.runtime.Capture.take(ctx.applicationContext, android.view.Display.DEFAULT_DISPLAY).message },
                     ),
                 )
                 // Wakes an off companion screen (slice C14); only while a second screen holds the companion.

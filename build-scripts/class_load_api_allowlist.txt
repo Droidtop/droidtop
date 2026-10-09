@@ -24,6 +24,10 @@ com.android.launcher3.util.PredictiveBackAdapter
 # SDK_INT >= S branch in EsDeThemeRenderer.kt's video `update` block.
 dev.droidtop.shell.gamepad.theme.EsDeVideoRenderEffect
 
+# AccessibilityService.TakeScreenshotCallback (API 30) for the companion's screenshots, built only
+# under the SDK_INT >= R branch in AccessibilityTyping.connect (AccessibilityTyping.kt).
+dev.droidtop.app.ScreenshotCallback
+
 # WindowInsetsAnimation.Callback (API 30). Instantiated under
 # Utilities.ATLEAST_R in Folder.java:324 and WorkUtilityView.java:137.
 com.android.launcher3.anim.KeyboardInsetAnimationCallback

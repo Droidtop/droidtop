@@ -5,7 +5,7 @@ package dev.droidtop.library.settings
  * tabs" and "Quick Menu: a branching panel", Droidtop/tracker#414). Pure state: the companion's Game tab and the
  * Quick Menu's Game section both read it, so turning Ask before stopping off changes both the same way.
  */
-enum class GameRow { RESUME, QUIT, RESTART, KILL, EMULATOR, OVERLAY, PERFORMANCE_MODE }
+enum class GameRow { RESUME, QUIT, RESTART, KILL, EMULATOR, OVERLAY, PERFORMANCE_MODE, SCREENSHOT }
 
 /**
  * What the runner says about itself: a stream (windowcast) disconnects rather than quits and has no restart or kill;
@@ -45,6 +45,7 @@ object GameControls {
             if (!runner.stream) add(GameRow.EMULATOR)
             add(GameRow.OVERLAY)
             add(GameRow.PERFORMANCE_MODE)
+            add(GameRow.SCREENSHOT)
         }
         return all.filter { row -> ControlAccess.shows(mode, controlRow(row)) }
     }
@@ -57,6 +58,7 @@ object GameControls {
         GameRow.EMULATOR -> ControlRow.GAME_EMULATOR
         GameRow.OVERLAY -> ControlRow.GAME_OVERLAY
         GameRow.PERFORMANCE_MODE -> ControlRow.GAME_PERFORMANCE_MODE
+        GameRow.SCREENSHOT -> ControlRow.GAME_SCREENSHOT
     }
 
     fun label(row: GameRow, runner: GameRunner): String = when (row) {
@@ -67,6 +69,7 @@ object GameControls {
         GameRow.EMULATOR -> "Emulator"
         GameRow.OVERLAY -> "Overlay"
         GameRow.PERFORMANCE_MODE -> "Performance mode"
+        GameRow.SCREENSHOT -> "Screenshot"
     }
 
     /** The question a row asks first, naming the game. */

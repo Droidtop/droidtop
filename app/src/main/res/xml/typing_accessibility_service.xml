@@ -4,11 +4,13 @@
      Only the events it needs: a view gaining focus or being tapped (a text field
      to type into), and a window changing (the field went away). Interactive
      windows are retrieved because a field's window names its display. Windows
-     changing also tells the picture-in-picture mover to look (PipMover). -->
+     changing also tells the picture-in-picture mover to look (PipMover). Screenshots
+     are the service's second job: the companion's Screenshot row and pin (Capture). -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeViewFocused|typeViewClicked|typeWindowStateChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
+    android:canTakeScreenshot="true"
     android:description="@string/typing_accessibility_description"
     android:notificationTimeout="50" />

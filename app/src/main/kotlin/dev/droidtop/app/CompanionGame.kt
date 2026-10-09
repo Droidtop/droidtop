@@ -175,6 +175,7 @@ internal fun CompanionGameTab() {
                 GameRow.PERFORMANCE_MODE -> performanceItem?.let { item ->
                     CompanionCatalogItems(listOf(item), onChanged = { overlayVersion++ })
                 }
+                GameRow.SCREENSHOT -> CompanionScreenshotRow(label)
             }
         }
         // Rows from plugins whose panel declares the game ability (slice C9): RetroArch's save and load, a stream's controls.
@@ -230,6 +231,33 @@ private fun CompanionEmulatorChoice(entry: LibraryEntry) {
             }
         }
         CompanionNote("From the next start")
+    }
+}
+
+/**
+ * Screenshot (slice C15): the game's screen through [dev.droidtop.runtime.Capture], then Share. The game's screen is the
+ * main one, where the shell launched it.
+ */
+@Composable
+private fun CompanionScreenshotRow(label: String) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var shot by remember { mutableStateOf<dev.droidtop.runtime.Capture.Shot?>(null) }
+    var working by remember { mutableStateOf(false) }
+    GameButton(if (working) "Taking a screenshot…" else label) {
+        if (working) return@GameButton
+        working = true
+        scope.launch {
+            val display = ForegroundShell.current()?.window?.decorView?.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
+            shot = dev.droidtop.runtime.Capture.take(context.applicationContext, display)
+            working = false
+        }
+    }
+    shot?.let { taken ->
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(taken.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite })
+            taken.uri?.let { uri -> CompanionPill("Share") { runCatching { context.startActivity(dev.droidtop.runtime.Capture.shareIntent(uri)) } } }
+        }
     }
 }
 

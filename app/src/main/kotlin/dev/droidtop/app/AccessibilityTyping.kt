@@ -64,6 +64,24 @@ class TypingAccessibilityService : AccessibilityService() {
  * types through the same field ([RoutedKeyboardSink]). Events arrive on the main thread; actions on the field, which
  * are calls into the other app, run in order on one worker thread.
  */
+/**
+ * The accessibility screenshot's answer as a picture (Capture). Its own class because its interface is Android 11's:
+ * built only under the SDK_INT >= R check in [AccessibilityTyping.connect] (build-scripts/class_load_api_allowlist.txt).
+ */
+@androidx.annotation.RequiresApi(Build.VERSION_CODES.R)
+internal class ScreenshotCallback(private val done: (android.graphics.Bitmap?) -> Unit) : AccessibilityService.TakeScreenshotCallback {
+    override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
+        val buffer = result.hardwareBuffer
+        val bitmap = runCatching {
+            android.graphics.Bitmap.wrapHardwareBuffer(buffer, result.colorSpace)?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+        }.getOrNull()
+        buffer.close()
+        done(bitmap)
+    }
+
+    override fun onFailure(errorCode: Int) = done(null)
+}
+
 internal object AccessibilityTyping {
     private const val HIDE_DELAY_MS = 400L
     private val main = Handler(Looper.getMainLooper())
@@ -97,11 +115,18 @@ internal object AccessibilityTyping {
         service = s
         AccessibilityKeyboard.hasEditor = { service != null && field != null }
         AccessibilityKeyboard.connected = true
+        // The service's second job: screenshots for the companion's Game row and pin (Capture, Android 11 and later).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            dev.droidtop.runtime.Capture.accessibility = dev.droidtop.runtime.Capture.Shooter { displayId, done ->
+                s.takeScreenshot(displayId, worker, ScreenshotCallback(done))
+            }
+        }
     }
 
     fun disconnect(s: AccessibilityService) {
         if (service !== s) return
         service = null
+        dev.droidtop.runtime.Capture.accessibility = null
         AccessibilityKeyboard.connected = false
         main.post {
             forget()

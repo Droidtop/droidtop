@@ -3584,6 +3584,12 @@ row of recent apps, became Home's Recent apps section for every mode.
   display settings"); and "This screen controls its own brightness" where droidtop has no brightness for it.
   Identify screens shows a large number and name on each screen for five seconds (a Presentation; a message on
   Android's default screen) and TalkBack reads the list.
+- **Screenshots (slice C15).** `Capture` (`:runtime-common`) is the one entry point: the helper app's shell runs
+  `screencap -p` into droidtop's own external cache folder for Android's default screen (`screencap -d` wants a
+  physical display id apps are not given), else droidtop's accessibility service takes it (`takeScreenshot`, Android
+  11 and later, any screen). The picture goes to Pictures/Screenshots (MediaStore), as Android's own do. Screenshot is
+  a row on the Game tab, with Share after it, and a catalog item a person can pin on Home. Without either route the
+  row says what would make it work.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 
@@ -4156,7 +4162,8 @@ rig check in the commit message.
 
 - **Other apps while another keyboard is selected: droidtop's accessibility service.** With Gboard
   (or any keyboard but droidtop's) selected and no elevated access, nothing of droidtop's is bound
-  to the editor, so droidtop has its own accessibility service, `TypingAccessibilityService`, which
+  to the editor, so droidtop has its own accessibility service, `TypingAccessibilityService` (two jobs: typing, and
+screenshots for the companion through `Capture`, `canTakeScreenshot`; window changes also nudge `PipMover`), which
   the user turns on (Displays, "Keyboard through accessibility"). It is kept minimal: the event types
   are a view gaining focus, a view tapped and a window changing; the flags are the interactive-window
   list (a field's window names its display, `AccessibilityWindowInfo.getDisplayId`, Android 11+;
