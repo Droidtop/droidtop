@@ -26,6 +26,8 @@ data class CompanionSettings(
     val barTipSeen: Boolean = false,
     /** "Show message text" ([dev.droidtop.runtime.systemstatus.NotificationRows.MessageText] key). */
     val messageText: String = "unlocked",
+    /** Home's low-battery line shows at or under this percent; 0 is off (the default). */
+    val lowBattery: Int = 0,
 ) {
     fun chosen(mode: String): List<String> = chosen[mode] ?: CompanionPrefs.defaultChosen(mode)
     fun opening(mode: String): String = opening[mode] ?: CompanionPrefs.OPEN_DEFAULT
@@ -40,6 +42,7 @@ object CompanionPrefs {
     private const val KEY_BAR_TIP = "bar_tip_seen"
     private const val KEY_MIGRATED = "migrated_roles"
     private const val KEY_MESSAGE_TEXT = "message_text"
+    private const val KEY_LOW_BATTERY = "low_battery"
 
     const val MAX_CHOSEN = 4
     const val OPEN_DEFAULT = "default"
@@ -102,6 +105,7 @@ object CompanionPrefs {
         onGameStart = (all[KEY_GAME_START] as? String)?.let(::currentId) ?: GAME_START_RUNNER,
         barTipSeen = all[KEY_BAR_TIP] as? Boolean ?: false,
         messageText = all[KEY_MESSAGE_TEXT] as? String ?: "unlocked",
+        lowBattery = all[KEY_LOW_BATTERY] as? Int ?: 0,
     )
 
     /** A stored bar list: comma separated, old ids made current, unknown ids and repeats dropped, at most four. */
@@ -157,6 +161,11 @@ object CompanionPrefs {
     fun setOnGameStart(context: Context, value: String) {
         update { it.copy(onGameStart = value) }
         prefs(context).edit().putString(KEY_GAME_START, value).apply()
+    }
+
+    fun setLowBattery(context: Context, percent: Int) {
+        update { it.copy(lowBattery = percent) }
+        prefs(context).edit().putInt(KEY_LOW_BATTERY, percent).apply()
     }
 
     fun setMessageText(context: Context, key: String) {

@@ -1130,6 +1130,15 @@ object GamingSettingsCatalog {
                     onSelect = { c, value -> CompanionPrefs.setOnGameStart(c, value) },
                 ),
                 ChoiceItem(
+                    id = "companion_low_battery",
+                    title = "Low battery line",
+                    subtitle = "A line on the companion's Home at this level, with battery saver one tap away",
+                    options = listOf(ChoiceOption("0", "Off (default)")) +
+                        listOf(10, 15, 20, 30).map { ChoiceOption(it.toString(), "At $it%") },
+                    current = settings.lowBattery.toString(),
+                    onSelect = { c, value -> CompanionPrefs.setLowBattery(c, value.toIntOrNull() ?: 0) },
+                ),
+                ChoiceItem(
                     id = "companion_message_text",
                     title = "Show message text",
                     subtitle = "Whether notifications on the companion show what a message says, or only who sent it",

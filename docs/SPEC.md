@@ -3369,11 +3369,19 @@ row of recent apps, became Home's Recent apps section for every mode.
   relevance: the status line (clock, network, battery, and as their own spoken words "Mic muted", "Mic in use"
   and "Camera in use" while any app records or holds a camera, from `AudioManager`'s recording callback, the
   camera availability callback and the microphone-mute broadcast while the line is on screen, never polled;
-  `StatusIndicators`) and the last launch or quit error, then the **pins** (slice C5, Droidtop/tracker#414):
+  `StatusIndicators`; and beside the battery, once about a minute of readings allow, "3 h 10 min left" or "45 min
+  to full": `BatterySampler` holds a `BATTERY_CHANGED` receiver while the line is on screen and reads
+  `BatteryManager`'s current and charge on each broadcast, no timer, no polling while asleep and no wakelock;
+  `BatteryEstimator` counts only readings since the charger was last plugged or unplugged, says nothing before
+  three readings over 45 seconds, smooths the current (exponential average) and falls back to the level's slope;
+  an optional low-battery line, off by default ("Low battery line" in the Companion group), offers Battery saver
+  and the game's own battery mode) and the last launch or quit error, then the **pins** (slice C5, Droidtop/tracker#414):
   catalog items by id (`PinnedControls`, default volume, brightness, Wi-Fi (the network row), Do Not Disturb
   and Mute microphone), drawn with the Quick Menu's own tile model (`QuickTiles.tile`, pressed by
   `QuickTiles.pressKind`); a slider pin has a step button each side. "Edit pins" lists every System, Display and
-  Sound item with Pin or Unpin (no long-press needed). A pin for a control that needs the helper app is not
+  Sound item with Pin or Unpin (no long-press needed), plus live stat tiles (slice C7): battery temperature and
+  draw in watts (from the battery broadcast) and the fastest core's clock (from `PerformanceMonitor`, which runs
+  only while that tile is on a Home that is on screen); a stat tile is not a live region. A pin for a control that needs the helper app is not
   drawn without it; a pin whose grant is missing shows its grant row. Kid and Kiosk keep volume and brightness,
   cannot edit, and Home shows nothing past the pins there (`ControlAccess`). Then the sections:
   1. **Now**: the running game (`LaunchDisplay.running`, the same parked launch the Quick Menu's Game section

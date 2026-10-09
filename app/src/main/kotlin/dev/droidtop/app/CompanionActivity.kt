@@ -240,6 +240,7 @@ internal fun CompanionSystemBar() {
             kotlinx.coroutines.delay(30_000)
         }
     }
+    val battery = rememberBattery()
     Column(modifier = Modifier.fillMaxWidth()) {
         androidx.compose.foundation.layout.Row(
             modifier = Modifier.fillMaxWidth(),
@@ -257,7 +258,13 @@ internal fun CompanionSystemBar() {
                 androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 6.dp))
                 Text(indicator, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
             }
+            // Time to empty or full, once the battery broadcasts give enough to say (about a minute).
+            battery.second?.let { estimate ->
+                androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 6.dp))
+                Text(estimate.label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
+        CompanionLowBatteryLine(battery.first)
         DisplayFallbackNotice()
     }
 }

@@ -63,4 +63,14 @@ class PinnedControlsTest {
         )
         assertTrue(StatusIndicators.lines(false, false, 0, 0).isEmpty())
     }
+
+    @Test
+    fun `stat tiles pin like controls, and only the clock runs the sampler`() {
+        val pins = listOf(GamingSettingsCatalog.ID_SYSTEM_VOLUME, PinnedControls.STAT_TEMPERATURE, PinnedControls.STAT_CLOCK)
+        assertEquals(pins, PinnedControls.visible(pins, UiMode.FULL, withoutProvider))
+        assertEquals(listOf(GamingSettingsCatalog.ID_SYSTEM_VOLUME), PinnedControls.visible(pins, UiMode.KID, withoutProvider))
+        assertTrue(PinnedControls.needsSampler(pins))
+        assertFalse(PinnedControls.needsSampler(listOf(PinnedControls.STAT_TEMPERATURE, PinnedControls.STAT_WATTS)))
+        assertFalse(PinnedControls.needsSampler(PinnedControls.visible(pins, UiMode.KID, withoutProvider)))
+    }
 }

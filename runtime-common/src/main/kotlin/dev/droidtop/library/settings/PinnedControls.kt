@@ -32,6 +32,24 @@ object PinnedControls {
         GamingSettingsCatalog.ID_SYSTEM_DND to GamingSettingsCatalog.ID_SYSTEM_DND_GRANT,
     )
 
+    /**
+     * Live stat tiles: not catalog items but readings, pinnable like one. The battery's heat and draw come from the
+     * battery broadcast Home already follows; the fastest core's clock needs the performance sampler, which runs only
+     * while a pin needs it and Home is on screen ([needsSampler]).
+     */
+    const val STAT_PREFIX = "stat:"
+    const val STAT_TEMPERATURE = "stat:temperature"
+    const val STAT_CLOCK = "stat:clock"
+    const val STAT_WATTS = "stat:watts"
+    val STATS: List<Pair<String, String>> = listOf(
+        STAT_TEMPERATURE to "Battery temperature",
+        STAT_CLOCK to "Fastest core clock",
+        STAT_WATTS to "Battery draw",
+    )
+
+    /** Whether Home must run the performance sampler for its pins. */
+    fun needsSampler(pins: List<String>): Boolean = STAT_CLOCK in pins
+
     data class State(val pins: List<String> = DEFAULT, val providerLineDismissed: Boolean = false)
 
     private val state = MutableStateFlow(State())
@@ -74,6 +92,7 @@ object PinnedControls {
         pins.filter { ControlAccess.pinnable(mode, it) }.mapNotNull { id ->
             when {
                 id in available -> id
+                id.startsWith(STAT_PREFIX) && STATS.any { it.first == id } -> id
                 STAND_INS[id]?.let { it in available } == true -> STAND_INS.getValue(id)
                 else -> null
             }
