@@ -188,6 +188,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(PluginJobsScreen.screen())
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(WineOptionsCatalog.gameScreen())
+        SettingsScreenRegistry.register(WindowsInstallCatalog.screen())
         SettingsScreenRegistry.register(pcStoresScreen())
         SettingsScreenRegistry.register(StoresCatalog.screen())
         SettingsScreenRegistry.register(SocialCatalog.screen())
@@ -1160,6 +1161,17 @@ object AppSettingsCatalogs {
                     // the long download or reinstall starts (Droidtop/tracker#299);
                     // the same WindowsSetup path launch and the game page use.
                     add(windowsSetupItem(provisioned, setupState))
+                    // A new game from an installer, in a prefix of its own (docs/SPEC.md 7c).
+                    if (provisioned) {
+                        add(
+                            NestedScreenItem(
+                                id = "windows_install_row",
+                                title = "Install a Windows game",
+                                subtitle = "Run a GOG offline installer or any setup program in a new prefix, then add the game it installed to your library",
+                                registryId = WindowsInstallCatalog.SCREEN_ID,
+                            ),
+                        )
+                    }
                 },
             ),
         ) + (

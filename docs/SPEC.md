@@ -6865,6 +6865,47 @@ Two concrete references to build from rather than design blind:
     game keeps inside the prefix are deleted; for the shared prefix the row says it is every game's.
     Game folders are never touched. Reset and Windows components are refused while any Wine process
     runs, since that process owns the prefix.
+  **Install a new game (2026-10-09, Droidtop/tracker#10).** Lutris's "install a game": a GOG offline
+  installer or any setup program runs in a NEW prefix of its own, and what it installed becomes a
+  first-class library game that starts in that prefix. "Install a Windows game"
+  (`WindowsInstallCatalog`, screen `windows_install`, a row of Settings > Windows games once
+  Windows is set up, and the screen the general "Add a game" flow, Droidtop/tracker#407, opens by id)
+  over `WindowsInstalls` in `:runtime-windows`:
+  - **The installer is read where it is.** Picked with the system picker or typed as a path (the
+    same two ways as "Run a program"); never copied or moved. Its folder is mapped into the new
+    prefix as a drive (`PrefixDrives`: a drive that already holds it, else the first free letter from
+    D), so the installer finds the data files beside it (a GOG installer's `.bin` parts) and sees its
+    own path as a Windows one. Wine cannot make that mapping read only without a mount namespace,
+    which a no-root app has no way to make; droidtop writes nothing there and an installer is not
+    expected to.
+  - **Where the game goes.** By default inside the new prefix (`C:\...`), which writes to none of the
+    person's folders. The person may choose a folder to install into ("Install into a folder of
+    mine"); it is mapped as a drive too, the row says which letter to choose in the installer, and it
+    is the only place of theirs anything is written (by the installer, at their choice). Nothing else
+    is written to a folder of theirs.
+  - **The new prefix** is made from the shared environment's settings (extra arguments cleared) by
+    `PcContainers.createNamed`, with the id the game will have: a folder game `CUSTOM_GAME_n` starts in
+    the prefix of that id (`PcContainers.forGame`), and `CustomGameScanner.reserveGameId` picks `n`
+    before any folder exists. So no second mapping from game to prefix is needed. An install that has
+    been started and not yet added is listed (`WindowsInstalls.Pending`, shared preferences), with "Run
+    the installer again", the prefix tools for its prefix (`PcContainers.ofContainer` opens a prefix
+    that is no game's yet), the folders found, and "Throw this install away" (the prefix is deleted
+    with `SafeDelete`, nothing else).
+  - **Adding the game.** `WindowsInstalls.findCandidates` offers the folders the installer put in the
+    prefix (inside `Program Files`, `Program Files (x86)`, `GOG Games`, `Games`, any other folder at
+    the top of `C:`, the chosen folder and what is in it), without what was there before it ran and
+    without Windows' own folders; droidtop does not guess which is the game. Picking one is
+    `WindowsInstalls.addGame`: `CustomGameScanner.adopt` makes the folder game `n` (the id store and
+    the scanner's folder list, as for any folder game) and `LibraryPaths.report` has the library look at
+    exactly that folder (§7g, "Targeted indexing": `PcGameProvider.indexPath` answers for a folder the
+    scanner was told about by hand outside the roots with the store part, which reads those folders). The
+    folder stays where the installer put it. `addGame` is the function #407's flow calls to make a
+    row; it takes a prefix made here.
+  - **"Unpack" is not built.** Unpacking a Windows installer without running it (innoextract) needs a
+    native binary for arm64-v8a and x86_64 that nothing in the tree carries, and a decision on where
+    one comes from (every bundle carries both ABIs, CLAUDE.md). Running the installer in Wine is the
+    one way, until that is decided.
+
 - **Linux container management**: distrobox itself is CLI-only (no
   official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
   real, actively-maintained GTK4 GUI for it — confirmed feature set:

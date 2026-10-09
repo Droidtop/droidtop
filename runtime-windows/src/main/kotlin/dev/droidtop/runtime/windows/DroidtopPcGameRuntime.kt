@@ -578,6 +578,10 @@ object PcContainers {
      */
     fun forGame(context: Context, entryId: String?): Container? {
         val manager = runCatching { ContainerManager(context) }.getOrNull() ?: return null
+        // A prefix that is no library game's yet (an install in progress, WindowsInstalls) is opened by its id.
+        entryId?.takeIf { it.startsWith(BY_CONTAINER) }?.let { token ->
+            return runCatching { manager.getContainerById(token.removePrefix(BY_CONTAINER)) }.getOrNull()
+        }
         val perGame = entryId?.let { ownId(it) }
         if (perGame != null && runCatching { manager.hasContainer(perGame) }.getOrDefault(false)) {
             return runCatching { manager.getContainerById(perGame) }.getOrNull()
@@ -585,6 +589,11 @@ object PcContainers {
         val containers = runCatching { manager.containers }.getOrNull().orEmpty()
         return containers.firstOrNull { it.id == DroidtopPcGameRuntime.CONTAINER_ID } ?: containers.firstOrNull()
     }
+
+    private const val BY_CONTAINER = "container:"
+
+    /** What [forGame] takes in place of an entry id to open the prefix with this container [id]. */
+    fun ofContainer(id: String): String = BY_CONTAINER + id
 
     /** Whether [container] is [entryId]'s own prefix rather than the one every other game shares. */
     fun isOwnPrefix(entryId: String?, container: Container): Boolean =
@@ -601,9 +610,16 @@ object PcContainers {
      * first when it is not on the device, then makes a whole new prefix:
      * never on the main thread.
      */
-    suspend fun createOwn(context: Context, entryId: String, title: String, settings: ContainerData): Container {
+    suspend fun createOwn(context: Context, entryId: String, title: String, settings: ContainerData): Container =
+        createNamed(context, ownId(entryId), title, settings)
+
+    /**
+     * A container with this [id], named [title], made with [settings]: [createOwn] for a game's id, and
+     * the install of a new game ([WindowsInstalls]), whose prefix is made before the game's folder
+     * exists, with the id the game will have. Returns the existing one if there is one.
+     */
+    suspend fun createNamed(context: Context, id: String, title: String, settings: ContainerData): Container {
         val manager = ContainerManager(context)
-        val id = ownId(entryId)
         if (manager.hasContainer(id)) return manager.getContainerById(id)
         // Creating a prefix copies Wine's own DLLs out of the installed build,
         // so the build has to be on disk first (the order setup keeps too).

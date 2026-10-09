@@ -189,7 +189,7 @@ object WinePrefixTools {
     }
 
     /** A line to refuse with while any Wine process runs, else null. */
-    private fun runningMessage(): String? =
+    internal fun runningMessage(): String? =
         if (ProcessHelper.listRunningWineProcesses().isEmpty()) null
         else "A Windows program is still running. Stop every Wine process first (Prefix tools), then try again"
 

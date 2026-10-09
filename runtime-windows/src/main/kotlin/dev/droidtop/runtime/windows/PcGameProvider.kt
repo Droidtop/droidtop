@@ -255,6 +255,15 @@ class PcGameProvider(
             return results
         }
         if (inStoreFolder) return results
+        // A game folder outside droidtop's roots that the scanner was told about by hand (the game a Windows
+        // installer made, WindowsInstalls) is a row of the store part, which reads those folders: no walk.
+        val underRoot = dev.droidtop.library.GamesRoots.current(context).any { root ->
+            path.path == root.path || path.path.startsWith(root.path.trimEnd('/') + "/")
+        }
+        if (!underRoot && PcLibrary.isManualFolder(path.path)) {
+            refreshStorePart()?.let { results += it }
+            return results
+        }
         val at = PcLibrary.folderGamesAt(context, path) ?: return results
         val engineDefs = runCatching { EnginesDatabase.defs(context) }.getOrDefault(emptyList())
         results += PathIndexing(

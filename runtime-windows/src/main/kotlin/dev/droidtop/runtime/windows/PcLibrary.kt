@@ -337,6 +337,10 @@ object PcLibrary {
         FolderAt(root.absolutePath, top.absolutePath, folder.absolutePath, games)
     }
 
+    /** Whether the vendored scanner was told, by hand, that [path] is a game folder. */
+    fun isManualFolder(path: String): Boolean =
+        runCatching { dev.droidtop.runtime.windows.PrefManager.customGameManualFolders.contains(path) }.getOrDefault(false)
+
     /** The vendored scanner is no longer told about game folders that were under [path], which is gone. */
     fun forgetFolders(path: String) {
         runCatching {

@@ -253,6 +253,40 @@ object CustomGameScanner {
         return candidateId
     }
 
+    /**
+     * A game id no known folder holds and [isFree] accepts, for a game whose folder does not exist yet:
+     * a Windows installer's prefix is made under the id its game will have ([adopt]), and a folder
+     * game's prefix is the one of its id (docs/SPEC.md 7c, "Install a new game").
+     */
+    fun reserveGameId(isFree: (Int) -> Boolean): Int {
+        val taken = getOrRebuildCache().keys
+        repeat(1000) {
+            val id = 1_000_000 + kotlin.random.Random.nextInt(1_000_000_000)
+            if (id !in taken && isFree(id)) return id
+        }
+        error("no free game id")
+    }
+
+    /**
+     * Makes [folder] the game with id [gameId]: remembered in droidtop's id store, told to the scanner as
+     * a game folder, and returns its app id, or null when another folder holds that id. Waits for the
+     * scanner's folder list to take the folder (its preference is written in the background, and a
+     * library read straight after must see it).
+     */
+    suspend fun adopt(folder: File, gameId: Int): String? {
+        if (!folder.isDirectory) return null
+        val holder = getOrRebuildCache()[gameId]
+        if (holder != null && holder != folder.absolutePath && File(holder).isDirectory) return null
+        PrefManager.customGameManualFolders = PrefManager.customGameManualFolders + folder.absolutePath
+        DroidtopGameIdStore.write(folder, gameId)
+        CustomGameCache.invalidate()
+        repeat(40) {
+            if (folder.absolutePath in PrefManager.customGameManualFolders) return@repeat
+            kotlinx.coroutines.delay(50)
+        }
+        return createLibraryItemFromFolder(folder.absolutePath)?.appId?.takeIf { it == "${CUSTOM_GAME}_$gameId" }
+    }
+
     /** The folder of the game with numeric id [gameId], or null. */
     fun findCustomGameById(gameId: Int): String? {
         val folderPath = getOrRebuildCache()[gameId] ?: return null
