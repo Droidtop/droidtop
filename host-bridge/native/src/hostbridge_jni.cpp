@@ -364,11 +364,24 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeInjectPointerAxis(
 
 extern "C" JNIEXPORT void JNICALL
 Java_dev_droidtop_hostbridge_HostBridge_nativeInjectKey(
-    JNIEnv* env, jobject thiz, jint evdevKeyCode, jboolean pressed) {
+    JNIEnv* env, jobject thiz, jint evdevKeyCode, jboolean pressed, jboolean typed) {
     std::lock_guard<std::mutex> lock(g_clientsMutex);
     if (auto* client = findClient(identityHash(env, thiz))) {
-        client->injectKey(static_cast<uint32_t>(evdevKeyCode), pressed == JNI_TRUE);
+        client->injectKey(static_cast<uint32_t>(evdevKeyCode), pressed == JNI_TRUE, typed == JNI_TRUE);
     }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeSetKeymap(JNIEnv* env, jobject thiz, jbyteArray utf8) {
+    if (!utf8) return JNI_FALSE;
+    jsize length = env->GetArrayLength(utf8);
+    std::string text(static_cast<size_t>(length), '\0');
+    env->GetByteArrayRegion(utf8, 0, length, reinterpret_cast<jbyte*>(text.data()));
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    if (auto* client = findClient(identityHash(env, thiz))) {
+        return client->setKeymap(text.data(), text.size()) ? JNI_TRUE : JNI_FALSE;
+    }
+    return JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL

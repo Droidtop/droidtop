@@ -53,6 +53,13 @@ class CompositorProvisioningTest {
     }
 
     @Test
+    fun `every plan installs the distro's xkbcommon tool for the keyboard layout`() {
+        assertTrue(CompositorProvisioning.plan("alpine", "sway")!!.installCommand.split(" ").contains("xkbcli"))
+        assertTrue(CompositorProvisioning.plan("alpine", "labwc")!!.installCommand.split(" ").contains("xkbcli"))
+        assertTrue(CompositorProvisioning.plan("debian", "sway")!!.installCommand.split(" ").contains("libxkbcommon-tools"))
+    }
+
+    @Test
     fun `unsupported combinations return null instead of a guessed plan`() {
         assertNull(CompositorProvisioning.plan("alpine", "hyprland"))
         assertNull(CompositorProvisioning.plan("fedora", "sway"))

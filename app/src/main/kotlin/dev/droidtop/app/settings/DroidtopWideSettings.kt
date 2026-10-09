@@ -269,6 +269,7 @@ object DroidtopWideSettings {
                             current = dev.droidtop.app.DesktopSetupPrefs.keepRunning(context),
                             onToggle = { ctx, on -> dev.droidtop.app.DesktopSetupPrefs.setKeepRunning(ctx, on) },
                         ),
+                        keyboardLayoutChoice(context),
                         ChoiceItem(
                             id = "pref_desktop_panel",
                             title = "Desktop panel",
@@ -333,6 +334,40 @@ object DroidtopWideSettings {
             },
             current = CatalogPrefs.prefs(context).getString(dev.droidtop.runtime.DesktopScale.KEY, dev.droidtop.runtime.DesktopScale.AUTOMATIC),
             onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(dev.droidtop.runtime.DesktopScale.KEY, value).apply() },
+        )
+    }
+
+    /**
+     * The desktop keyboard's layout (Droidtop/tracker#387): Automatic, named
+     * with what it resolves to and where that came from, or one of the
+     * container's own layouts (its list is copied the first time a desktop
+     * runs; before that, the layouts droidtop can name from a language).
+     */
+    private suspend fun keyboardLayoutChoice(context: Context): ChoiceItem {
+        val names = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            dev.droidtop.app.DesktopKeyboardLayout.layoutNames(context)
+        }
+        val stored = dev.droidtop.app.DesktopKeyboardLayout.setting(context)
+        val auto = dev.droidtop.app.DesktopKeyboardLayout.automatic(context)
+        val current = dev.droidtop.app.DesktopKeyboardLayout.resolve(context)
+        val ids = names.keys.ifEmpty { dev.droidtop.runtime.KeyboardLayouts.KNOWN }
+        val options = listOf(
+            ChoiceOption(
+                dev.droidtop.runtime.KeyboardLayouts.AUTOMATIC,
+                "Automatic (${dev.droidtop.app.DesktopKeyboardLayout.describe(auto, names)})",
+            ),
+        ) + (ids + listOfNotNull(stored.takeIf { it != dev.droidtop.runtime.KeyboardLayouts.AUTOMATIC }))
+            .distinct()
+            .map { id -> ChoiceOption(id, names[id]?.let { "$it ($id)" } ?: id) }
+        return ChoiceItem(
+            id = dev.droidtop.runtime.KeyboardLayouts.KEY,
+            title = "Keyboard layout",
+            subtitle = (if (stored == dev.droidtop.runtime.KeyboardLayouts.AUTOMATIC) "Automatic: " else "") +
+                dev.droidtop.app.DesktopKeyboardLayout.describe(current, names) +
+                ". For a physical keyboard; the on-screen keyboards type as they show",
+            options = options,
+            current = stored,
+            onSelect = { ctx, value -> dev.droidtop.app.DesktopKeyboardLayout.setSetting(ctx, value) },
         )
     }
 

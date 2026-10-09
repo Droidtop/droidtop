@@ -100,7 +100,13 @@ struct WaylandGlobals {
     wl_output* output = nullptr;
 
     zwlr_virtual_pointer_v1* virtual_pointer = nullptr;
+    // Two keyboards on the one seat (docs/SPEC.md 6b "Keyboard layout"): keys of a physical keyboard go through
+    // virtual_keyboard, which takes the layout droidtop compiles in the container (setKeymap); keys Android
+    // derived from characters (an on-screen keyboard, droidtop's own keyboards) go through text_keyboard, which
+    // keeps the US keymap those keys were chosen against. wlroots hands a client the keymap of whichever
+    // keyboard typed last, so each path types what it means.
     zwp_virtual_keyboard_v1* virtual_keyboard = nullptr;
+    zwp_virtual_keyboard_v1* text_keyboard = nullptr;
 };
 
 // Live state for one in-progress (or steady-state looping) screencopy
@@ -275,6 +281,26 @@ int createKeymapFd(const char* name, size_t size) {
         }
     }
     return ASharedMemory_create(name, size);
+}
+
+/** Hands [keyboard] the XKB keymap text [keymap] of [size] bytes (its trailing NUL included). False when it could not. */
+bool uploadKeymap(zwp_virtual_keyboard_v1* keyboard, const char* keymap, size_t size) {
+    int keymapFd = createKeymapFd("hostbridge-keymap", size);
+    if (keymapFd < 0) {
+        LOGE("creating the keymap file failed");
+        return false;
+    }
+    void* dst = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, keymapFd, 0);
+    if (dst == MAP_FAILED) {
+        LOGE("mmap failed for keymap fd: %s", strerror(errno));
+        close(keymapFd);
+        return false;
+    }
+    std::memcpy(dst, keymap, size);
+    munmap(dst, size);
+    zwp_virtual_keyboard_v1_keymap(keyboard, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, keymapFd, static_cast<uint32_t>(size));
+    close(keymapFd); // the request duplicates the fd; ours is no longer needed
+    return true;
 }
 
 // ---- output management (wlr-output-management-unstable-v1) ----
@@ -1331,27 +1357,17 @@ bool WaylandClient::connect(const char* socketPath) {
         globals_->virtual_pointer_manager, globals_->seat);
     globals_->virtual_keyboard = zwp_virtual_keyboard_manager_v1_create_virtual_keyboard(
         globals_->virtual_keyboard_manager, globals_->seat);
+    globals_->text_keyboard = zwp_virtual_keyboard_manager_v1_create_virtual_keyboard(
+        globals_->virtual_keyboard_manager, globals_->seat);
 
     // zwp_virtual_keyboard_v1 requires a keymap before it will process any
-    // key event at all (protocol requirement, not a hostbridge choice) —
-    // see default_keymap.h for why this is a static embedded blob rather
-    // than something generated on-device.
+    // key event at all (protocol requirement, not a hostbridge choice).
+    // Both start with the embedded US map (default_keymap.h); the layout
+    // keyboard gets the person's layout later through setKeymap, compiled
+    // by the container's own xkbcommon.
     size_t keymapSize = sizeof(kDefaultXkbKeymapUS); // includes the trailing NUL, which is fine/expected
-    int keymapFd = createKeymapFd("hostbridge-keymap", keymapSize);
-    if (keymapFd >= 0) {
-        void* dst = mmap(nullptr, keymapSize, PROT_READ | PROT_WRITE, MAP_SHARED, keymapFd, 0);
-        if (dst != MAP_FAILED) {
-            std::memcpy(dst, kDefaultXkbKeymapUS, keymapSize);
-            munmap(dst, keymapSize);
-            zwp_virtual_keyboard_v1_keymap(globals_->virtual_keyboard, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                            keymapFd, static_cast<uint32_t>(keymapSize));
-        } else {
-            LOGE("mmap failed for keymap fd: %s", strerror(errno));
-        }
-        close(keymapFd); // wl_keyboard.keymap request duplicates the fd internally; safe to close ours
-    } else {
-        LOGE("creating the keymap file failed");
-    }
+    uploadKeymap(globals_->virtual_keyboard, kDefaultXkbKeymapUS, keymapSize);
+    uploadKeymap(globals_->text_keyboard, kDefaultXkbKeymapUS, keymapSize);
 
     // Clipboard. Non-fatal when absent, unlike the globals checked above:
     // the desktop is still usable without a selection bridge.
@@ -1423,6 +1439,7 @@ void WaylandClient::disconnect() {
     if (globals_) {
         if (globals_->virtual_pointer) zwlr_virtual_pointer_v1_destroy(globals_->virtual_pointer);
         if (globals_->virtual_keyboard) zwp_virtual_keyboard_v1_destroy(globals_->virtual_keyboard);
+        if (globals_->text_keyboard) zwp_virtual_keyboard_v1_destroy(globals_->text_keyboard);
         if (globals_->toplevel_manager) zwlr_foreign_toplevel_manager_v1_destroy(globals_->toplevel_manager);
     }
     delete globals_;
@@ -1566,13 +1583,25 @@ void WaylandClient::injectPointerAxis(double horizontal, double vertical) {
     wl_display_flush(display_);
 }
 
-void WaylandClient::injectKey(uint32_t evdevKeyCode, bool pressed) {
-    if (!globals_ || !globals_->virtual_keyboard) return;
-    zwp_virtual_keyboard_v1_key(globals_->virtual_keyboard, 0, evdevKeyCode,
+void WaylandClient::injectKey(uint32_t evdevKeyCode, bool pressed, bool typed) {
+    if (!globals_) return;
+    zwp_virtual_keyboard_v1* keyboard = typed ? globals_->text_keyboard : globals_->virtual_keyboard;
+    if (!keyboard) return;
+    zwp_virtual_keyboard_v1_key(keyboard, 0, evdevKeyCode,
                                  pressed ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
     // Requests made off the dispatch thread are only buffered; without a
     // flush they wait for the next time the dispatch thread wakes.
     wl_display_flush(display_);
+}
+
+bool WaylandClient::setKeymap(const char* keymap, size_t length) {
+    if (!globals_ || !globals_->virtual_keyboard || !keymap || length == 0) return false;
+    // The protocol wants the text NUL-terminated within the size it is given.
+    std::string text(keymap, length);
+    bool ok = uploadKeymap(globals_->virtual_keyboard, text.c_str(), text.size() + 1);
+    wl_display_flush(display_);
+    if (ok) LOGI("layout keyboard keymap replaced (%zu bytes)", length);
+    return ok;
 }
 
 void WaylandClient::setClipboardListener(ClipboardTextCallback callback, void* userData) {

@@ -44,6 +44,32 @@ class DesktopInputRouterKeysTest {
     }
 
     @Test
+    fun `a typed key and its synthesized Shift go through the text keyboard, a physical key through the layout one`() {
+        val bridge = FakeHostBridge()
+        val router = router(bridge)
+
+        router.onKeyEvent(KeyEvent.KEYCODE_1, KeyEvent.ACTION_DOWN, 0, shiftMeta, typed = true)
+        router.onKeyEvent(KeyEvent.KEYCODE_1, KeyEvent.ACTION_UP, 0, shiftMeta, typed = true)
+        router.onKeyEvent(KeyEvent.KEYCODE_Y, KeyEvent.ACTION_DOWN, 0, 0, typed = false)
+        router.onKeyEvent(KeyEvent.KEYCODE_Y, KeyEvent.ACTION_UP, 0, 0, typed = false)
+
+        assertEquals(listOf(42 to true, 2 to true, 2 to false, 42 to false, 21 to true, 21 to false), bridge.keys)
+        assertEquals(listOf(true, true, true, true, false, false), bridge.typed)
+    }
+
+    @Test
+    fun `a held key is released through the keyboard it was pressed on`() {
+        val bridge = FakeHostBridge()
+        val router = router(bridge)
+
+        router.onKeyEvent(KeyEvent.KEYCODE_A, KeyEvent.ACTION_DOWN, 0, 0, typed = false)
+        router.releaseHeldInput()
+
+        assertEquals(listOf(30 to true, 30 to false), bridge.keys)
+        assertEquals(listOf(false, false), bridge.typed)
+    }
+
+    @Test
     fun `an unshifted key is forwarded alone`() {
         val bridge = FakeHostBridge()
         val router = router(bridge)

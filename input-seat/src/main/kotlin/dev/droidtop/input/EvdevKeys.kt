@@ -18,12 +18,11 @@ import android.view.MotionEvent
  * evdev `KEY_A = 30` plus XKB's fixed offset of 8. So every code below can
  * be checked against a name in that generated file rather than trusted.
  *
- * Consequence worth stating plainly: because the compositor applies a US
- * layout, a user typing on a physical AZERTY keyboard gets QWERTY output.
- * That is a keymap-selection gap (host-bridge's README already names it),
- * not something a bigger table here would fix — and adding a compensating
- * table here would be the second mapping mechanism this design exists to
- * avoid.
+ * The layout a physical keyboard types in is the keymap host-bridge gives
+ * its layout keyboard, compiled in the container from the person's
+ * "Keyboard layout" setting (docs/SPEC.md 6b, Droidtop/tracker#387), not a
+ * bigger table here: a compensating table would be the second mapping
+ * mechanism this design exists to avoid.
  */
 object EvdevKeys {
 

@@ -56,7 +56,8 @@ class DesktopInputRouter {
     private var lastTouchCentroidY = 0f
 
     private var lastMouseButtonState = 0
-    private val heldKeys = mutableSetOf<Int>()
+    /** Every key the container sees held, and whether it went through the typed-text keyboard (InputSeat.onKey). */
+    private val heldKeys = mutableMapOf<Int, Boolean>()
     private val heldButtons = mutableSetOf<Int>()
 
     /**
@@ -102,7 +103,7 @@ class DesktopInputRouter {
         val current = seat
         if (current != null) {
             heldButtons.forEach { current.onPointerButton(InputSource.TOUCH, it, pressed = false) }
-            heldKeys.forEach { current.onKey(InputSource.LAPDOCK_PERIPHERAL, it, down = false) }
+            heldKeys.forEach { (key, typed) -> current.onKey(InputSource.LAPDOCK_PERIPHERAL, key, down = false, typed = typed) }
         }
         heldButtons.clear()
         heldKeys.clear()
@@ -362,7 +363,7 @@ class DesktopInputRouter {
             return true
         }
 
-        return onKeyEvent(event.keyCode, event.action, event.repeatCount, event.metaState)
+        return onKeyEvent(event.keyCode, event.action, event.repeatCount, event.metaState, typed = isTyped(event))
     }
 
     /**
@@ -371,7 +372,7 @@ class DesktopInputRouter {
      * throws on every method call, so a [KeyEvent] cannot even be built
      * there. Nothing but reading the four fields may happen in the shell.
      */
-    internal fun onKeyEvent(androidKeyCode: Int, action: Int, repeatCount: Int, metaState: Int): Boolean {
+    internal fun onKeyEvent(androidKeyCode: Int, action: Int, repeatCount: Int, metaState: Int, typed: Boolean = false): Boolean {
         val seat = seat ?: return false
         val evdev = EvdevKeys.evdevKeyCode(androidKeyCode) ?: return false
         when (action) {
@@ -380,21 +381,36 @@ class DesktopInputRouter {
                 // repeat rate and delay. Forwarding Android's repeats as
                 // fresh presses would stack a second repeat on top of it.
                 if (repeatCount == 0) {
-                    synthesizeShiftDown(seat, evdev, metaState)
-                    heldKeys += evdev
-                    seat.onKey(InputSource.LAPDOCK_PERIPHERAL, evdev, down = true)
+                    synthesizeShiftDown(seat, evdev, metaState, typed)
+                    heldKeys[evdev] = typed
+                    seat.onKey(InputSource.LAPDOCK_PERIPHERAL, evdev, down = true, typed = typed)
                 }
             }
 
             KeyEvent.ACTION_UP -> {
-                heldKeys -= evdev
-                seat.onKey(InputSource.LAPDOCK_PERIPHERAL, evdev, down = false)
+                // Released through the keyboard it was pressed on, whatever this event says.
+                val pressedTyped = heldKeys.remove(evdev) ?: typed
+                seat.onKey(InputSource.LAPDOCK_PERIPHERAL, evdev, down = false, typed = pressedTyped)
                 releaseSynthesizedShift(seat, evdev)
             }
 
             else -> return false
         }
         return true
+    }
+
+    /**
+     * Whether Android derived this key from a character rather than read it off a physical keyboard: an
+     * on-screen keyboard, droidtop's own keyboards (they build KeyEvents with the virtual device), anything
+     * without a real input device. Those keys were picked against Android's US virtual key map, so they go
+     * through the container's US text keyboard; a physical keyboard's keys go through the layout keyboard
+     * (docs/SPEC.md 6b "Keyboard layout", Droidtop/tracker#387).
+     */
+    private fun isTyped(event: KeyEvent): Boolean {
+        if (event.flags and KeyEvent.FLAG_SOFT_KEYBOARD != 0) return true
+        if (event.deviceId == android.view.KeyCharacterMap.VIRTUAL_KEYBOARD) return true
+        val device = event.device ?: return true
+        return device.isVirtual
     }
 
     /**
@@ -414,7 +430,7 @@ class DesktopInputRouter {
      * like any other and toggles the container's own caps state, which a
      * synthesized Shift on top of it would cancel.
      */
-    private fun synthesizeShiftDown(seat: InputSeat, evdev: Int, metaState: Int) {
+    private fun synthesizeShiftDown(seat: InputSeat, evdev: Int, metaState: Int, typed: Boolean) {
         if (evdev == EvdevKeys.SHIFT_LEFT || evdev == EvdevKeys.SHIFT_RIGHT) return
         val shiftBits =
             KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_RIGHT_ON
@@ -427,8 +443,8 @@ class DesktopInputRouter {
         if (EvdevKeys.SHIFT_LEFT in heldKeys || EvdevKeys.SHIFT_RIGHT in heldKeys) return
         synthesizedShiftDown = true
         shiftDependents += evdev
-        heldKeys += EvdevKeys.SHIFT_LEFT
-        seat.onKey(InputSource.LAPDOCK_PERIPHERAL, EvdevKeys.SHIFT_LEFT, down = true)
+        heldKeys[EvdevKeys.SHIFT_LEFT] = typed
+        seat.onKey(InputSource.LAPDOCK_PERIPHERAL, EvdevKeys.SHIFT_LEFT, down = true, typed = typed)
     }
 
     /** Takes the synthesized Shift away again once every key it was sent for is up. */
@@ -436,8 +452,8 @@ class DesktopInputRouter {
         if (!shiftDependents.remove(evdev)) return
         if (shiftDependents.isNotEmpty() || !synthesizedShiftDown) return
         synthesizedShiftDown = false
-        heldKeys -= EvdevKeys.SHIFT_LEFT
-        seat.onKey(InputSource.LAPDOCK_PERIPHERAL, EvdevKeys.SHIFT_LEFT, down = false)
+        val shiftTyped = heldKeys.remove(EvdevKeys.SHIFT_LEFT) ?: false
+        seat.onKey(InputSource.LAPDOCK_PERIPHERAL, EvdevKeys.SHIFT_LEFT, down = false, typed = shiftTyped)
     }
 
     private fun pressButton(seat: InputSeat, source: InputSource, button: Int) {

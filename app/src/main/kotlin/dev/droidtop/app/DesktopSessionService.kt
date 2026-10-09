@@ -123,6 +123,7 @@ class DesktopSessionService : Service() {
         // A primary still booting is stopped too: cancelling the boot's
         // wait alone would leave its compositor coming up with nobody to
         // stop it.
+        DesktopKeyboardLayout.stopWatching(applicationContext)
         libraryEntries?.stop()
         libraryEntries = null
         val connected = _stateHolder.value as? DesktopSessionState.Connected
@@ -223,6 +224,8 @@ class DesktopSessionService : Service() {
         libraryEntries = DesktopLibraryEntries(applicationContext, LibraryCore.library(applicationContext)).also { it.start(scope) }
         // Fonts for all languages are a Downloads job, not part of the boot (Droidtop/tracker#390): started only
         // when this desktop does not have them yet, which one cheap test in the container answers.
+        // The physical keyboard's layout, compiled in the container (docs/SPEC.md 6b, Droidtop/tracker#387).
+        DesktopKeyboardLayout.startWatching(applicationContext)
         if (DesktopSetupPrefs.allLanguageFonts(applicationContext)) {
             scope.launch {
                 val installed = runCatching {

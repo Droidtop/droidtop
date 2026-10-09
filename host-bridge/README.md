@@ -93,6 +93,10 @@ it is not the same as confirmed-working. Treat the implementation below as
   `default_keymap.h` embeds a standard "us"/pc105 keymap generated once,
   on-host, via WSL's `libxkbcommon` (see that file's header comment) — no
   xkbcommon dependency on-device at all.
+  Two virtual keyboards share the seat: the layout keyboard, whose keymap
+  `setKeymap` replaces with one the container's own `xkbcli` compiled for the
+  person's layout, and the text keyboard, which keeps the US map for keys
+  Android derived from characters (`docs/SPEC.md` 6b "Keyboard layout").
 - **Windows / task manager** (`wlr-foreign-toplevel-management-unstable-v1`,
   Droidtop/tracker#94) — `ToplevelState` tracks every toplevel the
   compositor reports (title, app id, activated/minimized/maximized/

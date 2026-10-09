@@ -146,7 +146,9 @@ object CompositorProvisioning {
     }
 
     private fun basePlan(os: String, desktopEnvironment: String): PrimaryProvisioning? {
-        val terminal = "${ContainerTerminal.PACKAGE} $FILE_MANAGER_PACKAGE $ICON_THEME_PACKAGE"
+        // xkbcommon's command-line tool compiles the physical keyboard's layout (KeyboardLayouts, docs/SPEC.md 6b).
+        val xkbcli = KeyboardLayouts.CLI_PACKAGES[os].orEmpty()
+        val terminal = "${ContainerTerminal.PACKAGE} $FILE_MANAGER_PACKAGE $ICON_THEME_PACKAGE $xkbcli".trimEnd()
         return when (os to desktopEnvironment) {
             "debian" to "sway" -> PrimaryProvisioning(
                 installCommand = "$DEBIAN_NO_SERVICE_STARTS && export DEBIAN_FRONTEND=noninteractive && " +

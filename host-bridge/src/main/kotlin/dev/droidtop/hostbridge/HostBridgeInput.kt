@@ -14,5 +14,10 @@ interface HostBridgeInput {
     fun injectPointerMotionAbsolute(x: Double, y: Double, extentWidth: Int, extentHeight: Int)
     fun injectPointerButton(linuxButtonCode: Int, pressed: Boolean)
     fun injectPointerAxis(horizontal: Double, vertical: Double)
-    fun injectKey(evdevKeyCode: Int, pressed: Boolean)
+    /**
+     * [typed]: the key was derived from a character by Android (an on-screen keyboard, droidtop's own keyboards),
+     * so it goes through the keyboard that keeps the US keymap those keys were chosen against; false for a
+     * physical keyboard's keys, which take the person's layout (docs/SPEC.md 6b "Keyboard layout").
+     */
+    fun injectKey(evdevKeyCode: Int, pressed: Boolean, typed: Boolean = false)
 }

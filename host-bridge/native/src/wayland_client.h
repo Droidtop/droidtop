@@ -122,7 +122,12 @@ public:
     void injectPointerMotionAbsolute(double x, double y, uint32_t extentWidth, uint32_t extentHeight);
     void injectPointerButton(uint32_t linuxButtonCode, bool pressed);
     void injectPointerAxis(double horizontal, double vertical);
-    void injectKey(uint32_t evdevKeyCode, bool pressed);
+    // [typed]: the key was derived from a character (an on-screen keyboard), so it goes through the
+    // US-keymap text keyboard; otherwise through the layout keyboard (docs/SPEC.md 6b "Keyboard layout").
+    void injectKey(uint32_t evdevKeyCode, bool pressed, bool typed);
+
+    // Replaces the layout keyboard's XKB keymap with [keymap] (XKB text, [length] bytes, no NUL needed).
+    bool setKeymap(const char* keymap, size_t length);
 
     // ---- Windows, over wlr-foreign-toplevel-management-unstable-v1 ----
     //

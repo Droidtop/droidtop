@@ -117,9 +117,16 @@ class HostBridge : HostBridgeInput {
     }
 
     /** [evdevKeyCode]: Linux evdev keycode (KEY_* from linux/input-event-codes.h), not an Android KeyEvent code. */
-    override fun injectKey(evdevKeyCode: Int, pressed: Boolean) {
-        nativeInjectKey(evdevKeyCode, pressed)
+    override fun injectKey(evdevKeyCode: Int, pressed: Boolean, typed: Boolean) {
+        nativeInjectKey(evdevKeyCode, pressed, typed)
     }
+
+    /**
+     * Gives the physical keyboard's virtual keyboard the XKB keymap [keymap] (the text `xkbcli compile-keymap`
+     * prints), in place of the US map it starts with (docs/SPEC.md 6b "Keyboard layout"). False when there is no
+     * connection or the compositor's keymap file could not be made.
+     */
+    fun setKeymap(keymap: String): Boolean = keymap.isNotBlank() && nativeSetKeymap(keymap.toByteArray(Charsets.UTF_8))
 
     // ---- Windows, over wlr-foreign-toplevel-management-unstable-v1 ----
     //
@@ -197,7 +204,8 @@ class HostBridge : HostBridgeInput {
     private external fun nativeInjectPointerMotionAbsolute(x: Double, y: Double, extentWidth: Int, extentHeight: Int)
     private external fun nativeInjectPointerButton(linuxButtonCode: Int, pressed: Boolean)
     private external fun nativeInjectPointerAxis(horizontal: Double, vertical: Double)
-    private external fun nativeInjectKey(evdevKeyCode: Int, pressed: Boolean)
+    private external fun nativeInjectKey(evdevKeyCode: Int, pressed: Boolean, typed: Boolean)
+    private external fun nativeSetKeymap(utf8: ByteArray): Boolean
     private external fun nativeOfferClipboardText(utf8: ByteArray): Boolean
     private external fun nativeGetToplevels(): Array<Toplevel>
     private external fun nativeActivateToplevel(id: Long): Boolean

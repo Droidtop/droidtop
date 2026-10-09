@@ -31,7 +31,11 @@ internal class FakeHostBridge : HostBridgeInput {
         pointerAxes += horizontal to vertical
     }
 
-    override fun injectKey(evdevKeyCode: Int, pressed: Boolean) {
+    /** Which keyboard each key in [keys] went through: true for the typed-text (US) one. */
+    val typed = mutableListOf<Boolean>()
+
+    override fun injectKey(evdevKeyCode: Int, pressed: Boolean, typed: Boolean) {
         keys += evdevKeyCode to pressed
+        this.typed += typed
     }
 }

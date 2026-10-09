@@ -43,8 +43,11 @@ class InputSeat(
         bridge.injectPointerAxis(horizontal.toDouble(), vertical.toDouble())
     }
 
-    /** [keyCode]: Linux evdev keycode (KEY_* from linux/input-event-codes.h), NOT an Android KeyEvent code. */
-    fun onKey(source: InputSource, keyCode: Int, down: Boolean) {
-        bridge.injectKey(keyCode, down)
+    /**
+     * [keyCode]: Linux evdev keycode (KEY_* from linux/input-event-codes.h), NOT an Android KeyEvent code.
+     * [typed]: Android derived the key from a character (see [dev.droidtop.hostbridge.HostBridgeInput.injectKey]).
+     */
+    fun onKey(source: InputSource, keyCode: Int, down: Boolean, typed: Boolean = false) {
+        bridge.injectKey(keyCode, down, typed)
     }
 }

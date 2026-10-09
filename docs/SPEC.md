@@ -5577,6 +5577,56 @@ touchscreen (a hold threshold is not worth inventing without a device to tune
 it on). The second-screen trackpad surface of §6 is built on top of this
 router's relative-motion path — see §6c.
 
+### Keyboard layout (decided 2026-10-09, Droidtop/tracker#387)
+
+A physical keyboard types in the person's layout. The fixed US keymap
+(`host-bridge/native/src/default_keymap.h`) used to apply to every key, so a
+German or French keyboard typed US characters. wlroots uses a virtual
+keyboard's own keymap and ignores sway's `input ... xkb_layout`, so the fix
+has to be in host-bridge.
+
+- **Two virtual keyboards on the one seat.** Keys read off a physical
+  keyboard go through the *layout keyboard*. Keys Android derived from
+  characters go through the *text keyboard*, which keeps the US map: an
+  on-screen keyboard, droidtop's own keyboards (they build `KeyEvent`s on the
+  virtual device), anything with `FLAG_SOFT_KEYBOARD` or no real input
+  device. Those keys were chosen against Android's US
+  `KeyCharacterMap.VIRTUAL_KEYBOARD`. `DesktopInputRouter.isTyped` decides
+  which keyboard; a held key is released through the keyboard it went down
+  on, and #147's synthesized Shift goes through the keyboard of the key it
+  serves. wlroots hands a client the keymap of whichever keyboard typed last,
+  so each path types what it means.
+- **Keymaps come from the container.** The plan adds the distro's xkbcommon
+  tool (`xkbcli` on Alpine, `libxkbcommon-tools` on Debian). droidtop runs
+  `xkbcli compile-keymap --layout <l> [--variant <v>]` in the primary,
+  writing to `keymap.xkb` in the launcher channel directory (an exec's
+  captured output keeps only its last lines). It hands the text to
+  `HostBridge.setKeymap`, which uploads it on the layout keyboard. droidtop
+  ships no keymap data. A layout with no Latin letters (ru, gr, il...) is
+  compiled as `us,<layout>` with `grp:alt_shift_toggle`, the usual Linux
+  set-up, so commands stay typeable. If the compile fails (a desktop that
+  has not installed the tool yet), the keyboard keeps the US map and the log
+  says so.
+- **"Keyboard layout" in Desktop settings**, Automatic by default.
+  Automatic is the attached physical keyboard's layout when Android reports
+  one, otherwise the on-screen keyboard's language
+  (`InputMethodSubtype.languageTag`), otherwise US. Android reports a
+  physical keyboard's layout publicly only through that keyboard's
+  `KeyCharacterMap`, to which it applies the layout chosen for it in
+  Android's settings; `InputDevice`'s language tag and layout type are not in
+  the public SDK (absent from android-34 to 36's android.jar).
+  `KeyboardLayouts.fromKeyCharacters` reads a few telling keys: where Q and Y
+  are, and what the keys right of L, apostrophe, grave and backslash type. It
+  names us, gb, de, ch, cz, hu, fr, es, latam, it, pt, br, se, dk, no, ru,
+  ua and gr, or nothing, and then the on-screen keyboard's language decides.
+  A small language-to-layout table maps that language, region first
+  ("de-CH" is Swiss). The row says what Automatic chose and
+  where it came from, for example "Automatic: German (de), from the attached
+  keyboard". The other choices are the container's own layouts, from
+  xkeyboard-config's `evdev.lst`, copied the first time a desktop runs. It is
+  applied when the desktop comes up, when a keyboard is attached, removed or
+  changed, and when the setting changes: one exec each time, nothing per key.
+
 ### Desktop keeps the screen awake (Droidtop/tracker#97)
 
 A desktop session is driven through the seat, which Android's screen-off timer does not count
