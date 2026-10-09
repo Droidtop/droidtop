@@ -344,6 +344,18 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   bar is gone.
 - **One listener feeds the container's window list.** The bridge has room for one change listener, so the
   taskbar and the windows sheet read the same list.
+- **Android apps and games started from Desktop are in the bar** (Droidtop/tracker#352). A game or an app
+  launched from the Start menu is a fullscreen Activity over the desktop, which the compositor's window list
+  cannot show, so the bar and the windows sheet also list what the task manager reports running
+  (`TaskManager.snapshot`, the one list the Quick Menu, the companion and Standard's home read; it is polled
+  only while Desktop shows). An entry wears the app's icon; a tap opens it where it runs (`TaskActions.bringTo`),
+  a long press, or X in the sheet, closes it by the task manager's strongest path and says so only when that
+  could not end it. Without Shizuku the list holds the apps droidtop opened itself, as everywhere else.
+- **Notifications are the Quick Menu's section.** The tray readout counts the notifications waiting
+  (`NotificationsStore`, the dismissible ones; an ongoing notification waits for nobody), and the tray opens
+  the Quick Menu on Notifications once notification access is granted, on System before that (the
+  Notifications section, a step along the rail, is where the access is asked for). Desktop keeps no
+  notification list of its own.
 
 ### Emulators, and Android apps as windows
 

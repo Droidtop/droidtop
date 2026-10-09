@@ -37,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +59,7 @@ import dev.droidtop.runtime.ContainerApp
 import dev.droidtop.runtime.DisplayOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.droidtop.library.integrations.PluginHub
 import dev.droidtop.library.integrations.PluginPanels
@@ -72,6 +74,15 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PcGameStandalone
 import dev.droidtop.shell.gamepad.pc.PcLaunchOfferSheet
+import android.widget.Toast
+import dev.droidtop.library.tasks.TaskActions
+import dev.droidtop.runtime.systemstatus.NotificationsStore
+import dev.droidtop.runtime.tasks.CloseOutcome
+import dev.droidtop.runtime.tasks.RunningApp
+import dev.droidtop.runtime.tasks.TaskManager
+import dev.droidtop.runtime.tasks.TaskPolicy
+import dev.droidtop.runtime.tasks.text
+import dev.droidtop.shell.gamepad.AppIcon
 import dev.droidtop.shell.gamepad.currentShellWindow
 import dev.droidtop.shell.gamepad.hosted.HostedListSheet
 import dev.droidtop.shell.gamepad.hosted.HostedRow
@@ -156,6 +167,9 @@ fun DesktopShell(
     }
     // One listener on the bridge feeds the taskbar and the windows sheet alike.
     val toplevels = rememberToplevels(hostBridge)
+    // What Android is running that droidtop started (a game or an app launched from here is a fullscreen
+    // Activity over the desktop, not a window the compositor knows), polled only while Desktop shows.
+    val androidApps = rememberAndroidApps()
     // A library entry launches the way it launches everywhere (Library.launch, SPEC 2b). A PC or
     // engine game first takes Gaming's primary-action rule (a store game that is not installed offers
     // the install) and has Gaming's page and menu, opened from the Start menu's long press
@@ -177,6 +191,7 @@ fun DesktopShell(
         Taskbar(
             hostBridge = hostBridge,
             toplevels = toplevels,
+            androidApps = androidApps,
             compositorCommand = compositorCommand,
             onOpenStartMenu = { startMenuOpen = true },
             onOpenQuickMenu = { quickMenuOpen = true },
@@ -214,6 +229,7 @@ fun DesktopShell(
             WindowsSheet(
                 hostBridge = hostBridge,
                 toplevels = toplevels,
+                androidApps = androidApps,
                 compositorCommand = compositorCommand,
                 onDismiss = { windowsOpen = false },
             )
@@ -448,6 +464,7 @@ private fun BoxScope.DesktopViewport(
 private fun BoxScope.Taskbar(
     hostBridge: HostBridge?,
     toplevels: List<Toplevel>,
+    androidApps: List<RunningApp>,
     compositorCommand: String?,
     onOpenStartMenu: () -> Unit,
     onOpenQuickMenu: () -> Unit,
@@ -496,7 +513,7 @@ private fun BoxScope.Taskbar(
                 Text("Start")
             }
             Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
-            TaskbarWindowList(hostBridge, toplevels, compositorCommand, modifier = Modifier.weight(1f))
+            TaskbarWindowList(hostBridge, toplevels, androidApps, compositorCommand, modifier = Modifier.weight(1f))
             if (onOpenTerminal != null) {
                 TaskbarButton(onClick = onOpenTerminal) {
                     Text("Terminal")
@@ -579,12 +596,20 @@ private fun TaskbarButton(onClick: () -> Unit, content: @Composable () -> Unit) 
  * change to stop claiming it as already built.
  */
 @Composable
-private fun TaskbarWindowList(hostBridge: HostBridge?, toplevels: List<Toplevel>, compositorCommand: String?, modifier: Modifier = Modifier) {
+private fun TaskbarWindowList(
+    hostBridge: HostBridge?,
+    toplevels: List<Toplevel>,
+    androidApps: List<RunningApp>,
+    compositorCommand: String?,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // Sway's dead set_minimized (see the comment above) makes minimize a
     // compositor-dependent affordance, not a universal one.
     val minimizeSupported = compositorCommand != "sway"
 
-    if (toplevels.isEmpty()) {
+    if (toplevels.isEmpty() && androidApps.isEmpty()) {
         Spacer(modifier = modifier)
         return
     }
@@ -603,6 +628,14 @@ private fun TaskbarWindowList(hostBridge: HostBridge?, toplevels: List<Toplevel>
                     }
                 },
                 onClose = { hostBridge?.closeToplevel(toplevel.id) },
+            )
+        }
+        // The Android apps and games started from here, after the container's windows (Droidtop/tracker#352).
+        items(androidApps, key = { "app:" + it.packageName + "/" + it.displayId }) { app ->
+            TaskbarAppRow(
+                app = app,
+                onOpen = { openAndroidApp(context, app) },
+                onClose = { scope.launch { closeAndroidApp(context, app) } },
             )
         }
     }
@@ -627,18 +660,48 @@ private fun rememberToplevels(hostBridge: HostBridge?): List<Toplevel> {
 }
 
 /**
+ * The Android apps and games droidtop started and that are still running ([TaskManager.snapshot], the one
+ * task list the Quick Menu, the companion and Standard's home read too), kept current while Desktop is
+ * showing and only then. A game launched from the Start menu is a fullscreen Activity over the desktop,
+ * which the compositor's window list cannot show, so without this the bar listed neither it nor any
+ * Android app (Droidtop/tracker#352). Without Shizuku the list holds just the apps droidtop opened itself.
+ */
+@Composable
+private fun rememberAndroidApps(): List<RunningApp> {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) { TaskManager.watch(context) }
+    val snapshot by TaskManager.snapshot.collectAsState()
+    return remember(snapshot) { snapshot?.apps.orEmpty() }
+}
+
+private fun openAndroidApp(context: Context, app: RunningApp) {
+    TaskActions.bringTo(context, app.packageName, app.displayId)?.let {
+        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+    }
+}
+
+/** Closes through the task manager's strongest path and says so only when that did not end it. */
+private suspend fun closeAndroidApp(context: Context, app: RunningApp) {
+    val outcome = TaskManager.close(context, app.packageName)
+    if (outcome !is CloseOutcome.Closed) Toast.makeText(context, outcome.text, Toast.LENGTH_LONG).show()
+}
+
+/**
  * The taskbar's window list as a sheet a pad drives (Droidtop/tracker#350): A raises a window (restoring it
- * first when it is minimized), X closes it, and the rest of the rules are the taskbar's own, including
+ * first when it is minimized) or opens an Android app, X closes it, and the rest of the rules are the taskbar's own, including
  * that sway cannot minimize.
  */
 @Composable
 private fun WindowsSheet(
     hostBridge: HostBridge?,
     toplevels: List<Toplevel>,
+    androidApps: List<RunningApp>,
     compositorCommand: String?,
     onDismiss: () -> Unit,
 ) {
-    val rows = remember(toplevels) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val rows = remember(toplevels, androidApps) {
         toplevels.map { toplevel ->
             HostedRow(
                 key = "window:" + toplevel.id,
@@ -655,13 +718,24 @@ private fun WindowsSheet(
                 },
                 onToggle = { hostBridge?.closeToplevel(toplevel.id) },
             )
+        } + androidApps.map { app ->
+            HostedRow(
+                key = "app:" + app.packageName + "/" + app.displayId,
+                title = app.label,
+                subtitle = "Android app, " + TaskPolicy.displayLabel(app.displayId),
+                onSelect = {
+                    openAndroidApp(context, app)
+                    onDismiss()
+                },
+                onToggle = { scope.launch { closeAndroidApp(context, app) } },
+            )
         }
     }
     HostedListSheet(
         title = "Windows",
         rows = rows,
         onClose = onDismiss,
-        emptyText = "No windows are open on the desktop.",
+        emptyText = "Nothing is open on the desktop.",
         selectLabel = "Bring to front",
         toggleLabel = "Close window",
     )
@@ -708,6 +782,38 @@ private fun TaskbarWindowRow(toplevel: Toplevel, showMinimize: Boolean, onTap: (
     }
 }
 
+/** An Android app or game in the bar: the app's icon and name; a tap opens it, a long press offers Close. */
+@Composable
+private fun TaskbarAppRow(app: RunningApp, onOpen: () -> Unit, onClose: () -> Unit) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .widthIn(max = 180.dp)
+                .combinedClickable(onClick = onOpen, onLongClick = { menuOpen = true })
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            AppIcon(app.packageName, size = 20.dp)
+            Text(
+                app.label,
+                color = if (app.visible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (app.visible) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text("Close") },
+                onClick = { menuOpen = false; onClose() },
+            )
+        }
+    }
+}
+
 /**
  * Shown only while another keyboard than droidtop's own is active: copying in an Android app
  * then reaches the container only when droidtop's window regains focus (Android lets just the
@@ -744,7 +850,7 @@ private fun ClipboardNotice() {
  * [dev.droidtop.runtime.systemstatus.SystemStatus] core: the readout sits in the bar and the Quick Menu
  * is behind it. Volume, brightness, Do Not Disturb, the network and Bluetooth panels and the notification
  * list are that menu's sections, the same ones Gaming's R2 shows, so the tray keeps no control panel of
- * its own (docs/SPEC.md 2b "Desktop chrome with a pad", Droidtop/tracker#350). Data shared, chrome per
+ * its own; the readout also counts the notifications waiting (Droidtop/tracker#352) (docs/SPEC.md 2b "Desktop chrome with a pad", Droidtop/tracker#350). Data shared, chrome per
  * surface, the same split the settings catalogs use.
  */
 @Composable
@@ -752,6 +858,9 @@ private fun SystemTray(onClick: () -> Unit) {
     val context = LocalContext.current
     val status by remember { dev.droidtop.runtime.systemstatus.SystemStatus.flow(context) }
         .collectAsState(initial = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context))
+    // What is waiting, so the tray says so without opening the Quick Menu, whose first section it is once
+    // notification access is granted. Ongoing notifications (a foreground service's) are not waiting for anyone.
+    val waiting = NotificationsStore.items.collectAsState().value.count { it.clearable }
     androidx.compose.material3.TextButton(onClick = onClick) {
         val network = when (status.network) {
             dev.droidtop.runtime.systemstatus.NetworkKind.WIFI ->
@@ -767,7 +876,8 @@ private fun SystemTray(onClick: () -> Unit) {
         val battery = status.batteryPercent?.let { "  $it%" + if (status.charging) "⚡" else "" } ?: ""
         // "!" = connected without validated internet (captive portal); the Quick Menu's System
         // section opens the system sheet where signing in happens.
-        Text(network + noInternet + vpn + battery, color = MaterialTheme.colorScheme.onSurface)
+        val notifications = if (waiting > 0) "  $waiting new" else ""
+        Text(network + noInternet + vpn + battery + notifications, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
