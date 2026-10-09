@@ -73,7 +73,7 @@ fun CompanionSurface(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             // Status line, always the first row (the controls live in the System section and tab).
-            CompanionSystemBar(showControls = false)
+            CompanionSystemBar()
             LaunchErrorLine()
             if (layout.shows(CompanionHomeSection.NOW)) CompanionNowSection(entry, layout)
             if (layout.shows(CompanionHomeSection.CONTINUE)) CompanionRecents(layout)

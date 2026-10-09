@@ -3387,9 +3387,7 @@ row of recent apps, became Home's Recent apps section for every mode.
      opens that conversation on the Social tab. Not in Kiosk and Kid.
   5. **Notifications**: the compact group (`CompanionNotifications`):
      folded, its heading is the count and the newest line; open, up to twelve with Dismiss.
-  6. **System**: storage free and total, and the System tab's own switches as pills (the radios where a
-     `priv.shell` provider can flip them, Do Not Disturb) and a way to all controls. droidtop has no
-     performance profile, so there is none here.
+  6. **System**: storage free and total, and All controls (the System tab).
   7. **Widgets**: the user's Android widgets, then the host's own add/remove widget pills as ordinary rows.
   Each section's heading folds it (tap or A; the fold is remembered), a section with nothing to show draws
   nothing, and Displays > Companion > Home turns any section off (`CompanionHomePrefs`). Defaults: every
@@ -3411,8 +3409,11 @@ row of recent apps, became Home's Recent apps section for every mode.
   straight up scrolled the page. The
   capsules are smaller than before and every section starts with a heading, so the next section shows
   below the one in view.
-- **Tasks** is `CompanionTasks`, the task manager's row (switch, ask for the other screen, close, Clear
-  all apps with an inline confirm) using `SharedRunningAppsList`; see "The task manager".
+- **Apps** (formerly Tasks) is `CompanionTasks`, the task manager's row (switch, ask for the other screen,
+  close) using `SharedRunningAppsList`; see "The task manager". Each row has Protect, which keeps the app from
+  Clear all (`ProtectedApps`, Droidtop/tracker#252). Clear all always asks first ("Close 4 apps?", with Keep
+  them first and the two answers well apart), and leaves alone what is protected and whatever is open on the
+  companion's own screen (`TaskPolicy.clearAllTargets(..., keepDisplays)`).
 - **Performance** (`CompanionPerformanceTab`) reads `PerformanceMonitor` in `:runtime-common`, the one shared
   sampler and history (a 90-entry ring buffer, two seconds apart, three minutes) that the Quick Menu's
   performance section also reads. Sampling runs only while the tab is composed and its window is started
@@ -3425,14 +3426,20 @@ row of recent apps, became Home's Recent apps section for every mode.
   instead), per-core frequency (only where sysfs allows), CPU and GPU temperature (only the battery sensor and
   Android's thermal status are given), GPU load and other apps' frame rate (root or Shizuku). Per-app CPU is
   shown only with a running `priv.shell` provider, from `dumpsys cpuinfo` every six seconds while the tab shows.
-- **System** (`CompanionSystemTab`) is `SystemControls` and the existing job and storage sources, no second
-  mechanism: volume; brightness and screen timeout behind the one Modify system settings grant (a greyed
-  slider with an "Allow" chip offers the grant, re-checked on return); Do Not Disturb behind its own grant;
-  Wi-Fi, Bluetooth and airplane mode, which a normal app cannot switch, so with a `priv.shell` provider the
-  row runs the shell's own command (`SystemControls.radioCommand`) and without one the rows are not drawn;
-  internal storage free and total; and the running downloads and jobs from
-  `PluginJobsCenter`. `SystemControls.SCREEN_TIMEOUTS` is the one timeout list (the Gaming catalog uses it
-  too). Standard's inline controls use the same `SystemSliders` and `DndPill`.
+- **System is the catalog (slice C4, Droidtop/tracker#414).** `CompanionSystemTab` draws catalog items for
+  touch (`CompanionCatalogItems`), never controls of its own. Its top card, open, is the Quick Menu's own System
+  section: both surfaces take it from `quickSectionGroups` (`:shell-gamepad`), the one place that list is made, so
+  they cannot differ. Below it, folded: Display and Sound (the Quick Menu's Display and Audio sections), Power
+  (performance mode), Storage (free and total) and Privacy (Android's privacy dashboard,
+  `REVIEW_PERMISSION_USAGE`, else its Privacy settings). Connections and Accessibility join when their slices
+  land. A slider has a step button on each side (the Quick Menu's own step) and says its level to TalkBack; a
+  choice lays its options out under the row; an action that asks first shows the safe answer first. The catalog
+  is built off the main thread while the tab shows, again after each change and on a return from another screen
+  (a grant), and not at all while the tab is not composed; `PerformanceMonitor.subscribers` counts the surfaces
+  sampling, and drops to 0 when the Performance tab or section is switched away.
+  **Performance mode** is one catalog item (`GamingSettingsCatalog.performanceModeItem`, Android's GameManager
+  profile through the `priv.shell` provider, only while a game droidtop launched is in front): the Quick Menu's
+  Performance section and System > Power draw that item.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 

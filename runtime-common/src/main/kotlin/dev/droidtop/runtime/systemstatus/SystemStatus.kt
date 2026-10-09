@@ -322,6 +322,25 @@ object SystemControls {
         1_800_000 to "30 minutes",
     )
 
+    /**
+     * A screen timeout in words, for any value Android holds, not only the ones [SCREEN_TIMEOUTS] offers: the
+     * largest int is Android's "never" (a rig showed "2147483 seconds", build 1702), others read in the largest
+     * whole unit that fits.
+     */
+    fun timeoutLabel(ms: Int): String {
+        SCREEN_TIMEOUTS.firstOrNull { it.first == ms }?.let { return it.second }
+        if (ms == Int.MAX_VALUE || ms < 0) return "Never"
+        val seconds = ms / 1000
+        fun plural(n: Int, unit: String) = if (n == 1) "1 $unit" else "$n ${unit}s"
+        return when {
+            seconds >= 3600 && seconds % 3600 == 0 -> plural(seconds / 3600, "hour")
+            seconds >= 3600 -> "${seconds / 3600} h ${(seconds % 3600) / 60} min"
+            seconds >= 60 && seconds % 60 == 0 -> plural(seconds / 60, "minute")
+            seconds >= 60 -> "${seconds / 60} min ${seconds % 60} s"
+            else -> plural(seconds, "second")
+        }
+    }
+
     // ------------------------------------------------------------------
     // Radios. A normal app cannot switch Wi-Fi, Bluetooth or airplane mode
     // (removed from app reach in API 29 and later), so the only honest

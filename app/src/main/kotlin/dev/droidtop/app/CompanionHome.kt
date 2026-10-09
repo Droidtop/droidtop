@@ -492,9 +492,9 @@ private fun SocialGlanceRow(contact: SocialContact, badged: Boolean, onClick: ()
 }
 
 /**
- * System at a glance: storage, and the device switches the System tab carries (the radios where a
- * privileged provider can flip them, Do Not Disturb), as one row of pills. The status line at the top of the
- * page already says network and battery; the full controls are the System tab.
+ * System at a glance: storage, and the way to the System tab, where every device control is (the catalog's own
+ * items, docs/SPEC.md "The companion's tabs"). The status line at the top of the page already says network and
+ * battery.
  */
 @Composable
 internal fun CompanionSystemSection(layout: CompanionHomeLayout) {
@@ -502,11 +502,7 @@ internal fun CompanionSystemSection(layout: CompanionHomeLayout) {
     CompanionHomeSectionFrame(CompanionHomeSection.SYSTEM, layout) {
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             StorageLine()
-            PillRow {
-                RadioPills()
-                DndPill()
-                if (nav != null) CompanionPill("All controls") { nav.openTab(CompanionTab.SYSTEM) }
-            }
+            if (nav != null) PillRow { CompanionPill("All controls") { nav.openTab(CompanionTab.SYSTEM) } }
         }
     }
 }

@@ -182,6 +182,9 @@ fun SharedRunningAppsList(
     selectedIndex: Int? = null,
     clearLabel: String = "Clear all",
     rowMessage: (Int) -> String? = { null },
+    /** Packages Clear all leaves alone ([dev.droidtop.runtime.tasks.ProtectedApps]); each row's Protect shows and flips it. */
+    protectedPackages: Set<String> = emptySet(),
+    onProtect: ((Int, RunningApp) -> Unit)? = null,
     onClear: () -> Unit,
     onSwitch: (Int, RunningApp) -> Unit,
     onClose: (Int, RunningApp) -> Unit,
@@ -212,6 +215,10 @@ fun SharedRunningAppsList(
                 }
                 // A tap on the row switches to the app; this asks for it on the other screen.
                 if (displays.any { it != app.displayId }) SharedTaskAction("Move", false) { onMove(i, app) }
+                // Kept from Clear all, or not (Droidtop/tracker#252).
+                if (onProtect != null) {
+                    SharedTaskAction(if (app.packageName in protectedPackages) "Protected" else "Protect", false) { onProtect(i, app) }
+                }
                 SharedTaskAction("Close", false) { onClose(i, app) }
             }
         }

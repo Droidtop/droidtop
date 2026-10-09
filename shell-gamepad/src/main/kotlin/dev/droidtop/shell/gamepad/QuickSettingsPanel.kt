@@ -110,15 +110,7 @@ internal fun QuickSettingsPanel(
     // battery broadcast and a connectivity query.
     val groups by produceState(initialValue = emptyList<CatalogGroup>(), version) {
         value = withContext(Dispatchers.IO) {
-            val base = QuickTiles.sectionGroups(
-                GamingSettingsCatalog.groups(context),
-                section,
-                dev.droidtop.library.settings.UiModePrefs.get(context),
-            )
-            // The System tab also carries the two controller tiles (SPEC 7b), which live in this
-            // module because they act on the shell's own controller resolver.
-            if (section != QuickSection.SYSTEM) base
-            else base.map { it.copy(items = it.items + ControllerLayoutTiles.items()) }
+            quickSectionGroups(GamingSettingsCatalog.groups(context), section, dev.droidtop.library.settings.UiModePrefs.get(context))
         }
     }
     val panel = remember(groups) { QuickTiles.panel(groups) }
@@ -488,6 +480,22 @@ private fun QuickTileView(
             )
         }
     }
+}
+
+/**
+ * The catalog groups one tile section (System, Audio or Display) shows: the one place that list is made, drawn by
+ * the Quick Menu here and by the companion's System tab (docs/SPEC.md "The companion's tabs"), so the two never
+ * differ. The System section also carries the two controller tiles (SPEC 7b), which live in this module because
+ * they act on the shell's own controller resolver. [catalog] is the live Gaming catalog
+ * ([GamingSettingsCatalog.groups], built off the main thread).
+ */
+fun quickSectionGroups(
+    catalog: List<CatalogGroup>,
+    section: QuickSection,
+    mode: dev.droidtop.library.settings.UiMode,
+): List<CatalogGroup> {
+    val base = QuickTiles.sectionGroups(catalog, section, mode)
+    return if (section != QuickSection.SYSTEM) base else base.map { it.copy(items = it.items + ControllerLayoutTiles.items()) }
 }
 
 /**

@@ -83,9 +83,14 @@ object TaskPolicy {
     fun hiddenFromList(ownPackage: String, homePackages: Set<String>): Set<String> =
         SYSTEM_PROTECTED + ownPackage + homePackages
 
-    /** The apps Clear all would close, one per package, in list order. */
-    fun clearAllTargets(apps: List<RunningApp>, protected: Set<String>): List<RunningApp> =
-        apps.filter { it.packageName !in protected }.distinctBy { it.packageName }
+    /**
+     * The apps Clear all would close, one per package, in list order: never a protected one, and never one open on
+     * [keepDisplays] (the companion's own screen: an app the person opened there is theirs to keep, Droidtop/tracker#414).
+     */
+    fun clearAllTargets(apps: List<RunningApp>, protected: Set<String>, keepDisplays: Set<Int> = emptySet()): List<RunningApp> {
+        val kept = apps.filter { it.displayId in keepDisplays }.mapTo(HashSet()) { it.packageName }
+        return apps.filter { it.packageName !in protected && it.packageName !in kept }.distinctBy { it.packageName }
+    }
 
     fun needsClearAllConfirm(targetCount: Int): Boolean = targetCount > CONFIRM_CLEAR_ALL_ABOVE
 

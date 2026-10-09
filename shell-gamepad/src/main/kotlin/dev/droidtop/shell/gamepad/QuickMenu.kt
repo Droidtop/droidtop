@@ -50,8 +50,6 @@ import dev.droidtop.library.message
 import dev.droidtop.pluginhost.JobsSummary
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.runtime.systemstatus.NotificationsStore
-import dev.droidtop.runtime.systemstatus.GameMode
-import dev.droidtop.runtime.systemstatus.GameModeControl
 import dev.droidtop.runtime.systemstatus.OverlayLevel
 import dev.droidtop.runtime.systemstatus.PerformanceMonitor
 import dev.droidtop.runtime.systemstatus.PerformanceOverlay
@@ -334,10 +332,16 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
     val overlayLevel by PerformanceOverlay.level.collectAsState()
     val canDraw = remember { PerformanceOverlay.canDraw(context) }
     val hasShell = remember { PerformanceOverlay.hasShell() }
-    val game = remember { dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName }
-    var mode by remember { mutableStateOf<GameMode?>(null) }
+    // Performance mode is the one catalog item the companion's System > Power card and Game tab draw too
+    // (GamingSettingsCatalog.performanceModeItem): built off the main thread, rebuilt after each press.
+    var modeVersion by remember { mutableStateOf(0) }
+    val modeItem by androidx.compose.runtime.produceState<dev.droidtop.library.settings.AsyncActionItem?>(null, modeVersion) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            dev.droidtop.library.settings.GamingSettingsCatalog.performanceModeItem()
+        }
+    }
     var modeNote by remember { mutableStateOf<String?>(null) }
-    val rowCount = if (hasShell && game != null) 2 else 1
+    val rowCount = if (modeItem != null) 2 else 1
     var focusIndex by remember { mutableStateOf(0) }
 
     val cycleOverlay = {
@@ -355,16 +359,13 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
         }
     }
     val cycleMode = {
-        val next = (mode ?: GameMode.STANDARD).next()
-        val pkg = game
-        if (pkg != null) {
-            modeNote = "Setting..."
+        modeItem?.let { item ->
             scope.launch {
-                val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    GameModeControl.set(dev.droidtop.runtime.tasks.TaskManager.shell, next, pkg)
+                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    item.run(context) { status -> modeNote = status }
                 }
-                if (ok) mode = next
-                modeNote = if (ok) "Set for this game" else "Android refused"
+                modeNote = result
+                modeVersion++
             }
         }
     }
@@ -410,10 +411,10 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
                     touch(GamepadAction.A)
                 },
             )
-            if (hasShell && game != null) {
+            modeItem?.let { item ->
                 MenuRow(
-                    title = "Performance mode",
-                    value = mode?.label ?: "Unchanged",
+                    title = item.title,
+                    value = item.value,
                     subtitle = modeNote,
                     adjustable = true,
                     selected = focusIndex == 1,

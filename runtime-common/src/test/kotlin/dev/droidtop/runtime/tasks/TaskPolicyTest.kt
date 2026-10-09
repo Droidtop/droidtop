@@ -44,6 +44,25 @@ class TaskPolicyTest {
     }
 
     @Test
+    fun `clear all skips protected apps and whatever is open on the companion screen`() {
+        val protected = TaskPolicy.protectedPackages("dev.droidtop.app", emptySet(), setOf("com.discord"))
+        val apps = listOf(
+            app("com.discord", 0),
+            app("org.example.browser", 2),
+            app("org.example.browser", 0),
+            app("com.android.calendar", 0),
+        )
+        assertEquals(
+            listOf("com.android.calendar"),
+            TaskPolicy.clearAllTargets(apps, protected, keepDisplays = setOf(2)).map { it.packageName },
+        )
+        assertEquals(
+            listOf("org.example.browser", "com.android.calendar"),
+            TaskPolicy.clearAllTargets(apps, protected).map { it.packageName },
+        )
+    }
+
+    @Test
     fun `a confirm is asked only above the threshold`() {
         assertFalse(TaskPolicy.needsClearAllConfirm(0))
         assertFalse(TaskPolicy.needsClearAllConfirm(TaskPolicy.CONFIRM_CLEAR_ALL_ABOVE))

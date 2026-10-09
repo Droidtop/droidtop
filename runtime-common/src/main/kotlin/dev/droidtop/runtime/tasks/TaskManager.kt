@@ -75,12 +75,12 @@ object TaskManager {
         }
 
     /**
-     * Every app Clear all would close right now: the list as the system gives it, minus [protectedNow].
-     * Reads fresh, so the count a confirm shows is the count that will be closed.
+     * Every app Clear all would close right now: the list as the system gives it, minus [protectedNow] and
+     * whatever is open on [keepDisplays]. Reads fresh, so the count a confirm shows is the count that will be closed.
      */
-    suspend fun clearAllTargets(context: Context): List<RunningApp> =
+    suspend fun clearAllTargets(context: Context, keepDisplays: Set<Int> = emptySet()): List<RunningApp> =
         withContext(Dispatchers.IO) {
-            TaskPolicy.clearAllTargets(refreshNow(context).apps, protectedNow(context))
+            TaskPolicy.clearAllTargets(refreshNow(context).apps, protectedNow(context), keepDisplays)
         }
 
     /** Closes [targets] (from [clearAllTargets]) one after another, re-reads the list, and says what came of it. */

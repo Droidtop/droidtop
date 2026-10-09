@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -91,17 +92,35 @@ object PerformanceMonitor {
     private var lastSampleMs: Long = 0
 
     suspend fun watch(context: Context, intervalMs: Long = INTERVAL_MS) {
-        while (true) {
-            // One reading that fails (a vendor's odd battery property) must not end the loop, or the
-            // history stops growing and every graph stays empty.
-            try {
-                withContext(Dispatchers.IO) { sampleOnce(context.applicationContext) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // skipped: the next tick tries again
+        watchWith(intervalMs) { sampleOnce(context.applicationContext) }
+    }
+
+    private val watching = MutableStateFlow(0)
+
+    /**
+     * How many surfaces are watching right now. A reader lives only as long as the tab or section that shows it
+     * (docs/SPEC.md "The companion's tabs"), so this is 0 whenever none of them is on screen.
+     */
+    val subscribers: StateFlow<Int> = watching
+
+    /** [watch]'s loop with the reading passed in, so the counting is tested without a device. */
+    internal suspend fun watchWith(intervalMs: Long, sample: () -> Unit) {
+        watching.update { it + 1 }
+        try {
+            while (true) {
+                // One reading that fails (a vendor's odd battery property) must not end the loop, or the
+                // history stops growing and every graph stays empty.
+                try {
+                    withContext(Dispatchers.IO) { sample() }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // skipped: the next tick tries again
+                }
+                delay(intervalMs)
             }
-            delay(intervalMs)
+        } finally {
+            watching.update { it - 1 }
         }
     }
 

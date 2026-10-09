@@ -27,12 +27,17 @@ object GameModeControl {
         listOf("cmd", "game", "mode", "--user", "0", mode.key, packageName),
     )
 
+    private val chosen = java.util.concurrent.ConcurrentHashMap<String, GameMode>()
+
+    /** The mode droidtop last set for [packageName] in this run; null when it has not set one (Android keeps its own). */
+    fun lastSet(packageName: String): GameMode? = chosen[packageName]
+
     /** Sets [mode] for [packageName]; true when one spelling of the command was accepted. Blocks on the provider. */
     fun set(shell: PrivilegedShell, mode: GameMode, packageName: String): Boolean =
         commands(mode, packageName).any { argv ->
             val out = runCatching { shell.exec(argv) }.getOrNull()
             out != null && out.exit == 0 && !refused(out.stdout + out.stderr)
-        }
+        }.also { if (it) chosen[packageName] = mode }
 
     /** `cmd` can exit 0 and still print that the service or the mode is unknown. */
     fun refused(output: String): Boolean {

@@ -96,6 +96,8 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_RESTART = "pref_gaming_system_restart"
     const val ID_AUDIO_OUTPUT = "pref_gaming_audio_output"
     const val ID_ORIENTATION = "pref_screen_orientation_gaming"
+    const val ID_PERFORMANCE_MODE = "pref_gaming_performance_mode"
+    const val ID_PRIVACY_DASHBOARD = "action_privacy_dashboard"
 
     private val TIMEOUT_OPTIONS = dev.droidtop.runtime.systemstatus.SystemControls.SCREEN_TIMEOUTS
     const val ID_DOWNLOADS = "pref_gaming_downloads"
@@ -643,7 +645,11 @@ object GamingSettingsCatalog {
                         ChoiceItem(
                             id = ID_SYSTEM_TIMEOUT,
                             title = "Screen timeout",
-                            options = TIMEOUT_OPTIONS.map { (ms, label) -> ChoiceOption(ms.toString(), label) },
+                            // The device's own value is offered too when it is not one of ours, named in words
+                            // ("Never" for Android's largest value), never as raw milliseconds.
+                            options = (TIMEOUT_OPTIONS.map { it.first } + listOfNotNull(controls.screenTimeoutMs(context)))
+                                .distinct()
+                                .map { ms -> ChoiceOption(ms.toString(), controls.timeoutLabel(ms)) },
                             current = controls.screenTimeoutMs(context)?.toString(),
                             onSelect = { ctx, value ->
                                 value.toIntOrNull()?.let { controls.setScreenTimeoutMs(ctx, it) }
@@ -908,6 +914,49 @@ object GamingSettingsCatalog {
         onSelect = { ctx, value ->
             runCatching { dev.droidtop.runtime.MainScreenChoice.valueOf(value) }.getOrNull()
                 ?.let { dev.droidtop.runtime.MainScreen.set(ctx, it) }
+        },
+    )
+
+    /**
+     * Performance mode for the game in front (Android's GameManager profile, [GameModeControl]): one catalog item,
+     * drawn by the Quick Menu's Performance section, the companion's System > Power card and its Game tab
+     * (docs/SPEC.md "The companion's tabs"). Each press steps Standard, Performance, Battery saver. Null without a
+     * running `priv.shell` provider or without a game droidtop launched: there is nothing it could set. Asks the
+     * plugin registry, so built off the main thread like the rest of the catalog.
+     */
+    fun performanceModeItem(): AsyncActionItem? {
+        val shell = dev.droidtop.runtime.tasks.TaskManager.shell
+        if (!runCatching { shell.capabilities().shellCommand }.getOrDefault(false)) return null
+        val game = dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName ?: return null
+        val current = dev.droidtop.runtime.systemstatus.GameModeControl.lastSet(game)
+        return AsyncActionItem(
+            id = ID_PERFORMANCE_MODE,
+            title = "Performance mode",
+            subtitle = "How Android runs the game in front: Standard, Performance, or Battery saver",
+            value = current?.label ?: "Unchanged",
+            run = { _, onStatus ->
+                val next = (current ?: dev.droidtop.runtime.systemstatus.GameMode.STANDARD).next()
+                onStatus("Setting...")
+                if (dev.droidtop.runtime.systemstatus.GameModeControl.set(shell, next, game)) next.label else "Android refused"
+            },
+        )
+    }
+
+    /**
+     * Android's privacy dashboard (which apps used the camera, microphone and location lately, Android 12 and later),
+     * else its Privacy settings. The companion's System > Privacy card.
+     */
+    fun privacyDashboardItem(): ActionItem = ActionItem(
+        id = ID_PRIVACY_DASHBOARD,
+        title = "Privacy dashboard",
+        subtitle = "Which apps used the camera, microphone or location lately, in Android's own screen",
+        run = { ctx ->
+            val dashboard = Intent("android.intent.action.REVIEW_PERMISSION_USAGE").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val fallback = Intent(android.provider.Settings.ACTION_PRIVACY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val intent = if (android.os.Build.VERSION.SDK_INT >= 31 &&
+                dashboard.resolveActivity(ctx.packageManager) != null
+            ) dashboard else fallback
+            SettingsLaunch.start(ctx, intent)
         },
     )
 

@@ -350,7 +350,7 @@ internal fun CompanionNotifications(open: Boolean, onToggle: () -> Unit) {
 private const val MAX_LISTED_NOTIFICATIONS = 12
 
 @androidx.compose.runtime.Composable
-internal fun CompanionSystemBar(showControls: Boolean = true) {
+internal fun CompanionSystemBar() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val status by androidx.compose.runtime.remember {
         dev.droidtop.runtime.systemstatus.SystemStatus.flow(context)
@@ -364,8 +364,6 @@ internal fun CompanionSystemBar(showControls: Boolean = true) {
             kotlinx.coroutines.delay(30_000)
         }
     }
-    var controlsOpen by androidx.compose.runtime.remember { mutableStateOf(false) }
-
     Column(modifier = Modifier.fillMaxWidth()) {
         androidx.compose.foundation.layout.Row(
             modifier = Modifier.fillMaxWidth(),
@@ -378,15 +376,6 @@ internal fun CompanionSystemBar(showControls: Boolean = true) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-            if (showControls) {
-                TextButton(onClick = { controlsOpen = !controlsOpen }) {
-                    Text(if (controlsOpen) "Hide controls" else "Controls")
-                }
-            }
-        }
-        if (showControls && controlsOpen) {
-            SystemControlsRow()
         }
         DisplayFallbackNotice()
     }
@@ -435,20 +424,4 @@ internal fun statusLine(status: dev.droidtop.runtime.systemstatus.SystemStatusSn
     val vpn = if (status.vpnActive) "VPN" else ""
     val battery = status.batteryPercent?.let { "$it%" + if (status.charging) " \u26A1" else "" } ?: ""
     return listOf(network, noInternet, vpn, battery).filter { it.isNotEmpty() }.joinToString("   ")
-}
-
-/** Standard's inline controls: the shared sliders and Do Not Disturb, plus links to Android's own screens. */
-@androidx.compose.runtime.Composable
-private fun SystemControlsRow() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val controls = dev.droidtop.runtime.systemstatus.SystemControls
-    Column(modifier = Modifier.fillMaxWidth()) {
-        SystemSliders()
-        androidx.compose.foundation.layout.Row {
-            DndPill()
-            TextButton(onClick = { SettingsLaunch.start(context, controls.internetPanelIntent()) }) { Text("Network") }
-            TextButton(onClick = { SettingsLaunch.start(context, controls.bluetoothSettingsIntent()) }) { Text("Bluetooth") }
-            TextButton(onClick = { SettingsLaunch.start(context, controls.allSettingsIntent()) }) { Text("All settings") }
-        }
-    }
 }

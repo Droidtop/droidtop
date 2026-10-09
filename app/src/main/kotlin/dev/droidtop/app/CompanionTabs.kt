@@ -106,7 +106,7 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
 }
 
 /** The bar: the tabs drawn on it, in order, and what More holds (no More when that is empty). */
-internal data class CompanionBar(val tabs: List<CompanionTab>, val more: List<CompanionTab>) {
+internal data class CompanionBarLayout(val tabs: List<CompanionTab>, val more: List<CompanionTab>) {
     val all: List<CompanionTab> get() = tabs + more
 }
 
@@ -141,7 +141,7 @@ internal fun slots(
     labelSizes: Map<String, Float>,
     moreSize: Float = 0f,
     plugins: List<CompanionTab> = emptyList(),
-): CompanionBar {
+): CompanionBarLayout {
     val allowed = ControlAccess.panels(mode, ControlSurface.COMPANION)
     val pluginTabs = if (ControlPanel.PLUGINS in allowed) plugins else emptyList()
     val offered = CompanionTab.CHOOSABLE.filter { it.panel in allowed } +
@@ -162,14 +162,14 @@ internal fun slots(
     if (extent > 0f) {
         while (needed() > extent && bar.isNotEmpty()) moved.add(0, bar.removeAt(bar.lastIndex))
     }
-    return CompanionBar(bar + runningTabs, moved + rest)
+    return CompanionBarLayout(bar + runningTabs, moved + rest)
 }
 
 /** The count More shows: every badge of the tabs under it, so nothing waiting is hidden. */
-internal fun moreBadge(bar: CompanionBar, badges: Map<String, Int>): Int = bar.more.sumOf { badges[it.id] ?: 0 }
+internal fun moreBadge(bar: CompanionBarLayout, badges: Map<String, Int>): Int = bar.more.sumOf { badges[it.id] ?: 0 }
 
 /** The tab the companion opens on in [modeName]: the setting, else the mode's default; a tab the mode does not offer is Home. */
-internal fun openingTab(settings: CompanionSettings, modeName: String, bar: CompanionBar): String {
+internal fun openingTab(settings: CompanionSettings, modeName: String, bar: CompanionBarLayout): String {
     val wanted = when (val value = settings.opening(modeName)) {
         CompanionPrefs.OPEN_DEFAULT -> CompanionPrefs.defaultOpening(modeName)
         CompanionPrefs.OPEN_LAST -> settings.last[modeName] ?: CompanionPrefs.defaultOpening(modeName)
@@ -182,7 +182,7 @@ internal fun openingTab(settings: CompanionSettings, modeName: String, bar: Comp
  * The tab to turn to when a game starts while Home shows ("When a game starts"): the runner's tab by default
  * (Input for a runner that asks for it, else Game), nothing, or a named tab. Null: stay.
  */
-internal fun tabForGameStart(setting: String, running: List<CompanionTab>, bar: CompanionBar): String? {
+internal fun tabForGameStart(setting: String, running: List<CompanionTab>, bar: CompanionBarLayout): String? {
     val id = when (setting) {
         CompanionPrefs.GAME_START_NONE -> return null
         CompanionPrefs.GAME_START_RUNNER -> if (CompanionTab.INPUT in running) CompanionTab.INPUT.id else CompanionTab.GAME.id
@@ -368,15 +368,17 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                 if (moreOpen) {
                     CompanionMoreList(bar.more, shown, badges) { select(it.id) }
                 } else {
-                    when (shown) {
-                        CompanionTab.HOME.id -> CompositionLocalProvider(LocalCompanionNav provides nav) { home() }
-                        CompanionTab.GAME.id -> CompositionLocalProvider(LocalCompanionNav provides nav) { CompanionGameTab() }
-                        CompanionTab.SOCIAL.id -> CompanionSocialTab(socialStart)
-                        CompanionTab.APPS.id -> CompanionTasksTab()
-                        CompanionTab.PERFORMANCE.id -> CompanionPerformanceTab()
-                        CompanionTab.SYSTEM.id -> CompanionSystemTab()
-                        CompanionTab.INPUT.id -> SecondScreenInputSurface(mode)
-                        else -> Unit
+                    CompositionLocalProvider(LocalCompanionNav provides nav) {
+                        when (shown) {
+                            CompanionTab.HOME.id -> home()
+                            CompanionTab.GAME.id -> CompanionGameTab()
+                            CompanionTab.SOCIAL.id -> CompanionSocialTab(socialStart)
+                            CompanionTab.APPS.id -> CompanionTasksTab()
+                            CompanionTab.PERFORMANCE.id -> CompanionPerformanceTab()
+                            CompanionTab.SYSTEM.id -> CompanionSystemTab()
+                            CompanionTab.INPUT.id -> SecondScreenInputSurface(mode)
+                            else -> Unit
+                        }
                     }
                 }
             }

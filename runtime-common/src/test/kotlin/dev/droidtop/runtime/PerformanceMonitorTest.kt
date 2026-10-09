@@ -6,6 +6,7 @@ import dev.droidtop.runtime.systemstatus.RingBuffer
 import dev.droidtop.runtime.systemstatus.SystemControls
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import kotlinx.coroutines.launch
 import org.junit.Test
 
 class PerformanceMonitorTest {
@@ -86,5 +87,32 @@ class PerformanceMonitorTest {
             listOf("cmd", "connectivity", "airplane-mode", "enable"),
             SystemControls.radioCommand(SystemControls.Radio.AIRPLANE, true),
         )
+    }
+
+    @Test
+    fun `a watcher counts while it runs and the count drops to zero when its tab goes`() {
+        kotlinx.coroutines.runBlocking {
+            assertEquals(0, PerformanceMonitor.subscribers.value)
+            val first = launch { PerformanceMonitor.watchWith(10L) {} }
+            val second = launch { PerformanceMonitor.watchWith(10L) { error("a failed reading does not end the loop") } }
+            kotlinx.coroutines.delay(50)
+            assertEquals(2, PerformanceMonitor.subscribers.value)
+            first.cancel()
+            first.join()
+            assertEquals(1, PerformanceMonitor.subscribers.value)
+            second.cancel()
+            second.join()
+            assertEquals(0, PerformanceMonitor.subscribers.value)
+        }
+    }
+
+    @Test
+    fun `a screen timeout reads in words, the largest value as Never`() {
+        assertEquals("Never", SystemControls.timeoutLabel(Int.MAX_VALUE))
+        assertEquals("30 seconds", SystemControls.timeoutLabel(30_000))
+        assertEquals("1 hour", SystemControls.timeoutLabel(3_600_000))
+        assertEquals("2 hours", SystemControls.timeoutLabel(7_200_000))
+        assertEquals("20 minutes", SystemControls.timeoutLabel(1_200_000))
+        assertEquals("1 h 30 min", SystemControls.timeoutLabel(5_400_000))
     }
 }
