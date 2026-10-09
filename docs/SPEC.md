@@ -14876,32 +14876,47 @@ Plugins, beside the JSON integrations §12 already built — the two are
 the same idea, "hook something into droidtop", at different trust
 levels, and belong on the same path for that reason).
 
-**The sandbox is for compatibility and stability, not security.** A
-plugin here can do anything droidtop's own UID can do — there is no
-second permission model, no dropped capability, no [SecurityManager].
-What droidtop buys instead is crash containment: a `native_bundle`
-plugin's code runs in an isolated `:pluginhost` process (same UID,
-separate process), reached over one binder interface
+**Two tiers: contained by default, full trust by grant (redecided
+2026-10-08, Droidtop/tracker#378; `docs/plugin-api.md` §5).** The owner:
+"let plugins tell droidtop what permissions stuff they do will need, and
+let droidtop actually regulate their usage".
+
+- **Contained**, the default for a contract 2 plugin: an isolated process
+  of its own (`android:isolatedProcess="true"`), with a random UID, no
+  permissions, no network and no access to droidtop's files or shared
+  storage. Its code arrives as file descriptors, and everything it does
+  beyond its process goes through its broker, where the caller's grant, the
+  parameters it declared, the quota and the activity log apply. **For a
+  contained plugin the permission model is a security boundary.**
+- **Full trust** is only the critical `host.full_trust` grant, which a
+  plugin that cannot run contained must declare (Flutter plugins, native
+  libraries, `apps.bind`, the `priv.*`/`root.*` providers), and every
+  contract 1 plugin. **For full-trust plugins the earlier decision stands:
+  the process is for compatibility and stability, not security.** Such a
+  plugin runs as droidtop's UID, in a process of its own (one of eight
+  slots), and can do anything droidtop's UID can — no second permission
+  model, no [SecurityManager]; what droidtop gives it on top is crash
+  containment, and its Activity screen says that only what it asks droidtop
+  to do is listed.
+
+Either way a plugin is reached over one binder interface
 (`IPluginRuntime`/`IPluginRuntimeCallback`, `plugin-host` module). A
-plugin that throws, hangs, or native-crashes takes `:pluginhost` down,
-never `:app`; the binder `DeathRecipient` and a per-plugin crash
-callback both funnel into `PluginCrashPolicy`. A per-plugin crash disables
-that plugin; whole-process death disables exactly the plugins with calls in
+plugin that throws, hangs, or native-crashes takes its own process down,
+never `:app`; the binder death and a per-plugin crash callback both
+funnel into `PluginCrashPolicy`. A per-plugin crash disables that plugin;
+a process death disables exactly the plugins it held with calls in
 flight, while an idle death disables none so a system low-memory kill can
 reconnect on the next call. An ordinary plugin failure result does not
-disable it. The launcher keeps working. This is
-deliberately weaker than Enginehost's own "no internet, no arbitrary
-file access" runtime sandbox direction (§7d) — droidtop's plugins share
-droidtop's actual permissions — and every doc comment on the binder
-boundary says so again, so nobody mistakes crash containment for a
-security boundary later.
+disable it. The launcher keeps working.
 
 **Plugin kinds, and the one that's built.** `PluginKind` is an open set,
 one runner per kind:
 
 - **`native_bundle`** — real Android/Kotlin code: a dex payload
   (`classes.jar`, a zip containing `classes.dex`) plus optional native
-  `.so` libraries, loaded by `DexClassLoader` in `:pluginhost` and driven
+  `.so` libraries, loaded from memory (`InMemoryDexClassLoader`) in its
+  contained process, or by `DexClassLoader` in a full-trust one (a bundle
+  with native libraries needs full access), and driven
   through `DroidtopPlugin` (`onLoad`/`invoke`/`startJob`/`onUnload`).
   Native code ships arm64-v8a AND x86_64 whenever it ships any `.so` at
   all — the standing bundle rule (§7d) — enforced by
@@ -14960,8 +14975,11 @@ one runner per kind:
     chosen and downloaded independently of `libdroidtoppy.so`'s own
     build). `PYTHONHOME` is set as a plain environment variable before
     `Py_InitializeEx`, not through a config struct, for the same reason.
-    One interpreter per `:pluginhost` process (CPython has no
-    stable-ABI-safe way to run fully independent interpreters), with
+    One interpreter per plugin process (CPython has no
+    stable-ABI-safe way to run fully independent interpreters): a contained
+    python plugin has its process and interpreter to itself, started from
+    descriptors (`docs/plugin-api.md` §5.3), and full-trust python plugins
+    sharing a slot share one, with
     every python-kind plugin loaded as its own uniquely-named module via
     a small bootstrap script so two plugins' globals never collide.
   - **`PythonDroidtopPlugin`** adapts a `plugin.py` file to the same
@@ -15037,9 +15055,9 @@ of what is built. The decisions, briefly:
   both kinds, and `PluginGrants.pointRefusal` still guards the points
   droidtop calls in. The calling plugin is found from the Python call
   stack (the nearest frame whose module is a loaded plugin), so a worker
-  thread or a helper the plugin starts is attributed correctly; this is a
-  stability sandbox, not a security boundary (one interpreter hosts every
-  python plugin), the same stance as the rest of the python kind. The GIL
+  thread or a helper the plugin starts is attributed correctly. A
+  contained python plugin has its interpreter to itself; in a full-trust
+  slot this is a stability sandbox, not a security boundary. The GIL
   is released across the Java call, because a broker call can wait on the
   user. A reply is handed to C as ASCII JSON, since JNI's modified UTF-8
   cannot be decoded by CPython for characters outside the Basic
@@ -15072,12 +15090,19 @@ of what is built. The decisions, briefly:
   (risky defaults to Ask; harmless defaults to Allow). Category and call
   choices are stored per plugin, and clearing an override reveals the
   broader choice or declared default.
-- **Honest enforcement.** Today's `:pluginhost` shares droidtop's UID,
-  so permissions bound only what the host does on a plugin's behalf.
-  The proposed contained tier closes that: one `isolatedProcess` per
-  plugin, everything through the broker. Full trust (droidtop's UID,
-  one process per plugin) stays for providers that need Shizuku or root
-  and for contract 1 plugins.
+- **Enforcement (built 2026-10-08, Droidtop/tracker#378).** A contract 2
+  plugin runs contained: one isolated process per plugin, everything
+  through the broker, with network (`net.http`, `net.download`, per-hop
+  domain checks), its own data (`data`), picked files (`files.pick`),
+  scoped shared files (`files.shared`), volumes and network state as host
+  APIs. Full trust (droidtop's UID, one process per plugin) only by the
+  critical `host.full_trust` grant, which a plugin that cannot run contained
+  must declare or it is refused at install. Android permissions are
+  declared by the plugin and held and asked for by droidtop (Android's own
+  prompt on first use during a call the person started); one droidtop's
+  manifest does not request is refused at install. Every surface shows
+  "Contained", "Full access" or "Full access (older plugin)", and each
+  plugin has an Activity screen and a Containment check.
 - **Compatibility.** Contract 1 bundles keep working unchanged. One
   translation maps each existing capability, event and `PluginContext`
   method onto the new model (`docs/plugin-api.md` §6).

@@ -205,9 +205,9 @@ The reply uses the same `{ok, data|error}` shape.
 
 | Kind | Host → plugin | Plugin → host | Jobs |
 | --- | --- | --- | --- |
-| `native_bundle` | `DroidtopPlugin.handle(call: PluginCall): PluginReply` (v2); v1 `invoke(capability, args)` still served via the legacy translation | `PluginHost.call(api, version, op, args)` handed to `onLoad(host)` | `startJob(jobId, call, progress)` / `cancelJob` (as today) |
-| `python` | module-level `handle(call_json) -> reply_json` (JSON text both ways, like `invoke`; called for a contract 2 manifest, built 2026-10-01); v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args=None, version=1) -> dict`: the modules `droidtop` and `droidtop.host`, which the bootstrap puts in `sys.modules` before `plugin.py` is imported (built 2026-10-07); the dict is the parsed broker reply, `{"ok": true, "data": ...}` or `{"ok": false, "error": {...}}`, and a call never raises for a refusal | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: the bridge runs jobs on Python worker threads, forwards progress live, and calls `cancel_job(job_id)` cooperatively |
-| `flutter_embed` | the plugin's `MethodChannel("dev.droidtop.pluginhost/<plugin id>")`, method `handle`, envelope and reply as JSON strings (called for a contract 2 manifest, built 2026-10-01) | the same channel's `hostCall`, with `{api, version, op, args}` as JSON text and the broker reply as JSON text | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
+| `native_bundle` | `DroidtopPlugin.handle(call: PluginCall): PluginReply` (v2); v1 `invoke(capability, args)` still served via the legacy translation | `PluginContext.call(api, version, op, args)` on the context handed to `onLoad`; `PluginContext.openFile(...)` for an op that hands over a file (built 2026-10-08) | `startJob(jobId, call, progress)` / `cancelJob` (as today) |
+| `python` | module-level `handle(call_json) -> reply_json` (JSON text both ways, like `invoke`; called for a contract 2 manifest, built 2026-10-01); v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args=None, version=1) -> dict`: the modules `droidtop` and `droidtop.host`, which the bootstrap puts in `sys.modules` before `plugin.py` is imported (built 2026-10-07); the dict is the parsed broker reply, `{"ok": true, "data": ...}` or `{"ok": false, "error": {...}}`, and a call never raises for a refusal; `droidtop.host.open(api, op, args=None, version=1)` returns the same dict with the descriptor number under `fd` when a file was handed over (built 2026-10-08) | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: the bridge runs jobs on Python worker threads, forwards progress live, and calls `cancel_job(job_id)` cooperatively |
+| `flutter_embed` | the plugin's `MethodChannel("dev.droidtop.pluginhost/<plugin id>")`, method `handle`, envelope and reply as JSON strings (called for a contract 2 manifest, built 2026-10-01) | the same channel's `hostCall`, with `{api, version, op, args}` as JSON text and the broker reply as JSON text; no `open` (a Flutter plugin always runs with full access, §5.3, and opens its own files) | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
 
 **What a `native_bundle` plugin links against.** Its dex is loaded with
 droidtop's own class loader as parent, so the plugin API
@@ -265,6 +265,10 @@ each plugin:
   itself, from validated data. This is the rule `PluginContext` already
   follows (`launchAppWithExtras` takes strings; droidtop builds the
   `Intent`), made universal.
+- **Files cross as descriptors.** `IPluginHostBroker.open(request)` runs the
+  same checks for an op that hands the plugin a file (`data.open`,
+  `files.open`, `files.shared.open`) and returns the descriptor with the
+  reply. A contained plugin can open nothing else (§5.3).
 - **`PluginContext` becomes a thin client.** The existing methods
   (`hasShizukuAccess`, `isAppInstalled`, `launchApp`,
   `launchAppWithExtras`, `libraryFolderPath`, `privateDataDir`,
@@ -279,7 +283,7 @@ each plugin:
 | **Approve** | The approval screen shows, in plain language: what the plugin adds and where (grouped by mode), what it can access (normal permissions as a short list; each dangerous permission and high-risk extension point as its own line), what it needs from other plugins, and its trust badge (Official / Added by you). Every item is a tick box and **the plugin runs with the ticked subset** (decided 2026-10-01, §4.3 "Approval is a list"). Unticked dangerous permissions stay at `ask` (§4.3). | the approval screen in `AppSettingsCatalogs.pluginsScreen` |
 | **Enable** | An approved plugin is enabled by default. Disabling stops every call to it and hides its contributions everywhere, because `PluginStore.runnableFor` is the only iterator (checklist point 6). | `PluginStore.setEnabled` |
 | **Resolve** | On every install, approve, enable, disable, uninstall or crash, the `requires` graph is recomputed (§2.3). A plugin whose *required* API has no runnable provider is **Waiting**. It is not disabled, and it resumes by itself when a provider appears. | new: `PluginApiResolver` |
-| **Run** | Loading is lazy: a plugin is loaded on its first call, and after 60 s idle (proposed) it is unloaded unless it holds a job or a running background service (§3 E8). A crash, an uncaught exception, a native crash, a timeout or process death disables that plugin with a reason, and the user re-enables it by hand (12a checklist point 6). **Kept as is:** crash containment is the one rule `PluginCrashPolicy` exists for. | `PluginCrashPolicy`, `NativePluginRunner` |
+| **Run** | Loading is lazy: a plugin is loaded on its first call, and its process is let go 60 s after the last use (built 2026-10-08, `PluginProcesses`); a job or a running background service (§3 E8) keeps it in use. A crash, an uncaught exception, a native crash, a timeout or process death disables that plugin with a reason, and the user re-enables it by hand (12a checklist point 6). **Kept as is:** crash containment is the one rule `PluginCrashPolicy` exists for. | `PluginCrashPolicy`, `NativePluginRunner` |
 | **Update** | Same key: approval carries over (12a "Trust over updates"). **v2 adds a permission diff.** An update that adds any permission, extension point or `exports` entry keeps running with its *old* grants; the new items wait at `ask`, and the plugin's page asks about those items only, on the same list as at approval ("Wants new access", §4.3). An update never gains dangerous access silently. A different key, or a previously DENIED plugin, goes back to PENDING (unchanged). | `PluginStore`, `PluginRecord.approvedKeySha256` |
 | **Uninstall** | `onUnload` runs, and the payload, data directory, vault entries, grants and scheduled work are deleted. The audit log for the plugin is kept for 7 days (labelled "removed plugin") so that "what did it do" can still be answered. Dependents are re-resolved (§2.5). | `PluginStore.uninstall` |
 
@@ -1410,8 +1414,13 @@ Risk low.
   - A: an Android notification on droidtop's per-plugin channel (the user
     can mute each plugin in Android settings);
   - D: a container-side notification through the host bridge.
-- **Permission:** `notify.post` (normal), rate-limited (§8).
-- **Status:** not built.
+- **Permission:** `notify.post` (normal), rate-limited (§8). droidtop holds
+  Android's `POST_NOTIFICATIONS` for it (§4.1, "Android permissions").
+- **Status:** built in part (2026-10-08, Droidtop/tracker#378): `post {title,
+  text}` → `{posted}` as an Android notification in the plugin's own
+  channel, at most 5 an hour; droidtop asks Android for its permission on
+  first use during a call the person started. `actions`, `progress`,
+  `cancel` and the G and D surfaces are not built.
 - **Rules:**
   - Every notification is attributed to the plugin.
   - There is no full-screen intent and no heads-up by default.
@@ -1671,11 +1680,11 @@ droidtop's own Android permissions, gated per plugin by the broker.
 
 | Id | Group | For | Ops and events | Surfaces | Permission | Risk | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| D1 | Network state | adapt to connectivity; VPN/hotspot tiles | `net.state()` → {type, metered, vpn, ssid?}; event `net.changed` | data | `net.state` (normal; SSID needs `net.wifi_details`, dangerous: location-grade) | low | not built |
-| D2 | Network access | talk to the internet | `net.http {method, url, headers, body≤1MiB}` → response (≤ 8 MiB, or streamed into a job); `net.download {url} → job` (host download manager, into a host-chosen folder or the plugin's data dir) | data | `net.domains` (declared list, normal) / `net.any` (dangerous) / `net.local` (LAN, dangerous) | medium to high | not built; plugins open sockets directly today (§5) |
-| D3 | Storage and volumes | free space, removable media, where a library folder lives | `storage.volumes()` → [{id, label, removable, freeBytes}]; events `storage.mounted` / `unmounted` | data | `storage.volumes` (normal) | low | not built |
-| D4 | File picker (SAF) | let the user choose a file or folder for the plugin | `files.pick {mode, mime}` → a grant token; `files.open {token}` → fd | the system picker | `files.picker` (normal; the user's pick is the consent) | low | not built |
-| D5 | Shared files | broad access to shared storage | `files.list/read/write {scope path}` | data | `files.shared.read` / `files.shared.write` (dangerous; droidtop holds MANAGE_EXTERNAL_STORAGE) | high | not built; available *directly* today (§5) |
+| D1 | Network state | adapt to connectivity; VPN/hotspot tiles | `net.state()` → {type, metered, vpn, ssid?}; event `net.changed` | data | `net.state` (normal; SSID needs `net.wifi_details`, dangerous: location-grade) | low | built (2026-10-08, `net` `state` → {online, type, metered, vpn}); SSID and `net.changed` not built |
+| D2 | Network access | talk to the internet | `net.http {method, url, headers, body \| bodyBase64, timeoutMs, as}` → {status, url, headers, body \| bodyBase64, truncated} (each body ≤ 128 KiB: it travels inside the reply cap); `net.download {url, name}` → {jobId}, a job into the plugin's own data (H1), read with `plugins.job_status` | data | `net.domains` (declared list, normal) / `net.any` (dangerous) / `net.local` (LAN, dangerous) | medium to high | built (2026-10-08, `HostNetApis`): the URL alone picks the permission before any name is looked up; https only outside the local network; redirects followed by droidtop with every hop checked; a declared name that resolves to the local network needs `net.local`; every request logged with its host |
+| D3 | Storage and volumes | free space, removable media, where a library folder lives | `storage.volumes()` → [{id, label, removable, freeBytes}]; events `storage.mounted` / `unmounted` | data | `storage.volumes` (normal) | low | built (2026-10-08, `storage` `volumes`, with `primary`, `state`, `totalBytes`); the mount events are not built |
+| D4 | File picker (SAF) | let the user choose a file or folder for the plugin | `files.pick {mode, mime}` → a grant token; `files.open {token}` → fd | the system picker | `files.picker` (normal; the user's pick is the consent) | low | built (2026-10-08): `files.pick {mode: open \| create, mime, name}` → {picked, token, name, writable}, only during a call the person started; `files.open {token, mode}` → fd; `files.forget {token}`; folders are not offered |
+| D5 | Shared files | broad access to shared storage | `files.shared` `list`, `read`, `write`, `mkdir`, `delete`, `open` `{path, volume?}`, `path` inside one of the folders the permission entry declares (`paths`, `"*"` for all) | data | `files.shared.read` / `files.shared.write` (dangerous; droidtop holds MANAGE_EXTERNAL_STORAGE) | high | built (2026-10-08): never `Android/data` or `Android/obb`, checked again after links are followed, and only while droidtop itself has all-files access |
 | D6 | Clipboard | copy a code or link; read for paste-to-search | `clipboard.write {text}`; `clipboard.read()` only during a user-initiated call | data | `clipboard.write` (normal) / `clipboard.read` (dangerous) | low / high | not built |
 | D7 | Power and battery | defer work on low battery; power profiles | `power.state()` → {level, charging, saver}; `power.keep_awake {≤10 min}` (only while a job runs); events `power.low`, `power.charging` | data | `power.state` (normal) / `power.keep_awake` (normal, quota) | low | not built |
 | D8 | Display | know the displays (internal, companion, external) to place content | `display.list()` → [{id, role, size, density, hdr}]; events `display.added` / `removed`; `display.set {brightness}` | data; C15 renders | `display.info` (normal) / `display.control` (dangerous) | low / medium | not built |
@@ -1734,7 +1743,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 
 | Id | Group | For | Ops and events | Surfaces | Permission | Risk | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| H1 | Per-plugin storage | the plugin's own files and preferences | `privateDataDir()` (exists; a path in the full-trust tier, a host-backed fd API in the contained tier); `prefs.get/set` (small key/value, host-stored, shown in the export); quota §8 | — | — (own data) | low | built (`privateDataDir`) |
+| H1 | Per-plugin storage | the plugin's own files and preferences | `privateDataDir()` (exists; a path in the full-trust tier, a host-backed fd API in the contained tier); `prefs.get/set` (small key/value, host-stored, shown in the export); quota §8 | — | — (own data) | low | built: `privateDataDir` with full access; contained, the `data` API on the same folder (2026-10-08): `write {name, text \| base64, append}`, `read {name, offset, length ≤ 128 KiB, as}`, `list {prefix}`, `delete`, `usage`, `open {name, mode}` → fd, names of `[A-Za-z0-9._-]` segments, writes stop at 512 MiB; `prefs` not built |
 | H2 | Shared databases | data other plugins or droidtop may read: droidtop's library index (A1), and a plugin's own published dataset | droidtop's own databases: only through A1 APIs, never a handle. A plugin publishing data does it as a plugin-provided API (§2), e.g. `acme.playlog.query` | — | per API | varies | by design |
 | H3 | Import and export | move a plugin's settings or data between devices | EP `data.export@1`: `export → job writing into a host-chosen fd`; `import {fd}` | A/G/D: Accounts and sources → Plugins → <plugin> → Export / Import | none (user-initiated) | low | not built |
 | H4 | Backup and restore | droidtop's own backup includes plugin data | manifest `backup: {include: ["prefs", "data/<subpath>"]}`; vault entries never included; restore re-verifies the plugin and asks before re-granting dangerous permissions | Settings → Backup | none | medium | not built (#46 is the credentials-in-backup issue) |
@@ -1867,6 +1876,38 @@ wording the host uses, so it is identical in every mode.
 That is 66 permissions. Those marked † are restricted to official
 origins.
 
+**Android permissions (decided 2026-10-08, Droidtop/tracker#378).** A
+plugin never holds an Android permission: a contained process has none,
+and Android grants them to droidtop's package, not to a plugin. What a
+plugin declares is which of droidtop's Android-backed operations it needs;
+droidtop runs them under its own permission, gated per plugin like every
+other permission here.
+
+- Each registry row names the Android permission droidtop needs to do that
+  operation for a plugin, and from which Android version: `notify.post`
+  needs `POST_NOTIFICATIONS` (API 33+), `net.state`
+  `ACCESS_NETWORK_STATE`, `net.any` `INTERNET` (`PluginPermission.android`).
+- A plugin may declare the Android name (`{"id":
+  "android.permission.POST_NOTIFICATIONS", "reason": ...}`) instead of the
+  host id. The manifest reader takes it as that row's permission and keeps
+  the name it was written under, so the approval list, the grant and the
+  broker check are one. An Android name and its host id are one permission.
+- An Android permission droidtop's own manifest does not request is
+  **refused at install** with the reason ("it asks for the Android
+  permission CAMERA, which droidtop itself does not have, so no plugin can
+  use it through droidtop"). One droidtop requests but no operation uses is
+  listed as "Not supported by this version of droidtop".
+- At call time the broker checks the plugin's own grant first, then
+  whether droidtop holds the Android permission. If it does not, Android's
+  own prompt is shown, but only during a call the person started; from the
+  background the call fails with `PERMISSION_DENIED` and droidtop asks next
+  time. The approval line says "Android asks you too, the first time".
+- Camera (D20), location (D19) and Bluetooth (D13) have no droidtop
+  operation, and droidtop requests none of those permissions, so a plugin
+  naming them is refused at install. Each becomes possible only when its
+  operation is built and droidtop's manifest gains the permission, which is
+  then a decision about droidtop itself.
+
 **Always available, with no permission:** `host.info`, `plugins.available`,
 own `prefs`, own `privateDataDir`, `log.write`, `locale`/`time`, the
 `ui.prompt` sheet during a user-initiated call, and job progress.
@@ -1967,7 +2008,7 @@ There is no second place.
 | Normal permissions | granted on approval | granted on approval | — |
 | Dangerous | ticked or asked | ticked or asked; the grant sheet adds "from a source droidtop has not checked" | — |
 | Critical | ticked, with a warning | ticked, with a warning **plus** a second confirmation; † permissions not grantable at all | — |
-| `host.full_trust` | allowed (existing plugins) | allowed only with an explicit critical grant; the default once the contained tier exists (§5.3) is *contained* | — |
+| `host.full_trust` | allowed only with the critical grant; contained is the default (§5.3, built) | the same | — |
 | Export privileged APIs | allowed | only with `plugins.export_privileged` | — |
 | Onboarding steps | allowed | never | — |
 
@@ -1980,29 +2021,48 @@ tick.
 - **What is logged.** Every broker call that needs a dangerous or
   critical permission writes an entry: plugin, permission, op, a
   one-line target summary (a domain, a package, a folder name, never
-  contents), `via` chain, result code and timestamp. Normal-permission
-  calls are counted per day, not logged one by one.
+  contents), `via` chain, result code and timestamp. Network calls
+  (`net.http`, `net.download`, with the host), shared-file calls and
+  picked-file calls are logged whatever their tier (built 2026-10-08).
+  Other normal-permission calls are to be counted per day, not logged one
+  by one (not built).
 - **Storage.** In droidtop's private storage, per plugin: a ring of 2,000
   entries or 30 days. It is kept 7 days after uninstall.
 - **Where it shows.** Activity per plugin ("Used your GitHub token 3 times
-  today, last 14:02"), and "last used" on each permission row.
+  today, last 14:02"), and "last used" on each permission row. Built
+  2026-10-08: Accounts and sources → Plugins → <plugin> → Activity lists
+  the last 200 entries, newest first, under one line that says what the
+  list covers for that plugin's tier.
 - **Export.** It is included in Share diagnostics only with the user's
   say-so, and scrubbed (H5).
 - **What the audit cannot see.** Anything a full-trust plugin does
   directly with droidtop's UID, bypassing the broker (§5). The Activity
   screen says so on full-trust plugins: "This plugin runs with full
-  access; only what it asks droidtop to do is listed."
+  access; only what it asks droidtop to do is listed." A contained plugin
+  has no way around the broker.
 
 ---
 
 ## 5. Threat model
 
-### 5.1 What is enforced today, and what is not
+### 5.1 What is enforced, and what is not
 
-The process boundary is **crash containment, not a security sandbox**
-(12a, and `docs/security/2026-09-25-droidtop-plugins.md`). Concretely:
+Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
+(§5.3), and what is enforced depends on which:
 
-**Enforced today:**
+| | Contained (the default for contract 2) | Full trust (`host.full_trust`, and contract 1) |
+| --- | --- | --- |
+| Process | an isolated process of its own: a random UID, no permissions, the `isolated_app` SELinux domain | a process of its own (one of eight slots) under droidtop's UID |
+| Network | none: not in the `inet` group, so `socket()` is refused; `net.http`/`net.download` only, checked against `net.domains`/`net.any`/`net.local` per hop and logged | droidtop's `INTERNET`: any socket, unseen by droidtop |
+| droidtop's files (databases, preferences, sign-in tokens, other plugins' data) | none | all of them |
+| Its own files | the `data` API on its own folder only | its own folder by path, and everything else droidtop's UID reaches |
+| Shared storage | `files.shared` within its declared folders, `files.pick` documents, logged | all of it (`MANAGE_EXTERNAL_STORAGE`) |
+| Installed apps, usage stats, secure settings, logs | through declared host APIs only | whatever droidtop's UID holds (`QUERY_ALL_PACKAGES`, `PACKAGE_USAGE_STATS`, `WRITE_SECURE_SETTINGS` and `READ_LOGS` if granted) |
+| Shizuku, `su` | none (no binder, no permission; it can reach privilege only through a `priv.*` provider, with its own grant) | Shizuku's binder if droidtop was allowed, and `su` if the root manager granted droidtop's UID |
+| Other plugins | only through the broker (§2) | other full-trust plugins' files (same UID); not their objects (separate processes) |
+| The broker | the caller is the binder object; grant, scope, quota and audit on every call | the same for what it asks droidtop to do |
+
+**Enforced for every plugin:**
 
 - **Install integrity.** Signature, per-plugin keys certified by the
   pinned plugin master (with revocation), per-origin keys for user-trusted
@@ -2011,74 +2071,59 @@ The process boundary is **crash containment, not a security sandbox**
   namespacing and ABI coverage. Official bundles are signed by CI
   (repo secret `PLUGIN_SIGNING_KEY`, optional `PLUGIN_SIGNING_CERT` packaged as
   `origin.cert`); see docs/SPEC.md, plugin trust.
-- **Consent.** Nothing runs before approval. Root needs its own tick.
-  Approval binds to the digest and key.
-- **Routing.** droidtop calls only declared capabilities and delivers
-  only subscribed events. A disabled plugin is never called
+- **Consent.** Nothing runs before approval. Approval binds to the digest
+  and key. A plugin that cannot run contained must declare
+  `host.full_trust`, or it is refused at install, and it is not called
+  until the person allows it. An Android permission droidtop does not hold
+  is refused at install (§4.1).
+- **Routing.** droidtop calls only declared and allowed points and
+  delivers only subscribed events. A disabled plugin is never called
   (`runnableFor`).
-- **What droidtop hands over.** A folder path only for `acquire_content`
-  from that system's screen. Intents are built by droidtop from strings.
-  No database handle is passed.
+- **What droidtop hands over.** Intents are built by droidtop from strings.
+  No database handle is passed. A contained plugin gets files only as
+  descriptors from the broker.
 - **Replies.** Results are capped at 256 KiB and treated as untrusted
   input (never used as a path, URI or intent target without validation).
-- **Stability.** Watchdogs, and a crash, timeout or process death
-  disables the plugin.
+- **Stability.** Watchdogs, and a crash, timeout or death of its process
+  during a call disables the plugin.
 
-**Not enforced today.** The plugin runs as droidtop's UID in
-`:pluginhost` (`android:isolatedProcess="false"`), so it holds
-**everything droidtop holds**. Plugin code can, directly and invisibly:
-
-- open any socket (`INTERNET`);
-- read and write all shared storage (`MANAGE_EXTERNAL_STORAGE`);
-- list every installed app (`QUERY_ALL_PACKAGES`);
-- read droidtop's **own** private files: its databases, preferences,
-  store sign-in tokens and scraper credentials. "Never gets a database
-  handle" is an API design, not a wall.
-- request package installs (`REQUEST_INSTALL_PACKAGES`), read usage
-  stats if granted (`PACKAGE_USAGE_STATS`), write secure settings if
-  granted by adb (`WRITE_SECURE_SETTINGS`), and read logs if granted
-  (`READ_LOGS`);
-- use Shizuku, which is granted to droidtop's UID;
-- reach another plugin in the same process: its class loader, its
-  `privateDataDir` and its files;
-- call the broker pretending to be another plugin (same process, so the
-  broker binder objects are reachable by reflection);
-- run anything `su` gives it, if the device's root manager has already
-  granted droidtop's UID.
-
-This is why permissions today are **declarative consent plus host-side
-gating of host-mediated calls**. They are honest about what the host does
-on a plugin's behalf, and they do not bound what a plugin can do on its
-own.
+**Not enforced:** anything a full-trust plugin does directly. Its
+permissions are declarative consent plus host-side gating of what droidtop
+does for it; they do not bound what it can do on its own, and the Activity
+screen says so (§4.6). That is why full trust is a critical grant, needed
+only by what cannot run contained (Flutter plugins, native libraries,
+`apps.bind`, the `priv.*` and `root.*` providers) and by contract 1 plugins.
+Whether the contained tier holds on a given device is what the Containment
+check (§5.3) shows.
 
 ### 5.2 Threats and mitigations
 
 | # | Threat | Today | Mitigation in this design | What remains |
 | --- | --- | --- | --- | --- |
-| T1 | **Malicious plugin** (bad author, or a good author's key stolen) exfiltrates droidtop's credentials, the library, play history or shared files | only signing, the trust tier and user approval stand in the way | contained tier (§5.3): no direct network, no files, no UID permissions; everything through the broker, with domain allowlists and an audit | full-trust plugins stay able to do anything; limited to official origins by default and those needing Shizuku/root |
+| T1 | **Malicious plugin** (bad author, or a good author's key stolen) exfiltrates droidtop's credentials, the library, play history or shared files | mitigated for contained plugins (built 2026-10-08): no direct network, no files, no UID permissions | contained tier (§5.3): everything through the broker, with domain allowlists and an audit | full-trust plugins stay able to do anything; only by the critical `host.full_trust` grant, needed only by what cannot run contained |
 | T2 | **Silent escalation on update** (same key, new code wants more) | approval carries over; nothing re-asks | permission diff (§1.5): new dangerous items wait in `ask`; new exports need a grant | a full-trust plugin's new *code* can still misuse existing direct access |
 | T3 | **Confused deputy through the host**: a plugin gets droidtop to act with droidtop's power (write outside a folder, send an intent to an arbitrary package, open a FileProvider URI) | ad hoc: the host builds intents, validates results | the broker checks the **caller's** grant, never droidtop's; every path comes from the host (tokens and fds), never from the plugin; intents only to declared packages unless `apps.intents.out` is dangerous-granted | host bugs in validation: each API gets a unit test that a plugin-supplied path, URI or package outside scope is refused |
 | T4 | **Confused deputy through a provider plugin**: A reaches root through B without its own grant | not possible yet (no plugin→plugin) | A's own grant is required (§2.6); risk floor; `via` chain audited; depth ≤ 3, no cycles; narrow standard-interface schemas | a buggy provider that exposes more than its label: reviewed for official providers; third-party exporters need `plugins.export_privileged` |
-| T5 | **Data exfiltration** by network, intents, clipboard, share, logs, telemetry or crafted result URLs | open (T1) | `net.domains` allowlist, audited; `apps.intents.out` scoped; `clipboard.read` dangerous and user-initiated only; logs scrubbed; telemetry opt-in with payload shown; host renders no plugin-supplied URL as a clickable link without showing the domain | covert channels inside allowed domains; a contained plugin can still send what it can read to an allowed domain, so keep what it can read small |
+| T5 | **Data exfiltration** by network, intents, clipboard, share, logs, telemetry or crafted result URLs | mitigated for contained plugins: the network is `net.http`/`net.download` only, every hop checked and logged | `net.domains` allowlist, audited; `apps.intents.out` scoped; `clipboard.read` dangerous and user-initiated only; logs scrubbed; telemetry opt-in with payload shown; host renders no plugin-supplied URL as a clickable link without showing the domain | covert channels inside allowed domains; a contained plugin can still send what it can read to an allowed domain, so keep what it can read small |
 | T6 | **UI spoofing / phishing**: a plugin renders "Enter your Steam password" or a fake permission sheet | partially: plugins draw no UI | plugin text always carries its name chip; no secret text fields (C14); passwords only through G2/G3 host flows; permission sheets are host-only and visually distinct; onboarding steps official only | a misleading but honest-looking label; mitigated by attribution and review of official plugins |
 | T7 | **Denial of service**: hang, crash loop, battery drain, notification spam | watchdog; crash disables | quotas (§8); background only with a grant; per-plugin notification channel and rate limit | a plugin that behaves badly but never crashes: the Activity and Jobs screens make it visible |
-| T8 | **Cross-plugin interference** in the shared `:pluginhost` | open | contained tier: one isolated process per plugin; full-trust plugins in their own non-isolated process (not shared) | full-trust plugins share droidtop's UID and can still read each other's files |
+| T8 | **Cross-plugin interference** in a shared plugin process | mitigated (built 2026-10-08): one process per plugin; contained ones isolated | contained tier: one isolated process per plugin; full-trust plugins in their own non-isolated process (shared only beyond eight full-trust plugins in use at once) | full-trust plugins share droidtop's UID and can still read each other's files |
 | T9 | **Supply chain**: TOFU key fetch, catalog index tampering, runtime download tampering | mitigated (https only, fingerprint shown, changed key stops dead, index untrusted, pinned runtime hashes) | unchanged; add a "key changed" entry to the audit log | a user who confirms a TOFU key for a malicious source |
-| T10 | **Privacy of the user's play history and library** | open (T1) | `library.history` and `apps.list` are dangerous; A1 read is paged and index-only; G6: no identity APIs; per-plugin random install id | a plugin granted history can keep it |
-| T11 | **Root or Shizuku abuse** | per-plugin root tick, but same-UID code can call `su` or Shizuku without the host knowing | host holds no privilege; providers only; caller grants; `priv.*` requires optional-only (§2.7) | a full-trust plugin still shares droidtop's UID, so it can reach Shizuku or `su` directly if the root manager granted the UID; hence §5.3's "each full-trust plugin its own process" and the plan for a provider-owned UID (§10 Q2) |
+| T10 | **Privacy of the user's play history and library** | mitigated for contained plugins: the library database is unreachable, only A1 calls | `library.history` and `apps.list` are dangerous; A1 read is paged and index-only; G6: no identity APIs; per-plugin random install id | a plugin granted history can keep it |
+| T11 | **Root or Shizuku abuse** | contained plugins: no `su`, no Shizuku binder; full-trust plugins: same-UID code can still call `su` or Shizuku without the host knowing | host holds no privilege; providers only; caller grants; `priv.*` requires optional-only (§2.7) | a full-trust plugin still shares droidtop's UID, so it can reach Shizuku or `su` directly if the root manager granted the UID; hence §5.3's "each full-trust plugin its own process" and the plan for a provider-owned UID (§10 Q2) |
 | T12 | **Malformed data into droidtop**: theme files, metadata, result JSON, notification text | size caps, the untrusted-input rule | schema check per op reply; theme input goes through the same hardened parser as downloads; text length caps | parser bugs in droidtop itself |
 
-### 5.3 Proposal: a contained execution tier
+### 5.3 The contained execution tier (built 2026-10-08)
 
 To make the permission model hold for real, plugins must stop sharing
-droidtop's UID. The proposal:
+droidtop's UID. The design, as built (Droidtop/tracker#378):
 
 - **Contained, the default for contract 2 plugins.** Each plugin runs in
   its own **isolated process**: `android:isolatedProcess="true"` on the
   runtime service. `Context.bindIsolatedService` (API 29+) gives one
   process per plugin from a single declaration; on API 28 and older a
-  fixed pool of declared slots (`PluginSandbox0..7`) is used, the same
-  pattern browsers use for renderers.
+  fixed pool of declared slots (`PluginSandboxSlot0..7`) is used, one
+  plugin each, the same pattern browsers use for renderers.
   - **What an isolated process has.** Its own random UID, **no
     permissions at all**, no network (it is not in the inet group), no
     access to droidtop's files or shared storage, and almost no system
@@ -2114,22 +2159,32 @@ isolated range, no permissions, not in the `inet` group (no sockets), the
 may not open droidtop's files (`app_data_file`) or shared storage, and no
 content providers. droidtop's application object checks for an isolated
 process first and starts nothing in it.
-- **Full trust, by grant.** This is today's same-UID `:pluginhost`,
-  but **one process per plugin**, so no plugin can reach another
-  in-process (T8). It is needed for:
-  - the Shizuku and root providers (their privilege is granted per UID);
+- **Full trust, by grant.** droidtop's UID, but **one process per
+  plugin** from eight declared slots (`:pluginhost`, `:pluginhost1` to
+  `:pluginhost7`; beyond eight in use at once the least recently used slot
+  is shared), so no plugin can reach another in-process (T8). It is needed
+  for:
+  - the Shizuku and root providers (their privilege is granted per UID;
+    the Shizuku binder arrives in `:pluginhost` and the other slots ask
+    for it through Shizuku's multi-process support);
   - plugins that bind other apps' services (`apps.bind`: an isolated
     process cannot bind);
+  - Flutter plugins and plugins with native libraries ("Spike results"
+    below);
   - contract 1 plugins, which keep running full-trust with the badge
     "Full access (older plugin)".
-  - It needs `host.full_trust` (critical).
+  - It needs `host.full_trust` (critical). A contract 2 plugin that cannot
+    run contained must declare it or is refused at install; until it is
+    granted the plugin is not called (during a call the person started the
+    first-use sheet asks), and its badge reads "Full access" once it is.
 - **What this buys.** For contained plugins, the permission table in §4
   becomes an actual boundary, and the audit log becomes complete.
 - **What it costs.**
   - A broker round trip for network and files.
   - One process per plugin in use. Mitigated by lazy loading and the
-    60 s idle unload (§1.5).
-  - A per-kind loader spike.
+    60 s idle unload (§1.5); a contained plugin starts afresh after it.
+  - A python plugin's first start in a new process compiles the standard
+    library modules it imports from the zip (no bytecode is written).
 - **What it cannot fix.** Full-trust plugins. That is why they are
   limited to official origins by default, and why each one is its own
   process.
@@ -2355,7 +2410,9 @@ arrays under the manifest's own keys (`V2Declarations`).
 - **The transport.** Shizuku's server pushes its binder to a content
   provider named `<applicationId>.shizuku` in each app the user allowed.
   `:plugin-host` declares Shizuku's own `ShizukuProvider` under that name in
-  `:pluginhost`, the process plugins run in, and depends on Shizuku's client
+  `:pluginhost`, the first full-trust slot (the other slots and droidtop's
+  main process ask for the binder through Shizuku's multi-process support),
+  and depends on Shizuku's client
   library (`dev.rikka.shizuku:api` and `:provider` 13.1.5, Apache-2.0). The
   plugin's class loader delegates to the host's first, so the provider
   plugin references `rikka.shizuku.Shizuku` without bundling it and shares
@@ -2377,6 +2434,42 @@ arrays under the manifest's own keys (`V2Declarations`).
 - The provider plugin itself is `Droidtop/droidtop-plugin-shizuku`
   (`droidtop-plugin/`): a contract 2 manifest exporting both interfaces,
   full-trust, with the existing status tile and app_status surfaces.
+
+**As built (the contained tier, #378, 2026-10-08).**
+
+- **Processes.** `PluginProcessService` is the one binder every plugin
+  process runs; `PluginRuntimeService` (and `FullTrustSlot1..7`) loads a
+  full-trust plugin from its folder, `PluginSandboxService` (isolated, and
+  `PluginSandboxSlot0..7` below API 29) loads a contained one from
+  descriptors. `PluginProcesses` hands each plugin its process, lets it go
+  after 60 s idle, and reports a death once to
+  `PluginCrashPolicy.processDied` with the plugins that process held.
+  droidtop's application object starts nothing in an isolated process.
+- **Tiers.** `PluginTiers` decides the tier per load from the grants, says
+  what cannot run contained and why, and gives the badge.
+  `PluginManifest.structuralProblems` refuses at install a contract 2
+  plugin that cannot run contained and does not declare `host.full_trust`.
+- **Loading.** `ContainedFiles` opens what a kind needs in `:app`; the
+  sandbox reads dex from `classes.jar` into `InMemoryDexClassLoader`, and
+  starts python from descriptors (§5.3, "Spike results").
+  `PythonRuntimeManager` builds `python-stdlib.zip` once per runtime.
+- **The broker.** `IPluginHostBroker.open` for ops that hand over a file;
+  `HostOp` can choose its permission from the arguments (`net.http`), be
+  user-only (`files.pick`), be logged whatever its tier, and name an
+  Android permission droidtop must hold. Host ops built: `net` `state`,
+  `http`, `download`; `data` `write`, `read`, `list`, `delete`, `usage`,
+  `open`; `files` `pick`, `open`, `forget`; `files.shared` `list`, `read`,
+  `write`, `mkdir`, `delete`, `open`; `storage` `volumes`; `notify` `post`.
+  `BrokerAskActivity` shows Android's document picker and permission prompt
+  for the broker. Picked-file tokens are deleted with the plugin.
+- **Screens.** The plugin row, page and Permissions screen show the tier;
+  the approval list says whether the plugin runs contained or asks for full
+  access; Activity lists the log; Advanced → Containment check loads the
+  plugin as a call would and reports what its process can reach.
+- **Kind parity.** `openFile` is served to `native_bundle`
+  (`PluginContext.openFile`) and `python` (`droidtop.host.open`), not to
+  `flutter_embed`, which always runs with full access and opens its own
+  files.
 
 **Compatibility promises:**
 
@@ -2481,31 +2574,30 @@ chose not to wait. A plugin that misses them was slow, not broken.
 | --- | --- |
 | broker calls | 50/s burst, 10/s sustained |
 | reply size | 256 KiB (`MAX_RESULT_BYTES`); argument size 256 KiB |
-| `net.http` response | 8 MiB (bigger goes through `net.download` as a job) |
+| `net.http` body | 128 KiB each way (bigger goes through `net.download` as a job) |
 | concurrent jobs | 2, beyond which jobs queue in the Jobs screen |
 | notifications | 5 per hour, 1 ongoing |
 | overlay toasts | 1 per 10 s |
 | scheduled jobs | at most every 15 min (the WorkManager floor) |
 | `power.keep_awake` | 10 min per request, only with a running job |
-| data directory | a 512 MiB soft limit, shown on the plugin row; no hard stop (droidtop never deletes a plugin's data by itself) |
+| data directory | 512 MiB: a `data` write or download that would pass it is refused (`RATE_LIMITED`); droidtop never deletes a plugin's data by itself |
 | audit log | 2,000 entries / 30 days |
 | event delivery | an event whose handlers are not done in 15 s is dropped for that plugin (as today's watchdog) |
 
 **Processes.**
 
-- Today: one shared `:pluginhost`, with `PluginRuntimeService` holding a
-  map of loaded plugins.
-- Target:
-  - contained plugins get one isolated process each;
-  - full-trust plugins get one process each.
-  In both cases the idle unload (60 s) frees memory, and Android's
-  low-memory killer may kill any plugin process. That counts as process
-  death: in-flight calls fail, but **it does not disable the plugin**
-  when the system (not the plugin) killed it (see P1-12).
+- Built 2026-10-08 (§5.3): contained plugins get one isolated process each
+  (one `bindIsolatedService` instance from API 29, one of eight isolated
+  slots below it); full-trust plugins get one of eight slots under
+  droidtop's UID each.
+- The idle unload (60 s) frees memory, and Android's low-memory killer may
+  kill any plugin process. That counts as process death: in-flight calls
+  fail, but **it does not disable the plugin** when the system (not the
+  plugin) killed it (see P1-12).
 
-When the shared `:pluginhost` process dies, the host disables exactly the
-plugins with calls in flight at the time of death. A process death while
-idle disables none, so the next call can reconnect after a low-memory kill.
+When a plugin process dies, the host disables exactly the plugins it held
+that had calls in flight at the time of death. A death while idle disables
+none, so the next call can reconnect after a low-memory kill.
 An ordinary `PluginResult.failure` is a plugin-reported result, not a crash,
 and does not disable the plugin.
 
@@ -2559,11 +2651,13 @@ Each is one issue when its time comes. They are not filed now, to keep
 the tracker honest.
 
 - **Containment:**
-  - P2-1: the contained-tier spike, per kind, on both rigs;
-  - P2-2: the contained tier as the default for contract 2;
-  - P2-3: one process per full-trust plugin.
+  - P2-1: the contained-tier spike, per kind, on both rigs (built
+    2026-10-08, #378; the device results are §5.3's to record);
+  - P2-2: the contained tier as the default for contract 2 (built, #378);
+  - P2-3: one process per full-trust plugin (built, #378).
 - **Network:**
-  - P2-4: `net.http`/`net.download` broker with domain allowlists;
+  - P2-4: `net.http`/`net.download` broker with domain allowlists (built,
+    #378);
   - P2-5: a web-session API (G3) for #9;
   - P2-6: an OAuth helper (G2);
   - P2-7: GitHub request API (G4) folded into #16's token store.
@@ -2581,7 +2675,7 @@ the tracker honest.
   - P2-17: controller mapping + the Key Mapper bridge (B5, F1, #15);
   - P2-18: perf read and profiles (B6, B7);
   - P2-19: search providers (C5, with #12);
-  - P2-20: notifications (C6);
+  - P2-20: notifications (C6; `post` built, #378);
   - P2-21: theme packs (C7);
   - P2-22: desktop tray through SNI (C8);
   - P2-23: file handlers and associations (C9, E4);
@@ -2591,7 +2685,8 @@ the tracker honest.
   - P2-27: onboarding steps (C13);
   - P2-28: prompts (C14).
 - **System and desktop:**
-  - P2-29: the system group D1–D17 as host APIs, in order of demand;
+  - P2-29: the system group D1–D17 as host APIs, in order of demand (D1
+    to D5 built, #378);
   - P2-30: containers read/manage/exec (E1, E2);
   - P2-31: terminal (E3);
   - P2-32: windows through windowcast (E5);
@@ -2641,4 +2736,6 @@ answer.
   it.
 - **Q4. Should the contained tier be the default for official plugins
   too,** once the spike proves it, with full trust only where a plugin
-  needs it? The recommendation is yes.
+  needs it? The recommendation is yes. **Decided 2026-10-08
+  (Droidtop/tracker#378): contained is the default for every contract 2
+  plugin, official ones included.**
