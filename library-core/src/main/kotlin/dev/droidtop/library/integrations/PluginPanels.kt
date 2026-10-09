@@ -89,10 +89,11 @@ object PluginPanels {
         groups = { context ->
             withContext(Dispatchers.IO) {
                 val panels = panelsFor(context, PluginModes.ofSurface(surface))
-                // The catalog as last fetched, never a network call: Decky's badge on a plugin with an update.
-                val index = PluginCatalog.lastGoodIndex(context)
+                // The catalogs as last fetched, never a network call: Decky's badge on a plugin with an update.
+                val listings = PluginCatalog.listings(context)
+                val userKeys = dev.droidtop.pluginhost.UserOriginKeys.load(dev.droidtop.pluginhost.UserOriginKeys.storeFile(context))
                 val rows: List<CatalogItem> = panels.map { panel ->
-                    val update = index?.let { PluginCatalog.updateFor(it, panel.record) } != null
+                    val update = PluginCatalog.offerFor(listings, panel.record, userKeys) != null
                     val value = if (update) "Update available" else summary(panel)
                     NestedScreenItem(
                         id = "plugin_panel_${panel.pluginId}",

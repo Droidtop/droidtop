@@ -202,14 +202,51 @@ class PluginCertificatesTest {
     }
 
     @Test
-    fun `a user-trusted origin verifies by its own key and ignores a certificate`() = withKeys {
+    fun `a user-trusted origin verifies by its own key, and droidtop's master gives no standing there`() = withKeys {
         val acme = freshKeyPair()
         val userKeys = mapOf("acme" to b64(acme.public.encoded))
-        val verdict = verify(acme, certificate(), id = "acme.tool", origin = "acme", userKeys = userKeys)
+        val verdict = verify(acme, null, id = "acme.tool", origin = "acme", userKeys = userKeys)
         assertEquals(Sha256.hex(acme.public.encoded), (verdict as BundleVerdict.Verified).anchorSha256)
         assertNull(verdict.certificate)
-        // A master-certified key gives no standing for another origin.
+        // A certificate from droidtop's plugin master is not one from the key the person trusts for acme.
         assertTrue(verify(pluginKey, certificate(ids = listOf("acme.tool")), id = "acme.tool", origin = "acme", userKeys = userKeys) is BundleVerdict.Refused)
+        assertTrue(verify(acme, certificate(ids = listOf("acme.tool")), id = "acme.tool", origin = "acme", userKeys = userKeys) is BundleVerdict.Refused)
+    }
+
+    @Test
+    fun `an added catalog's master certifies its repositories' keys for its own origin`() = withKeys {
+        val orgMaster = freshKeyPair()
+        val repoKey = freshKeyPair()
+        val userKeys = mapOf("gamegrab" to b64(orgMaster.public.encoded))
+        val cert = certificate(ids = listOf("gamegrab.f95"), subject = repoKey, issuer = orgMaster, certId = "gamegrab-sources/droidtop-plugin-f95#0")
+
+        val verdict = verify(repoKey, cert, id = "gamegrab.f95", origin = "gamegrab", userKeys = userKeys)
+        // Approval binds to the org master, so a repository key rotation under it keeps approval; never official.
+        assertEquals(Sha256.hex(orgMaster.public.encoded), (verdict as BundleVerdict.Verified).anchorSha256)
+        assertNotNull(verdict.certificate)
+        assertFalse(Sha256.hex(orgMaster.public.encoded) in PluginOriginKeys.officialAnchorFingerprints())
+        // Another id, another signer, or the origin's own revocation list refuses it.
+        assertTrue(verify(repoKey, cert, id = "gamegrab.other", origin = "gamegrab", userKeys = userKeys) is BundleVerdict.Refused)
+        assertTrue(verify(freshKeyPair(), cert, id = "gamegrab.f95", origin = "gamegrab", userKeys = userKeys) is BundleVerdict.Refused)
+        val own = PluginRevocationList(0, emptySet(), emptySet(), byOrigin = mapOf("gamegrab" to PluginRevocationList(1, setOf("gamegrab-sources/droidtop-plugin-f95#0"), emptySet())))
+        assertTrue(verify(repoKey, cert, id = "gamegrab.f95", origin = "gamegrab", userKeys = userKeys, revoked = own) is BundleVerdict.Refused)
+        // The plugin master's own list never reaches a user-trusted origin.
+        val official = PluginRevocationList(1, setOf("gamegrab-sources/droidtop-plugin-f95#0"), emptySet())
+        assertTrue(verify(repoKey, cert, id = "gamegrab.f95", origin = "gamegrab", userKeys = userKeys, revoked = official) is BundleVerdict.Verified)
+        // A certified official bundle is unaffected by the org's list.
+        assertTrue(verify(pluginKey, certificate(), revoked = own) is BundleVerdict.Verified)
+    }
+
+    @Test
+    fun `an origin's revocation list is kept only when its own master signed it`() = withKeys {
+        val root = tmp.newFolder("plugins-origins")
+        val orgMaster = freshKeyPair()
+        assertFalse(PluginRevocations.acceptForOrigin(root, "gamegrab", revocations(2, certIds = listOf("a#0")), orgMaster.public))
+        assertTrue(PluginRevocations.acceptForOrigin(root, "gamegrab", revocations(2, certIds = listOf("a#0"), issuer = orgMaster), orgMaster.public))
+        assertTrue(PluginRevocations.load(root).forOrigin("gamegrab").revokesCert("a#0"))
+        assertFalse(PluginRevocations.load(root).revokesCert("a#0"))
+        assertEquals(PluginRevocationList.NONE, PluginRevocations.load(root).forOrigin("other"))
+        assertFalse(PluginRevocations.acceptForOrigin(root, "gamegrab", revocations(1, issuer = orgMaster), orgMaster.public))
     }
 
     @Test

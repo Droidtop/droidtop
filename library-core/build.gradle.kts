@@ -164,6 +164,8 @@ dependencies {
     api(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.kotlinx.serialization.json)
+    // Reads the QR code of a plugin catalog's address from a picked image (PluginCatalogSources.qrText).
+    implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
     // RomDatabaseMigrationTest walks the game_metadata migration chain over

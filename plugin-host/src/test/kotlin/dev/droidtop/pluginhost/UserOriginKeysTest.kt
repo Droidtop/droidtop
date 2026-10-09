@@ -180,4 +180,19 @@ class UserOriginKeysTest {
         corrupt.writeText("{ this is not json")
         assertTrue(UserOriginKeys.load(corrupt).isEmpty())
     }
+
+    @Test
+    fun `a key trusted through an added catalog remembers the catalog`() {
+        val file = store()
+        val key = spkiBase64(freshKeyPair())
+
+        UserOriginKeys.add(file, "acme", key, source = "https://example.com/index.json", catalog = "someone/catalog")
+
+        assertEquals("someone/catalog", UserOriginKeys.load(file)["acme"]?.catalog)
+        // Trusted earlier some other way, then accepted through a catalog: the catalog is recorded, the key is untouched.
+        UserOriginKeys.add(file, "other", spkiBase64(freshKeyPair()), source = null)
+        assertTrue(UserOriginKeys.attachCatalog(file, "other", "someone/catalog"))
+        assertEquals("someone/catalog", UserOriginKeys.load(file)["other"]?.catalog)
+        assertFalse(UserOriginKeys.attachCatalog(file, "missing", "someone/catalog"))
+    }
 }

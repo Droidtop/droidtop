@@ -991,8 +991,8 @@ object AppSettingsCatalogs {
         val selfUpdate = dev.droidtop.app.update.AppSelfUpdate
         val newerBuild = selfUpdate.newerSeenVersionName(context)
         val installed = PluginStore.installed(context)
-        val index = PluginCatalog.lastGoodIndex(context)
-        val pluginUpdates = index?.let { PluginCatalog.updatesFor(installed, it) }.orEmpty()
+        val listings = PluginCatalog.listings(context)
+        val pluginUpdates = PluginCatalog.offersFor(installed, listings, UserOriginKeys.load(UserOriginKeys.storeFile(context)))
         val published = LibraryCore.library(context).backgroundScanState(LibraryKinds.GAMES).value
         val gameUpdates = published?.let { entries ->
             LibraryGrouping.group(entries).mapNotNull { group -> group.game.availableUpdate?.let { group.game.name to it } }
@@ -1012,23 +1012,23 @@ object AppSettingsCatalogs {
                     run = {},
                 ),
             )
-            pluginUpdates.forEach { (record, release) ->
+            pluginUpdates.forEach { (record, offer) ->
                 add(
                     ActionItem(
                         id = "updates_plugin_${record.manifest.id}",
                         title = record.manifest.label,
-                        subtitle = "Plugin, installed ${record.manifest.version}",
-                        value = "Update to ${release.version}",
+                        subtitle = "Plugin, installed ${record.manifest.version}" + if (offer.source.official) "" else " - Unofficial, from ${offer.source.name}",
+                        value = "Update to ${offer.release.version}",
                         run = {},
                     ),
                 )
             }
-            if (index == null && installed.isNotEmpty()) {
+            if (listings.isEmpty() && installed.isNotEmpty()) {
                 add(
                     ActionItem(
                         id = "updates_plugins_unknown",
                         title = "Plugins",
-                        subtitle = "The plugin catalog has not been fetched yet. Plugins, Add, Browse catalog checks it",
+                        subtitle = "The plugin catalog has not been fetched yet. Plugins, Add, Catalogs checks it",
                         value = "Not checked",
                         run = {},
                     ),
@@ -1488,9 +1488,11 @@ object AppSettingsCatalogs {
         val resolution = PluginApiResolver.current(context)
         val grantStore = PluginGrants.forContext(context)
         val providerChoices = PluginProviderChoices.forContext(context).all()
-        // The catalog as last fetched, never a network call: a card says when its plugin has an update (Decky's badge);
+        // The catalogs as last fetched, never a network call: a card says when its plugin has an update (Decky's badge);
         // the update itself is on the plugin's page and in Updates.
-        val catalogIndex = PluginCatalog.lastGoodIndex(context)
+        val listings = PluginCatalog.listings(context)
+        val catalogNames = catalogNames(context)
+        val catalogsSummary = PluginCatalogScreen.summary(context)
 
         listOf(
             CatalogGroup(
@@ -1513,10 +1515,11 @@ object AppSettingsCatalogs {
                             pluginCard(
                                 record,
                                 userKeys,
+                                catalogNames,
                                 resolution.waiting[record.manifest.id],
                                 grants,
                                 PluginRuntimeNeeds.missing(context, record.manifest),
-                                updateAvailable = catalogIndex?.let { PluginCatalog.updateFor(it, record) } != null,
+                                updateAvailable = PluginCatalog.offerFor(listings, record, userKeys) != null,
                             ),
                         )
                     }
@@ -1529,9 +1532,10 @@ object AppSettingsCatalogs {
                 items = listOf(
                     NestedScreenItem(
                         id = "plugins_add_catalog",
-                        title = "Browse catalog",
-                        subtitle = "From droidtop-platforms and origins you trust",
+                        title = "Catalogs",
+                        subtitle = "droidtop's own catalog, and catalogs you add by address or QR code",
                         inline = PluginCatalogScreen.screen(),
+                        valueLabel = { catalogsSummary },
                     ),
                     DocumentPickItem(
                         id = "plugins_add_file",
@@ -1567,16 +1571,29 @@ object AppSettingsCatalogs {
         )
     }
 
-    private fun pluginTrustBadge(origin: String, userKeys: Map<String, UserOriginKey>): String = when {
-        PluginOriginKeys.isOfficial(origin) -> "Official"
-        userKeys.containsKey(origin) -> userKeys.getValue(origin).repo?.let { "Verified by: $it" } ?: "Added by you"
-        else -> "NOT TRUSTED"
+    /**
+     * A plugin's trust badge, the same words in the list, on its page and on the approval screen
+     * (docs/SPEC.md 12a "The badge", "Added catalogs"): an origin trusted through an added catalog is
+     * "Unofficial" whatever else vouches for it, since a catalog that is not droidtop's listed it.
+     */
+    private fun pluginTrustBadge(origin: String, userKeys: Map<String, UserOriginKey>, catalogNames: Map<String, String>): String {
+        if (PluginOriginKeys.isOfficial(origin)) return "Official"
+        val entry = userKeys[origin] ?: return "NOT TRUSTED"
+
+        entry.catalog?.let { return "Unofficial: from ${catalogNames[it] ?: it}" }
+        return entry.repo?.let { "Verified by: $it" } ?: "Added by you"
     }
+
+    /** Added catalogs' display names by id, for the badge. Disk. */
+    private fun catalogNames(context: Context): Map<String, String> =
+        dev.droidtop.library.integrations.PluginCatalogSources.added(dev.droidtop.library.integrations.PluginCatalogSources.storeFile(context))
+            .associate { it.id to it.name }
 
     /** The installed-plugins list row: what it's called, what it adds in plain words, its trust badge and its state -- the whole card, one tap into [pluginDetailScreen]. */
     private fun pluginCard(
         record: dev.droidtop.pluginhost.PluginRecord,
         userKeys: Map<String, UserOriginKey>,
+        catalogNames: Map<String, String>,
         waiting: List<dev.droidtop.pluginhost.RequiredApi>?,
         grants: PluginGrants.Snapshot,
         runtimeNeed: RuntimeNeed?,
@@ -1606,7 +1623,7 @@ object AppSettingsCatalogs {
             record.trust == PluginTrustState.APPROVED -> "Running"
             else -> "Unknown"
         }
-        val trustBadge = pluginTrustBadge(m.origin, userKeys)
+        val trustBadge = pluginTrustBadge(m.origin, userKeys, catalogNames)
         return NestedScreenItem(
             id = "plugin_${m.id}",
             title = m.label,
@@ -1656,7 +1673,7 @@ object AppSettingsCatalogs {
                     )
                 } else {
                     val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
-                    pluginDetailGroups(context, record, userKeys)
+                    pluginDetailGroups(context, record, userKeys, catalogNames(context))
                 }
             }
         },
@@ -1666,6 +1683,7 @@ object AppSettingsCatalogs {
         context: Context,
         record: dev.droidtop.pluginhost.PluginRecord,
         userKeys: Map<String, UserOriginKey>,
+        catalogNames: Map<String, String>,
     ): List<CatalogGroup> {
         val m = record.manifest
         val resolution = PluginApiResolver.current(context)
@@ -1681,10 +1699,24 @@ object AppSettingsCatalogs {
                 record.trust == PluginTrustState.APPROVED && record.enabled -> "Running"
                 else -> "Disabled"
             }
-            val trustLine = when {
-                PluginOriginKeys.isOfficial(m.origin) -> "Official"
-                userKeys.containsKey(m.origin) -> userKeys.getValue(m.origin).repo?.let { "Verified by: $it" } ?: "Added by you"
-                else -> "NOT TRUSTED: no trusted key for this origin anymore (see Keys you trust)"
+            val trustLine = if (!PluginOriginKeys.isOfficial(m.origin) && !userKeys.containsKey(m.origin)) {
+                "NOT TRUSTED: no trusted key for this origin anymore (see Keys you trust)"
+            } else {
+                pluginTrustBadge(m.origin, userKeys, catalogNames)
+            }
+            val unofficialFrom = userKeys[m.origin]?.catalog?.takeIf { !PluginOriginKeys.isOfficial(m.origin) }
+            // The approval screen says where the plugin came from before anything is approved
+            // (docs/SPEC.md 12a "Added catalogs"): from a catalog that is not droidtop's, it is Unofficial.
+            if (record.trust == PluginTrustState.PENDING && unofficialFrom != null) {
+                add(
+                    ActionItem(
+                        id = "plugin_${m.id}_unofficial",
+                        title = "Unofficial",
+                        subtitle = "From \"${catalogNames[unofficialFrom] ?: unofficialFrom}\", a catalog that is not part of droidtop. " +
+                            "droidtop has not vetted it; approve it only if you trust where it came from",
+                        run = {},
+                    ),
+                )
             }
             // A pending status used to look like a button but had no action. The approval controls below
             // are the action; keep the trust/status row for plugins that already have a decision.
@@ -1822,7 +1854,7 @@ object AppSettingsCatalogs {
         val newAccessGroups: List<CatalogGroup> = if (newTicks == null) {
             emptyList()
         } else {
-            pluginConsentGroups(context, record, userKeys, ticks = newTicks, only = freshIds) + CatalogGroup(
+            pluginConsentGroups(context, record, userKeys, catalogNames, ticks = newTicks, only = freshIds) + CatalogGroup(
                 id = "plugin_${m.id}_new_access_group",
                 title = null,
                 items = listOf(
@@ -1842,7 +1874,7 @@ object AppSettingsCatalogs {
 
         // "Asks for" is what approval is about; once approved, the Permissions screen below holds the real
         // state of each one, and a second list saying "Asks first" beside "7 allowed, 0 ask" contradicts it.
-        val consentGroups = pluginConsentGroups(context, record, userKeys, ticks = approvalTicks)
+        val consentGroups = pluginConsentGroups(context, record, userKeys, catalogNames, ticks = approvalTicks)
             .filterNot { record.trust == PluginTrustState.APPROVED && it.id.endsWith("_consent_asks") }
 
         // Grants exist once the plugin is approved (docs/plugin-api.md 4.4): one screen per plugin, no second place.
@@ -1948,23 +1980,22 @@ object AppSettingsCatalogs {
         val runtimeGroup: List<CatalogItem> = listOfNotNull(runtimeItem(context, m.kind, m.label, runtimeNeed))
 
         val updateGroup = buildList<CatalogItem> {
-            val index = PluginCatalog.lastGoodIndex(context)
-            val release = index?.let { PluginCatalog.updateFor(it, record) }
-            val plugin = index?.pluginById(m.id)
+            val listings = PluginCatalog.listings(context)
+            val offer = PluginCatalog.offerFor(listings, record, userKeys)
             add(
-                if (release != null && plugin != null) {
+                if (offer != null) {
                     AsyncActionItem(
                         id = "plugin_${m.id}_update",
                         title = "Version ${m.version}",
-                        subtitle = "An update is available in the catalog",
-                        value = "Update to ${release.version}",
-                        run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, release, onStatus) },
+                        subtitle = if (offer.source.official) "An update is available in the catalog" else "An update is available in \"${offer.source.name}\" (unofficial)",
+                        value = "Update to ${offer.release.version}",
+                        run = { ctx, onStatus -> PluginCatalog.install(ctx, offer.plugin, offer.release, onStatus) },
                     )
                 } else {
                     ActionItem(
                         id = "plugin_${m.id}_version",
                         title = "Version ${m.version}",
-                        subtitle = if (index == null) "Catalog not fetched yet: open Add > Browse catalog to check" else "Matches the catalog's latest stable release",
+                        subtitle = if (listings.isEmpty()) "Catalog not fetched yet: open Add > Catalogs to check" else "No newer stable release in your catalogs",
                         run = {},
                     )
                 },
@@ -2320,12 +2351,13 @@ object AppSettingsCatalogs {
         context: Context,
         record: dev.droidtop.pluginhost.PluginRecord,
         userKeys: Map<String, UserOriginKey>,
+        catalogNames: Map<String, String>,
         ticks: MutableSet<String>? = null,
         only: Set<String>? = null,
     ): List<CatalogGroup> {
         val m = record.manifest
         val scope = if (only == null) "" else "new_"
-        val full = PluginConsent.of(m, PluginStore.installed(context)) { pluginTrustBadge(it, userKeys) }
+        val full = PluginConsent.of(m, PluginStore.installed(context)) { pluginTrustBadge(it, userKeys, catalogNames) }
         val view = if (only == null) full else full.only(only)
         fun info(key: String, title: String, subtitle: String? = null, value: String? = null) =
             ActionItem(id = "plugin_${m.id}_$scope$key", title = title, subtitle = subtitle, value = value, run = {})
@@ -2458,9 +2490,11 @@ object AppSettingsCatalogs {
                                     id = "plugin_key_${entry.origin}",
                                     title = entry.origin,
                                     subtitle = buildString {
-                                        append("Added by you: third-party, NOT official. Key fingerprint ")
+                                        append(if (entry.catalog != null) "Unofficial, from the catalog ${entry.catalog}" else "Added by you")
+                                        append(": third-party, NOT official. Key fingerprint ")
                                         append(UserOriginKeys.fingerprint(entry.keyBase64) ?: "unreadable")
                                         entry.source?.let { append(". Added from $it") }
+
                                     },
                                     run = {},
                                 ),

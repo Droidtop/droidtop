@@ -27,9 +27,13 @@ import java.util.Base64
  *   from it keep running and updating until their repositories ship
  *   certified releases; the transition ends as SPEC 12a describes.
  * - Any other origin's key reaches a device through "Keys you trust"
- *   ([UserOriginKeys]): the user adds the source, droidtop fetches its
- *   published key, and the user confirms it once -- never through this
- *   object's pinned set, which stays what droidtop itself shipped.
+ *   ([UserOriginKeys]): the user adds the source (or accepts a catalog),
+ *   droidtop fetches its published key, and the user confirms it once --
+ *   never through this object's pinned set, which stays what droidtop
+ *   itself shipped and the only thing that yields "Official". Such a key
+ *   is either the origin's own signing key or, for an organisation's
+ *   catalog, that organisation's plugin master, which certifies each of its
+ *   repositories' keys the way droidtop's master certifies official ones.
  */
 object PluginOriginKeys {
     /**
@@ -169,8 +173,16 @@ object BundleSignature {
      * by revocation), and the manifest signature must verify against the
      * certified key. An official bundle WITHOUT one: the legacy origin key,
      * unless the revocation list withdrew it. Any other origin: its
-     * user-trusted key; a certificate in such a bundle is ignored, since the
-     * person's own trust decision is what vouches for it.
+     * user-trusted key, which the person's own trust decision vouches for.
+     * When such a bundle carries a certificate, the user-trusted key is that
+     * origin's master (an added catalog's organisation master, SPEC 12a
+     * "Added catalogs") and the same chain applies against it: the
+     * certificate must be signed by it, cover [pluginId], not be revoked by
+     * that origin's own revocation list ([PluginRevocationList.forOrigin]),
+     * be valid at install, and certify the key the manifest is signed with.
+     * Approval binds to the master's fingerprint, so a repository's key
+     * rotation under the same master keeps it. A certificate never makes a
+     * bundle official.
      */
     fun verifyBundle(
         manifestBytes: ByteArray,
@@ -206,6 +218,29 @@ object BundleSignature {
         val fingerprint = Sha256.hex(key.encoded)
         if (PluginOriginKeys.isOfficial(origin) && revocations.revokesKey(fingerprint)) {
             return BundleVerdict.Refused("the official key this bundle is signed with has been withdrawn; it needs a certified release")
+        }
+        if (!PluginOriginKeys.isOfficial(origin)) {
+            val own = revocations.forOrigin(origin)
+            if (own.revokesKey(fingerprint)) {
+                return BundleVerdict.Refused("the key you trust for origin \"$origin\" has been revoked by its catalog")
+            }
+            if (certificateText != null) {
+                val certificate = PluginCertificates.parse(certificateText, key)
+                    ?: return BundleVerdict.Refused("${PluginCertificates.FILE_NAME} is not a certificate signed by the key you trust for origin \"$origin\"")
+                if (!certificate.covers(pluginId)) {
+                    return BundleVerdict.Refused("the certificate is for ${certificate.pluginIds.joinToString()}, not \"$pluginId\"")
+                }
+                if (own.revokesCert(certificate.certId) || own.revokesKey(certificate.keySha256)) {
+                    return BundleVerdict.Refused("the certificate \"${certificate.certId}\" has been revoked by its catalog")
+                }
+                if (nowEpochSeconds != null && !certificate.validAt(nowEpochSeconds)) {
+                    return BundleVerdict.Refused("the certificate \"${certificate.certId}\" is not valid now (check the device's date)")
+                }
+                if (!verifyWith(certificate.publicKey, manifestBytes, signatureBase64)) {
+                    return BundleVerdict.Refused("signature doesn't verify against the key certified for \"$pluginId\"")
+                }
+                return BundleVerdict.Verified(fingerprint, certificate)
+            }
         }
         if (!verifyWith(key, manifestBytes, signatureBase64)) {
             return BundleVerdict.Refused("signature doesn't verify against a trusted key for origin \"$origin\"")

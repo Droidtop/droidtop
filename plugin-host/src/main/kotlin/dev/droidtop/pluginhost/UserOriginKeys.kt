@@ -27,6 +27,11 @@ data class UserOriginKey(
      * (docs/SPEC.md 12a "Plugin repositories").
      */
     val repo: String? = null,
+    /**
+     * The id of the added catalog ("owner/name" of its repository, docs/SPEC.md 12a "Added catalogs") the
+     * person accepted to get this key, or null. A plugin from such an origin is badged "Unofficial".
+     */
+    val catalog: String? = null,
 )
 
 /** What [UserOriginKeys.add] (or [UserOriginKeys.replace]) decided, verbatim on the settings screen. */
@@ -70,7 +75,8 @@ object UserOriginKeys {
                 val keyBase64 = entry.optString("key").takeIf { it.isNotBlank() } ?: continue
                 val source = if (entry.isNull("source")) null else entry.optString("source").takeIf { it.isNotBlank() }
                 val repo = if (entry.isNull("repo")) null else entry.optString("repo").takeIf { it.isNotBlank() }
-                put(key, UserOriginKey(origin = key, keyBase64 = keyBase64, source = source, repo = repo))
+                val catalog = if (entry.isNull("catalog")) null else entry.optString("catalog").takeIf { it.isNotBlank() }
+                put(key, UserOriginKey(origin = key, keyBase64 = keyBase64, source = source, repo = repo, catalog = catalog))
             }
         }
     }
@@ -86,6 +92,7 @@ object UserOriginKeys {
                 JSONObject().put("key", entry.keyBase64).apply {
                     entry.source?.let { put("source", it) }
                     entry.repo?.let { put("repo", it) }
+                    entry.catalog?.let { put("catalog", it) }
                 },
             )
         }
@@ -140,7 +147,7 @@ object UserOriginKeys {
      * is the same key); a DIFFERENT key for a trusted origin ->
      * [AddKeyOutcome.KeyChanged] with nothing written.
      */
-    fun add(file: File, origin: String, keyBase64: String, source: String?, repo: String? = null): AddKeyOutcome {
+    fun add(file: File, origin: String, keyBase64: String, source: String?, repo: String? = null, catalog: String? = null): AddKeyOutcome {
         val id = origin.trim()
         originProblem(id)?.let { return AddKeyOutcome.Refused(it) }
         val key = canonicalKey(keyBase64)
@@ -151,10 +158,10 @@ object UserOriginKeys {
             return if (fingerprint(key) == fingerprint(existing.keyBase64)) {
                 AddKeyOutcome.AlreadyTrustedSameKey
             } else {
-                AddKeyOutcome.KeyChanged(existing, UserOriginKey(id, key, source, repo))
+                AddKeyOutcome.KeyChanged(existing, UserOriginKey(id, key, source, repo, catalog))
             }
         }
-        val entry = UserOriginKey(origin = id, keyBase64 = key, source = source?.trim()?.takeIf { it.isNotBlank() }, repo = repo)
+        val entry = UserOriginKey(origin = id, keyBase64 = key, source = source?.trim()?.takeIf { it.isNotBlank() }, repo = repo, catalog = catalog)
         runCatching { save(file, stored + (id to entry)) }
             .onFailure { return AddKeyOutcome.Refused("couldn't save the key: ${it.message}") }
         return AddKeyOutcome.Added(entry)
@@ -190,6 +197,19 @@ object UserOriginKeys {
         return runCatching { save(file, stored + (origin to existing.copy(repo = repo))) }.isSuccess
     }
 
+    /**
+     * Records that an already-trusted [origin] was also accepted through the added catalog [catalog]
+     * (docs/SPEC.md 12a "Added catalogs"), leaving its key as it is; its plugins are badged "Unofficial"
+     * from then on. False when it is not trusted or the store could not be written.
+     */
+    fun attachCatalog(file: File, origin: String, catalog: String): Boolean {
+        val stored = load(file)
+        val existing = stored[origin] ?: return false
+        if (existing.catalog == catalog) return true
+        return runCatching { save(file, stored + (origin to existing.copy(catalog = catalog))) }.isSuccess
+    }
+
+
     /** Stops trusting `origin`; false when it wasn't trusted to begin with. Plugins it signed stop verifying the moment this returns true. */
     fun remove(file: File, origin: String): Boolean {
         val stored = load(file)
@@ -197,6 +217,9 @@ object UserOriginKeys {
         runCatching { save(file, stored - origin) }.onFailure { return false }
         return true
     }
+
+    /** The full lowercase hex SHA-256 of a key's SPKI bytes, the form catalog indexes and revocation lists name keys by; null when unreadable. */
+    fun keySha256(keyBase64: String): String? = PluginOriginKeys.parseSpki(keyBase64)?.let { Sha256.hex(it.encoded) }
 
     /**
      * The eye-comparable form of a key for prompts and rows: SHA-256 of

@@ -16588,15 +16588,21 @@ the secondary path for sources that publish no key.
   Re-adding the same key restores them — approval, bound per archive
   digest, was never destroyed, only signature resolution was.
 - **The badge.** Every plugin's line on the Plugins screen carries its
-  trust tier: "Official" (origin certified in droidtop's binary) or
-  "Added by you" (user-trusted origin — the label never borrows
-  "Official"). A user-origin whose key is gone shows the flagged
-  not-trusted state instead.
+  trust tier: "Official" (origin certified in droidtop's binary),
+  "Unofficial: from <catalog>" (an origin trusted through a catalog the
+  person added, "Added catalogs" below; this wins over the next two,
+  because a catalog that is not droidtop's listed it), "Verified by:
+  <owner/name>" (a plugin repository) or "Added by you" (user-trusted
+  origin — no label ever borrows "Official"). A user-origin whose key is
+  gone shows the flagged not-trusted state instead. The same words are on the plugin's page, in what other
+  plugins' consent lists say about it, and, for an Unofficial plugin, as
+  an "Unofficial" row at the top of its approval screen.
 - **Storage.** `filesDir/plugin-user-keys.json`, droidtop's private
   storage, writable only by the app, written via a temp file + rename
   so a failed write cannot leave a half-written store:
-  `{ "<origin>": { "key": "<SPKI base64>", "source": "<url it was fetched from, absent when pasted by hand>" } }`.
-  The official origin has no entry there and never can.
+  `{ "<origin>": { "key": "<SPKI base64>", "source": "<url it was fetched from, absent when pasted by hand>", "repo": "<owner/name>", "catalog": "<added catalog id>" } }`
+  (the last two only when they apply). The official origin has no entry
+  there and never can.
 
 **Per-plugin keys and the plugin master (owner, 2026-10-08).** "Every
 plugin repo gets a different key derived from the master." Official
@@ -16650,7 +16656,8 @@ access to another's secrets or write access to the organisation.
   it is read. A revoked certificate or key refuses new installs and stops
   installed plugins at their next activation ("signature no longer
   verifies: ..."). A rotation is a new generation with a new `certId`; the
-  old one is then revoked.
+  old one is then revoked. This list applies to the official origin only;
+  an added catalog's origin has its own ("Added catalogs").
 - **Approval across keys.** Approval binds to the trust anchor
   (`PluginRecord.approvedKeySha256`): the master's fingerprint for a
   certified bundle, the legacy official key's, or the user-trusted key's.
@@ -16672,10 +16679,27 @@ access to another's secrets or write access to the organisation.
   with a key that is NOT derived from the master (`plugin-key-provision
   independent`: `PLUGIN_SIGNING_KEY` only, no certificate) under its own
   origin id, and reaches a device through "Keys you trust" exactly like
-  any third-party origin, using the same bundle format. A certificate in a
-  non-official bundle is ignored: only the person's own trust decision
-  vouches for it, and a master certificate never gives standing outside
-  the official origin.
+  any third-party origin, using the same bundle format. droidtop's plugin
+  master never gives standing outside the official origin.
+- **Organisation masters (coordinator decision for the owner's
+  Droidtop/tracker#382, 2026-10-08).** An added catalog's organisation
+  has ONE key for its origin: its own plugin master, from a separate
+  master seed, never droidtop's (for gamegrab-sources the origin is
+  `gamegrab`). Each of its plugin repositories signs with its own key,
+  certified by that master (`plugin-key-provision official` run with the
+  organisation's seed), and the bundle carries `origin.cert`.
+  `BundleSignature.verifyBundle` checks such a bundle exactly as an
+  official one, bundle -> repository key -> certificate -> master, but
+  against the key the person trusts for that origin instead of
+  `MasterKey.PINNED`: when a non-official bundle carries a certificate,
+  the user-trusted key is its origin's master; the certificate must be
+  signed by it, cover the plugin id, not be revoked by that origin's own
+  list, be valid at install, and certify the key the manifest is signed
+  with. Approval binds to the master's fingerprint, so a repository key
+  rotation under the same master keeps it. Only the pinned master ever
+  yields "Official". An origin whose trusted key signs its bundles
+  directly (an independent key with no certificate, romgi's shape today)
+  keeps working the Keys-you-trust way.
 
 Unit-tested in `net-core` (`GitHubDeviceFlowTest`: interval, `slow_down`, denial,
 expiry, cancel, offline; `GitHubAccountTest`: the credential store seam), in
@@ -16832,7 +16856,8 @@ what the index says is display data, never a trust decision.
     available", "Up to date", never "Up to date" on a catalog that was
     never read) and "Update all" (`PluginCatalog.updateAll`) are the
     Updates screen's "Available" group, see "Places".
-  - **Add** — "Browse catalog" (the catalog screen below) and "Install
+  - **Add** — "Catalogs" (the catalog screens below and "Added
+    catalogs"; it was "Browse catalog" while there was one) and "Install
     plugin file" (the file picker), both install sources in one place
     instead of the file picker being the very last row of the old flat
     list.
@@ -16867,6 +16892,125 @@ what the index says is display data, never a trust decision.
   and says which one it is showing. "Update all" fetches fresh itself
   before comparing. The index is a snapshot and says when it was made
   (`generatedAt`), the same posture Enginehost's index has.
+- **Added catalogs (owner, 2026-10-08, Droidtop/tracker#382: "a catalog
+  repo under gamegrab-sources to gather all the 'unofficial' plugins in
+  that org together, with a warning that this catalog is unofficial").**
+  `PluginCatalog` works over a list of catalog sources
+  (`PluginCatalogSources`): the official catalog above is the first,
+  built in and never removable; every other is one the person added.
+  There is no second code path: listing, the offer rule, updates, "Update
+  all" and install are the same functions for every catalog, and install
+  is still `PluginCatalog.install` into `PluginBundleInstaller`.
+  - **Where.** Plugins > Add > "Catalogs": "Your catalogs" (each opens
+    that catalog's own screen: refresh, its plugins, and for an added one
+    an "About this catalog" group with its address, signature, disclaimer
+    and "Remove this catalog") and "Add a catalog": an address field (the
+    catalog's GitHub repository, which droidtop turns into
+    `raw.githubusercontent.com/<owner>/<repo>/HEAD/index.json`, or the
+    https address of its index.json; plain http is refused), "Fetch this
+    catalog", and "Read a QR code" (a photo or screenshot of the catalog's
+    QR code, decoded on the device with zxing, the library droidtop
+    already draws QR codes with; there is no live camera scanner).
+  - **Format.** An added catalog's index is the same schema 1 index with
+    two more top-level blocks, both required for an added catalog and
+    absent from droidtop's own: `catalog` {`id` ("owner/name" of the
+    repository that publishes it), `name`, `homepage`, `trust`
+    ("unofficial"), and, once the organisation has one, `key` (its plugin
+    master, P-256 SPKI and `keySha256`) and `origin` (its own origin id,
+    which the index must list under exactly that key)} and `disclaimer`
+    {`version`, `text`}. A present but malformed block refuses the whole
+    index.
+  - **Adding is fetch, review, Accept.** Fetching shows the catalog's
+    name, "Unofficial: not part of droidtop and not vetted by it", its
+    address, whether it is signed (and the catalog key's fingerprint), its
+    disclaimer text in full, and every origin it lists with its key
+    fingerprint and whether the person already trusts that key, a
+    different one, or none. Nothing is stored or trusted until "Accept and
+    add" (behind a confirmation that names the catalog and how many
+    origins it trusts). Accepting stores the catalog with the disclaimer
+    version accepted, keeps the index it showed, and trusts each origin
+    exactly as "Keys you trust" does: `UserOriginKeys.add` with the
+    catalog's id recorded (`UserOriginKey.catalog`); the same key already
+    trusted is recorded as also coming from this catalog; a DIFFERENT key
+    for an origin already trusted stops dead (nothing is written, both
+    fingerprints are shown, and that origin's plugins are not offered from
+    this catalog); the official origin is never taken from an added
+    catalog. An origin that appears in the catalog later is listed under
+    "Origins" with its fingerprint and a "Trust origin" action behind its
+    own confirmation, never trusted by a refresh.
+  - **What the index says is still display data, never a trust
+    decision.** An added catalog offers an origin only when the person's
+    store holds exactly the key the index names for it and no catalog
+    revoked it (`PluginCatalog.originState`); a bundle then verifies
+    against that user-trusted key in `BundleSignature.verifyBundle` like
+    any other. A different key in a later index is shown as "a different
+    key" and offered nothing; Keys you trust is where the person compares
+    and replaces it.
+  - **The disclaimer gates the listing.** While the index carries a
+    disclaimer `version` higher than the one accepted, the catalog's
+    screen shows only the new text and "Accept"; nothing from it is listed,
+    offered as an update, or counted by "Update all".
+  - **The master and the signature.** The catalog's master
+    ("Organisation masters" above) is trusted on first use at Accept, with
+    its fingerprint shown, and from then on a copy naming another master
+    or none is refused and the cached copy kept; trusting another master
+    means removing the catalog and adding it again. The index itself may
+    be signed the way droidtop-components' catalog is ("The catalog's
+    signature", 9): `index.json.sig` (base64 DER ECDSA over the exact
+    index bytes) and `index.cert` (a `droidtop-catalog-cert-v1`
+    certificate from the catalog's master naming the catalog's id),
+    checked by the same `CatalogSignature.verify` with that master. Once a
+    signature has verified, an unsigned copy is refused. A master or a
+    signature that appears after Accept is recorded, since that only makes
+    later fetches stricter. A catalog with neither can be added, and its
+    review says the index is not signed.
+  - **Revocation, per catalog.** `revocations.json` beside the index, in
+    the plugin master's own format and signed bytes (`PluginRevocations`:
+    `sequence`, `certIds`, `keySha256`, `signature`), signed by the
+    catalog's master. It is fetched with the index and kept, per origin
+    the person trusts through that catalog, only when the master signed it
+    and its sequence is higher than the one on file
+    (`PluginRevocations.acceptForOrigin`, `.origin-revocations.json` in the
+    plugins root). `verifyBundle` checks an origin's own list for that
+    origin alone (`PluginRevocationList.forOrigin`): a revoked certificate
+    or key refuses installs and stops installed plugins at their next
+    activation. droidtop's list never reaches an added catalog's origin,
+    and a catalog's list never reaches an origin trusted another way. A
+    catalog without a master has no revocation list.
+  - **Removing a catalog** stops listing and updates from it and deletes
+    its cached index; the keys trusted through it stay (removing a catalog
+    is not removing a key), so installed plugins keep running under the
+    trust rules above and keep their Unofficial badge. Stopping trust is
+    Keys you trust's "Stop trusting".
+  - **Updates.** An installed plugin's update comes from the first
+    catalog, official first, that lists its id under an origin it offers
+    (`PluginCatalog.offerFor`), so the Plugins screen badge, the plugin's
+    page, its panel, the Updates screen and "Update all" all read one
+    rule. "Update all" fetches every catalog fresh and leaves out, and
+    names, any whose refresh failed.
+  - **Storage.** `filesDir/plugin-catalogs.json` (the added catalogs: id,
+    name, index address, homepage, the catalog master, whether its index
+    signature has verified, the disclaimer version accepted),
+    written through a temp file and a rename; each added catalog's index
+    is cached under `filesDir/plugin-catalog/added/<first 16 hex of the
+    SHA-256 of its id>/index.json`, the official one where it always was.
+  - **The first one** is gamegrab-sources/catalog
+    (`https://raw.githubusercontent.com/gamegrab-sources/catalog/main/index.json`):
+    every plugin of the gamegrab-sources organisation, built by that
+    repository's own workflow from the signed bundles in each repository's
+    releases (certified ones under origin `gamegrab` and the
+    organisation's master, independent ones under the origin and key the
+    repository commits in `droidtop-plugin-key.json`), with the owner's
+    disclaimer. Its master and index signature arrive when the owner
+    provisions them (`catalog-master-key.json`, `CATALOG_SIGNING_KEY`,
+    `CATALOG_SIGNING_CERT`); until then the index names no master and is
+    unsigned. droidtop ships no address for it: the person adds it.
+
+  Unit-tested in `library-core` (`PluginCatalogSourcesTest`: addresses,
+  the store, the blocks, the disclaimer gate, the offer rule, the
+  master's origin) and `plugin-host` (`UserOriginKeysTest`: the catalog
+  field; `PluginCertificatesTest`: an organisation master's chain, its
+  own revocation list, and droidtop's master giving no standing there).
 - **Not built:** the droidtop-platforms side that populates
   `droidtop-plugins/index.json` (its own generator and workflow,
   mirroring `generator/plugins_index.py`, in that repository — until it

@@ -112,10 +112,18 @@ data class PluginRevocationList(
     val certIds: Set<String>,
     /** Lowercase hex SHA-256 fingerprints of revoked keys: a plugin key, or the legacy official origin key. */
     val keySha256: Set<String>,
+    /**
+     * The lists of user-trusted origins whose key is an added catalog's master, by origin (SPEC 12a
+     * "Added catalogs"): each signed by that origin's own master and applied to that origin alone.
+     */
+    val byOrigin: Map<String, PluginRevocationList> = emptyMap(),
 ) {
     fun revokesCert(certId: String): Boolean = certId in certIds
 
     fun revokesKey(sha256: String): Boolean = sha256.lowercase() in keySha256
+
+    /** The list that applies to the user-trusted [origin], or [NONE]: the plugin master's list never reaches outside the official origin. */
+    fun forOrigin(origin: String): PluginRevocationList = byOrigin[origin] ?: NONE
 
     companion object {
         val NONE = PluginRevocationList(0, emptySet(), emptySet())
@@ -141,6 +149,9 @@ data class PluginRevocationList(
 object PluginRevocations {
     /** In the plugins root; the leading dot keeps it apart from every plugin id's directory. */
     const val FILE_NAME = ".plugin-revocations.json"
+
+    /** The accepted lists of user-trusted origins, by origin, beside [FILE_NAME]. */
+    const val ORIGINS_FILE_NAME = ".origin-revocations.json"
 
     private const val PREFIX = "droidtop-plugin-revocations-v1"
     private const val MAX_CHARS = 256 * 1024
@@ -168,13 +179,59 @@ object PluginRevocations {
         PluginRevocationList(sequence, certIds.toSet(), keys.toSet())
     }.getOrNull()
 
-    /** The accepted list, or [PluginRevocationList.NONE] when there is none, no master is pinned, or the stored file no longer verifies. */
-    fun load(pluginsRoot: File): PluginRevocationList {
+    /**
+     * The accepted list ([PluginRevocationList.NONE] when there is none, no master is pinned, or the
+     * stored file no longer verifies), carrying the user-trusted origins' own lists
+     * ([PluginRevocationList.byOrigin]).
+     */
+    fun load(pluginsRoot: File): PluginRevocationList = official(pluginsRoot).copy(byOrigin = originLists(pluginsRoot))
+
+    private fun official(pluginsRoot: File): PluginRevocationList {
         val master = PluginOriginKeys.master() ?: return PluginRevocationList.NONE
         val file = File(pluginsRoot, FILE_NAME)
         if (!file.isFile) return PluginRevocationList.NONE
         val text = runCatching { file.readText() }.getOrNull() ?: return PluginRevocationList.NONE
         return parse(text, master) ?: PluginRevocationList.NONE
+    }
+
+    /**
+     * Stores [text] as [origin]'s list when [master] (the key the person trusts for that origin, an added
+     * catalog's organisation master) signed it, in the same format and over the same bytes as the plugin
+     * master's list, and its sequence is higher than the one stored for [origin]. Returns whether it did.
+     * Kept as the parsed list in app-private storage, like the trusted key it was checked against.
+     */
+    fun acceptForOrigin(pluginsRoot: File, origin: String, text: String, master: PublicKey): Boolean {
+        val offered = parse(text, master) ?: return false
+        val stored = originLists(pluginsRoot)
+        if (offered.sequence <= (stored[origin]?.sequence ?: 0)) return false
+        val json = JSONObject()
+        (stored + (origin to offered)).forEach { (id, list) ->
+            json.put(
+                id,
+                JSONObject()
+                    .put("sequence", list.sequence)
+                    .put("certIds", JSONArray(list.certIds.sorted()))
+                    .put("keySha256", JSONArray(list.keySha256.sorted())),
+            )
+        }
+        pluginsRoot.mkdirs()
+        val temp = File(pluginsRoot, "$ORIGINS_FILE_NAME.tmp")
+        temp.writeText(json.toString())
+        return temp.renameTo(File(pluginsRoot, ORIGINS_FILE_NAME))
+    }
+
+    private fun originLists(pluginsRoot: File): Map<String, PluginRevocationList> {
+        val file = File(pluginsRoot, ORIGINS_FILE_NAME)
+        if (!file.isFile) return emptyMap()
+        val json = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return emptyMap()
+        return json.keys().asSequence().mapNotNull { origin ->
+            val entry = json.optJSONObject(origin) ?: return@mapNotNull null
+            origin to PluginRevocationList(
+                entry.optLong("sequence"),
+                entry.optJSONArray("certIds").strings().toSet(),
+                entry.optJSONArray("keySha256").strings().map { it.lowercase() }.toSet(),
+            )
+        }.toMap()
     }
 
     /**

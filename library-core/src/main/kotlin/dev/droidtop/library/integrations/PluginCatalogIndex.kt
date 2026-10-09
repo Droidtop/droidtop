@@ -46,11 +46,41 @@ data class PluginCatalogOrigin(
     /** The key document's keySha256, or null when the entry carries no usable key document -- then [dev.droidtop.library.integrations.PluginCatalog.originOffered] is false for it no matter what. */
     val keySha256: String?,
     val plugins: List<PluginCatalogPlugin>,
+    /** The key document's SPKI, base64, when [keySha256] is set: what an added catalog's origin is trusted with on first use, after the person saw its fingerprint. */
+    val keyBase64: String? = null,
 )
+
+/**
+ * An added catalog's `catalog` block (docs/SPEC.md 12a "Added catalogs"): who it says it is. Display data
+ * like everything else in the index, except [keyBase64], the catalog master's public key, which droidtop
+ * trusts on first use when the person accepts the catalog and from then on requires the index to be
+ * signed under.
+ */
+data class PluginCatalogInfo(
+    /** "owner/name" of the repository that publishes it; never the official catalog's id. */
+    val id: String,
+    val name: String,
+    val homepage: String?,
+    /** "unofficial" for every catalog but droidtop's own. */
+    val trust: String,
+    /**
+     * The organisation's plugin master, P-256 SPKI base64, or null for a catalog without one: trusted on first use
+     * as its own origin's key ([origin]), which certifies each of its repositories' keys.
+     */
+    val keyBase64: String?,
+    /** The organisation's own origin id (e.g. "gamegrab"), listed under [keyBase64]; null without a master. */
+    val origin: String? = null,
+)
+
+/** An added catalog's `disclaimer` block: shown, and accepted by the person, before anything from it is listed. */
+data class PluginCatalogDisclaimer(val version: Int, val text: String)
 
 data class PluginCatalogIndex(
     val generatedAt: String?,
     val origins: List<PluginCatalogOrigin>,
+    /** Null for droidtop's own catalog, which has neither block. */
+    val catalog: PluginCatalogInfo? = null,
+    val disclaimer: PluginCatalogDisclaimer? = null,
 ) {
     fun pluginById(id: String): PluginCatalogPlugin? =
         origins.asSequence().flatMap { it.plugins }.firstOrNull { it.id == id }
@@ -70,6 +100,9 @@ object PluginCatalogIndexParser {
     const val SCHEMA_VERSION = 1
     private val HEX_64 = Regex("^[0-9a-fA-F]{64}$")
     private val STREAMS = setOf("stable", "testing", "unstable")
+    private val CATALOG_ID = Regex("[A-Za-z0-9._-]{1,100}/[A-Za-z0-9._-]{1,100}")
+    private const val MAX_DISCLAIMER_CHARS = 4000
+    private const val MAX_NAME_CHARS = 80
 
     fun parse(text: String): PluginCatalogIndex? {
         val root = runCatching { JSONObject(text) }.getOrNull() ?: return null
@@ -90,7 +123,7 @@ object PluginCatalogIndexParser {
             // must not take the rest of the origin's listing down with
             // it -- the listing itself is display data and the install
             // path is where trust is decided.
-            val keySha256 = runCatching {
+            val keyDocument = runCatching {
                 val key = originJson.optJSONObject("key") ?: return@runCatching null
                 if (key.optString("algorithm") != "SHA256withECDSA") return@runCatching null
                 if (key.optString("origin") != origin) return@runCatching null
@@ -99,8 +132,9 @@ object PluginCatalogIndexParser {
                 if (!HEX_64.matches(declared)) return@runCatching null
                 val der = runCatching { java.util.Base64.getDecoder().decode(spki) }.getOrNull() ?: return@runCatching null
                 if (!Sha256.hex(der).equals(declared, ignoreCase = true)) return@runCatching null
-                declared
+                declared to spki
             }.getOrNull()
+            val keySha256 = keyDocument?.first
 
             val pluginsJson = originJson.optJSONArray("plugins") ?: return null
             val plugins = mutableListOf<PluginCatalogPlugin>()
@@ -147,9 +181,45 @@ object PluginCatalogIndexParser {
                 if (releases.isEmpty()) return null
                 plugins.add(PluginCatalogPlugin(id, label, description, releases))
             }
-            origins.add(PluginCatalogOrigin(origin, trust, keySha256, plugins))
+            origins.add(PluginCatalogOrigin(origin, trust, keySha256, plugins, keyDocument?.second))
         }
-        return PluginCatalogIndex(nullableText(root, "generatedAt"), origins)
+        // The added-catalog blocks are optional in the format (droidtop's own index has neither), but one
+        // that is present must be whole: a half-readable disclaimer is never shown as if it were the text.
+        val catalog = if (root.has("catalog")) parseCatalog(root.optJSONObject("catalog")) ?: return null else null
+        val disclaimer = if (root.has("disclaimer")) parseDisclaimer(root.optJSONObject("disclaimer")) ?: return null else null
+        return PluginCatalogIndex(nullableText(root, "generatedAt"), origins, catalog, disclaimer)
+    }
+
+    private fun parseCatalog(json: JSONObject?): PluginCatalogInfo? {
+        if (json == null) return null
+        val id = json.optString("id")
+        if (!CATALOG_ID.matches(id)) return null
+        val name = json.optString("name").trim()
+        if (name.isEmpty() || name.length > MAX_NAME_CHARS) return null
+        val trust = json.optString("trust")
+        if (trust.isBlank()) return null
+        val homepage = nullableText(json, "homepage")?.takeIf { it.startsWith("https://") }
+        val keyBase64 = if (!json.has("key")) {
+            null
+        } else {
+            val key = json.optJSONObject("key") ?: return null
+            if (key.optString("algorithm") != "SHA256withECDSA") return null
+            val spki = key.optString("publicKeySpki")
+            val der = runCatching { java.util.Base64.getDecoder().decode(spki) }.getOrNull() ?: return null
+            if (!Sha256.hex(der).equals(key.optString("keySha256"), ignoreCase = true)) return null
+            spki
+        }
+        val origin = nullableText(json, "origin")
+        if (origin != null && (origin != origin.lowercase() || keyBase64 == null)) return null
+        return PluginCatalogInfo(id, name, homepage, trust, keyBase64, origin)
+    }
+
+    private fun parseDisclaimer(json: JSONObject?): PluginCatalogDisclaimer? {
+        if (json == null) return null
+        val version = json.optInt("version", -1)
+        val text = json.optString("text").trim()
+        if (version < 1 || text.isEmpty() || text.length > MAX_DISCLAIMER_CHARS) return null
+        return PluginCatalogDisclaimer(version, text)
     }
 
     /** The org.json `null`-vs-"null"-string trap (see PluginRecord's own copy of this check): a JSON null must come back as a real null. */

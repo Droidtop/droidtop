@@ -6,60 +6,260 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.DocumentPickItem
+import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
+import dev.droidtop.pluginhost.UserOriginKey
+import dev.droidtop.pluginhost.UserOriginKeys
+import dev.droidtop.runtime.util.Sha256
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The "Add" screen of the plugin catalog (docs/SPEC.md 12a "The
- * catalog", "The flow"): one row per plugin the index lists -- label,
- * description, and the row's own action (Install / Update to <version> /
- * no action, saying why when there is none) -- with the installed list
- * first on the parent screen, this one only the available side. It is a
- * [CatalogScreen] carried inline by the Plugins screen rather than
- * registered on its own, because it is only reachable from there; both
- * settings renderers already render inline screens.
+ * Plugins > Catalogs (docs/SPEC.md 12a "The catalog", "Added catalogs"):
+ * droidtop's own catalog first, then every catalog the person added, each
+ * opening its own screen of plugins -- label, description, an "Unofficial"
+ * badge for every catalog but droidtop's, and the row's own action (Install /
+ * Update to <version> / no action, saying why when there is none). Adding a
+ * catalog is fetch, review (its name, its disclaimer, whether it is signed,
+ * each origin's key fingerprint) and an explicit Accept; nothing is listed
+ * or trusted before that. These are [CatalogScreen]s carried inline by the
+ * Plugins screen, which both settings renderers already render.
  *
- * The screen's groups builder may touch the network (the index fetch,
- * [PluginCatalog.currentIndex], off the main thread via
- * [Dispatchers.IO]), and it is deliberate: this is the one surface whose
- * whole job is the catalog, so it is the one place a refresh is
- * automatic; the parent Plugins screen reads the cached copy only.
+ * A catalog's own screen may touch the network (the index fetch,
+ * [PluginCatalog.currentIndex], off the main thread via [Dispatchers.IO]),
+ * and it is deliberate: that screen's whole job is the catalog, so it is the
+ * one place a refresh is automatic; the Plugins screen reads cached copies only.
  */
 object PluginCatalogScreen {
-    const val ID = "plugins_catalog"
+    const val ID = "plugins_catalogs"
+
+    // Buffers between the address field and its action, and the fetched catalog awaiting the person's
+    // decision: the same pending-buffer shape "Keys you trust" uses.
+    @Volatile private var pendingAddress = ""
+    @Volatile private var pendingProposal: PluginCatalog.Proposal? = null
 
     fun screen(): CatalogScreen = CatalogScreen(
         id = ID,
-        title = "Catalog",
-        subtitle = "What the plugin catalog lists. Nothing here runs until you approve it on the Plugins screen",
-        groups = { context -> catalogGroups(context) },
+        title = "Catalogs",
+        subtitle = "Where plugins are listed. droidtop's own catalog is built in; any other is one you added: " +
+            "unofficial, not part of droidtop, and not vetted by it",
+        groups = { context -> catalogsGroups(context) },
     )
 
-    private suspend fun catalogGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
-        val load = PluginCatalog.currentIndex(context)
+    /** The Plugins screen row's value. Disk; call off the main thread. */
+    fun summary(context: Context): String {
+        val added = PluginCatalogSources.added(PluginCatalogSources.storeFile(context)).size
+        return if (added == 0) "Official only" else "Official + $added added"
+    }
+
+    private fun slug(id: String): String = Sha256.hex(id.toByteArray()).take(12)
+
+    private suspend fun catalogsGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val sources = PluginCatalogSources.all(context)
+        val proposal = pendingProposal
+        listOfNotNull(
+            CatalogGroup(
+                id = "plugins_catalogs_list",
+                title = "Your catalogs",
+                items = sources.map { source ->
+                    NestedScreenItem(
+                        id = "plugins_catalog_${slug(source.id)}",
+                        title = source.name,
+                        subtitle = if (source.official) {
+                            "droidtop's own catalog, from droidtop-platforms"
+                        } else {
+                            "Unofficial: not part of droidtop. ${source.indexUrl}"
+                        },
+                        inline = catalogScreen(source.id, source.name),
+                    )
+                },
+            ),
+            CatalogGroup(
+                id = "plugins_catalogs_add",
+                title = "Add a catalog",
+                items = listOf(
+                    TextInputItem(
+                        id = "plugins_catalogs_add_address",
+                        title = "Catalog address",
+                        subtitle = "The catalog's GitHub repository (https://github.com/<owner>/<repo>) or the https address of its index.json",
+                        value = pendingAddress,
+                        onChange = { _, v -> pendingAddress = v.trim() },
+                    ),
+                    AsyncActionItem(
+                        id = "plugins_catalogs_add_fetch",
+                        title = "Fetch this catalog",
+                        subtitle = "Shows its disclaimer and keys below; nothing is added until you accept",
+                        run = { ctx, onStatus -> fetch(ctx, pendingAddress, onStatus) },
+                    ),
+                    DocumentPickItem(
+                        id = "plugins_catalogs_add_qr",
+                        title = "Read a QR code",
+                        subtitle = "A photo or screenshot of the catalog's QR code",
+                        mimeType = "image/*",
+                        onPicked = { ctx, uri ->
+                            val text = PluginCatalogSources.qrText(ctx, uri)
+                            if (text == null) {
+                                "No QR code found in that image"
+                            } else {
+                                pendingAddress = text.trim()
+                                fetch(ctx, pendingAddress) {}
+                            }
+                        },
+                    ),
+                ),
+            ),
+            proposal?.let { proposalGroup(it) },
+        )
+    }
+
+    private suspend fun fetch(context: Context, address: String, onStatus: (String) -> Unit): String {
+        if (address.isBlank()) return "Type the catalog's address first"
+        onStatus("Fetching $address...")
+        return when (val result = PluginCatalog.propose(context, address)) {
+            is PluginCatalog.ProposeResult.Failed -> {
+                pendingProposal = null
+                result.reason
+            }
+            is PluginCatalog.ProposeResult.Ready -> {
+                pendingProposal = result.proposal
+                "Fetched \"${result.proposal.info.name}\". Read its disclaimer below; nothing is added until you accept it."
+            }
+        }
+    }
+
+    /** The review before adding: WHO, its disclaimer, its signature, each origin's key -- and Accept or Discard. */
+    private fun proposalGroup(proposal: PluginCatalog.Proposal): CatalogGroup {
+        val newOrigins = proposal.origins.count { it.existing == null && it.keyBase64 != null }
+        return CatalogGroup(
+            id = "plugins_catalogs_proposal",
+            title = "Review before adding",
+            items = buildList {
+                add(
+                    ActionItem(
+                        id = "plugins_catalogs_proposal_who",
+                        title = "${proposal.info.name} (unofficial)",
+                        subtitle = buildString {
+                            append("Not part of droidtop and not vetted by it. From ").append(proposal.indexUrl).append(". ")
+                            val master = proposal.info.keyBase64
+                            if (master != null) {
+                                append("Master key ").append(UserOriginKeys.fingerprint(master))
+                                proposal.info.origin?.let { append(" (origin \"").append(it).append("\")") }
+                                append(": it vouches for this catalog's plugins, and droidtop refuses a later copy under another master. ")
+                            }
+                            append(
+                                if (proposal.signed) {
+                                    "Index signed."
+                                } else {
+                                    "Index not signed: droidtop can only check that it came from this address."
+                                },
+                            )
+                        },
+                        run = {},
+                    ),
+                )
+                add(
+                    ActionItem(
+                        id = "plugins_catalogs_proposal_disclaimer",
+                        title = "Disclaimer",
+                        subtitle = proposal.disclaimer.text,
+                        run = {},
+                    ),
+                )
+                proposal.origins.forEach { origin ->
+                    add(
+                        ActionItem(
+                            id = "plugins_catalogs_proposal_origin_${origin.origin}",
+                            title = "Origin \"${origin.origin}\"",
+                            subtitle = originReview(origin),
+                            run = {},
+                        ),
+                    )
+                }
+                add(
+                    AsyncActionItem(
+                        id = "plugins_catalogs_proposal_accept",
+                        title = "Accept and add",
+                        subtitle = "You accept the disclaimer above. Plugins from the origins listed can then be installed and updated " +
+                            "from this catalog, marked Unofficial; each still runs only after you approve it",
+                        confirmTitle = "Accept the disclaimer of \"${proposal.info.name}\"" +
+                            (if (newOrigins > 0) " and trust its $newOrigins origin${if (newOrigins == 1) "" else "s"}?" else "?"),
+                        run = { ctx, _ ->
+                            val message = PluginCatalog.accept(ctx, proposal)
+                            pendingProposal = null
+                            pendingAddress = ""
+                            message
+                        },
+                    ),
+                )
+                add(
+                    ActionItem(
+                        id = "plugins_catalogs_proposal_discard",
+                        title = "Discard",
+                        subtitle = "Add nothing, trust nothing",
+                        run = { _ -> pendingProposal = null },
+                    ),
+                )
+            },
+        )
+    }
+
+    private fun originReview(origin: PluginCatalog.ProposedOrigin): String {
+        val key = origin.keyBase64 ?: return "The catalog gives no usable key for it, so its plugins are not offered"
+        val fingerprint = UserOriginKeys.fingerprint(key) ?: "unreadable"
+        val existing = origin.existing
+        return when {
+            existing == null -> "Key fingerprint $fingerprint. Trusted when you accept: third-party, not official, and droidtop has not vetted it"
+            UserOriginKeys.keySha256(existing.keyBase64) == UserOriginKeys.keySha256(key) -> "Key fingerprint $fingerprint, which you already trust"
+            else -> "NOT trusted from this catalog: you trust a different key for it (${UserOriginKeys.fingerprint(existing.keyBase64)}; " +
+                "this catalog names $fingerprint), so its plugins here are not offered and nothing is changed"
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // One catalog's own screen.
+    // ------------------------------------------------------------------
+
+    private fun catalogScreen(sourceId: String, name: String): CatalogScreen = CatalogScreen(
+        id = "plugins_catalog_screen_${slug(sourceId)}",
+        title = name,
+        subtitle = if (sourceId == PluginCatalogSources.OFFICIAL_ID) {
+            "What droidtop's catalog lists. Nothing here runs until you approve it on the Plugins screen"
+        } else {
+            "Unofficial catalog, not part of droidtop. Nothing here runs until you approve it on the Plugins screen"
+        },
+        groups = { context -> catalogGroups(context, sourceId) },
+    )
+
+    private suspend fun catalogGroups(context: Context, sourceId: String): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val source = PluginCatalogSources.byId(context, sourceId)
+            ?: return@withContext listOf(
+                CatalogGroup(
+                    id = "plugins_catalog_gone",
+                    title = null,
+                    items = listOf(ActionItem(id = "plugins_catalog_gone_row", title = "This catalog was removed", run = {})),
+                ),
+            )
+        val load = PluginCatalog.currentIndex(context, source)
+        // Read again: a fetch may have recorded the catalog's signing key.
+        val current = PluginCatalogSources.byId(context, sourceId) ?: source
         val installed = PluginStore.installed(context).associateBy { it.manifest.id }
-        val items = buildList<CatalogItem> {
+        val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
+        val index = load.index
+        val top = buildList<CatalogItem> {
             add(
                 AsyncActionItem(
                     id = "plugins_catalog_refresh",
                     title = "Refresh catalog",
-                    subtitle = "Re-fetch the index from droidtop-platforms",
-                    run = { ctx, _ -> PluginCatalog.refresh(ctx) },
+                    subtitle = if (current.official) "Re-fetch the index from droidtop-platforms" else "Re-fetch the index from ${current.indexUrl}",
+                    run = { ctx, _ -> PluginCatalog.refresh(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current) },
                 ),
             )
             load.note?.let { note ->
-                add(
-                    ActionItem(
-                        id = "plugins_catalog_note",
-                        title = "Catalog status",
-                        subtitle = note,
-                        run = {},
-                    ),
-                )
+                add(ActionItem(id = "plugins_catalog_note", title = "Catalog status", subtitle = note, run = {}))
             }
-            val index = load.index
             if (index == null) {
                 add(
                     ActionItem(
@@ -67,70 +267,171 @@ object PluginCatalogScreen {
                         title = if (load.published) "Nothing to show yet" else "No catalog is published yet",
                         subtitle = if (load.published) {
                             "The refresh above just failed. A plugin file can still be installed from the Plugins screen."
-                        } else {
+                        } else if (current.official) {
                             "There is nothing to browse yet. Install a plugin file from the Plugins screen instead."
+                        } else {
+                            "Nothing is published at this catalog's address now."
                         },
                         run = {},
                     ),
                 )
-            } else {
-                index.origins.forEach { origin ->
-                    origin.plugins.forEach { plugin ->
-                        add(rowFor(origin, plugin, installed[plugin.id]))
-                    }
-                }
             }
         }
-        listOf(CatalogGroup(id = "plugins_catalog_list", title = null, items = items))
+        val groups = mutableListOf(CatalogGroup(id = "plugins_catalog_top", title = null, items = top))
+        if (index != null && !PluginCatalog.listable(current, index)) {
+            groups += disclaimerChangedGroup(current, index)
+        } else if (index != null) {
+            if (!current.official) {
+                originDecisions(current, index, userKeys)?.let { groups += it }
+            }
+            groups += CatalogGroup(
+                id = "plugins_catalog_list",
+                title = "Plugins",
+                items = index.origins.flatMap { origin ->
+                    val state = PluginCatalog.originState(current, origin, userKeys)
+                    origin.plugins.map { plugin -> rowFor(current, origin, state, plugin, installed[plugin.id]) }
+                },
+            )
+        }
+        if (!current.official) groups += aboutGroup(current, index)
+        groups
     }
 
-    private fun rowFor(origin: PluginCatalogOrigin, plugin: PluginCatalogPlugin, installed: PluginRecord?): CatalogItem {
+    /** A newer disclaimer than the one accepted: its text and Accept, and nothing listed until then. */
+    private fun disclaimerChangedGroup(source: PluginCatalogSource, index: PluginCatalogIndex): CatalogGroup {
+        val disclaimer = index.disclaimer!!
+        return CatalogGroup(
+            id = "plugins_catalog_disclaimer_changed",
+            title = "The disclaimer changed",
+            items = listOf(
+                ActionItem(id = "plugins_catalog_disclaimer_new", title = "New disclaimer", subtitle = disclaimer.text, run = {}),
+                AsyncActionItem(
+                    id = "plugins_catalog_disclaimer_accept",
+                    title = "Accept",
+                    subtitle = "Lists this catalog's plugins again",
+                    confirmTitle = "Accept the new disclaimer of \"${source.name}\"?",
+                    run = { ctx, _ ->
+                        PluginCatalog.acceptDisclaimer(ctx, PluginCatalogSources.byId(ctx, source.id) ?: source, disclaimer.version)
+                        "Accepted. \"${source.name}\" is listed again"
+                    },
+                ),
+            ),
+        )
+    }
+
+    /** Origins that need the person: new in the catalog since it was accepted, a changed key, or revoked. */
+    private fun originDecisions(source: PluginCatalogSource, index: PluginCatalogIndex, userKeys: Map<String, UserOriginKey>): CatalogGroup? {
+        val items = index.origins.mapNotNull { origin ->
+            val fingerprint = origin.keyBase64?.let(UserOriginKeys::fingerprint) ?: "unreadable"
+            when (val state = PluginCatalog.originState(source, origin, userKeys)) {
+                PluginCatalog.OriginState.NotTrusted -> AsyncActionItem(
+                    id = "plugins_catalog_trust_${origin.origin}",
+                    title = "Trust origin \"${origin.origin}\"",
+                    subtitle = "New in this catalog. Key fingerprint $fingerprint: third-party, not official, and droidtop has not vetted it",
+                    confirmTitle = "Trust origin \"${origin.origin}\" ($fingerprint) from \"${source.name}\"?",
+                    run = { ctx, _ -> PluginCatalog.trustOrigin(ctx, source, origin.origin, origin.keyBase64) },
+                )
+                is PluginCatalog.OriginState.KeyChanged -> ActionItem(
+                    id = "plugins_catalog_changed_${origin.origin}",
+                    title = "\"${origin.origin}\": a different key",
+                    subtitle = "You trust ${UserOriginKeys.fingerprint(state.stored.keyBase64)}; this catalog now names $fingerprint. " +
+                        "Its plugins here are not offered and nothing was changed. Compare the two under Keys you trust",
+                    run = {},
+                )
+
+                else -> null
+            }
+        }
+        return if (items.isEmpty()) null else CatalogGroup(id = "plugins_catalog_origins", title = "Origins", items = items)
+    }
+
+    /** An added catalog's own facts, its disclaimer, and Remove. */
+    private fun aboutGroup(source: PluginCatalogSource, index: PluginCatalogIndex?): CatalogGroup = CatalogGroup(
+        id = "plugins_catalog_about",
+        title = "About this catalog",
+        items = buildList {
+            add(
+                ActionItem(
+                    id = "plugins_catalog_about_where",
+                    title = "Unofficial",
+                    subtitle = buildString {
+                        append("Not part of droidtop and not vetted by it. Index ").append(source.indexUrl)
+                        source.homepage?.let { append(". Home ").append(it) }
+                        append(". ")
+                        append(
+                            (source.masterKeyBase64?.let { "Master key ${UserOriginKeys.fingerprint(it)}. " } ?: "No master key. ") +
+                                (if (source.indexSigned) "Index signed" else "Index not signed"),
+                        )
+                    },
+                    run = {},
+                ),
+            )
+            index?.disclaimer?.let {
+                add(ActionItem(id = "plugins_catalog_about_disclaimer", title = "Disclaimer", subtitle = it.text, run = {}))
+            }
+            add(
+                AsyncActionItem(
+                    id = "plugins_catalog_remove",
+                    title = "Remove this catalog",
+                    subtitle = "Nothing is listed or updated from it any more. Plugins you installed from it stay, under the keys you trusted",
+                    confirmTitle = "Remove \"${source.name}\"?",
+                    run = { ctx, _ ->
+                        if (PluginCatalog.removeCatalog(ctx, source)) "Removed \"${source.name}\"" else "It was already removed"
+                    },
+                ),
+            )
+        },
+    )
+
+    private fun rowFor(
+        source: PluginCatalogSource,
+        origin: PluginCatalogOrigin,
+        state: PluginCatalog.OriginState,
+        plugin: PluginCatalogPlugin,
+        installed: PluginRecord?,
+    ): CatalogItem {
         val subtitle = buildString {
             append(plugin.description ?: "No description")
-            append(" - ").append(origin.origin)
+            if (source.official) append(" - ").append(origin.origin) else append(" - Unofficial, from ").append(source.name)
             if (PluginCatalog.hasOrderConflict(plugin)) {
                 append(" - the catalog lists releases whose versions and dates disagree, so none is offered until it is fixed")
             }
         }
+        val offered = state == PluginCatalog.OriginState.Offered
         val latest = PluginCatalog.latestStable(plugin)
-        val isUpdate = installed != null && latest != null &&
+        val isUpdate = offered && installed != null && latest != null &&
             !latest.manifestSha256.equals(installed.archiveDigest, ignoreCase = true)
+        val id = "plugins_catalog_${plugin.id}"
         return when {
             isUpdate -> AsyncActionItem(
-                id = "plugins_catalog_${plugin.id}",
+                id = id,
                 title = plugin.label,
                 subtitle = subtitle,
-                value = "Update to ${latest.version}",
+                value = "Update to ${latest!!.version}",
                 run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, latest!!, onStatus) },
             )
-            installed != null -> ActionItem(
-                id = "plugins_catalog_${plugin.id}",
-                title = plugin.label,
-                subtitle = subtitle,
-                value = "Installed ${installed.manifest.version}",
-                run = {},
-            )
-            PluginCatalog.originOffered(origin.origin, origin.keySha256) && latest != null -> AsyncActionItem(
-                id = "plugins_catalog_${plugin.id}",
+            installed != null -> ActionItem(id = id, title = plugin.label, subtitle = subtitle, value = "Installed ${installed.manifest.version}", run = {})
+            offered && latest != null -> AsyncActionItem(
+                id = id,
                 title = plugin.label,
                 subtitle = subtitle,
                 value = "Install ${latest.version}",
-                run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, latest!!, onStatus) },
+                run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, latest, onStatus) },
             )
-            !PluginCatalog.originOffered(origin.origin, origin.keySha256) -> ActionItem(
-                id = "plugins_catalog_${plugin.id}",
+            !offered -> ActionItem(
+                id = id,
                 title = plugin.label,
                 subtitle = subtitle,
-                value = "Not available in this build (its origin's key isn't pinned here)",
+                value = when (state) {
+                    PluginCatalog.OriginState.NotTrusted -> "Trust its origin above first"
+                    is PluginCatalog.OriginState.KeyChanged -> "Not offered: its key changed"
+
+                    is PluginCatalog.OriginState.Unusable -> "Not available (${state.reason})"
+                    PluginCatalog.OriginState.Offered -> ""
+                },
                 run = {},
             )
-            else -> ActionItem(
-                id = "plugins_catalog_${plugin.id}",
-                title = plugin.label,
-                subtitle = subtitle,
-                value = "No stable release yet",
-                run = {},
-            )
+            else -> ActionItem(id = id, title = plugin.label, subtitle = subtitle, value = "No stable release yet", run = {})
         }
     }
 }
