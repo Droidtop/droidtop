@@ -14205,7 +14205,9 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   (`PcSource.holdingItemId`), and the pill says so. **Folders**
   (`FoldersCatalog`) lists each game folder with the PC and engine games the
   library holds under it and when the PC walk last finished it
-  (`GamesRoots.pcScannedAt`), or "Not available" when it cannot be read (a card
+  (`GamesRoots.pcScannedAt`), both in the row's value ("170 games · scanned 5
+  min ago"; a row's subtitle is only its hint in the Gaming shell), or "Not
+  available" when it cannot be read (a card
   that is out: its games are kept, never marked gone); Add a folder and, by
   selecting a folder, stop looking there (the same `GamesRootPrefs` settings
   Settings > Game folders has; the library's facts about its games are kept by

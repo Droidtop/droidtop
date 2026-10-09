@@ -77,14 +77,19 @@ internal object FoldersCatalog {
         )
     }
 
-    /** A root row's value: its games, or that it cannot be read now. */
-    fun rootValue(root: RootCount): String = if (root.available) gamesWord(root.games) else "Not available"
-
-    /** A root row's line: where it is, and when it was last looked at. */
-    fun rootLine(root: RootCount, now: Long): String {
-        val scanned = root.scannedAt?.let { "Last scanned " + agoWords(now, it) } ?: "Not scanned yet"
-        return "${root.path} · $scanned. Select to stop looking here"
+    /**
+     * A root row's value: its games and when the walk last finished it, or that it cannot be read now. The scan time
+     * is a fact the row shows, not a tooltip: the Gaming shell draws a row's subtitle only as its hint (rig, build
+     * 1715: "Last scanned" never showed on the folder's row).
+     */
+    fun rootValue(root: RootCount, now: Long): String {
+        if (!root.available) return "Not available"
+        val scanned = root.scannedAt?.let { "scanned " + agoWords(now, it) } ?: "not scanned yet"
+        return "${gamesWord(root.games)} · $scanned"
     }
+
+    /** A root row's hint: where it is, and what selecting it does. */
+    fun rootLine(root: RootCount): String = "${root.path}. Select to stop looking here"
 
     /** "5 min ago", in the coarsest honest unit, as the store rows say "Synced 5 min ago". */
     fun agoWords(now: Long, then: Long): String = syncedAgo(now, then).removePrefix("Synced ")
@@ -100,8 +105,8 @@ internal object FoldersCatalog {
                     ActionItem(
                         id = "folders_root_${root.path}",
                         title = File(root.path).name.ifBlank { root.path },
-                        subtitle = rootLine(root, now),
-                        value = rootValue(root),
+                        subtitle = rootLine(root),
+                        value = rootValue(root, now),
                         confirmTitle = "Stop looking in ${root.path}? Its games leave the library; adding it back restores them",
                         run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, root.path) },
                     )

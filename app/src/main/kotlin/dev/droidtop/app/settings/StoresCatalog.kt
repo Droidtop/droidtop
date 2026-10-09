@@ -193,6 +193,9 @@ internal fun syncedAgo(nowMs: Long, thenMs: Long?): String {
 internal object StoresCatalog {
     const val SCREEN_ID = "stores"
 
+    /** The column entry the page's own settings (link hints, automatic sync) sit under. */
+    private const val OPTIONS_CATEGORY = "Options"
+
     /**
      * What the last key sign-in of a store said when it failed, until the
      * next attempt: a key row cannot answer by itself, so the account row
@@ -319,6 +322,10 @@ internal object StoresCatalog {
             CatalogGroup(
                 id = "stores_links_group",
                 title = null,
+                // Named, with the sync row's group: a group that is not made of links is a column entry of its own,
+                // and an unnamed one took the page's title ("Game sources", unlabeled, last in the column).
+                category = OPTIONS_CATEGORY,
+                icon = CatalogIcon.DATA,
                 items = listOf(
                     ToggleItem(
                         id = "stores_links",
@@ -332,6 +339,8 @@ internal object StoresCatalog {
             CatalogGroup(
                 id = "stores_sync_group",
                 title = null,
+                category = OPTIONS_CATEGORY,
+                icon = CatalogIcon.DATA,
                 items = listOf(
                     ChoiceItem(
                         id = "stores_auto_sync",

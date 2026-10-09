@@ -278,7 +278,9 @@ fun CatalogNavigator(
     }
     val groups = remember(screen, rootGroups, paneLoaded, category?.key) {
         when {
-            screen !== root -> paneLoaded?.takeIf { it.first === screen }?.second.orEmpty()
+            // A category's screen is built after the column's cursor has rested on it; until then the pane says so
+            // instead of standing blank (rig, build 1715: a store row showed nothing until Right or a tap).
+            screen !== root -> paneLoaded?.takeIf { it.first === screen }?.second ?: if (depth == 0) PANE_LOADING else emptyList()
             // A plain category: its groups. One group is unheaded (the column names it); several keep
             // their titles as section labels, except a title that repeats the category's own name.
             category != null -> rootGroups.orEmpty().filter { it.id in category.groupIds }
@@ -1050,6 +1052,10 @@ private val TWO_PANE_MIN_WIDTH = 600.dp
 
 /** How long the column's cursor rests on a linked category before its screen is built. */
 private const val PANE_LOAD_SETTLE_MS = 120L
+
+private val PANE_LOADING = listOf(
+    CatalogGroup(id = "pane_loading", title = null, items = listOf(ActionItem(id = "pane_loading_row", title = "Loading...", run = {}))),
+)
 
 /** A row Left/Right steps in place (a slider, a short choice); anything else is opened or flipped with A. */
 private fun CatalogItem.stepsInPlace(): Boolean = this is SliderItem || (this is ChoiceItem && options.size <= 6)

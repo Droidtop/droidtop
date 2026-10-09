@@ -73,9 +73,9 @@ class StoresCatalogTest {
         )
         assertEquals("2 folders · 412 games", FoldersCatalog.summary(counts))
         assertEquals("No folders yet", FoldersCatalog.summary(FolderCounts(emptyList(), 0)))
-        assertEquals("400 games", FoldersCatalog.rootValue(counts.roots[0]))
-        assertEquals("Not available", FoldersCatalog.rootValue(counts.roots[1]))
-        assertEquals("/sd/Games · Not scanned yet. Select to stop looking here", FoldersCatalog.rootLine(counts.roots[0], 0L))
-        assertEquals("/sd/More · Last scanned just now. Select to stop looking here", FoldersCatalog.rootLine(counts.roots[1], 1_000L))
+        assertEquals("400 games · not scanned yet", FoldersCatalog.rootValue(counts.roots[0], 0L))
+        assertEquals("Not available", FoldersCatalog.rootValue(counts.roots[1], 1_000L))
+        assertEquals("12 games · scanned just now", FoldersCatalog.rootValue(counts.roots[1].copy(available = true), 1_000L))
+        assertEquals("/sd/Games. Select to stop looking here", FoldersCatalog.rootLine(counts.roots[0]))
     }
 }
