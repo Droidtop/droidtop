@@ -6819,12 +6819,26 @@ Two concrete references to build from rather than design blind:
   a prefix configured by either reads back the same. The dialog and its host activity
   (`PcContainerConfigActivity`) are gone. For a game in the shared prefix the row edits the shared
   prefix and says so.
-  **Wine configuration** (`WinePrefixes.configure`), a row in both places,
-  opens Wine's own `winecfg` in that prefix the way a game starts there:
-  Windows version, DLL overrides, drives and audio are Wine's settings and
-  winecfg is where Wine keeps them, so droidtop does not copy them into
-  rows of its own. For a game in the shared prefix the row says that the
-  changes reach every game sharing it.
+  **Prefix tools (2026-10-09, Droidtop/tracker#10).** Lutris's prefix menu, the part that fixes a
+  Windows game that will not start, is one row of both places, "Prefix tools"
+  (`PrefixToolsCatalog` over `WinePrefixTools` in `:runtime-windows`), for the prefix the game
+  starts in (the shared one for a game that has none of its own, and the row says the changes reach
+  every game sharing it):
+  - **Wine's own programs.** Wine configuration (`winecfg`: Windows version, DLL overrides, drives
+    and audio, which Wine keeps there, so droidtop does not copy them into rows of its own), the
+    Registry editor (`regedit`) and a Command prompt (`wineconsole cmd`: `cmd` has no terminal to
+    attach to here, so `wineconsole` gives it a window). Each starts through `launchInPrefix`, the
+    one way a Windows program starts in a prefix, on the game screen (`WineGameActivity`), as the
+    app's own uid and never with root (§5b). The screen words it as a program's: `WineEngine.launch`
+    takes a `tool` name, a code-0 exit is never reported for a tool, and a failure says "program",
+    not "game".
+  - **Run a program in this prefix.** Any `.exe`, `.msi`, `.bat` or `.cmd`, chosen with the system
+    picker (`PickedFiles` turns a shared-storage document into its real path) or typed as a path,
+    for what the picker cannot reach, such as a shared folder. It runs where it is, from its own
+    folder: nothing is copied or moved, and no folder of the person's is written to by droidtop. The
+    same `WinePrefixTools.runIn` starts a file opened with droidtop (§4b).
+  - **Stop every Wine process.** `ProcessHelper.killAllWineProcesses`, the list a launch clears
+    before it starts, behind a question because it ends every Windows program, in any prefix.
 - **Linux container management**: distrobox itself is CLI-only (no
   official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
   real, actively-maintained GTK4 GUI for it — confirmed feature set:
@@ -7288,9 +7302,10 @@ how its game ended and says so itself (Droidtop/tracker#302): the watchdog could
 package come back, so it told the person that "droidtop closed straight after it started" and pointed at
 emulator setup. `WinePresentation.exitReport` decides the screen's words: any non-zero exit, and a code-0
 exit within 10 s when the guest never mapped a window of its own (a game that finds no Direct3D device
-often quits cleanly; a tool such as Wine configuration can be closed within seconds), is shown with Wine's
+often quits cleanly), is shown with Wine's
 exit code, how long it ran and the last 12 lines Wine printed. A game that ran and quit with code 0 just
-returns to the shell.
+returns to the shell. A prefix tool (§7c, Prefix tools) is reported only for a non-zero exit, however soon it
+ended, and the words say "program".
 
 Considered and not built (Droidtop/tracker#270): a "taking a long time" notice for an emulator that is open
 and responsive but never draws (NetherSX2 sat black and idle for 60 s with no report). Without root nothing

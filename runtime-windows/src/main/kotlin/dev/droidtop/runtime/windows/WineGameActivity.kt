@@ -88,6 +88,9 @@ class WineGameActivity : Activity() {
     /** The library game this screen runs, when it is one (its cloud saves are synced when the screen ends). */
     private var entryId: String? = null
 
+    /** What a prefix tool is called, when this screen runs one ([WineEngine.launch]'s `tool`); null for a game. */
+    private var tool: String? = null
+
     /** What the Quick Menu's Game section reaches this screen through (Resume is a relaunch, Stop is [stop]). */
     private val ownScreen = object : OwnGameScreens.Screen {
         override val entryId: String? get() = this@WineGameActivity.entryId
@@ -128,6 +131,7 @@ class WineGameActivity : Activity() {
         val workingDir = intent.getStringExtra(EXTRA_WORKING_DIR)?.let(::File)
         val arguments = intent.getStringArrayListExtra(EXTRA_ARGUMENTS).orEmpty()
         entryId = intent.getStringExtra(EXTRA_ENTRY_ID)
+        tool = intent.getStringExtra(EXTRA_TOOL)
         OwnGameScreens.register(ownScreen)
         val prefix = containerId?.let { id ->
             runCatching { ContainerManager(this).getContainerById(id) }.getOrNull()
@@ -256,7 +260,7 @@ class WineGameActivity : Activity() {
      */
     private fun onGuestTerminated(status: Int) {
         val ranMs = SystemClock.elapsedRealtime() - startedAtMs
-        val report = WinePresentation.exitReport(status, ranMs, guestShowedWindow, session?.output().orEmpty())
+        val report = WinePresentation.exitReport(status, ranMs, guestShowedWindow, session?.output().orEmpty(), tool = tool != null)
         Timber.i("Wine exited %d after %d ms", status, ranMs)
         runOnUiThread {
             // The person left the game (Back): stopping the session killed
@@ -276,7 +280,11 @@ class WineGameActivity : Activity() {
      * so it is shown here, and finishing immediately would take it away
      * before it could be read.
      */
-    private fun showFailure(message: String, cause: Throwable? = null, title: String = "This Windows game did not start.") {
+    private fun showFailure(
+        message: String,
+        cause: Throwable? = null,
+        title: String = if (tool != null) "This Windows program did not start." else "This Windows game did not start.",
+    ) {
         if (failed) return
         failed = true
         if (cause == null) {
@@ -408,6 +416,7 @@ class WineGameActivity : Activity() {
         private const val EXTRA_WORKING_DIR = "dev.droidtop.wine.WORKING_DIR"
         private const val EXTRA_ARGUMENTS = "dev.droidtop.wine.ARGUMENTS"
         private const val EXTRA_ENTRY_ID = "dev.droidtop.wine.ENTRY_ID"
+        private const val EXTRA_TOOL = "dev.droidtop.wine.TOOL"
         private const val FAILURE_PADDING_PX = 48
 
         /**
@@ -431,6 +440,7 @@ class WineGameActivity : Activity() {
             workingDir: File,
             arguments: List<String> = emptyList(),
             entryId: String? = null,
+            tool: String? = null,
         ): Intent =
             Intent(context, WineGameActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -439,6 +449,7 @@ class WineGameActivity : Activity() {
                 putExtra(EXTRA_WORKING_DIR, workingDir.absolutePath)
                 putStringArrayListExtra(EXTRA_ARGUMENTS, ArrayList(arguments))
                 entryId?.let { putExtra(EXTRA_ENTRY_ID, it) }
+                tool?.let { putExtra(EXTRA_TOOL, it) }
                 // A game's own Wine choices over a shared prefix are this
                 // launch's, not the prefix's (docs/SPEC.md 5a), so they
                 // travel with the launch rather than being saved into it.
@@ -512,12 +523,17 @@ object WinePresentation {
      * is reported too when the guest never mapped a window of its own
      * ([showedWindow]): a game that cannot create its device often quits
      * cleanly (rig, a Unity game with no Direct3D 11 device), while a tool such
-     * as Wine configuration may well be closed again within seconds.
+     * as Wine configuration may well be closed again within seconds. A prefix
+     * [tool] is never reported for code 0.
      */
-    fun exitReport(status: Int, ranMs: Long, showedWindow: Boolean, output: String): ExitReport? {
+    fun exitReport(status: Int, ranMs: Long, showedWindow: Boolean, output: String, tool: Boolean = false): ExitReport? {
+        // A prefix tool (Wine configuration, the registry editor, an installer) is closed when its work is done,
+        // however soon; only a failing exit is worth saying.
+        if (tool && status == 0) return null
         val atOnce = ranMs < EXITED_AT_ONCE_MS
         if (status == 0 && (!atOnce || showedWindow)) return null
-        val title = if (atOnce) "This Windows game closed straight after it started." else "This Windows game stopped with an error."
+        val what = if (tool) "program" else "game"
+        val title = if (atOnce) "This Windows $what closed straight after it started." else "This Windows $what stopped with an error."
         val seconds = (ranMs / 1000).coerceAtLeast(0)
         val code = "Wine exited with code $status after $seconds s."
         val lines = output.lines().map(String::trimEnd).filter(String::isNotBlank).takeLast(EXIT_LINES)

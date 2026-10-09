@@ -72,6 +72,11 @@ sealed interface WineEngine {
         arguments: List<String> = emptyList(),
         /** The library game this launch is, when it is one: its cloud saves are synced when the game ends. */
         entryId: String? = null,
+        /**
+         * What a prefix tool is called ("Registry editor"), when this launch is one rather than a game: the screen
+         * then words its end as a program's, and a quick exit with code 0 is not a failure (docs/SPEC.md 7c).
+         */
+        tool: String? = null,
     ): PcLaunchResult
 }
 
@@ -133,6 +138,7 @@ class BionicWineEngine(private val context: Context) : WineEngine {
         workingDir: File,
         arguments: List<String>,
         entryId: String?,
+        tool: String?,
     ): PcLaunchResult {
         // Whatever this prefix's settings name and the device lacks (a Wine
         // build, a DXVK or FEXCore version, a graphics driver chosen in its
@@ -150,7 +156,7 @@ class BionicWineEngine(private val context: Context) : WineEngine {
         // screen a launch lands on, and it is the same call for all of
         // them.
         return runCatching {
-            LaunchDisplay.start(context, WineGameActivity.intent(context, prefix, target, workingDir, arguments, entryId))
+            LaunchDisplay.start(context, WineGameActivity.intent(context, prefix, target, workingDir, arguments, entryId, tool))
         }.fold(
             onSuccess = { PcLaunchResult(true, "ok") },
             onFailure = { PcLaunchResult(false, it.message ?: "couldn't start the Windows game screen") },

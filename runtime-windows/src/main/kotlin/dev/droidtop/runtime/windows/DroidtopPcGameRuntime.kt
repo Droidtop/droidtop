@@ -665,6 +665,7 @@ internal suspend fun launchInPrefix(
     workingDir: File,
     arguments: List<String> = emptyList(),
     entryId: String? = null,
+    tool: String? = null,
 ): PcLaunchResult {
     val prefixHostPath = File(container.rootDir, ".wine")
     if (!prefixHostPath.isDirectory) {
@@ -673,7 +674,7 @@ internal suspend fun launchInPrefix(
             "container \"${container.name}\" has no Wine prefix at ${prefixHostPath.absolutePath}",
         )
     }
-    return runCatching { engine.launch(container, target, workingDir, arguments, entryId) }
+    return runCatching { engine.launch(container, target, workingDir, arguments, entryId, tool) }
         .getOrElse { PcLaunchResult(false, it.message ?: it.toString()) }
 }
 
@@ -716,26 +717,6 @@ object WinePrefixes {
         val container = withContext(Dispatchers.IO) {
             runCatching { ContainerManager(context).getContainerById(prefixId) }.getOrNull()
         } ?: return PcLaunchResult(false, "that Windows environment no longer exists")
-        val workingDir = file.parentFile ?: file
-        val engine = BionicWineEngine(context)
-        return if (file.name.endsWith(".msi", ignoreCase = true)) {
-            launchInPrefix(engine, container, "start", workingDir, listOf("/unix", file.absolutePath))
-        } else {
-            launchInPrefix(engine, container, file.absolutePath, workingDir)
-        }
-    }
-
-    /**
-     * Opens Wine's own configuration window (`winecfg`) in the prefix
-     * [entryId] starts in (the shared one for null), the way a game is
-     * started there: Windows version, DLL overrides, drives and audio are
-     * Wine's settings, and winecfg is where Wine keeps them (docs/SPEC.md
-     * 7c). Returns the line the settings row shows.
-     */
-    suspend fun configure(context: Context, entryId: String?): String {
-        val container = withContext(Dispatchers.IO) { PcContainers.forGame(context, entryId) }
-            ?: return "There is no Windows environment yet. Run Set up Windows games first."
-        val result = launchInPrefix(BionicWineEngine(context), container, "winecfg", ImageFs.find(context).rootDir)
-        return if (result.succeeded) "Opened Wine configuration" else "Couldn't open Wine configuration: ${result.detail}"
+        return WinePrefixTools.runIn(context, container, file)
     }
 }

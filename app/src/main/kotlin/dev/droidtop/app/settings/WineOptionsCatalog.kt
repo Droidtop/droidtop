@@ -15,7 +15,6 @@ import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.runtime.windows.WineOptionRow
 import dev.droidtop.runtime.windows.WineOptions
-import dev.droidtop.runtime.windows.WinePrefixes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -148,15 +147,15 @@ object WineOptionsCatalog {
                 ),
             )
             if (state.setUp) add(
-                AsyncActionItem(
-                    id = "wine_options_winecfg",
-                    title = "Wine configuration",
+                NestedScreenItem(
+                    id = "wine_options_tools",
+                    title = "Prefix tools",
                     subtitle = if (overGame) {
-                        "Wine's own settings window (winecfg) for the shared prefix: Windows version, libraries, drives, audio. Changes apply to every game that shares it"
+                        "Wine configuration, the registry editor and a command prompt, running a program, and stopping Wine, for the shared prefix. They apply to every game that shares it"
                     } else {
-                        "Wine's own settings window (winecfg) for this prefix: Windows version, libraries, drives, audio"
+                        "Wine configuration, the registry editor and a command prompt, running a program, and stopping Wine, for this prefix"
                     },
-                    run = { ctx, _ -> WinePrefixes.configure(ctx, entryId) },
+                    inline = PrefixToolsCatalog.screen(if (overGame) null else entryId, title, shared = overGame || shared),
                 ),
             )
             add(
