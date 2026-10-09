@@ -59,7 +59,7 @@ internal fun StartMenu(
     onPlay: (LibraryEntry) -> Unit,
     onOpenPage: (LibraryEntry) -> Unit,
     onOpenTerminal: (() -> Unit)?,
-    onSearch: () -> Unit,
+    onSearch: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -110,7 +110,7 @@ internal fun StartMenu(
                 subtitle = "Apps, games and download sources",
                 onSelect = {
                     dismiss()
-                    search()
+                    search("")
                 },
             ),
         )
@@ -252,6 +252,12 @@ internal fun StartMenu(
             toggleLabel = "Pin or unpin",
             detailLabel = "Options",
             cursor = cursor,
+            // A hardware keyboard typing while the menu is open is the search's: the menu has the focus, and
+            // the container gets its keys back when it closes.
+            onTyped = { text ->
+                dismiss()
+                search(text)
+            },
         )
     } else {
         // The row's menu: the one place a finger or Y reaches pinning and the game page.

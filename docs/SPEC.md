@@ -321,9 +321,8 @@ mark and no hint row. Owner direction, 2026-10-08: "Still focus on gaming mode f
 OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not a second set.
 
 - **Four buttons are droidtop's while Desktop shows;** every other pad button stays the container's as
-  6b has it. Start opens the Start menu (Gaming's left menu), Select or R2 the Quick Menu (Gaming's R2;
-  Select as well, because a pad whose triggers send no key still has it), L1 the list of windows, R1 the
-  search.
+  6b has it. Start opens the Start menu (Gaming's left menu), R2 the Quick Menu (Gaming's R2; Select stays the
+  container's, coordinator, 2026-10-08), L1 the list of windows, R1 the search.
   `DesktopPadRoutes` (`:shell-desktop`) claims them in `MainActivity.dispatchKeyEvent`, before any view,
   and only from a gamepad: a keyboard's keys are the container's. `DesktopShell` collects them.
 - **Each is a sheet that is a window of its own** (a Dialog), so the one input pipeline (6e) runs in it.
@@ -339,7 +338,7 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   Disturb, network, Bluetooth) is deleted: those are the Quick Menu's tiles over the settings catalog, so
   there is one control panel, not two.
 - **The bar says which buttons.** With a pad attached (`ShellWindow.padPresent`) a strip beside the bar
-  (`PadLegend`, not tappable) names Start, Select, L1 and R1; it is a strip of its own so the bar keeps its
+  (`PadLegend`, not tappable) names Start, R2, L1 and R1; it is a strip of its own so the bar keeps its
   width for the window list on a 768 dp console. The bar's buttons stay for touch and a mouse. The Start
   button only opens now: the menu is modal, so the "Close" label it wore while the menu floated over the
   bar is gone.
@@ -364,8 +363,8 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   result opens its detail. Nothing in it loads the launcher's model. The owner's issue for the Start menu
   (Droidtop/tracker#348) asked for a field that filters every section in place; a second filter beside the
   one search would be a second mechanism for one job, so the menu's search is the one search, which already
-  lists every source of the menu. Typing on a hardware keyboard while the menu is open is not routed to it:
-  a keyboard is the container's, and the search is a row and a button away.
+  lists every source of the menu. A hardware keyboard typing a letter or digit while the Start menu is open opens the search with that text
+  (`HostedListSheet.onTyped`): the open sheet has the focus, and the container gets its keys back when it closes.
 - **Notifications are the Quick Menu's section.** The tray readout counts the notifications waiting
   (`NotificationsStore`, the dismissible ones; an ongoing notification waits for nobody), and the tray opens
   the Quick Menu on Notifications once notification access is granted, on System before that (the
@@ -5356,7 +5355,7 @@ Shift on top of it would cancel.
 left/right button; the D-pad, face buttons, shoulders and left stick are left
 alone. The shell around the surface — taskbar, start menu, settings — is
 driven by the D-pad and A inside the sheets it opens, and claiming those would break
-navigation in exactly the case a gamepad pointer is for (no mouse attached). Start, Select, R2 and L1
+navigation in exactly the case a gamepad pointer is for (no mouse attached). Start, R2, L1 and R1
 are droidtop's while Desktop shows and open those sheets (2b "Desktop chrome with a pad").
 The right stick and stick clicks are the controls that navigation does not use.
 

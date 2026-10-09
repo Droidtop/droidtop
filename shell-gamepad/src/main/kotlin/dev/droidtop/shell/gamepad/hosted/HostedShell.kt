@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
@@ -89,6 +90,20 @@ class HostedCursor {
     var index: Int = 0
 }
 
+/**
+ * The text a hardware keyboard's key press types, or null: only a press from a keyboard (not a pad), with no
+ * Ctrl or Alt held, of a printable character other than a space (Space is X on the pad's table, 6e).
+ */
+private fun typedText(event: android.view.KeyEvent): String? {
+    if (event.action != android.view.KeyEvent.ACTION_DOWN) return null
+    if (!event.isFromSource(android.view.InputDevice.SOURCE_KEYBOARD) || event.isFromSource(android.view.InputDevice.SOURCE_GAMEPAD)) return null
+    if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return null
+    val ch = event.unicodeChar
+    if (ch <= 0 || (ch and android.view.KeyCharacterMap.COMBINING_ACCENT) != 0) return null
+    val c = ch.toChar()
+    return if (c.isLetterOrDigit()) c.toString() else null
+}
+
 private sealed interface HostedItem {
     data class Header(val text: String) : HostedItem
     data class Entry(val index: Int, val row: HostedRow) : HostedItem
@@ -134,6 +149,7 @@ fun HostedListSheet(
     onExtraPad: (PadPress) -> Boolean = { false },
     extraBindings: List<HintBinding> = emptyList(),
     cursor: HostedCursor = remember { HostedCursor() },
+    onTyped: ((String) -> Unit)? = null,
 ) {
     val window = currentShellWindow()
     val currentRows by rememberUpdatedState(rows)
@@ -158,7 +174,16 @@ fun HostedListSheet(
     CompositionLocalProvider(LocalShellWindow provides window) {
         Dialog(onDismissRequest = onClose) {
             MenuPanel(
-                modifier = modifier.width(window.panelWidth(440.dp)),
+                modifier = modifier.width(window.panelWidth(440.dp)).onPreviewKeyEvent { event ->
+                    val typed = onTyped
+                    val text = if (typed == null) null else typedText(event.nativeKeyEvent)
+                    if (typed != null && text != null) {
+                        typed(text)
+                        true
+                    } else {
+                        false
+                    }
+                },
                 focusLabel = title,
                 title = title,
                 // The sheet draws the hint row itself, inside the panel.

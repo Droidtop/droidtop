@@ -163,6 +163,7 @@ fun DesktopShell(
     var quickMenuOpen by remember { mutableStateOf(false) }
     var windowsOpen by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
+    var searchText by remember { mutableStateOf("") }
     // The pad's buttons that belong to droidtop's chrome rather than to the desktop arrive from the activity.
     LaunchedEffect(Unit) {
         DesktopPadRoutes.requests.collect { route ->
@@ -170,7 +171,10 @@ fun DesktopShell(
                 DesktopPadRoutes.Route.START_MENU -> startMenuOpen = true
                 DesktopPadRoutes.Route.QUICK_MENU -> quickMenuOpen = true
                 DesktopPadRoutes.Route.WINDOWS -> windowsOpen = true
-                DesktopPadRoutes.Route.SEARCH -> searchOpen = true
+                DesktopPadRoutes.Route.SEARCH -> {
+                    searchText = ""
+                    searchOpen = true
+                }
             }
         }
     }
@@ -274,7 +278,10 @@ fun DesktopShell(
                 onPlay = playEntry,
                 onOpenPage = { entry -> pageId = entry.id },
                 onOpenTerminal = onOpenTerminal,
-                onSearch = { searchOpen = true },
+                onSearch = { text ->
+                    searchText = text
+                    searchOpen = true
+                },
                 onDismiss = { startMenuOpen = false },
             )
         }
@@ -282,6 +289,7 @@ fun DesktopShell(
             DesktopSearch(
                 library = library,
                 linuxApps = linuxApps,
+                initialText = searchText,
                 onLaunchLinuxApp = onLaunchLinuxApp,
                 onPlay = playEntry,
                 onDismiss = { searchOpen = false },
@@ -563,7 +571,7 @@ private fun BoxScope.Taskbar(
             PadLegend(
                 items = listOf(
                     GamepadAction.START to "Start menu",
-                    GamepadAction.SELECT to "Quick menu",
+                    GamepadAction.R2 to "Quick menu",
                     GamepadAction.L to "Windows",
                     GamepadAction.R to "Search",
                 ),
@@ -747,6 +755,7 @@ private fun rememberToplevels(hostBridge: HostBridge?): List<Toplevel> {
 private fun DesktopSearch(
     library: Library,
     linuxApps: List<ContainerApp>,
+    initialText: String,
     onLaunchLinuxApp: ((ContainerApp) -> Unit)?,
     onPlay: (LibraryEntry) -> Unit,
     onDismiss: () -> Unit,
@@ -756,7 +765,7 @@ private fun DesktopSearch(
     val apps by rememberUpdatedState(linuxApps)
     val launch by rememberUpdatedState(onLaunchLinuxApp)
     LauncherSearchScreen(
-        initialText = "",
+        initialText = initialText,
         games = games,
         findApps = { text ->
             apps.filter { StartMenuSections.appMatches(it.name, it.genericName, text) }.map { app ->
