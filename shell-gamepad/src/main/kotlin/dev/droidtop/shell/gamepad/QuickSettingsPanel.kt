@@ -497,7 +497,7 @@ private fun QuickTileView(
  * tile size, and no new artifact in the repo.
  */
 @Composable
-internal fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier) {
+fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val u = size.minDimension / 24f
         val stroke = Stroke(width = 2f * u, cap = androidx.compose.ui.graphics.StrokeCap.Round)
@@ -687,6 +687,32 @@ internal fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier =
                 line(12f, 3f, 12f, 20f)
                 line(4f, 13f, 12f, 9f); line(20f, 13f, 12f, 9f)
                 line(8f, 21f, 12f, 18f); line(16f, 21f, 12f, 18f)
+            }
+            QuickGlyph.HOME -> {
+                line(3f, 11f, 12f, 3.5f); line(12f, 3.5f, 21f, 11f)
+                line(5.5f, 9.5f, 5.5f, 20f); line(18.5f, 9.5f, 18.5f, 20f)
+                line(5.5f, 20f, 18.5f, 20f)
+                line(10f, 20f, 10f, 14f); line(14f, 20f, 14f, 14f); line(10f, 14f, 14f, 14f)
+            }
+            QuickGlyph.KEYBOARD -> {
+                drawRoundRect(
+                    tint,
+                    topLeft = p(2.5f, 6f),
+                    size = Size(19f * u, 12f * u),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f * u, 2f * u),
+                    style = stroke,
+                )
+                listOf(6f, 10f, 14f, 18f).forEach { x -> dot(x, 10f, 1.1f) }
+                line(8f, 14.5f, 16f, 14.5f)
+            }
+            QuickGlyph.PEOPLE -> {
+                ring(9f, 8f, 3.5f)
+                arc(9f, 20f, 6.5f, 180f, 180f)
+                ring(17f, 9f, 2.5f)
+                arc(17f, 19.5f, 4.5f, 210f, 120f)
+            }
+            QuickGlyph.MORE -> {
+                dot(5f, 12f, 2f); dot(12f, 12f, 2f); dot(19f, 12f, 2f)
             }
         }
     }

@@ -26,7 +26,6 @@ import dev.droidtop.input.TRACKPAD_TRAVEL_MM_PER_SCREEN_WIDTH
 import dev.droidtop.input.TrackpadGestureEngine
 import dev.droidtop.input.TrackpadOutput
 import dev.droidtop.input.TrackpadView
-import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
 import dev.droidtop.shell.gamepad.ChromeColors
 import dev.droidtop.shell.gamepad.KeyboardTargets
@@ -35,36 +34,6 @@ import org.pocketworkstation.pckeyboard.KeyboardSink
 import org.pocketworkstation.pckeyboard.SecondScreenKeyboard
 import java.lang.ref.WeakReference
 import kotlinx.coroutines.launch
-
-/**
- * What the second screen is for, per mode.
- *
- * Two real roles, with different defaults per mode because the modes want
- * different things (docs/SPEC.md section 4): Desktop mode's lower screen
- * is an input surface by design, while in Gaming mode the shell itself
- * moves to the addon and the remaining screen is the ambient widgets
- * panel. Both are switchable, because a user with a physical keyboard
- * wants the companion in Desktop mode, and a user browsing a large library
- * one-handed wants the trackpad in Gaming mode.
- */
-object SecondScreenInputPrefs {
-
-    enum class Role { COMPANION, INPUT }
-
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_PREFIX = "pref_second_screen_role_"
-
-    fun role(context: Context, mode: SecondaryDisplayContent.Mode): Role {
-        val stored = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_PREFIX + mode.name, null)
-        return stored?.let { runCatching { Role.valueOf(it) }.getOrNull() } ?: defaultFor(mode)
-    }
-
-    fun defaultFor(mode: SecondaryDisplayContent.Mode): Role = when (mode) {
-        SecondaryDisplayContent.Mode.DESKTOP -> Role.INPUT
-        else -> Role.COMPANION
-    }
-}
 
 /**
  * The foreground droidtop Activity, for the one thing the second screen

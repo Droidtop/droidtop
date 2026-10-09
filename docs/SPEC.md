@@ -3315,18 +3315,39 @@ intent filters and user-facing strings all survive.
 
 The companion is a tabbed, touch-only second screen. One entry, `CompanionTabs` (`:app`), is drawn by
 every host that draws the companion (the registry's `Surface`, used by `SecondScreenPresentation` and
-`SecondaryDisplayActivity`, and `CompanionActivity`); the per-mode role choice (section 6c) now only
-picks the tab it opens on. Standard draws the same tabs (decided 2026-10-08, Droidtop/tracker#347): its own
+`SecondaryDisplayActivity`, and `CompanionActivity`). Standard draws the same tabs (decided 2026-10-08, Droidtop/tracker#347): its own
 launcher-style surface used to stand in for them, so a Standard user's add-on display had no Social, Tasks,
 Performance, System or Keys, did not scroll and carried a prose line; its one unique piece, the quick-launch
 row of recent apps, became Home's Recent apps section for every mode.
 
-- **Tabs, in strip order:** Home (today's widgets and info surface, `CompanionSurface`, the host's own
-  add/remove controls where it has them), Social (every provider's friends and conversations, with
-  droidtop's own keyboard for typing; not in Kiosk and Kid; see "Social", Droidtop/tracker#327), Tasks,
-  Performance, System and Input. Input (the keyboard and
-  trackpad surface) is offered in Desktop mode and wherever a mode's role is set to Input. Desktop opens on
-  Input (section 6c, unchanged); every other mode opens on Home. Only the selected tab is composed.
+- **Tabs (redesigned 2026-10-09, Droidtop/tracker#414, slice C2):** Home (the widgets and info surface,
+  `CompanionSurface`, the host's own add/remove controls where it has them), Game (only while a game runs: the
+  running game's card), System, Apps (the task manager, formerly Tasks), Performance, Input (the keyboard and
+  trackpad surface), Social (every provider's friends and conversations, with droidtop's own keyboard for
+  typing; see "Social", Droidtop/tracker#327) and Plugins (only while a plugin has a companion panel). Which
+  tabs a UI mode offers is `ControlAccess`'s (7f "UI modes and ControlAccess"): Kid and Kiosk get Home, Game
+  and Performance. Only the selected tab is composed.
+- **The bar.** A window taller than wide draws a bar of labelled icons along the bottom; a wider one draws the
+  same entries as a rail down the left. Both are `TabRail` (`:shell-gamepad`), the one rail the Quick Menu draws
+  without labels. Which tabs are on it is one pure function, `slots(chosen, mode, running, extent, labelSizes)`
+  in `CompanionTabs.kt`: up to four chosen tabs, then the running tabs (Game while a game runs; Input too while
+  a stream or a PC game runs, unless already chosen), then More, always last, holding every other tab. Chosen
+  tabs never move for a running one. Labels wrap to two lines; the bar measures them at the current font and
+  passes their sizes in, and when they do not fit, chosen tabs move into More from the right end and come back
+  when there is room, so the person decides what goes first by their order. Where the mode hides the Companion
+  group (Kid, Kiosk) nobody can choose, so the bar is the mode's whole tab set. Defaults: Home, System, Apps,
+  Social in Gaming and Standard; Input, Home, System, Apps in Desktop. A tab under More passes its badge to
+  More (the Social unread count, spoken with it). Every entry has the tab role, its selected state and a spoken
+  name. A first-run tip says what the bar is and that Game appears while a game runs, until dismissed.
+- **Opening tab and game start.** The companion opens on the mode's opening tab: Home in Gaming and Standard,
+  Input in Desktop (section 6c), any tab, or the last one used. When a game starts while Home shows, it turns
+  to the runner's tab ("When a game starts": Game by default, Input for a runner that asks for it, any tab, or
+  stay), announces the tab to TalkBack, and goes back to Home on quit. Started from another tab, nothing moves.
+- **The Companion group** of the catalog (Displays > Companion > Tabs, `CompanionPrefs` in `:runtime-common`)
+  holds these: per mode the four bar slots and the opening tab, When a game starts, and Reset the companion to
+  defaults (asks first). There is no companion-only settings screen. The per-mode second-screen role ("Widgets
+  and game info" or "Keyboard and trackpad") it replaces is migrated once into the opening tab where it differed
+  from the mode's default, and old tab ids (Tasks) read as today's (Apps).
 - **Touch first, screens independent.** The companion never takes the pad from the shell (tracker#186, #265):
   its window is focusable only while Android makes it the top activity, and then every key goes to the shell
   if one is in front on another screen (`TouchOnlySurfaceFocus`). When there is no shell to hand it to (a game
@@ -3336,8 +3357,8 @@ row of recent apps, became Home's Recent apps section for every mode.
   controls in that state was taken back: the person is holding the pad for the game on the other screen, and an
   A there would press whatever the ring was on, Quit included. Nothing here moves an app the user opened
   (#243); Tasks' switch tap launches on the app's own screen and its arrow pair is an explicit request.
-  The strip scrolls sideways and the Performance and System pages lay out in one column in portrait and two on
-  a wide window, from the window's own bounds (#213).
+  The Performance and System pages lay out in one column in portrait and two on a wide window, from the
+  window's own bounds (#213).
 - **Home is the second screen's dashboard, one scrolling column (Droidtop/tracker#285, #328).**
   `CompanionSurface` draws a single vertically scrolling page over the idle art; nothing is stacked over
   anything else, the rails scroll sideways inside it, and a focused item scrolls itself into view. Order, by
@@ -4248,8 +4269,9 @@ above). droidtop has three modes and now three second-screen designs:
   section 7e is scoped but not built, and there is nothing real to show without fabricating
   it; a plugin status tile is an ordinary Android widget (PluginStatusWidgetProvider),
   already covered by the widget area.
-- **Desktop**: unchanged -- keyboard and trackpad (SecondScreenInputSurface), or the
-  companion when the user picks that role instead (SecondScreenInputPrefs).
+- **Desktop**: the companion opening on its Input tab (keyboard and trackpad,
+  SecondScreenInputSurface); its opening tab is the person's to change (Displays > Companion >
+  Tabs, "The companion's tabs", Droidtop/tracker#414).
 
 **One registry, one mechanism (fixed the same pass).** SecondaryDisplayContent (:display)
 already held a per-mode composable registry that only SecondaryDisplayActivity (the idle,
@@ -9442,7 +9464,7 @@ VPN, Bluetooth, Battery, Swap screens, Reinitialize displays — are rendered by
 the Quick Menu's System tab only: the catalog's System group carries a
 `quickOnly` flag and every Settings renderer skips it
 (`GamingSettingsCatalog.settingsGroups`), keeping under System just
-Screens (main screen, game launch target, second-screen roles), Software
+Screens (main screen, game launch target, the companion), Software
 updates and Android settings. The Quick Menu shows those configuration
 rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items.
 

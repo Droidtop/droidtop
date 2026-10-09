@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import dev.droidtop.display.secondScreenScroll
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.PlatformsDatabase
@@ -218,6 +220,27 @@ internal fun CompanionNowSection(focused: LibraryEntry?, layout: CompanionHomeLa
 }
 
 private const val RUNNING_CHECK_MS = 5_000L
+
+/**
+ * The Game tab, on the bar while a game runs (docs/SPEC.md "The companion's tabs"): the running game's card with
+ * Resume and Quit. Nothing running (the game ended while the tab showed) is two words.
+ */
+@Composable
+internal fun CompanionGameTab() {
+    val running by LaunchDisplay.running.collectAsState()
+    val entries by CompanionState.libraryEntries.collectAsState()
+    val runningId = running?.context?.gameId
+    val entry = remember(runningId, entries) { runningId?.let { id -> entries.firstOrNull { it.id == id } } }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .secondScreenScroll(rememberScrollState())
+            .padding(16.dp),
+    ) {
+        val session = running
+        if (entry != null && session != null) NowRunningCard(entry, session.sinceEpochMs) else CompanionNote("Nothing running")
+    }
+}
 
 @Composable
 private fun NowCardFrame(entry: LibraryEntry, content: @Composable () -> Unit) {

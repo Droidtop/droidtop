@@ -3,7 +3,6 @@ package dev.droidtop.shell.gamepad
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,8 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -282,7 +279,8 @@ private const val RailWidthDp = 64
  * edge, or a row across the top of a bottom sheet. It scrolls if the sections outnumber the room
  * and keeps the current one in view. Not a focus target: L1/R1 step it, and a tap selects. The
  * current section wears Steam's chosen-tab look (a quiet plate, the glyph in full ink, not the
- * accent: it is where you are, and the cursor is in the section), the others muted.
+ * accent: it is where you are, and the cursor is in the section), the others muted. The one
+ * [TabRail], unlabelled; the companion draws the same rail with labels.
  */
 @Composable
 private fun QuickRail(
@@ -293,65 +291,22 @@ private fun QuickRail(
     onSelect: (QuickSection) -> Unit,
 ) {
     val window = currentShellWindow()
-    val target = window.minTouchTarget.coerceAtLeast(44.dp)
-    val items: @Composable () -> Unit = {
-        sections.forEach { s -> key(s) {
-            val current = s == selected
-            val requester = remember { BringIntoViewRequester() }
-            LaunchedEffect(current) { if (current) requester.bringIntoView() }
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .bringIntoViewRequester(requester)
-                    .size(target)
-                    .clip(MenuTokens.RowShape)
-                    .background(if (current) MenuTokens.SurfaceSelected else Color.Transparent, Corners.Crisp)
-                    // Ahead of the clickable: a plain clickable is still a
-                    // focus target, and the pad's focus belongs to the section.
-                    .focusProperties { canFocus = false }
-                    .clickable { onSelect(s) }
-                    .semantics {
-                        contentDescription = s.label
-                        this.selected = current
-                    },
-            ) {
-                QuickGlyphIcon(
-                    glyph = s.glyph,
-                    tint = if (current) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
-                    modifier = Modifier.size(22.dp),
-                )
-                if (s in dots && !current) {
-                    Box(
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(8.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(MenuTokens.Accent),
-                    )
-                }
-            }
-        } }
-    }
-    if (vertical) {
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(RailWidthDp.dp)
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 12.dp, horizontal = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) { items() }
-    } else {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) { items() }
-    }
+    TabRail(
+        tabs = sections.map { RailTab(key = it, label = it.label, glyph = it.glyph, dot = it in dots) },
+        selected = selected,
+        vertical = vertical,
+        labelled = false,
+        colors = RailColors(
+            selected = MenuTokens.SurfaceSelected,
+            ink = MenuTokens.OnSurface,
+            muted = MenuTokens.OnSurfaceMuted,
+            accent = MenuTokens.Accent,
+            onAccent = MenuTokens.OnSurface,
+        ),
+        onSelect = { onSelect(it.key as QuickSection) },
+        modifier = if (vertical) Modifier.width(RailWidthDp.dp) else Modifier,
+        target = window.minTouchTarget.coerceAtLeast(44.dp),
+    )
 }
 
 /**

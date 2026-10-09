@@ -104,7 +104,9 @@ object ControlAccess {
         longPress = false,
         openOnCompanion = false,
         alwaysAsk = true,
-        hiddenItemIds = setOf(GamingSettingsCatalog.ID_UI_MODE, ID_KID_VOLUME_CAP, ID_UI_MODE_PASSKEY),
+        hiddenItemIds = setOf(
+            GamingSettingsCatalog.ID_UI_MODE, GamingSettingsCatalog.ID_DISPLAY_COMPANION, ID_KID_VOLUME_CAP, ID_UI_MODE_PASSKEY,
+        ),
         hiddenGroupIds = setOf(GROUP_COMPANION),
     )
 

@@ -34,6 +34,8 @@ enum class QuickGlyph {
     DISPLAY, GAMEPAD, SWAP, UPDATE, ANDROID, EXIT, SETTINGS, BATTERY, GENERIC,
     // The rail's own marks and the rows added with the branching panel.
     APPS, BELL, GAUGE, DOWNLOAD, POWER, AIRPLANE,
+    // The companion's tabs (docs/SPEC.md "The companion's tabs"), drawn by the same rail.
+    HOME, KEYBOARD, PEOPLE, MORE,
 }
 
 /**

@@ -336,8 +336,6 @@ object GamingSettingsCatalog {
                 ))
                 add(displayShellTargetItem(context))
                 add(displayGameLaunchTargetItem(context))
-                add(secondScreenRoleItem(context, MODE_GAMING))
-                add(secondScreenRoleItem(context, MODE_DESKTOP))
                 addAll(secondScreenKeyboardItems(context))
                 addAll(screenNameItems(context))
             },
@@ -888,6 +886,115 @@ object GamingSettingsCatalog {
         },
     )
 
+    /** The tabs a person can put on the companion's bar or open it on, with their names. Game comes by itself. */
+    private val COMPANION_TAB_CHOICES = listOf(
+        ControlPanel.HOME to "Home",
+        ControlPanel.SYSTEM to "System",
+        ControlPanel.APPS to "Apps",
+        ControlPanel.PERFORMANCE to "Performance",
+        ControlPanel.INPUT to "Input",
+        ControlPanel.SOCIAL to "Social",
+    )
+
+    private val COMPANION_MODE_NAMES = mapOf("GAMING" to "Gaming", "STANDARD" to "Standard", "DESKTOP" to "Desktop")
+
+    /**
+     * The Companion group (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): the bar's tabs and the
+     * opening tab per mode, what happens when a game starts, and a reset. Kid and Kiosk hide the group
+     * ([ControlAccess.GROUP_COMPANION]). Reads [CompanionPrefs], loaded by the caller off the main thread.
+     */
+    private fun companionTabsGroup(context: Context): CatalogGroup {
+        val settings = CompanionPrefs.settings.value
+        val tabOptions = COMPANION_TAB_CHOICES.map { (panel, label) -> ChoiceOption(CompanionPrefs.id(panel), label) }
+        fun names(ids: List<String>) = ids.mapNotNull { id ->
+            COMPANION_TAB_CHOICES.firstOrNull { CompanionPrefs.id(it.first) == id }?.second
+        }.joinToString(", ")
+        val perMode = CompanionPrefs.MODES.map { mode ->
+            val name = COMPANION_MODE_NAMES.getValue(mode)
+            NestedScreenItem(
+                id = "companion_tabs_$mode",
+                title = "In $name",
+                subtitle = "The tabs on the companion's bar in $name, and the one it opens on",
+                valueLabel = { _ -> names(CompanionPrefs.settings.value.chosen(mode)) },
+                inline = CatalogScreen(
+                    id = "companion_tabs_$mode",
+                    title = "Companion in $name",
+                    groups = { ctx ->
+                        CompanionPrefs.load(ctx)
+                        val now = CompanionPrefs.settings.value
+                        val chosen = now.chosen(mode)
+                        listOf(
+                            CatalogGroup(
+                                id = "companion_tabs_${mode}_bar",
+                                title = "Tabs on the bar",
+                                items = (0 until CompanionPrefs.MAX_CHOSEN).map { slot ->
+                                    ChoiceItem(
+                                        id = "companion_tab_${mode}_$slot",
+                                        title = "Tab ${slot + 1}",
+                                        subtitle = "Tabs not on the bar are under More; Game joins the bar while a game runs",
+                                        options = listOf(ChoiceOption("", "None")) + tabOptions,
+                                        current = chosen.getOrNull(slot).orEmpty(),
+                                        onSelect = { c, value ->
+                                            CompanionPrefs.setChosen(
+                                                c,
+                                                mode,
+                                                CompanionPrefs.placeTab(CompanionPrefs.settings.value.chosen(mode), slot, value),
+                                            )
+                                        },
+                                    )
+                                },
+                            ),
+                            CatalogGroup(
+                                id = "companion_tabs_${mode}_opening",
+                                title = null,
+                                items = listOf(
+                                    ChoiceItem(
+                                        id = "companion_opening_$mode",
+                                        title = "Opening tab",
+                                        subtitle = "The tab the companion shows when it appears",
+                                        options = listOf(
+                                            ChoiceOption(
+                                                CompanionPrefs.OPEN_DEFAULT,
+                                                if (mode == "DESKTOP") "Input (default)" else "Home (default)",
+                                            ),
+                                            ChoiceOption(CompanionPrefs.OPEN_LAST, "The last one used"),
+                                        ) + tabOptions,
+                                        current = now.opening(mode),
+                                        onSelect = { c, value -> CompanionPrefs.setOpening(c, mode, value) },
+                                    ),
+                                ),
+                            ),
+                        )
+                    },
+                ),
+            )
+        }
+        return CatalogGroup(
+            id = ControlAccess.GROUP_COMPANION,
+            title = "Tabs",
+            items = perMode + listOf(
+                ChoiceItem(
+                    id = "companion_game_start",
+                    title = "When a game starts",
+                    subtitle = "Which tab the companion turns to when you start a game from its Home",
+                    options = listOf(
+                        ChoiceOption(CompanionPrefs.GAME_START_RUNNER, "Game, or Input for streams (default)"),
+                        ChoiceOption(CompanionPrefs.GAME_START_NONE, "Stay where it is"),
+                    ) + tabOptions,
+                    current = settings.onGameStart,
+                    onSelect = { c, value -> CompanionPrefs.setOnGameStart(c, value) },
+                ),
+                ActionItem(
+                    id = "companion_reset",
+                    title = "Reset the companion to defaults",
+                    subtitle = "Puts the bar, the opening tab and the tips back as they came",
+                    confirmTitle = "Reset the companion?",
+                    run = { c -> CompanionPrefs.reset(c) },
+                ),
+            ),
+        )
+    }
+
     /**
      * Typing on the add-on display (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314). With
      * the elevated helper, a switch for Android's own keyboard on the second screen (on by default, given back when
@@ -955,8 +1062,11 @@ object GamingSettingsCatalog {
                     groups = { ctx ->
                         keyboard.load(ctx)
                         CompanionHomePrefs.load(ctx)
+                        CompanionPrefs.load(ctx)
                         val home = CompanionHomePrefs.layout.value
-                        listOf(
+                        // Kid and Kiosk never reach the companion's own preferences (ControlAccess).
+                        ControlAccess.filter(UiModePrefs.get(ctx), listOf(
+                            companionTabsGroup(ctx),
                             // The companion screen's own orientation lock, apart from each mode's (tracker#213).
                             CatalogGroup(
                                 id = "${ID_DISPLAY_COMPANION}_screen",
@@ -1004,7 +1114,7 @@ object GamingSettingsCatalog {
                                     ),
                                 ),
                             ),
-                        )
+                        ))
                     },
                 ),
             ),
@@ -1071,42 +1181,6 @@ object GamingSettingsCatalog {
             dev.droidtop.runtime.DisplayArrangement.changed()
         },
     )
-
-    /**
-     * What the second screen is FOR, per mode (docs/SPEC.md 4 and 6c).
-     *
-     * Per mode rather than once, because the modes genuinely differ:
-     * Desktop's lower screen is an input surface by design, while Gaming
-     * moves the shell to the addon and leaves the built-in panel as the
-     * ambient widgets surface. Both are the user's to change, which is
-     * what section 4 means by the input role being toggleable.
-     *
-     * Written as raw keys read by `:app`'s `SecondScreenInputPrefs`, the
-     * same seam `pref_display_game_launch_target` already uses: this module must
-     * not depend on `:app`.
-     */
-    private fun secondScreenRoleItem(context: Context, mode: String): ChoiceItem {
-        val id = "pref_second_screen_role_$mode"
-        val default = if (mode == MODE_DESKTOP) "INPUT" else "COMPANION"
-        return ChoiceItem(
-            id = id,
-            // The mode leads the title: in portrait the title column is narrow, and two titles that began
-            // "Second screen in" both ended as "Second s..." (rig, 2026-10-09).
-            title = if (mode == MODE_DESKTOP) "Desktop: second screen" else "Gaming: second screen",
-            subtitle = if (mode == MODE_DESKTOP) "What the second screen is for in Desktop mode" else "What the second screen is for in Gaming mode",
-            options = listOf(
-                ChoiceOption("COMPANION", "Widgets and game info"),
-                ChoiceOption("INPUT", "Keyboard and trackpad"),
-            ),
-            current = CatalogPrefs.prefs(context).getString(id, default),
-            onSelect = { ctx, value ->
-                CatalogPrefs.prefs(ctx).edit().putString(id, value).apply()
-            },
-        )
-    }
-
-    private const val MODE_GAMING = "GAMING"
-    private const val MODE_DESKTOP = "DESKTOP"
 
     private fun themeItem(context: Context): ChoiceItem {
         // The VALUE stays the directory id, which is what ThemePrefs
