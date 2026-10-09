@@ -16,27 +16,46 @@ data class Computer(
     /**
      * Where its WireGuard answers from outside the LAN, as it said the last
      * time the two met (`wg:203.0.113.7:47611`, `wg:[2001:db8::7]:47611`): a
-     * port the person forwarded and its global IPv6 addresses.
+     * port the person forwarded, its global IPv6 addresses, and the address
+     * its router gives it as STUN found it.
      */
     val endpoints: List<String> = emptyList(),
     val pairedAtMs: Long,
     val lastSyncMs: Long = 0L,
     /** What the last sync with it did, as one line. */
     val lastLine: String? = null,
+    /** Its global discovery ID (Syncthing's device ID form), as it said in its last hello. */
+    val disco: String? = null,
+    /** Which way the last session reached it: [Computers.PATH_LAN], [Computers.PATH_WIREGUARD] or [Computers.PATH_RENDEZVOUS]. */
+    val lastPath: String? = null,
+    val lastPathMs: Long = 0L,
 )
 
 /**
  * The computers this device is paired with (docs/SPEC.md 7o "Computers"), and
  * the one way to reach one: [call] fills in this device's key, the computer's
- * id and its known addresses, and remembers the address that answered. Each
- * computer gets a folder of its own under `files/agent/<id>/` for the save
- * baselines, the conflict archive and the library state.
+ * id, its known addresses and the rendezvous settings, and remembers the
+ * address that answered, the endpoints and discovery ID it stated, and which
+ * way the session went. Each computer gets a folder of its own under
+ * `files/agent/<id>/` for the save baselines, the conflict archive and the
+ * library state.
  *
  * Nothing here listens or polls: droidtop reaches a computer around a game's
  * launch and exit, when the person starts a sync, and while the pairing screen
  * is open.
  */
 object Computers {
+    const val PATH_LAN = "lan"
+    const val PATH_WIREGUARD = "wireguard"
+    const val PATH_RENDEZVOUS = "rendezvous"
+
+    /** Syncthing's global discovery servers, in the agent core's notation. */
+    const val DEFAULT_DISCOVERY = "default"
+
+    private const val PREFS = "droidtop_agent_rendezvous"
+    private const val KEY_ON = "on"
+    private const val KEY_SERVER = "server"
+
     @Volatile
     private var cache: List<Computer>? = null
 
@@ -91,16 +110,34 @@ object Computers {
     fun deviceName(context: Context): String =
         android.provider.Settings.Global.getString(context.contentResolver, "device_name")?.takeIf { it.isNotBlank() } ?: Build.MODEL
 
+    /** Whether droidtop finds computers away from home through global discovery (on unless the person turned it off). */
+    fun rendezvousOn(context: Context): Boolean = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ON, true)
+
+    fun setRendezvousOn(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ON, on).apply()
+    }
+
+    /** The discovery server: [DEFAULT_DISCOVERY] for Syncthing's, or an https address (droidtop's own, Droidtop/tracker#364). */
+    fun discoveryServer(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_SERVER, null)?.takeIf { it.isNotBlank() } ?: DEFAULT_DISCOVERY
+
+    /** Sets the discovery server; anything but an https address goes back to Syncthing's. */
+    fun setDiscoveryServer(context: Context, server: String) {
+        val value = server.trim().takeIf { it.startsWith("https://") } ?: DEFAULT_DISCOVERY
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_SERVER, value).apply()
+    }
+
     /**
      * Runs [op] for [computer]. Blocks on the network: never on the main thread.
      *
      * The core tries the computer's LAN addresses, then the LAN broadcast,
-     * then its WireGuard endpoints (droidtop-agent docs/DESIGN.md section 10),
-     * so a computer away from this network is still reached when its
-     * forwarded port or a global IPv6 address answers. A reply from a live
-     * session carries the endpoints the computer states now, which replace
-     * the ones kept; an address reached through the tunnel is not a LAN
-     * address and is not kept.
+     * then its WireGuard endpoints, then a rendezvous through global
+     * discovery (droidtop-agent docs/DESIGN.md section 10), so a computer away
+     * from this network is still reached when a forwarded port, a global IPv6
+     * address or a punched hole lets the tunnel through. A reply from a live
+     * session carries the endpoints and discovery ID the computer states now,
+     * which replace the ones kept, and which way it went; an address reached
+     * through the tunnel is not a LAN address and is not kept.
      */
     fun call(context: Context, computer: Computer, op: String, args: JSONObject = JSONObject()): JSONObject {
         val seed = DeviceIdentity.seed(context) ?: return JSONObject().put("error", "this device's key could not be opened")
@@ -109,18 +146,30 @@ object Computers {
             .put("peer", computer.id)
             .put("addresses", JSONArray(known.addresses + known.endpoints))
             .put("name", deviceName(context))
+        if (rendezvousOn(context) && known.disco != null) {
+            args.put("disco", known.disco).put(
+                "rendezvous",
+                JSONObject()
+                    .put("servers", JSONArray(listOf(discoveryServer(context))))
+                    .put("stun", JSONArray(listOf("default")))
+                    .put("state", File(folder(context), "rendezvous.json").absolutePath),
+            )
+        }
         val reply = AgentNative.call(op, args)
+        if (!reply.has("computer")) return reply
         val address = reply.optString("address").takeIf { it.isNotBlank() }
         val endpoints = reply.optJSONArray("endpoints")
-            ?.takeIf { reply.has("computer") }
             ?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.startsWith("wg:") }.take(MAX_ENDPOINTS) }
-        if (address != null || (endpoints != null && endpoints != known.endpoints)) {
-            update(context, computer.id) { c ->
-                c.copy(
-                    addresses = address?.let { (listOf(it) + c.addresses).distinct().take(MAX_ADDRESSES) } ?: c.addresses,
-                    endpoints = endpoints ?: c.endpoints,
-                )
-            }
+        val disco = reply.optString("disco").takeIf { it.isNotBlank() }
+        val path = reply.optString("path").takeIf { it.isNotBlank() }
+        update(context, computer.id) { c ->
+            c.copy(
+                addresses = address?.let { (listOf(it) + c.addresses).distinct().take(MAX_ADDRESSES) } ?: c.addresses,
+                endpoints = endpoints ?: c.endpoints,
+                disco = disco ?: c.disco,
+                lastPath = path ?: c.lastPath,
+                lastPathMs = if (path != null) System.currentTimeMillis() else c.lastPathMs,
+            )
         }
         return reply
     }
@@ -150,10 +199,14 @@ object Computers {
         .put("pairedAtMs", c.pairedAtMs)
         .put("lastSyncMs", c.lastSyncMs)
         .put("lastLine", c.lastLine ?: JSONObject.NULL)
+        .put("disco", c.disco ?: JSONObject.NULL)
+        .put("lastPath", c.lastPath ?: JSONObject.NULL)
+        .put("lastPathMs", c.lastPathMs)
 
     private fun fromJson(o: JSONObject): Computer? {
         val id = o.optString("id").takeIf { ID.matches(it) } ?: return null
         fun strings(name: String) = o.optJSONArray(name)?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty().filter { it.isNotBlank() }
+        fun text(name: String) = o.optString(name).takeIf { o.has(name) && !o.isNull(name) && it.isNotBlank() }
         return Computer(
             id = id,
             name = o.optString("name").ifBlank { "Computer" },
@@ -161,12 +214,15 @@ object Computers {
             endpoints = strings("endpoints"),
             pairedAtMs = o.optLong("pairedAtMs"),
             lastSyncMs = o.optLong("lastSyncMs"),
-            lastLine = o.optString("lastLine").takeIf { o.has("lastLine") && !o.isNull("lastLine") },
+            lastLine = text("lastLine"),
+            disco = text("disco"),
+            lastPath = text("lastPath"),
+            lastPathMs = o.optLong("lastPathMs"),
         )
     }
 
     private const val MAX_ADDRESSES = 4
 
-    /** A forwarded port and a few IPv6 addresses; more is a computer with many interfaces. */
+    /** A forwarded port, the STUN-found address and a few IPv6 addresses; more is a computer with many interfaces. */
     private const val MAX_ENDPOINTS = 8
 }

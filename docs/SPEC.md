@@ -14726,13 +14726,31 @@ The design's order (droidtop-agent docs/DESIGN.md section 10) holds:
      kept as a LAN address.
    - The computer's screen says whether it can be reached away from home
      ("Away from home"), and how to make it so when it cannot.
-   - Hole punching between two NATs is not done: it needs both sides to
-     learn their public endpoint at the same moment, which waits on the
-     owner's decision about a discovery service (droidtop-agent DESIGN
-     decision 4).
-     Syncthing's global discovery and public STUN servers were read for it
-     (2026-10-09): neither publishes terms that let another program use
-     them, so nothing is built on them (droidtop-agent DESIGN section 10).
+   - **Through two NATs: a rendezvous, the way Syncthing does it** (owner,
+     2026-10-09: "We ARE using syncthing's detection and routing
+     implementation"; "there's a reason we aren't passing DATA over it").
+     The agent learns its router's address for UDP 47611 by STUN (from that
+     socket) and announces it with Syncthing's global discovery protocol;
+     droidtop, when the LAN and the stated endpoints do not answer, asks
+     STUN for its own address, looks the computer up, announces itself, and
+     sends WireGuard handshakes from that socket while the computer, which
+     looks its handhelds up on Syncthing's schedule, punches towards it.
+     - Each device's discovery ID is the Syncthing-form ID of a certificate
+       made from its own key; the two tell each other in `hello`, and
+       `Computers` keeps the computer's (`disco`).
+     - Syncthing's default discovery and STUN servers, at Syncthing's own
+       client's pace (announce on change and every 30 minutes, a found
+       address kept 5 minutes, a miss asked again after a minute or the
+       server's Retry-After). Addresses only; Syncthing's relays are never
+       used, and every byte of a sync goes through the WireGuard tunnel.
+     - Settings > Computers > "Find computers away from home" (on by
+       default) and "Discovery server" (`default` is Syncthing's; droidtop's
+       own, Droidtop/tracker#364, can be set there later).
+     - The computer's screen says which way the last session went (this
+       network, WireGuard to a stated address, or punched through) and how
+       it is reached away from home.
+     - Two routers that change the port for every destination (symmetric
+       NAT) cannot be punched; the cloud folder (3.) is the path then.
 3. Store and forward through a folder of the person's own that their own
    sync tool carries to both sides (Drive, OneDrive, Dropbox, Nextcloud,
    Syncthing-Fork, FolderSync): Settings > Computers > "Cloud folder", picked
@@ -14759,8 +14777,8 @@ The design's order (droidtop-agent docs/DESIGN.md section 10) holds:
      synced live with that computer is not left in the folder.
 4. Later, a droidtop-run relay on the server VM (Droidtop/tracker#364).
 
-A community relay or discovery service is never used without the owner's
-decision, and Tailscale is never required.
+No relay carries data. Syncthing's discovery and STUN servers carry
+addresses only (the owner's decision above), and Tailscale is never required.
 
 ## 8. Licensing
 

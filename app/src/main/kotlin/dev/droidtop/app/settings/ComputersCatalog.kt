@@ -17,6 +17,8 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.net.peer.AgentNative
 import dev.droidtop.net.peer.Computer
 import dev.droidtop.net.peer.Computers
@@ -104,7 +106,27 @@ object ComputersCatalog {
      */
     private fun shareRows(context: Context): List<CatalogItem> {
         val label = ComputerShare.label(context)
+        val server = Computers.discoveryServer(context)
         return buildList {
+            // Rendezvous (docs/SPEC.md 7o "Transports"): Syncthing's discovery and STUN carry addresses only.
+            add(
+                ToggleItem(
+                    id = "computers_rendezvous",
+                    title = "Find computers away from home",
+                    subtitle = "Through Syncthing's global discovery, the way Syncthing finds devices: only addresses go there, and the sync itself goes through a direct, encrypted tunnel",
+                    current = Computers.rendezvousOn(context),
+                    onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setRendezvousOn(ctx, on) } },
+                ),
+            )
+            add(
+                TextInputItem(
+                    id = "computers_discovery_server",
+                    title = "Discovery server",
+                    subtitle = "default is Syncthing's global discovery; or the https address of another discovery server",
+                    value = server,
+                    onChange = { ctx, text -> withContext(Dispatchers.IO) { Computers.setDiscoveryServer(ctx, text) } },
+                ),
+            )
             add(
                 FolderPickItem(
                     id = "computers_share_folder",
@@ -131,6 +153,28 @@ object ComputersCatalog {
                 )
             }
         }
+    }
+
+    /**
+     * Which way the last session with [computer] went, and how it is reached
+     * away from home: its stated endpoints, the rendezvous, or what is missing.
+     */
+    private fun awayLine(context: Context, computer: Computer): String {
+        val last = computer.lastPathMs.takeIf { it > 0 }?.let { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it)) }
+        val went = when (computer.lastPath) {
+            Computers.PATH_LAN -> "The last sync went over this network"
+            Computers.PATH_WIREGUARD -> "The last sync went through WireGuard to an address ${computer.name} gave"
+            Computers.PATH_RENDEZVOUS -> "The last sync went through WireGuard, after finding ${computer.name} through global discovery"
+            else -> "No sync yet"
+        } + (last?.let { " ($it)" } ?: "") + ". "
+        val away = when {
+            Computers.rendezvousOn(context) && computer.disco != null ->
+                "Away from home, droidtop finds it through ${if (Computers.discoveryServer(context) == Computers.DEFAULT_DISCOVERY) "Syncthing's global discovery" else "your discovery server"} and punches through both routers"
+            Computers.rendezvousOn(context) -> "Away from home it can be found once a sync on this network has told droidtop its discovery ID"
+            computer.endpoints.isNotEmpty() -> "Away from home it is tried at ${computer.endpoints.joinToString(", ") { it.removePrefix("wg:") }}"
+            else -> "Away from home it cannot be reached: turn on Find computers away from home, or forward UDP 47611 on its router"
+        }
+        return went + away + (computer.endpoints.takeIf { it.isNotEmpty() && Computers.rendezvousOn(context) }?.let { e -> "; it is also tried at ${e.joinToString(", ") { it.removePrefix("wg:") }}" } ?: "")
     }
 
     private fun computerRow(computer: Computer) = NestedScreenItem(
@@ -178,11 +222,13 @@ object ComputersCatalog {
                     ActionItem(
                         id = "computer_away",
                         title = "Away from home",
-                        subtitle = if (computer.endpoints.isEmpty()) {
-                            "${computer.name} gave no way in from outside its network. On the computer, forward UDP 47611 on the router and run droidtop-agent endpoint set <public address>:47611, or let a global IPv6 address through its firewall"
-                        } else {
-                            "Reached through WireGuard at ${computer.endpoints.joinToString(", ") { it.removePrefix("wg:") }} when it is not on this network"
+                        value = when (computer.lastPath) {
+                            Computers.PATH_LAN -> "this network"
+                            Computers.PATH_WIREGUARD -> "WireGuard"
+                            Computers.PATH_RENDEZVOUS -> "punched through"
+                            else -> null
                         },
+                        subtitle = awayLine(context, computer),
                         run = {},
                     ),
                     NestedScreenItem(
