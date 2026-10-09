@@ -11436,12 +11436,16 @@ Steam store. The rule behind it: droidtop ships keys that IDENTIFY it (the Scree
 developer ID, the TheGamesDB application key) and never a key that AUTHENTICATES a person (their
 own key, their account, a secret); anything of the second kind is supplied by the person.
 
-**Supplying your own keys (directed 2026-10-08, tracker #264).** Four sources take a credential of
-the person's own, and all four have the same row and the same guide (`ScraperKeyService`): IGDB
+**Supplying your own keys (directed 2026-10-08, tracker #264).** Five sources take a credential of
+the person's own, and all five have the same row and the same guide (`ScraperKeyService`): IGDB
 (a Twitch developer application's Client ID and Secret, client-credentials token, no user
 sign-in), SteamGridDB (an API key from the person's preferences page), TheGamesDB (an API key) and
 ScreenScraper (the person's own username and password, which raises their daily limit; the
-developer ID stays droidtop's). Each has ONE row under Settings > Accounts and sources whose value
+developer ID stays droidtop's) and RetroAchievements (the person's own username and their Web
+API Key from the site's Settings, Keys; it reads their achievements and progress and is not a
+scraper, so its row sits under its own "Achievements" group of Settings > Accounts and sources;
+droidtop ships no RetroAchievements key, and the Connect key is never asked for, the emulator's
+own sign-in stays the emulator's: RetroArch's RetroAchievements login is RetroArch's). Each has ONE row under Settings > Accounts and sources whose value
 is its state (`Not set`, `Not tested`, `Connected`; `Built in` for TheGamesDB on a build that
 carries the application key, `No account` for ScreenScraper, `ScraperKeyState`) and whose guide is
 a screen behind the row (`ScraperKeySetupActivity`). Store sign-ins (Steam, GOG, Epic, Amazon,
@@ -11506,7 +11510,7 @@ Details already credits each source for the fields it supplied ("Where these fac
    is never an HTTP client of anything else.
 
 **Credentials are stored encrypted (directed 2026-10-08, tracker #264).** Every credential the
-person supplies (the six fields above) is kept by `CredentialStore`, one helper for all of them:
+person supplies (the eight fields above) is kept by `CredentialStore`, one helper for all of them:
 AES-256-GCM under a non-exportable Android Keystore key (`KeystoreSecretCipher`, the same
 mechanism the GitHub token uses, `GitHubTokenStore`, with its own key alias), the sealed value in
 a private preferences file of its own (`droidtop_credentials`), opened once per process and

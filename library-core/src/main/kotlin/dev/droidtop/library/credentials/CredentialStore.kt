@@ -28,11 +28,14 @@ object CredentialStore {
     const val THEGAMESDB_API_KEY = "droidtop_thegamesdb_apikey"
     const val SCREENSCRAPER_USER = "droidtop_screenscraper_ssid"
     const val SCREENSCRAPER_PASSWORD = "droidtop_screenscraper_sspassword"
+    const val RETROACHIEVEMENTS_USER = "droidtop_retroachievements_user"
+    const val RETROACHIEVEMENTS_API_KEY = "droidtop_retroachievements_apikey"
 
     /** Every key the vault holds; also the set a settings backup exports when the person opts in. */
     val KEYS: Set<String> = setOf(
         IGDB_CLIENT_ID, IGDB_CLIENT_SECRET, STEAMGRIDDB_API_KEY,
         THEGAMESDB_API_KEY, SCREENSCRAPER_USER, SCREENSCRAPER_PASSWORD,
+        RETROACHIEVEMENTS_USER, RETROACHIEVEMENTS_API_KEY,
     )
 
     @Volatile private var vault: CredentialVault? = null

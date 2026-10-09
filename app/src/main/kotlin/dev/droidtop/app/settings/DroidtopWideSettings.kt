@@ -45,6 +45,7 @@ object DroidtopWideSettings {
         "droidtop_thegamesdb_apikey",
         "droidtop_igdb_client_id",
         "droidtop_igdb_client_secret",
+        "droidtop_retroachievements_apikey",
     )
 
     private fun isCredentialKey(key: String): Boolean {

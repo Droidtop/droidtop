@@ -85,6 +85,23 @@ enum class ScraperKeyService(
             KeyField("password", "Password", secret = true, storeKey = CredentialStore.SCREENSCRAPER_PASSWORD),
         ),
     ),
+    RETROACHIEVEMENTS(
+        title = "RetroAchievements",
+        url = "https://retroachievements.org/settings",
+        steps = listOf(
+            "Open retroachievements.org",
+            "Sign in to your account",
+            "Open Settings, Keys",
+            "Copy the Web API Key",
+            "Enter it here",
+        ),
+        credit = "Achievements from RetroAchievements.org",
+        gets = "Achievements and progress",
+        fields = listOf(
+            KeyField("username", "Username", secret = false, storeKey = CredentialStore.RETROACHIEVEMENTS_USER),
+            KeyField("api_key", "Web API Key", secret = true, storeKey = CredentialStore.RETROACHIEVEMENTS_API_KEY),
+        ),
+    ),
     ;
 
     /** The stored values, by field id; blank where none is set. */
@@ -190,6 +207,9 @@ object ScraperKeyCheck {
                         userId = values.getValue("username"),
                         userPassword = values.getValue("password"),
                     ),
+                )
+                ScraperKeyService.RETROACHIEVEMENTS -> ScraperKeyState.outcome(
+                    dev.droidtop.library.achievements.RetroAchievementsClient.profile(values.getValue("username"), values.getValue("api_key")),
                 )
             }
         }

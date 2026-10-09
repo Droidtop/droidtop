@@ -64,6 +64,23 @@
         { "label": "Confirm the email", "hint": "ScreenScraper emails a confirmation link; open it in the system browser or on your phone.", "urlMatch": "^https://(www\\.)?screenscraper\\.fr/.*(valid|confirm)" },
         { "label": "Sign in once", "hint": "Check the login works here. Your password is never read from this page.", "urlMatch": "^https://(www\\.)?screenscraper\\.fr/" }
       ]
+    },
+    "RETROACHIEVEMENTS": {
+      "verified": false,
+      "startUrl": "https://retroachievements.org/settings",
+      "hosts": ["retroachievements.org", "www.retroachievements.org"],
+      "steps": [
+        { "label": "Sign in", "hint": "Your own RetroAchievements account. Create a free one on the site if you have none.", "urlMatch": "^https://(www\\.)?retroachievements\\.org/(login|register|forgot)" },
+        { "label": "Open Settings", "hint": "The Settings page has a Keys section.", "urlMatch": "^https://(www\\.)?retroachievements\\.org/settings/?$" },
+        { "label": "Show the Web API Key", "hint": "A 32 character code under Keys. Never the Connect key: droidtop uses the Web API Key to read your progress. droidtop offers to use it when it appears.", "urlMatch": "^https://(www\\.)?retroachievements\\.org/settings" }
+      ],
+      "capture": {
+        "host": "retroachievements.org",
+        "pathMatch": "^/settings/?$",
+        "fields": [
+          { "id": "api_key", "selectors": ["input[readonly]", "code"], "labels": ["web api key"], "pattern": "[A-Za-z0-9]{32}" }
+        ]
+      }
     }
   }
 }

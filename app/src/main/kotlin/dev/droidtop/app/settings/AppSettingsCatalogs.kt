@@ -1371,6 +1371,13 @@ object AppSettingsCatalogs {
                 ),
             ),
             CatalogGroup(
+                id = "accounts_achievements",
+                title = "Achievements",
+                items = listOf(
+                    guidedKeyRow(context, ScraperKeyService.RETROACHIEVEMENTS, "RetroAchievements"),
+                ),
+            ),
+            CatalogGroup(
                 id = "accounts_plugins",
                 title = "Plugins and integrations",
                 items = ElevatedAccessCatalog.rows(context) + listOf(

@@ -98,7 +98,7 @@ class KeyPagesTest {
             .map(::File).firstOrNull { it.isFile }
         assertNotNull("key-pages.json not found from ${File(".").absolutePath}", file)
         val pages = KeyPages.parse(file!!.readText())
-        assertEquals(setOf("IGDB", "STEAMGRIDDB", "THEGAMESDB", "SCREENSCRAPER"), pages.keys)
+        assertEquals(setOf("IGDB", "STEAMGRIDDB", "THEGAMESDB", "SCREENSCRAPER", "RETROACHIEVEMENTS"), pages.keys)
         for ((name, spec) in pages) {
             assertTrue(name, KeyPages.canLoad(spec, spec.startUrl))
             assertTrue(name, spec.steps.size in 3..5)
