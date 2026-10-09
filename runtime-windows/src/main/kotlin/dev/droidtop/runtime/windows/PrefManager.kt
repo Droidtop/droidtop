@@ -128,6 +128,17 @@ object PrefManager {
         get() = runCatching { Json.decodeFromString<Set<String>>(getPref(CUSTOM_GAME_MANUAL_FOLDERS, "[]")) }.getOrDefault(emptySet())
         set(value) = setPref(CUSTOM_GAME_MANUAL_FOLDERS, Json.encodeToString(value))
 
+    /**
+     * Adds [folder] to [customGameManualFolders] and returns once it is written, so the next read sees it (the
+     * setter hands its write to a coroutine and returns before it lands). "Add a game" (docs/SPEC.md 7g).
+     */
+    suspend fun addCustomGameManualFolder(folder: String) {
+        dataStore.edit { pref ->
+            val current = runCatching { Json.decodeFromString<Set<String>>(pref[CUSTOM_GAME_MANUAL_FOLDERS] ?: "[]") }.getOrDefault(emptySet())
+            if (folder !in current) pref[CUSTOM_GAME_MANUAL_FOLDERS] = Json.encodeToString(current + folder)
+        }
+    }
+
 
     /* The Steam sign-in GameNative kept, read once by droidtop's Steam carry-over */
     private val CELL_ID = intPreferencesKey("cell_id")

@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
+import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.LauncherGamesActivity
+import dev.droidtop.app.OpenWithSource
 import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreLinkPrefs
 import dev.droidtop.library.integrations.PluginJobsScreen
@@ -17,6 +19,8 @@ import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.DocumentPickItem
+import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
@@ -31,6 +35,7 @@ import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreSyncs
 import dev.droidtop.library.stores.StoreWeb
 import dev.droidtop.library.userFacingErrorMessage
+import dev.droidtop.runtime.windows.AddGame
 import dev.droidtop.runtime.windows.PcLibrary
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.runtime.windows.displayName
@@ -242,6 +247,19 @@ internal object StoresCatalog {
                 },
             ),
             CatalogGroup(
+                id = "stores_add_group",
+                title = null,
+                items = listOf(
+                    NestedScreenItem(
+                        id = "stores_add_game",
+                        title = "Add a game",
+                        subtitle = "A game already on this device, from its folder or file, or one from a store's pages",
+                        inline = addGameScreen(),
+                        icon = CatalogIcon.GLOBAL,
+                    ),
+                ),
+            ),
+            CatalogGroup(
                 id = "stores_storage_group",
                 title = null,
                 items = listOf(
@@ -288,6 +306,85 @@ internal object StoresCatalog {
                     ),
                 ),
             ).takeIf { anySignedIn },
+        )
+    }
+
+    /** What the last store link typed into "Add a game" was, when it was no store's page; shown until the next. */
+    @Volatile
+    private var linkNote: String? = null
+
+    /**
+     * "Add a game" (docs/SPEC.md 7g, "Adding a game by hand", Droidtop/tracker#407): a game already on the device,
+     * picked with the system's own picker and listed where it is ([AddGame]; nothing is copied or moved), or a game
+     * from a store, through that store's own pages ([StoreWeb]), where getting it makes it a library row.
+     */
+    private fun addGameScreen() = CatalogScreen(
+        id = "stores_add_game_screen",
+        title = "Add a game",
+        subtitle = "Listed where it is; nothing is copied or moved",
+        groups = { context -> addGameGroups(context) },
+        indexGroups = { emptyList() },
+    )
+
+    private suspend fun addGameGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val signedIn = PcStore.entries.filter { it.signedIn(context) && it.own?.webPages != null }
+        listOf(
+            CatalogGroup(
+                id = "stores_add_device",
+                title = "On this device",
+                items = listOf(
+                    FolderPickItem(
+                        id = "stores_add_folder",
+                        title = "A game's folder",
+                        subtitle = "A Windows game, an engine game (Ren'Py, RPG Maker, ...) or an HTML game, in its own folder",
+                        onPicked = { ctx, uri ->
+                            val folder = GamesRootPrefs.resolveStoragePath(uri)
+                                ?: return@FolderPickItem "droidtop cannot reach that folder. Pick a folder on this device's storage"
+                            AddGame.add(ctx, folder)
+                        },
+                    ),
+                    DocumentPickItem(
+                        id = "stores_add_file",
+                        title = "A game's file",
+                        subtitle = "A Windows program (.exe), an HTML game's page or a ROM",
+                        mimeType = "*/*",
+                        onPicked = { ctx, uri ->
+                            val file = OpenWithSource.resolve(ctx, uri)
+                                ?: return@DocumentPickItem "droidtop cannot reach that file. Pick a file on this device's storage"
+                            AddGame.add(ctx, file)
+                        },
+                    ),
+                ),
+            ),
+            CatalogGroup(
+                id = "stores_add_store",
+                title = "From a store",
+                items = listOf(
+                    TextInputItem(
+                        id = "stores_add_link",
+                        title = "A store page's address",
+                        subtitle = linkNote ?: "Opens the page in that store's own view, where you can get the game",
+                        value = "",
+                        onChange = { ctx, text ->
+                            val link = text.trim()
+                            linkNote = when {
+                                link.isEmpty() -> null
+                                StoreWeb.openLink(ctx, link) -> null
+                                else -> "That is not a page of ${PcStore.entries.joinToString(", ") { it.label }}"
+                            }
+                        },
+                    ),
+                ) + signedIn.mapNotNull { store ->
+                    val own = store.own ?: return@mapNotNull null
+                    TextInputItem(
+                        id = "stores_add_find_${store.key}",
+                        title = "Find on ${store.label}",
+                        subtitle = "Opens ${store.label}'s search for what you type",
+                        value = "",
+                        onChange = { ctx, text -> StoreWeb.search(ctx, own, text) },
+                    )
+                },
+            ),
         )
     }
 

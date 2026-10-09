@@ -9559,6 +9559,41 @@ native, Python and Flutter plugins alike, being a host call. The reply is
 `{accepted: true}`: the report is taken and indexed off the plugin's thread,
 and a plugin never learns what the library holds.
 
+### Adding a game by hand (owner, 2026-10-09, Droidtop/tracker#407)
+
+The owner: "We also need to be able to add games to library". The Stores
+place opens with **Add a game** (`StoresCatalog`), one screen with two
+ways in, and nothing is ever copied, moved or written into the person's
+files: droidtop records where the game is.
+
+- **On this device**: "A game's folder" (the system's folder picker) and
+  "A game's file" (the system's file picker: a `.exe` or `.bat`, an
+  HTML game's `.html` page, or a ROM). `AddGame` decides what it is
+  (`AddGame.kindOf`): a folder, a Windows program, a web page, a ROM of a
+  system droidtop knows by its extension, or nothing it knows, which it says.
+  Inside one of the person's game folders the path is indexed where it is
+  (targeted indexing above, `LibraryPaths`): the PC folder rule decides which
+  folder is the game, and a ROM is indexed by the ROM walk's own rules for
+  the system folder it sits in (a ROM in no system's folder is refused with
+  the reason). Outside the game folders a game's folder (the folder picked,
+  or the folder of the program or page picked) joins the folder scanner's
+  hand-given folders (`PrefManager.customGameManualFolders`, written before
+  the answer returns), which the store part of the PC library already lists
+  as folder games; the store part is read again and the folder reported
+  after it (`StoreChanges.announce(also = ...)`), so engine detection, which
+  looks inside the PC library's known installs, finds a Ren'Py, RPG Maker or
+  HTML game there as it would in a game folder. A picked program becomes the
+  program the game runs (`WindowsPrograms.choose`). A whole drive, or a
+  folder that holds a game folder, is refused (`AddGame.refusalFor`): it would
+  be every game under it as one. **A ROM outside every game folder is not
+  listed**: ROMs are read from the system folders of game folders, so the
+  answer says to add the folder that holds it under Game folders.
+- **From a store**: "A store page's address" opens the page in that store's
+  own view ("A store's own pages" in Stores, above), and "Find on <store>"
+  opens each signed-in store's search for what the person types. Getting the
+  game there (buying, claiming) is what makes it a library row: the store is
+  synced and the new game is named.
+
 ### Where an update comes from (2026-09-25)
 
 `GameVersion.latestKnown` / "an update is available" (7m) comes, for a

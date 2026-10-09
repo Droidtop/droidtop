@@ -405,7 +405,7 @@ object StoreLibraries {
 object StoreChanges {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    fun announce(context: Context) {
+    fun announce(context: Context, also: List<String> = emptyList()) {
         val app = context.applicationContext
         scope.launch {
             val store = StoreLibraries.all().firstOrNull()
@@ -413,7 +413,9 @@ object StoreChanges {
             if (store == null || gamesFolder == null) {
                 LibraryRescan.requestInBackground(app)
             } else {
-                LibraryPaths.report(app, PathChange(changed = listOf(StoreInstallJob.rootFor(gamesFolder.path, store).path)))
+                // [also]: paths to index once the store part is read again (a folder "Add a game" gave the folder
+                // scanner, which engine detection then finds among the store part's installs), in this order.
+                LibraryPaths.report(app, PathChange(changed = listOf(StoreInstallJob.rootFor(gamesFolder.path, store).path) + also))
             }
         }
     }
