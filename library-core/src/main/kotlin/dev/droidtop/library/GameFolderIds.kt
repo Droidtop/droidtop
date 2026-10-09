@@ -21,6 +21,13 @@ import java.security.MessageDigest
  *     ([fingerprint]: the relative paths and sizes of its files, which
  *     survives a move across volumes). That is a renamed or moved game
  *     and keeps its id, so its playtime, scraped art and settings stay;
+ *     or, failing both, which sits in the same parent folder under the same
+ *     title once the version is taken off its name ([titleKey]): a game
+ *     whose `MyGame-v0.5` folder was replaced by `MyGame-v0.6` is the same
+ *     game at a new version (docs/SPEC.md 7g, "A folder game keeps its
+ *     identity across a version bump", Droidtop/tracker#397 slice E). Only a
+ *     folder that VANISHED is matched, so two version folders side by side
+ *     stay two games;
  *  3. a `.gamenative` file left by an earlier build or by gamenative-tux
  *     itself, READ through [legacyRead] only: it is adopted into this
  *     store and never written back or deleted.
@@ -78,8 +85,11 @@ class GameFolderIds(
         if (orphans.isEmpty()) return null
         val here = stat(folder)
         if (here != null) orphans.firstOrNull { it.stat == here }?.let { return it }
-        val shape = fingerprint(folder) ?: return null
-        return orphans.firstOrNull { it.fingerprint == shape }
+        val shape = fingerprint(folder)
+        if (shape != null) orphans.firstOrNull { it.fingerprint == shape }?.let { return it }
+        val title = titleKey(folder.name) ?: return null
+        val parent = folder.absoluteFile.parent ?: return null
+        return orphans.singleOrNull { File(it.path).parent == parent && titleKey(File(it.path).name) == title }
     }
 
     private fun record(id: Int, folder: File) =
@@ -115,6 +125,14 @@ class GameFolderIds(
     }
 
     companion object {
+        /**
+         * A folder name's title with its version taken off, by the one parse a
+         * folder game's Version comes from ([GameTitleParser]), compared
+         * without case or punctuation; null when nothing of a title is left.
+         */
+        fun titleKey(name: String): String? =
+            GameTitleParser.parseName(name).title.lowercase().filter { it.isLetterOrDigit() }.ifEmpty { null }
+
         private const val MAX_FILES = 200
         private const val MAX_DEPTH = 3
         private val TAB = Char(9).toString()

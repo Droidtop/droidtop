@@ -87,6 +87,31 @@ class SettingsCatalogInitProvider : ContentProvider() {
             val seconds = (android.os.SystemClock.elapsedRealtime() - started + 500) / 1000
             "Rescan finished in $seconds s: $games game folders and store entries, $apps apps."
         }
+        // "Rescan PC game folders" (docs/SPEC.md 7j "Places", Droidtop/tracker#397 slice E): the PC and engine
+        // walks only, never the ROM walk, and the answer says how many games it found that were not listed.
+        dev.droidtop.library.settings.LibraryRescan.pcFoldersHandler = { ctx, onStatus ->
+            onStatus("Looking at your PC game folders\u2026")
+            val started = android.os.SystemClock.elapsedRealtime()
+            val library = dev.droidtop.app.LibraryCore.library(ctx)
+            val kinds = dev.droidtop.library.LibraryKinds.PC_GAMES
+            val before = library.entryIdsOf(kinds)
+            kotlinx.coroutines.coroutineScope {
+                val progress = launch {
+                    dev.droidtop.library.ScanActivity.state.collect { running ->
+                        dev.droidtop.library.ScanActivity.describe(running)
+                            ?.let { onStatus("$it. Select again to cancel.") }
+                    }
+                }
+                try {
+                    library.rescanNow(kinds)
+                } finally {
+                    progress.cancel()
+                }
+            }
+            val added = (library.entryIdsOf(kinds) - before).size
+            val seconds = (android.os.SystemClock.elapsedRealtime() - started + 500) / 1000
+            "Rescan of PC game folders finished in $seconds s: " + if (added == 0) "nothing new." else "$added new."
+        }
         // "These files changed" (docs/SPEC.md 7g, "Targeted indexing"): a finished download, a store install or
         // removal and a plugin's `library.files` report all end here, and the library looks at exactly those paths.
         // Reports left by a process that ended before it indexed them, or made before this ran, are indexed now.

@@ -147,21 +147,29 @@ class PcPageAboutTest {
     }
 
     @Test
-    fun theSourceRowsLiveUnderVersionsAndCheckNowNeedsALink() {
+    fun theSourceRowsLiveUnderVersionsAndOpenSourcePageNeedsAKnownPage() {
         val source = UpdateSources.Source("forum", "Forum thread", null)
-        assertEquals(PageTab.VERSIONS, pageTabOf(CHECK_ROW))
-        val unlinked = sourceRows(listOf(source), null, emptyMap(), {}, { _, _ -> })
+        assertEquals(PageTab.VERSIONS, pageTabOf(OPEN_SOURCE_ROW))
+        val unlinked = sourceRows(listOf(source), null, {}, {})
         assertEquals(listOf("Forum thread"), unlinked.map { it.title })
         assertEquals(PageTab.VERSIONS, unlinked[0].tab)
         assertEquals("Link", unlinked[0].value)
-        val links = GameLinks(sources = listOf(SourceLink("forum", "123")))
-        val linked = sourceRows(listOf(source), links, mapOf("forum" to "Up to date"), {}, { _, _ -> })
-        assertEquals(listOf("Forum thread", CHECK_ROW), linked.map { it.title })
+        // Linked, but no page known yet: nothing to open.
+        val noPage = GameLinks(sources = listOf(SourceLink("forum", "123")))
+        assertEquals(listOf("Forum thread"), sourceRows(listOf(source), noPage, {}, {}).map { it.title })
+        val url = "https://www.example.org/threads/game.123/"
+        val links = GameLinks(sources = listOf(SourceLink("forum", "123", SourceAnswer("1.0", 0L, false, url))))
+        var opened: String? = null
+        val linked = sourceRows(listOf(source), links, {}, { opened = it })
+        assertEquals(listOf("Forum thread", OPEN_SOURCE_ROW), linked.map { it.title })
         assertEquals("#123", linked[0].value)
-        assertEquals("Up to date", linked[1].value)
-        assertEquals("Check now", sourceRows(listOf(source), links, emptyMap(), {}, { _, _ -> })[1].value)
+        // Only the host is shown; the whole link is the tip and what opens.
+        assertEquals("example.org", linked[1].value)
+        assertEquals(url, linked[1].tip)
+        linked[1].onActivate?.invoke()
+        assertEquals(url, opened)
         // No source installed: no rows, nothing to link to.
-        assertEquals(emptyList<PageFact>(), sourceRows(emptyList(), links, emptyMap(), {}, { _, _ -> }))
+        assertEquals(emptyList<PageFact>(), sourceRows(emptyList(), links, {}, {}))
     }
 
     @Test

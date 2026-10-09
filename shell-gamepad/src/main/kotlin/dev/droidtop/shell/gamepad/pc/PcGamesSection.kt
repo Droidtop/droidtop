@@ -65,6 +65,7 @@ import dev.droidtop.shell.gamepad.ViewStrip
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.gridPadTarget
+import dev.droidtop.shell.gamepad.focusRing
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.declaresHints
@@ -134,6 +135,14 @@ internal class PcGamesState {
     val shelfItems = mutableStateMapOf<String, Int>()
 
     /**
+     * The cursor is on the shelf's heading, not a capsule: Left from a
+     * shelf's first capsule reaches a heading that opens something (Update
+     * available's opens the Updates tab), so the pad reaches what a tap on
+     * the heading does. Any other move leaves it.
+     */
+    var headingFocused by mutableStateOf(false)
+
+    /**
      * The cursor is on Home's destination row (Retro Games, PC Games) under
      * the shelves, and which of its tiles. Home only; the row is the last
      * stop of Home's one list, so Down from the last shelf reaches it and
@@ -198,8 +207,24 @@ internal class PcGamesState {
      * docs/SPEC.md 7j "Places"): the Source facet selected on the store's id,
      * nothing else. Marks the query loaded so the saved query is not read over it.
      */
-    fun showSource(id: String) {
-        query = LibraryQuery().withToggled(LibraryFacet.SOURCE, id, true)
+    fun showSource(id: String, holding: dev.droidtop.library.stores.StoreHolding? = null) {
+        val bySource = LibraryQuery().withToggled(LibraryFacet.SOURCE, id, true)
+        // A store page's holding row ("Shared with you · 573") adds its Ownership value; the pill says both.
+        showQuery(if (holding == null) bySource else bySource.withToggled(LibraryFacet.OWNERSHIP, holding.name, true))
+    }
+
+    /** Every game that came through another launcher: Game sources' "Imported" row. */
+    fun showImported() {
+        showQuery(
+            dev.droidtop.library.PcLaunchers.all.fold(LibraryQuery()) { query, launcher ->
+                query.withToggled(LibraryFacet.IMPORTED_FROM, launcher.id, true)
+            },
+        )
+    }
+
+    /** The grid over [filtered], opened from outside the tab (Game sources); B returns to where the person came from. */
+    private fun showQuery(filtered: LibraryQuery) {
+        query = filtered
         queryLoaded = true
         view = PcView.GRID
         stripFocused = false
@@ -647,6 +672,9 @@ internal fun PcGamesSection(
         if (state.view != PcView.GRID || activeChip >= 0) return@remember null
         state.query.pillText(scope, grid.size, state.query.totalIn(games.orEmpty(), scope))
     }
+    // A shelf heading that opens something: Update available's, on Overview. The pad reaches it with Left.
+    fun headingOpens(shelf: PcShelf): Boolean = shelf.id == SHELF_UPDATES && !state.home
+
     // Update available's heading opens the Updates tab (the view everyone was given), else the same filter.
     fun openUpdates() {
         val updates = savedViews.views.firstOrNull { it.id == LibraryViewPrefs.UPDATES_VIEW_ID }?.query
@@ -654,6 +682,11 @@ internal fun PcGamesSection(
         state.stripFocused = false
         state.showGrid(updates)
         state.stripIndex = tabs.indexOfFirst { it is PcTab.Grid && it.view.query == updates }.coerceAtLeast(0)
+    }
+
+    fun openShelf(shelf: PcShelf) {
+        state.headingFocused = false
+        if (headingOpens(shelf)) openUpdates()
     }
 
     // Which level B leaves (docs/SPEC.md 6e: B always goes back one level).
@@ -707,7 +740,7 @@ internal fun PcGamesSection(
     // Sort By (docs/SPEC.md 7j), Select the focused game's menu: only what
     // dispatches, re-read as the cursor moves.
     val verb = focusedPlay?.first?.verb
-    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view, onDest, onFreeRow, focusedTile) {
+    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view, onDest, onFreeRow, focusedTile, state.headingFocused) {
         // Steam's order: the list's own actions, then A and B. Start (Menu)
         // is the shell's, drawn at the row's left; L1/R1 are the glyphs at
         // the strip's ends, not hints.
@@ -715,7 +748,7 @@ internal fun PcGamesSection(
             HintBinding(GamepadAction.X, "Filter"),
             HintBinding(GamepadAction.Y, "Sort By"),
             HintBinding(GamepadAction.SELECT, "Options"),
-            HintBinding(GamepadAction.A, if (onDest || focusedTile != null) "Open" else if (state.stripFocused || onFreeRow) "Select" else verb ?: "Play") {
+            HintBinding(GamepadAction.A, if (onDest || focusedTile != null || (state.onShelves && state.headingFocused)) "Open" else if (state.stripFocused || onFreeRow) "Select" else verb ?: "Play") {
                 onDest || state.stripFocused || onFreeRow || focusedTile != null || focusedEntry != null
             },
             HintBinding(GamepadAction.B, "Back") { state.view != PcView.HOME },
@@ -758,6 +791,7 @@ internal fun PcGamesSection(
     }
 
     fun moveTo(shelf: Int, item: Int) {
+        state.headingFocused = false
         if (shelf != state.shelfIndex || item != state.itemIndex) EsDeNavigationSounds.play(UiSound.MOVE)
         currentShelf?.let { state.shelfItems[it.id] = state.itemIndex }
         state.shelfIndex = shelf
@@ -776,6 +810,7 @@ internal fun PcGamesSection(
                 .focusable()
                 .onPad { press ->
                     heldStep = press.repeat
+                    if (press.action == GamepadAction.UP || press.action == GamepadAction.DOWN) state.headingFocused = false
                     when (press.action) {
                         GamepadAction.UP -> when {
                             // Back from Home's destination row to the last shelf.
@@ -830,7 +865,17 @@ internal fun PcGamesSection(
                                     if (next != state.stripIndex) EsDeNavigationSounds.play(UiSound.MOVE)
                                     state.stripIndex = next
                                 }
-                                state.onShelves -> moveTo(state.shelfIndex, menuStep(state.itemIndex, currentList.size, step))
+                                state.onShelves -> when {
+                                    state.headingFocused -> if (step > 0) {
+                                        EsDeNavigationSounds.play(UiSound.MOVE)
+                                        state.headingFocused = false
+                                    }
+                                    step < 0 && state.itemIndex == 0 && currentShelf?.let(::headingOpens) == true -> {
+                                        EsDeNavigationSounds.play(UiSound.MOVE)
+                                        state.headingFocused = true
+                                    }
+                                    else -> moveTo(state.shelfIndex, menuStep(state.itemIndex, currentList.size, step))
+                                }
                                 onTiles -> tileStep(tileRowList, state.itemIndex, press.action)?.let { moveTo(state.shelfIndex, it) }
                                 onFreeRow -> Unit
                                 else -> gridPadTarget(
@@ -840,7 +885,8 @@ internal fun PcGamesSection(
                             }
                         }
                         GamepadAction.A -> {
-                            if (onDest) HOME_DESTINATIONS.getOrNull(state.destIndex)?.let { onOpenSection(it.section) }
+                            if (state.onShelves && state.headingFocused) currentShelf?.let(::openShelf)
+                            else if (onDest) HOME_DESTINATIONS.getOrNull(state.destIndex)?.let { onOpenSection(it.section) }
                             else if (state.stripFocused) activateChip(state.stripIndex)
                             else if (onFreeRow) toggleFree()
                             else if (focusedTile != null) state.showGrid(focusedTile.query)
@@ -920,7 +966,7 @@ internal fun PcGamesSection(
                     partsOf = ::partsOf,
                     systemNames = systemNames,
                     mixed = state.home,
-                    onOpenShelf = { shelf -> if (shelf.id == SHELF_UPDATES && !state.home) openUpdates() },
+                    onOpenShelf = ::openShelf,
                 )
                 else -> {
                     if (grid.isEmpty() && !hasFreeRow) {
@@ -1363,6 +1409,7 @@ private fun PcShelvesHome(
                             end = window.edgePadding,
                             bottom = Space.Sm,
                         )
+                        .focusRing(onThisShelf && state.headingFocused, dev.droidtop.shell.gamepad.Corners.Crisp)
                         .clickable { onOpenShelf(shelf) },
                 )
                 LazyRow(
@@ -1377,7 +1424,7 @@ private fun PcShelvesHome(
                         val hero = isHeroCard(shelfIndex, itemIndex)
                         PcCapsule(
                             entry = entry,
-                            selected = onThisShelf && state.itemIndex == itemIndex,
+                            selected = onThisShelf && !state.headingFocused && state.itemIndex == itemIndex,
                             width = if (hero) heroCardWidth else width,
                             onTap = { onTapCapsule(shelfIndex, itemIndex, entry) },
                             onLongPress = { onLongPressCapsule(entry) },

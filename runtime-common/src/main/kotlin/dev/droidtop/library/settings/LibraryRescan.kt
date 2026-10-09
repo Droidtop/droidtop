@@ -28,10 +28,19 @@ import kotlinx.coroutines.isActive
  * calls it when it is selected again while the rescan runs, so a walk over
  * a slow card is never something a person has to sit out
  * (Droidtop/tracker#275).
+ *
+ * "Rescan PC game folders" ([runPcFolders], Droidtop/tracker#397 slice E) is
+ * the same action over the PC walks only (PC and engine games, never the ROM
+ * walk): Game sources > Folders and PC Games' list options offer it. One
+ * rescan runs at a time, whichever it is, and either row cancels it.
  */
 object LibraryRescan {
     @Volatile
     var handler: (suspend (Context, (String) -> Unit) -> String)? = null
+
+    /** The PC-only walk, registered by `:app` beside [handler]; its answer says how many games are new. */
+    @Volatile
+    var pcFoldersHandler: (suspend (Context, (String) -> Unit) -> String)? = null
 
     private val active = AtomicReference<Deferred<String>?>(null)
 
@@ -59,7 +68,16 @@ object LibraryRescan {
         detached.launch { runCatching { run(app) {} } }
     }
 
-    suspend fun run(context: Context, onStatus: (String) -> Unit): String {
+    suspend fun run(context: Context, onStatus: (String) -> Unit): String = runWith(handler, context, onStatus)
+
+    /** Walks the PC game folders only (and reads the stores' rows again), never a ROM folder. */
+    suspend fun runPcFolders(context: Context, onStatus: (String) -> Unit): String = runWith(pcFoldersHandler, context, onStatus)
+
+    private suspend fun runWith(
+        handler: (suspend (Context, (String) -> Unit) -> String)?,
+        context: Context,
+        onStatus: (String) -> Unit,
+    ): String {
         val rescan = handler ?: return "The library cannot be rescanned from here."
         return coroutineScope {
             val answer = async { rescan(context, onStatus) }

@@ -52,6 +52,34 @@ object GamesRoots {
 
     private const val KEY_SCANNED_ROOTS = "droidtop_games_roots_last_scanned"
 
+    private const val PC_SCANS_PREFS = "droidtop_pc_root_scans"
+
+    /**
+     * When the PC walk last finished each of [roots] (Game sources > Folders,
+     * docs/SPEC.md 7j "Places"): written by the walk itself for every root it
+     * walked to the end, never for one it skipped or was cancelled in. A
+     * preferences write: off the main thread, as the walk is.
+     */
+    fun markPcScanned(context: Context, roots: Collection<String>, now: Long = System.currentTimeMillis()) {
+        if (roots.isEmpty()) return
+        val edit = context.getSharedPreferences(PC_SCANS_PREFS, Context.MODE_PRIVATE).edit()
+        roots.forEach { edit.putLong(it, now) }
+        edit.apply()
+    }
+
+    /** Each root's last finished PC walk ([markPcScanned]), by path; a root never walked is absent. */
+    fun pcScannedAt(context: Context): Map<String, Long> =
+        context.getSharedPreferences(PC_SCANS_PREFS, Context.MODE_PRIVATE).all
+            .mapNotNull { (path, value) -> (value as? Long)?.let { path to it } }.toMap()
+
+    /**
+     * Whether [root] can be read now: it is a folder and lists. An SD card
+     * that is not in reads as not available, and its games are kept, not
+     * marked gone ("An unmounted root is skipped by every walk, never
+     * emptied", docs/SPEC.md 7g). One `stat` and one listing: off the main thread.
+     */
+    fun isAvailable(root: File): Boolean = root.isDirectory && root.list() != null
+
     /**
      * Whether the set of roots has changed since the last scan that was
      * told about it -- in which case an ordinary scan has to re-walk

@@ -1302,13 +1302,23 @@ private fun GamepadShellBody(
                         // something here too, for the reason Settings' is.
                         shownSection.placeScreenId != null -> {
                             canGoBack = true
-                            // Every registered store's Open library, built in or plugged in.
+                            // Every registered store's Open library and holding rows, built in or plugged in,
+                            // and Game sources' Wine shortcuts and Imported rows: PC Games, filtered.
                             val storeLibraries = remember {
-                                dev.droidtop.library.stores.StoreLibraries.all().associate { store ->
-                                    "${PcSource.LIBRARY_ITEM_PREFIX}${store.id}" to {
-                                        pcGames.showSource(store.id)
-                                        nav.openSection(GamingSection.PC_GAMES)
+                                fun openGames(show: () -> Unit): () -> Unit = {
+                                    show()
+                                    nav.openSection(GamingSection.PC_GAMES)
+                                }
+                                buildMap<String, () -> Unit> {
+                                    for (store in dev.droidtop.library.stores.StoreLibraries.all()) {
+                                        put("${PcSource.LIBRARY_ITEM_PREFIX}${store.id}", openGames { pcGames.showSource(store.id) })
+                                        for (holding in dev.droidtop.library.stores.StoreHolding.entries) {
+                                            put(PcSource.holdingItemId(store.id, holding), openGames { pcGames.showSource(store.id, holding) })
+                                        }
                                     }
+                                    val wine = PcSource.WineShortcut.id
+                                    put("${PcSource.LIBRARY_ITEM_PREFIX}$wine", openGames { pcGames.showSource(wine) })
+                                    put(PcSource.IMPORTED_ITEM_ID, openGames { pcGames.showImported() })
                                 }
                             }
                             PlaceCatalogView(

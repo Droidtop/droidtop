@@ -159,6 +159,16 @@ internal fun countsLine(counts: StoreCounts, signedIn: Boolean): String = when {
     else -> "Sign in to read this store's library"
 }
 
+/** "1,193 games", grouped the way a person reads a big number. */
+internal fun gamesWord(count: Int): String = "%,d %s".format(count, if (count == 1) "game" else "games")
+
+/** A store's row in Game sources: "Signed in · 1,193 games", or "Not signed in". */
+internal fun sourceValue(signedIn: Boolean, games: Int): String = when {
+    !signedIn -> "Not signed in"
+    games > 0 -> "Signed in \u00b7 ${gamesWord(games)}"
+    else -> "Signed in"
+}
+
 /** "Synced 5 min ago": when the library was last read, in the coarsest unit that is honest. */
 internal fun syncedAgo(nowMs: Long, thenMs: Long?): String {
     if (thenMs == null) return "Not synced yet"
@@ -192,8 +202,8 @@ internal object StoresCatalog {
 
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
-        title = "Stores",
-        subtitle = "Each store: who is signed in, its library, and syncing it",
+        title = "Game sources",
+        subtitle = "Where your games come from: stores, your game folders and imports",
         groups = { context -> rootGroups(context) },
         live = storeJobChanges,
     )
@@ -221,28 +231,63 @@ internal object StoresCatalog {
         val signedInByStore = PcStore.entries.associateWith { it.signedIn(context) }
         val installing = PcStore.entries.sumOf { store -> storeJobs(store).count { !it.paused } }
         val anySignedIn = signedInByStore.values.any { it }
+        val storeGames = runCatching { PcLibrary.storeGames(context) }.getOrDefault(emptyList())
+        val folders = FoldersCatalog.counts(context)
+        val imported = runCatching { dev.droidtop.library.PcLaunchers.viaByEntry(context) }.getOrDefault(emptyMap())
+        fun storeRow(store: PcStore): CatalogItem {
+            val signedIn = signedInByStore[store] == true
+            val games = storeCounts(storeGames, store.key).total
+            return NestedScreenItem(
+                id = "store_${store.key}",
+                title = store.label,
+                // How to sign in is only worth saying while the person is not signed in; the value column
+                // already says "Signed in" (Droidtop/tracker#367).
+                subtitle = if (signedIn) null else store.signInNote,
+                inline = storePage(store),
+                valueLabel = { sourceValue(signedIn, games) },
+                icon = CatalogIcon.GLOBAL,
+                progress = busyProgress(storeJobs(store)),
+            )
+        }
+        val (signedInStores, signedOutStores) = PcStore.entries.partition { signedInByStore[it] == true }
         listOfNotNull(
             CatalogGroup(
                 id = "stores_list",
                 title = null,
                 // The page's facts at a glance (DroidDeck's store header chips).
                 chips = listOfNotNull(
-                    signedInByStore.values.count { it }.let { n -> CatalogChip("$n of ${PcStore.entries.size} signed in", ok = n > 0) },
+                    signedInByStore.values.count { it }.let { n -> CatalogChip("$n of ${PcStore.entries.size} stores signed in", ok = n > 0) },
                     CatalogChip("$installing downloading").takeIf { installing > 0 },
                 ),
-                items = PcStore.entries.map { store ->
-                    val signedIn = signedInByStore[store] == true
-                    NestedScreenItem(
-                        id = "store_${store.key}",
-                        title = store.label,
-                        // How to sign in is only worth saying while the person is not signed in; the value column
-                        // already says "Signed in" (Droidtop/tracker#367).
-                        subtitle = if (signedIn) null else store.signInNote,
-                        inline = storePage(store),
-                        valueLabel = { if (signedIn) "Signed in" else "Not signed in" },
-                        icon = CatalogIcon.GLOBAL,
-                        progress = busyProgress(storeJobs(store)),
+                // Signed-in stores first, then the person's game folders, then the stores to sign in to,
+                // then imports once a game came through a launcher (docs/SPEC.md 7j "Places", Droidtop/tracker#397 slice E).
+                items = buildList<CatalogItem> {
+                    signedInStores.forEach { add(storeRow(it)) }
+                    add(
+                        NestedScreenItem(
+                            id = "game_sources_folders",
+                            title = "Folders",
+                            subtitle = "The game folders droidtop looks in for PC and engine games",
+                            inline = FoldersCatalog.screen(),
+                            valueLabel = { FoldersCatalog.summary(folders) },
+                            icon = CatalogIcon.GAME_FOLDERS,
+                        ),
                     )
+                    signedOutStores.forEach { add(storeRow(it)) }
+                    if (imported.isNotEmpty()) {
+                        add(
+                            ActionItem(
+                                id = PcSource.IMPORTED_ITEM_ID,
+                                title = "Imported",
+                                subtitle = "Games added through another launcher (" +
+                                    imported.values.distinct().joinToString(", ") { dev.droidtop.library.PcLaunchers.label(it) } +
+                                    "). Opens them in PC Games",
+                                value = gamesWord(imported.size),
+                                icon = CatalogIcon.GLOBAL,
+                                run = ::openGames,
+                            ),
+                        )
+                    }
                 },
             ),
             CatalogGroup(
@@ -387,6 +432,15 @@ internal object StoresCatalog {
         )
     }
 
+    /** Outside the Gaming shell, which opens PC Games filtered by the row's id, a library row opens the games screen. */
+    private fun openGames(context: Context) {
+        context.startActivity(
+            Intent(context, LauncherGamesActivity::class.java)
+                .setAction(LauncherGamesActivity.ACTION_SHOW_GAMES)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
     private fun storePage(store: PcStore) = CatalogScreen(
         id = "store_page_${store.key}",
         title = store.label,
@@ -462,22 +516,23 @@ internal object StoresCatalog {
             if (counts.family > 0) {
                 add(
                     ActionItem(
-                        id = "store_${store.key}_family",
+                        // The Gaming shell opens PC Games on this store's shared games (PcSource.HOLDING_ITEM_PREFIX).
+                        id = PcSource.holdingItemId(store.key, StoreHolding.FAMILY),
                         title = StoreHolding.FAMILY.label,
                         subtitle = "Games another account lends you. PC Games lists them unless List options says otherwise",
                         value = "${counts.family} ${if (counts.family == 1) "game" else "games"}",
-                        run = {},
+                        run = ::openGames,
                     ),
                 )
             }
             if (counts.free > 0) {
                 add(
                     ActionItem(
-                        id = "store_${store.key}_free",
+                        id = PcSource.holdingItemId(store.key, StoreHolding.FREE),
                         title = StoreHolding.FREE.label,
                         subtitle = "Free games the account holds but never added. PC Games shows them once played or installed, or from List options",
                         value = "${counts.free} ${if (counts.free == 1) "game" else "games"}",
-                        run = {},
+                        run = ::openGames,
                     ),
                 )
             }
@@ -489,13 +544,7 @@ internal object StoresCatalog {
                         id = "${PcSource.LIBRARY_ITEM_PREFIX}${store.key}",
                         title = "Open library",
                         subtitle = "Shows only ${store.label} games in PC Games",
-                        run = { ctx ->
-                            ctx.startActivity(
-                                Intent(ctx, LauncherGamesActivity::class.java)
-                                    .setAction(LauncherGamesActivity.ACTION_SHOW_GAMES)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        },
+                        run = ::openGames,
                     ),
                 )
             }

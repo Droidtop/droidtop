@@ -29,6 +29,7 @@ import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
 import dev.droidtop.library.integrations.GetGamesContext
 import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
@@ -186,6 +187,8 @@ internal fun GamelistOptionsMenu(
             // is -- not a collection that merely happens to contain a PC
             // entry, which is not where a game folder belongs.
             if (systemId == PC_SYSTEM_ID) add(PC_SETUP)
+            // The PC walks only, the same action as Game sources > Folders' row (LibraryRescan).
+            if (systemId == PC_SYSTEM_ID) add(GamingSettingsCatalog.RESCAN_PC_FOLDERS)
             listOptions.forEach { add(it.first) }
         }
         add("Close")
@@ -233,6 +236,19 @@ internal fun GamelistOptionsMenu(
                 scope.launch {
                     status = withContext(Dispatchers.IO) {
                         dev.droidtop.library.settings.LibraryRescan.run(context) { status = it }
+                    }
+                    busy = false
+                }
+            }
+            GamingSettingsCatalog.RESCAN_PC_FOLDERS -> {
+                if (busy) {
+                    dev.droidtop.library.settings.LibraryRescan.cancel()
+                    return
+                }
+                busy = true
+                scope.launch {
+                    status = withContext(Dispatchers.IO) {
+                        dev.droidtop.library.settings.LibraryRescan.runPcFolders(context) { status = it }
                     }
                     busy = false
                 }

@@ -356,6 +356,13 @@ data class PcInfo(
      * [StoreIdentity.group] reads. Empty when the store names none.
      */
     val externalIds: Map<String, String> = emptyMap(),
+    /**
+     * The store marker the PC folder scan found in a folder game's folder
+     * (docs/SPEC.md 7g, "Store markers"): a game GOG's offline installer or
+     * Heroic put there reads as that store's game ([PcSource.of]). Null for a
+     * store's own row and for a folder with no marker.
+     */
+    val marker: StoreMarker? = null,
 )
 
 /**
@@ -579,6 +586,13 @@ object LibraryKinds {
      * instead of nowhere.
      */
     val GAMES: Set<LibraryEntryKind> = LibraryEntryKind.entries.toSet() - APPS
+
+    /**
+     * What "Rescan PC game folders" walks (docs/SPEC.md 7j "Places",
+     * Droidtop/tracker#397 slice E): every game that is not a console ROM,
+     * so the PC and engine walks run and the ROM walk does not.
+     */
+    val PC_GAMES: Set<LibraryEntryKind> = GAMES - LibraryEntryKind.CONSOLE_ROM
 }
 
 /**
@@ -1022,8 +1036,25 @@ class Library(
             walk?.cancel()
             throw cancelled
         }
+        // A walk of some kinds (the PC folders alone) changed slices every
+        // other list is built from too: those lists show it now.
+        republish()
         return stateFor(key).value?.size ?: 0
     }
+
+    /**
+     * The entries [kinds]' providers hold now, read from their slices (from
+     * the index the first time), without the person's facts laid over them:
+     * what Game sources counts, and what a rescan compares before and after.
+     * Disk work the first time; off the main thread.
+     */
+    suspend fun currentEntriesOf(kinds: Set<LibraryEntryKind>): List<LibraryEntry> = withContext(Dispatchers.IO) {
+        providers.filter { provider -> provider.kinds.any { it in kinds } }
+            .flatMap { provider -> lockOf(provider).withLock { currentSlice(provider) }?.entries().orEmpty() }
+    }
+
+    /** The ids of [currentEntriesOf]: what a rescan compares before and after to say how many games are new. */
+    suspend fun entryIdsOf(kinds: Set<LibraryEntryKind>): Set<String> = currentEntriesOf(kinds).mapTo(HashSet()) { it.id }
 
     /** What [indexPaths] did, for the log line and the tests. */
     data class PathIndexed(val reindexed: Int, val dropped: Int, val partsChanged: Int)

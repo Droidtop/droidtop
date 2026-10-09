@@ -13,6 +13,7 @@ import dev.droidtop.library.ScanBudget
 import dev.droidtop.library.ScanLog
 import dev.droidtop.library.ScanSkips
 import dev.droidtop.library.StoreInstall
+import dev.droidtop.library.StoreMarker
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLibraries
@@ -68,6 +69,8 @@ object PcLibrary {
         val externalIds: Map<String, String> = emptyMap(),
         /** How the account holds it ([StoreGame.holding]); folders are always owned. */
         val holding: dev.droidtop.library.stores.StoreHolding = dev.droidtop.library.stores.StoreHolding.OWNED,
+        /** A folder game's store marker ([PcInfo.marker]), read by the folder scan; null for a store row. */
+        val marker: StoreMarker? = null,
     ) {
         val installDir: File? get() = installPath?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { it.isDirectory }
     }
@@ -211,6 +214,7 @@ object PcLibrary {
         val rootPaths = roots.map { it.absolutePath }
         try {
             var found: List<ScannedFolder> = emptyList()
+            var walkedOk = false
             if (roots.isNotEmpty()) {
                 try {
                     // A store installs into the person's game folders
@@ -223,6 +227,7 @@ object PcLibrary {
                         if (storeOwned.isEmpty()) group else group.copy(gameFolders = group.gameFolders.filterNot { it.isUnder(storeOwned) })
                     }
                     adoptFoundFolders(rootPaths, found)
+                    walkedOk = true
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (t: Throwable) {
@@ -273,6 +278,14 @@ object PcLibrary {
             val unwalked = groups.filter { it.skipped }.map { it.topFolder }
             folderSourceInstalls = folderSourceInstalls.filter { install -> install.installDir.absolutePath.isUnder(unwalked) } +
                 groups.flatMap { it.games }.mapNotNull { it.toStoreInstall() }
+            // When each root was last walked, for Game sources > Folders: a walk that failed,
+            // or a root that cannot be read (a card that is out), does not count.
+            if (walkedOk) {
+                dev.droidtop.library.GamesRoots.markPcScanned(
+                    context,
+                    roots.filter { dev.droidtop.library.GamesRoots.isAvailable(it) }.map { it.absolutePath },
+                )
+            }
             return groups
         } finally {
             ScanActivity.finish(SCAN_SOURCE)
@@ -687,6 +700,8 @@ object PcLibrary {
         // `Some Game/book3` is `Some Game`. The folder name stays on disk
         // and on the game page; nothing here reads the disk.
         val title = folderPath?.let { GameTitleParser.parse(it, root).title }?.takeIf { it.isNotBlank() } ?: name
+        // A store's marker in the folder (docs/SPEC.md 7g, "Store markers"), off the listing the walk just read.
+        val marker = folderPath?.let { path -> runCatching { PcFolderScan.storeMarkerOf(File(path), listingCache) }.getOrNull() }
         return Game(
             id = "folder:$appId",
             // The game folder it was found under; a folder the person gave the
@@ -699,6 +714,9 @@ object PcLibrary {
             // The scanner never measured a folder (GameNative left it 0 too).
             sizeBytes = 0L,
             artUrl = localArt,
+            // The build a store's marker names is the installed version; a folder name never beats it.
+            installedVersion = marker?.buildId,
+            marker = marker,
         )
     }
 }
@@ -732,6 +750,7 @@ fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
     installPath = installPath,
     installedVersion = installedVersion,
     externalIds = externalIds,
+    marker = marker,
     latestVersion = StoreUpdates.resultFor(id)?.latest,
     update = StoreUpdates.resultFor(id)?.update ?: StoreUpdate.UNKNOWN,
 )

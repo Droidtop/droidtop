@@ -315,7 +315,16 @@ object PcFolderScan {
         internal val hasOwnFile: Boolean,
         /** How many entries the folder held, which with [mtime] tells [EngineVerdicts] the folder is the one it judged. */
         internal val entryCount: Int,
+        /** The store markers among its entries ([StoreMarkers.isMarkerName]), read off the same listing. */
+        internal val markerNames: List<String> = emptyList(),
     ) {
+        /** The folder's [StoreMarker], read the first time it is asked for and kept with the listing. */
+        @Volatile
+        internal var marker: StoreMarker? = null
+
+        @Volatile
+        internal var markerRead: Boolean = false
+
         /** Rule 6's answer for this folder, with the engine rules it was asked under; filled in when first needed. */
         @Volatile
         internal var engineDefs: List<EngineDef>? = null
@@ -653,23 +662,50 @@ object PcFolderScan {
                 }
             }
             listings++
-            val folders = ArrayList<File>()
-            var hasProgram = false
-            var hasOwnFile = false
-            val entries = folder.listFiles() ?: emptyArray()
-            for (entry in entries) {
-                entriesStatted++
-                if (entry.isDirectory) {
-                    folders += entry
-                    continue
-                }
-                if (!entry.name.startsWith(".")) hasOwnFile = true
-                if (!hasProgram && GameExecutableResolver.isProgram(entry)) hasProgram = true
-            }
-            folders.sortBy { it.name.lowercase() }
-            val listing = Listing(mtime, folders, hasProgram, hasOwnFile, entries.size)
+            val listing = readListing(folder, mtime)
+            entriesStatted += listing.entryCount
             if (cache != null && mtime != 0L) cache.put(folder, listing)
             return listing
         }
+    }
+
+    /** One read of [folder]: ONE listing, ONE `stat` per entry, and what rules 2 and 4 and the store markers need from it. */
+    private fun readListing(folder: File, mtime: Long): Listing {
+        val folders = ArrayList<File>()
+        val markers = ArrayList<String>(0)
+        var hasProgram = false
+        var hasOwnFile = false
+        val entries = folder.listFiles() ?: emptyArray()
+        for (entry in entries) {
+            if (StoreMarkers.isMarkerName(entry.name)) markers += entry.name
+            if (entry.isDirectory) {
+                folders += entry
+                continue
+            }
+            if (!entry.name.startsWith(".")) hasOwnFile = true
+            if (!hasProgram && GameExecutableResolver.isProgram(entry)) hasProgram = true
+        }
+        folders.sortBy { it.name.lowercase() }
+        return Listing(mtime, folders, hasProgram, hasOwnFile, entries.size, markers)
+    }
+
+    /**
+     * The store marker in a game folder the walk found (docs/SPEC.md 7g,
+     * "Store markers"): GOG's `goggame-<id>.info`, Epic's `.egstore`. Asked
+     * of the folder's listing, which [cache] already holds when the walk
+     * just read it (one `stat` then), and the marker files are read only
+     * when the listing names one; the answer is kept with the listing, so
+     * a rescan of an unchanged folder reads nothing. Null for a folder with
+     * no marker. On the caller's thread: the walk's IO.
+     */
+    fun storeMarkerOf(folder: File, cache: ListingCache? = null): StoreMarker? {
+        val mtime = folder.lastModified()
+        val listing = cache?.takeIf { mtime != 0L }?.get(folder, mtime)
+            ?: readListing(folder, mtime).also { if (cache != null && mtime != 0L) cache.put(folder, it) }
+        if (listing.markerRead) return listing.marker
+        val marker = StoreMarkers.read(folder, listing.markerNames)
+        listing.marker = marker
+        listing.markerRead = true
+        return marker
     }
 }

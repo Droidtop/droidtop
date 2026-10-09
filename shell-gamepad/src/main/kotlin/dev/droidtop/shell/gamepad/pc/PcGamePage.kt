@@ -118,7 +118,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * One PC game's own page (docs/SPEC.md 7i, "The game page", 2026-10-02):
@@ -214,14 +213,13 @@ internal fun PcGamePage(
     val versions = remember(entry, siblings) { installedVersions(entry, siblings) }
     var linksToken by remember(entry.id) { mutableIntStateOf(0) }
     var editingSource by remember(entry.id) { mutableStateOf<UpdateSources.Source?>(null) }
-    var sourceStatus by remember(entry.id) { mutableStateOf<Map<String, String>>(emptyMap()) }
     val links by produceState<GameLinks?>(null, gameIds, linksToken) {
         value = if (library != null && isFolder) library.gameLinks(gameIds) else null
     }
     val updateSources by produceState(emptyList<UpdateSources.Source>(), library, isFolder) {
         value = if (library != null && isFolder) library.updateSources() else emptyList()
     }
-    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, sourceStatus, updateSources) {
+    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources) {
         pageRows(
             entry, play, runner, siblings,
             scrapeStatus = scrapeStatus,
@@ -238,14 +236,13 @@ internal fun PcGamePage(
                 sourceRows(
                     sources = updateSources,
                     links = links,
-                    statuses = sourceStatus,
                     onEdit = { editingSource = it },
-                    onCheck = { source, link ->
-                        scope.launch {
-                            sourceStatus = sourceStatus + (source.key to "Checking...")
-                            val line = checkSourceAndSay(library, gameIds, link.key, versions, entry.latestKnown)
-                            sourceStatus = sourceStatus + (source.key to line)
-                            linksToken++
+                    onOpen = { url ->
+                        runCatching {
+                            context.startActivity(
+                                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
                         }
                     },
                 )
@@ -643,10 +640,8 @@ internal fun PcGamePage(
             source = linking,
             current = links?.link(linking.key),
             scope = scope,
-            say = { line ->
-                sourceStatus = if (line == null) sourceStatus - linking.key else sourceStatus + (linking.key to line)
-                linksToken++
-            },
+            // What linking found shows on the source's own row once the links are read again.
+            say = { linksToken++ },
             onClose = { editingSource = null },
         )
     }
@@ -1065,23 +1060,8 @@ private fun pageRows(
     }
 }
 
-private data class FolderSizeStamp(val path: String, val modified: Long, val length: Long)
-
-private val folderSizeCache = ConcurrentHashMap<FolderSizeStamp, Long>()
-
-/** Folder sizes are read only for the open game page, on IO, and reused by path metadata stamp. */
-private fun folderSizeBytes(path: String): Long {
-    val folder = File(path)
-    if (!folder.isDirectory) return 0L
-    val stamp = FolderSizeStamp(folder.absolutePath, folder.lastModified(), folder.length())
-    folderSizeCache[stamp]?.let { return it }
-    val size = runCatching {
-        folder.walkTopDown().sumOf { file -> if (file.isFile) file.length() else 0L }
-    }.getOrDefault(0L)
-    if (folderSizeCache.size > 256) folderSizeCache.clear()
-    folderSizeCache[stamp] = size
-    return size
-}
+/** Folder sizes are read only for the open game page, on IO, by the one measurement Storage reads too ([dev.droidtop.library.FolderSizes]). */
+private fun folderSizeBytes(path: String): Long = dev.droidtop.library.FolderSizes.measure(path)?.bytes ?: 0L
 
 /**
  * "2 h 15 min, played 7 times", "Never played": the one play-time sentence of
@@ -1167,7 +1147,7 @@ internal enum class PageTab(val label: String, val emptyLine: String) {
  */
 internal fun pageTabOf(title: String): PageTab = when (title) {
     "About", "Not scraped yet", "Compatibility", "Install state", "Times played" -> PageTab.OVERVIEW
-    "Version", "Latest", "Update", CHECK_ROW -> PageTab.VERSIONS
+    "Version", "Latest", "Update", OPEN_SOURCE_ROW -> PageTab.VERSIONS
     "Manual", "Video", "Where these facts came from" -> PageTab.EXTRAS
     else -> PageTab.DETAILS
 }

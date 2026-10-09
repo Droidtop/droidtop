@@ -26,22 +26,31 @@ import kotlinx.coroutines.launch
  * is droidtop's own UI.
  */
 
-internal const val CHECK_ROW = "Check for update"
+/**
+ * The page's row for a linked source's own page (Droidtop/tracker#397 slice
+ * E): it opens the link in the browser and fetches nothing. The page shows
+ * only the link's host; the whole link is the row's tip.
+ */
+internal const val OPEN_SOURCE_ROW = "Open source page"
+
+/** "f95zone.to" of a link, for a row's value; null when [url] is not a web link. */
+internal fun linkHost(url: String?): String? =
+    url?.let { runCatching { java.net.URI(it.trim()).host }.getOrNull() }?.removePrefix("www.")?.takeIf { it.isNotBlank() }
 
 /** What the paste field says when a source gives no hint of its own. */
 internal const val SOURCE_LINK_HELP = "A link or id; blank unlinks"
 
 /**
  * The game's update sources as rows under Versions: one per source (A
- * links or changes it) and, for each linked one, "Check now" with its last
- * answer ([statuses], by source key, one short line). Pure, for the tests.
+ * links or changes it) and, for each linked one whose page is known,
+ * "Open source page" with the link's host, which opens it in the browser and
+ * fetches nothing ([onOpen]). Pure, for the tests.
  */
 internal fun sourceRows(
     sources: List<UpdateSources.Source>,
     links: GameLinks?,
-    statuses: Map<String, String>,
     onEdit: (UpdateSources.Source) -> Unit,
-    onCheck: (UpdateSources.Source, SourceLink) -> Unit,
+    onOpen: (String) -> Unit,
 ): List<PageFact> = sources.flatMap { source ->
     val link = links?.link(source.key)
     listOfNotNull(
@@ -53,14 +62,17 @@ internal fun sourceRows(
             tip = link?.answer?.url,
             tab = PageTab.VERSIONS,
         ),
-        link?.let {
-            PageFact(
-                CHECK_ROW,
-                value = statuses[source.key] ?: "Check now",
-                subtitle = source.label.takeIf { sources.size > 1 },
-                onActivate = { onCheck(source, it) },
-                tab = PageTab.VERSIONS,
-            )
+        link?.answer?.url?.let { url ->
+            linkHost(url)?.let { host ->
+                PageFact(
+                    OPEN_SOURCE_ROW,
+                    value = host,
+                    subtitle = source.label.takeIf { sources.size > 1 },
+                    onActivate = { onOpen(url) },
+                    tip = url,
+                    tab = PageTab.VERSIONS,
+                )
+            }
         },
     )
 }

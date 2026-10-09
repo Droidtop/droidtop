@@ -11202,6 +11202,45 @@ pressable; installed games that left the library are found with Ownership =
 No longer in your library. How many updates a sync brought is not said yet:
 a sync does not ask for builds (the update check runs on its own).
 
+### Store markers and folder games (Droidtop/tracker#397 slice E)
+
+**Store markers.** A game a store installed outside droidtop (a GOG offline
+installer, Heroic, legendary) is a folder game to the walk, and the store left
+a marker in its folder. The PC folder scan is the one reader: the walk's own
+listing of a game folder says whether a marker is there
+(`StoreMarkers.isMarkerName`), and only then are the marker files read
+(`PcFolderScan.storeMarkerOf`, kept with the cached listing, so an unchanged
+folder reads nothing). GOG's is `goggame-<id>.info` (the file whose
+`rootGameId` is its own `gameId` is the game, every other one is DLC;
+`buildId` is the build); Epic's is `.egstore/<install id>.mancpn`, whose
+`CatalogItemId` is the id droidtop's Epic rows are keyed by. What it found is
+written on the row (`PcInfo.marker`: store id, game id, build, DLC ids) and the
+build is the row's installed version, beating anything a folder name says.
+Consumers read the row; nothing else opens these files. A folder with a marker
+is that store's game for every reader of `PcSource` (the Source facet, the
+focus line), signed in or not, and carries no Ownership: holding is a store
+row's fact.
+
+**A folder game keeps its identity across a version bump.** A folder game's id
+is `GameFolderIds`' (droidtop's own file, never one in the folder). Besides a
+rename (same device and inode) and a move (same content shape), a folder that
+appeared in the same parent folder as one that vanished, with the same title
+once the version is taken off the name (`GameFolderIds.titleKey`, the one
+parse a folder's Version comes from, `GameTitleParser`), is the same game:
+`MyGame-v0.5` replaced by `MyGame-v0.6` keeps its id, so its favourite, play
+time, collections, set version and source links stay and it is not Recently
+added. Only a vanished folder is matched, and only when one is: two version
+folders side by side stay two games. The version shapes a folder name gives
+(each a row of `FolderVersionParseTest`): `Game v1.2`, `Game-1.2.0`,
+`Game [v0.5]`, `Game (0.5b)`, `Game 1.2 PC`, `Game_v0.6.1a`; anything else has
+no version (`Far Cry 5`, `Cyberpunk 2077`). Engine games are keyed by their
+folder's path and are not covered by this.
+
+**A linked source's page.** On a folder game's page, a linked update source
+whose page is known has the row **Open source page**: the page shows only the
+link's host, the whole link is the row's tip, and A opens it in the browser.
+It fetches nothing. The options menu keeps its "Check now" for the source.
+
 ### What the store services give, and what they do not
 
 Read from the vendored gamenative tree (2026-09-24), because "What is best
@@ -12128,7 +12167,7 @@ it:
 
 | Steam Deck / Big Picture | Others | PC Games |
 | --- | --- | --- |
-| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (nonzero indexed first-seen time, newest first), Update available, Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), then, when the library has more than one source (a store, a game folder, the Wine shortcuts: `PcSource`), one shelf per source in the Source filter's order, else one per pinned collection, else one per engine family (Visual Novels, RPG Maker, Windows, ...). On Overview, **Update available leads whenever it has rows**, above Continue playing, its heading always with its count; a tap on that heading opens the Updates tab (Droidtop/tracker#397 slice C). **The Collections tab** (`PcCollections.kt`, slice D) is a tile grid in three groups: your collections, your saved views, and each store's imported collections under "From <store>". A tile shows its name, its count and, when it is a tab, a mark, without needing focus; A opens the grid filtered to it (the **Collection** facet, static membership only, values OR), a saved view's tile applies the view. Hidden games do not count in a tile, and a collection whose every game here is hidden is not shown. Select on a tile: Pin as a tab (or Unpin), Pin all imported, Unpin all imported. A pinned collection's tab is a saved view over its Collection facet. **Home** keeps only recent activity across every library: Continue playing, Recently added and Update available (`homeShelves`, `HOME_SHELF_IDS`). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
+| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (nonzero indexed first-seen time, newest first), Update available, Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), then, when the library has more than one source (a store, a game folder, the Wine shortcuts: `PcSource`), one shelf per source in the Source filter's order, else one per pinned collection, else one per engine family (Visual Novels, RPG Maker, Windows, ...). On Overview, **Update available leads whenever it has rows**, above Continue playing, its heading always with its count; a tap on that heading opens the Updates tab (Droidtop/tracker#397 slice C), and so does A on it from the pad: Left from the shelf's first capsule puts the cursor on the heading (its ring, the hint reads "Open"), and any other move leaves it (slice E). **The Collections tab** (`PcCollections.kt`, slice D) is a tile grid in three groups: your collections, your saved views, and each store's imported collections under "From <store>". A tile shows its name, its count and, when it is a tab, a mark, without needing focus; A opens the grid filtered to it (the **Collection** facet, static membership only, values OR), a saved view's tile applies the view. Hidden games do not count in a tile, and a collection whose every game here is hidden is not shown. Select on a tile: Pin as a tab (or Unpin), Pin all imported, Unpin all imported. A pinned collection's tab is a saved view over its Collection facet. **Home** keeps only recent activity across every library: Continue playing, Recently added and Update available (`homeShelves`, `HOME_SHELF_IDS`). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
 | Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip** (decided 2026-10-02, Droidtop/tracker#273 slice 2): the one row above PC Games' content, L1 and R1 glyphs at its ends: **Overview** (the shelves, `VIEW_OVERVIEW`, first and where PC Games opens), then the fixed built-in tabs **All games, Installed, Favourites, Collections**, then the person's **pinned views** in their own order (`pcStripTabs`, Droidtop/tracker#397 slice C). Built-in tabs never come and go: an empty one shows one line saying how to fill it (Collections: "Add a game to a collection from its menu (Select). Collections a store keeps appear here after it syncs."). List options > **Favourites tab / Collections tab** can hide those two; Overview, All games and Installed cannot be hidden, and the order is fixed so press counts stay the same. **Store tabs and the Updates tab are gone**: a store is a Source filter, and any filter can be saved as a tab. Everyone was given, once, a pinned view **"Updates"** over the Update available facet, first among the pinned views (`LibraryViewPrefs.withUpdatesView`); unpinning or removing it is the person's choice. Every grid tab, built-in or pinned, carries its count ("Installed · 12"). **Select on a pinned tab** opens its Options: Edit (a new name, then the Filter sheet over its filters and sort; saving writes the same view, same tab position), Unpin (it stays a saved view, listed in Collections), Move left, Move right, Move to first. The chips are Steam's tab pills (`ShellChip(tab = true)`, 2026-10-08): small bold capitals in the tab-label role, padded 6 by 16; the view on screen sits on a quiet plate (not the accent: it is a place, not a filter in effect), the chip under the cursor turns solid, and a shoulder glyph with nowhere to go is drawn at half strength. The full grid is one press away (R1 from Overview is All games). No Home chip (Home is a destination of its own and has no strip), no Filters chip (X opens the filter dialog), no Continue playing view (it is the first shelf). B from a grid view returns to Overview. The strip ends short of the floating status cluster (`StatusClusterRoom`, Droidtop/tracker#292), so its R1 glyph is never under the clock. The filters set that no strip view stands for show as ONE pill at the strip's end, naming every active filter, the first two by name and the rest as a number ("Steam · Shared with you · +2, 40 of 3,300 ✕"), on one line that shortens its own text and never pushes tabs off the strip, cleared by one press; there is no count line and no chip row on this page (the Filter sheet keeps its chips). The filter, sort, search and saved views are reached from X, Y and the sheets (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
 | 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule; that line carries the version management fact too: the installed build and, when a source knows a newer one, "v0.9.6 is available" (`focusLine`, `GameUpdates.line`). No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is Steam's, by the window's tier (`capsuleWidth`, `capsuleWidthFor`; 2026-10-08, Droidtop/tracker#363): 110dp up to an 853dp window (about six across on the console's 768dp window, so a shelf's last capsule is cut and says there is more; three on a phone held upright), 134dp up to 1279dp, 172dp from 1280dp. Shelves and the grid share it; the grid packs whole capsules of that width 12dp apart and centres the row in what is left (`GridCells.FixedSize`), never stretching a capsule to fill. |
 | Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons, a quiet facts strip, a tab strip (Overview, Versions and updates, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are one row of Overview, the same row for every source: RetroAchievements fills it for a console game on its detail screen (7h, "RetroAchievements"); a store's achievements (Droidtop/tracker#230) take this page's row when they exist. |
@@ -13897,7 +13936,38 @@ that hides Settings (Kiosk, Kid) hides the places too, because they are
 device management (`GamingSection.managesDevice`). The list is one pure
 function (`menuSectionsFor`, built on `sectionsFor`).
 
-- **Stores** (`stores`, `StoresCatalog`): one page per store (Steam, GOG,
+- **Game sources** (`stores`, `StoresCatalog`, called Stores until
+  Droidtop/tracker#397 slice E): where games come from, in one list. Signed-in
+  stores first (registry order), then **Folders**, then the stores not signed
+  in, then **Imported** once a game came through another launcher
+  (`PcLaunchers.viaByEntry`); a store row reads "Signed in · 1,193 games" or
+  "Not signed in", Folders "3 folders · 412 games". A store page's holding rows
+  ("Shared with you · 573", Free to play) are pressable like Open library:
+  the shell opens PC Games filtered to that store and that holding
+  (`PcSource.holdingItemId`), and the pill says so. **Folders**
+  (`FoldersCatalog`) lists each game folder with the PC and engine games the
+  library holds under it and when the PC walk last finished it
+  (`GamesRoots.pcScannedAt`), or "Not available" when it cannot be read (a card
+  that is out: its games are kept, never marked gone); Add a folder and, by
+  selecting a folder, stop looking there (the same `GamesRootPrefs` settings
+  Settings > Game folders has; the library's facts about its games are kept by
+  id, so adding it back restores them); **Rescan PC game folders**; the Wine
+  shortcuts; and the line "New games appear after Rescan or a store sync."
+  **Rescan PC game folders** (`LibraryRescan.runPcFolders`, also in PC Games'
+  list options) walks the PC and engine games only (`LibraryKinds.PC_GAMES`),
+  never the ROM walk, reads the stores' rows again and says how many games it
+  found that were not listed ("1 new"); one rescan runs at a time and either
+  row stops it. No folder watcher is added. **Storage** shows the room each
+  game folder has, then Retro (each console system's games, from the index,
+  drawn at once and never moved), then PC: each store's installs with the size
+  the store recorded and an Uninstall, then the games that are folders of
+  their own, in title order, whose sizes are measured in the background one
+  after another (`FolderSizes`, kept by the folder's stamp, the same
+  measurement the game page's Size reads; a folder that cannot be read in part
+  says "at least") and fill in row by row; leaving the page stops the
+  measuring and a finished row is not measured again. Hidden games are one row,
+  "N hidden games · size".
+- **A store's page** (`StoresCatalog`): one page per store (Steam, GOG,
   Epic, Amazon Games, itch.io) with its account (signed in, as whom where
   the store keeps that in the open, sign in or out), its library (how many
   games the library has read from it and how many are installed, a way into

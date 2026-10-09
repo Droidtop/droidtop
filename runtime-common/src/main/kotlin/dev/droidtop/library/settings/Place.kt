@@ -18,7 +18,8 @@ private const val UPDATES_SCREEN = "updates"
 private const val PLUGINS_SCREEN = "plugins"
 
 enum class Place(val screenId: String, val title: String) {
-    STORES(STORES_SCREEN, "Stores"),
+    // "Game sources" (Droidtop/tracker#397 slice E): stores, game folders and imports, one place.
+    STORES(STORES_SCREEN, "Game sources"),
     SOCIAL(SOCIAL_SCREEN, "Social"),
     DOWNLOADS(DOWNLOADS_SCREEN, "Downloads and installs"),
     UPDATES(UPDATES_SCREEN, "Updates"),

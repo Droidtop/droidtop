@@ -56,4 +56,26 @@ class StoresCatalogTest {
         // A clock that went backwards is not a negative age.
         assertEquals("Synced just now", syncedAgo(now, now + 5 * minute))
     }
+
+    @Test
+    fun `a Game sources row says signed in and how many games, or that it is not`() {
+        assertEquals("Not signed in", sourceValue(signedIn = false, games = 12))
+        assertEquals("Signed in", sourceValue(signedIn = true, games = 0))
+        assertEquals("Signed in · 412 games", sourceValue(signedIn = true, games = 412))
+        assertEquals("1 game", gamesWord(1))
+    }
+
+    @Test
+    fun `the Folders row and a folder's own row say what was found and whether it can be read`() {
+        val counts = FolderCounts(
+            listOf(RootCount("/sd/Games", 400, true, null), RootCount("/sd/More", 12, false, 1_000L)),
+            shortcuts = 2,
+        )
+        assertEquals("2 folders · 412 games", FoldersCatalog.summary(counts))
+        assertEquals("No folders yet", FoldersCatalog.summary(FolderCounts(emptyList(), 0)))
+        assertEquals("400 games", FoldersCatalog.rootValue(counts.roots[0]))
+        assertEquals("Not available", FoldersCatalog.rootValue(counts.roots[1]))
+        assertEquals("/sd/Games · Not scanned yet. Select to stop looking here", FoldersCatalog.rootLine(counts.roots[0], 0L))
+        assertEquals("/sd/More · Last scanned just now. Select to stop looking here", FoldersCatalog.rootLine(counts.roots[1], 1_000L))
+    }
 }

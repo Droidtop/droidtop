@@ -1261,7 +1261,7 @@ object AppSettingsCatalogs {
                 items = listOf(
                     NestedScreenItem(
                         id = "pc_stores_accounts_link",
-                        title = "Stores",
+                        title = "Game sources",
                         subtitle = "Sign in to Steam, GOG, Epic, Amazon Games or itch.io to download your library",
                         registryId = StoresCatalog.SCREEN_ID,
                         valueLabel = { "$signedInCount of ${PcStore.entries.size} stores signed in" },
@@ -1359,7 +1359,7 @@ object AppSettingsCatalogs {
                     // Each store's sign-in, library and sync live on its own page in Stores (docs/SPEC.md 7j "Places").
                     NestedScreenItem(
                         id = "accounts_stores_link",
-                        title = "Stores",
+                        title = "Game sources",
                         subtitle = "Steam, GOG, Epic Games, Amazon Games and itch.io: sign in or out, library, sync",
                         registryId = StoresCatalog.SCREEN_ID,
                         valueLabel = { "$signedInStores of ${PcStore.entries.size} signed in" },

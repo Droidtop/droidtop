@@ -1191,6 +1191,23 @@ object GamingSettingsCatalog {
         },
     )
 
+    /**
+     * "Rescan PC game folders" (docs/SPEC.md 7j "Places", Droidtop/tracker#397
+     * slice E): [rescanLibraryItem] over the PC walks only, on Game sources >
+     * Folders. Selected again while it runs, it stops the rescan.
+     */
+    fun rescanPcFoldersItem(): AsyncActionItem = AsyncActionItem(
+        id = ID_RESCAN_PC_FOLDERS,
+        title = RESCAN_PC_FOLDERS,
+        subtitle = "Looks in your game folders for new or changed PC and engine games. Console folders are not walked",
+        run = { ctx, onStatus ->
+            if (LibraryRescan.cancel()) "Cancelling the rescan\u2026" else LibraryRescan.runPcFolders(ctx, onStatus)
+        },
+    )
+
+    const val ID_RESCAN_PC_FOLDERS = "rescan_pc_folders"
+    const val RESCAN_PC_FOLDERS = "Rescan PC game folders"
+
     private fun launchComponent(className: String, vararg extras: Pair<String, Any>): (Context) -> Unit = { ctx ->
         val intent = Intent(Intent.ACTION_MAIN).apply {
             component = ComponentName(ctx.packageName, className)

@@ -60,6 +60,19 @@ sealed class PcSource {
          */
         const val LIBRARY_ITEM_PREFIX = "store_library:"
 
+        /**
+         * The catalog item id of a store page's holding row ("Shared with you ·
+         * 573"): [holdingItemId]. The Gaming shell fulfils it with PC Games
+         * filtered to that store and that holding (docs/SPEC.md 7j, "Places").
+         */
+        const val HOLDING_ITEM_PREFIX = "store_holding:"
+
+        fun holdingItemId(storeId: String, holding: dev.droidtop.library.stores.StoreHolding): String =
+            "$HOLDING_ITEM_PREFIX$storeId:${holding.name}"
+
+        /** The id of the Game sources row that opens PC Games on every imported game (the "Imported from" filter). */
+        const val IMPORTED_ITEM_ID = "game_sources_imported"
+
         /** The source an [id] names; an id this build has no store for stays a store, drawn by its id. */
         fun fromId(id: String): PcSource = when {
             id == WINE_ID -> WineShortcut
@@ -70,7 +83,8 @@ sealed class PcSource {
         /**
          * Where [entry] came from, or null for an entry that is not a PC game.
          * A store row (or a folder engine detection claimed from a store, which
-         * carries the store's id) is its store; a game under one of [roots] is
+         * carries the store's id) is its store, and so is a folder holding a
+         * store's marker ([PcInfo.marker]); a game under one of [roots] is
          * that root, the most specific when one root is inside another; a
          * hand-made Wine shortcut is [WineShortcut]. Pure and cheap (string
          * work over a handful of roots), so a list may ask it per row.
@@ -78,6 +92,8 @@ sealed class PcSource {
         fun of(entry: LibraryEntry, roots: List<String> = emptyList()): PcSource? {
             val pc = entry.pcInfo
             storeIdOf(pc?.storeId ?: entry.id)?.let { return Store(it) }
+            // A folder a store installed outside droidtop reads as that store (its marker, 7g "Store markers").
+            pc?.marker?.let { return Store(it.storeId) }
             if (pc != null && pc.storeId == null && pc.installPath == null && entry.id.startsWith("/") &&
                 entry.kind == LibraryEntryKind.WINE_PROFILE
             ) {
