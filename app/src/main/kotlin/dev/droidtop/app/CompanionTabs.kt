@@ -24,7 +24,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.runtime.LaunchedEffect
 import dev.droidtop.runtime.keyboard.AddonKeyboard
 import dev.droidtop.shell.gamepad.KeyboardTargets
 import androidx.compose.runtime.getValue
@@ -92,7 +91,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
     val social = remember { !UiModePrefs.get(context).hidesSettings }
     val tabs = companionTabs(mode, role, social)
     var selected by remember(mode, role) { mutableStateOf(defaultCompanionTab(role)) }
-    // The tab to go back to when the input controller was opened for a field or by the Keys button.
+    // The tab to go back to when the input controller was opened by the Keys button.
     var before by remember { mutableStateOf<CompanionTab?>(null) }
     // A conversation Home's Social section opened; the Social tab starts there.
     var socialStart by remember { mutableStateOf<OpenConversation?>(null) }
@@ -122,17 +121,11 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             KeyboardTargets.companionShown(token, null)
         }
     }
-    // A field on the other screen wants keys: switch to the input controller, and back when it is done.
+    // A field on the other screen wants keys: the input controller is what shows while the request stands, and
+    // [selected] is never touched, so Hide, Back and a field losing focus all land on the tab the person was on
+    // however the request ended (Droidtop/tracker#369). A tab pressed meanwhile ends the request first.
     val requested by KeyboardTargets.companion.collectAsState()
-    LaunchedEffect(requested != null) {
-        if (requested != null && selected != CompanionTab.INPUT) {
-            before = selected
-            selected = CompanionTab.INPUT
-        } else if (requested == null && before != null) {
-            selected = before ?: selected
-            before = null
-        }
-    }
+    val shown = if (requested != null) CompanionTab.INPUT else selected
     // The Social tab's unread count over every provider, read when something changes, never polled.
     val unread by produceState(initialValue = SocialBadge.unread, social) {
         if (social) SocialHub.changes().collect { value = SocialHub.unread() }
@@ -148,7 +141,11 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         ) {
             tabs.forEach { tab ->
                 val label = if (tab == CompanionTab.SOCIAL && unread > 0) "${tab.label} $unread" else tab.label
-                CompanionPill(label, selected = tab == selected) { socialStart = null; selected = tab }
+                CompanionPill(label, selected = tab == shown) {
+                    if (requested != null) KeyboardTargets.hideCompanion()
+                    socialStart = null
+                    selected = tab
+                }
             }
             // A keyboard over any tab, typing into whatever has focus on the other screen (tracker#314). The Input
             // tab already is one.
@@ -168,7 +165,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             }
         }
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            when (selected) {
+            when (shown) {
                 CompanionTab.HOME -> CompositionLocalProvider(LocalCompanionNav provides nav) { home() }
                 CompanionTab.SOCIAL -> CompanionSocialTab(socialStart)
                 CompanionTab.TASKS -> CompanionTasksTab()

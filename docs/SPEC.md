@@ -3669,8 +3669,10 @@ rig check in the commit message.
     `RoutedKeyboardSink`), so the field keeps its focus wherever the keyboard is drawn.
   - Companion: the companion switches to its own input controller, the Input tab
     (`SecondScreenInputView`, the same keyboard and trackpad Desktop mode uses), whose keys go to the
-    requesting field while the request lasts, and switches back to the tab it was on when the field
-    loses focus or its Hide is pressed. It hosts only while a companion host is started on another
+    requesting field while the request lasts, and is on the tab it was on again when the field
+    loses focus, its Hide is pressed or the request ends any other way. The tab the person chose is
+    never overwritten: the Input tab is what the strip shows while a request stands (`shown` in
+    `CompanionTabs`), so there is no remembered tab to lose (Droidtop/tracker#369). It hosts only while a companion host is started on another
     display (lifecycle ON_START to ON_STOP) and the companion's own setting allows it, so a companion
     that is off, hidden by Kiosk or Kid, covered by a full-screen app, or absent on a single-display
     device leaves the keyboard on the field's screen.
