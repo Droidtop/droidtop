@@ -3057,6 +3057,13 @@ does not duplicate it once built.
 Budgets below 15 s that are marked "not a crash" exist because the UI
 chose not to wait. A plugin that misses them was slow, not broken.
 
+The first default-budget call a process answers after it started (the
+runtime's own first lines: the Dart isolate, the Python interpreter) gets
+`COLD_START_GRACE_MS` (30 s) on top of the 15 s, and a miss of that call is
+"still starting, try again", never a crash. The load has its own 15 s budget.
+Later calls get 15 s and the crash rule above. A call with a shorter budget
+keeps it.
+
 **Quotas** (per plugin, host-enforced, reply `RATE_LIMITED`):
 
 | Resource | Quota |

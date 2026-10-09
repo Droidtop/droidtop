@@ -486,7 +486,8 @@ class FlutterDroidtopPlugin internal constructor(
                 },
             )
         }
-        if (!latch.await(PluginRunner.CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        // The host's watchdog is the real limit and may be extended for a first call (PluginRunner.COLD_START_GRACE_MS).
+        if (!latch.await(PluginRunner.CALL_TIMEOUT_MS + PluginRunner.COLD_START_GRACE_MS, TimeUnit.MILLISECONDS)) {
             return null to "timed out waiting for the Dart side"
         }
         return resultJson to errorMessage

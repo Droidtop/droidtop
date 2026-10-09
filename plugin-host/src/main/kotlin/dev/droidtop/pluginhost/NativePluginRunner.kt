@@ -32,6 +32,11 @@ class NativePluginRunner(
     /** The processes this runner registered [callback] with, so [unbind] can unregister the very same stub. */
     private val registered = ConcurrentHashMap<IBinder, IPluginRuntime>()
 
+    /** The process each plugin last answered a call in: a call on any other runtime of it is the first since that process started. */
+    private val answeredOn = ConcurrentHashMap<String, IBinder>()
+
+    private fun isCold(pluginId: String, runtime: IPluginRuntime): Boolean = answeredOn[pluginId] !== runtime.asBinder()
+
     // Why each plugin's last [load] returned false, for the caller to show and for logcat (see [loadFailure]).
     private val loadFailures = ConcurrentHashMap<String, String>()
 
@@ -155,13 +160,17 @@ class NativePluginRunner(
     override suspend fun invoke(pluginId: String, capability: PluginCapability, args: Map<String, String>): PluginResult {
         val runtime = runtimes[pluginId] ?: return PluginResult.failure("plugin process is not running")
         val argsJson = JSONObject().apply { args.forEach { (k, v) -> put(k, v) } }.toString()
+        val cold = isCold(pluginId, runtime)
+        val budget = PluginRunner.CALL_TIMEOUT_MS + if (cold) PluginRunner.COLD_START_GRACE_MS else 0L
         return try {
-            val resultJson = withTimeout(PluginRunner.CALL_TIMEOUT_MS) {
+            val resultJson = withTimeout(budget) {
                 withContext(Dispatchers.IO) { runtime.invoke(pluginId, capability.id, argsJson) }
             } ?: return PluginResult.failure("plugin returned no result")
+            answeredOn[pluginId] = runtime.asBinder()
             decode(resultJson)
         } catch (e: TimeoutCancellationException) {
-            onCrash(pluginId, capability.id, "call timed out after ${PluginRunner.CALL_TIMEOUT_MS}ms")
+            if (cold) return PluginResult.failure("still starting up (the first call can take a while); try again in a moment")
+            onCrash(pluginId, capability.id, "call timed out after ${budget}ms")
             PluginResult.failure("timed out")
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -199,13 +208,18 @@ class NativePluginRunner(
      */
     suspend fun handle(pluginId: String, call: PluginCall, timeoutMs: Long, crashOnTimeout: Boolean): PluginReply {
         val runtime = runtimes[pluginId] ?: return PluginReply.error(PluginErrorCode.FAILED, "plugin process is not running")
+        // Only the default budget is extended: a shorter one is the UI choosing not to wait, and stays short.
+        val cold = crashOnTimeout && isCold(pluginId, runtime)
+        val budget = timeoutMs + if (cold) PluginRunner.COLD_START_GRACE_MS else 0L
         return try {
-            val text = withTimeout(timeoutMs) {
+            val text = withTimeout(budget) {
                 withContext(Dispatchers.IO) { runtime.handle(pluginId, call.toJson().toString()) }
             }
+            answeredOn[pluginId] = runtime.asBinder()
             PluginReply.parse(text)
         } catch (e: TimeoutCancellationException) {
-            if (crashOnTimeout) onCrash(pluginId, call.point, "call timed out after ${timeoutMs}ms")
+            if (cold) return PluginReply.error(PluginErrorCode.TIMEOUT, "still starting up (the first call can take a while); try again in a moment")
+            if (crashOnTimeout) onCrash(pluginId, call.point, "call timed out after ${budget}ms")
             PluginReply.error(PluginErrorCode.TIMEOUT, "timed out")
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e

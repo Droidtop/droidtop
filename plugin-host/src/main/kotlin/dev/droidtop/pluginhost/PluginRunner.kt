@@ -26,6 +26,14 @@ interface PluginRunner {
         /** The watchdog every runner enforces per call -- long enough for a real network fetch, short enough that a hung plugin can't freeze a screen droidtop owns. */
         const val CALL_TIMEOUT_MS = 15_000L
 
+        /**
+         * Added to the watchdog of the first call a process answers after it started (a runtime's first call: the Dart
+         * isolate or the Python interpreter running its own first lines). The load has its own budget; the first call
+         * after it still ran 15 s on BlueStacks and disabled the plugin (rig, build 1715, F95 0.3.1, Droidtop/tracker#316
+         * notes). A miss of a cold call is "still starting", not a crash.
+         */
+        const val COLD_START_GRACE_MS = 30_000L
+
         const val MAX_RESULT_BYTES = 256 * 1024
     }
 }
