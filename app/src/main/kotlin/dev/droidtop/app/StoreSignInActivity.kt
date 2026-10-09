@@ -1,5 +1,8 @@
 package dev.droidtop.app
 
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -299,10 +302,13 @@ private fun AccountSignIn(label: String, session: StoreAccountSignIn, onDone: ()
             AccountSignInStep.Working -> Busy("Signing in")
             is AccountSignInStep.Done -> Busy("Signed in${current.account?.let { " as $it" }.orEmpty()}")
         }
-        Text(
-            "Confirm selects, back goes back",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // The shell's hint pills, so the buttons are named by the pad's layout, not by Android key names.
+        HintRow(
+            bindings = listOf(
+                HintBinding(GamepadAction.A, "Select"),
+                HintBinding(GamepadAction.B, "Back"),
+            ),
+            background = androidx.compose.ui.graphics.Color.Transparent,
         )
     }
 }
