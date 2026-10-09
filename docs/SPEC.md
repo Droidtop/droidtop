@@ -2162,10 +2162,20 @@ the `ContainerRuntime` interface that already exists (§3):
   gets silence. The x86_64 modules asset now includes `module-pipe-source`
   (the CI dependency cache key had to move for a release to carry it: a
   cache hit skips the script, so a module added to the script alone ships
-  the old asset); the arm64 asset is upstream gamenative's prebuilt set, and where it lacks
-  that module the desktop log says "microphone not bridged" and audio out
-  is unaffected. plugin-api D9's refusal of `audio.record` to plugins is a
-  different question and stands.
+  the old asset). The arm64 asset is upstream gamenative's prebuilt
+  set and has no `module-pipe-source` (its listing at
+  windows-runtime-prebuilt-0f08762e: libprotocol-native,
+  module-aaudio-sink, module-native-protocol-unix, pactl), so the console
+  had no microphone (Droidtop/tracker#132). build-vendor-deps.sh now builds
+  that one module for arm64 from the same PulseAudio 13.0 tree and
+  configure line, and packs it alone as
+  `pulseaudio-desktop-arm64-v8a.tzst` in runtime-linux-noroot's assets;
+  `HostAudioServer` unpacks it over the upstream modules. The Windows
+  runtime's arm64 audio stays the upstream set, so the console's game
+  audio does not change. Where the module is still missing the desktop log
+  says "microphone not bridged" and audio out is unaffected. plugin-api
+  D9's refusal of `audio.record` to plugins is a different question and
+  stands.
   **Settings operations stay asynchronous (decided 2026-10-01, Droidtop/tracker#47).**
   Catalog toggle and folder-pick handlers are suspend functions. Both settings
   renderers invoke them from a screen-lifecycle coroutine, show "Working..."

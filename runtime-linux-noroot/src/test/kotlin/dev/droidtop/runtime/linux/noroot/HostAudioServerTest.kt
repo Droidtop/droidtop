@@ -30,6 +30,18 @@ class HostAudioServerTest {
     }
 
     @Test
+    fun `arm64 adds the Desktop's own modules asset, x86_64 needs none`() {
+        val assets = listOf(
+            "pulseaudio-gamenative-x86_64.tzst",
+            "pulseaudio-gamenative-20260612.tzst",
+            "pulseaudio-desktop-arm64-v8a.tzst",
+        )
+        assertEquals("pulseaudio-desktop-arm64-v8a.tzst", HostAudioServer.desktopAssetNameFor(assets, "arm64-v8a"))
+        assertNull(HostAudioServer.desktopAssetNameFor(assets, "x86_64"))
+        assertNull(HostAudioServer.desktopAssetNameFor(listOf("pulseaudio-gamenative-20260612.tzst"), "arm64-v8a"))
+    }
+
+    @Test
     fun `the config loads the unix socket transport and the AAudio sink`() {
         val config = HostAudioServer.defaultPaConfig("/data/user/0/dev.droidtop.app/files/proot/sockets/audio.sock")
         assertEquals(

@@ -409,7 +409,19 @@ echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
 # Outputs: runtime-windows/src/main/jniLibs/x86_64/ (the six libraries)
 # and runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst
 # (modules/ and pactl, laid out like the arm64 asset).
-if [ "$ABI" = "x86_64" ]; then (
+#
+# arm64 builds the same tree for one module only. The upstream arm64 asset
+# has no module-pipe-source (it holds libprotocol-native,
+# module-aaudio-sink, module-native-protocol-unix and pactl), and the
+# Desktop microphone loads it (Droidtop/tracker#132). The module comes from
+# the same PulseAudio version and configure line as the arm64 set it loads
+# into, and needs only that set's libpulsecore-13.0, libpulsecommon-13.0
+# and libpulse, the names the asset's own module-aaudio-sink.so needs. It
+# ships alone in runtime-linux-noroot/src/main/assets/
+# pulseaudio-desktop-arm64-v8a.tzst, which the Desktop audio bridge
+# unpacks beside the upstream modules; the Windows runtime's arm64 audio
+# stays the upstream set.
+(
     export PATH="$TOOLCHAIN_BIN:$PATH"
     export CC CXX AR=llvm-ar RANLIB=llvm-ranlib STRIP=llvm-strip NM=llvm-nm
     PA_WORK="$WORK/pulseaudio"
@@ -451,6 +463,30 @@ if [ "$ABI" = "x86_64" ]; then (
         --disable-oss-output --disable-oss-wrapper --disable-gconf --disable-asyncns --disable-nls \
         --without-fftw --disable-default-build-tests \
         ax_cv_PTHREAD_PRIO_INHERIT=no ac_cv_header_glob_h=no ac_cv_header_execinfo_h=no
+
+    patch_android_elf() {
+        patchelf --remove-rpath "$1"
+        soname="$(patchelf --print-soname "$1" 2>/dev/null || true)"
+        case "$soname" in *.so.*) patchelf --set-soname "${soname%%.so.*}.so" "$1" ;; esac
+        for needed in $(patchelf --print-needed "$1"); do
+            case "$needed" in *.so.*) patchelf --replace-needed "$needed" "${needed%%.so.*}.so" "$1" ;; esac
+        done
+        llvm-strip --strip-unneeded "$1"
+    }
+
+    if [ "$ABI" = "arm64-v8a" ]; then
+        make -C src -j"$(nproc)" module-pipe-source.la
+        PA_DESKTOP="$PA_WORK/desktop-asset"
+        mkdir -p "$PA_DESKTOP/modules"
+        cp -L src/.libs/module-pipe-source.so "$PA_DESKTOP/modules/"
+        patch_android_elf "$PA_DESKTOP/modules/module-pipe-source.so"
+        patchelf --print-needed "$PA_DESKTOP/modules/module-pipe-source.so"
+        mkdir -p "$REPO_ROOT/runtime-linux-noroot/src/main/assets"
+        tar -C "$PA_DESKTOP" -I 'zstd -19' -cf \
+            "$REPO_ROOT/runtime-linux-noroot/src/main/assets/pulseaudio-desktop-arm64-v8a.tzst" modules
+        exit 0
+    fi
+
     make -C src -j"$(nproc)" \
         libpulsecommon-13.0.la libpulse.la libpulsecore-13.0.la pulseaudio pactl \
         libprotocol-native.la module-native-protocol-unix.la module-aaudio-sink.la module-pipe-source.la
@@ -466,18 +502,12 @@ if [ "$ABI" = "x86_64" ]; then (
     cp -L src/.libs/pactl "$PA_ASSET/pactl"
     for elf in "$PA_LIBS"/libltdl.so "$PA_LIBS"/libsndfile.so "$PA_LIBS"/libpulse*.so \
         "$PA_ASSET"/modules/*.so "$PA_ASSET/pactl"; do
-        patchelf --remove-rpath "$elf"
-        soname="$(patchelf --print-soname "$elf" 2>/dev/null || true)"
-        case "$soname" in *.so.*) patchelf --set-soname "${soname%%.so.*}.so" "$elf" ;; esac
-        for needed in $(patchelf --print-needed "$elf"); do
-            case "$needed" in *.so.*) patchelf --replace-needed "$needed" "${needed%%.so.*}.so" "$elf" ;; esac
-        done
-        llvm-strip --strip-unneeded "$elf"
+        patch_android_elf "$elf"
     done
     mkdir -p "$REPO_ROOT/runtime-windows/src/main/assets"
     tar -C "$PA_ASSET" -I 'zstd -19' -cf \
         "$REPO_ROOT/runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst" modules pactl
-) fi
+)
 
 echo "=== Done. Deps installed under $DEPS_DIR ==="
 find "$DEPS_DIR" -iname "*wayland-client*" -o -iname "libffi.a"

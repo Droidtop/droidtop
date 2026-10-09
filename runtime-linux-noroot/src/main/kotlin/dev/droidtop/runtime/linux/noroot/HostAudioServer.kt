@@ -203,7 +203,11 @@ internal class HostAudioServer(private val context: Context) {
         if (!current.waitFor(STOP_GRACE_S, TimeUnit.SECONDS)) current.destroyForcibly()
     }
 
-    /** Unpacks the modules asset into [modulesDir] once; a no-op once they are there. */
+    /**
+     * Unpacks the modules asset into [modulesDir] once, then the Desktop's
+     * own modules asset over it where this ABI has one
+     * ([desktopAssetNameFor]); a no-op once they are there.
+     */
     private fun extractModulesIfNeeded(abi: String) {
         // Re-extracted after an app update: the modules asset can gain modules
         // (the microphone's pipe source did), and an old extraction lacks them.
@@ -212,11 +216,18 @@ internal class HostAudioServer(private val context: Context) {
         }.getOrDefault("")
         val marker = File(modulesDir, EXTRACTED_MARKER)
         if (File(modulesDir, AAUDIO_SINK_MODULE).isFile && marker.isFile && marker.readText() == installed) return
-        val assets = context.assets
-        val assetName = assetNameFor(assets.list("").orEmpty().toList(), abi)
+        val assetNames = context.assets.list("").orEmpty().toList()
+        val assetName = assetNameFor(assetNames, abi)
             ?: throw IOException("no PulseAudio modules asset packaged for $abi")
         modulesDir.mkdirs()
-        assets.open(assetName).use { raw ->
+        unpack(assetName)
+        desktopAssetNameFor(assetNames, abi)?.let { unpack(it) }
+        marker.writeText(installed)
+    }
+
+    /** Writes every file of the tar.zst asset [assetName] under [workingDir], at its path in the archive. */
+    private fun unpack(assetName: String) {
+        context.assets.open(assetName).use { raw ->
             ZstdInputStream(raw).use { zstd ->
                 TarInputStream(zstd).use { tar ->
                     var entry = tar.nextEntry
@@ -231,7 +242,6 @@ internal class HostAudioServer(private val context: Context) {
                 }
             }
         }
-        marker.writeText(installed)
     }
 
     companion object {
@@ -262,6 +272,18 @@ internal class HostAudioServer(private val context: Context) {
             "arm64-v8a" -> assetNames.firstOrNull { ARM64_ASSET.matches(it) }
             else -> null
         }
+
+        /**
+         * The Desktop's own modules for [abi], unpacked over [assetNameFor]'s,
+         * or null where that asset already holds everything. Only arm64 has
+         * one: the upstream arm64 asset has no [PIPE_SOURCE_MODULE], so
+         * build-scripts/build-vendor-deps.sh builds that one module from the
+         * same PulseAudio and configure line and packs it alone
+         * (Droidtop/tracker#132). The x86_64 asset is droidtop's own build and
+         * already holds it.
+         */
+        internal fun desktopAssetNameFor(assetNames: List<String>, abi: String): String? =
+            "pulseaudio-desktop-$abi.tzst".takeIf { it in assetNames }
 
         /**
          * The whole of the server's config: a Unix socket at [socketPath],

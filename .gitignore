@@ -29,6 +29,7 @@ runtime-linux-noroot/src/main/jniLibs/
 app/src/main/jniLibs/
 runtime-windows/src/main/jniLibs/
 runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst
+runtime-linux-noroot/src/main/assets/pulseaudio-desktop-arm64-v8a.tzst
 # The re-hosted Windows runtime prebuilts (build-scripts/fetch-windows-runtime-prebuilt.sh).
 runtime-windows/prebuilt/
 # The lsfg-vk layer (build-scripts/fetch-lsfg-layer.sh).
