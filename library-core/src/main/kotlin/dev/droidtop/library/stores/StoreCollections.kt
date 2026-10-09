@@ -17,7 +17,8 @@ import kotlinx.coroutines.withContext
  * collections are separate and are never touched.
  */
 object StoreCollections {
-    private const val PREFIX = "import:"
+    /** Every imported collection's id starts with this ([dev.droidtop.library.CollectionScope.isImported]). */
+    const val IMPORT_PREFIX = "import:"
 
     /** Whether [collectionId] is a store's collection copied in (and so rewritten at the store's next sync). */
     fun isImported(collectionId: String) = collectionId.startsWith(PREFIX)
@@ -26,7 +27,7 @@ object StoreCollections {
     fun copyName(importedName: String) = importedName.substringAfter(": ", importedName).ifBlank { importedName }
 
     /** The ids of the collections imported from [storeId] start with this. */
-    fun prefixFor(storeId: String) = "$PREFIX$storeId:"
+    fun prefixFor(storeId: String) = "$IMPORT_PREFIX$storeId:"
 
     /** The droidtop collection and its members' library ids that [collection] of [store] becomes. Pure. */
     fun plan(storeId: String, storeLabel: String, collection: StoreCollection): Pair<CollectionEntity, List<String>> =

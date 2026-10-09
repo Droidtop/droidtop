@@ -61,6 +61,8 @@ enum class LibraryFacet(val key: String, val label: String) {
     KIND("kind", "Kind"),
     // The launcher a game came to droidtop through (Lutris), by its id ([dev.droidtop.library.PcLaunchers]).
     IMPORTED_FROM("via", "Imported from"),
+    // The collections a card is in (a merged card if any copy is), by collection id: static membership only.
+    COLLECTION("collection", "Collection"),
     ENGINE("engine", "Engine"),
     RUNNER("runner", "Runner"),
     INSTALLED("installed", "Install state"),
@@ -96,6 +98,7 @@ enum class LibraryFacet(val key: String, val label: String) {
         OWNERSHIP -> entry.holding()?.let { listOf(it.name) }.orEmpty()
         KIND -> listOf(if (entry.kind in dev.droidtop.shell.gamepad.pc.NON_ENGINE_KINDS) KIND_PC else KIND_ENGINE)
         IMPORTED_FROM -> context.viaOf(entry)?.let { listOf(it) }.orEmpty()
+        COLLECTION -> context.collectionsOf(entry).toList()
         ENGINE -> entry.engineLabel()?.let { listOf(it) }.orEmpty()
         RUNNER -> context.runnerLabelOf(entry)?.let { listOf(it) }.orEmpty()
         // The one answer the Installed shelf reads too (LibraryEntry.isInstalled): a
@@ -145,8 +148,9 @@ enum class LibraryFacet(val key: String, val label: String) {
         APP_SOURCE -> entry.appFacts?.let { listOf(appSourceLabel(it)) }.orEmpty()
     }
 
-    /** What a person reads for one of this facet's values: a source's name for its id, the value itself otherwise. */
-    fun valueLabel(value: String): String = when (this) {
+    /** What a person reads for one of this facet's values: a source's or a collection's name for its id, the value itself otherwise. */
+    fun valueLabel(value: String, context: LibraryQueryContext = LibraryQueryContext()): String = when (this) {
+        COLLECTION -> context.collectionName(value) ?: value
         SOURCE -> PcSource.fromId(value).label()
         OWNERSHIP -> StoreHolding.entries.firstOrNull { it.name == value }?.label ?: value
         KIND -> if (value == KIND_ENGINE) "Engine" else "PC"
@@ -235,6 +239,10 @@ data class LibraryQueryContext(
     val pcRoots: List<String> = emptyList(),
     /** The launcher a game was imported through ([dev.droidtop.library.PcLaunchers]), read once off the main thread; null for none. */
     val viaOf: (LibraryEntry) -> String? = { null },
+    /** The collections a card is in ([dev.droidtop.library.CollectionMembership]), from the membership the list collects. */
+    val collectionsOf: (LibraryEntry) -> Set<String> = { emptySet() },
+    /** A collection's name by id, for the Collection facet's values. */
+    val collectionName: (String) -> String? = { null },
 )
 
 /** What one list offers: which facets, which sorts, and how to read the facts. */
@@ -284,7 +292,7 @@ data class LibraryQuery(
     /** One chip per active filter, in the scope's facet order: what a chip row draws. */
     fun activeChips(scope: LibraryQueryScope): List<QueryChip> = buildList {
         text.trim().takeIf { it.isNotEmpty() }?.let { add(QueryChip(null, it)) }
-        scope.facets.forEach { facet -> selected(facet).sorted().forEach { add(QueryChip(facet, it)) } }
+        scope.facets.forEach { facet -> selected(facet).sorted().forEach { add(QueryChip(facet, it, facet.valueLabel(it, scope.context))) } }
     }
 
     /** The view with one chip's filter taken off. */
@@ -460,8 +468,8 @@ data class FacetOffer(val facet: LibraryFacet, val values: List<FacetValueCount>
  * text. The chip row and the sheet's summary line read these, so what is
  * drawn and what is applied cannot differ.
  */
-data class QueryChip(val facet: LibraryFacet?, val value: String) {
-    val label: String get() = if (facet == null) "\"$value\"" else facet.valueLabel(value)
+data class QueryChip(val facet: LibraryFacet?, val value: String, private val display: String? = null) {
+    val label: String get() = if (facet == null) "\"$value\"" else display ?: facet.valueLabel(value)
 }
 
 /**
@@ -765,6 +773,16 @@ object LibraryViewPrefs {
             showShared = prefs.getBoolean(SHOW_SHARED, defaults.showShared),
             showFree = prefs.getBoolean(SHOW_FREE, defaults.showFree),
         )
+    }
+
+    private const val IMPORT_PROMPTED = "droidtop_library_import_prompted_"
+
+    /** Whether the person was asked once whether [storeId]'s imported collections become tabs; a preferences read. */
+    fun importPrompted(context: Context, storeId: String): Boolean =
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getBoolean(IMPORT_PROMPTED + storeId, false)
+
+    fun setImportPrompted(context: Context, storeId: String) {
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit().putBoolean(IMPORT_PROMPTED + storeId, true).apply()
     }
 
     private const val TAB_FAVOURITES = "droidtop_library_pc_tab_favourites"

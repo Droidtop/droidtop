@@ -106,9 +106,10 @@ internal fun pluginHomeShelves(
  *   the whole library says nothing.
  * - With more than one source ([PcSource]: a store, a game folder, the Wine
  *   shortcuts), **one shelf per source**, in the Source filter's order.
- *   With one, **one per engine family** (Visual Novels, RPG Maker,
- *   Windows, ...): a library of 170 folder games is not one row, it is the
- *   handful of kinds the person collects.
+ *   With one, a shelf per pinned collection ([pinnedCollections], id and
+ *   name), or with none pinned **one per engine family** (Visual Novels,
+ *   RPG Maker, Windows, ...): a library of 170 folder games is not one row,
+ *   it is the handful of kinds the person collects.
  *
  * On PC Games' Overview ([updatesFirst]) Update available, when it has rows,
  * leads, above Continue playing (docs/SPEC.md 7i); Home keeps its own order.
@@ -132,6 +133,8 @@ internal fun pcShelves(
     isRecentlyAdded: (LibraryEntry) -> Boolean = { true },
     updatesFirst: Boolean = false,
     roots: List<String> = emptyList(),
+    pinnedCollections: List<Pair<String, String>> = emptyList(),
+    collectionsOf: (LibraryEntry) -> Set<String> = { emptySet() },
 ): List<PcShelf> {
     val listed = games.filter { listExclusion(it, ListPlace.LIST, options) == null }
     val active = games.filter { listExclusion(it, ListPlace.ACTIVITY, options) == null }
@@ -176,6 +179,9 @@ internal fun pcShelves(
             bySource.entries.filter { it.key != null }
                 .sortedWith(compareBy<Map.Entry<PcSource?, List<LibraryEntry>>, PcSource>(PcSource.ORDER) { it.key!! })
                 .forEach { (source, rows) -> shelf("source:${source!!.id}", source.label(), rows)?.let(::add) }
+        } else if (pinnedCollections.isNotEmpty()) {
+            // One source: the person's pinned collections are the shelves (docs/SPEC.md 7i).
+            pinnedCollections.forEach { (id, name) -> shelf("collection:$id", name, listed.filter { id in collectionsOf(it) })?.let(::add) }
         } else {
             listed.groupBy { it.kind.displayName() }
                 .entries

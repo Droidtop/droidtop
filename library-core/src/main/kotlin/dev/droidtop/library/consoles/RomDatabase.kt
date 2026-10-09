@@ -13,6 +13,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.migration.Migration
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Real per-game metadata -- deliberately a SEPARATE table, not more columns
@@ -238,6 +239,14 @@ interface RomDao {
 
     @Query("SELECT * FROM collections ORDER BY name")
     suspend fun getCollections(): List<CollectionEntity>
+
+    /** [getCollections], again whenever the table changes ([dev.droidtop.library.CollectionMembership.flow]). */
+    @Query("SELECT * FROM collections ORDER BY name")
+    fun collectionsFlow(): Flow<List<CollectionEntity>>
+
+    /** Every membership row, again whenever one changes: one whole-table read, never one per game. */
+    @Query("SELECT collection_id, game_id FROM collection_members")
+    fun membersFlow(): Flow<List<CollectionMemberEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCollection(collection: CollectionEntity)

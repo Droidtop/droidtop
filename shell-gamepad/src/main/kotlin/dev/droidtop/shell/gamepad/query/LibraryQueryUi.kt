@@ -167,7 +167,7 @@ internal fun LibraryFilterSheet(
                             offer.facet.label,
                             value = when (selected.size) {
                                 0 -> null
-                                1 -> offer.facet.valueLabel(selected.first())
+                                1 -> offer.facet.valueLabel(selected.first(), scope.context)
                                 else -> "${selected.size} selected"
                             },
                             chevron = true,
@@ -209,7 +209,7 @@ internal fun LibraryFilterSheet(
                     val on = entry.value in query.selected(facet)
                     add(
                         FilterEntry.Row(
-                            facet.valueLabel(entry.value),
+                            facet.valueLabel(entry.value, scope.context),
                             value = (if (on) "✓ " else "") + entry.count,
                             onClick = { onQueryChange(query.withToggled(facet, entry.value, !on)) },
                         ),

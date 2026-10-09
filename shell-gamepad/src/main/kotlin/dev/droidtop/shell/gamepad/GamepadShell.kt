@@ -2354,14 +2354,21 @@ private fun GamesSection(
             if (entries.any { it.lastPlayedEpochMs != null }) add(GameGroup.Collection(AutoCollections.LAST_PLAYED_ID, "Last played", "auto-lastplayed"))
         }
     }
-    val customCollectionGroups = remember(customCollections) {
-        customCollections.map { GameGroup.Collection(it.id, it.name, AutoCollections.CUSTOM_THEME_FOLDER) }
+    // One rule with PC Games (docs/SPEC.md 7g, "A store's collections"): a
+    // collection is a Retro one only while it has a Retro member, so a store's
+    // collections of PC games never show here, and it lists its Retro members only.
+    val retroMembership = remember(customCollections, customCollectionMembership) {
+        dev.droidtop.library.CollectionMembership(customCollections, customCollectionMembership)
+    }
+    val customCollectionGroups = remember(retroMembership, entriesById) {
+        dev.droidtop.library.CollectionScope.retroCollections(retroMembership) { it in entriesById }
+            .map { GameGroup.Collection(it.id, it.name, AutoCollections.CUSTOM_THEME_FOLDER) }
     }
     val collectionGroups = autoCollectionGroups + customCollectionGroups
     // Real cross-cutting membership -- a game can be in several
     // collections at once, unlike the strict system/engine partition
     // below (see GameGroup.Collection's own doc comment).
-    val collectionGroupMembers = remember(collectionGroups, entries, customCollectionMembership) {
+    val collectionGroupMembers = remember(collectionGroups, entries, retroMembership) {
         collectionGroups.associateWith { group ->
             when (group.id) {
                 AutoCollections.ALL_GAMES_ID -> entries
@@ -2370,7 +2377,7 @@ private fun GamesSection(
                     .filter { it.lastPlayedEpochMs != null }
                     .sortedByDescending { it.lastPlayedEpochMs }
                     .take(AutoCollections.LAST_PLAYED_LIMIT)
-                else -> customCollectionMembership[group.id].orEmpty().mapNotNull { entriesById[it] }
+                else -> dev.droidtop.library.CollectionScope.retroMembers(group.id, retroMembership, entriesById)
             }
         }
     }

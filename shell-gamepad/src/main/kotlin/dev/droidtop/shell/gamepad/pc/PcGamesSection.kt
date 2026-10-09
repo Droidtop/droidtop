@@ -80,6 +80,8 @@ import dev.droidtop.shell.gamepad.query.StripTabs
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.width
 import dev.droidtop.library.PcSource
+import dev.droidtop.library.CollectionMembership
+import dev.droidtop.library.CollectionScope
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
@@ -337,15 +339,31 @@ internal fun PcGamesSection(
         ownership = next
         coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setOwnershipOptions(context, next) } }
     }
-    val scope = remember(pcRoots, ownership, viaByEntry) {
+    // Which games are in which collections (docs/SPEC.md 7i, "Collections"):
+    // two whole-table reads, again whenever a collection changes, never a
+    // read per game. A merged card is a member if any of its copies is.
+    val membership by remember { CollectionMembership.flow(context) }.collectAsState(CollectionMembership())
+    val copiesOf: (LibraryEntry) -> List<String> = remember(folded) {
+        val siblings = folded?.siblings.orEmpty();
+        { card -> siblings[card.id]?.map { it.id } ?: listOf(card.id) }
+    }
+    val scope = remember(pcRoots, ownership, viaByEntry, membership, copiesOf) {
+        val names = membership.collections.associate { collection ->
+            collection.id to CollectionScope.shortName(collection, CollectionScope.importedFrom(collection.id)?.let { PcSource.Store(it).label() })
+        }
         LibraryQueryScope(
             id = LibraryViewPrefs.PC_SCOPE_ID,
-            context = dev.droidtop.shell.gamepad.query.LibraryQueryContext(pcRoots = pcRoots.orEmpty(), viaOf = { viaByEntry[it.id] }),
+            context = dev.droidtop.shell.gamepad.query.LibraryQueryContext(
+                pcRoots = pcRoots.orEmpty(),
+                viaOf = { viaByEntry[it.id] },
+                collectionsOf = { membership.collectionsOf(copiesOf(it)) },
+                collectionName = { names[it] },
+            ),
             ownership = ownership,
             // Runner, ready and ProtonDB are left off: they cost a folder
             // walk or a network ask per entry, which a list never pays.
             facets = listOf(
-                LibraryFacet.SOURCE, LibraryFacet.OWNERSHIP, LibraryFacet.KIND, LibraryFacet.IMPORTED_FROM,
+                LibraryFacet.SOURCE, LibraryFacet.OWNERSHIP, LibraryFacet.KIND, LibraryFacet.COLLECTION, LibraryFacet.IMPORTED_FROM,
                 LibraryFacet.ENGINE, LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES,
                 LibraryFacet.PLAYED, LibraryFacet.RECENTLY_PLAYED, LibraryFacet.GENRE, LibraryFacet.DEVELOPER,
                 LibraryFacet.YEAR, LibraryFacet.UPDATE, LibraryFacet.MISSING_ART, LibraryFacet.HIDDEN,
@@ -447,10 +465,19 @@ internal fun PcGamesSection(
             homeShelfList = own + fresh
         }
     }
-    LaunchedEffect(games, ownership, recentlyAdded, pcRoots) {
+    // The collections pinned as tabs, by id and name: Overview's shelves when the library has one source.
+    val pinnedCollections = remember(savedViews.views) {
+        savedViews.views.filter { it.pinned }.mapNotNull { view ->
+            view.query.selected(LibraryFacet.COLLECTION).singleOrNull()?.takeIf { view.query.facets.size == 1 }?.let { it to view.name }
+        }
+    }
+    LaunchedEffect(games, ownership, recentlyAdded, pcRoots, pinnedCollections, scope) {
         val all = games ?: return@LaunchedEffect
         val next = withContext(Dispatchers.Default) {
-            pcShelves(all, options = ownership, isRecentlyAdded = recentlyAdded, updatesFirst = true, roots = pcRoots.orEmpty())
+            pcShelves(
+                all, options = ownership, isRecentlyAdded = recentlyAdded, updatesFirst = true, roots = pcRoots.orEmpty(),
+                pinnedCollections = pinnedCollections, collectionsOf = scope.context.collectionsOf,
+            )
         }
         if (state.view == PcView.OVERVIEW && !state.stripFocused) keepCursor(pcShelfList, next)
         pcShelfList = next
@@ -486,11 +513,63 @@ internal fun PcGamesSection(
         state.view == PcView.COLLECTIONS -> emptyList()
         else -> grid
     }
-    LaunchedEffect(shelves.size, currentList.size, hasFreeRow) {
+    // The Collections tab: its groups of tiles, worked out off the main thread
+    // as the library, the membership or the saved views change.
+    var collectionGroupList by remember { mutableStateOf(emptyList<CollectionGroup>()) }
+    LaunchedEffect(games, membership, savedViews.views, scope) {
+        val all = games ?: return@LaunchedEffect
+        collectionGroupList = withContext(Dispatchers.Default) { collectionGroups(all, membership, copiesOf, savedViews.views, scope) }
+    }
+    val tiles = remember(collectionGroupList) { collectionGroupList.tiles() }
+    val columns = collectionColumns()
+    val tileRowList = remember(collectionGroupList, columns) { tileRows(collectionGroupList, columns) }
+    val onTiles = state.view == PcView.COLLECTIONS
+    val focusedTile = if (onTiles && !state.stripFocused) tiles.getOrNull(state.itemIndex) else null
+    var tileMenu by remember { mutableStateOf<CollectionTile?>(null) }
+    LaunchedEffect(shelves.size, currentList.size, hasFreeRow, tiles.size, onTiles) {
         state.shelfIndex = state.shelfIndex.coerceIn(0, (shelves.size - 1).coerceAtLeast(0))
         // The grid's free-to-play row is one more stop after the last game.
-        val last = if (hasFreeRow) currentList.size else currentList.size - 1
+        val last = when {
+            onTiles -> tiles.size - 1
+            hasFreeRow -> currentList.size
+            else -> currentList.size - 1
+        }
         state.itemIndex = state.itemIndex.coerceIn(0, last.coerceAtLeast(0))
+    }
+    // The imported collections a store brought, and whether to make them tabs: asked once per store.
+    var promptStore by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(membership) {
+        val stores = membership.collections.mapNotNull { CollectionScope.importedFrom(it.id) }.distinct()
+        if (stores.isEmpty()) return@LaunchedEffect
+        promptStore = withContext(Dispatchers.IO) { stores.firstOrNull { !LibraryViewPrefs.importPrompted(context, it) } }
+    }
+    fun importedCollectionTiles(storeId: String? = null): List<CollectionTile> = tiles.filter { tile ->
+        tile.collectionId?.let { id -> CollectionScope.importedFrom(id)?.let { storeId == null || it == storeId } } == true
+    }
+    fun pinCollections(pin: List<CollectionTile>) {
+        val have = savedViews.views.map { it.id }.toSet()
+        savedViews.replaceAll(
+            savedViews.views + pin.filter { collectionViewId(it.collectionId!!) !in have }
+                .map { NamedLibraryView(it.name, it.query, id = collectionViewId(it.collectionId!!), pinned = true) },
+        )
+    }
+    fun unpinCollections(ids: Set<String>) {
+        savedViews.replaceAll(savedViews.views.filterNot { view -> ids.any { view.id == collectionViewId(it) } })
+    }
+    fun togglePin(tile: CollectionTile) {
+        val collectionId = tile.collectionId
+        when {
+            collectionId != null && tile.pinned -> savedViews.replaceAll(
+                savedViews.views.filterNot { it.id == collectionViewId(collectionId) }
+                    .map { if (it.pinned && it.query == tile.query) it.copy(pinned = false) else it },
+            )
+            collectionId != null -> pinCollections(listOf(tile))
+            else -> savedViews.replaceAll(savedViews.views.map { if (it.id == tile.viewId) it.copy(pinned = !it.pinned) else it })
+        }
+    }
+    fun answerPrompt(storeId: String) {
+        promptStore = null
+        coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setImportPrompted(context, storeId) } }
     }
     // Home's destination row is the list's last stop, and the only one when
     // nothing is on the shelves yet.
@@ -628,7 +707,7 @@ internal fun PcGamesSection(
     // Sort By (docs/SPEC.md 7j), Select the focused game's menu: only what
     // dispatches, re-read as the cursor moves.
     val verb = focusedPlay?.first?.verb
-    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view, onDest, onFreeRow) {
+    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view, onDest, onFreeRow, focusedTile) {
         // Steam's order: the list's own actions, then A and B. Start (Menu)
         // is the shell's, drawn at the row's left; L1/R1 are the glyphs at
         // the strip's ends, not hints.
@@ -636,8 +715,8 @@ internal fun PcGamesSection(
             HintBinding(GamepadAction.X, "Filter"),
             HintBinding(GamepadAction.Y, "Sort By"),
             HintBinding(GamepadAction.SELECT, "Options"),
-            HintBinding(GamepadAction.A, if (onDest) "Open" else if (state.stripFocused || onFreeRow) "Select" else verb ?: "Play") {
-                onDest || state.stripFocused || onFreeRow || focusedEntry != null
+            HintBinding(GamepadAction.A, if (onDest || focusedTile != null) "Open" else if (state.stripFocused || onFreeRow) "Select" else verb ?: "Play") {
+                onDest || state.stripFocused || onFreeRow || focusedTile != null || focusedEntry != null
             },
             HintBinding(GamepadAction.B, "Back") { state.view != PcView.HOME },
         )
@@ -657,10 +736,12 @@ internal fun PcGamesSection(
     // it, eased on the first press and linear while a direction is held; the
     // page of shelves moves by as little as it takes (docs/SPEC.md 6e and
     // "Gaming motion and focus").
-    LaunchedEffect(state.view, state.stripFocused, state.stripIndex, state.shelfIndex, state.itemIndex, shelves, grid, onDest) {
+    val tilesState = rememberLazyGridState()
+    LaunchedEffect(state.view, state.stripFocused, state.stripIndex, state.shelfIndex, state.itemIndex, shelves, grid, onDest, tiles) {
         when {
             state.stripFocused -> stripState.keepCentred(state.stripIndex, chained = heldStep)
             onDest -> columnState.keepInView(shelves.size, animate = !heldStep)
+            onTiles -> if (tiles.isNotEmpty()) tilesState.keepCentred(gridIndexOfTile(collectionGroupList, state.itemIndex), chained = heldStep)
             state.onShelves -> {
                 val shelf = shelves.getOrNull(state.shelfIndex) ?: return@LaunchedEffect
                 columnState.keepInView(state.shelfIndex, animate = !heldStep)
@@ -710,7 +791,8 @@ internal fun PcGamesSection(
                             } else if (!state.home) {
                                 state.stripFocused = true
                             }
-                            state.view == PcView.COLLECTIONS -> state.stripFocused = true
+                            onTiles -> tileStep(tileRowList, state.itemIndex, GamepadAction.UP)?.let { moveTo(state.shelfIndex, it) }
+                                ?: run { state.stripFocused = true }
                             // From the free-to-play row back to the last game.
                             onFreeRow -> if (grid.isNotEmpty()) moveTo(state.shelfIndex, grid.lastIndex) else state.stripFocused = true
                             else -> {
@@ -720,7 +802,7 @@ internal fun PcGamesSection(
                         }
                         GamepadAction.DOWN -> when {
                             onDest -> Unit
-                            state.stripFocused -> if (currentList.isNotEmpty() || hasFreeRow) state.stripFocused = false
+                            state.stripFocused -> if (currentList.isNotEmpty() || hasFreeRow || (onTiles && tiles.isNotEmpty())) state.stripFocused = false
                             state.onShelves -> if (state.shelfIndex < shelves.lastIndex) {
                                 val next = state.shelfIndex + 1
                                 moveTo(next, state.shelfItems[shelves[next].id] ?: 0)
@@ -728,7 +810,8 @@ internal fun PcGamesSection(
                                 EsDeNavigationSounds.play(UiSound.MOVE)
                                 state.destFocused = true
                             }
-                            onFreeRow || state.view == PcView.COLLECTIONS -> Unit
+                            onTiles -> tileStep(tileRowList, state.itemIndex, GamepadAction.DOWN)?.let { moveTo(state.shelfIndex, it) }
+                            onFreeRow -> Unit
                             // Down from the last row reaches the free-to-play row; nothing wraps onto it.
                             else -> gridPadTarget(state.itemIndex, grid.size, gridColumns(), FocusDirection.Down)
                                 ?.let { moveTo(state.shelfIndex, it) }
@@ -748,7 +831,8 @@ internal fun PcGamesSection(
                                     state.stripIndex = next
                                 }
                                 state.onShelves -> moveTo(state.shelfIndex, menuStep(state.itemIndex, currentList.size, step))
-                                onFreeRow || state.view == PcView.COLLECTIONS -> Unit
+                                onTiles -> tileStep(tileRowList, state.itemIndex, press.action)?.let { moveTo(state.shelfIndex, it) }
+                                onFreeRow -> Unit
                                 else -> gridPadTarget(
                                     state.itemIndex, grid.size, gridColumns(),
                                     if (step < 0) FocusDirection.Left else FocusDirection.Right,
@@ -759,6 +843,7 @@ internal fun PcGamesSection(
                             if (onDest) HOME_DESTINATIONS.getOrNull(state.destIndex)?.let { onOpenSection(it.section) }
                             else if (state.stripFocused) activateChip(state.stripIndex)
                             else if (onFreeRow) toggleFree()
+                            else if (focusedTile != null) state.showGrid(focusedTile.query)
                             else focusedEntry?.let(activate)
                         }
                         GamepadAction.X -> state.filterOpen = true
@@ -769,7 +854,13 @@ internal fun PcGamesSection(
                         // On a pinned tab, Select is that tab's Options (Edit, Unpin, Move).
                         GamepadAction.SELECT, GamepadAction.L2 -> {
                             val pinned = (tabs.getOrNull(state.stripIndex) as? PcTab.Grid)?.takeIf { state.stripFocused && !it.builtIn }
-                            if (pinned != null) tabMenu = pinned.view else focusedEntry?.let(::openOptions) ?: run { state.optionsOpen = true }
+                            if (pinned != null) {
+                                tabMenu = pinned.view
+                            } else if (focusedTile != null) {
+                                tileMenu = focusedTile
+                            } else {
+                                focusedEntry?.let(::openOptions) ?: run { state.optionsOpen = true }
+                            }
                         }
                         else -> return@onPad false
                     }
@@ -798,9 +889,17 @@ internal fun PcGamesSection(
                 games == null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MenuTokens.OnSurface)
                 }
-                state.view == PcView.COLLECTIONS -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(COLLECTIONS_EMPTY, color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
-                }
+                onTiles -> PcCollectionsView(
+                    groups = collectionGroupList,
+                    selected = state.itemIndex.takeIf { !state.stripFocused },
+                    columns = columns,
+                    state = tilesState,
+                    onTap = { index ->
+                        state.stripFocused = false
+                        if (state.itemIndex == index) tiles.getOrNull(index)?.let { state.showGrid(it.query) } else moveTo(state.shelfIndex, index)
+                    },
+                    empty = COLLECTIONS_EMPTY,
+                )
                 state.onShelves -> PcShelvesHome(
                     shelves = shelves,
                     state = state,
@@ -1063,6 +1162,44 @@ internal fun PcGamesSection(
     // The free-space offer before a store install or update.
     PcLaunchOfferSheet(pcLaunch)
 
+    tileMenu?.let { tile ->
+        CollectionTileMenu(
+            tile = tile,
+            hasImported = importedCollectionTiles().isNotEmpty(),
+            onTogglePin = {
+                tileMenu = null
+                togglePin(tile)
+            },
+            onPinAllImported = {
+                tileMenu = null
+                pinCollections(importedCollectionTiles())
+            },
+            onUnpinAllImported = {
+                tileMenu = null
+                unpinCollections(importedCollectionTiles().mapNotNull { it.collectionId }.toSet())
+            },
+            onDismiss = { tileMenu = null },
+        )
+    }
+    promptStore?.takeIf { tileMenu == null && tabMenu == null && !state.filterOpen }?.let { storeId ->
+        val count = membership.collections.count { CollectionScope.importedFrom(it.id) == storeId }
+        ImportedCollectionsPrompt(
+            storeLabel = PcSource.Store(storeId).label(),
+            count = count,
+            onChoose = {
+                answerPrompt(storeId)
+                state.open(home = false)
+                state.showCollections()
+                state.stripFocused = false
+                state.stripIndex = tabs.indexOf(PcTab.Collections).coerceAtLeast(0)
+            },
+            onAddAll = {
+                answerPrompt(storeId)
+                pinCollections(importedCollectionTiles(storeId))
+            },
+            onNotNow = { answerPrompt(storeId) },
+        )
+    }
     // A pinned tab's Options (Select on it): Edit, Unpin, Move.
     tabMenu?.let { view ->
         PinnedTabMenu(
