@@ -282,3 +282,100 @@ object PluginTiles {
         }
     }
 }
+
+/**
+ * Update sources (docs/plugin-api.md 3 A6, `library.updates`): the plugins
+ * a game can be linked to, asked by the library's own update round
+ * ([dev.droidtop.library.SourceUpdateCheck]) and by the link rows on a
+ * game's page, never from list rendering. A provider's `provides` entry
+ * `id` is the source key its links are stored under (docs/SPEC.md 7g,
+ * "Where an update comes from"); an entry without one is not a source.
+ * Ops, all quick calls: `check {ids}`, `resolve {text}`, `match {title, versions}`.
+ */
+class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources {
+    private val app = context.applicationContext
+
+    private fun providers(): List<Pair<PluginRecord, ProvidedPoint>> =
+        providersOf(app, POINT).filter { (_, entry) -> !entry.id.isNullOrBlank() }.distinctBy { (_, entry) -> entry.id }
+
+    override fun sources(): List<dev.droidtop.library.UpdateSources.Source> = providers().map { (record, entry) ->
+        dev.droidtop.library.UpdateSources.Source(
+            key = entry.id!!,
+            label = entry.label ?: record.manifest.label,
+            hint = runCatching { JSONObject(entry.extra).optString("linkHint") }.getOrNull()?.takeIf { it.isNotBlank() },
+        )
+    }
+
+    private suspend fun call(source: String, op: String, args: JSONObject, timeoutMs: Long, userInitiated: Boolean): dev.droidtop.pluginhost.PluginReply? {
+        val (record, _) = providers().firstOrNull { (_, entry) -> entry.id == source } ?: return null
+        val policy = PluginCrashPolicy(app)
+        return try {
+            policy.handle(record, newCall(POINT, op, "library.updates", args.put("source", source), timeoutMs), timeoutMs = timeoutMs, crashOnTimeout = false, userInitiated = userInitiated)
+        } finally {
+            policy.shutdown()
+        }
+    }
+
+    override suspend fun check(source: String, externalIds: List<String>): Map<String, dev.droidtop.library.UpdateSources.Answer> {
+        val args = JSONObject().put("ids", org.json.JSONArray(externalIds))
+        val reply = call(source, "check", args, CHECK_BUDGET_MS, userInitiated = false)
+            ?: throw java.io.IOException("The source $source is not installed or not running")
+        if (!reply.ok) throw java.io.IOException(reply.message ?: "The source did not answer")
+        val answers = reply.data.optJSONArray("answers") ?: return emptyMap()
+        val asked = externalIds.toSet()
+        return buildMap {
+            for (i in 0 until answers.length()) {
+                val row = answers.optJSONObject(i) ?: continue
+                val id = row.optString("id").takeIf { it in asked } ?: continue
+                put(
+                    id,
+                    if (row.optBoolean("gone", false)) {
+                        dev.droidtop.library.UpdateSources.Answer.Gone
+                    } else {
+                        dev.droidtop.library.UpdateSources.Answer.Version(row.optStringOrNull("version"), row.optStringOrNull("url"))
+                    },
+                )
+            }
+        }
+    }
+
+    override suspend fun resolve(source: String, text: String): dev.droidtop.library.UpdateSources.Found? {
+        val reply = call(source, "resolve", JSONObject().put("text", text), QUICK_BUDGET_MS, userInitiated = true) ?: return null
+        if (!reply.ok) return null
+        return reply.data.optJSONObject("found")?.let(::found)
+    }
+
+    override suspend fun match(source: String, title: String, versions: List<String>): List<dev.droidtop.library.UpdateSources.Found> {
+        val args = JSONObject().put("title", title).put("versions", org.json.JSONArray(versions))
+        val reply = call(source, "match", args, QUICK_BUDGET_MS, userInitiated = true) ?: return emptyList()
+        if (!reply.ok) return emptyList()
+        val rows = reply.data.optJSONArray("candidates") ?: return emptyList()
+        return (0 until minOf(rows.length(), MAX_CANDIDATES)).mapNotNull { rows.optJSONObject(it)?.let(::found) }
+    }
+
+    private fun found(row: JSONObject): dev.droidtop.library.UpdateSources.Found? {
+        val id = row.optString("id").trim().takeIf { it.isNotEmpty() && it.length <= 200 } ?: return null
+        return dev.droidtop.library.UpdateSources.Found(
+            externalId = id,
+            title = row.optStringOrNull("title"),
+            version = row.optStringOrNull("version"),
+            url = row.optStringOrNull("url")?.takeIf { it.startsWith("https://") || it.startsWith("http://") },
+            note = row.optStringOrNull("note"),
+        )
+    }
+
+    private fun JSONObject.optStringOrNull(name: String): String? =
+        if (isNull(name)) null else optString(name).trim().takeIf { it.isNotEmpty() }
+
+    companion object {
+        const val POINT = "library.updates"
+
+        /** A round's `check`: the source paces its own requests, so it gets longer than a quick call; a miss is not a crash. */
+        const val CHECK_BUDGET_MS = 120_000L
+
+        /** `resolve` and `match` answer a person waiting on a sheet. */
+        const val QUICK_BUDGET_MS = 15_000L
+
+        const val MAX_CANDIDATES = 20
+    }
+}

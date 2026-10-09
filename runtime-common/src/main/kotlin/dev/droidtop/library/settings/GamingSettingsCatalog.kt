@@ -95,7 +95,7 @@ object GamingSettingsCatalog {
     private val TIMEOUT_OPTIONS = dev.droidtop.runtime.systemstatus.SystemControls.SCREEN_TIMEOUTS
     const val ID_DOWNLOADS = "pref_gaming_downloads"
     const val ID_GAME_FOLDERS = "pref_gaming_game_folders"
-    const val ID_F95_IMPORT = "pref_gaming_f95_import"
+
     const val ID_DISPLAY_SHELL_TARGET = dev.droidtop.runtime.MainScreen.KEY
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
     const val ID_DISPLAY_SWAP = "action_display_swap"
@@ -272,20 +272,7 @@ object GamingSettingsCatalog {
                         icon = CatalogIcon.WINDOWS_GAMES,
                     ),
                 )
-                // The watch-list import is a library-sources action like
-                // the scraper rows above it: it reads one external source
-                // of library facts (docs/SPEC.md 7g, "The watch list,
-                // imported once"). Owned by :app, where the Library lives,
-                // resolved through the registry like its siblings.
-                add(
-                    NestedScreenItem(
-                        id = ID_F95_IMPORT,
-                        title = "Import from F95Checker",
-                        subtitle = "Link games to their F95zone threads from a F95Checker watch-list database, after you check every match",
-                        registryId = "f95_import",
-                        icon = CatalogIcon.LIBRARY,
-                    ),
-                )
+
                 // Rescan library is not a row here: it is a one-shot
                 // library action, and lives in the Games section's options
                 // menu and on Game folders (the same item, by id).

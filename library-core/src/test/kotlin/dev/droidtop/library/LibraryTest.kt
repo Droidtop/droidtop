@@ -457,7 +457,7 @@ private class FoldingProvider(
     }
 }
 
-/** The library's own links (merged names, thread links), in memory. */
+/** The library's own links (merged names, source links), in memory. */
 private class FakeGameLinksStore : GameLinksStore {
     val names = mutableMapOf<String, String>()
     override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> =
@@ -465,13 +465,13 @@ private class FakeGameLinksStore : GameLinksStore {
     override suspend fun setGameName(ids: Collection<String>, name: String?) {
         ids.forEach { if (name == null) names.remove(it) else names[it] = name }
     }
-    override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) {}
+    override suspend fun setSourceLink(ids: Collection<String>, source: String, externalId: String?) {}
     override suspend fun moveTo(fromId: String, toId: String) {
         names.remove(fromId)?.let { names.putIfAbsent(toId, it) }
     }
-    override suspend fun linkedThreads(): Map<Long, F95ThreadCheck?> = emptyMap()
-    override suspend fun idsLinkedTo(thread: Long): List<String> = emptyList()
-    override suspend fun saveCheck(check: F95ThreadCheck) {}
+    override suspend fun linkedSources(): Map<SourceKey, SourceAnswer?> = emptyMap()
+    override suspend fun idsLinkedTo(key: SourceKey): List<String> = emptyList()
+    override suspend fun saveAnswer(key: SourceKey, answer: SourceAnswer) {}
 }
 
 private class FakeFoldIndexStore(val slices: MutableMap<String, LibrarySlice>) : LibraryIndexStore {

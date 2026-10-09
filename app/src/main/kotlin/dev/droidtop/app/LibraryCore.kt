@@ -112,10 +112,13 @@ object LibraryCore {
             slowRoundAllowed = {
                 app.getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode != true
             },
-            // Merged games' names and F95zone thread links, and the update
-            // source's answers (docs/SPEC.md 7g, 7m): the library's own
-            // facts, in the same database as play history.
+            // Merged games' names and source links, and the sources'
+            // answers (docs/SPEC.md 7g, 7m): the library's own facts, in
+            // the same database as play history.
             links = RoomGameLinksStore(app),
+            // Update checks are asked of the `library.updates` plugins
+            // (docs/plugin-api.md 3 A6).
+            updateSources = dev.droidtop.library.integrations.PluginUpdateSources(app),
         )
     }
 }

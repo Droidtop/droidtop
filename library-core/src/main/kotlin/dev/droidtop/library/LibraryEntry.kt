@@ -191,13 +191,9 @@ data class LibraryEntry(
      */
     val gameName: String? = null,
     /**
-     * The F95zone thread the user linked to this game, by id (docs/SPEC.md
-     * 7g, "Where an update comes from"). A library fact, like [gameName].
-     */
-    val f95Thread: Long? = null,
-    /**
-     * The newest version the update source last reported for [f95Thread],
-     * as it wrote it; null until it has been asked. A library fact.
+     * The newest version a source the user linked this game to last
+     * reported, as it wrote it (docs/SPEC.md 7g, "Where an update comes
+     * from"); null until one has been asked. A library fact, like [gameName].
      */
     val latestKnown: String? = null,
     /**
@@ -870,12 +866,12 @@ class Library(
     private val records: GameRecordStore = NoOpGameRecordStore,
     /** Asked before each slow round; false (battery saver) skips that round (docs/SPEC.md 7g). */
     private val slowRoundAllowed: () -> Boolean = { true },
-    /** What the user said about a game (its name after a merge, its F95zone thread) and the update source's answers (docs/SPEC.md 7g, 7m). */
+    /** What the user said about a game (its name after a merge, its source links) and the sources' answers (docs/SPEC.md 7g, 7m). */
     private val links: GameLinksStore = NoOpGameLinksStore,
-    /** Where a linked thread's newest version is asked (docs/SPEC.md 7g, "Where an update comes from"). */
-    f95Api: F95CheckerApi = HttpF95CheckerApi,
+    /** Where a linked record's newest version is asked: the `library.updates` plugins (docs/SPEC.md 7g, "Where an update comes from"). */
+    private val updateSources: UpdateSources = NoUpdateSources,
 ) {
-    private val updates = F95UpdateCheck(links, f95Api)
+    private val updates = SourceUpdateCheck(links, updateSources)
 
     private val scanScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -1320,7 +1316,7 @@ class Library(
     }
 
     /**
-     * A round of update checks over the linked threads that are due, on
+     * A round of update checks over the source links that are due, on
      * [scanScope] and never awaited by anything: a walk does not wait for
      * the network, and an answer reaches the lists when it arrives.
      */
@@ -1329,43 +1325,68 @@ class Library(
     }
 
     /** Hands an update round's answers to every list, when it changed anything. */
-    private suspend fun publishUpdates(outcome: F95UpdateCheck.Outcome?) {
+    private suspend fun publishUpdates(outcome: SourceUpdateCheck.Outcome?) {
         if (outcome == null || outcome.changedIds.isEmpty()) return
         changedFactIds += outcome.changedIds
         republish()
     }
 
     /**
+     * The update sources a game can be linked to now (docs/plugin-api.md 3
+     * A6): one row each on a folder game's page. Reads plugin manifests, so
+     * it runs on the IO dispatcher.
+     */
+    suspend fun updateSources(): List<UpdateSources.Source> = withContext(Dispatchers.IO) { updateSources.sources() }
+
+    /**
      * What the user said about the game [ids] are the folders of, and what
-     * its update source last answered: the thread, when one is linked.
+     * its sources last answered: each source's link from whichever folder
+     * holds it (a link is the game's, written to every folder at once).
      */
     suspend fun gameLinks(ids: Collection<String>): GameLinks? = withContext(Dispatchers.IO) {
         val all = links.getAll(ids)
-        all.values.firstOrNull { it.f95Thread != null } ?: all.values.firstOrNull()
+        if (all.isEmpty()) return@withContext null
+        GameLinks(
+            gameName = all.values.firstNotNullOfOrNull { it.gameName },
+            sources = all.values.flatMap { it.sources }.distinctBy { it.source },
+        )
     }
 
     /**
-     * Links [thread] to the game whose folders are [ids] -- every folder,
-     * because a thread is the game's, not one version's -- or unlinks it
-     * when [thread] is null, and asks about a newly linked thread at once
-     * (docs/SPEC.md 7g). Returns why the ask failed, or null.
+     * Records of [source] that may be the game called [title] with
+     * [versions], for a person to pick from (the source's own search; a
+     * failing source offers none).
      */
-    suspend fun linkF95Thread(ids: Collection<String>, thread: Long?): String? = withContext(Dispatchers.IO) {
-        links.setF95Thread(ids, thread)
+    suspend fun sourceMatches(source: String, title: String, versions: List<String>): List<UpdateSources.Found> =
+        withContext(Dispatchers.IO) { runCatching { updateSources.match(source, title, versions) }.getOrDefault(emptyList()) }
+
+    /** The record of [source] that a person's pasted [text] names, or null when it names none. */
+    suspend fun resolveSourceText(source: String, text: String): UpdateSources.Found? =
+        withContext(Dispatchers.IO) { runCatching { updateSources.resolve(source, text) }.getOrNull() }
+
+    /**
+     * Links the game whose folders are [ids] -- every folder, because a
+     * link is the game's, not one version's -- to [externalId] at
+     * [source], or unlinks it from [source] when [externalId] is null, and
+     * asks about a newly linked record at once (docs/SPEC.md 7g). Returns
+     * why the ask failed, or null.
+     */
+    suspend fun linkSource(ids: Collection<String>, source: String, externalId: String?): String? = withContext(Dispatchers.IO) {
+        links.setSourceLink(ids, source, externalId)
         changedFactIds += ids
-        val outcome = thread?.let { updates.round(only = it) }
+        val outcome = externalId?.let { updates.round(only = SourceKey(source, it)) }
         changedFactIds += outcome?.changedIds.orEmpty()
         republish()
         outcome?.error
     }
 
     /**
-     * Asks about [thread] now, a person's "Check now": the same round,
-     * limited to one thread and to once a minute ([F95UpdateCheck]).
+     * Asks about [key] now, a person's "Check now": the same round,
+     * limited to one record and to once a minute ([SourceUpdateCheck]).
      * Returns why the ask failed, or null.
      */
-    suspend fun checkF95ThreadNow(thread: Long): String? = withContext(Dispatchers.IO) {
-        val outcome = updates.round(only = thread) ?: return@withContext "A check is already running; try again in a moment."
+    suspend fun checkSourceNow(key: SourceKey): String? = withContext(Dispatchers.IO) {
+        val outcome = updates.round(only = key) ?: return@withContext "A check is already running; try again in a moment."
         publishUpdates(outcome)
         outcome.error
     }
@@ -2098,12 +2119,11 @@ class Library(
         // store every time, absent included: an entry that went through a
         // record or the index carrying an old answer does not keep it.
         val name = said?.gameName
-        val thread = said?.f95Thread
         val latest = said?.latestKnown
-        return if (withFavourite.gameName == name && withFavourite.f95Thread == thread && withFavourite.latestKnown == latest) {
+        return if (withFavourite.gameName == name && withFavourite.latestKnown == latest) {
             withFavourite
         } else {
-            withFavourite.copy(gameName = name, f95Thread = thread, latestKnown = latest)
+            withFavourite.copy(gameName = name, latestKnown = latest)
         }
     }
 

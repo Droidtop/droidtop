@@ -1174,19 +1174,44 @@ Risk —.
 - **Status:** interface built (empty candidate pool; see its doc).
 
 **A6 Update checks.** EP `library.updates@1`. Risk medium.
-- **For:** "is there a newer version of this game, app or mod", covering
-  a web-sourced game (#9), a GitHub-released homebrew, or an Obtainium
-  bridge (F1).
-- **Ops:**
-  - `check {entry ids} → [{entryId, available, version, notes}]`, run in
-    the host's scheduled update pass;
-  - `apply`, a **job** that routes to A2 `acquire`.
-- **Surfaces:** G: an "Update available" badge and an Updates row;
-  A: notification (C6); D: the file manager badge.
+- **For:** "is there a newer version of this game", for a game the person
+  linked to a record of the source: a web-sourced game (#9, the F95zone
+  plugin, tracker#380), a GitHub-released homebrew, or an Obtainium bridge
+  (F1).
+- **Declaring it:** one `provides` entry per source, whose `id` is the
+  source key droidtop stores the person's links under (keep it stable
+  across versions: a changed key orphans every link) and whose `label` is
+  the row title on a game's page ("F95zone thread"). An optional
+  `linkHint` in the entry says what to paste ("Thread link or number").
+  Two plugins declaring one key: the first one installed is asked.
+- **Ops** (every call's args also carry `source`, the entry id):
+  - `check {ids: [string]}` → `{answers: [{id, version?, url?, gone?}]}`.
+    Run in the host's update round, never from UI: at most 50 ids per call,
+    each id at most every 6 hours (once a minute for a person's "Check
+    now"), 2-minute budget, a miss is not a crash. The plugin paces its own
+    site requests inside the call. An id left out of `answers` keeps its
+    last answer; `gone: true` says the record is private, moved or deleted.
+    The HOST compares `version` with the game's own versions (docs/SPEC.md
+    7g, "When it is an update"); a plugin never says "update available".
+  - `resolve {text}` → `{found: {id, title?, version?, url?, note?}}` or
+    `{}`: the record a person's pasted link or id names (15 s).
+  - `match {title, versions}` → `{candidates: [{id, title?, version?,
+    url?, note?}]}`: records that may be the game, best first, at most 20
+    shown (15 s). `note` says why one is offered ("on your watch list").
+  - `apply`, a **job** that routes to A2 `acquire` (not built).
+- **Surfaces:** G/A/D: one row per source under a folder game's Versions
+  and in its options menu, a sheet that links it (the `match` candidates,
+  a paste field for `resolve`, Unlink), and "Check for update"; the answer
+  feeds the "Update available" badge, the Updates shelf and filter, and
+  Settings > Updates (docs/SPEC.md 7g "One wording"). A notification (C6)
+  is not built.
 - **Permission:** `provide:library.updates`, `net.domains`.
-- **Status:** not built.
-- **Rules:** the host schedules it (at most daily per plugin), and it is
-  never polled from UI.
+- **Status:** built 2026-10-08 (`PluginUpdateSources`,
+  `SourceUpdateCheck`, `SourceLinkRows.kt`); replaces droidtop's built-in
+  F95zone update check and F95Checker import.
+- **Rules:** the host schedules every `check`; it is never polled from UI,
+  and the plugin stores no library facts: the link and the last answer are
+  droidtop's (`source_links`, `source_answers`).
 
 **A7 Save management and sync.** EP `saves.sync@1` plus API
 `saves.locate@1`. Risk high.

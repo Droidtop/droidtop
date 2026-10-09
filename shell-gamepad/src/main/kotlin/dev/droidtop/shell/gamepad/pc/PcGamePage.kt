@@ -65,8 +65,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
-import dev.droidtop.library.F95Thread
+
 import dev.droidtop.library.GameLinks
+import dev.droidtop.library.UpdateSources
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.Library
@@ -94,7 +95,7 @@ import dev.droidtop.shell.gamepad.screenRect
 import dev.droidtop.shell.gamepad.Motion
 import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.ShoulderGlyph
-import dev.droidtop.shell.gamepad.TextEditDialog
+
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.groundBackground
@@ -187,7 +188,7 @@ internal fun PcGamePage(
     // "Choose a runner" on a game no runner offers: opens the Engine picker (Droidtop/tracker#287).
     onChooseEngine: () -> Unit = onOpenOptions,
     onClose: () -> Unit,
-    // The library, for the game's update source (the F95zone thread rows);
+    // The library, for the game's update sources (the source link rows);
     // null draws the page without them.
     library: Library? = null,
 ) {
@@ -203,21 +204,24 @@ internal fun PcGamePage(
     // the row's value until the library publishes the result.
     val scope = rememberCoroutineScope()
     var scrapeStatus by remember(entry.id) { mutableStateOf<String?>(null) }
-    // The game's update source (docs/SPEC.md 7g, 7i): the thread is the
-    // GAME's, so it is read and written for every folder of it, through the
-    // same library calls the options menu uses.
+    // The game's update sources (docs/SPEC.md 7g, 7i): a link is the GAME's,
+    // so it is read and written for every folder of it, through the same
+    // library calls the options menu uses.
     val isFolder = entry.groupingPath() != null
     val gameIds = remember(entry, siblings) {
         siblings.filter { it.groupingPath() != null }.map { it.id }.ifEmpty { listOf(entry.id) }
     }
     val versions = remember(entry, siblings) { installedVersions(entry, siblings) }
     var linksToken by remember(entry.id) { mutableIntStateOf(0) }
-    var editingThread by remember(entry.id) { mutableStateOf(false) }
-    var threadStatus by remember(entry.id) { mutableStateOf<String?>(null) }
+    var editingSource by remember(entry.id) { mutableStateOf<UpdateSources.Source?>(null) }
+    var sourceStatus by remember(entry.id) { mutableStateOf<Map<String, String>>(emptyMap()) }
     val links by produceState<GameLinks?>(null, gameIds, linksToken) {
         value = if (library != null && isFolder) library.gameLinks(gameIds) else null
     }
-    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, threadStatus) {
+    val updateSources by produceState(emptyList<UpdateSources.Source>(), library, isFolder) {
+        value = if (library != null && isFolder) library.updateSources() else emptyList()
+    }
+    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, sourceStatus, updateSources) {
         pageRows(
             entry, play, runner, siblings,
             scrapeStatus = scrapeStatus,
@@ -231,18 +235,17 @@ internal fun PcGamePage(
                 }
             },
             sourceRows = if (library != null && isFolder) {
-                threadRows(
+                sourceRows(
+                    sources = updateSources,
                     links = links,
-                    status = threadStatus,
-                    onEdit = { editingThread = true },
-                    onCheck = {
-                        val thread = links?.f95Thread
-                        if (thread != null) {
-                            scope.launch {
-                                threadStatus = "Checking..."
-                                threadStatus = checkF95ThreadAndSay(library, gameIds, thread, versions, entry.latestKnown)
-                                linksToken++
-                            }
+                    statuses = sourceStatus,
+                    onEdit = { editingSource = it },
+                    onCheck = { source, link ->
+                        scope.launch {
+                            sourceStatus = sourceStatus + (source.key to "Checking...")
+                            val line = checkSourceAndSay(library, gameIds, link.key, versions, entry.latestKnown)
+                            sourceStatus = sourceStatus + (source.key to line)
+                            linksToken++
                         }
                     },
                 )
@@ -622,19 +625,21 @@ internal fun PcGamePage(
     }
     PluginPageScreen(pluginRows)
     programScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { programScreen = null }) }
-    if (editingThread && library != null) {
-        TextEditDialog(
-            title = "F95zone thread",
-            subtitle = F95_THREAD_HELP,
-            initial = links?.f95Thread?.let { F95Thread.url(it) }.orEmpty(),
-            onCommit = { text ->
-                editingThread = false
-                scope.launch {
-                    linkF95ThreadFromText(library, gameIds, text) { threadStatus = it }
-                    linksToken++
-                }
+    val linking = editingSource
+    if (linking != null && library != null) {
+        SourceLinkSheet(
+            library = library,
+            gameIds = gameIds,
+            gameTitle = entry.title,
+            versions = versions,
+            source = linking,
+            current = links?.link(linking.key),
+            scope = scope,
+            say = { line ->
+                sourceStatus = if (line == null) sourceStatus - linking.key else sourceStatus + (linking.key to line)
+                linksToken++
             },
-            onDismiss = { editingThread = false },
+            onClose = { editingSource = null },
         )
     }
 }
@@ -1118,7 +1123,7 @@ internal enum class PageTab(val label: String, val emptyLine: String) {
  */
 internal fun pageTabOf(title: String): PageTab = when (title) {
     "About", "Not scraped yet", "Compatibility", "Install state", "Times played" -> PageTab.OVERVIEW
-    "Version", "Latest", "Update", THREAD_ROW, CHECK_ROW -> PageTab.VERSIONS
+    "Version", "Latest", "Update", CHECK_ROW -> PageTab.VERSIONS
     "Manual", "Video", "Where these facts came from" -> PageTab.EXTRAS
     else -> PageTab.DETAILS
 }
@@ -1132,26 +1137,6 @@ internal fun groupRowsByTab(rows: List<PageFact>, parts: List<PageFact>): Map<Pa
         (if (tab == PageTab.OVERVIEW) parts else emptyList()) + ordered
     }
 
-internal const val THREAD_ROW = "F95zone thread"
-internal const val CHECK_ROW = "Check for update"
-
-/**
- * The game's update source as rows under Versions: the linked thread
- * (A links or changes it) and, once one is linked, "Check now" with its
- * last answer ([status], one short line). Pure, for the tests.
- */
-internal fun threadRows(links: GameLinks?, status: String?, onEdit: () -> Unit, onCheck: () -> Unit): List<PageFact> {
-    val thread = links?.f95Thread
-    return listOfNotNull(
-        PageFact(
-            THREAD_ROW,
-            value = thread?.let { "#$it" } ?: "Link",
-            subtitle = if (links?.check?.gone == true) "Gone: private, moved or deleted" else null,
-            onActivate = onEdit,
-        ),
-        thread?.let { PageFact(CHECK_ROW, value = status ?: "Check now", onActivate = onCheck) },
-    )
-}
 
 /**
  * The parts of a game of several (`Week 1`, `Week 2`, `Part3` ...) as rows

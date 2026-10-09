@@ -2808,7 +2808,7 @@ the `ContainerRuntime` interface that already exists (§3):
   the task manager's one path, for every kind of entry, not only ROMs ("The task manager", below).
 - **Playtime label**: droidtop records launches (last played, count) but not session length, so a
   launched game's `playtime` theme binding reads "Played", never "Never played" (console pass,
-  2026-09-28). The launch itself republishes the lists the shell is already showing, like an F95
+  2026-09-28). The launch itself republishes the lists the shell is already showing, like a source
   link or a folded replacement does: the 2026-09-29 rig pass caught the detail still reading
   "Never played" over the running game because the recorded play waited for the next rescan to
   reach a published list.
@@ -4474,7 +4474,7 @@ data the library already has (never re-scraped, never fabricated):
 - play time (already built) and last played, now added, formatted with Android's own
   `DateUtils.getRelativeTimeSpanString` ("3 days ago") rather than a raw epoch or a
   hand-rolled duration;
-- an available-update line, reusing the existing F95/update tracking
+- an available-update line, reusing the existing source-link update tracking
   (`LibraryEntry.availableUpdate`, docs/SPEC.md §7g) rather than building a second
   "is this current" check;
 - which player will actually run it, for console ROMs: `ConsoleRomProvider.resolvePlayer`
@@ -9461,15 +9461,17 @@ and a plugin never learns what the library holds.
 
 ### Where an update comes from (2026-09-25)
 
-`GameVersion.latestKnown` / "an update is available" (7m) has one source:
-**F95Checker's public index, `api.f95checker.dev`**, for games the user has
-linked to their F95zone thread. It is the index F95Checker itself reads
-(its `modules/api.py`, `fast_check` and `full_check`), ported through the
-user's own Pythia (`plugin_sources/library/f95/f95_update_check.py`), and
-it needs no F95zone account: neither call sends a cookie. For a FOLDER game
-nothing else claims an update; a game with no link says nothing about
-updates, which is not the same as "up to date" and is not shown as such. A
-STORE game's update comes from its store (next paragraphs).
+`GameVersion.latestKnown` / "an update is available" (7m) comes, for a
+FOLDER game, from the **update sources** the person linked the game to:
+plugins that provide `library.updates` (docs/plugin-api.md 3 A6). droidtop
+itself knows no site. F95zone was built into droidtop until 2026-10-08 and
+is now one such plugin, the F95zone source in the separate
+gamegrab-sources plugin organisation (Droidtop/tracker#380): "F95 support
+becomes a plugin", and nothing about one site stays in the core. For a
+folder game nothing else claims an update; a game with no link says
+nothing about updates, which is not the same as "up to date" and is not
+shown as such. A STORE game's update comes from its store (next
+paragraphs).
 
 **A store game's update (2026-10-02, Droidtop/tracker#222).** `PcInfo` carries
 `installedVersion` (the build the store words, null when it gives none),
@@ -9531,99 +9533,82 @@ screen belongs to this change. Membership belongs to a store row's id, so
 a merged card (7g, "One game across stores") keeps the 7m known limit: the
 union the issue asks for is not built.
 
-**How droidtop learns a game's thread: the user tells it.** A folder game's
-detail has an "F95zone thread" row; the user pastes the thread's link (the
-browser's `f95zone.to/threads/<name>.<id>/`, the short form, or the bare
-number, `F95Thread.parse`). Nothing on disk says which thread a game is --
-a game's own files do not carry it, and a folder name is not an id -- and
-Pythia learns it the same way, from what the user told F95Checker (its
-watch list, imported), never by guessing from a name. The link is the
-GAME's, so it is written to every folder of the game at once and read from
-whichever folder holds it (`LibraryGameGroup.f95Thread`); a missing game
-folded into its replacement carries its link across (`GameLinksStore.moveTo`,
-only into an empty place).
+**A source link, one per game per source (2026-10-08, Droidtop/tracker#380).**
+A link is a source key and the source's own id for the game
+(`SourceKey(source, externalId)`): a forum thread, a project page, a
+release feed. The source key is the `id` of the plugin's `library.updates`
+entry in its manifest (for F95zone, `f95zone`), so links survive a plugin's
+reinstall and update; a link whose source is not installed is kept and not
+asked. Nothing on disk says which record a game is -- a game's own files do
+not carry it, and a folder name is not an id -- so the PERSON makes the
+link. The link is the GAME's: it is written to every folder of the game at
+once and read from whichever folder holds it (`Library.gameLinks`); a
+missing game folded into its replacement carries its links across
+(`GameLinksStore.moveTo`, only into an empty place, per source).
 
-**The watch list, imported once** (`F95CheckerImport`, 2026-09-28; Settings >
-Library > "Import from F95Checker"). Pasting a link per game is honest work
-but the user has already told F95Checker every thread they watch, and that
-is the one other source that can say which thread a game is. Its local
-database, `db.sqlite3` (F95Checker's own `modules/db.py`), keeps one `games`
-table whose row `id` IS the F95zone thread id -- `create_game` inserts
-`thread.id` as the row's own id -- while custom rows (a game with no
-thread) carry a negative id and `custom` set and are not watch-list
-threads at all. The user picks that file through the system file picker and
-droidtop reads it the same way the user's own Pythia reads it
-(`plugin_sources/library/f95/plugin.py`: a read-only connection, negative
-ids skipped): READ-ONLY, straight from the picked document's own file
-descriptor (`/proc/self/fd`, `SQLiteDatabase`'s `OPEN_READONLY`) -- never
-copied anywhere, never written, never held open past the reading of five
-columns. Nothing leaves the device; the F95Checker index is not told.
+**How a link is made: droidtop's own rows and sheet, the source's own
+knowledge.** A folder game's page has, under Versions, one row per update
+source (titled with the entry's `label`, "Link" until linked, then the id)
+and, once linked, "Check for update"; its options menu has the same rows
+(`SourceLinkRows.kt`, one file for both). A opens one sheet
+(`SourceLinkSheet`): first the source's own matches for the game's name
+(`match {title, versions}`, best first, each with its version and why it is
+offered, for example "on your watch list"), then "Type a link or id"
+(the paste field; the plugin reads the text with `resolve {text}`, since
+droidtop does not know what any one site's links look like), then "Unlink"
+when linked. Every row asks twice (the two-step confirm of
+`SameGamePicker`): a link changes what droidtop tells the person about the
+game. Linking asks about the new record at once. There is no bulk import in
+the core: the F95Checker watch-list import (`F95CheckerImport`, 2026-09-28)
+is deleted, and a source that knows the person's own list (F95Checker's
+watched threads, through plugin context sync, tracker#380, or the signed-in
+site) offers those records first in `match` instead.
 
-Only the thread links are imported. The `name` and the two version strings
-F95Checker keeps (`version`, the thread's newest, and `installed`, the
-version the user marked installed there) are EVIDENCE for matching, never
-data to write: a watch row names a library game when the two names are
-equal the way `GameNaming.nameKey` compares names (case and punctuation
-aside -- the same equality that already decides two folders are one game),
-and the row CORROBORATES the match when either of its versions equals one
-of the game's own versions the way `GameUpdates` compares versions (as both
-sides write them, less a leading `v`). A name that is merely similar never
-matches, for the same reason the scan never merges merely similar folder
-names (its corpus holds three folder names 0.94 similar that are three
-different games); similar names stay for a person to link by hand on the
-game's own screen.
+**What is kept.** Three tables in the library's own database beside play
+history and favourites (`PlayHistoryDatabase` version 4): `game_links` (the
+names a merge gave), `source_links` (entry id, source key, external id) and
+`source_answers` (per source record: the version it gave, its page, when it
+was asked, whether it is gone). They are LIBRARY FACTS like play history:
+joined onto every list the library publishes (`LibraryEntry.latestKnown`),
+never written by a walk, never in a game record. Migration 3 to 4 moved
+every F95zone thread link and answer to the source key `f95zone`, so a
+person's links survive the move into a plugin.
 
-Nothing is linked by the import itself. The screen shows one row per name
-match with both sides' versions on it; a corroborated match is shown marked,
-every other match unmarked, and the two cases that make a pairing
-ambiguous -- two watch rows sharing one name (a game and its mod), or one
-watch row naming two library games -- are always unmarked, as is a game
-already linked to a different thread. A game already linked to the row's own
-thread is not offered at all. One action then links the marked games, with
-a confirm step, through the ONE write path a pasted link already uses
-(`Library.linkF95Thread`: every folder of the game at once, and the ask
-about the new thread at once), so an import changes nothing a paste would
-not, and reads the library the library already published
-(`backgroundScanState` over the game kinds, grouping and matching in
-memory; a walk is never started for it).
-
-**What is kept.** Two tables in the library's own database beside play
-history and favourites (`PlayHistoryDatabase`, `game_links` and
-`f95_threads`): the user's links, and for each linked thread the index's
-last-changed stamp, the version it gave, when it was asked and whether the
-thread is gone. They are LIBRARY FACTS like play history: joined onto every
-list the library publishes (`LibraryEntry.f95Thread`, `latestKnown`), never
-written by a walk, never in a game record.
-
-**When it asks, and how little** (`F95UpdateCheck`). Rounds ride the slow
+**When it asks, and how little** (`SourceUpdateCheck`). Rounds ride the slow
 pass's clock and its conditions -- only while something observes the
 library, never in battery saver -- but run in their own coroutine: a walk
-never waits for the network, and an answer reaches the lists when it
-arrives (`Library.checkUpdatesInBackground`, then `republish`). A thread is
-asked about at most once every six hours; linking a thread, or the detail's
-"Check for an update now", asks about that one thread at once, but not
-twice within a minute. A round is Pythia's: one fast check of up to ten
-threads per request, and a full check only for a thread whose last-changed
-stamp moved past the one kept (or that has no version yet). Requests are a
-second apart; one round runs at a time; a failure (the index down, no
-network) changes nothing it did not finish and the next round asks again.
-The index refuses a whole batch when one id in it is not a thread, so a
-refused batch is asked one thread at a time, and a thread it does not know,
-or answers 400/403/404 for, is recorded as gone.
+never waits for a plugin, and an answer reaches the lists when it arrives
+(`Library.checkUpdatesInBackground`, then `republish`). A record is asked
+about at most once every six hours; linking, or "Check for update", asks
+about that one record at once, but not twice within a minute. A round is
+one `check {ids}` call per source per 50 records (2-minute budget, not a
+crash on a miss). The HOST decides when a record is due; the SOURCE decides
+how it asks its site (batching, spacing, its own caches; the F95zone
+plugin keeps F95Checker's fast-check and full-check pacing). One round runs
+at a time; a failing source changes nothing it did not finish and the other
+sources go on; an id a source does not answer keeps its last answer until
+it is due again.
 
 **When it is an update** (`GameUpdates.available`). Pythia's rule: the
-version the thread gives is an update when it is none of the game's own
+version a source gives is an update when it is none of the game's own
 versions, compared as both sides write them less a leading `v`. It is the
-game's fact, so a game that already has the thread's version in any folder
+game's fact, so a game that already has the source's version in any folder
 claims nothing, and every version row of a game that lacks it says so. Two
-cases claim nothing: a thread that gives no version (blank, F95Checker's
-`N/A`), and a game none of whose folders names a version, where there is
-nothing to compare -- Pythia skips that case too.
+cases claim nothing: a source that gives no version (blank, `N/A`), and a
+game none of whose folders names a version, where there is nothing to
+compare -- Pythia skips that case too. With several sources linked, the
+first in source-key order that gives a version speaks for the game.
+
+**Details and downloads from the same source.** A source plugin's details
+for a game (description, tags, developer) arrive through `library.metadata`
+in the scrape pass (docs/plugin-api.md 3 A3), and its downloads through
+`library.sources` `acquire` into droidtop's own Downloads place (12a,
+"Downloads"; tracker#355). Neither is part of the update check.
 
 **One wording, everywhere it shows** (`GameUpdates.line`, "v0.9.6 is
 available"): the card's second line (from `LibraryGameGroup.displayEntry`'s
 `availableUpdate`, which only the whole game can know), the detail's
-identity line under the title, the F95zone thread row, and every "Parts and
+identity line under the title, the source's row, and every "Parts and
 versions" row.
 
 ### One file per game is the truth; the index is a light layer over it (directed 2026-09-21)
@@ -11645,10 +11630,10 @@ structure, top to bottom, drawn only from theme tokens:
   the **part list** first (`partFacts`: a heading row with the count, then
   each part with its newest version, in the order the folder names give).
   Versions and updates: the Update row first when a source knows a newer
-  version, then Version (installed), Latest, and the game's update source
-  (Droidtop/tracker#288):
-  the F95zone thread row (A links it, changes it, or clears it, through the
-  same `linkF95ThreadFromText` the options menu uses) and, once linked,
+  version, then Version (installed), Latest, and the game's update sources
+  (Droidtop/tracker#288, #380): one row per `library.updates` source (A opens
+  `SourceLinkSheet`, the same sheet the options menu uses: the source's
+  matches, a pasted link, or unlink) and, once linked,
   "Check for update", which answers in one short line (`checkOutcomeLine`:
   "Up to date", "v0.9.6 is available", or why it failed). The rows need the
   library handed to `PcGamePage` and appear only on folder games. Extras: the
@@ -11852,7 +11837,7 @@ the pipeline applies it.
   "Filters, sort and the hint bar"). **Select** is Options: the focused
   game's own menu (`PcGameMenu`, unchanged in substance: the game page, the
   favourite, the runner and its picker, Wine/container settings, ProtonDB,
-  the Lutris import, the F95 link and update, merge and versions, under
+  the Lutris import, the source links and updates, merge and versions, under
   Play / About / Fix and advanced); **L2** is its alias and the header's L2
   pill (§7k) is live on this tab exactly while a game is under the cursor.
   With no game under the cursor (the strip, an empty list) Select opens the
@@ -13349,7 +13334,7 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   version from data that exists today: droidtop's own newer build as the
   last check saw it, installed plugins against the cached catalog (with
   Update all), and games whose source names a version the library lacks
-  (the F95 index, 7g "Where an update comes from"). It reads only what is
+  (a linked source, 7g "Where an update comes from"). It reads only what is
   cached or published and never starts a network call or a walk. The
   group below it is droidtop's own update settings and Check now, as
   before. Android apps are not listed: nothing yet knows an installed app's
@@ -13682,7 +13667,7 @@ Settings tab, the left menu's places, Console systems and Containers.
   in (Global settings) contribute groups to several categories. The Gaming
   Settings column is, in order: **Home & modes** (Home screen, Modes, Shell),
   **Library** (Console systems, Emulators, Game folders, Windows games,
-  Scraper and F95Checker import as rows that open their screens; Downloads
+  Scraper as rows that open their screens; Downloads
   too in a mode with no left menu, see below),
   **Accounts and sources** (its screen drawn directly, a hub of one),
   **Appearance** (theme rows and Accessibility), **Controls**, **Displays**
@@ -13704,8 +13689,7 @@ Settings tab, the left menu's places, Console systems and Containers.
   fewer). Evaluated and kept as pushed screens: Scraper (about twenty option
   rows), Game folders (a live list of the scanned folders, plus path entry),
   Windows games (the Wine option rows open their own pickers and the drive
-  list varies) and F95Checker import (a matches list built from the picked
-  database). A link to a screen the left menu lists as a place is not drawn
+  list varies). A link to a screen the left menu lists as a place is not drawn
   in Gaming's Settings (`withoutPlaceLinks`, fed by `menuSectionsFor`): in
   Gaming, Downloads is the left menu's place, so the Library category has no
   "Downloads and installs" row; Standard and Desktop, which have no left menu,
@@ -14138,7 +14122,7 @@ Roman numerals are deliberately not read as numbers: `Mega Man X` is not
 the game's "The same game as..." picker, where a person confirms it
 (`SimilarGames`, `Library.mergeGames`). Two folds are not the person's to
 split: the shared store id of a folder that is a store's install, and a
-shared F95 thread. The DLsite RJ code and the F95zone thread join folders,
+shared source link. The DLsite RJ code and a source link join folders,
 not stores, and stay as written in 7g.
 
 The merge is a hash lookup per row (two maps, then union-find), so it grows

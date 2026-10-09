@@ -29,9 +29,10 @@ import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.EngineHost
 import dev.droidtop.library.EngineOverridePrefs
 import dev.droidtop.library.EnginesDatabase
-import dev.droidtop.library.F95Thread
+
 import dev.droidtop.library.GameEngine
 import dev.droidtop.library.GameLinks
+import dev.droidtop.library.UpdateSources
 import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.GameNaming
@@ -87,7 +88,7 @@ import kotlinx.coroutines.withContext
  * PcLibraryView own focused-game panel instead, bound from the exact
  * same [LibraryEntry] fields. This menu is only what NEITHER the theme
  * NOR that panel show: the resolved runner and its picker, Wine/
- * container settings, ProtonDB, the Lutris import, the F95 link and
+ * container settings, ProtonDB, the Lutris import, the source links and
  * update state, merge and versions/segments, favourite/collections/
  * scrape.
  *
@@ -154,7 +155,7 @@ internal fun PcGameMenu(
     var pickingSameGame by remember(entry) { mutableStateOf(false) }
     var renaming by remember(entry) { mutableStateOf(false) }
     var progressToken by remember(entry) { mutableStateOf(0) }
-    var editingThread by remember(entry) { mutableStateOf(false) }
+    var editingSource by remember(entry) { mutableStateOf<UpdateSources.Source?>(null) }
     var pickingEngine by remember(entry) { mutableStateOf(openEnginePicker) }
     var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
     var importingLutris by remember(entry) { mutableStateOf(false) }
@@ -250,7 +251,7 @@ internal fun PcGameMenu(
     val gameName = dev.droidtop.library.GameNaming.displayName(grouping?.game?.name ?: ownNameOf(entry))
     val group = grouping?.takeIf { it.hasChoices }
 
-    // The game's update source (docs/SPEC.md 7g): a thread link is the
+    // The game's update sources (docs/SPEC.md 7g): a source link is the
     // GAME's, so it is read and written for every folder of it, and read
     // from the library rather than from [entry], which is the list's copy
     // from before anything on this screen changed it.
@@ -259,6 +260,9 @@ internal fun PcGameMenu(
     var linksToken by remember(entry) { mutableStateOf(0) }
     val links by produceState<GameLinks?>(null, gameIds, linksToken) {
         value = if (isFolder) library.gameLinks(gameIds) else null
+    }
+    val updateSources by produceState(emptyList<UpdateSources.Source>(), isFolder) {
+        value = if (isFolder) library.updateSources() else emptyList()
     }
     val versions = grouping?.game?.allVersions?.map { it.version }
         ?: entry.groupingPath()?.let { listOf(GameNaming.derive(it).version) }.orEmpty()
@@ -458,19 +462,21 @@ internal fun PcGameMenu(
             onDismiss = { renaming = false },
         )
     }
-    if (editingThread) {
-        TextEditDialog(
-            title = "F95zone thread",
-            subtitle = F95_THREAD_HELP,
-            initial = links?.f95Thread?.let { F95Thread.url(it) }.orEmpty(),
-            onCommit = { text ->
-                editingThread = false
-                scope.launch {
-                    linkF95ThreadFromText(library, gameIds, text) { status = it }
-                    linksToken++
-                }
+    val linking = editingSource
+    if (linking != null) {
+        SourceLinkSheet(
+            library = library,
+            gameIds = gameIds,
+            gameTitle = gameName,
+            versions = versions,
+            source = linking,
+            current = links?.link(linking.key),
+            scope = scope,
+            say = { line ->
+                status = line
+                linksToken++
             },
-            onDismiss = { editingThread = false },
+            onClose = { editingSource = null },
         )
     }
 
@@ -620,23 +626,27 @@ internal fun PcGameMenu(
         updateRows = if (!isFolder) {
             emptyList()
         } else {
-            listOfNotNull(
-                PcActionRow("F95zone thread", f95Line(links, available, versions), { editingThread = true }),
-                links?.f95Thread?.let { thread ->
-                    PcActionRow(
-                        "Check for an update now",
-                        links?.check?.let { "Last checked " + android.text.format.DateUtils.getRelativeTimeSpanString(it.checkedAtEpochMs) }
-                            ?: "Not checked yet",
-                        {
-                            scope.launch {
-                                status = "Checking thread $thread..."
-                                status = checkF95ThreadAndSay(library, gameIds, thread, versions, entry.latestKnown)
-                                linksToken++
-                            }
-                        },
-                    )
-                },
-            )
+            updateSources.flatMap { source ->
+                val link = links?.link(source.key)
+                listOfNotNull(
+                    PcActionRow(source.label, sourceLine(link, available, versions), { editingSource = source }),
+                    link?.let {
+                        PcActionRow(
+                            if (updateSources.size > 1) "Check ${source.label} now" else "Check for an update now",
+                            it.answer?.takeIf { a -> a.checkedAtEpochMs > 0 }
+                                ?.let { a -> "Last checked " + android.text.format.DateUtils.getRelativeTimeSpanString(a.checkedAtEpochMs) }
+                                ?: "Not checked yet",
+                            {
+                                scope.launch {
+                                    status = "Checking ${source.label}..."
+                                    status = checkSourceAndSay(library, gameIds, it.key, versions, entry.latestKnown)
+                                    linksToken++
+                                }
+                            },
+                        )
+                    },
+                )
+            }
         },
         entry = entry,
         runner = runner,
@@ -964,7 +974,7 @@ internal fun PcGameMenu(
     // it, the menu showed round the smaller sheet with its own Close row
     // (console, build 1519, Droidtop/tracker#371).
     val childOpen = (contentOpen && ownStore != null) || storeOffer != null || pickingMatch ||
-        pickingReplacement || (pickingSameGame && grouping != null) || renaming || editingThread
+        pickingReplacement || (pickingSameGame && grouping != null) || renaming || editingSource != null
     if (!childOpen) Dialog(onDismissRequest = goBack) {
         HideSystemBarsInThisDialog()
         MenuPanel(
@@ -1086,81 +1096,6 @@ private fun LibraryEntry.identityLine(update: String?): String = if (missing) "b
     update?.let { append(" · ").append(GameUpdates.line(it)) }
 }
 
-/** What the thread dialog says, on the menu and on the game page. */
-internal const val F95_THREAD_HELP = "Thread link or number; blank unlinks"
-
-/**
- * A person's text for the F95zone thread (a link, its number, or blank to
- * unlink) applied to the game whose folders are [gameIds], with each step
- * said through [say]. The ONE linking path: the menu's thread row and the
- * game page's thread row both end here.
- */
-internal suspend fun linkF95ThreadFromText(
-    library: Library,
-    gameIds: Collection<String>,
-    text: String,
-    say: (String?) -> Unit,
-) {
-    val thread = F95Thread.parse(text)
-    if (text.isNotBlank() && thread == null) {
-        say("That is not an F95zone thread link: it should look like f95zone.to/threads/<name>.<number>/")
-        return
-    }
-    say(if (thread == null) "Unlinking..." else "Checking thread $thread...")
-    val failure = library.linkF95Thread(gameIds, thread)
-    say(
-        when {
-            failure != null -> "Linked thread $thread, but checking it failed: $failure"
-            thread == null -> "Unlinked. This game is no longer checked for updates."
-            else -> null
-        },
-    )
-}
-
-/** "Check now" for [thread], then the one short line for what it found ([checkOutcomeLine]). */
-internal suspend fun checkF95ThreadAndSay(
-    library: Library,
-    gameIds: Collection<String>,
-    thread: Long,
-    versions: List<String>,
-    fallbackLatest: String?,
-): String {
-    val failure = library.checkF95ThreadNow(thread)
-    return checkOutcomeLine(failure, library.gameLinks(gameIds), versions, fallbackLatest)
-}
-
-/**
- * What a check found, in one short line: why it failed, "Up to date", or
- * "v1.2 is available" ([GameUpdates.line]). Pure, for the tests.
- */
-internal fun checkOutcomeLine(failure: String?, links: GameLinks?, versions: List<String>, fallbackLatest: String?): String {
-    if (failure != null) return failure
-    val check = links?.check
-    if (check?.gone == true) return "Thread is gone: private, moved or deleted"
-    GameUpdates.available(links?.latestKnown ?: fallbackLatest, versions)?.let { return GameUpdates.line(it) }
-    val newest = check?.version ?: return "The thread gives no version"
-    return if (versions.none { it.isNotEmpty() }) "Newest is $newest" else "Up to date"
-}
-
-/**
- * What the F95zone thread row says: whether a thread is linked, and what
- * its update source last answered, in the one wording for an update
- * ([GameUpdates.line]).
- */
-private fun f95Line(links: GameLinks?, available: String?, versions: List<String>): String {
-    val thread = links?.f95Thread
-        ?: return "Not linked. Paste the game's F95zone thread link to be told when a new version is out"
-    val check = links.check
-    val newest = check?.version
-    return when {
-        check == null -> "Thread $thread - not checked yet"
-        check.gone -> "Thread $thread is gone: private, moved or deleted"
-        available != null -> "${GameUpdates.line(available)} - thread $thread"
-        newest == null -> "Thread $thread gives no version"
-        versions.none { it.isNotEmpty() } -> "The thread's newest is $newest; this game's folders name no version to compare"
-        else -> "Up to date: $newest is the thread's newest - thread $thread"
-    }
-}
 
 /**
  * The menu's three sections (docs/SPEC.md 13, "Gaming mode"): what plays

@@ -1387,8 +1387,8 @@ internal fun CatalogChoicePicker(
 
 /**
  * The shell's one text-entry dialog: a settings row's value, and anything
- * else a person types or pastes (an F95zone thread link on a game's
- * screen). Paste is there because what gets typed here is usually copied
+ * else a person types or pastes (a source link on a game's screen).
+ * Paste is there because what gets typed here is usually copied
  * from somewhere else.
  */
 @Composable

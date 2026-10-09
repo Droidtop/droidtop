@@ -75,18 +75,20 @@ object NoOpFavoritesStore : FavoritesStore {
 
 /**
  * What the user has said about one entry's game, and what its update
- * source last answered (docs/SPEC.md 7g and 7m).
+ * sources last answered (docs/SPEC.md 7g and 7m).
  */
 data class GameLinks(
     /** The game the user made this folder part of; null is the name the folder derives. */
     val gameName: String? = null,
-    /** The F95zone thread the user linked. */
-    val f95Thread: Long? = null,
-    /** What the update source last said about [f95Thread]; null until it has been asked. */
-    val check: F95ThreadCheck? = null,
+    /** The sources' records the user linked this game to, one per source, by source key. */
+    val sources: List<SourceLink> = emptyList(),
 ) {
-    /** The thread's version as the source wrote it, when it has one to give. */
-    val latestKnown: String? get() = check?.takeUnless { it.gone }?.version
+    /** The link to [source], when there is one. */
+    fun link(source: String): SourceLink? = sources.firstOrNull { it.source == source }
+
+    /** The newest version a linked source gives, when one has one to give (sources in key order, so it is stable). */
+    val latestKnown: String?
+        get() = sources.sortedBy { it.source }.firstNotNullOfOrNull { it.answer?.takeUnless { a -> a.gone }?.version }
 }
 
 /**
@@ -104,32 +106,32 @@ interface GameLinksStore {
      */
     suspend fun setGameName(ids: Collection<String>, name: String?)
 
-    /** Links [thread] to every one of [ids], or unlinks them when it is null. */
-    suspend fun setF95Thread(ids: Collection<String>, thread: Long?)
+    /** Links every one of [ids] to [externalId] at [source], or unlinks them from [source] when it is null. */
+    suspend fun setSourceLink(ids: Collection<String>, source: String, externalId: String?)
 
     /**
      * Carries [fromId]'s links to [toId] when a missing game is folded
      * into the game that replaced it ([Library.replaceMissing]). Only into
-     * an empty place: a game that already has its own name or thread keeps
-     * it.
+     * an empty place: a game that already has its own name, or its own
+     * link to a source, keeps it.
      */
     suspend fun moveTo(fromId: String, toId: String)
 
-    /** Every thread any entry links, with what the source last said about it. */
-    suspend fun linkedThreads(): Map<Long, F95ThreadCheck?>
+    /** Every record any entry links, with what its source last said about it. */
+    suspend fun linkedSources(): Map<SourceKey, SourceAnswer?>
 
-    /** The entries that link [thread]. */
-    suspend fun idsLinkedTo(thread: Long): List<String>
+    /** The entries that link [key]. */
+    suspend fun idsLinkedTo(key: SourceKey): List<String>
 
-    suspend fun saveCheck(check: F95ThreadCheck)
+    suspend fun saveAnswer(key: SourceKey, answer: SourceAnswer)
 }
 
 object NoOpGameLinksStore : GameLinksStore {
     override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> = emptyMap()
     override suspend fun setGameName(ids: Collection<String>, name: String?) {}
-    override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) {}
+    override suspend fun setSourceLink(ids: Collection<String>, source: String, externalId: String?) {}
     override suspend fun moveTo(fromId: String, toId: String) {}
-    override suspend fun linkedThreads(): Map<Long, F95ThreadCheck?> = emptyMap()
-    override suspend fun idsLinkedTo(thread: Long): List<String> = emptyList()
-    override suspend fun saveCheck(check: F95ThreadCheck) {}
+    override suspend fun linkedSources(): Map<SourceKey, SourceAnswer?> = emptyMap()
+    override suspend fun idsLinkedTo(key: SourceKey): List<String> = emptyList()
+    override suspend fun saveAnswer(key: SourceKey, answer: SourceAnswer) {}
 }

@@ -54,7 +54,7 @@ data class LibraryGameGroup(
         get() {
             val entry = defaultCopy?.let { entriesByPath[it.path] }
                 ?: entriesByPath.values.first()
-            // A folder's update comes from the F95 index; a store row's
+            // A folder's update comes from a linked source; a store row's
             // from its store ([GameUpdates.forStore]).
             val update = game.availableUpdate
                 ?: entriesByPath.values.firstNotNullOfOrNull { GameUpdates.forStore(it.pcInfo) }
@@ -67,9 +67,6 @@ data class LibraryGameGroup(
 
     /** How many folders this one card stands for. */
     val folders: Int get() = entriesByPath.size
-
-    /** The F95zone thread the user linked to this game, from whichever of its folders holds the link. */
-    val f95Thread: Long? get() = entriesByPath.values.firstNotNullOfOrNull { it.f95Thread }
 
     /** The entry one copy of this game is, or null when the scan no longer has it. */
     fun entryFor(copy: GameCopy): LibraryEntry? = entriesByPath[copy.path]

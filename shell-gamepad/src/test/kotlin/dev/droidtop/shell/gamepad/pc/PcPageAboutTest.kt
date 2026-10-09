@@ -1,7 +1,9 @@
 package dev.droidtop.shell.gamepad.pc
 
-import dev.droidtop.library.F95ThreadCheck
 import dev.droidtop.library.GameLinks
+import dev.droidtop.library.SourceAnswer
+import dev.droidtop.library.SourceLink
+import dev.droidtop.library.UpdateSources
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import org.junit.Assert.assertEquals
@@ -145,29 +147,33 @@ class PcPageAboutTest {
     }
 
     @Test
-    fun theThreadRowsLiveUnderVersionsAndCheckNowNeedsALink() {
-        assertEquals(PageTab.VERSIONS, pageTabOf(THREAD_ROW))
+    fun theSourceRowsLiveUnderVersionsAndCheckNowNeedsALink() {
+        val source = UpdateSources.Source("forum", "Forum thread", null)
         assertEquals(PageTab.VERSIONS, pageTabOf(CHECK_ROW))
-        val unlinked = threadRows(null, null, {}, {})
-        assertEquals(listOf(THREAD_ROW), unlinked.map { it.title })
+        val unlinked = sourceRows(listOf(source), null, emptyMap(), {}, { _, _ -> })
+        assertEquals(listOf("Forum thread"), unlinked.map { it.title })
+        assertEquals(PageTab.VERSIONS, unlinked[0].tab)
         assertEquals("Link", unlinked[0].value)
-        val linked = threadRows(GameLinks(f95Thread = 123L), "Up to date", {}, {})
-        assertEquals(listOf(THREAD_ROW, CHECK_ROW), linked.map { it.title })
+        val links = GameLinks(sources = listOf(SourceLink("forum", "123")))
+        val linked = sourceRows(listOf(source), links, mapOf("forum" to "Up to date"), {}, { _, _ -> })
+        assertEquals(listOf("Forum thread", CHECK_ROW), linked.map { it.title })
         assertEquals("#123", linked[0].value)
         assertEquals("Up to date", linked[1].value)
-        assertEquals("Check now", threadRows(GameLinks(f95Thread = 123L), null, {}, {})[1].value)
+        assertEquals("Check now", sourceRows(listOf(source), links, emptyMap(), {}, { _, _ -> })[1].value)
+        // No source installed: no rows, nothing to link to.
+        assertEquals(emptyList<PageFact>(), sourceRows(emptyList(), links, emptyMap(), {}, { _, _ -> }))
     }
 
     @Test
     fun aCheckSaysUpToDateOrWhatIsAvailableInOneLine() {
-        fun links(version: String?, gone: Boolean = false) =
-            GameLinks(f95Thread = 1L, check = F95ThreadCheck(1L, 0L, version, 0L, gone))
-        assertEquals("Up to date", checkOutcomeLine(null, links("v0.9.5"), listOf("0.9.5"), null))
-        assertEquals("v0.9.6 is available", checkOutcomeLine(null, links("v0.9.6"), listOf("0.9.5"), null))
-        assertEquals("Thread is gone: private, moved or deleted", checkOutcomeLine(null, links(null, gone = true), listOf("0.9.5"), null))
-        assertEquals("The thread gives no version", checkOutcomeLine(null, links(null), listOf("0.9.5"), null))
-        assertEquals("Newest is v1.0", checkOutcomeLine(null, links("v1.0"), listOf(""), null))
-        assertEquals("offline", checkOutcomeLine("offline", links("v1.0"), listOf("1.0"), null))
+        fun link(version: String?, gone: Boolean = false) =
+            SourceLink("forum", "1", SourceAnswer(version, 0L, gone))
+        assertEquals("Up to date", checkOutcomeLine(null, link("v0.9.5"), listOf("0.9.5"), null))
+        assertEquals("v0.9.6 is available", checkOutcomeLine(null, link("v0.9.6"), listOf("0.9.5"), null))
+        assertEquals("Gone: private, moved or deleted", checkOutcomeLine(null, link(null, gone = true), listOf("0.9.5"), null))
+        assertEquals("The source gives no version", checkOutcomeLine(null, link(null), listOf("0.9.5"), null))
+        assertEquals("Newest is v1.0", checkOutcomeLine(null, link("v1.0"), listOf(""), null))
+        assertEquals("offline", checkOutcomeLine("offline", link("v1.0"), listOf("1.0"), null))
     }
 
     @Test

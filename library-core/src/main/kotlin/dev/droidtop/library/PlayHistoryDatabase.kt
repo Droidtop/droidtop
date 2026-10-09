@@ -114,24 +114,33 @@ interface FavoritesDao {
     }
 }
 
-/** One row per entry the user has said something about; see [GameLinks]. */
+/** One row per entry the user has named as part of another game; see [GameLinks]. */
 @Entity(tableName = "game_links")
 data class GameLinkEntity(
     @PrimaryKey val id: String,
     @ColumnInfo(name = "game_name") val gameName: String? = null,
-    @ColumnInfo(name = "f95_thread") val f95Thread: Long? = null,
 )
 
-/** What F95Checker's index last said about one thread; see [F95ThreadCheck]. */
-@Entity(tableName = "f95_threads")
-data class F95ThreadEntity(
-    @PrimaryKey @ColumnInfo(name = "thread_id") val threadId: Long,
-    @ColumnInfo(name = "last_changed") val lastChanged: Long,
+/** One entry's link to one source's record of its game; see [SourceLink]. */
+@Entity(tableName = "source_links", primaryKeys = ["id", "source"])
+data class SourceLinkEntity(
+    val id: String,
+    val source: String,
+    @ColumnInfo(name = "external_id") val externalId: String,
+)
+
+/** What a source last said about one of its records; see [SourceAnswer]. */
+@Entity(tableName = "source_answers", primaryKeys = ["source", "external_id"])
+data class SourceAnswerEntity(
+    val source: String,
+    @ColumnInfo(name = "external_id") val externalId: String,
     val version: String?,
+    val url: String?,
     @ColumnInfo(name = "checked_at") val checkedAt: Long,
     val gone: Boolean,
 ) {
-    fun toCheck() = F95ThreadCheck(threadId, lastChanged, version, checkedAt, gone)
+    val key: SourceKey get() = SourceKey(source, externalId)
+    fun toAnswer() = SourceAnswer(version, checkedAt, gone, url)
 }
 
 @Dao
@@ -139,8 +148,11 @@ interface GameLinksDao {
     @Query("SELECT * FROM game_links WHERE id IN (:ids)")
     suspend fun getLinks(ids: Collection<String>): List<GameLinkEntity>
 
-    @Query("SELECT * FROM f95_threads WHERE thread_id IN (:threads)")
-    suspend fun getThreads(threads: Collection<Long>): List<F95ThreadEntity>
+    @Query("SELECT * FROM source_links WHERE id IN (:ids)")
+    suspend fun getSourceLinks(ids: Collection<String>): List<SourceLinkEntity>
+
+    @Query("SELECT * FROM source_answers WHERE source = :source AND external_id IN (:externalIds)")
+    suspend fun getAnswers(source: String, externalIds: Collection<String>): List<SourceAnswerEntity>
 
     @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
     suspend fun putLink(row: GameLinkEntity)
@@ -149,50 +161,67 @@ interface GameLinksDao {
     suspend fun deleteLink(id: String)
 
     @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
-    suspend fun putThread(row: F95ThreadEntity)
+    suspend fun putSourceLink(row: SourceLinkEntity)
 
-    @Query("SELECT DISTINCT f95_thread FROM game_links WHERE f95_thread IS NOT NULL")
-    suspend fun linkedThreadIds(): List<Long>
+    @Query("DELETE FROM source_links WHERE id = :id AND source = :source")
+    suspend fun deleteSourceLink(id: String, source: String)
 
-    @Query("SELECT id FROM game_links WHERE f95_thread = :thread")
-    suspend fun idsLinkedTo(thread: Long): List<String>
+    @Query("DELETE FROM source_links WHERE id = :id")
+    suspend fun deleteSourceLinks(id: String)
 
-    /** A thread nothing links any more is not worth an answer kept. */
-    @Query("DELETE FROM f95_threads WHERE thread_id NOT IN (SELECT f95_thread FROM game_links WHERE f95_thread IS NOT NULL)")
-    suspend fun pruneThreads()
+    @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun putAnswer(row: SourceAnswerEntity)
+
+    @Query("SELECT DISTINCT source, external_id FROM source_links")
+    suspend fun linkedKeys(): List<LinkedKey>
+
+    @Query("SELECT * FROM source_answers")
+    suspend fun allAnswers(): List<SourceAnswerEntity>
+
+    @Query("SELECT id FROM source_links WHERE source = :source AND external_id = :externalId")
+    suspend fun idsLinkedTo(source: String, externalId: String): List<String>
+
+    /** A record nothing links any more is not worth an answer kept. */
+    @Query(
+        "DELETE FROM source_answers WHERE NOT EXISTS (SELECT 1 FROM source_links l " +
+            "WHERE l.source = source_answers.source AND l.external_id = source_answers.external_id)",
+    )
+    suspend fun pruneAnswers()
 
     @Transaction
     suspend fun setGameName(ids: Collection<String>, name: String?) {
-        val existing = getLinks(ids).associateBy { it.id }
-        for (id in ids) putOrDrop((existing[id] ?: GameLinkEntity(id)).copy(gameName = name))
+        for (id in ids) if (name == null) deleteLink(id) else putLink(GameLinkEntity(id, name))
     }
 
     @Transaction
-    suspend fun setF95Thread(ids: Collection<String>, thread: Long?) {
-        val existing = getLinks(ids).associateBy { it.id }
-        for (id in ids) putOrDrop((existing[id] ?: GameLinkEntity(id)).copy(f95Thread = thread))
-        pruneThreads()
+    suspend fun setSourceLink(ids: Collection<String>, source: String, externalId: String?) {
+        for (id in ids) if (externalId == null) deleteSourceLink(id, source) else putSourceLink(SourceLinkEntity(id, source, externalId))
+        pruneAnswers()
     }
 
     /** See [GameLinksStore.moveTo]: only into an empty place. */
     @Transaction
     suspend fun moveTo(fromId: String, toId: String) {
         val rows = getLinks(listOf(fromId, toId)).associateBy { it.id }
-        val from = rows[fromId] ?: return
-        val to = rows[toId] ?: GameLinkEntity(toId)
-        putOrDrop(to.copy(gameName = to.gameName ?: from.gameName, f95Thread = to.f95Thread ?: from.f95Thread))
+        val from = rows[fromId]
+        if (from != null && rows[toId] == null) putLink(GameLinkEntity(toId, from.gameName))
         deleteLink(fromId)
+        val links = getSourceLinks(listOf(fromId, toId)).groupBy { it.id }
+        val taken = links[toId].orEmpty().map { it.source }.toSet()
+        for (link in links[fromId].orEmpty()) if (link.source !in taken) putSourceLink(link.copy(id = toId))
+        deleteSourceLinks(fromId)
     }
 }
 
-/** Writes [row], or drops it when it no longer says anything. */
-private suspend fun GameLinksDao.putOrDrop(row: GameLinkEntity) {
-    if (row.gameName == null && row.f95Thread == null) deleteLink(row.id) else putLink(row)
-}
+/** One linked record, as [GameLinksDao.linkedKeys] reads it. */
+data class LinkedKey(
+    val source: String,
+    @ColumnInfo(name = "external_id") val externalId: String,
+)
 
 @Database(
-    entities = [PlayHistoryEntity::class, FavoriteEntity::class, GameLinkEntity::class, F95ThreadEntity::class],
-    version = 3,
+    entities = [PlayHistoryEntity::class, FavoriteEntity::class, GameLinkEntity::class, SourceLinkEntity::class, SourceAnswerEntity::class],
+    version = 4,
     exportSchema = false,
 )
 abstract class PlayHistoryDatabase : RoomDatabase() {
@@ -229,13 +258,47 @@ abstract class PlayHistoryDatabase : RoomDatabase() {
             }
         }
 
+        // The F95zone thread link became a generic source link
+        // (docs/SPEC.md 7g, "Where an update comes from"): every existing
+        // thread link and answer moves to the source key "f95zone", the key
+        // the F95zone plugin's `library.updates` entry declares, so a person's
+        // links survive the move of F95 support into a plugin. game_links
+        // keeps only the names, rebuilt because SQLite before 3.35 cannot
+        // drop a column.
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `source_links` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, " +
+                        "`external_id` TEXT NOT NULL, PRIMARY KEY(`id`, `source`))",
+                )
+                db.execSQL(
+                    "INSERT OR IGNORE INTO `source_links` (`id`, `source`, `external_id`) " +
+                        "SELECT `id`, 'f95zone', CAST(`f95_thread` AS TEXT) FROM `game_links` WHERE `f95_thread` IS NOT NULL",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `source_answers` (`source` TEXT NOT NULL, `external_id` TEXT NOT NULL, " +
+                        "`version` TEXT, `url` TEXT, `checked_at` INTEGER NOT NULL, `gone` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`source`, `external_id`))",
+                )
+                db.execSQL(
+                    "INSERT OR IGNORE INTO `source_answers` (`source`, `external_id`, `version`, `url`, `checked_at`, `gone`) " +
+                        "SELECT 'f95zone', CAST(`thread_id` AS TEXT), `version`, NULL, `checked_at`, `gone` FROM `f95_threads`",
+                )
+                db.execSQL("DROP TABLE IF EXISTS `f95_threads`")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `game_links_new` (`id` TEXT NOT NULL, `game_name` TEXT, PRIMARY KEY(`id`))")
+                db.execSQL("INSERT INTO `game_links_new` (`id`, `game_name`) SELECT `id`, `game_name` FROM `game_links` WHERE `game_name` IS NOT NULL")
+                db.execSQL("DROP TABLE `game_links`")
+                db.execSQL("ALTER TABLE `game_links_new` RENAME TO `game_links`")
+            }
+        }
+
         fun get(context: Context): PlayHistoryDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     PlayHistoryDatabase::class.java,
                     "droidtop-play-history.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
             }
     }
 }
@@ -245,31 +308,39 @@ class RoomGameLinksStore(context: Context) : GameLinksStore {
 
     override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> {
         if (ids.isEmpty()) return emptyMap()
-        val links = ids.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getLinks(it) }
-        if (links.isEmpty()) return emptyMap()
-        val threads = links.mapNotNull { it.f95Thread }.distinct()
-        val checks = threads.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getThreads(it) }.associateBy { it.threadId }
-        return links.associate { row ->
-            row.id to GameLinks(row.gameName, row.f95Thread, row.f95Thread?.let { checks[it]?.toCheck() })
+        val names = ids.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getLinks(it) }.associate { it.id to it.gameName }
+        val links = ids.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getSourceLinks(it) }
+        if (names.isEmpty() && links.isEmpty()) return emptyMap()
+        val answers = links.groupBy { it.source }.flatMap { (source, rows) ->
+            rows.map { it.externalId }.distinct().chunked(MAX_IDS_PER_QUERY).flatMap { dao.getAnswers(source, it) }
+        }.associateBy { it.key }
+        val byId = links.groupBy { it.id }
+        return (names.keys + byId.keys).associateWith { id ->
+            GameLinks(
+                gameName = names[id],
+                sources = byId[id].orEmpty().map { row ->
+                    SourceLink(row.source, row.externalId, answers[SourceKey(row.source, row.externalId)]?.toAnswer())
+                },
+            )
         }
     }
 
     override suspend fun setGameName(ids: Collection<String>, name: String?) = dao.setGameName(ids, name)
 
-    override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) = dao.setF95Thread(ids, thread)
+    override suspend fun setSourceLink(ids: Collection<String>, source: String, externalId: String?) =
+        dao.setSourceLink(ids, source, externalId)
 
     override suspend fun moveTo(fromId: String, toId: String) = dao.moveTo(fromId, toId)
 
-    override suspend fun linkedThreads(): Map<Long, F95ThreadCheck?> {
-        val threads = dao.linkedThreadIds()
-        val checks = threads.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getThreads(it) }.associateBy { it.threadId }
-        return threads.associateWith { checks[it]?.toCheck() }
+    override suspend fun linkedSources(): Map<SourceKey, SourceAnswer?> {
+        val answers = dao.allAnswers().associateBy { it.key }
+        return dao.linkedKeys().map { SourceKey(it.source, it.externalId) }.associateWith { answers[it]?.toAnswer() }
     }
 
-    override suspend fun idsLinkedTo(thread: Long): List<String> = dao.idsLinkedTo(thread)
+    override suspend fun idsLinkedTo(key: SourceKey): List<String> = dao.idsLinkedTo(key.source, key.externalId)
 
-    override suspend fun saveCheck(check: F95ThreadCheck) = dao.putThread(
-        F95ThreadEntity(check.thread, check.lastChanged, check.version, check.checkedAtEpochMs, check.gone),
+    override suspend fun saveAnswer(key: SourceKey, answer: SourceAnswer) = dao.putAnswer(
+        SourceAnswerEntity(key.source, key.externalId, answer.version, answer.url, answer.checkedAtEpochMs, answer.gone),
     )
 }
 

@@ -429,7 +429,7 @@ internal fun MenuRow(
     // Up/Down moving that cursor past the visible viewport changed which
     // row was selected without ever scrolling MenuPanel's own
     // verticalScroll Column to show it. A menu longer than one screenful
-    // (PcGameMenu's Runs with/Play/Engine/F95zone thread/Manage install/
+    // (PcGameMenu's Runs with/Play/Engine/source links/Manage install/
     // Saves/Controls/Engine settings/ProtonDB/Lutris import/same-game
     // merge/versions/PC setup list, reported "inaccessible")
     // silently stopped responding to Down the moment the selection walked

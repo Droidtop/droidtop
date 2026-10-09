@@ -101,7 +101,7 @@ object GameUpdates {
      * other answer. An installed copy only: a game that is not here has
      * nothing to update. The store's answer feeds the card, the shelf and
      * the Update filter through [LibraryEntry.availableUpdate], the way
-     * the F95 index feeds it for a folder.
+     * a linked source feeds it for a folder.
      */
     fun forStore(pc: PcInfo?): String? =
         if (pc != null && pc.installed && pc.update == StoreUpdate.AVAILABLE) {
@@ -116,10 +116,7 @@ object GameUpdates {
 
     /**
      * The ONE way both sides of a version comparison lose their leading
-     * `v`: the update rule above, and the F95Checker watch-list import's
-     * corroboration (dev.droidtop.library.f95checker.F95CheckerImport),
-     * which compares a watch row's versions with a game's own the same
-     * way so the two never disagree about what counts as equal.
+     * `v`, for the update rule above.
      */
     internal fun normalize(version: String): String = version.trim().removePrefix("v").removePrefix("V").trim()
 }

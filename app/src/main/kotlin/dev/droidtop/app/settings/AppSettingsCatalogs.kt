@@ -166,7 +166,6 @@ object AppSettingsCatalogs {
     const val SCREEN_ANDROID_SETTINGS = "android_settings"
     const val SCREEN_ENGINEHOST = "enginehost"
     const val SCREEN_UPDATES = "updates"
-    const val SCREEN_F95_IMPORT = "f95_import"
 
     @Volatile private var registered = false
 
@@ -193,7 +192,6 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(androidSettingsScreen())
         SettingsScreenRegistry.register(enginehostScreen())
         SettingsScreenRegistry.register(updatesScreen())
-        SettingsScreenRegistry.register(F95ImportCatalog.screen())
         SettingsScreenRegistry.register(ComputersCatalog.screen())
         SettingsScreenRegistry.register(DroidtopWideSettings.globalScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.desktopScreen())
