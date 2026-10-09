@@ -41,6 +41,8 @@ import dev.droidtop.shell.desktop.DesktopPadRoutes
 import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
 import dev.droidtop.shell.gamepad.ShellRestore
+import dev.droidtop.shell.gamepad.input.LocalOverlayKeys
+import dev.droidtop.shell.gamepad.input.OverlayKeys
 import dev.droidtop.shell.gamepad.input.PadGate
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.OnboardingGate
@@ -90,6 +92,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // Made-up keys (a held stick's repeats) stop the moment another app on
         // either screen has the pad (Droidtop/tracker#265).
         focused = { topResumed },
+        // The overlays composed in this window own the keys from the moment they are pushed (SPEC 6e).
+        overlays = OverlayKeys(),
     )
 
     /**
@@ -321,6 +325,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             LaunchedEffect(mode, keepAwakeState is DesktopSessionState.Connected) {
                 setKeepScreenOn(mode == Mode.DESKTOP && keepAwakeState is DesktopSessionState.Connected)
             }
+            androidx.compose.runtime.CompositionLocalProvider(LocalOverlayKeys provides padGate.overlays) {
             Box(modifier = Modifier.fillMaxSize()) {
             when (mode) {
                 Mode.GAMING -> GamepadShell(
@@ -435,6 +440,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             }
             }
             }
+            }
         }
     }
 
@@ -543,6 +549,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // flight must not keep firing dispatchKeyEvent into a window
         // that is no longer the one the user is looking at.
         padGate.cancel()
+        padGate.overlays?.forgetHeld()
         super.onPause()
     }
 
@@ -552,7 +559,10 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
         topResumed = isTopResumedActivity
-        if (!isTopResumedActivity) padGate.cancel()
+        if (!isTopResumedActivity) {
+            padGate.cancel()
+            padGate.overlays?.forgetHeld()
+        }
         if (isTopResumedActivity) dev.droidtop.runtime.AudioHandOff.reopen("top window")
     }
 

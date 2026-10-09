@@ -280,6 +280,9 @@ class PadGate(
     private val deliver: (KeyEvent) -> Boolean,
     private val enabled: () -> Boolean = { true },
     private val focused: () -> Boolean = { true },
+    /** The window's overlay stack and which layer this window is in it (docs/SPEC.md 6e); none: no overlay rule. */
+    val overlays: OverlayKeys? = null,
+    private val layer: () -> Int = { 0 },
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val core: PadGateCore = PadGateCore(
@@ -299,7 +302,7 @@ class PadGate(
             if (focused()) {
                 PadModality.padDriving()
                 val event = key.toKeyEvent()
-                val handled = deliver(event)
+                val handled = deliverRouted(event)
                 log(event, if (handled) "made-by-gate handled" else "made-by-gate unhandled")
             } else {
                 // Not cancelled here: this runs inside the core's own update.
@@ -329,9 +332,24 @@ class PadGate(
         if (event.keyCode != KeyEvent.KEYCODE_BACK && GamepadKeyMap.physicalAction(event.keyCode) != null) {
             PadModality.padDriving()
         }
-        val handled = deliver(event)
+        val handled = deliverRouted(event)
         log(event, if (handled) "handled" else "unhandled")
         return handled
+    }
+
+    /**
+     * [deliver], unless an overlay covers this window or the press went to
+     * another layer ([OverlayKeys]): then the event is swallowed here and
+     * never reaches the screen beneath.
+     */
+    private fun deliverRouted(event: KeyEvent): Boolean {
+        val stack = overlays ?: return deliver(event)
+        val down = event.action == KeyEvent.ACTION_DOWN
+        if (!stack.route(layer(), event.keyCode, down, event.repeatCount)) {
+            log(event, "covered")
+            return true
+        }
+        return deliver(event)
     }
 
     /**
@@ -439,10 +457,10 @@ class PadGate(
          * Puts a gate in front of [window]'s own callback, once; the
          * returned function takes it out again.
          */
-        fun attach(window: Window): () -> Unit {
+        fun attach(window: Window, overlays: OverlayKeys? = null, layer: () -> Int = { 0 }): () -> Unit {
             val existing = window.callback
             if (existing == null || existing is GatedCallback) return {}
-            val gate = PadGate(deliver = { event -> existing.dispatchKeyEvent(event) })
+            val gate = PadGate(deliver = { event -> existing.dispatchKeyEvent(event) }, overlays = overlays, layer = layer)
             val gated = GatedCallback(existing, gate)
             window.callback = gated
             return {
@@ -464,10 +482,18 @@ class PadGate(
 @Composable
 fun GatePadInThisDialog() {
     val view = LocalView.current
-    DisposableEffect(view) {
+    val overlays = LocalOverlayKeys.current
+    val token = androidx.compose.runtime.remember { Any() }
+    DisposableEffect(view, overlays) {
         val window = (view.parent as? DialogWindowProvider)?.window
-        val detach = window?.let { PadGate.attach(it) } ?: {}
-        onDispose { detach() }
+        // Pushed before the window has focus: from here the screen beneath
+        // gets no keys (OverlayKeys).
+        overlays?.push(token)
+        val detach = window?.let { PadGate.attach(it, overlays) { overlays?.layerOf(token) ?: 0 } } ?: {}
+        onDispose {
+            detach()
+            overlays?.pop(token)
+        }
     }
 }
 

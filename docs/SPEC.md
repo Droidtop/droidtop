@@ -5904,6 +5904,24 @@ The system back key is not a pad action: it belongs to the back
 dispatcher (`BackHandler`), so no key handler takes it and its long press
 still reaches the activity's mode switcher.
 
+**2b. The overlay stack owns the keys (`OverlayKeys`, Droidtop/tracker#359).**
+Every modal surface is a `Dialog`, a window of its own, and Android gives
+it window focus a frame or more after the press that opened it. In that gap
+the activity's gate still delivered keys to the screen underneath, so the
+opening A's release, or a D-pad press from a quick thumb, landed on the
+library behind a game menu (`PadGate.dispatchKey` delivered everything the
+window got; `MenuPanel` only requests focus from a `LaunchedEffect`).
+`GatePadInThisDialog`, which every gated overlay calls, now pushes the
+overlay on its activity's stack when its content composes, before its window
+has focus, and pops it on dispose. From then on, per window: a window with an
+overlay above it gets nothing (presses, repeats and releases are swallowed,
+not queued); and a release, or a repeat, goes only to the layer that took
+its DOWN, so the A that opened a menu releases into nothing and the B that
+closed one does not back out of the screen beneath. The rule lives once, in
+the gate, so the Quick Menu, the left menu, sheets and side panels share it
+instead of each guarding its own opening. A dialog that does not call
+`GatePadInThisDialog` is not on the stack.
+
 **3. The edge rule and the cadence (`Modifier.onPad`).** A screen takes
 the pad with `onPad { press -> ... }` and gets a `PadPress`: an action,
 and whether it is a held direction coming round again. It never sees a
