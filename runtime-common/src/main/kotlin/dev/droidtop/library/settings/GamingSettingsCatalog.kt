@@ -1065,7 +1065,10 @@ object GamingSettingsCatalog {
         val default = if (mode == MODE_DESKTOP) "INPUT" else "COMPANION"
         return ChoiceItem(
             id = id,
-            title = if (mode == MODE_DESKTOP) "Second screen in Desktop mode" else "Second screen in Gaming mode",
+            // The mode leads the title: in portrait the title column is narrow, and two titles that began
+            // "Second screen in" both ended as "Second s..." (rig, 2026-10-09).
+            title = if (mode == MODE_DESKTOP) "Desktop: second screen" else "Gaming: second screen",
+            subtitle = if (mode == MODE_DESKTOP) "What the second screen is for in Desktop mode" else "What the second screen is for in Gaming mode",
             options = listOf(
                 ChoiceOption("COMPANION", "Widgets and game info"),
                 ChoiceOption("INPUT", "Keyboard and trackpad"),

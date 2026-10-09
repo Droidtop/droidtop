@@ -2525,8 +2525,9 @@ the `ContainerRuntime` interface that already exists (§3):
     an IME window — Android places those itself, §6c has the detail — so
     it is an ordinary droidtop window on that display, and droidtop's IME
     is told to stop drawing over the primary one while it is up.
-    **Toggleable**: "Second screen in Desktop mode" and "Second screen in
-    Gaming mode" in settings choose between this input surface and the
+    **Toggleable**: "Desktop: second screen" and "Gaming: second screen"
+    in settings (the mode leads the title so the two stay told apart where
+    portrait truncates a title) choose between this input surface and the
     companion/widgets surface, per mode, per the per-output role model
     above. Gaming defaults to the companion, Desktop to input.
 - **Gaming dual-screen roles (directed 2026-08-30, first live addon
