@@ -64,6 +64,7 @@ internal object SteamLibrarySync {
         }
         answerNow?.let { SteamOwnedGames.save(context, it) }
         val rows = SteamLibraryRows.read(context, db)
+        val hidden = SteamCollections.load(context)?.collections?.firstOrNull { it.id == SteamCollections.ID_HIDDEN }?.appIds.orEmpty()
         val line = summary(
             licences = licences,
             stored = db.licenses().all(),
@@ -71,6 +72,7 @@ internal object SteamLibrarySync {
             kinds = db.apps().kinds(),
             answer = answerNow,
             rows = rows.map { it.app.id to it.holding },
+            hidden = hidden,
         )
         ScanLog.write(line)
         Timber.tag(TAG).i(line)
@@ -88,7 +90,9 @@ internal object SteamLibrarySync {
      * family member's grant, and that only the free sub or an ended licence
      * names; then Steam's own owned-games answer ([answer], null when this
      * sync got none) set against them; then the library [rows] as the store
-     * page counts them, and the DLC of the person's own games.
+     * page counts them, and the DLC of the person's own games, each with the
+     * counts it leaves out, so the figures can be set against the profile's
+     * ([hidden] is the apps in Steam's hidden-games list as the last sync read it).
      */
     fun summary(
         licences: List<License>,
@@ -97,6 +101,7 @@ internal object SteamLibrarySync {
         kinds: List<SteamAppKind>,
         answer: SteamOwnedGames.Answer?,
         rows: List<Pair<Int, StoreHolding>>,
+        hidden: Set<Int> = emptySet(),
     ): String {
         fun Map<String, Int>.words() = entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .joinToString(", ") { "${it.key} ${it.value}" }.ifEmpty { "none" }
@@ -141,7 +146,11 @@ internal object SteamLibrarySync {
             "only in the free sub or ended licences: ${byType(notGranted)}; " +
             "$steamSays; " +
             "library games: own ${holdings[StoreHolding.OWNED] ?: 0}, free not listed ${holdings[StoreHolding.FREE] ?: 0}, " +
-            "family ${holdings[StoreHolding.FAMILY] ?: 0}; dlc of own games ${dlc.held} (paid ${dlc.paid})"
+            "family ${holdings[StoreHolding.FAMILY] ?: 0}; own leaves out ${ownership.paid.count { isGame(it) && answer != null && it !in answer.listed }} " +
+            "paid games Steam does not list (apart, unless installed) and the ${answer?.listed?.count { !isGame(it) } ?: 0} it lists that are not games; " +
+            "steam hides ${rows.count { it.second == StoreHolding.OWNED && it.first in hidden }} of the own games (still counted); " +
+            "dlc counted ${dlc.counted} (paid, base game own); dlc left out: free ${dlc.free}, " +
+            "paid with a base game that is not own ${dlc.otherBase}, family ${dlc.family}"
     }
 
     /** The licences as GameNative kept them: each raw, for the depot downloader, and one row per package. */

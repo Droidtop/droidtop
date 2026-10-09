@@ -10903,6 +10903,16 @@ follows:
   games (`SteamLibraryRows.dlcOfOwnGames`); whether Steam's profile counts
   DLC the same way (782 for the owner, against 911 paid DLC of any base on
   1535) is what the sync line's "dlc of own games" figures check.
+  The store page follows the profile's rules (console 0909: 1,270 games and
+  1,122 DLC on the store page against the profile's 1,245 and 782): once
+  Steam's owned-games answer is known, a paid game it leaves out (11 on the
+  console) is no longer counted as own and is held apart with the free games
+  unless it is installed (`SteamOwnership.statusOf(answered = true)`), and
+  the DLC counted is the DLC an own live licence grants and bills as a
+  purchase; free DLC and DLC of a game that is not the person's own are not
+  counted. The numbers are computed from the last sync's saved data, never
+  fetched when the page opens, so after an upgrade that changed these rules
+  they move when the next sync saves the owned-games answer.
   Each Steam sync writes one line to scan.log (`SteamLibrarySync.summary`):
   the licences by payment method and by flag, how many are another account's,
   whether the free sub is held and how many apps it names, the own live
@@ -10912,8 +10922,10 @@ follows:
   Steam's owned-games answer set against those (how many it lists, by
   licence kind, how many are not a game here, which free games it lists and
   played, which paid games it leaves out), and the library games as the
-  store page counts them (own, free not listed, family) with the DLC of own
-  games (held, and paid), to set against Steam's own profile counts. Install is a job like every store's: fresh product info, then
+  store page counts them (own, free not listed, family) with what own leaves
+  out (paid games Steam does not list, the non-games it lists, own games Steam
+  hides) and the DLC counted with the DLC left out (free, a base game that is
+  not own, family), to set against Steam's own profile counts. Install is a job like every store's: fresh product info, then
   the depots `SteamDepots.plan` picks (GameNative's rules: Windows, 64-bit over
   32-bit, the plain build over the Steam Deck one, the device's language else
   English, granted by the account's packages, not Steam China) with the DLC the

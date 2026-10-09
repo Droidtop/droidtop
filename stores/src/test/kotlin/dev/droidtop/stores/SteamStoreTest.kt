@@ -277,6 +277,10 @@ class SteamStoreTest {
         assertEquals(SteamOwnership.Status.FAMILY, ownership.statusOf(3, installed = true))
         assertEquals(SteamOwnership.Status.FAMILY, ownership.statusOf(3))
         for (app in listOf(4, 5, 100, 101)) assertEquals("$app", SteamOwnership.Status.NONE, ownership.statusOf(app))
+        // Once Steam has answered, a paid game it leaves out is listed apart unless installed.
+        assertEquals(SteamOwnership.Status.FREE, ownership.statusOf(2, answered = true))
+        assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(2, answered = true, installed = true))
+        assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(1, listed = true, answered = true))
         // A free-to-start game is owned through its DLC.
         assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(6, dlc = listOf(60)))
         // With no account id known, every live licence is the account's own.
@@ -297,6 +301,7 @@ class SteamStoreTest {
             accountId = 7,
             kinds = kinds,
             answer = SteamOwnedGames.Answer(listed = setOf(1, 7, 200), played = setOf(7)),
+            hidden = setOf(2),
             rows = listOf(
                 1 to StoreHolding.OWNED, 2 to StoreHolding.OWNED, 6 to StoreHolding.OWNED, 7 to StoreHolding.OWNED,
                 9 to StoreHolding.OWNED, 8 to StoreHolding.FREE, 3 to StoreHolding.FAMILY,
@@ -310,7 +315,9 @@ class SteamStoreTest {
                 "only in the free sub or ended licences: game 2, demo 1, dlc 1, no product info 1; " +
                 "Steam's owned-games answer: 3 games (paid 1, free 1, family 0, other 1; 1 not a game here: no product info 1); " +
                 "free games it lists 1 of 2, played 1; paid games it does not list 2; " +
-                "library games: own 5, free not listed 1, family 1; dlc of own games 1 (paid 1)",
+                "library games: own 5, free not listed 1, family 1; own leaves out 2 paid games Steam does not list (apart, unless installed) " +
+                "and the 1 it lists that are not games; steam hides 1 of the own games (still counted); " +
+                "dlc counted 1 (paid, base game own); dlc left out: free 0, paid with a base game that is not own 0, family 0",
             line,
         )
     }

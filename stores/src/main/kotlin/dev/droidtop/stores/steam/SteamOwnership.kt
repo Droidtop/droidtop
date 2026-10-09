@@ -23,7 +23,8 @@ import `in`.dragonbra.javasteam.enums.ELicenseFlags
  *   is installed.
  *
  * Steam's answer settles the rest too: a game it lists is the person's own
- * whatever the licences say here.
+ * whatever the licences say here, and once it has answered, a paid game it
+ * leaves out is listed apart, not counted, unless installed.
  *
  * Every other live own licence ([paid]: a purchase, a key, a gift) owns. A
  * package whose billing type has not been read yet counts as paid, so nothing
@@ -36,7 +37,7 @@ class SteamOwnership(val paid: Set<Int>, val free: Set<Int>, val family: Set<Int
         /** The person's own: paid for, listed by Steam as owned, or free and installed. */
         OWN,
 
-        /** Free, added to the account, not listed by Steam and not installed. */
+        /** Free, or paid but left out by Steam's answer, not listed by Steam as owned and not installed. */
         FREE,
 
         /** Another account's, lent through a Steam Family. */
@@ -50,7 +51,16 @@ class SteamOwnership(val paid: Set<Int>, val free: Set<Int>, val family: Set<Int
      * [listed] whether Steam's owned-games answer lists it, [installed]
      * whether it is installed here.
      */
-    fun statusOf(appId: Int, dlc: Collection<Int> = emptyList(), listed: Boolean = false, installed: Boolean = false): Status = when {
+    fun statusOf(
+        appId: Int,
+        dlc: Collection<Int> = emptyList(),
+        listed: Boolean = false,
+        installed: Boolean = false,
+        answered: Boolean = false,
+    ): Status = when {
+        // Once Steam has answered, a paid game it leaves out is not the person's own as the profile counts
+        // (11 on the console) unless installed; it is listed apart with the free games not played.
+        (appId in paid || dlc.any { it in paid }) && answered && !listed && !installed -> Status.FREE
         appId in paid || dlc.any { it in paid } -> Status.OWN
         listed -> Status.OWN
         appId in free || dlc.any { it in free } -> if (installed) Status.OWN else Status.FREE

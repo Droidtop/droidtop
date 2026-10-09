@@ -152,11 +152,11 @@ class SteamStore : StoreLibrary {
         }
     }
 
-    /** The DLC the account holds for its own games ([SteamLibraryRows.dlcOfOwnGames]). */
+    /** The DLC the profile counts for the account's own games ([SteamLibraryRows.dlcOfOwnGames]). */
     override suspend fun dlcCount(context: Context): Int = withContext(Dispatchers.IO) {
         val db = db(context)
         val own = SteamLibraryRows.read(context, db).filter { it.holding == StoreHolding.OWNED }.mapTo(HashSet()) { it.app.id }
-        SteamLibraryRows.dlcOfOwnGames(db.apps().kinds(), SteamOwnership.of(db.licenses().all(), SteamLibraryRows.accountId(context)), own).held
+        SteamLibraryRows.dlcOfOwnGames(db.apps().kinds(), SteamOwnership.of(db.licenses().all(), SteamLibraryRows.accountId(context)), own).counted
     }
 
     override suspend fun installedPath(context: Context, gameId: String): String? = withContext(Dispatchers.IO) {

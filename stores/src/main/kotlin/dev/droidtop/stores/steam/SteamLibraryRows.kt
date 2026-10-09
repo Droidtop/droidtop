@@ -22,7 +22,13 @@ internal object SteamLibraryRows {
         val dlcByBase = db.apps().dlcKinds().groupBy({ it.base }, { it.id })
         val answer = SteamOwnedGames.load(context)
         val owned = db.apps().owned(SteamLibrarySync.PLAYABLE_TYPES).mapNotNull { app ->
-            val status = ownership.statusOf(app.id, dlcByBase[app.id].orEmpty(), listed = app.id in answer.listed, installed = app.id in installs)
+            val status = ownership.statusOf(
+                app.id,
+                dlcByBase[app.id].orEmpty(),
+                listed = app.id in answer.listed,
+                installed = app.id in installs,
+                answered = answer.listed.isNotEmpty(),
+            )
             holdingOf(status)?.let { Row(app, it, installs[app.id]) }
         }
         val ownedIds = owned.mapTo(HashSet()) { it.app.id }
@@ -39,16 +45,29 @@ internal object SteamLibraryRows {
     fun accountId(context: Context): Int? =
         SteamCredentials.load(context)?.steamId64?.takeIf { it != 0L }?.let { (it and 0xFFFFFFFFL).toInt() }
 
-    data class DlcCount(val held: Int, val paid: Int)
+    /**
+     * The DLC the store page counts ([counted]) and the DLC it leaves out: [free]
+     * ones of own games (a free licence adds them to the account, the profile
+     * does not count them), [otherBase] paid ones whose base game is not one
+     * of the person's own games, [family] ones only a family member's licence
+     * grants.
+     */
+    data class DlcCount(val counted: Int, val free: Int, val otherBase: Int, val family: Int)
 
     /**
-     * The DLC whose base game is one of [ownGames]: [DlcCount.held] those any
-     * own live licence grants, [DlcCount.paid] those a paid one grants. What
-     * the store page shows as the account's DLC is [DlcCount.held].
+     * The DLC the profile counts, 782 on the console (Droidtop/tracker#377): a
+     * DLC an own live licence grants and bills as a purchase ([SteamOwnership.paid]),
+     * whose base game is one of [ownGames]. Everything else is counted into
+     * the left-out figures so the sync line shows each exclusion.
      */
     fun dlcOfOwnGames(kinds: List<SteamAppKind>, ownership: SteamOwnership, ownGames: Set<Int>): DlcCount {
-        val dlc = kinds.filter { it.type == AppType.dlc.code && it.base in ownGames }
-        return DlcCount(dlc.count { it.id in ownership.paid || it.id in ownership.free }, dlc.count { it.id in ownership.paid })
+        val dlc = kinds.filter { it.type == AppType.dlc.code }
+        return DlcCount(
+            counted = dlc.count { it.base in ownGames && it.id in ownership.paid },
+            free = dlc.count { it.base in ownGames && it.id in ownership.free },
+            otherBase = dlc.count { it.base !in ownGames && it.id in ownership.paid },
+            family = dlc.count { it.id in ownership.family },
+        )
     }
 
     private fun holdingOf(status: SteamOwnership.Status): StoreHolding? = when (status) {
