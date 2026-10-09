@@ -530,7 +530,30 @@ object PluginBrokers {
     /** Plugin ids with host-to-plugin calls currently in flight. */
     internal fun inFlightPluginIds(): Set<String> = active.filterValues { it.isNotEmpty() }.keys.toSet()
 
-    fun userInitiated(pluginId: String): Boolean = active[pluginId]?.any { it.user } == true
+    fun userInitiated(pluginId: String): Boolean {
+        val now = System.currentTimeMillis()
+        return active[pluginId]?.any { it.user && now - it.startedMs < it.budgetMs } == true
+    }
+
+    private val jobMarks = ConcurrentHashMap<String, Pair<String, Active>>()
+
+    /**
+     * A job the person started (a page's Download button) runs after the call that started it has returned, so its
+     * host calls would otherwise find no call of theirs in flight and be refused a user-only op, such as opening a
+     * site's download page in droidtop's web view (docs/plugin-api.md 3 G3). It counts as their call until it ends,
+     * or [JOB_BUDGET_MS] at most.
+     */
+    fun jobRunning(pluginId: String, jobId: String) {
+        val mark = Active(System.currentTimeMillis(), JOB_BUDGET_MS, true)
+        active.getOrPut(pluginId) { CopyOnWriteArrayList() }.add(mark)
+        jobMarks[jobId] = pluginId to mark
+    }
+
+    fun jobEnded(jobId: String) {
+        jobMarks.remove(jobId)?.let { (pluginId, mark) -> active[pluginId]?.remove(mark) }
+    }
+
+    private const val JOB_BUDGET_MS = 30L * 60 * 1000
 
     fun remainingMs(pluginId: String): Long? =
         active[pluginId]?.lastOrNull()?.let { it.budgetMs - (System.currentTimeMillis() - it.startedMs) }

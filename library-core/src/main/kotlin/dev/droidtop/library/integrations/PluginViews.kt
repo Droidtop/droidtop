@@ -212,6 +212,8 @@ object PluginViews {
             title = title,
             onProgress = { percent, statusLine -> onStatus(if (percent >= 0) "$statusLine ($percent%)" else statusLine) },
             onComplete = { if (!done.isCompleted) done.complete(it) },
+            // A page's button: the person started it.
+            userInitiated = true,
         ) ?: return PluginResult.failure("${record.manifest.label} could not start this task")
         return done.await()
     }

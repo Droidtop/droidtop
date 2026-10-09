@@ -191,6 +191,8 @@ object PluginJobsCenter {
         pausable: Boolean = false,
         resumable: Boolean = false,
         resumePayload: String? = null,
+        /** The person started it (a page's button, a context action): it counts as their call while it runs ([PluginBrokers.jobRunning]). */
+        userInitiated: Boolean = false,
     ): String? {
         context?.let(::attach)
         val jobId = UUID.randomUUID().toString()
@@ -211,6 +213,7 @@ object PluginJobsCenter {
             },
             { _, eventJobId, result ->
                 if (eventJobId == jobId) {
+                    PluginBrokers.jobEnded(jobId)
                     update(jobId) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100) }
                     if (!deferred.isCompleted) deferred.complete(result)
                     onComplete(result)
@@ -246,8 +249,10 @@ object PluginJobsCenter {
                 ),
             ) + current
         }
+        if (userInitiated) PluginBrokers.jobRunning(record.manifest.id, jobId)
         val accepted = runner.startJob(record, capability, args, jobId)
         if (!accepted) {
+            PluginBrokers.jobEnded(jobId)
             runner.shutdown()
             runners.remove(jobId)
             resumeSpecs.remove(jobId)
