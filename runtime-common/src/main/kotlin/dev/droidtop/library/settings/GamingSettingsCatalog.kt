@@ -1130,6 +1130,13 @@ object GamingSettingsCatalog {
                     onSelect = { c, value -> CompanionPrefs.setOnGameStart(c, value) },
                 ),
                 ToggleItem(
+                    id = "companion_pip",
+                    title = "Move picture-in-picture video to the companion",
+                    subtitle = "A video that goes small on the main screen plays on the companion instead. Needs the helper app",
+                    current = settings.pipToCompanion,
+                    onToggle = { c, on -> CompanionPrefs.setPipToCompanion(c, on) },
+                ),
+                ToggleItem(
                     id = "companion_ask_stopping",
                     title = "Ask before stopping",
                     subtitle = "Quit, Restart, Kill, Stop and Clear all ask first, on the companion and in the Quick Menu",

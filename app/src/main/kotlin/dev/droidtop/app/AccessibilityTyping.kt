@@ -110,6 +110,11 @@ internal object AccessibilityTyping {
     }
 
     fun onEvent(s: AccessibilityService, event: AccessibilityEvent) {
+        // The service's second job: a window changed, so a video may have gone into picture-in-picture (PipMover).
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            dev.droidtop.runtime.tasks.PipMover.nudge()
+            return
+        }
         val pkg = event.packageName?.toString() ?: return
         // droidtop's own windows type in their own window (InWindowKeyboard, OwnFieldKeyboard).
         if (pkg == s.packageName) return

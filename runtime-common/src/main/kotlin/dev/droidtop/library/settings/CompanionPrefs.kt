@@ -32,6 +32,8 @@ data class CompanionSettings(
     val askBeforeStopping: Boolean = true,
     /** Ask before load and overwrite (plugin rows flagged confirm); on by default. */
     val askBeforeLoad: Boolean = true,
+    /** Move picture-in-picture video to the companion (with the helper app); on by default. */
+    val pipToCompanion: Boolean = true,
 ) {
     /** The two ask-first rules as [GameControls] takes them. */
     val ask: AskFirst get() = AskFirst(askBeforeStopping, askBeforeLoad)
@@ -52,6 +54,7 @@ object CompanionPrefs {
     private const val KEY_LOW_BATTERY = "low_battery"
     private const val KEY_ASK_STOP = "ask_before_stopping"
     private const val KEY_ASK_LOAD = "ask_before_load"
+    private const val KEY_PIP = "pip_to_companion"
 
     const val MAX_CHOSEN = 4
     const val OPEN_DEFAULT = "default"
@@ -117,7 +120,13 @@ object CompanionPrefs {
         lowBattery = all[KEY_LOW_BATTERY] as? Int ?: 0,
         askBeforeStopping = all[KEY_ASK_STOP] as? Boolean ?: true,
         askBeforeLoad = all[KEY_ASK_LOAD] as? Boolean ?: true,
+        pipToCompanion = all[KEY_PIP] as? Boolean ?: true,
     )
+
+    fun setPipToCompanion(context: Context, on: Boolean) {
+        update { it.copy(pipToCompanion = on) }
+        prefs(context).edit().putBoolean(KEY_PIP, on).apply()
+    }
 
     fun setAskBeforeStopping(context: Context, on: Boolean) {
         update { it.copy(askBeforeStopping = on) }

@@ -3,9 +3,10 @@
      (TypingAccessibilityService, docs/SPEC.md 4c "Typing on the add-on display").
      Only the events it needs: a view gaining focus or being tapped (a text field
      to type into), and a window changing (the field went away). Interactive
-     windows are retrieved because a field's window names its display. -->
+     windows are retrieved because a field's window names its display. Windows
+     changing also tells the picture-in-picture mover to look (PipMover). -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeViewFocused|typeViewClicked|typeWindowStateChanged"
+    android:accessibilityEventTypes="typeViewFocused|typeViewClicked|typeWindowStateChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"

@@ -3483,6 +3483,17 @@ row of recent apps, became Home's Recent apps section for every mode.
   **Performance mode** is one catalog item (`GamingSettingsCatalog.performanceModeItem`, Android's GameManager
   profile through the `priv.shell` provider, only while a game droidtop launched is in front): the Quick Menu's
   Performance section, System > Power and the Game tab draw that item.
+- **Picture-in-picture video moves to the companion (owner, 2026-10-09, Droidtop/tracker#430).** While a
+  companion host is started, `PipMover` moves a task that goes into picture-in-picture on the main screen (the
+  display the shell is drawn on, else Android's default) to the companion's display through the helper app's shell
+  (`am display move-stack <task> <display>`; the task list's `mode=pinned`), and moves what it moved back to the main
+  screen when the companion stops; a companion display that goes away hands its tasks back to the default display
+  by itself. "Move picture-in-picture video to the companion" in the Companion group, on by default; without a
+  `priv.shell` provider nothing happens, since an app cannot move another app's task. It looks when droidtop's
+  accessibility service reports a window change (`typeWindowsChanged`, that service's second job beside typing),
+  else every five seconds while the companion shows; never while no companion shows. The video stays a
+  picture-in-picture window on the companion; filling the companion screen instead is not built (it needs a shell
+  command for the windowing mode that has not been checked on the console).
 - **Game (slice C8).** `CompanionGameTab`: a header (art, name, this session's play time), then the rows
   `GameControls` (`:runtime-common`, pure) gives for the UI mode and the runner: Resume, Quit, Restart, Kill, the
   overlay level and performance mode. Kid and Kiosk get Resume and Quit. A stream (`REMOTE_STREAM`, windowcast)
@@ -16880,11 +16891,7 @@ Advanced.
   datagrams), the same one a `gpu.render` process takes, so the wall holds
   on a device that does not enforce Android's own rules (the BlueStacks
   rig runs with SELinux disabled; plugin-enforce-7, `docs/plugin-api.md`
-  §5.3 "The rigs"). A contained plugin's own screen (`ui.main`) is drawn
-  through droidtop: an isolated process can neither get vsync nor use a
-  Surface's buffers, so its engine draws into shared frames droidtop
-  allocates and droidtop paints them (plugin-enforce-8, §5.3 "ui.main in
-  the sandbox").
+  §5.3 "The rigs").
 - **The graphics tier** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
   a plugin that needs the GPU and nothing else declares `gpu.render` and the
   person ticks it. Granting it runs the plugin in a droidtop-owned process

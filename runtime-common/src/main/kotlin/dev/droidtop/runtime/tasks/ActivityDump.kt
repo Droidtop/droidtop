@@ -1,7 +1,14 @@
 package dev.droidtop.runtime.tasks
 
 /** One standard task read out of `dumpsys activity activities`. */
-data class DumpedTask(val taskId: Int, val packageName: String, val displayId: Int, val visible: Boolean)
+data class DumpedTask(
+    val taskId: Int,
+    val packageName: String,
+    val displayId: Int,
+    val visible: Boolean,
+    /** In picture-in-picture (`mode=pinned`). */
+    val pinned: Boolean = false,
+)
 
 /**
  * Reads the task list out of `dumpsys activity activities`, filtered by the shell to the `Display #N` and
@@ -23,6 +30,7 @@ object ActivityDump {
     private val affinity = Regex("""\bA=(?:\d+:)?([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)""")
     private val type = Regex("""\btype=(\w+)""")
     private val visible = Regex("""\bvisible=(true|false)""")
+    private val mode = Regex("""\bmode=(\w+)""")
 
     fun parse(text: String): List<DumpedTask> {
         var displayId = 0
@@ -38,7 +46,13 @@ object ActivityDump {
             if (kind != null && kind != "standard") continue
             val pkg = affinity.find(rest)?.groupValues?.get(1) ?: continue
             if (!seen.add(id)) continue
-            out += DumpedTask(id, pkg, displayId, visible.find(rest)?.groupValues?.get(1) == "true")
+            out += DumpedTask(
+                id,
+                pkg,
+                displayId,
+                visible.find(rest)?.groupValues?.get(1) == "true",
+                pinned = mode.find(rest)?.groupValues?.get(1) == "pinned",
+            )
         }
         return out
     }

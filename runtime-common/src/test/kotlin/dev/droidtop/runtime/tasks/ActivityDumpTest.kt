@@ -31,6 +31,23 @@ class ActivityDumpTest {
     }
 
     @Test
+    fun `a picture-in-picture task is read as pinned and moves to the companion`() {
+        val dump = """
+            Display #0 (activities from top to bottom):
+              * Task{5555555 #1900 type=standard A=10300:com.google.android.youtube U=0 visible=true mode=pinned translucent=false sz=1}
+              * Task{4a1b2c3 #1743 type=standard A=10123:com.android.calendar U=0 visible=true mode=fullscreen translucent=false sz=1}
+            Display #2 (activities from top to bottom):
+              * Task{6666666 #1950 type=standard A=10301:org.example.video U=0 visible=true mode=pinned translucent=false sz=1}
+        """.trimIndent()
+        val tasks = ActivityDump.parse(dump)
+        assertEquals(listOf(1900, 1950), tasks.filter { it.pinned }.map { it.taskId })
+        assertEquals(listOf(1900), PipMover.toMove(tasks, mainDisplay = 0, companionDisplay = 2).map { it.taskId })
+        assertTrue(PipMover.toMove(tasks, mainDisplay = 2, companionDisplay = 2).isEmpty())
+        assertEquals(listOf("am", "display", "move-stack", "1900", "2"), PipMover.moveCommand(1900, 2))
+        assertEquals(listOf(1950), PipMover.toMoveBack(tasks, moved = setOf(1950, 1743), companionDisplay = 2).map { it.taskId })
+    }
+
+    @Test
     fun `home and other non-standard task types are not apps`() {
         assertTrue(ActivityDump.parse(twoDisplays).none { it.taskId == 1 })
     }

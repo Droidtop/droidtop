@@ -72,6 +72,7 @@ import dev.droidtop.shell.gamepad.RailTab
 import dev.droidtop.shell.gamepad.TabRail
 import dev.droidtop.shell.gamepad.labelExtent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -249,6 +250,42 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         onDispose {
             lifecycle.lifecycle.removeObserver(observer)
             KeyboardTargets.companionShown(token, null)
+        }
+    }
+    // Picture-in-picture video moves here while this companion is started, and back to the main screen when it
+    // stops (PipMover; only with the helper app and the setting on, Droidtop/tracker#430).
+    DisposableEffect(lifecycle, view) {
+        val scope = kotlinx.coroutines.MainScope()
+        var job: kotlinx.coroutines.Job? = null
+        fun mainDisplay(): Int = ForegroundShell.current()?.let { shell ->
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) shell.display?.displayId else null
+        } ?: android.view.Display.DEFAULT_DISPLAY
+        val observer = LifecycleEventObserver { _, event ->
+            val companion = view.display?.displayId ?: return@LifecycleEventObserver
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    job?.cancel()
+                    job = scope.launch {
+                        dev.droidtop.runtime.tasks.PipMover.watch(
+                            enabled = { CompanionPrefs.settings.value.pipToCompanion },
+                            mainDisplay = ::mainDisplay,
+                            companionDisplay = companion,
+                        )
+                    }
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    job?.cancel()
+                    job = null
+                    val main = mainDisplay()
+                    scope.launch { dev.droidtop.runtime.tasks.PipMover.moveBack(main, companion) }
+                }
+                else -> Unit
+            }
+        }
+        lifecycle.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.lifecycle.removeObserver(observer)
+            job?.cancel()
         }
     }
     // A field on the other screen wants keys: the input controller is what shows while the request stands, and
