@@ -11546,7 +11546,9 @@ device offers the game, "Folder is missing" for a game the walk no longer
 finds. A game no runner can take is never a dead end that only says
 "no runner": the line names what is missing (`PcRunners.noRunnerLine`:
 no engine, Windows or Linux build found in the folder; or that no
-Enginehost plugin covers the engine yet). A game whose engine has an
+Enginehost plugin covers the engine yet), and ends with the one step that
+always exists: the page's Engine row, which pins the engine when the
+detection is missing or wrong (7e2b). A game whose engine has an
 Enginehost plugin always has a setup row instead ("Install the HTML
 plugin") whose action asks Enginehost for it, as an emulator-less console
 game does with "Get an emulator". The capsule's hint pill, the page's big button and `PcGameMenu`'s

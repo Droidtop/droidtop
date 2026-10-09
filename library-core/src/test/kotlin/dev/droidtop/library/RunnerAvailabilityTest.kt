@@ -249,9 +249,9 @@ class RunnerAvailabilityTest {
     @Test
     fun `a game nothing can run says what is missing instead of no runner`() {
         val rows = RunnerAvailability.evaluate(facts(engine = null, enginehostSupported = false))
-        assertEquals("No game engine, Windows or Linux build found in this folder", PcRunners(null, rows).noRunnerLine)
+        assertEquals("No game engine, Windows or Linux build found in this folder. If it is a game, pick its engine under Engine", PcRunners(null, rows).noRunnerLine)
         assertEquals(
-            "No Enginehost plugin covers HTML yet",
+            "No Enginehost plugin covers HTML yet. If that is wrong, pick another engine under Engine",
             PcRunners(GameEngine.HTML, rows).noRunnerLine,
         )
         assertEquals("This game's folder isn't on this device", PcRunners(null, emptyList()).noRunnerLine)

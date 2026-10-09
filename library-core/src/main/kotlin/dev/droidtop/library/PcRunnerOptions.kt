@@ -260,12 +260,14 @@ data class PcRunners(val engine: GameEngine?, val options: List<RunnerOption>) {
      * what is missing instead of "no runner offers this game"
      * (Droidtop/tracker#287). A game whose engine has an Enginehost
      * plugin never lands here: it has a setup row ("Install the HTML
-     * plugin") and the action to run it.
+     * plugin") and the action to run it. The line ends with the one next
+     * step that always exists, the page's Engine row (the engine pin,
+     * docs/SPEC.md 7e2b), so a wrong or missing detection is not a dead end.
      */
     val noRunnerLine: String
         get() = when {
             options.isEmpty() -> "This game's folder isn't on this device"
-            engine == null -> "No game engine, Windows or Linux build found in this folder"
-            else -> "No Enginehost plugin covers ${engine.displayName()} yet"
+            engine == null -> "No game engine, Windows or Linux build found in this folder. If it is a game, pick its engine under Engine"
+            else -> "No Enginehost plugin covers ${engine.displayName()} yet. If that is wrong, pick another engine under Engine"
         }
 }
