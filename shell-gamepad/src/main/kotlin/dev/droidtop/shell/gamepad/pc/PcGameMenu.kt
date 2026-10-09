@@ -818,14 +818,21 @@ internal fun PcGameMenu(
         // and "Support the developer" rows, hideable per game. Read from the
         // entries and their links only, so no lookup happens as this opens.
         val ownedOn = (grouping?.entriesByPath?.values ?: listOf(entry)).mapNotNull { it.ownership() }.ownershipLabel()
+        // A page of a store droidtop runs ("Get it on Steam") opens in that store's own view, signed in, where the
+        // person can buy or claim it and the store is synced after (docs/SPEC.md 7g, "A store's own pages"); any
+        // other link goes to the device's browser.
         val openLink = { url: String ->
-            status = runCatching {
-                context.startActivity(
-                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
+            status = if (dev.droidtop.library.stores.StoreWeb.openLink(context, url)) {
                 null
-            }.getOrElse { "Nothing on this device opens $url" }
+            } else {
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                    null
+                }.getOrElse { "Nothing on this device opens $url" }
+            }
         }
         val pointers = if (ownedOn.isEmpty() && !storeLinksHidden) {
             dev.droidtop.library.StorePages.getItOn(entry.links) + dev.droidtop.library.StorePages.support(entry.links)

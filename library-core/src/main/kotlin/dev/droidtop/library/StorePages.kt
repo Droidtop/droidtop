@@ -83,6 +83,7 @@ object StorePages {
         return when {
             host.endsWith("steampowered.com") || host.endsWith("steamcommunity.com") -> "Steam"
             host.endsWith("gog.com") -> "GOG"
+            host.endsWith("epicgames.com") -> "Epic"
             host.endsWith("itch.io") -> "itch.io"
             host.endsWith("dlsite.com") -> "DLsite"
             else -> null

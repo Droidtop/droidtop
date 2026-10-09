@@ -41,8 +41,9 @@ class StorePagesTest {
             GameLink("Official site", "https://example.org/game"),
             GameLink("Patreon", "https://www.patreon.com/dev"),
             GameLink("Store", "https://dev.itch.io/game"),
+            GameLink("Epic", "https://store.epicgames.com/p/game"),
         )
-        assertEquals(listOf("Get it on Steam", "Get it on itch.io"), StorePages.getItOn(links).map { it.label })
+        assertEquals(listOf("Get it on Steam", "Get it on itch.io", "Get it on Epic"), StorePages.getItOn(links).map { it.label })
         assertEquals(listOf("https://www.patreon.com/dev"), StorePages.support(links).map { it.url })
         assertEquals(listOf("Official site"), StorePages.other(links).map { it.label })
     }

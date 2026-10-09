@@ -14233,10 +14233,15 @@ on the card.
 
 A game owned on no store that has scraped links saying where it can be
 bought or where its developer takes support shows them on that menu as
-plain rows: "Get it on Steam", "Get it on GOG", "Get it on itch.io",
-"Get it on DLsite", "Support the developer" (Patreon, SubscribeStar)
-(`StorePages`). They read the links a scrape already wrote and nothing
-else, so no lookup happens as the menu opens. They are information, not a
+plain rows: "Get it on Steam", "Get it on GOG", "Get it on Epic", "Get it
+on itch.io", "Get it on DLsite", "Support the developer" (Patreon,
+SubscribeStar) (`StorePages`). They read the links a scrape already wrote
+and nothing else, so no lookup happens as the menu opens. A link to a page
+of a store droidtop runs (this row, or any of the game's links) opens in
+that store's own view, signed in as the account, where the person can buy
+or claim the game and the store is synced afterwards (7g, "A store's own
+pages", Droidtop/tracker#407); any other link opens in the device's
+browser. They are information, not a
 pitch: no popups, no grid badges, and one "Hide these for this game" row
 dismisses them for that game, "Hide these for every game" for all of them,
 and a switch on the Stores place brings them back (`StoreLinkPrefs`,
