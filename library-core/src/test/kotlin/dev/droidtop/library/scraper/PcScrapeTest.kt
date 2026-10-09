@@ -35,7 +35,7 @@ class PcScrapeTest {
         // "scrappy" is a real distribution's own build tag. The parser
         // reads everything after the version as the build's, never the
         // title's (GameTitleParser), so the search is the name alone.
-        assertEquals("BeingADIK", PcScrapeTitle.clean("BeingADIK-0.8.3-scrappy"))
+        assertEquals("Being ADIK", PcScrapeTitle.clean("BeingADIK-0.8.3-scrappy"))
     }
 
     @Test

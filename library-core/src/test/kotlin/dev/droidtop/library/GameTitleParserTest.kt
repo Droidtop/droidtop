@@ -60,9 +60,22 @@ class GameTitleParserTest {
         // Scene names: dots are spaces, everything after the version is the build's.
         Row("Game.Name.v1.2.3-GROUP", "Game Name", version = "1.2.3"),
         // Language tokens.
-        Row("SampleVN-1.0-eng", "SampleVN", version = "1.0", language = "en"),
-        Row("SampleVN-1.0-jpn", "SampleVN", version = "1.0", language = "ja"),
-        Row("SampleVN-1.0-mtl", "SampleVN", version = "1.0", language = "mtl"),
+        Row("SampleVN-1.0-eng", "Sample VN", version = "1.0", language = "en"),
+        Row("SampleVN-1.0-jpn", "Sample VN", version = "1.0", language = "ja"),
+        Row("SampleVN-1.0-mtl", "Sample VN", version = "1.0", language = "mtl"),
+        // A title written as one run of words is read as the words (Droidtop/tracker#282); one with no
+        // lower-case letter, or with spaces, is left as it is.
+        Row("PrincessEvangileFull", "Princess Evangile Full"),
+        Row("SingleAgain", "Single Again"),
+        Row("BeingADik", "Being A Dik"),
+        Row("GTA", "GTA"),
+        Row("LUST-ACADEMY-BOOK1", "LUST ACADEMY BOOK1"),
+        Row("Love Of MagicBook", "Love Of MagicBook"),
+        // A version written onto the title with no separator is still the version.
+        Row("SevenDayWYandereGirlV0.80", "Seven Day W Yandere Girl", version = "0.80"),
+        // A short name that is a game's whole title keeps it: the version is cut, not the name.
+        Row("REC_v0.4.3.5", "REC", version = "0.4.3.5"),
+        Row("RTS_0.032_WIN2", "RTS", version = "0.032"),
         // Numbered titles keep their number; a bare number is never a version.
         Row("Far Cry 5", "Far Cry 5"),
         Row("Cyberpunk 2077", "Cyberpunk 2077"),

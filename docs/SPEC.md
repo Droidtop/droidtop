@@ -14897,6 +14897,21 @@ The person's own title (`Library.renameGame`, the menu's "Title" row) is
 the existing `GameLinksStore` game name, keyed by entry id, so it survives
 every rescan; clearing it returns to the parsed one.
 
+**Names written as one run (Droidtop/tracker#282).** A folder name with no
+space in it is read as the words it is made of: a space where a lower-case
+letter meets a capital and before the last capital of a capital run that
+starts a word (`PrincessEvangileFull` is `Princess Evangile Full`,
+`BeingADik` is `Being A Dik`); a name with no lower-case letter (`GTA`) or
+with a space is left as written. A dotted version written straight onto the
+title with a capital V (`SomeGameV0.80`) is the version, not part of the
+title. The console's PC cards that read `REC` and `RTS` are not a parser
+miss: their folders are `REC_v0.4.3.5` and `RTS_0.032_WIN2`, whose titles
+are `REC` and `RTS` (a build-stage folder under a titled game still takes
+the game's title, `isReleaseTagFolder`). The grid's name line under the
+focused game is the theme's `name` field, `LibraryEntry.title`, so it is
+the parsed title too; what read as raw names there were names the parser
+had no rule for.
+
 **Entry titles are the parsed title at the source (Droidtop/tracker#174,
 #282).** Every provider stores `LibraryEntry.title` already parsed, so every
 surface that draws it (a themed ES-DE textlist or card, the capsules, the

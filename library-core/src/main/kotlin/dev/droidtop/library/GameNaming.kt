@@ -43,6 +43,13 @@ object GameNaming {
     private val GENERIC_PART_PREFIX get() = PartMarkers.LEAF_PREFIX
     private val TRAILING_PART get() = PartMarkers.TRAILING
 
+    /**
+     * A dotted version written straight onto a title with no separator, a capital V
+     * after a lower-case letter: `SomeGameV0.80`. [NAME_VERSION] needs a separator, so
+     * without this the version stayed in the title (Droidtop/tracker#282).
+     */
+    private val GLUED_VERSION = Regex("""^(.*[a-z])V(\d+(?:\.\d+)+[a-zA-Z]?)$""")
+
     /** A leaf that is a dotted version and nothing else: `10.0-sancho`. */
     private val BARE_VERSION_LEAF = Regex("""^\d+\.\d""")
 
@@ -282,7 +289,10 @@ object GameNaming {
         }
 
         val match = NAME_VERSION.find(leaf)
-            ?: return trailingSegment(Derived(leaf, "", emptyList(), null))
+            ?: return trailingSegment(
+                GLUED_VERSION.find(leaf)?.let { Derived(it.groupValues[1], it.groupValues[2], emptyList(), null) }
+                    ?: Derived(leaf, "", emptyList(), null),
+            )
         val name = match.groupValues[1].trim(' ', '-', '_').ifEmpty { leaf }
         val version = (match.groupValues[2].ifEmpty { match.groupValues[3] }).replace('_', '.')
         val (mods, language) = classifyVariantTokens(match.groupValues[4])

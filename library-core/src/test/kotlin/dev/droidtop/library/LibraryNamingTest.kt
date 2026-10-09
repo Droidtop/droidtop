@@ -102,13 +102,13 @@ class LibraryNamingTest {
     fun `an episode folder is named by its series`() {
         assertEquals("Thief of Hearts - Part1", qualifiedFolderTitle(File("/games/renpy/Thief of Hearts/Part1")))
         assertEquals("Fetish Locator - Week 1", qualifiedFolderTitle(File("/games/renpy/Fetish Locator/Week 1")))
-        assertEquals("BeingADik - Chap3+", qualifiedFolderTitle(File("/games/renpy/BeingADik/Chap3+")))
+        assertEquals("Being A Dik - Chap3+", qualifiedFolderTitle(File("/games/renpy/BeingADik/Chap3+")))
     }
 
     @Test
     fun `a folder that is only a version is titled by its game and that version`() {
         assertEquals(
-            "BeingADIK 12.0",
+            "Being ADIK 12.0",
             qualifiedFolderTitle(File("/games/renpy/BeingADIK/12.0-scrappy"), root = File("/games/renpy")),
         )
     }

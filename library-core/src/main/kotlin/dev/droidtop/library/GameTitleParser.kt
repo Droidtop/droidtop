@@ -316,7 +316,7 @@ object GameTitleParser {
         for (token in derived.tags) classify(token)
         for (token in derived.mods) classify(token)
 
-        val title = tidy(GameNaming.displayName(derived.name)).ifEmpty { raw }
+        val title = splitRunTogether(tidy(GameNaming.displayName(derived.name))).ifEmpty { raw }
         val subtitle = SUBTITLE.find(title)?.groupValues?.get(2)?.trim()?.ifEmpty { null }
         val main = SUBTITLE.find(title)?.groupValues?.get(1)?.trim() ?: title
         val numbered = SERIES_NUMBER.find(main)
@@ -356,6 +356,19 @@ object GameTitleParser {
             number = numbered?.groupValues?.get(2)?.toIntOrNull(),
         )
     }
+
+    private val RUN_TOGETHER = Regex("""(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])""")
+
+    /**
+     * A title written as one run of words, `PrincessEvangileFull`, read as the words it is
+     * made of: a space where a lower-case letter meets a capital, and before the last
+     * capital of a capital run that starts a word (`BeingADik` is `Being A Dik`). Only a
+     * name with no space in it: a spaced title is as its author wrote it, and a name
+     * with no lower-case letter (`GTA`, `LUSTACADEMY`) has no word breaks to read
+     * (Droidtop/tracker#282).
+     */
+    private fun splitRunTogether(title: String): String =
+        if (title.contains(' ')) title else RUN_TOGETHER.replace(title, " ")
 
     /** Runs of spaces and of `-`, `_`, `,` made one, and separators hanging off either end cut. */
     private fun tidy(title: String): String =
