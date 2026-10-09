@@ -313,7 +313,7 @@ object WineOptions {
                 "For a game that calls Steam (steam_api.dll): it starts through a stand-in for the Steam client in its prefix (gbe_fork), " +
                     "as your droidtop Steam account when signed in, so it does not stop waiting for Steam. " +
                     "Achievements and multiplayer stay on this device. Nothing in the game's folder changes. " +
-                    "On for a Steam game; off for a game from anywhere else until you turn it on.",
+                    "Off for games Steam doesn't own; turn on to use the Steamworks shim. A steam_appid.txt only supplies the app ID, the switch decides.",
                 if (on) STEAMWORKS_ON else STEAMWORKS_OFF,
                 listOf(WineOptionChoice(STEAMWORKS_ON, "On"), WineOptionChoice(STEAMWORKS_OFF, "Off")),
                 ownChoice = own[STEAMWORKS_KEY] != null,
