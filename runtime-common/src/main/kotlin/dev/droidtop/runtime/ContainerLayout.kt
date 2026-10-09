@@ -120,9 +120,15 @@ object ContainerLayout {
      * to say (droidspaces' own PulseAudio bridge owns this variable for
      * its own containers instead, see DroidSpacesRuntime, so its callers
      * pass false to leave it unset here).
+     *
+     * `XDG_DATA_DIRS` is the specification's default with droidtop's
+     * library entries after it ([ContainerLauncher.DATA_DIR], docs/SPEC.md
+     * 2a), so every stock menu lists the library's games; the distro's own
+     * entries come first and win a name clash.
      */
     fun clientEnvironment(waylandSocketName: String?, audioShared: Boolean = true): Map<String, String> = buildMap {
         put("XDG_RUNTIME_DIR", SOCKET_DIR)
+        put("XDG_DATA_DIRS", "/usr/local/share:/usr/share:${ContainerLauncher.DATA_DIR}")
         // CUPS clients take a socket path here. With printing off nothing
         // listens there, which to a program is the same as no CUPS.
         put("CUPS_SERVER", "$SOCKET_DIR/$CUPS_SOCKET")

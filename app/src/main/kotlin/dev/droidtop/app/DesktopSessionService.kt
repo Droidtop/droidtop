@@ -94,6 +94,10 @@ class DesktopSessionService : Service() {
     @Volatile
     private var booting: Pair<ContainerRuntime, Container>? = null
 
+    /** The library inside the desktop (docs/SPEC.md 2a), from the moment the session is up. */
+    @Volatile
+    private var libraryEntries: DesktopLibraryEntries? = null
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) stopSelf()
         return START_NOT_STICKY
@@ -119,6 +123,8 @@ class DesktopSessionService : Service() {
         // A primary still booting is stopped too: cancelling the boot's
         // wait alone would leave its compositor coming up with nobody to
         // stop it.
+        libraryEntries?.stop()
+        libraryEntries = null
         val connected = _stateHolder.value as? DesktopSessionState.Connected
         connected?.hostBridge?.disconnect()
         val live = connected?.let { it.runtime to it.container } ?: booting
@@ -211,6 +217,7 @@ class DesktopSessionService : Service() {
             runtime,
             primary,
         )
+        libraryEntries = DesktopLibraryEntries(applicationContext, LibraryCore.library(applicationContext)).also { it.start(scope) }
     }
 
     /**

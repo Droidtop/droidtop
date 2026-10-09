@@ -50,6 +50,14 @@ class ContainerLayoutTest {
     }
 
     @Test
+    fun `menus find the distro's entries first, then the library's`() {
+        assertEquals(
+            "/usr/local/share:/usr/share:/run/droidtop-app-storage/desktop-launcher/share",
+            ContainerLayout.clientEnvironment(null)["XDG_DATA_DIRS"],
+        )
+    }
+
+    @Test
     fun `PULSE_SERVER is set by default and dropped when audio sharing is off`() {
         val shared = ContainerLayout.clientEnvironment(null)
         assertEquals("${ContainerLayout.SOCKET_DIR}/${ContainerLayout.AUDIO_SOCKET}", shared["PULSE_SERVER"])

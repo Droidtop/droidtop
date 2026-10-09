@@ -40,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,7 +57,9 @@ import dev.droidtop.input.InputSeats
 import dev.droidtop.input.PointerTransform
 import dev.droidtop.library.Library
 import dev.droidtop.library.LaunchResult
+import dev.droidtop.library.LibraryKinds
 import dev.droidtop.runtime.ContainerApp
+import dev.droidtop.runtime.DesktopLaunchRequests
 import dev.droidtop.runtime.DisplayOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -241,6 +244,16 @@ fun DesktopShell(
         } else {
             val entry = library.backgroundScanState(START_MENU_KINDS).value?.firstOrNull { it.id == entryId }
             if (entry != null) playEntry(entry) else launchById(entryId)
+        }
+    }
+
+    // A game the container's own menus asked for (docs/SPEC.md 2a, the launch helper): played exactly
+    // as a Start menu tap plays it. An id the published list does not hold (yet) launches by id.
+    val currentPlay by rememberUpdatedState(playEntry)
+    LaunchedEffect(library) {
+        DesktopLaunchRequests.requests.collect { id ->
+            val entry = library.backgroundScanState(LibraryKinds.GAMES).value?.firstOrNull { it.id == id }
+            if (entry != null) currentPlay(entry) else launchById(id)
         }
     }
 

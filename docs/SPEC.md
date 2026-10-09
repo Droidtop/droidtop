@@ -189,10 +189,9 @@ Android side — that broke the actual intent:
   integrate into as ordinary windows — droidtop's equivalent of "dom0's
   desktop environment" is this in-container launcher, not host-bridge).
   It shows an **injected list of applications** — `:library-core`'s
-  `Library` contents, pushed in from the Android side by some channel
-  (exact mechanism still open: a bind-mounted file the launcher
-  watches for changes is the simplest first cut, not yet designed in
-  detail) — and rendered inside the container, not composited by Android.
+  `Library` contents, pushed in from the Android side as freedesktop
+  desktop entries (the channel below) — and rendered inside the
+  container, not composited by Android.
 - **The task manager is Android-side** — host-bridge's own privileged
   position (able to see across the primary *and* every sibling, which no
   single container's own namespace can) is what makes a real cross-
@@ -229,9 +228,52 @@ Android side — that broke the actual intent:
   API) — resizable, movable windows sitting alongside Wine/Linux windows
   in the same Desktop shell, not a separate "Android apps" mode.
 
-The in-container launcher doesn't exist as software yet, the injection
-channel isn't designed in detail, and the helper process is a concept,
-not code.
+**The injection channel and the launch helper (built 2026-10-08,
+Droidtop/tracker#353).** Both are freedesktop standards, so no image
+changes and nothing of droidtop runs inside the container beyond one shell
+script (`ContainerLauncher`, `runtime-common`):
+
+- *Channel.* While a desktop session runs, `DesktopLibraryEntries` (`:app`)
+  writes one desktop entry per library game (`LibraryKinds.GAMES`, hidden
+  and missing ones left out) into `<filesDir>/desktop-launcher/share/
+  applications`. Every container already sees the app's files directory at
+  `/run/droidtop-app-storage`, and `ContainerLayout.clientEnvironment` sets
+  `XDG_DATA_DIRS=/usr/local/share:/usr/share:/run/droidtop-app-storage/
+  desktop-launcher/share`, so any stock menu, panel or launcher that reads
+  the Desktop Entry Specification lists the games under `Categories=Game`,
+  the distro's own entries first. The list is the library's published
+  index (`Library.backgroundScanState`), written once it settles, off the
+  main thread; an entry is rewritten only when its text changed, which a
+  manifest beside the entries remembers across sessions, and an entry for
+  a game that left the library is deleted. Icons are the entry's own local
+  art, mapped to its path inside the container (shared storage or the
+  app's files); a remote URL gives no icon line, and nothing is copied.
+- *Helper.* Each entry's `Exec` is `sh .../bin/droidtop-open <token>`,
+  where the token is 16 hex digits of the library id's SHA-256 (ids carry
+  paths and characters `Exec` would have to quote, and a token gives
+  nothing away). The helper refuses anything but a token, creates an empty
+  request file under a hidden name in `.../desktop-launcher/requests` and
+  renames it into place. droidtop watches that directory (`FileObserver`,
+  MOVED_TO), deletes each request, maps the token back to the id it
+  published and hands the id to `DesktopLaunchRequests`; the Desktop shell
+  answers exactly as a Start menu tap (Gaming's primary-action rule for a
+  PC or engine game, `Library.launch` otherwise). Not a second launcher
+  logic: the helper only asks.
+- *Boundary.* The container can name only a token droidtop itself
+  published. An unknown token, a name that is not a token, and requests
+  left from an earlier session are ignored; nothing the container writes is
+  run, parsed as a command or passed to Android as an argument. With no
+  Desktop shell showing there is nobody to answer and the request is
+  dropped with a log line.
+
+Still open, and the owner's to choose: which stock panel/launcher the
+primary starts (waybar with a launcher, sfwbar, nwg-panel...), an ordinary
+distro package started from the compositor's own config. Until then the
+entries are reached from any launcher a person installs (`fuzzel`, `wofi
+--show drun`), from `gtk-launch`, and from file managers that browse
+applications. When that panel lands, droidtop's own Compose taskbar shrinks
+to what only Android can do (the task manager across containers, the mode
+switch).
 
 **Until it does (built 2026-09-24): droidtop's Start menu lists the primary
 container's own applications.** `ContainerApplications` (`runtime-common`)
