@@ -23,4 +23,5 @@
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
         android:settingsActivity="org.pocketworkstation.pckeyboard.LatinIMESettings"
         android:isDefault="@bool/im_is_default"
+        android:supportsInlineSuggestions="true"
 />

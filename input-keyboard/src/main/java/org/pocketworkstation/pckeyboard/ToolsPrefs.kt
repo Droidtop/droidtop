@@ -2,6 +2,7 @@ package org.pocketworkstation.pckeyboard
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import android.preference.PreferenceManager
 import android.view.inputmethod.EditorInfo
 
@@ -23,6 +24,9 @@ object ToolsPrefs {
     /** Dragging a finger along the space bar moves the cursor. */
     const val SPACE_DRAG = "pref_space_drag"
 
+    /** Autofill suggestions (Android 11+) drawn in a row above the keys. */
+    const val INLINE_AUTOFILL = "pref_inline_autofill"
+
     /** The emoji panel and its search. */
     const val EMOJI = "pref_emoji"
 
@@ -43,11 +47,21 @@ object ToolsPrefs {
 
     fun form(context: Context): KeyboardForm.Form = KeyboardForm.of(prefs(context).getString(KeyboardForm.PREF, null))
 
+    fun inlineAutofill(context: Context): Boolean = InlineRules.wanted(Build.VERSION.SDK_INT, prefs(context).getBoolean(INLINE_AUTOFILL, true))
+
     fun emoji(context: Context): Boolean = prefs(context).getBoolean(EMOJI, true)
 
     fun spaceDrag(context: Context): Boolean = prefs(context).getBoolean(SPACE_DRAG, true)
 
     fun macros(context: Context): List<Macro> = MacroParser.parse(prefs(context).getString(MACROS, "") ?: "")
+}
+
+/** When the keyboard asks for autofill suggestions (Droidtop/tracker#342): Android 11 or later, and not switched off. */
+object InlineRules {
+    const val MIN_SDK = 30
+
+    @JvmStatic
+    fun wanted(sdk: Int, preference: Boolean): Boolean = sdk >= MIN_SDK && preference
 }
 
 /** When the keyboard may learn from what is typed (Droidtop/tracker#340). */

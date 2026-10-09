@@ -77,6 +77,15 @@ class EditingHelpersTest {
         assertEquals(listOf("good"), h.entries.map { it.text })
     }
 
+    // --- inline autofill ---
+
+    @Test fun inlineAutofillNeedsAndroid11AndThePreference() {
+        assertFalse(InlineRules.wanted(29, true))
+        assertFalse(InlineRules.wanted(30, false))
+        assertTrue(InlineRules.wanted(30, true))
+        assertTrue(InlineRules.wanted(36, true))
+    }
+
     // --- space drag ---
 
     @Test fun spaceDragIsATapUntilTheThresholdThenStepsTheCursor() {

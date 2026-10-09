@@ -345,6 +345,14 @@
             />
 
     <CheckBoxPreference
+            android:key="pref_inline_autofill"
+            android:title="@string/title_inline_autofill"
+            android:persistent="true"
+            android:defaultValue="true"
+            android:summary="@string/summary_inline_autofill"
+            />
+
+    <CheckBoxPreference
             android:key="pref_incognito"
             android:title="@string/title_incognito"
             android:persistent="true"

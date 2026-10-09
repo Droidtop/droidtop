@@ -38,6 +38,7 @@ import android.content.res.XmlResourceParser;
 import android.inputmethodservice.InputMethodService;
 import android.media.AudioManager;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -55,6 +56,7 @@ import android.util.Printer;
 import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
 import android.view.View;
+import androidx.annotation.RequiresApi;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.Window;
@@ -983,7 +985,7 @@ public class LatinIME extends InputMethodService implements
      * macros, incognito), or the keys alone when the strip is switched off.
      */
     View wrapInputView(LatinKeyboardView keyboard) {
-        return ToolsDeck.wrap(this, keyboard, new ImeConnectionSink(), null, new Runnable() {
+        final View view = ToolsDeck.wrap(this, keyboard, new ImeConnectionSink(), null, new Runnable() {
             public void run() {
                 // A tool types at the cursor: finish the word being composed first, as an arrow key does.
                 final InputConnection ic = getCurrentInputConnection();
@@ -991,7 +993,32 @@ public class LatinIME extends InputMethodService implements
                     commitTyped(ic, true);
                 }
             }
-        });
+        }, null);
+        mToolsDeck = view instanceof ToolsDeck ? (ToolsDeck) view : null;
+        return view;
+    }
+
+    /** The tool strip around the current input view, if there is one; shows the autofill suggestions. */
+    private ToolsDeck mToolsDeck;
+
+    /** droidtop patch (Droidtop/tracker#342): autofill suggestions in the keyboard, Android 11 and later. */
+    @Override
+    @RequiresApi(Build.VERSION_CODES.R)
+    public android.view.inputmethod.InlineSuggestionsRequest onCreateInlineSuggestionsRequest(Bundle uiExtras) {
+        if (!ToolsPrefs.INSTANCE.inlineAutofill(this)) {
+            return null;
+        }
+        return InlineAutofill.request(this);
+    }
+
+    @Override
+    @RequiresApi(Build.VERSION_CODES.R)
+    public boolean onInlineSuggestionsResponse(android.view.inputmethod.InlineSuggestionsResponse response) {
+        if (mToolsDeck == null || !ToolsPrefs.INSTANCE.inlineAutofill(this)) {
+            return false;
+        }
+        InlineAutofill.show(this, response, mToolsDeck);
+        return true;
     }
 
     /** droidtop patch (Droidtop/tracker#340): a space-bar drag moves the cursor like the arrow keys do. */
@@ -1017,6 +1044,9 @@ public class LatinIME extends InputMethodService implements
     public void onFinishInputView(boolean finishingInput) {
         super.onFinishInputView(finishingInput);
         SecondScreenKeyboard.onShowEnded();
+        if (mToolsDeck != null) {
+            mToolsDeck.clearInlineSuggestions();
+        }
         // Remove penging messages related to update suggestions
         mHandler.removeMessages(MSG_UPDATE_SUGGESTIONS);
         mHandler.removeMessages(MSG_UPDATE_OLD_SUGGESTIONS);

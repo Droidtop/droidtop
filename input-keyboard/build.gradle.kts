@@ -66,6 +66,8 @@ android {
 dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
     implementation(libs.androidx.appcompat)
+    // Inline autofill suggestions in the keyboard (Android 11+, Droidtop/tracker#342).
+    implementation(libs.androidx.autofill)
     implementation(libs.androidx.core.ktx)
 
     testImplementation(libs.junit)

@@ -5168,6 +5168,17 @@ proposal) is not built; these helpers are in the one settings tree that already 
 - **Floating is not built, by decision.** An input method cannot reliably own an overlay window, least of all on
   a secondary display (the study's question 7).
 
+### Inline autofill (Droidtop/tracker#342)
+
+On Android 11 and later droidtop's input method asks for inline suggestions (`method.xml`
+`supportsInlineSuggestions`, `LatinIME.onCreateInlineSuggestionsRequest`), so a password manager or the
+platform's autofill service can offer its entries in the keyboard instead of a dropdown over the app. The request
+(`InlineAutofill`, `androidx.autofill`) styles the chips in the keyboard's dark colours and allows six; the
+response is inflated and drawn in a row above the keys (`ToolsDeck.showInlineSuggestions`), cleared when the
+input view finishes. Its own preference ("Autofill suggestions", on); on Android 10 and earlier (`InlineRules`)
+nothing is requested. Only the input method gets suggestions: the panels droidtop draws for the companion and
+over other apps type through other routes that autofill does not know.
+
 ## 6b. Desktop surface input (built 2026-09-01)
 
 The seat in §6 was a primitive with no caller. `:shell-desktop`'s

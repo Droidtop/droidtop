@@ -37,12 +37,21 @@ class ToolsDeck private constructor(
     private lateinit var incognitoButton: Button
     private var searchBar: EmojiSearchBar? = null
     private val notice = TextView(context)
+    private val inlineRow = LinearLayout(context)
+    private val inlineScroll = HorizontalScrollView(context)
 
     init {
         orientation = VERTICAL
         setBackgroundColor(BACKGROUND)
         isFocusable = false
         addView(buildStrip(), LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        inlineScroll.apply {
+            isHorizontalScrollBarEnabled = false
+            isFocusable = false
+            visibility = GONE
+            addView(inlineRow)
+        }
+        addView(inlineScroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         notice.apply {
             textSize = 12f
             setTextColor(MUTED)
@@ -129,6 +138,21 @@ class ToolsDeck private constructor(
         overlayId = null
         keyboard.visibility = VISIBLE
     }
+
+    /**
+     * The autofill suggestions ([InlineAutofill], Android 11+) in a row above the keys; an empty list hides the row.
+     * The views belong to the autofill service's process and are only moved here.
+     */
+    fun showInlineSuggestions(views: List<View>) {
+        inlineRow.removeAllViews()
+        views.forEach { view ->
+            (view.parent as? ViewGroup)?.removeView(view)
+            inlineRow.addView(view)
+        }
+        inlineScroll.visibility = if (views.isEmpty()) GONE else VISIBLE
+    }
+
+    fun clearInlineSuggestions() = showInlineSuggestions(emptyList())
 
     private fun showNotice(text: String) {
         notice.text = text
