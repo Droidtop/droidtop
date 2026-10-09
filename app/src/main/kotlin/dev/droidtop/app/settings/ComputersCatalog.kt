@@ -8,11 +8,14 @@ import dev.droidtop.app.PairComputerActivity
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.computers.ComputerLibrary
+import dev.droidtop.library.computers.ComputerShare
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogIcon
+import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.net.peer.AgentNative
 import dev.droidtop.net.peer.Computer
@@ -89,6 +92,43 @@ object ComputersCatalog {
             )
             if (computers.isNotEmpty()) {
                 add(CatalogGroup(id = "computers_paired", title = "Paired", items = computers.map { computerRow(it) }))
+            }
+            add(CatalogGroup(id = "computers_share", title = "When a computer is away", items = shareRows(context)))
+        }
+    }
+
+    /**
+     * The person's own cloud folder (docs/SPEC.md 7o "Transports"): picked with
+     * the system's folder picker, and the same folder the computer names with
+     * `droidtop-agent share set`. Read on an IO thread by [groups].
+     */
+    private fun shareRows(context: Context): List<CatalogItem> {
+        val label = ComputerShare.label(context)
+        return buildList {
+            add(
+                FolderPickItem(
+                    id = "computers_share_folder",
+                    title = "Cloud folder",
+                    subtitle = if (label == null) {
+                        "A folder your own sync app carries to the computer (Drive, OneDrive, Dropbox, Nextcloud, Syncthing). Saves and library changes wait there while the computer is away"
+                    } else {
+                        "$label. On the computer: droidtop-agent share set <the same folder>"
+                    },
+                    onPicked = { ctx, uri ->
+                        withContext(Dispatchers.IO) { ComputerShare.set(ctx, uri) }
+                        null
+                    },
+                ),
+            )
+            if (label != null) {
+                add(
+                    ActionItem(
+                        id = "computers_share_clear",
+                        title = "Stop using the cloud folder",
+                        subtitle = "Nothing in it is deleted",
+                        run = { ctx -> ComputerShare.clear(ctx) },
+                    ),
+                )
             }
         }
     }

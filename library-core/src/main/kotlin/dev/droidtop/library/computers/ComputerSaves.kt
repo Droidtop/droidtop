@@ -60,6 +60,23 @@ object ComputerSaves {
         )
     }
 
+    /**
+     * What leaving the saves in the cloud folder did. The computer applies the
+     * set only while its own saves still match the set this device last knew
+     * it had; otherwise it keeps the set aside and says so in the folder, and
+     * the next live sync asks the person.
+     */
+    private fun posted(computer: Computer, reply: JSONObject?, phase: SaveSyncPhase): SaveSyncResult? = when {
+        reply == null -> null
+        reply.has("error") -> SaveSyncResult("Saves for ${computer.name}: ${reply.optString("error")}", failed = true)
+        else -> when (reply.optString("outcome")) {
+            "posted" -> SaveSyncResult("Saves: ${reply.optInt("files")} left in your cloud folder for ${computer.name}", uploaded = reply.optInt("files"))
+            "up_to_date" -> SaveSyncResult("Saves match what ${computer.name} has")
+            // Never synced live with this computer, so where the saves are is not known here yet.
+            else -> SaveSyncResult("${computer.name} did not answer", failed = phase == SaveSyncPhase.MANUAL)
+        }
+    }
+
     private fun side(o: JSONObject?): SaveSide =
         SaveSide(timestampMs = o?.optLong("newest_ms") ?: 0L, files = o?.optInt("files") ?: 0, bytes = o?.optLong("bytes") ?: 0L)
 
@@ -96,6 +113,9 @@ object ComputerSaves {
             reply = Computers.call(context, computer, "sync_saves", args(if (choice == SaveChoice.LOCAL) "here" else "there"))
         }
         val result = when {
+            // Away from the computer after playing: the saves wait in the person's cloud folder, when one is set.
+            reply.has("unreachable") && phase != SaveSyncPhase.BEFORE_LAUNCH && ComputerShare.folder(context) != null ->
+                posted(computer, ComputerShare.postSaves(context, computer, args(null)), phase)
             // Away from the computer is normal: said on the screen only when the person asked for the sync.
             reply.has("unreachable") -> SaveSyncResult("${computer.name} did not answer", failed = phase == SaveSyncPhase.MANUAL)
             reply.has("error") -> SaveSyncResult("Saves with ${computer.name}: ${reply.optString("error")}", failed = true)

@@ -106,7 +106,9 @@ object ComputerLibrary {
     /**
      * One exchange with [computer]: this device's games and marks out, the
      * computer's changes in, and the marks that arrived written into
-     * [library]. Network and disk work: never on the main thread.
+     * [library]. When the computer does not answer and a cloud folder is set
+     * ([ComputerShare]), the same exchange goes through the folder instead.
+     * Network and disk work: never on the main thread.
      */
     suspend fun sync(context: Context, computer: Computer, library: Library, games: List<LibraryEntry>): String {
         val scan = JSONArray()
@@ -127,11 +129,20 @@ object ComputerLibrary {
         }
         val marks = marksOf(games)
         fun args() = JSONObject().put("state", stateFile(context).absolutePath).put("scan", scan).put("marks", marks)
-        val reply = Computers.call(context, computer, "sync_library", args())
+        val live = Computers.call(context, computer, "sync_library", args())
+        val shared = if (live.has("unreachable")) ComputerShare.library(context, computer, args()) else null
+        val reply = shared ?: live
         val written = if (AgentNative.failure(reply) == null) writeMarks(context, library, games, reply.optJSONObject("marks")) else 0
         val marked = if (written > 0) "; marks changed on $written games" else ""
         val line = AgentNative.failure(reply)?.let { "Library with ${computer.name}: $it" }
-            ?: "Library: ${reply.optInt("pushed")} changes sent to ${computer.name}, ${reply.optInt("pulled")} received$marked"
+            ?: if (shared != null) {
+                val refused = reply.optJSONArray("refused")?.let { r -> (0 until r.length()).mapNotNull { r.optJSONObject(it) } }.orEmpty()
+                val refusals = refused.joinToString("") { "; ${computer.name} kept its own saves of ${it.optString("title").ifBlank { it.optString("key") }}: ${it.optString("reason")}" }
+                val unsent = reply.optString("unsent").takeIf { it.isNotBlank() }?.let { "; not yet in the cloud folder: $it" }.orEmpty()
+                "Library through your cloud folder: ${reply.optInt("posted")} changes left for ${computer.name}, ${reply.optInt("applied")} applied$marked$refusals$unsent"
+            } else {
+                "Library: ${reply.optInt("pushed")} changes sent to ${computer.name}, ${reply.optInt("pulled")} received$marked"
+            }
         Computers.noteSync(context, computer.id, line)
         return line
     }

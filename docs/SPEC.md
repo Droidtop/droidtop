@@ -14489,7 +14489,8 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   versioning for storage.
 - **A computer that does not answer** is normal away from home. It is
   recorded on its row and is not shown at launch. It is shown when the
-  person started the sync.
+  person started the sync. After a game ends, with a cloud folder set, the
+  saves are left there for it instead ("Transports" below).
 
 ### Library
 
@@ -14541,7 +14542,29 @@ The design's order (droidtop-agent docs/DESIGN.md section 10) holds:
      owner's decision about a discovery service (droidtop-agent DESIGN
      decision 4).
 3. Store and forward through a folder of the person's own that their own
-   sync tool carries to both sides.
+   sync tool carries to both sides (Drive, OneDrive, Dropbox, Nextcloud,
+   Syncthing-Fork, FolderSync): Settings > Computers > "Cloud folder", picked
+   with the system's folder picker, and the same folder named on the computer
+   with `droidtop-agent share set` (`ComputerShare`).
+   - It is used only when the computer does not answer: a library sync then
+     exchanges library letters through it, and a game's saves after it ends
+     are left there for the computer.
+   - Each side leaves sealed letters for the other in
+     `droidtop-agent/<recipient id>/inbox/`; only the two paired keys can
+     open them. The agent core seals, opens and applies; it cannot open a
+     picked folder, so droidtop mirrors the layout in `files/agent/share/in`
+     (filled before the call) and `share/out` (emptied into the folder after
+     it, under a temporary name then renamed where the provider can). A
+     letter is deleted from the folder only once the core opened it.
+   - A save set states the set it was made against: the last live baseline,
+     or the set left before it when no live sync has settled that one. The
+     agent applies it only while its own files still match that, and
+     otherwise keeps it in its archive and says so in a letter, which the
+     next library sync shows on the computer's row. A change on both sides
+     therefore stays a conflict for the next live sync.
+   - droidtop learns where a game's saves are only from a live sync (the
+     core keeps the computer's answer beside the baseline), so a game never
+     synced live with that computer is not left in the folder.
 4. Later, a droidtop-run relay on the server VM (Droidtop/tracker#364).
 
 A community relay or discovery service is never used without the owner's
