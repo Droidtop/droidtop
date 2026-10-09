@@ -13611,6 +13611,19 @@ external-content route. An action that claims to install would be
 fabrication; an action that opens the door and says which file to pick
 is real, and is the shape this research supports.
 
+**Built (Droidtop/tracker#13).** A base game whose files carry an update or
+DLC (`SwitchGameFacts.updatePaths`/`dlcPaths`) has an "Add update and DLC"
+chip on its page (`SwitchContentHandoff`, library-core): it opens the
+emulator the game would launch with (`resolvePlayer`, the same choice a
+launch makes) at its launcher activity and shows a line naming the files to
+pick in the emulator's install-content picker. It copies, moves and opens
+nothing, and a row with no base game (`loose`) has no chip. **Grouping stays
+Switch-only** (decided with the gap analysis, 2026-10-01): only Switch
+packages carry a title ID to fold on. PC folder games already keep `DLC` and
+`Updates` directories out of the list, and a store game's DLC is a list on
+its page (#229), not a fold; the PC update half is the version model
+(#222).
+
 ## 7n. PC game titles, executables and multi-part games (Droidtop/tracker#264)
 
 Owner, 2026-10-01: the PC tab needs scraping, game detection and parsing,

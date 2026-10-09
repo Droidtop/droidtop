@@ -1748,6 +1748,17 @@ private fun EntryDetailScreen(
             if (isRomEntry) {
                 ShellChip("Choose match", onClick = { pickingMatch = true })
             }
+            // A Switch game with an update or DLC beside it: opens its emulator and names the files to pick (SwitchContentHandoff).
+            if (dev.droidtop.library.consoles.SwitchContentHandoff.applies(entry)) {
+                ShellChip(
+                    "Add update and DLC",
+                    onClick = {
+                        detailScope.launch {
+                            integrationError = dev.droidtop.library.consoles.SwitchContentHandoff.open(context, entry)
+                        }
+                    },
+                )
+            }
             // More games for this game's own system (an app's page asks which system).
             GetGamesChip(
                 dev.droidtop.library.integrations.GetGamesContext.GAME_PAGE,
