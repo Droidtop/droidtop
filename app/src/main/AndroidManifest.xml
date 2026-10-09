@@ -47,6 +47,8 @@
          Desktop tray, Gaming settings). SSID is deliberately never
          read: it would drag in fine-location. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Pairing a computer: the computer finds this device by a LAN broadcast while the pairing screen is open (docs/SPEC.md 7o). -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Do Not Disturb control. Like WRITE_SETTINGS this is a special
          access the user grants on a system screen droidtop opens
          (SystemControls.dndGrantIntent) - one of the few real controls
@@ -522,6 +524,11 @@
         <!-- The guided key setup for IGDB, SteamGridDB, TheGamesDB and ScreenScraper, opened from their rows under Accounts and sources. -->
         <activity
             android:name=".ScraperKeySetupActivity"
+            android:exported="false" />
+
+        <!-- Pairing a computer running droidtop-agent, opened from Accounts and sources, Computers (docs/SPEC.md 7o). -->
+        <activity
+            android:name=".PairComputerActivity"
             android:exported="false" />
 
         <!-- Signing in to a store (docs/SPEC.md 7g "Stores"): a store's own

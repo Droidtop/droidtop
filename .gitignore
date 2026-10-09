@@ -34,6 +34,8 @@ runtime-linux-noroot/src/main/assets/pulseaudio-desktop-arm64-v8a.tzst
 runtime-windows/prebuilt/
 # The lsfg-vk layer (build-scripts/fetch-lsfg-layer.sh).
 runtime-windows/lsfg/
+# droidtop-agent's Android library (build-scripts/fetch-agent-lib.sh).
+net-core/agent/
 
 # Signing (real release key + passwords — never commit these; CI reads
 # them from repo secrets instead, see .github/workflows/android-build.yml)

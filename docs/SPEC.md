@@ -49,6 +49,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [7k2. Gaming theming: the active ES-DE theme as droidtop's own design tokens (owner direction 2026-10-01, Droidtop/tracker#185)](#7k2-gaming-theming-the-active-es-de-theme-as-droidtops-own-design-tokens-owner-direction-2026-10-01-droidtoptracker185)
 - [7m. One game, its versions and its segments (directed 2026-09-16)](#7m-one-game-its-versions-and-its-segments-directed-2026-09-16)
 - [7n. PC game titles, executables and multi-part games (Droidtop/tracker#264)](#7n-pc-game-titles-executables-and-multi-part-games-droidtoptracker264)
+- [7o. Computers: droidtop-agent (decided 2026-10-08, Droidtop/tracker#373)](#7o-computers-droidtop-agent-decided-2026-10-08-droidtoptracker373)
 - [8. Licensing](#8-licensing)
 - [9. Module map](#9-module-map)
 - [10. Build order](#10-build-order)
@@ -6139,8 +6140,10 @@ emulator. No droidtop module encodes, decodes or transports a stream.
 droidtop carries no program for the gaming PC. The Go scaffold that once
 sat in `pc-helper/` (a Sunshine `POST /api/apps` client and a Steam install
 trigger) was built for the removed Sunshine-specific streaming path, was
-never built or run, and was deleted: anything that runs on the remote PC
-belongs to windowcast. The one finding worth keeping for whoever builds it
+never built or run, and was deleted. The program the person's computers run
+for sync is droidtop-agent, in its own repository (7o); it never streams.
+Streaming stays windowcast's, and the agent is meant to become windowcast's
+interface on the PC as well (owner, 2026-10-08: one desktop app, not two). The one finding worth keeping for whoever builds it
 there: a remote Steam install has no zero-touch first-time path.
 `steam://install/<appid>` needs Steam running and logged in on that PC and
 shows its own UI; SteamCmd runs unattended only after a one-time
@@ -14297,6 +14300,131 @@ alternatives list on the game page, and the vendored gamenative scanner's
 own weaker executable pick and raw name (on hold with `.gamenative`). Next
 slice: a read-only "library health" view (leftover or duplicate folders,
 archives beside extracted copies); droidtop never deletes or moves files.
+
+## 7o. Computers: droidtop-agent (decided 2026-10-08, Droidtop/tracker#373)
+
+Owner, 2026-10-08: "Droidtop's sync system needs to allow the droidtop device
+to be a full functioned computer. If I already have a gaming computer or a
+game library, I should be able to sync to and from it." The person's own
+computers run **droidtop-agent**, a separate program in its own repository
+(Droidtop/droidtop-agent; its docs/DESIGN.md is the full design). It pairs
+with the handheld and keeps three things in step, both ways:
+- the saves of the games the two share;
+- the game library: what each side has installed;
+- plugin contexts: a plugin's supporting state that a program on the
+  computer also keeps (docs/plugin-api.md 3 F8).
+
+It never streams or remote-controls anything; that stays windowcast's (7a).
+
+### What droidtop carries, and where
+
+- **One core, two ends.** The agent's Rust core is also droidtop's library,
+  `libdroidtop_agent.so` (arm64-v8a and x86_64). The agent repository builds
+  it and publishes it with each release. droidtop fetches it against
+  `net-core/agent-lib.pin` (tag and SHA-256,
+  `build-scripts/fetch-agent-lib.sh`), the way it fetches the lsfg-vk layer.
+  So droidtop's CI needs no Rust toolchain, and pairing, the session channel,
+  the save rule and the merges are one implementation. `AgentNative` in
+  `:net-core` is the one JNI entry point: an operation and its arguments as
+  JSON, a JSON reply, blocking, called on `Dispatchers.IO` only.
+- **The device key** (`DeviceIdentity`, `:net-core`) is an Ed25519 key made on
+  the device when it is first needed. Its seed is sealed with
+  `KeystoreSecretCipher`, in a preferences file no settings backup carries.
+  Its public half is the id each computer pins. It is windowcast's identity
+  format: the agent keeps windowcast's `Identity` file on the computer, so
+  the two can share one pairing when the agent becomes windowcast's
+  interface on the PC (owner, 2026-10-08: "one desktop app, not two").
+- **Paired computers** (`Computers`, `:net-core`) are kept in
+  `files/agent/computers.json`. Each computer has a folder,
+  `files/agent/<id>/`, for its save baselines and conflict archive.
+  `Computers.call` is the one way to reach a computer: it fills in this
+  device's key, the computer's id and its known addresses, and remembers the
+  address that answered.
+- **Pairing** (`PairComputerActivity`, opened from Settings > Accounts and
+  sources > Computers > Pair a computer):
+  - the screen shows windowcast's 6-digit SPAKE2 code, and a QR code of the
+    same invitation (`droidtop-pair:1?code=…&id=…&name=…&at=ip:port`);
+  - the person types `droidtop-agent pair <code>` on the computer;
+  - the handheld is the SPAKE2 host and listens only while that screen is
+    open; the code works once, and three wrong codes end the attempt;
+  - neither a desktop PC nor the Retroid Pocket 5 has a camera, so the QR
+    code is for a laptop webcam or a phone acting for the computer.
+- **No resident process.** droidtop reaches a computer only:
+  - before a game starts and after it ends;
+  - when the person presses "Sync the library now";
+  - when a plugin calls `context.sync`;
+  - while the pairing screen is open.
+  Nothing listens or polls otherwise.
+
+### Saves
+
+- **One launch seam, two save sources.** `StoreSaves.sync` keeps a game
+  whose store keeps its saves in the store's cloud (Steam Cloud, 7g
+  "Stores"). Any other game goes to `ComputerSaves`. A game is never synced
+  both ways, so the two never fight over the same files (owner decision
+  pending; this is the default). The job after a game ends ("Saves: <game>"
+  in Downloads) runs for both.
+- **Where the saves are** is the computer's answer, in Ludusavi's template
+  vocabulary (`<winAppData>/Game/*.sav`). The agent takes it from, in order:
+  the person's own entries (`droidtop-agent saves add`), their Ludusavi
+  custom games, and the Ludusavi manifest, which the agent fetches at run
+  time and never bundles. droidtop resolves each token in its own copy of
+  the game: Windows roots inside the game's Wine prefix (the agent core's
+  `prefix_roots`, the same layout as `SaveLayout.windowsDirs`), and `<base>`
+  as the game's folder. The core refuses any file name outside those
+  templates, on both sides.
+- **The rule is the Steam Cloud rule** (`SteamCloudPlan.decide`), in the
+  agent core. A baseline per computer and game holds the files as they were
+  after the last sync.
+  - If only one side changed, it wins, deletions included.
+  - If both changed, it is a conflict, and so is a first sync with
+    differing files on both sides.
+  - The baseline moves file by file, so a sync cut short is finished by the
+    next one rather than turning into a conflict.
+  - Files are written beside their target, checked against their SHA-256,
+    then renamed over it with their time.
+- **Conflicts are the person's**, through the same "Saves differ" dialog
+  (`SaveConflictPrompts`), naming the computer. The losing side is copied
+  into an archive before it is overwritten:
+  - on the handheld: `files/agent/<id>/archive/<game>/<UTC time>/`;
+  - on the computer: the agent's own `archive/`.
+  Only the latest loser per game is kept, because the owner ruled out
+  versioning for storage.
+- **A computer that does not answer** is normal away from home. It is
+  recorded on its row and is not shown at launch. It is shown when the
+  person started the sync.
+
+### Library
+
+- Each device is the authority on what it has installed. droidtop sends its
+  games, and the computer sends what its scanner found: Steam, GOG, Epic,
+  Amazon, itch, Battle.net, Heroic, Lutris, game folders, and ROM folders by
+  ES-DE system name.
+- A game's key on every device is:
+  - its store id (`steam:440`);
+  - for a ROM, its system and file name (`rom:snes/<name>`);
+  - otherwise its title in lower case, letters and digits only.
+- Changes carry a hybrid logical clock. Each side pulls only what changed
+  after its cursor, so a sync costs what changed.
+- The state, with every device's games, is the core's
+  `files/agent/library.json`. The computer's games are listed under its row
+  ("Games on <computer>").
+- Not yet carried: the person's marks (favourite, hidden, completed). The
+  core has them, last writer wins per field, but droidtop does not yet write
+  marks it receives into its own metadata, so sending its own would undo the
+  other side's.
+
+### Transports
+
+The design's order (droidtop-agent docs/DESIGN.md section 10) holds:
+1. LAN direct, with a signed UDP discovery that only paired agents answer.
+2. Direct userspace WireGuard between the two paired keys.
+3. Store and forward through a folder of the person's own that their own
+   sync tool carries to both sides.
+4. Later, a droidtop-run relay on the server VM (Droidtop/tracker#364).
+
+A community relay or discovery service is never used without the owner's
+decision, and Tailscale is never required.
 
 ## 8. Licensing
 

@@ -15,6 +15,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    sourceSets {
+        getByName("main") {
+            // droidtop-agent's core for both ABIs (docs/SPEC.md 7o), built and
+            // released by Droidtop/droidtop-agent and fetched against
+            // agent-lib.pin (build-scripts/fetch-agent-lib.sh).
+            jniLibs.srcDir("agent/jniLibs")
+        }
+    }
 }
 
 dependencies {

@@ -194,6 +194,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(enginehostScreen())
         SettingsScreenRegistry.register(updatesScreen())
         SettingsScreenRegistry.register(F95ImportCatalog.screen())
+        SettingsScreenRegistry.register(ComputersCatalog.screen())
         SettingsScreenRegistry.register(DroidtopWideSettings.globalScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.desktopScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.standardScreen())
@@ -1312,6 +1313,7 @@ object AppSettingsCatalogs {
 
     private suspend fun accountsAndSourcesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val signedInStores = PcStore.entries.count { it.signedIn(context) }
+        val pairedComputers = dev.droidtop.net.peer.Computers.list(context).size
 
         val activeIntegrations = IntegrationStore.available(context).size
         val installedPlugins = PluginStore.installed(context)
@@ -1347,6 +1349,8 @@ object AppSettingsCatalogs {
                         valueLabel = { "$signedInStores of ${PcStore.entries.size} signed in" },
                         icon = CatalogIcon.GLOBAL,
                     ),
+                    // The person's computers running droidtop-agent (docs/SPEC.md 7o).
+                    ComputersCatalog.linkRow(pairedComputers),
                 ),
             ),
             CatalogGroup(

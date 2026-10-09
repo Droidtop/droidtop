@@ -235,3 +235,18 @@ runs:
       if: steps.lsfg-cache.outputs.cache-hit != 'true'
       shell: bash
       run: bash build-scripts/fetch-lsfg-layer.sh
+
+    - name: Cache droidtop-agent's Android library
+      id: agentlib-cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: net-core/agent
+        key: agent-lib-${{ hashFiles('net-core/agent-lib.pin') }}
+
+    - name: Fetch droidtop-agent's Android library
+      # libdroidtop_agent.so for both ABIs, built and released by
+      # Droidtop/droidtop-agent, checked against net-core/agent-lib.pin
+      # (docs/SPEC.md 7o).
+      if: steps.agentlib-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash build-scripts/fetch-agent-lib.sh
