@@ -285,6 +285,20 @@ interface RomDao {
         }
     }
 
+    @Query("SELECT game_id FROM collection_members WHERE collection_id = :collectionId")
+    suspend fun getCollectionMemberIds(collectionId: String): List<String>
+
+    /**
+     * Makes [copy] a collection of its own holding the games [sourceId] holds now
+     * (docs/SPEC.md 7g, "Collections", "Copy as my collection"): a store's
+     * collection is rewritten at each sync, the copy is the person's and is not.
+     */
+    @androidx.room.Transaction
+    suspend fun copyCollection(sourceId: String, copy: CollectionEntity) {
+        upsertCollection(copy)
+        for (game in getCollectionMemberIds(sourceId)) addCollectionMember(CollectionMemberEntity(copy.id, game))
+    }
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addCollectionMember(member: CollectionMemberEntity)
 

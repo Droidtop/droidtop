@@ -2077,6 +2077,10 @@ class Library(
     suspend fun createCollection(name: String): dev.droidtop.library.consoles.CollectionEntity? =
         withContext(Dispatchers.IO) { romProvider?.createCollection(name) }
 
+    /** Copies a collection, a store's included, as one of the person's own; null when there is nothing to copy. */
+    suspend fun copyCollection(id: String): dev.droidtop.library.consoles.CollectionEntity? =
+        withContext(Dispatchers.IO) { romProvider?.copyCollection(id) }
+
     suspend fun renameCollection(id: String, newName: String) {
         withContext(Dispatchers.IO) { romProvider?.renameCollection(id, newName) }
     }

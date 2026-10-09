@@ -977,6 +977,14 @@ class ConsoleRomProvider(
         return collection
     }
 
+    /** A collection of the person's own with the games [sourceId] holds now; null when [sourceId] is not a collection. */
+    suspend fun copyCollection(sourceId: String): CollectionEntity? {
+        val source = dao.getCollections().firstOrNull { it.id == sourceId } ?: return null
+        val copy = CollectionEntity(id = java.util.UUID.randomUUID().toString(), name = dev.droidtop.library.stores.StoreCollections.copyName(source.name))
+        dao.copyCollection(sourceId, copy)
+        return copy
+    }
+
     suspend fun renameCollection(id: String, newName: String) {
         dao.upsertCollection(CollectionEntity(id = id, name = newName))
     }

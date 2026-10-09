@@ -338,6 +338,13 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             // is the only one. Every other mode keeps the system bars: a
             // home screen and a desktop both want them.
             LaunchedEffect(mode) { applySystemBars(mode) }
+            // Signed-in stores last read longer ago than the person's interval are read again as
+            // the Gaming shell opens, on an unmetered network only (SPEC 7g, "Stores"); no timer.
+            LaunchedEffect(mode) {
+                if (mode == Mode.GAMING) {
+                    runCatching { dev.droidtop.library.stores.StoreAutoSync.runIfDue(applicationContext) }
+                }
+            }
             // A desktop session is used through the seat, which Android's screen-off timer does
             // not count as activity, so the screen would blank mid-use (SPEC 4e). The window
             // flag holds only while this window is showing the live desktop.

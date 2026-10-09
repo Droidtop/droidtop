@@ -19,6 +19,12 @@ import kotlinx.coroutines.withContext
 object StoreCollections {
     private const val PREFIX = "import:"
 
+    /** Whether [collectionId] is a store's collection copied in (and so rewritten at the store's next sync). */
+    fun isImported(collectionId: String) = collectionId.startsWith(PREFIX)
+
+    /** The name a person's copy of the imported collection called [importedName] gets: the store's label dropped. Pure. */
+    fun copyName(importedName: String) = importedName.substringAfter(": ", importedName).ifBlank { importedName }
+
     /** The ids of the collections imported from [storeId] start with this. */
     fun prefixFor(storeId: String) = "$PREFIX$storeId:"
 

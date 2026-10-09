@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.CollectionEntity
+import dev.droidtop.library.stores.StoreCollections
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import kotlinx.coroutines.launch
 
@@ -98,6 +99,16 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
                         scope.launch {
                             val newState = library.toggleCollectionMembership(collection.id, entry) ?: return@launch
                             membership = if (newState) membership + collection.id else membership - collection.id
+                            CollectionsRefresh.bump()
+                        }
+                    }
+                }
+                // A store's collection is rewritten at the store's next sync; a copy is the person's own.
+                items(collections.filter { StoreCollections.isImported(it.id) }) { imported ->
+                    CollectionToggleRow("Copy ${imported.name} as my collection", null) {
+                        scope.launch {
+                            library.copyCollection(imported.id) ?: return@launch
+                            reloadToken++
                             CollectionsRefresh.bump()
                         }
                     }

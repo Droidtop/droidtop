@@ -11,6 +11,8 @@ import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogChip
+import dev.droidtop.library.settings.ChoiceItem
+import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.CatalogItem
@@ -19,6 +21,7 @@ import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.stores.StoreHolding
+import dev.droidtop.library.stores.StoreAutoSync
 import dev.droidtop.library.stores.StoreChanges
 import dev.droidtop.library.stores.StoreInstallJob
 import dev.droidtop.library.stores.StoreLibraries
@@ -263,6 +266,15 @@ internal object StoresCatalog {
                 id = "stores_sync_group",
                 title = null,
                 items = listOf(
+                    ChoiceItem(
+                        id = "stores_auto_sync",
+                        title = "Sync store libraries automatically",
+                        subtitle = "When the Gaming shell opens, signed-in stores last read longer ago than this are read again, on Wi-Fi " +
+                            "and other unmetered networks only. Nothing runs in the background",
+                        options = StoreAutoSync.Interval.entries.map { ChoiceOption(it.name, it.label) },
+                        current = StoreAutoSync.interval(context).name,
+                        onSelect = { ctx, value -> StoreAutoSync.setInterval(ctx, StoreAutoSync.Interval.valueOf(value)) },
+                    ),
                     AsyncActionItem(
                         id = "stores_sync_all",
                         title = "Sync all libraries",

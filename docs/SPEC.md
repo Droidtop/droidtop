@@ -9624,7 +9624,11 @@ transaction (`RomDao.replaceImportedCollections`); a collection the store no
 longer has goes, and the person's own collections are never touched. They are
 droidtop's ordinary collections, so they show where those show (the Gaming
 shell's Collections and the game menu's Collections row); an edit made to one
-lasts until the next sync, which makes it the store's again. A store that
+lasts until the next sync, which makes it the store's again, so the game
+menu's Collections editor lists, under the collections, a row **Copy <name> as
+my collection** for each imported one: it makes an ordinary collection of the
+person's own (name without the store's label, a fresh id, the games the
+mirror holds then) that no sync touches (`RomDao.copyCollection`). A store that
 cannot answer leaves what was imported as it is. **Open for the owner:**
 free-form tags as a facet of the PC library, and a collection shelf on the PC
 Games strip (`PcShelves`); a collection is a group with a name, which is what
@@ -13372,10 +13376,21 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   Stores page itself, once any store is signed in) does that for every
   signed-in store one after the other. Both, and the read a sign-in ends with,
   go through the one `StoreSyncs.run` (`:library-core`, Droidtop/tracker#225)
-  around `StoreLibrary.sync`: the library is read when asked and after a
-  sign-in, not on a timer: a background loop against five stores' servers
-  was not asked for (a worker's 30-minute loop was bounced for that), so an
-  automatic periodic read is open until the owner says so.
+  around `StoreLibrary.sync`: the library is read when asked, after a
+  sign-in, and when the Gaming shell opens (below), never on a timer: a
+  background loop against five stores' servers was not asked for (a worker's
+  30-minute loop was bounced for that). **Automatic sync** (decided
+  2026-10-09, Droidtop/tracker#225): the setting **Sync store libraries
+  automatically** on the Stores page is Off, Every 6 hours (the default) or
+  Daily. When the Gaming shell opens (`MainActivity`, mode Gaming,
+  `StoreAutoSync.runIfDue`), each signed-in store whose last good read
+  (`StoreSyncs.lastSynced`; never read counts as due) is older than the
+  interval is read again through `StoreSyncs.run`, one after the other off the
+  main thread, provided the active network is unmetered; a store asked within
+  the last 15 minutes in this process is not asked again, so reopening the
+  shell does not hammer one that is down. There is no service, alarm, worker
+  or loop: nothing runs while the shell is not opening, and a metered network
+  or Off means nothing is read.
   A store adds its own rows to its page (`StoreLibrary.settingsItems`):
   Steam's status (Online, Invisible, Offline), cloud saves and message
   notifications. The "last synced"
