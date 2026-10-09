@@ -11028,6 +11028,9 @@ structure, top to bottom, drawn only from theme tokens:
   buttons. While the cursor is in the rows the band has scrolled away.
   Store games have no installed or latest version until #222 gives them
   one; the strip simply has no Version fact for them.
+  The Details tab's Runner row states only the resolved runner and its reason. A store game that is not
+  installed has no runner worked out, and the action band's line ("Downloads 590 MB") is not a runner fact, so
+  the row is left out rather than showing it (Droidtop/tracker#371).
 - **The tab strip** (`PageTabStrip`): Overview, Versions and updates, Extras,
   Details as Steam's uppercase tab pills (`ShellChip(tab = true)`), centred,
   scrolling sideways when it must, under the band and pinned at the top once

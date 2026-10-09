@@ -988,13 +988,18 @@ private fun pageRows(
     folderPath?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() && it != GameNaming.displayName(entry.title) }
         ?.let { add(PageFact("Folder name", it)) }
     entry.engineLabel()?.let { add(PageFact("Engine", it)) }
-    add(
-        PageFact(
-            "Runner",
-            runner?.label ?: if (play.pressable) "" else play.verb,
-            subtitle = runner?.reason ?: play.detail,
-        ),
-    )
+    // The play state's own line (a store game's "Downloads 590 MB", an install step) is the action band's
+    // and is not a statement about the runner, so it is never drawn under this label; a store stage with
+    // no runner worked out leaves the row out (Droidtop/tracker#371).
+    if (runner != null || play.store == null) {
+        add(
+            PageFact(
+                "Runner",
+                runner?.label ?: if (play.pressable) "" else play.verb,
+                subtitle = if (runner != null) runner.reason else play.detail,
+            ),
+        )
+    }
     if (!entry.hideMetadata) {
         aboutFacts(entry).forEach { (label, value) -> add(PageFact(label, value)) }
         entry.players?.takeIf { it.isNotBlank() }?.let { add(PageFact("Players", it)) }
