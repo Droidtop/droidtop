@@ -120,6 +120,12 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
         return androidAnswer
     }
 
+    val notifications = mutableListOf<Triple<String, String, String>>()
+    override fun notify(pluginId: String, pluginLabel: String, title: String, text: String): Boolean {
+        notifications += Triple(pluginId, title, text)
+        return true
+    }
+
     override fun startBrokeredJob(caller: PluginRecord, provider: PluginRecord, call: PluginCall) = jobId
     override fun brokeredJobStatus(caller: PluginRecord, jobId: String) = PluginReply.error(PluginErrorCode.NOT_FOUND, "no such job")
 }

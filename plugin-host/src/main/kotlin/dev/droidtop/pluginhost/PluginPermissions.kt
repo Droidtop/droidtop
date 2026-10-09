@@ -10,7 +10,10 @@ enum class PermissionTier { NORMAL, DANGEROUS, CRITICAL }
  * the document. [officialOnly] rows (marked with a dagger there) are
  * refused at install for an origin that is not the official one.
  * [scopedTier] is set where a parameter changes the tier: `apps.intents.out`
- * is normal for declared packages and dangerous for any package.
+ * is normal for declared packages and dangerous for any package. [android]
+ * is the Android permission droidtop itself holds to do this for a plugin
+ * (docs/plugin-api.md 4.1, "Android permissions"): a plugin may declare the
+ * row under that Android name, and droidtop asks Android for it on first use.
  */
 data class PluginPermission(
     val id: String,
@@ -18,6 +21,7 @@ data class PluginPermission(
     val label: String,
     val officialOnly: Boolean = false,
     val scopedTier: PermissionTier? = null,
+    val android: AndroidNeed? = null,
 )
 
 /**
@@ -41,11 +45,11 @@ object PluginPermissions {
         PluginPermission("perf.read", PermissionTier.NORMAL, "See performance readings (CPU, temperature, battery)"),
         PluginPermission("perf.profile.set", PermissionTier.DANGEROUS, "Change performance and fan settings"),
         PluginPermission("overlay.toast", PermissionTier.NORMAL, "Show short messages during games"),
-        PluginPermission("notify.post", PermissionTier.NORMAL, "Send you notifications"),
-        PluginPermission("net.state", PermissionTier.NORMAL, "See whether you are online"),
+        PluginPermission("notify.post", PermissionTier.NORMAL, "Send you notifications", android = AndroidNeed("android.permission.POST_NOTIFICATIONS", fromSdk = 33)),
+        PluginPermission("net.state", PermissionTier.NORMAL, "See whether you are online", android = AndroidNeed("android.permission.ACCESS_NETWORK_STATE")),
         PluginPermission("net.wifi_details", PermissionTier.DANGEROUS, "See the name of your Wi-Fi network"),
         PluginPermission("net.domains", PermissionTier.NORMAL, "Connect to: listed domains"),
-        PluginPermission("net.any", PermissionTier.DANGEROUS, "Connect to any site on the internet"),
+        PluginPermission("net.any", PermissionTier.DANGEROUS, "Connect to any site on the internet", android = AndroidNeed("android.permission.INTERNET")),
         PluginPermission("net.local", PermissionTier.DANGEROUS, "Find and connect to devices on your local network"),
         PluginPermission("storage.volumes", PermissionTier.NORMAL, "See your storage devices and free space"),
         PluginPermission("files.picker", PermissionTier.NORMAL, "Ask you to choose files or folders"),
@@ -126,7 +130,38 @@ object PluginPermissions {
     }
 }
 
-/** Android's own permissions as a plugin names them (docs/plugin-api.md 4.1, "Android permissions"). */
+/**
+ * Android's own permissions as a plugin names them (docs/plugin-api.md 4.1, "Android permissions"). A plugin never holds
+ * one: a contained process has none, and Android grants them to droidtop, not to a plugin. What a plugin declares is
+ * which of droidtop's Android-backed operations it needs, and droidtop runs them under its own permission, gated per
+ * plugin like every other permission. So a declared Android name means the host permission of the operation that uses
+ * it ([PluginPermission.android]), read as that one when the manifest is parsed; a name droidtop's own manifest does
+ * not request is refused at install, because no plugin could ever use it through droidtop.
+ */
 object AndroidPermissions {
     const val PREFIX = "android.permission."
+
+    /** Where a manifest entry declared under an Android name keeps that name, after it was read as its host permission. */
+    const val DECLARED_AS = "android"
+
+    /** The host permission [name] stands for, or null when no droidtop operation uses it. */
+    fun hostIdFor(name: String): String? = PluginPermissions.all.firstOrNull { it.android?.permission == name }?.id
+
+    /** The Android permission [declared] was declared under, or null when it was declared by its host id. */
+    fun declaredName(declared: DeclaredPermission): String? = when {
+        declared.id.startsWith(PREFIX) -> declared.id
+        else -> runCatching { org.json.JSONObject(declared.extra).optString(DECLARED_AS) }.getOrNull()?.takeIf { it.startsWith(PREFIX) }
+    }
+
+    /** One line per Android permission [manifest] names that droidtop's own manifest, [held], does not request. */
+    fun installProblems(manifest: PluginManifest, held: Set<String>): List<String> =
+        manifest.v2.permissions.mapNotNull { declaredName(it) }.distinct().filter { it !in held }.map {
+            "it asks for the Android permission ${it.removePrefix(PREFIX)}, which droidtop itself does not have, so no plugin can use it through droidtop"
+        }
+
+    /** The permissions droidtop's own manifest requests. */
+    fun heldBy(context: android.content.Context): Set<String> = runCatching {
+        @Suppress("DEPRECATION")
+        context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_PERMISSIONS).requestedPermissions?.toSet()
+    }.getOrNull().orEmpty()
 }

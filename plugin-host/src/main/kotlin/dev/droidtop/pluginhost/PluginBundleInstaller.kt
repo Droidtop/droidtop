@@ -48,6 +48,8 @@ object PluginBundleInstaller {
         pluginsRoot: File,
         userKeys: Map<String, String> = emptyMap(),
         nowEpochSeconds: Long = System.currentTimeMillis() / 1000,
+        /** The permissions droidtop's own manifest requests ([AndroidPermissions.heldBy]); null skips that check (tests). */
+        hostPermissions: Set<String>? = null,
     ): PluginInstallResult {
         val entries = linkedMapOf<String, ByteArray>()
         try {
@@ -88,6 +90,12 @@ object PluginBundleInstaller {
 
         manifest.structuralProblems().firstOrNull()?.let {
             return PluginInstallResult.Refused(PluginInstallError(it))
+        }
+        // docs/plugin-api.md 4.1: an Android permission droidtop does not have can never reach a plugin through droidtop.
+        if (hostPermissions != null) {
+            AndroidPermissions.installProblems(manifest, hostPermissions).firstOrNull()?.let {
+                return PluginInstallResult.Refused(PluginInstallError(it))
+            }
         }
 
         // Checklist point 3: signature and schema before anything else touches disk as "the plugin".

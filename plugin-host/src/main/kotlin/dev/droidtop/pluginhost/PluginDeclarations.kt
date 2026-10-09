@@ -37,7 +37,8 @@ data class V2Declarations(
 
         fun fromJson(json: JSONObject): V2Declarations = V2Declarations(
             provides = objects(json, "provides").mapNotNull { ProvidedPoint.fromJson(it) },
-            permissions = objects(json, "permissions").mapNotNull { DeclaredPermission.fromJson(it) },
+            // One entry per permission: an Android name and its host id are the same permission, and the first one written counts.
+            permissions = objects(json, "permissions").mapNotNull { DeclaredPermission.fromJson(it) }.distinctBy { it.id },
             subscribes = objects(json, "subscribes").mapNotNull { EventSubscription.fromJson(it) },
             exports = objects(json, "exports").mapNotNull { ExportedApi.fromJson(it) },
             requires = objects(json, "requires").mapNotNull { RequiredApi.fromJson(it) },
@@ -132,12 +133,18 @@ data class DeclaredPermission(
         private val KNOWN = setOf("id", "reason", "required")
 
         fun fromJson(json: JSONObject): DeclaredPermission? {
-            val id = json.optString("id").takeIf { it.isNotBlank() } ?: return null
+            val written = json.optString("id").takeIf { it.isNotBlank() } ?: return null
+            // An Android permission name is read as the host permission of the operation that uses it (docs/plugin-api.md 4.1),
+            // keeping the name it was written under; one no operation uses stays as written and is "not supported".
+            val host = AndroidPermissions.hostIdFor(written)?.takeIf { written.startsWith(AndroidPermissions.PREFIX) }
+            val extra = if (host == null) json.rest(KNOWN) else JSONObject(json.rest(KNOWN)).put(AndroidPermissions.DECLARED_AS, written).let { o ->
+                JSONObject().also { sorted -> o.keys().asSequence().sorted().forEach { sorted.put(it, o.get(it)) } }.toString()
+            }
             return DeclaredPermission(
-                id = id,
+                id = host ?: written,
                 reason = json.optNullable("reason"),
                 required = json.optBoolean("required", false),
-                extra = json.rest(KNOWN),
+                extra = extra,
             )
         }
     }

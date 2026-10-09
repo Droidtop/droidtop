@@ -85,6 +85,10 @@ interface BrokerEnvironment {
     /** Shows Android's own prompt for [need] and waits for the answer; true when droidtop holds it afterwards. Only called during a call the person started. */
     fun requestAndroid(need: AndroidNeed): Boolean = false
 
+    /** C6: posts a notification in [pluginId]'s own channel, named [pluginLabel]; false when it could not. */
+    fun notify(pluginId: String, pluginLabel: String, title: String, text: String): Boolean =
+        throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop posts no notifications for plugins")
+
     /** D1 (docs/plugin-api.md 3): `{online, type, metered, vpn}`. */
     fun netState(): JSONObject = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop reports no network state")
 
@@ -128,6 +132,20 @@ interface BrokerEnvironment {
     /** Starts a provider op that is a job, owned by [caller]; returns the job id or null when it could not start. */
     fun startBrokeredJob(caller: PluginRecord, provider: PluginRecord, call: PluginCall): String?
     fun brokeredJobStatus(caller: PluginRecord, jobId: String): PluginReply
+}
+
+/** At most [perHour] uses per key in any hour (docs/plugin-api.md 8: notifications). */
+class HourlyQuota(private val perHour: Int) {
+    private val uses = HashMap<String, ArrayDeque<Long>>()
+
+    @Synchronized
+    fun tryTake(key: String, nowMs: Long): Boolean {
+        val times = uses.getOrPut(key) { ArrayDeque() }
+        while (times.isNotEmpty() && nowMs - times.first() >= 60L * 60 * 1000) times.removeFirst()
+        if (times.size >= perHour) return false
+        times.addLast(nowMs)
+        return true
+    }
 }
 
 /** A refill-over-time limiter: 50 calls at once, 10 per second sustained (docs/plugin-api.md 8). */
@@ -308,6 +326,19 @@ object HostApis {
             val text = args.optString("text").trim().takeIf { it.isNotEmpty() } ?: invalid("text is required")
             JSONObject().put("shown", env.toast(record.manifest.label, text.take(MAX_TOAST)))
         },
+        // docs/plugin-api.md 3 C6: a notification in the plugin's own channel, posted by droidtop under its own Android
+        // permission (asked of Android on first use from a call the person started), at most 5 an hour.
+        HostOp(
+            "notify", "post",
+            permission = "notify.post",
+            android = PluginPermissions.find("notify.post")?.android,
+            target = { it.optString("title").take(60) },
+        ) { env, record, args ->
+            val title = args.optString("title").trim().take(MAX_NOTIFY_TITLE).takeIf { it.isNotEmpty() } ?: invalid("title is required")
+            val text = args.optString("text").trim().take(MAX_NOTIFY_TEXT)
+            if (!notifyQuota.tryTake(record.manifest.id, env.nowMs())) throw BrokerException(PluginErrorCode.RATE_LIMITED, "at most $NOTIFY_PER_HOUR notifications an hour")
+            JSONObject().put("posted", env.notify(record.manifest.id, record.manifest.label, title, text))
+        },
         // docs/plugin-api.md 3 C19: a social provider with a live connection says something changed, so droidtop never
         // polls it. Only a plugin that provides social.provider, with that point still on, may say so.
         HostOp(
@@ -374,6 +405,13 @@ object HostApis {
 
     /** The longest toast text droidtop shows; longer text is cut, never refused. */
     const val MAX_TOAST = 200
+
+    const val MAX_NOTIFY_TITLE = 80
+    const val MAX_NOTIFY_TEXT = 400
+    const val NOTIFY_PER_HOUR = 5
+
+    /** Notifications per plugin in the last hour (docs/plugin-api.md 8). */
+    private val notifyQuota = HourlyQuota(NOTIFY_PER_HOUR)
 
     fun all(): List<HostOp> = ops
 

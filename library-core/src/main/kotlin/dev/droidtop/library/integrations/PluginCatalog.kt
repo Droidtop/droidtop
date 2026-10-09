@@ -237,7 +237,7 @@ object PluginCatalog {
             val label = args[ARG_LABEL] ?: "The plugin"
             val version = args[ARG_VERSION].orEmpty()
             // The user-trusted keys too: a bundle from an origin the person trusted verifies like an official one.
-            when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context)))) {
+            when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context)), hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context))) {
                 is PluginInstallResult.Installed ->
                     if (result.record.trust == PluginTrustState.APPROVED) {
                         "Updated $label to $version"

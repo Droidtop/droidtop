@@ -313,7 +313,7 @@ object PluginRepoUpdates {
                 PluginRepos.UpdateDecision.UpToDate -> Processed.Outcome(null)
                 PluginRepos.UpdateDecision.NotInstalled -> Processed.Outcome(RepoUpdateOutcome.Offered(label, peeked.manifest.version))
                 is PluginRepos.UpdateDecision.Refused -> Processed.Outcome(RepoUpdateOutcome.Refused(label, decision.reason))
-                is PluginRepos.UpdateDecision.Apply -> when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), userKeys)) {
+                is PluginRepos.UpdateDecision.Apply -> when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), userKeys, hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context))) {
                     is PluginInstallResult.Refused -> Processed.Outcome(RepoUpdateOutcome.Refused(label, result.error.reason))
                     is PluginInstallResult.Installed ->
                         if (result.record.trust == PluginTrustState.APPROVED) {
@@ -343,7 +343,7 @@ object PluginRepoUpdates {
             val peeked = PluginRepos.peek(file) ?: return "That is not a plugin bundle."
             if (peeked.manifest.origin != entry.origin) return "That bundle is for another origin than this repository is trusted for."
             val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
-            return when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), userKeys)) {
+            return when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), userKeys, hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context))) {
                 is PluginInstallResult.Refused -> "Not installed: ${result.error.reason}"
                 is PluginInstallResult.Installed -> "${result.record.manifest.label} ${result.record.manifest.version} installed. Approve it on the Plugins screen before it runs."
             }

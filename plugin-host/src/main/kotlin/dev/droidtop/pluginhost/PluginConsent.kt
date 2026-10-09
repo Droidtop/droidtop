@@ -107,9 +107,11 @@ object PluginConsent {
             val scope = scopeText(declared.id, extra)
             val tier = PluginPermissions.tierFor(declared.id, scopeIsAny = declared.id == "apps.intents.out" && extra.optString("scope") == "any") ?: continue
             val risky = tier != PermissionTier.NORMAL
+            // An operation droidtop runs under an Android permission it may not hold yet: Android asks the person too (4.1).
+            val androidNote = PluginPermissions.find(declared.id)?.android?.takeIf { it.fromSdk > 0 }?.let { "Android asks you too, the first time" }
             val line = ConsentLine(
                 title = label + (scope?.let { " ($it)" } ?: ""),
-                detail = declared.reason,
+                detail = listOfNotNull(declared.reason, androidNote).joinToString(" - ").ifEmpty { null },
                 id = if (newContract) declared.id else null,
                 highRisk = risky,
                 ticked = !risky,

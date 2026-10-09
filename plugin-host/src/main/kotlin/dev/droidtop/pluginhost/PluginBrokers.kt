@@ -185,6 +185,22 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun requestAndroid(need: AndroidNeed): Boolean = BrokerAskActivity.requestPermission(appContext, need.permission)
 
+    override fun notify(pluginId: String, pluginLabel: String, title: String, text: String): Boolean = runCatching {
+        val manager = appContext.getSystemService(android.app.NotificationManager::class.java) ?: return@runCatching false
+        // One channel per plugin, named after it, so the person can silence one plugin in Android's own settings.
+        val channel = "plugin-$pluginId"
+        manager.createNotificationChannel(android.app.NotificationChannel(channel, pluginLabel, android.app.NotificationManager.IMPORTANCE_DEFAULT))
+        val notification = android.app.Notification.Builder(appContext, channel)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSubText(pluginLabel)
+            .setAutoCancel(true)
+            .build()
+        manager.notify(channel, "$title|$text".hashCode(), notification)
+        true
+    }.getOrDefault(false)
+
     // ---- Network (docs/plugin-api.md 3 D1, D2) ----
 
     override fun netState(): JSONObject {
