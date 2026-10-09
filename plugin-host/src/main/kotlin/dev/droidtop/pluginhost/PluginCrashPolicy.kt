@@ -12,11 +12,11 @@ import kotlinx.coroutines.withContext
  * acquire_content search, a metadata pass -- goes through [guard]
  * instead of calling a [PluginRunner] directly and re-implementing this.
  *
- * [PluginRuntimeService] and [NativePluginRunner] both funnel failures
- * (an uncaught exception in plugin code, a timeout, the whole
- * `:pluginhost` process dying) into the crash callback given to
- * [NativePluginRunner]'s constructor; this object is that callback's one
- * real implementation.
+ * Every plugin process ([PluginProcessService]) and [NativePluginRunner]
+ * funnel failures (an uncaught exception in plugin code, a timeout) into
+ * the crash callback given to [NativePluginRunner]'s constructor, and
+ * [PluginProcesses] reports a process dying to [processDied]; this class
+ * holds both real implementations.
  */
 class PluginCrashPolicy(
     private val context: Context,
@@ -27,17 +27,40 @@ class PluginCrashPolicy(
     private val runner: NativePluginRunner = NativePluginRunner(context, ::onCrash, onJobProgress, onJobComplete)
 
     private fun onCrash(pluginId: String, capability: String, reason: String) {
-        if (pluginId.isEmpty()) {
-            // A process death during a call is evidence against that plugin;
-            // an idle death is a system kill and must reconnect without disabling.
-            disableInFlight(PluginBrokers.inFlightPluginIds()) { affectedId ->
-                Log.w("droidtop.plugin", "$affectedId disabled: $reason")
-                PluginStore.disableWithReason(context, affectedId, PluginLoadErrorMessage.userMessage(reason), detail = reason)
-            }
-            return
-        }
+        if (pluginId.isEmpty()) return
         Log.w("droidtop.plugin", "$pluginId disabled: $reason")
         PluginStore.disableWithReason(context, pluginId, PluginLoadErrorMessage.userMessage(reason), detail = reason)
+    }
+
+    /** Loads [record]; the reason it could not, or null. */
+    private suspend fun loadFor(record: PluginRecord, userInitiated: Boolean, tier: PluginTier = PluginTier.FULL_TRUST): String? {
+        val dir = PluginStore.payloadDirFor(context, record.manifest.id)
+        return if (runner.load(record, dir.absolutePath, tier)) null else loadFailure(record)
+    }
+
+    /**
+     * The containment check (docs/plugin-api.md 5.3): loads [record] contained, in an isolated process, and reports, in plain lines,
+     * which tier and process it runs in and what that process reached when it tried the network, droidtop's files and
+     * shared storage, plus how a contained python runtime loaded. For the rig and for anyone who wants to see the wall.
+     */
+    suspend fun containmentReport(record: PluginRecord): String {
+        if (!record.runnable()) return "${record.manifest.label} is not approved and turned on"
+        gateOnVerification(record)?.let { return it.error ?: "failed its check" }
+        missingRuntime(record)?.let { return it.message }
+        loadFor(record, userInitiated = true, tier = PluginTier.CONTAINED)?.let { return "Did not load contained: $it" }
+        val report = runner.reachability(record.manifest.id) ?: return "Loaded, but its process did not answer"
+        return buildString {
+            append(if (report.optBoolean("isolated")) "Contained: an isolated process" else "Full access: droidtop's own UID")
+            append(" (uid ").append(report.optInt("uid")).append(", Android API ").append(report.optInt("sdk")).append(")")
+            PluginProcesses.describe(record.manifest.id)?.let { append("\nProcess: ").append(it) }
+            append("\nNetwork: ").append(report.optString("network"))
+            append("\ndroidtop's files: ").append(report.optString("droidtopFiles"))
+            append("\nShared storage: ").append(report.optString("sharedStorage"))
+            report.optJSONObject("notes")?.optJSONObject("python")?.let { python ->
+                append("\nPython: ").append(if (python.optBoolean("ok")) "started" else "did not start: ${python.optString("error")}")
+                append("\n").append(python.toString(1))
+            }
+        }
     }
 
     /**
@@ -45,8 +68,7 @@ class PluginCrashPolicy(
      * runner already reported the crash via the callback above by the
      * time this returns -- makes sure the record is disabled even if the
      * failure path didn't already do it (belt and braces for a case the
-     * callback missed, e.g. [ensureConnected] itself never getting a
-     * connection).
+     * callback missed, e.g. the process never starting).
      */
     suspend fun invoke(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, userInitiated: Boolean = true): PluginResult {
         if (!record.runnable()) return PluginResult.failure("plugin is not approved/enabled")
@@ -55,12 +77,9 @@ class PluginCrashPolicy(
             return PluginResult.failure("no runner for kind ${record.manifest.kind.id} yet")
         }
         capabilityRefusal(record, capability)?.let { return PluginResult.failure(it) }
-        val dir = PluginStore.payloadDirFor(context, record.manifest.id)
         gateOnVerification(record)?.let { return it }
         missingRuntime(record)?.let { return PluginResult.failure(it.message) }
-        if (!runner.load(record, dir.absolutePath)) {
-            return PluginResult.failure(loadFailure(record))
-        }
+        loadFor(record, userInitiated)?.let { return PluginResult.failure(it) }
         // A returned PluginResult.failure (ok=false, no exception) is a
         // PLUGIN reporting its own ordinary failure -- "no network",
         // "nothing found" -- and is not a crash: it must not disable the
@@ -103,8 +122,7 @@ class PluginCrashPolicy(
         }
         gateOnVerification(record)?.let { return PluginReply.error(PluginErrorCode.FAILED, it.error ?: "plugin failed verification") }
         missingRuntime(record)?.let { return PluginReply.error(PluginErrorCode.FAILED, it.message) }
-        val dir = PluginStore.payloadDirFor(context, record.manifest.id)
-        if (!runner.load(record, dir.absolutePath)) return PluginReply.error(PluginErrorCode.FAILED, loadFailure(record))
+        loadFor(record, userInitiated)?.let { return PluginReply.error(PluginErrorCode.FAILED, it) }
         return PluginBrokers.during(record.manifest.id, userInitiated, timeoutMs) {
             runner.handle(record.manifest.id, call, timeoutMs, crashOnTimeout)
         }
@@ -132,8 +150,10 @@ class PluginCrashPolicy(
             Log.w("droidtop.plugin", "${record.manifest.id} job not started: ${it.message}")
             return false
         }
-        val dir = PluginStore.payloadDirFor(context, record.manifest.id)
-        if (!runner.load(record, dir.absolutePath)) return false
+        loadFor(record, userInitiated = false)?.let {
+            Log.w("droidtop.plugin", "${record.manifest.id} job not started: $it")
+            return false
+        }
         return runner.startJob(record.manifest.id, capability, args, jobId)
     }
 
@@ -160,8 +180,7 @@ class PluginCrashPolicy(
         if (record.manifest.kind !in RUNNABLE_KINDS) return null
         gateOnVerification(record)?.let { return null }
         if (missingRuntime(record) != null) return null
-        val dir = PluginStore.payloadDirFor(context, record.manifest.id)
-        if (!runner.load(record, dir.absolutePath)) return null
+        if (loadFor(record, userInitiated = false) != null) return null
         return runner.notifyEvent(record.manifest.id, event, args)
     }
 
@@ -207,6 +226,17 @@ class PluginCrashPolicy(
     companion object {
         internal fun disableInFlight(pluginIds: Set<String>, disable: (String) -> Unit) {
             pluginIds.forEach(disable)
+        }
+
+        /**
+         * A plugin process died ([PluginProcesses]), holding [pluginIds]. A death during a call is evidence against the
+         * plugin the call was for; an idle death is a system kill and must reconnect on the next call without disabling.
+         */
+        internal fun processDied(context: Context, pluginIds: Set<String>, reason: String) {
+            disableInFlight(pluginIds intersect PluginBrokers.inFlightPluginIds()) { affectedId ->
+                Log.w("droidtop.plugin", "$affectedId disabled: $reason")
+                PluginStore.disableWithReason(context, affectedId, PluginLoadErrorMessage.userMessage(reason), detail = reason)
+            }
         }
 
         // Kinds with a real runner behind NativePluginRunner. Found stale

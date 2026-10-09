@@ -1,8 +1,9 @@
 package dev.droidtop.pluginhost
 
 /**
- * What a `native_bundle` plugin implements, loaded by [PluginRuntimeService]
- * in the isolated :pluginhost process. One `invoke` per capability call,
+ * What a `native_bundle` plugin implements, loaded in a plugin process of
+ * its own ([PluginSandboxService] when contained, [PluginRuntimeService]
+ * with full access). One `invoke` per capability call,
  * JSON in and JSON out at the binder boundary ([dev.droidtop.pluginhost.IPluginRuntime]),
  * decoded to/from a [PluginArgs]/[PluginResult] pair here so plugin authors
  * write against typed maps, not raw strings.
@@ -127,7 +128,20 @@ interface PluginContext {
      */
     fun call(api: String, version: Int, op: String, argsJson: String): String
 
-    /** This plugin's own private directory (`filesDir/plugins/<id>/data`), separate from its read-only installed payload -- the "per-plugin data directory" the crash-containment decision requires. */
+    /**
+     * The same call for an op that hands over a file instead of JSON (`data.open`, `files.open`,
+     * `files.shared.open`; docs/plugin-api.md 3 D4, D5, H1). [PluginFileReply.fd] is the file, or null when the
+     * call was refused, and [PluginFileReply.reply] says why. The plugin owns the descriptor and closes it. A
+     * contained plugin can open no file by path, so this is how a file reaches it.
+     */
+    fun openFile(api: String, version: Int, op: String, argsJson: String): PluginFileReply =
+        PluginFileReply(PluginReply.error(PluginErrorCode.UNSUPPORTED, "this host hands over no files").encode(), null)
+
+    /**
+     * A full-trust plugin's own directory (`filesDir/plugins/<id>/data`), separate from its read-only installed
+     * payload. A contained plugin gets an empty string: it can open no path at all, and the same directory is
+     * reached through the `data` API instead (docs/plugin-api.md 3 H1).
+     */
     fun privateDataDir(): String
 
     /**
@@ -216,6 +230,9 @@ interface PluginContext {
      */
     fun launchAppWithExtras(packageName: String, extras: Map<String, String>, action: String? = null): Boolean
 }
+
+/** What [PluginContext.openFile] returns: the broker's reply JSON, and the file when the call was allowed. */
+class PluginFileReply(val reply: String, val fd: android.os.ParcelFileDescriptor?)
 
 /**
  * The long-running-job shape a quick request/response `invoke()` can't

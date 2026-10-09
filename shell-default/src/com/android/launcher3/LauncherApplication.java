@@ -37,6 +37,10 @@ public class LauncherApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        // droidtop patch: a contained plugin's isolated process (droidtop's
+        // docs/plugin-api.md 5.3) has no files, no preferences and no
+        // permissions, and runs nothing of the launcher's.
+        if (dev.droidtop.runtime.util.IsolatedProcess.isIsolated()) return;
         // Only checks if a backup is staged, does nothing otherwise
         app.murinelauncher.backup.BackupHelper.INSTANCE.applyStagedRestoreIfNeeded(this);
         mNightMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;

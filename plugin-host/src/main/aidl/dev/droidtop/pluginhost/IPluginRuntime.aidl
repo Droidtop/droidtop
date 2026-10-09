@@ -1,11 +1,14 @@
 package dev.droidtop.pluginhost;
 
+import android.os.ParcelFileDescriptor;
 import dev.droidtop.pluginhost.IPluginHostBroker;
 import dev.droidtop.pluginhost.IPluginRuntimeCallback;
 
 /**
- * The one binder contract between :app and the isolated :pluginhost
- * process (docs/SPEC.md 12a). Everything crosses as plain strings
+ * The one binder contract between :app and a plugin process (docs/SPEC.md
+ * 12a, docs/plugin-api.md 5.3): a full-trust process under droidtop's own
+ * UID, or a contained one, an isolated process with a UID of its own.
+ * Everything crosses as plain strings
  * (JSON in, JSON out) rather than a richer Parcelable, on purpose: the
  * boundary is untrusted-input-shaped either way ("droidtop treats what a
  * plugin returns as untrusted input"), so there is no value in a typed
@@ -63,6 +66,24 @@ interface IPluginRuntime {
      * by an id the plugin claims.
      */
     boolean loadPlugin(String pluginId, String installDir, String entryClass, boolean rootApproved, IPluginHostBroker broker);
+
+    /**
+     * Loads a contained plugin (docs/plugin-api.md 5.3) in an isolated
+     * process, which can open no file of droidtop's: :app opens every file
+     * the plugin's kind needs (its code, and for python the runtime) and
+     * hands them over as descriptors, files[i] named names[i].
+     * manifestJson is the verified manifest. Returns false, never throws,
+     * with the reason in lastLoadError. A full-trust process refuses it.
+     */
+    boolean loadContained(String pluginId, String manifestJson, in ParcelFileDescriptor[] files, in String[] names, IPluginHostBroker broker);
+
+    /**
+     * What this process can reach, as JSON (the containment check,
+     * docs/plugin-api.md 5.3): whether it is isolated, its UID, whether a
+     * network socket opens, whether droidtop's files and shared storage
+     * list, and for a contained python plugin how its runtime loaded.
+     */
+    String reachability();
 
     /**
      * Why the last {@link #loadPlugin} of this plugin returned false, in a

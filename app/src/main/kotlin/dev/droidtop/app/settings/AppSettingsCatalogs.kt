@@ -2031,6 +2031,20 @@ object AppSettingsCatalogs {
             ActionItem(id = "plugin_${m.id}_id", title = "Plugin id", subtitle = m.id, run = {}),
             ActionItem(id = "plugin_${m.id}_origin", title = "Origin", subtitle = m.origin, run = {}),
             ActionItem(id = "plugin_${m.id}_digest", title = "Archive digest", subtitle = record.archiveDigest, run = {}),
+            // docs/plugin-api.md 5.3: loads the plugin as a call would and shows what its process reached when it tried.
+            AsyncActionItem(
+                id = "plugin_${m.id}_containment",
+                title = "Containment check",
+                subtitle = "Where it runs, and whether it can reach the network, droidtop's files or shared storage by itself",
+                run = { ctx, _ ->
+                    val policy = PluginCrashPolicy(ctx.applicationContext)
+                    try {
+                        policy.containmentReport(record)
+                    } finally {
+                        policy.shutdown()
+                    }
+                },
+            ),
         ) + listOfNotNull(
             // A debug build's crash-containment check (docs/SPEC.md 12a). Its status tile itself is in the plugin's panel.
             if (record.runnable() && PluginCapability.STATUS_TILE in m.capabilities && ctxIsDebuggable(context)) {

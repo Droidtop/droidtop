@@ -1,8 +1,8 @@
 package dev.droidtop.pluginhost;
 
 /**
- * Handed to {@link IPluginRuntime#registerCallback} so the :pluginhost
- * process can report a crash back to :app without :app having to poll.
+ * Handed to {@link IPluginRuntime#registerCallback} so a plugin process
+ * can report a crash back to :app without :app having to poll.
  * This is the other half of PluginCrashPolicy's containment: the binder
  * DeathRecipient catches the process dying outright, this callback
  * catches a plugin that threw but left the process alive.

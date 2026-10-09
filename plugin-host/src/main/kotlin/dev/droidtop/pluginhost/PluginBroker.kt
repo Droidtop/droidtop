@@ -79,6 +79,12 @@ interface BrokerEnvironment {
     /** The per-plugin secret store behind `vault` (docs/plugin-api.md 3 G1); null where there is none (the call is UNSUPPORTED). */
     fun vault(): PluginVault? = null
 
+    /** Whether droidtop holds [need] now (or this Android version has no such permission). */
+    fun holdsAndroid(need: AndroidNeed): Boolean = true
+
+    /** Shows Android's own prompt for [need] and waits for the answer; true when droidtop holds it afterwards. Only called during a call the person started. */
+    fun requestAndroid(need: AndroidNeed): Boolean = false
+
     /** The chain of plugins the call [pluginId] is currently serving came through (empty when it serves none). */
     fun chainServedBy(pluginId: String): List<String>
 
@@ -106,17 +112,37 @@ class TokenBucket(private val capacity: Int, private val refillPerSec: Double, p
     }
 }
 
+/**
+ * An Android permission droidtop itself must hold to run an op for a plugin (docs/plugin-api.md 4.1, "Android
+ * permissions"), from Android version [fromSdk] on: below it the permission does not exist and nothing is asked.
+ */
+data class AndroidNeed(val permission: String, val fromSdk: Int = 0)
+
 /** One host API op a plugin may call (docs/plugin-api.md 3). [permission] is null for an op every plugin may call. */
 class HostOp(
     val api: String,
     val op: String,
     val versions: Set<Int> = setOf(1),
     val permission: String? = null,
+    /**
+     * For an op whose permission depends on its arguments: the id to check, given what the plugin declared. `net.http`
+     * needs `net.local` for a device on the local network, `net.domains` for a declared domain and `net.any` otherwise.
+     * Wins over [permission].
+     */
+    val permissionFor: ((declared: List<DeclaredPermission>, args: JSONObject, env: BrokerEnvironment) -> String)? = null,
     /** Returns why the arguments do not fit what the plugin declared for [permission], or null. */
     val scope: ((declared: DeclaredPermission, args: JSONObject) -> String?)? = null,
-    /** A one-line target summary for the audit log (a package, never contents). */
+    /** A one-line target summary for the audit log (a package, a domain, a file name; never contents). */
     val target: (args: JSONObject) -> String = { "" },
-    val exec: (env: BrokerEnvironment, record: PluginRecord, args: JSONObject) -> JSONObject,
+    /** Only during a call the person started: the op shows something of the system's (a picker, a prompt). */
+    val userOnly: Boolean = false,
+    /** Written to the activity log whatever the permission's tier: everything that leaves the device or touches shared files. */
+    val alwaysAudit: Boolean = false,
+    /** The Android permission droidtop needs for this op; asked of Android on first use during a call the person started. */
+    val android: AndroidNeed? = null,
+    /** For an op that hands the plugin a file ([IPluginHostBroker.open]) instead of JSON. */
+    val open: ((env: BrokerEnvironment, record: PluginRecord, args: JSONObject) -> android.os.ParcelFileDescriptor)? = null,
+    val exec: ((env: BrokerEnvironment, record: PluginRecord, args: JSONObject) -> JSONObject)? = null,
 )
 
 /** The host's own APIs. Everything a plugin can do beyond its own process goes through one of these or through a provider. */
@@ -419,6 +445,25 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
         PluginReply.error(PluginErrorCode.FAILED, "the host could not run this call").encode()
     }
 
+    /**
+     * [IPluginHostBroker.open]: the same checks in the same order, for a host op that hands the plugin a file. The reply
+     * is `{opened: true}` with the descriptor, or the refusal with none. Never throws.
+     */
+    fun open(requestJson: String): Pair<String, android.os.ParcelFileDescriptor?> = try {
+        val request = parse(requestJson)
+        val record = runnableRecord()
+        if (!bucket.tryTake()) throw BrokerException(PluginErrorCode.RATE_LIMITED, "too many calls")
+        val hostOp = HostApis.find(request.api, request.op)
+            ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "${request.api} ${request.op} hands over no file")
+        val opener = hostOp.open ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "${request.api} ${request.op} hands over no file; call it instead")
+        val fd = guarded(record, request, hostOp) { opener(env, record, request.args) }
+        PluginReply.ok(JSONObject().put("opened", true)).encode() to fd
+    } catch (e: BrokerException) {
+        PluginReply.error(e.code, e.message.orEmpty()).encode() to null
+    } catch (t: Throwable) {
+        PluginReply.error(PluginErrorCode.FAILED, "the host could not open this: ${t.message ?: t::class.java.simpleName}").encode() to null
+    }
+
     private class Request(val api: String, val version: Int, val op: String, val args: JSONObject)
 
     private fun parse(text: String): Request {
@@ -435,31 +480,48 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
         return Request(api, json.optInt("version", 1), op, json.optJSONObject("args") ?: JSONObject())
     }
 
-    private fun handle(text: String): PluginReply {
-        val request = parse(text)
-        // 1. The plugin is runnable.
+    /** 1. The plugin is runnable: approved, enabled, and not Waiting for a provider. */
+    private fun runnableRecord(): PluginRecord {
         val record = env.record(pluginId) ?: throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "this plugin is not installed")
         if (!record.runnable() || env.resolution().isWaiting(pluginId)) {
             throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "this plugin is not running")
         }
+        return record
+    }
+
+    private fun handle(text: String): PluginReply {
+        val request = parse(text)
+        val record = runnableRecord()
         // 5. The quota (checked early so a flood costs nothing else).
         if (!bucket.tryTake()) throw BrokerException(PluginErrorCode.RATE_LIMITED, "too many calls")
         val hostOp = HostApis.find(request.api, request.op)
         return when {
-            hostOp != null -> callHost(record, request, hostOp)
+            hostOp != null -> {
+                val exec = hostOp.exec ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "${request.api} ${request.op} hands over a file; open it instead")
+                PluginReply.ok(guarded(record, request, hostOp) { exec(env, record, request.args) })
+            }
             HostApis.isHostApi(request.api) -> throw BrokerException(PluginErrorCode.UNSUPPORTED, "${request.api} has no op ${request.op}")
             else -> callProvider(record, request)
         }
     }
 
-    private fun callHost(record: PluginRecord, request: Request, hostOp: HostOp): PluginReply {
+    /**
+     * Checks 2 to 4 for a host op, then [run] (6) and the audit entry (7): the version is served; an op that shows
+     * something of the system's runs only during a call the person started; the permission the op needs (fixed, or
+     * chosen from the arguments) is declared, its parameters fit what was declared, and it is granted (with the
+     * first-use sheet); and droidtop itself holds the Android permission the op needs, asking Android when it may.
+     */
+    private fun <T> guarded(record: PluginRecord, request: Request, hostOp: HostOp, run: () -> T): T {
         // 2. The API and version are supported.
         if (request.version !in hostOp.versions) throw BrokerException(PluginErrorCode.UNSUPPORTED, "${request.api} version ${request.version} is not supported")
         var tier: PermissionTier? = null
         var permission: String? = null
         var result = "ok"
         try {
-            hostOp.permission?.let { id ->
+            if (hostOp.userOnly && !env.userInitiated(pluginId)) {
+                throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "${request.api} ${request.op} works only while you are using ${record.manifest.label}")
+            }
+            (hostOp.permissionFor?.invoke(record.manifest.v2.permissions, request.args, env) ?: hostOp.permission)?.let { id ->
                 permission = id
                 // 3. The permission is declared and granted.
                 val declared = record.manifest.v2.permissions.firstOrNull { it.id == id }
@@ -469,15 +531,32 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
                 hostOp.scope?.invoke(declared, request.args)?.let { throw BrokerException(PluginErrorCode.PERMISSION_DENIED, it) }
                 requireGrant(record, id, tier!!, declared.reason, PluginPermissions.labelFor(id) ?: id)
             }
-            return PluginReply.ok(hostOp.exec(env, record, request.args))
+            hostOp.android?.let { requireAndroid(record, it) }
+            return run()
         } catch (e: BrokerException) {
             result = e.code.name
             throw e
+        } catch (t: Throwable) {
+            result = PluginErrorCode.FAILED.name
+            throw t
         } finally {
-            if (permission != null && tier != null && tier != PermissionTier.NORMAL) {
-                env.audit(pluginId, AuditEntry(env.nowMs(), permission!!, request.api, request.op, hostOp.target(request.args), emptyList(), result))
+            val audited = if (permission != null) tier != null && (tier != PermissionTier.NORMAL || hostOp.alwaysAudit) else hostOp.alwaysAudit
+            if (audited) {
+                env.audit(pluginId, AuditEntry(env.nowMs(), permission ?: request.api, request.api, request.op, runCatching { hostOp.target(request.args) }.getOrDefault(""), emptyList(), result))
             }
         }
+    }
+
+    /**
+     * droidtop runs the op under its own Android permission (docs/plugin-api.md 4.1): when it does not hold it yet,
+     * Android's own prompt is shown, but only during a call the person started. From the background the call is
+     * refused and droidtop asks next time.
+     */
+    private fun requireAndroid(record: PluginRecord, need: AndroidNeed) {
+        if (env.holdsAndroid(need)) return
+        if (env.userInitiated(pluginId) && env.requestAndroid(need)) return
+        val name = need.permission.removePrefix(AndroidPermissions.PREFIX)
+        throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "droidtop needs Android's $name permission for this; it asks the next time you use ${record.manifest.label}")
     }
 
     /**

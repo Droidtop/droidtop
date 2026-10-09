@@ -125,3 +125,8 @@ object PluginPermissions {
         }
     }
 }
+
+/** Android's own permissions as a plugin names them (docs/plugin-api.md 4.1, "Android permissions"). */
+object AndroidPermissions {
+    const val PREFIX = "android.permission."
+}

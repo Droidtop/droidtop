@@ -1,38 +1,58 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <!--
-          The plugin sandbox is for compatibility and crash containment,
-          NOT security (docs/SPEC.md 12a): this is a same-UID, separate
-          PROCESS, not a separate app. A plugin that throws, hangs or
-          native-crashes takes down :pluginhost, :app's binder connection
-          dies (DeathRecipient), PluginCrashPolicy disables that plugin
-          and the launcher keeps running. It is not exported: only :app
-          binds to it, and only :app decides which plugin loads.
+          Plugin processes (docs/plugin-api.md 5.3). Not exported: only :app
+          binds to them, and only :app decides which plugin loads where.
+
+          Full trust: droidtop's own UID, one process per plugin from eight
+          slots (:pluginhost and :pluginhost1 to :pluginhost7). Only a plugin
+          the person allowed host.full_trust, and an older contract 1 plugin,
+          runs here. This is crash containment, not security: a plugin here can
+          do anything droidtop's UID can. A plugin that throws, hangs or
+          native-crashes takes down its own process, never :app.
         -->
         <service
             android:name="dev.droidtop.pluginhost.PluginRuntimeService"
             android:process=":pluginhost"
             android:exported="false"
             android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.FullTrustSlot1" android:process=":pluginhost1" android:exported="false" />
+        <service android:name="dev.droidtop.pluginhost.FullTrustSlot2" android:process=":pluginhost2" android:exported="false" />
+        <service android:name="dev.droidtop.pluginhost.FullTrustSlot3" android:process=":pluginhost3" android:exported="false" />
+        <service android:name="dev.droidtop.pluginhost.FullTrustSlot4" android:process=":pluginhost4" android:exported="false" />
+        <service android:name="dev.droidtop.pluginhost.FullTrustSlot5" android:process=":pluginhost5" android:exported="false" />
+        <service android:name="dev.droidtop.pluginhost.FullTrustSlot6" android:process=":pluginhost6" android:exported="false" />
+        <service android:name="dev.droidtop.pluginhost.FullTrustSlot7" android:process=":pluginhost7" android:exported="false" />
 
         <!--
-          Where Shizuku hands droidtop its binder. Shizuku's server looks for a
-          provider named "applicationId.shizuku" in every app the user allowed
-          and calls sendBinder on it, so the provider has to exist for the
-          Shizuku provider plugin to work at all. It lives in :pluginhost, the
-          process the plugin runs in, so the binder arrives where it is used.
-          The Shizuku provider plugin uses it (docs/plugin-api.md 2.7) and so
-          does droidtop's own main process, which shares the binder through
-          Shizuku's multi-process support (ShizukuTransport, SystemShizukuOps).
-          Every other plugin reaches privilege through the priv.* APIs.
-          The permission is the one Shizuku's own documentation asks for: only
-          the Shizuku server (the shell or root) holds it.
+          Contained, the default for a contract 2 plugin: an isolated process
+          with a random UID of its own, no permissions, no network and no access
+          to droidtop's files or shared storage. Everything the plugin does
+          beyond its process goes through its broker. From API 29 :app starts
+          one instance per plugin with bindIsolatedService; below that the eight
+          slots each hold one plugin.
         -->
+        <service
+            android:name="dev.droidtop.pluginhost.PluginSandboxService"
+            android:process=":plugin_sandbox"
+            android:exported="false"
+            android:isolatedProcess="true" />
+        <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot0" android:process=":plugin_sandbox0" android:exported="false" android:isolatedProcess="true" />
+        <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot1" android:process=":plugin_sandbox1" android:exported="false" android:isolatedProcess="true" />
+        <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot2" android:process=":plugin_sandbox2" android:exported="false" android:isolatedProcess="true" />
+        <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot3" android:process=":plugin_sandbox3" android:exported="false" android:isolatedProcess="true" />
+        <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot4" android:process=":plugin_sandbox4" android:exported="false" android:isolatedProcess="true" />
+        <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot5" android:process=":plugin_sandbox5" android:exported="false" android:isolatedProcess="true" />
+        <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot6" android:process=":plugin_sandbox6" android:exported="false" android:isolatedProcess="true" />
+        <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot7" android:process=":plugin_sandbox7" android:exported="false" android:isolatedProcess="true" />
+
         <!--
           A plugin's own full-screen UI (ui.main, docs/plugin-api.md 1.7),
-          hosted in the plugin's process. Not exported: only droidtop starts
-          it, after checking approval and the signature. It takes the
-          configuration changes itself, as every Flutter activity does.
+          hosted in a full-trust plugin process: an activity cannot run in an
+          isolated process, and only a Flutter plugin, which needs full access
+          anyway, can declare one. Not exported: only droidtop starts it, after
+          checking approval and the signature. It takes the configuration
+          changes itself, as every Flutter activity does.
         -->
         <activity
             android:name="dev.droidtop.pluginhost.PluginMainActivity"
@@ -43,6 +63,18 @@
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" />
 
+        <!--
+          Where Shizuku hands droidtop its binder. Shizuku's server looks for a
+          provider named "applicationId.shizuku" in every app the user allowed
+          and calls sendBinder on it, so the provider has to exist for the
+          Shizuku provider plugin to work at all. It lives in :pluginhost, the
+          first full-trust slot; every other droidtop process, the other slots
+          and droidtop's own main process included, shares the binder through
+          Shizuku's multi-process support (ShizukuTransport, SystemShizukuOps).
+          Every other plugin reaches privilege through the priv.* APIs.
+          The permission is the one Shizuku's own documentation asks for: only
+          the Shizuku server (the shell or root) holds it.
+        -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"

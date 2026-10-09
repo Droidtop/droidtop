@@ -23,15 +23,19 @@ class PythonDroidtopPlugin(
     private val dataDir: String,
     /** The manifest's contract: 2 means `plugin.py` answers `handle` itself. */
     private val contractVersion: Int = 1,
+    /** A contained plugin's `plugin.py` as text (docs/plugin-api.md 5.3): its process cannot open [scriptPath], so the module is executed from this. */
+    private val source: String? = null,
 ) : DroidtopPlugin {
     override fun onLoad(context: PluginContext) {
-        // Throws PythonCallException on any failure -- caught by
-        // PluginRuntimeService.loadPlugin's existing catch(Throwable),
-        // same as a native_bundle plugin's onLoad throwing.
-        // Registered first: a plugin may call droidtop.host.call at import time or in on_load.
+        // Throws PythonCallException on any failure: caught by the process's load path, the same as a native_bundle
+        // plugin's onLoad throwing. Registered first: a plugin may call droidtop.host.call at import time or in on_load.
         PythonHostCalls.register(uniqueName, context)
         try {
-            PythonBridge.nativeLoadModule(uniqueName, scriptPath, dataDir)
+            if (source != null) {
+                PythonBridge.nativeLoadSource(uniqueName, source, dataDir)
+            } else {
+                PythonBridge.nativeLoadModule(uniqueName, scriptPath, dataDir)
+            }
         } catch (t: Throwable) {
             PythonHostCalls.unregister(uniqueName)
             throw t

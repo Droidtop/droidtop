@@ -16,6 +16,13 @@ import org.json.JSONObject
 /** The binder object one plugin holds: it can only ever speak as [core]'s plugin. */
 class PluginHostBroker(private val core: BrokerCore) : IPluginHostBroker.Stub() {
     override fun call(requestJson: String?): String = core.call(requestJson.orEmpty())
+
+    // The descriptor goes back as the return value, which the binder closes on droidtop's side once it is sent.
+    override fun open(requestJson: String?, reply: Array<String?>?): android.os.ParcelFileDescriptor? {
+        val (text, fd) = core.open(requestJson.orEmpty())
+        if (reply != null && reply.isNotEmpty()) reply[0] = text
+        return fd
+    }
 }
 
 /**

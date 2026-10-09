@@ -1,5 +1,7 @@
 package dev.droidtop.pluginhost
 
+import org.json.JSONObject
+
 /**
  * Thrown by the native bridge (`native/src/droidtoppy_jni.c`) when a
  * Python-level call fails -- an exception raised inside the plugin's own
@@ -66,6 +68,56 @@ object PythonBridge {
     external fun nativeUnloadModule(uniqueName: String)
 
     /**
+     * [nativeLoadModule] for a contained plugin (docs/plugin-api.md 5.3), whose process can open no path: [source] is the
+     * text of its `plugin.py`, executed as the module [uniqueName].
+     */
+    external fun nativeLoadSource(uniqueName: String, source: String, dataDir: String)
+
+    /**
+     * Starts the interpreter in a contained plugin's isolated process from descriptors only (docs/plugin-api.md 5.3).
+     * [depFds] are the runtime's other libraries (loaded first, in any order: each is retried until none loads), then
+     * libpython itself; [zipFd] is the standard library zip, which goes on `sys.path` as `/proc/self/fd/<n>` and is read
+     * through the descriptor; each of [extFds] is a `lib-dynload` module registered as a built-in under its
+     * [extNames] entry before the interpreter starts. Every descriptor becomes the bridge's own. Returns a JSON report:
+     * `ok`, `error`, and how each library loaded (`fd`, or `memfd` when mapping the file's own descriptor was refused and
+     * a private copy worked), which is the spike's evidence.
+     */
+    external fun nativeInitContained(
+        libpythonFd: Int,
+        libpythonName: String,
+        zipFd: Int,
+        depFds: IntArray,
+        depNames: Array<String>,
+        extFds: IntArray,
+        extNames: Array<String>,
+        extFiles: Array<String>,
+    ): String
+
+    /** [nativeInitContained] from the descriptors :app handed over, by [ContainedFiles] name. Never throws. */
+    fun initContained(files: Map<String, android.os.ParcelFileDescriptor>): JSONObject = try {
+        val libpython = files.entries.firstOrNull { it.key.startsWith(ContainedFiles.PYTHON_LIBPYTHON) }
+            ?: throw IllegalStateException("libpython was not handed over")
+        val zip = files[ContainedFiles.PYTHON_STDLIB] ?: throw IllegalStateException("the standard library zip was not handed over")
+        val deps = files.entries.filter { it.key.startsWith(ContainedFiles.PYTHON_DEP) }
+        // `python/ext/<module>/<file>`
+        val exts = files.entries.filter { it.key.startsWith(ContainedFiles.PYTHON_EXT) }
+        JSONObject(
+            nativeInitContained(
+                libpythonFd = libpython.value.detachFd(),
+                libpythonName = libpython.key.removePrefix(ContainedFiles.PYTHON_LIBPYTHON),
+                zipFd = zip.detachFd(),
+                depFds = deps.map { it.value.detachFd() }.toIntArray(),
+                depNames = deps.map { it.key.removePrefix(ContainedFiles.PYTHON_DEP) }.toTypedArray(),
+                extFds = exts.map { it.value.detachFd() }.toIntArray(),
+                extNames = exts.map { it.key.removePrefix(ContainedFiles.PYTHON_EXT).substringBefore('/') }.toTypedArray(),
+                extFiles = exts.map { it.key.substringAfterLast('/') }.toTypedArray(),
+            ),
+        )
+    } catch (t: Throwable) {
+        JSONObject().put("ok", false).put("error", t.message ?: t::class.java.simpleName)
+    }
+
+    /**
      * The Java end of `droidtop.host.call` (docs/plugin-api.md 1.3), called by
      * `native/src/droidtoppy_jni.c` from whichever thread Python made the call on.
      * Never throws: a JNI caller cannot do anything with an exception, so every
@@ -73,6 +125,10 @@ object PythonBridge {
      */
     @JvmStatic
     fun hostCall(pluginId: String, requestJson: String): String = PythonHostCalls.call(pluginId, requestJson)
+
+    /** The Java end of `droidtop.host.open`: the broker reply, with the descriptor number under `fd` when a file was handed over. Never throws. */
+    @JvmStatic
+    fun hostOpen(pluginId: String, requestJson: String): String = PythonHostCalls.open(pluginId, requestJson)
 }
 
 /**
@@ -105,6 +161,26 @@ internal object PythonHostCalls {
         }
         val reply = try {
             context.call(request.api, request.version, request.op, request.argsJson)
+        } catch (t: Throwable) {
+            PluginReply.error(PluginErrorCode.FAILED, t.message ?: "broker call failed").encode()
+        }
+        return asciiJson(reply)
+    }
+
+    /** `droidtop.host.open`: the same request through [PluginContext.openFile]; a file handed over is detached and its number put in the reply as `fd`, the plugin's to close. */
+    fun open(pluginId: String, requestJson: String): String {
+        val context = contexts[pluginId]
+            ?: return PluginReply.error(PluginErrorCode.FAILED, "plugin is not loaded").encode()
+        val request = try {
+            HostCallRequest.parse(requestJson)
+        } catch (e: Exception) {
+            return PluginReply.error(PluginErrorCode.INVALID_ARGS, e.message ?: "malformed host call").encode()
+        }
+        val reply = try {
+            val file = context.openFile(request.api, request.version, request.op, request.argsJson)
+            val json = runCatching { JSONObject(file.reply) }.getOrElse { PluginReply.error(PluginErrorCode.FAILED, "malformed reply").toJson() }
+            file.fd?.let { json.put("fd", it.detachFd()) }
+            json.toString()
         } catch (t: Throwable) {
             PluginReply.error(PluginErrorCode.FAILED, t.message ?: "broker call failed").encode()
         }

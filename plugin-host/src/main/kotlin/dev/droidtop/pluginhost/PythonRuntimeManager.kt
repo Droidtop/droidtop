@@ -128,7 +128,70 @@ object PythonRuntimeManager {
         val spec = readSpec(context) ?: throw IllegalStateException("no pinned Python runtime for this build")
         val installDir = installDirFor(context, spec)
         RuntimeArtifactInstaller.install(archive, installDir, spec.artifact, ::extractRuntime)
+        // A contained plugin's first start should not wait for this (docs/plugin-api.md 5.3); a failure here is retried then.
+        runCatching { stdlibZip(installDir, spec) }
         return "Python runtime installed"
+    }
+
+    /**
+     * What a contained python plugin's isolated process is handed (docs/plugin-api.md 5.3), by [ContainedFiles] name:
+     * libpython, the standard library as one zip, the runtime's other libraries (OpenSSL, SQLite) and every `lib-dynload`
+     * extension module by module name. Null when the runtime is not installed. Builds the zip the first time: off the main thread.
+     */
+    fun containedFiles(context: Context): List<Pair<String, File>>? {
+        val spec = readSpec(context) ?: return null
+        val home = installDirFor(context, spec)
+        if (!RuntimeArtifactInstaller.isInstalled(home)) return null
+        val lib = File(home, "lib")
+        val libpython = File(lib, spec.libpythonSoName).takeIf { it.isFile } ?: return null
+        val zip = stdlibZip(home, spec)
+        val deps = lib.listFiles { f -> f.isFile && f.name.endsWith(".so") && f.name != spec.libpythonSoName }.orEmpty().sortedBy { it.name }
+        val extensions = File(lib, "${spec.stdlibDirName}/lib-dynload").listFiles { f -> f.isFile && f.name.endsWith(".so") }.orEmpty().sortedBy { it.name }
+        return buildList {
+            add(ContainedFiles.PYTHON_LIBPYTHON + libpython.name to libpython)
+            add(ContainedFiles.PYTHON_STDLIB to zip)
+            deps.forEach { add(ContainedFiles.PYTHON_DEP + it.name to it) }
+            // `_json.cpython-314-x86_64-linux-android.so` is the module `_json`.
+            extensions.forEach { add(ContainedFiles.PYTHON_EXT + it.name.substringBefore('.') + "/" + it.name to it) }
+        }
+    }
+
+    private val zipLock = Any()
+
+    /**
+     * The standard library as one zip, `python-stdlib.zip` beside the runtime: a contained process can open no folder, and
+     * `zipimport` reads a zip through one descriptor. Pure Python only (the extension modules are handed over one by one),
+     * without the test suite, IDLE and Tk, which no plugin can use. Entries are stored, not compressed: building it is a
+     * copy, and an import decompresses nothing. Built once per runtime install, through a temporary file.
+     */
+    private fun stdlibZip(home: File, spec: RuntimeSpec): File {
+        val out = File(home, "python-stdlib.zip")
+        synchronized(zipLock) {
+            if (out.isFile) return out
+            val root = File(home, "lib/${spec.stdlibDirName}")
+            val skip = setOf("lib-dynload", "test", "tests", "idlelib", "tkinter", "turtledemo", "ensurepip", "site-packages", "__pycache__")
+            val tmp = File(home, "python-stdlib.zip.tmp")
+            java.util.zip.ZipOutputStream(tmp.outputStream().buffered()).use { zip ->
+                root.walkTopDown()
+                    .onEnter { it == root || it.name !in skip }
+                    .filter { it.isFile && !it.name.endsWith(".pyc") && !it.name.endsWith(".so") }
+                    .forEach { file ->
+                        val bytes = file.readBytes()
+                        val crc = java.util.zip.CRC32().apply { update(bytes) }
+                        val entry = java.util.zip.ZipEntry(file.relativeTo(root).path.replace(File.separatorChar, '/')).apply {
+                            method = java.util.zip.ZipEntry.STORED
+                            size = bytes.size.toLong()
+                            compressedSize = bytes.size.toLong()
+                            this.crc = crc.value
+                        }
+                        zip.putNextEntry(entry)
+                        zip.write(bytes)
+                        zip.closeEntry()
+                    }
+            }
+            check(tmp.renameTo(out)) { "couldn't move the standard library zip into place" }
+        }
+        return out
     }
 
     /**
