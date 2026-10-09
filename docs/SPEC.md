@@ -150,7 +150,19 @@ Instead, mirror Qubes OS's dom0/AppVM split:
   compositor, not through droidtop code. Its one capture session
   (host-bridge/native/src/wayland_client.cpp:1456) and one virtual pointer
   and keyboard per connection (wayland_client.cpp:1316-1319) are
-  per-connection state, so a second compositor client leaves them untouched.
+  per-connection state, so a second compositor client leaves them untouched,
+  and the JNI layer keys every connection by its `HostBridge` object rather
+  than holding a singleton (host-bridge/native/src/hostbridge_jni.cpp:84-95).
+  Audited 2026-10-08 (Droidtop/tracker#100): nothing in host-bridge takes an
+  exclusive grab, a keyboard-shortcuts inhibitor or a pointer constraint.
+  Two things it does are compositor-wide by the protocols' own design, and a
+  second client has to leave them to host-bridge rather than fight over them:
+  the output's mode, which `applyOutputSize` sets to the Android surface's
+  size through wlr-output-management (wayland_client.cpp:385-396), so a
+  second consumer that wants another size captures its own output (sway's
+  `create_output` on the headless backend) instead of reconfiguring this
+  one; and the clipboard, which the data-control bridge sets for the whole
+  seat (§6d), as any clipboard manager does.
 - **Everything else is a sibling container** — a Linux distro (Ubuntu,
   Debian, Alpine, whatever the user picks) or a Wine prefix, each bind-
   mounting the primary container's `WAYLAND_DISPLAY` and PulseAudio socket
