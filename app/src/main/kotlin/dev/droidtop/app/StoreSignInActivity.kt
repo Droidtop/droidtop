@@ -300,7 +300,7 @@ private fun AccountSignIn(label: String, session: StoreAccountSignIn, onDone: ()
             is AccountSignInStep.Done -> Busy("Signed in${current.account?.let { " as $it" }.orEmpty()}")
         }
         Text(
-            "A selects, B goes back",
+            "Confirm selects, back goes back",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

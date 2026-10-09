@@ -110,7 +110,6 @@ internal fun SaveConflictDialog(gameTitle: String, conflict: SaveConflict, onAns
                 onClick = { press(1) },
             )
             MenuRow(title = "Decide later", selected = selected == 2, onClick = { press(2) })
-            MenuHint("Up/Down moves, A picks and A again confirms, B decides later")
         }
     }
 }

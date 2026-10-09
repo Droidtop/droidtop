@@ -996,7 +996,6 @@ internal fun PcGameMenu(
                     }
                 }
             }
-            dev.droidtop.shell.gamepad.MenuHint(if (page == PcMenuPage.Root) "Up/Down moves, A activates, B closes" else "Up/Down moves, A activates, B goes back")
         }
     }
     if (contentOpen && ownStore != null) {

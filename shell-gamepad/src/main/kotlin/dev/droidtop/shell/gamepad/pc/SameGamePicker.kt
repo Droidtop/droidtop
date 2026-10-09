@@ -124,7 +124,6 @@ internal fun SameGamePicker(
                 }
             }
             if (working) MenuHint(workingLine)
-            MenuHint("Up/Down moves, A picks and A again confirms, B closes")
         }
     }
 }

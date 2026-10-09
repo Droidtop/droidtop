@@ -443,9 +443,6 @@ internal fun GamelistOptionsMenu(
             // the problem and hid the fix (rig, dq-shell2-01). The panel
             // scrolls, so a long result makes the panel longer instead.
             status?.let { ResultText(it) }
-            MenuHint(
-                if (pickingLetter) "Up/Down moves, A jumps, B goes back" else "Up/Down moves, A activates, B closes",
-            )
         }
     }
 

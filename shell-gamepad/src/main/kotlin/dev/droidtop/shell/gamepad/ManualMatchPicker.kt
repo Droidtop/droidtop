@@ -158,7 +158,6 @@ internal fun ManualMatchPicker(
                 }
             }
             status?.let { MenuHint(it) }
-            MenuHint("Up/Down moves, A picks, B closes")
         }
     }
 

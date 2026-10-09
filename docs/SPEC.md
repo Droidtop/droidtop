@@ -13033,7 +13033,9 @@ Settings tab, the left menu's places, Console systems and Containers.
   a screen is labels and values: a search result says only which screen the row
   is in (`SettingsSearchResult.screenTitle`; the row's explanation stays
   searchable but is not drawn), a game menu row's summary is a short value
-  ("From the folder name", "2 found"), and a sheet carries no instruction line
+  ("From the folder name", "2 found"), and a sheet carries no instruction line (the footer's pills are the one place buttons are named, so
+  they follow the pad's layout and the Swap A and B setting; plain text never names A or B,
+  Droidtop/tracker#365)
   (Sort by, Search). Sentences stay for failures and for confirmations of a
   consequential or destructive action.
 

@@ -233,13 +233,7 @@ internal fun LutrisImportScreen(
                 )
             }
             if (current is ImportStage.Preview) PreviewBody(current)
-            MenuHint(
-                when (current) {
-                    is ImportStage.Preview -> "Nothing in the script is run. Up/Down moves, A picks, B goes back"
-                    ImportStage.PickGame, is ImportStage.PickInstaller -> "Up/Down moves, A picks, B goes back"
-                    else -> "B goes back"
-                },
-            )
+            if (current is ImportStage.Preview) MenuHint("Nothing in the script is run.")
         }
     }
 }

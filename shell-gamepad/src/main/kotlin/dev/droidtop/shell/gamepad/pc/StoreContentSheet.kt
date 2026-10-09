@@ -209,7 +209,6 @@ internal fun StoreContentSheet(
             }
             status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MenuTokens.Value) }
             if (working) MenuHint("Working")
-            MenuHint("Up/Down moves, A changes, B closes")
         }
     }
 }
