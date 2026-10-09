@@ -297,7 +297,7 @@ internal object StoresCatalog {
                 CatalogChip("Not signed in")
             },
         )
-        if (signedIn) add(CatalogChip(syncedAgo(System.currentTimeMillis(), store.lastSyncRequested(context))))
+        if (signedIn) add(CatalogChip(syncedAgo(System.currentTimeMillis(), store.lastSynced(context))))
         val running = jobs.count { !it.paused }
         if (running > 0) add(CatalogChip("$running downloading"))
         val paused = jobs.size - running
