@@ -395,19 +395,20 @@ internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: StoreDow
 }
 
 /**
- * The bottom corners and the progress bar: the store a game is from (one
- * letter, no store's own artwork), how many copies it stands for when more
- * than one, and a thin bar while a download runs.
+ * The bottom corners and the progress bar: what the game is and where it is
+ * from ([badge], [kindBadgeOf]; no store's artwork, no letter), a small
+ * generic glyph when it is shared with you or left your library
+ * ([ownershipGlyph]; never words, docs/SPEC.md 7i "Badges"), how many copies
+ * it stands for when more than one, and a thin bar while a download runs.
  */
 @Composable
 private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownloads.Progress?, parts: Int, badge: KindBadge?) {
-    val source = dev.droidtop.library.PcSource.of(entry)?.label()?.firstOrNull()?.uppercaseChar()
-    if (badge != null) {
-        KindMark(badge, Modifier.align(Alignment.BottomStart))
-    } else if (entry.isStoreRow() && source != null) {
-        CapsuleChip(source.toString(), MenuTokens.OnSurface, MenuTokens.Scrim, Modifier.align(Alignment.BottomStart))
+    if (badge != null) KindMark(badge, Modifier.align(Alignment.BottomStart))
+    val glyph = ownershipGlyph(entry)
+    val copies = if (parts > 1) "\u00d7$parts" else null
+    listOfNotNull(glyph, copies).joinToString(" ").takeIf { it.isNotEmpty() }?.let {
+        CapsuleChip(it, MenuTokens.OnSurface, MenuTokens.Scrim, Modifier.align(Alignment.BottomEnd))
     }
-    if (parts > 1) CapsuleChip("×$parts", MenuTokens.OnSurface, MenuTokens.Scrim, Modifier.align(Alignment.BottomEnd))
     // The shell's one progress bar, the same a download's row in the Downloads place draws.
     if (download != null) ShellProgressBar(download.fraction.coerceIn(0f, 1f), Modifier.align(Alignment.BottomStart).fillMaxWidth())
 }
@@ -438,6 +439,20 @@ private fun KindMark(badge: KindBadge, modifier: Modifier) {
     )
 }
 
+/**
+ * The generic glyph a capsule carries for a store row that is not simply the
+ * person's: shared with them by another account, or gone from their library.
+ * Null for the rest. Pure, one look at the row's holding.
+ */
+internal fun ownershipGlyph(entry: LibraryEntry): String? = when (dev.droidtop.library.originLabel(entry, 1).mark) {
+    dev.droidtop.library.OwnershipMark.SHARED -> SHARED_GLYPH
+    dev.droidtop.library.OwnershipMark.LEFT -> LEFT_GLYPH
+    null -> null
+}
+
+internal const val SHARED_GLYPH = "\u21c4"
+internal const val LEFT_GLYPH = "\u2298"
+
 /** A chip in a capsule's corner: the shell's one [StatusChip], kept clear of the corner. */
 @Composable
 private fun CapsuleChip(text: String, ink: Color, fill: Color, modifier: Modifier) {
@@ -446,12 +461,19 @@ private fun CapsuleChip(text: String, ink: Color, fill: Color, modifier: Modifie
 
 /**
  * The one line that names the focused game and its facts, drawn once under
- * the capsules instead of on every card (docs/SPEC.md 7i): title, store,
- * state, version, size. Pure, for the tests.
+ * the capsules instead of on every card (docs/SPEC.md 7i): title, where it
+ * came from in full ("Steam · Shared with you", "GOG · via Heroic", "Folder:
+ * Games", [originLabel]), state, version, size. Pure, for the tests.
  */
-internal fun focusLine(entry: LibraryEntry, play: PcPlayState?, parts: Int): String = buildList {
+internal fun focusLine(
+    entry: LibraryEntry,
+    play: PcPlayState?,
+    parts: Int,
+    roots: List<String> = emptyList(),
+    via: String? = null,
+): String = buildList {
     add(GameNaming.displayName(entry.title))
-    dev.droidtop.library.PcSource.of(entry)?.takeIf { entry.isStoreRow() }?.let { add(it.label()) }
+    add(dev.droidtop.library.originLabel(entry, 1, roots = roots, via = via).full)
     play?.takeIf { it.store != null }?.let { add(if (it.progress != null) "${it.verb} ${(it.progress * 100).toInt()}%" else it.verb) }
     entry.pcInfo?.installedVersion?.let { add(it) }
     // The version-management fact a shelf or the grid owes the focused game:

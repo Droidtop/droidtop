@@ -12209,6 +12209,24 @@ Deck's library tabs are the better shape.
 
 ### The game page
 
+**Details in order of use (Droidtop/tracker#397 slice G).** The Details tab
+leads with Source (`originLabel`'s full text; "Owned on Steam and GOG" under it
+when a card holds several stores), Ownership (only when not simply owned, with
+its sentence; a game that left the library reads "This game left your library.
+<Store> may refuse to start it"), Size, Cloud saves and DLC, then the rest, then
+**More**, which folds the technical facts until selected: the store id, the
+installed build, the install location and where the version came from ("set by
+you", "from the store's installer", "from the folder name"). **Cloud saves**:
+a store copy whose store keeps cloud saves droidtop reaches (Steam) says when
+they last synced (`StoreSaves.lastSync`, kept by every sync), "Last sync
+failed" with A to retry, or offline "Not synced since <when>"; a store with
+none reads "<Store> cloud saves are not supported" (GOG); a folder game has no
+row. The Update row stays the first row of Versions and updates. **Set
+version**: on a folder game A on Version opens a field prefilled with what the
+folder's name says; what is set wins over the folder's name until "Clear set
+version" (Use folder name), kept by the game's id (`SetVersions`), so it
+survives a version bump. A store marker's build beats the folder's name.
+
 **Outside Gaming (decided 2026-10-08, Droidtop/tracker#349).** Owner: "Still
 focus on gaming mode for now, just wire it in OUT from there". The page was
 reachable only from the PC Games tab, so Standard's Games grid and Desktop's
@@ -12409,12 +12427,21 @@ own games, in droidtop's own treatment:
   each card or row says what it is: one word, then its store or system, quieter
   (`KindBadge`, `kindBadgeOf`, pure, over fields the entry already carries and
   the system-name map loaded once off the main thread, so no lookup per card):
-  "PC · Steam" (a PC game, its store), "Engine" (a detected engine game, with
-  its store when it has one), "Retro · Super Nintendo" (an emulated game, its
-  system), "App" (an Android app). It sits at the capsule's bottom-left on a
-  dark plate, the Deck's small corner mark, in place of the old store letter,
-  on every Home shelf and PC Games' Overview shelves; the PC grid, which is
-  all PC, keeps the store letter. The launcher's search rows use the same text
+  "Retro · Super Nintendo" (an emulated game, its system), "App" (an Android
+  app). A PC or engine game's badge is `originLabel`'s (`:library-core`, one
+  function with a table test, Droidtop/tracker#397 slice G): an engine game
+  reads "ENGINE · <engine>" ("ENGINE · REN'PY", "ENGINE · RPG MAKER MZ",
+  `LibraryEntryKind.engineFamily`, the one rule the Kind facet's Engine value
+  reads too), a PC game "PC", plus " · <source>" only when the library has rows
+  from more than one source ("PC · GOG"). Ownership is never text on a capsule:
+  a game shared with you or gone from your library carries a small generic
+  glyph in the bottom-right corner (no store logo). The focus line and the
+  page's Source row carry the full text: "Steam · Shared with you", "GOG · via
+  Heroic", "Folder: Games". The List option **Capsule badge** is Full (the
+  default), Kind only ("PC", "ENGINE") or Off, and applies to PC and engine
+  games only. The badge sits at the capsule's bottom-left on a dark plate, the
+  Deck's small corner mark, on every shelf and in the PC grid alike; the store
+  letter is gone. The launcher's search rows use the same text
   as the row's detail instead of "Game". Social friends are not library
   entries (a friend's game is a name from the service, not a card), so they
   carry no badge; the service is already named on the row.

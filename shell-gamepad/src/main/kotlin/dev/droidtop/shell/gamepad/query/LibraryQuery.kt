@@ -801,6 +801,18 @@ object LibraryViewPrefs {
             .apply()
     }
 
+    private const val CAPSULE_BADGE = "droidtop_library_pc_capsule_badge"
+
+    /** What a PC capsule's badge says (List options > Capsule badge, docs/SPEC.md 7i); Full until changed. A preferences read. */
+    fun capsuleBadge(context: Context): dev.droidtop.library.CapsuleBadgeStyle {
+        val stored = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getString(CAPSULE_BADGE, null)
+        return dev.droidtop.library.CapsuleBadgeStyle.entries.firstOrNull { it.name == stored } ?: dev.droidtop.library.CapsuleBadgeStyle.FULL
+    }
+
+    fun setCapsuleBadge(context: Context, style: dev.droidtop.library.CapsuleBadgeStyle) {
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit().putString(CAPSULE_BADGE, style.name).apply()
+    }
+
     fun setOwnershipOptions(context: Context, options: OwnershipOptions) {
         context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
             .putBoolean(SHOW_SHARED, options.showShared)

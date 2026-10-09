@@ -98,7 +98,7 @@ fun LauncherSearchScreen(
                     LocalSearchRow(app.key, SearchRowKind.APP, app.title, APP_DETAIL, app.icon, app.open)
                 }
                 val matching = playable.filter { matchesSearchText(it, text) }.take(MAX_GAME_ROWS).map { game ->
-                    LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), kindBadgeOf(game, systemNames).text) { onPlay(game) }
+                    LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), kindBadgeOf(game, systemNames)?.text.orEmpty()) { onPlay(game) }
                 }
                 apps + matching
             },

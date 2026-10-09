@@ -81,7 +81,7 @@ class PcShelvesTest {
     }
 
     @Test
-    fun `a kind badge names pc, engine, app or retro with its store or system`() {
+    fun `a kind badge names pc, engine, app or retro, and a pc game's source only when there are several`() {
         val names = mapOf("snes" to "Super Nintendo")
         val rom = game("/rom", kind = LibraryEntryKind.CONSOLE_ROM).copy(systemId = "snes")
         val app = game("com.example.game", kind = LibraryEntryKind.NATIVE_ANDROID_APP).copy(appFacts = InstalledAppFacts())
@@ -89,11 +89,18 @@ class PcShelvesTest {
 
         assertEquals(KindBadge(BadgeKind.PC, null), kindBadgeOf(game("/pc", kind = LibraryEntryKind.WINE_PROFILE), names))
         assertEquals(KindBadge(BadgeKind.APP, null), kindBadgeOf(app, names))
-        assertEquals(KindBadge(BadgeKind.ENGINE, null), kindBadgeOf(engine, names))
-        assertEquals("Retro · Super Nintendo", kindBadgeOf(rom, names).text)
-        assertEquals("Retro · gba", kindBadgeOf(rom.copy(systemId = "gba"), names).text)
+        // An engine game names its engine (docs/SPEC.md 7i, "Badges").
+        assertEquals(KindBadge(BadgeKind.ENGINE, "Ren'Py"), kindBadgeOf(engine, names))
+        assertEquals("Retro · Super Nintendo", kindBadgeOf(rom, names)?.text)
+        assertEquals("Retro · gba", kindBadgeOf(rom.copy(systemId = "gba"), names)?.text)
         val steam = game("/steam", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(storeId = "steam:1", installed = true))
-        assertEquals("PC · Steam", kindBadgeOf(steam, names).text)
+        // A Steam-only library reads "PC"; with a second origin the store is named.
+        assertEquals("PC", kindBadgeOf(steam, names)?.text)
+        assertEquals("PC · Steam", kindBadgeOf(steam, names, origins = 2)?.text)
+        assertEquals("PC", kindBadgeOf(steam, names, origins = 2, style = dev.droidtop.library.CapsuleBadgeStyle.KIND_ONLY)?.text)
+        assertEquals(null, kindBadgeOf(steam, names, origins = 2, style = dev.droidtop.library.CapsuleBadgeStyle.OFF))
+        // A Retro badge is not the PC option's to drop.
+        assertEquals("Retro · Super Nintendo", kindBadgeOf(rom, names, style = dev.droidtop.library.CapsuleBadgeStyle.OFF)?.text)
     }
 
     @Test

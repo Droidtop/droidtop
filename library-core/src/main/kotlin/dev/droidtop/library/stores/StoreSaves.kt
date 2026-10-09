@@ -135,6 +135,32 @@ object StoreSaves {
         runCatching { store.syncSaves(context, entryId.substringAfter(':'), phase, prefix, title, resolver) }
             .onFailure { Log.w(TAG, "Cloud save sync failed for $entryId", it) }
             .getOrElse { SaveSyncResult("Cloud saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
+            ?.also { result -> if (!result.unresolved) record(context, entryId, failed = result.failed) }
+    }
+
+    /**
+     * When a game's saves last matched its store's cloud ([okAt]) and when a
+     * try last failed ([failedAt], only while that failure is the latest
+     * word): what the game page's Cloud saves row says (docs/SPEC.md 7i).
+     */
+    data class LastSync(val okAt: Long?, val failedAt: Long?)
+
+    private const val LAST_PREFS = "droidtop_store_save_syncs"
+
+    /** The kept [LastSync] of [entryId], or null when its saves never synced here. A preferences read. */
+    fun lastSync(context: Context, entryId: String): LastSync? {
+        val raw = context.getSharedPreferences(LAST_PREFS, Context.MODE_PRIVATE).getString(entryId, null) ?: return null
+        val ok = raw.substringBefore(':').toLongOrNull()?.takeIf { it > 0 }
+        val failed = raw.substringAfter(':', "").toLongOrNull()?.takeIf { it > 0 }
+        return LastSync(ok, failed)
+    }
+
+    private fun record(context: Context, entryId: String, failed: Boolean, now: Long = System.currentTimeMillis()) {
+        val known = lastSync(context, entryId)
+        val next = if (failed) LastSync(known?.okAt, now) else LastSync(now, null)
+        context.getSharedPreferences(LAST_PREFS, Context.MODE_PRIVATE).edit()
+            .putString(entryId, "${next.okAt ?: 0}:${next.failedAt ?: 0}")
+            .apply()
     }
 
     /**

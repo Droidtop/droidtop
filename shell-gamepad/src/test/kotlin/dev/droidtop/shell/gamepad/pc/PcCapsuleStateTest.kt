@@ -134,10 +134,15 @@ class PcCapsuleStateTest {
         val entry = store(installed = false, size = 2_500_000_000L)
         val line = focusLine(entry, playStateOf(null, entry), parts = 1)
         assertEquals("Game steam:1 · Steam · Install · 2.5 GB", line)
-        assertEquals("Folder game", focusLine(folder(), null, parts = 1))
+        // Where it came from, in full: a folder game names its game folder.
+        assertEquals("Folder game · Folder: games", focusLine(folder(), null, parts = 1, roots = listOf("/games")))
         assertTrue(focusLine(folder(), null, parts = 3).endsWith("3 copies"))
         // Version management on the line: the version a source knows of.
-        assertEquals("Folder game · v0.9.6 is available", focusLine(folder(update = "0.9.6"), null, parts = 1))
+        assertEquals("Folder game · Folder: games · v0.9.6 is available", focusLine(folder(update = "0.9.6"), null, parts = 1, roots = listOf("/games")))
+        // A shared game says so in words here, never on the capsule.
+        assertEquals("Game steam:1 · Steam · Shared with you", focusLine(store().let { it.copy(pcInfo = it.pcInfo?.copy(holding = dev.droidtop.library.stores.StoreHolding.FAMILY)) }, null, parts = 1))
+        assertEquals(SHARED_GLYPH, ownershipGlyph(store().let { it.copy(pcInfo = it.pcInfo?.copy(holding = dev.droidtop.library.stores.StoreHolding.FAMILY)) }))
+        assertNull(ownershipGlyph(store()))
     }
 
     @Test

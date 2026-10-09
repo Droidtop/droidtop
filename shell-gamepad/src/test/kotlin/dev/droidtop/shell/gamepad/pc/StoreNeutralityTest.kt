@@ -99,7 +99,7 @@ class StoreNeutralityTest {
     fun `a capsule and the focus line name every store the same way`() {
         for (store in StoreLibraries.all()) {
             val game = row(store, 2)
-            assertEquals(store.label, kindBadgeOf(game, emptyMap()).detail)
+            assertEquals(store.label, kindBadgeOf(game, emptyMap(), origins = 2)?.detail)
             assertTrue(focusLine(game, null, 1).contains(store.label))
         }
     }

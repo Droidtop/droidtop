@@ -344,6 +344,8 @@ internal fun PcGamesSection(
     var pcRoots by remember { mutableStateOf<List<String>?>(null) }
     var ownership by remember { mutableStateOf(OwnershipOptions()) }
     var stripTabs by remember { mutableStateOf(StripTabs()) }
+    // How much a capsule's badge says (List options > Capsule badge, docs/SPEC.md 7i).
+    var badgeStyle by remember { mutableStateOf(dev.droidtop.library.CapsuleBadgeStyle.FULL) }
     // Which games came through a launcher (Lutris): one read of the game settings.
     var viaByEntry by remember { mutableStateOf(emptyMap<String, String>()) }
     LaunchedEffect(Unit) {
@@ -353,12 +355,26 @@ internal fun PcGamesSection(
         }
         ownership = options
         stripTabs = withContext(Dispatchers.IO) { LibraryViewPrefs.stripTabs(context) }
+        badgeStyle = withContext(Dispatchers.IO) { LibraryViewPrefs.capsuleBadge(context) }
         viaByEntry = withContext(Dispatchers.IO) { runCatching { dev.droidtop.library.PcLaunchers.viaByEntry(context) }.getOrDefault(emptyMap()) }
         pcRoots = roots
     }
     fun setStripTabs(next: StripTabs) {
         stripTabs = next
         coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setStripTabs(context, next) } }
+    }
+    fun setBadgeStyle(next: dev.droidtop.library.CapsuleBadgeStyle) {
+        badgeStyle = next
+        coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setCapsuleBadge(context, next) } }
+    }
+    // How many sources the library has rows from: a PC capsule names its source only when there
+    // is more than one (docs/SPEC.md 7i, "Badges"). One pass over the fold, off the main thread.
+    var origins by remember { mutableIntStateOf(1) }
+    LaunchedEffect(games, pcRoots) {
+        val roots = pcRoots.orEmpty()
+        origins = withContext(Dispatchers.Default) {
+            games.orEmpty().mapNotNullTo(HashSet()) { PcSource.of(it, roots)?.id }.size.coerceAtLeast(1)
+        }
     }
     fun setOwnership(next: OwnershipOptions) {
         ownership = next
@@ -432,6 +448,7 @@ internal fun PcGamesSection(
         systemNames = loaded.first
         others = loaded.second
     }
+    fun badgeOf(entry: LibraryEntry): KindBadge? = kindBadgeOf(entry, systemNames, origins, badgeStyle, pcRoots.orEmpty())
     // Home's shelves (recent activity across every library) and PC Games'
     // Overview (the PC library's own), from the one shelf builder.
     var homeShelfList by remember { mutableStateOf(emptyList<PcShelf>()) }
@@ -965,6 +982,7 @@ internal fun PcGamesSection(
                     downloads = downloads,
                     partsOf = ::partsOf,
                     systemNames = systemNames,
+                    badgeOf = ::badgeOf,
                     mixed = state.home,
                     onOpenShelf = ::openShelf,
                 )
@@ -998,6 +1016,7 @@ internal fun PcGamesSection(
                                     onLongPress = { state.pageId = entry.id },
                                     download = entry.downloadKey()?.let { downloads[it] },
                                     parts = partsOf(entry),
+                                    badge = badgeOf(entry),
                                 )
                             }
                             // The last item, across the whole width: what the
@@ -1021,7 +1040,7 @@ internal fun PcGamesSection(
         // instead of on every capsule.
         focusedEntry?.let { entry ->
             Text(
-                focusLine(entry, focusedPlay?.first, partsOf(entry)),
+                focusLine(entry, focusedPlay?.first, partsOf(entry), pcRoots.orEmpty(), viaByEntry[entry.id]),
                 color = MenuTokens.OnSurfaceMuted,
                 style = TypeRole.supporting,
                 maxLines = 1,
@@ -1120,6 +1139,11 @@ internal fun PcGamesSection(
                 },
                 ("Collections tab: " + if (stripTabs.collections) "Shown" else "Hidden") to {
                     setStripTabs(stripTabs.copy(collections = !stripTabs.collections))
+                },
+                // Full ("PC · GOG", "Engine · Ren'Py"), Kind only ("PC"), Off: what a capsule's badge says.
+                ("Capsule badge: " + badgeStyle.label) to {
+                    val styles = dev.droidtop.library.CapsuleBadgeStyle.entries
+                    setBadgeStyle(styles[(styles.indexOf(badgeStyle) + 1) % styles.size])
                 },
                 ("Show games shared with you: " + if (ownership.showShared) "On" else "Off") to {
                     setOwnership(ownership.copy(showShared = !ownership.showShared))
@@ -1352,6 +1376,8 @@ private fun PcShelvesHome(
     downloads: Map<String, StoreDownloads.Progress>,
     partsOf: (LibraryEntry) -> Int,
     systemNames: Map<String, String>,
+    // What each card's badge says (kindBadgeOf with the library's origins and the Capsule badge option).
+    badgeOf: (LibraryEntry) -> KindBadge? = { kindBadgeOf(it, systemNames) },
     mixed: Boolean,
     // A tap on a shelf's heading (Update available's opens the Updates tab).
     onOpenShelf: (PcShelf) -> Unit = {},
@@ -1432,7 +1458,7 @@ private fun PcShelvesHome(
                             parts = partsOf(entry),
                             hero = hero,
                             // Every shelf says what each game is (PC, Retro, App, Engine) and where it is from.
-                            badge = kindBadgeOf(entry, systemNames),
+                            badge = badgeOf(entry),
                         )
                     }
                 }

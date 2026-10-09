@@ -1,5 +1,8 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.originLabel
+import dev.droidtop.library.engineFamily
+import dev.droidtop.library.CapsuleBadgeStyle
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.PcSource
@@ -212,25 +215,29 @@ internal data class KindBadge(val kind: BadgeKind, val detail: String?) {
     val text: String get() = if (detail == null) kind.word else "${kind.word} · $detail"
 }
 
-/** The kinds that are neither a Windows or Linux program, a remote PC, an app nor a console ROM: an engine game. */
-internal val NON_ENGINE_KINDS = setOf(
-    LibraryEntryKind.NATIVE_ANDROID_APP,
-    LibraryEntryKind.WINE_PROFILE,
-    LibraryEntryKind.LINUX_CONTAINER_APP,
-    LibraryEntryKind.REMOTE_STREAM,
-    LibraryEntryKind.CONSOLE_ROM,
-)
+/** The kinds that are no engine (a Windows or Linux program, a remote PC, an app, a console ROM): the one rule, [engineFamily]. */
+internal val NON_ENGINE_KINDS: Set<LibraryEntryKind> =
+    LibraryEntryKind.entries.filterTo(HashSet()) { it.engineFamily() == null }
 
 /**
  * The [KindBadge] of [entry], from fields the entry already carries and
  * [systemNames] (system id to display name, loaded once): a map read, never a
- * lookup per card. Pure.
+ * lookup per card. A PC or engine game's is [originLabel]'s (docs/SPEC.md 7i,
+ * "Badges"): "PC", "PC · GOG" once the library has more than one origin
+ * ([origins]), "Engine · Ren'Py"; null when the Capsule badge option ([style])
+ * is Off. Pure.
  */
-internal fun kindBadgeOf(entry: LibraryEntry, systemNames: Map<String, String>): KindBadge = when {
+internal fun kindBadgeOf(
+    entry: LibraryEntry,
+    systemNames: Map<String, String>,
+    origins: Int = 1,
+    style: CapsuleBadgeStyle = CapsuleBadgeStyle.FULL,
+    roots: List<String> = emptyList(),
+): KindBadge? = when {
     entry.appFacts != null || entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP -> KindBadge(BadgeKind.APP, null)
     entry.inPcFold -> {
-        val store = PcSource.of(entry)?.takeIf { entry.isStoreRow() }?.label()
-        KindBadge(if (entry.kind in NON_ENGINE_KINDS) BadgeKind.PC else BadgeKind.ENGINE, store)
+        val origin = originLabel(entry, origins, style, roots)
+        if (!origin.shown) null else KindBadge(if (entry.kind in NON_ENGINE_KINDS) BadgeKind.PC else BadgeKind.ENGINE, origin.detail)
     }
     else -> KindBadge(BadgeKind.RETRO, entry.systemId?.let { systemNames[it] ?: it })
 }

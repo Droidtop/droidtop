@@ -142,7 +142,8 @@ class PcPageAboutTest {
         assertEquals(listOf("Update", "Version", "Latest"), byTab.getValue(PageTab.VERSIONS).map { it.title })
         assertEquals(listOf("Manual", "Official site"), byTab.getValue(PageTab.EXTRAS).map { it.title })
         // What no tab names is a detail, so a new row is never lost.
-        assertEquals(listOf("Install location", "Runner", "Engine", "Developer"), byTab.getValue(PageTab.DETAILS).map { it.title })
+        // Details in order of use; the install location is one of More's technical rows, last.
+        assertEquals(listOf("Runner", "Engine", "Developer", "Install location"), byTab.getValue(PageTab.DETAILS).map { it.title })
         assertEquals(PageTab.DETAILS, pageTabOf("Something new"))
     }
 
@@ -270,5 +271,27 @@ class PcPageAboutTest {
         assertEquals("Install", pageActionLabel(0, "Install"))
         assertEquals("Favourite", pageActionLabel(1, "Play"))
         assertEquals("Options", pageActionLabel(2, "Play"))
+    }
+
+    @Test
+    fun `the cloud saves row says when they synced, that it failed, that the device is offline, or that the store has none`() {
+        val day = 24L * 60 * 60 * 1000
+        val now = 10 * day
+        val synced = dev.droidtop.library.stores.StoreSaves.LastSync(okAt = now - 2 * day, failedAt = null)
+        assertEquals("Synced 2 days ago" to "Select to sync now", cloudSavesLine("Steam", true, synced, online = true, now = now))
+        assertEquals("Offline" to "Not synced since 2 days ago", cloudSavesLine("Steam", true, synced, online = false, now = now))
+        val failed = synced.copy(failedAt = now - 1000)
+        assertEquals("Last sync failed" to "Select to retry", cloudSavesLine("Steam", true, failed, online = true, now = now))
+        assertEquals("Not synced yet" to "Select to sync now", cloudSavesLine("Steam", true, null, online = true, now = now))
+        assertEquals("Not supported" to "GOG cloud saves are not supported", cloudSavesLine("GOG", false, null, online = true, now = now))
+    }
+
+    @Test
+    fun `details lead with where it came from, then ownership, size and cloud saves, and More last`() {
+        val rows = listOf("Install location", "Runner", MORE_ROW, "Cloud saves", "Size", "Ownership", "Source", "Store id").map { PageFact(it) }
+        assertEquals(
+            listOf("Source", "Ownership", "Size", "Cloud saves", "Runner", MORE_ROW, "Install location", "Store id"),
+            groupRowsByTab(rows, emptyList()).getValue(PageTab.DETAILS).map { it.title },
+        )
     }
 }

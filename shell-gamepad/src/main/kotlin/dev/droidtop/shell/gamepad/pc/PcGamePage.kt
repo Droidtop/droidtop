@@ -114,6 +114,7 @@ import dev.droidtop.shell.gamepad.showsShoulderGlyphs
 import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.UiSound
+import dev.droidtop.shell.gamepad.TextEditDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -219,9 +220,64 @@ internal fun PcGamePage(
     val updateSources by produceState(emptyList<UpdateSources.Source>(), library, isFolder) {
         value = if (library != null && isFolder) library.updateSources() else emptyList()
     }
-    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources) {
+    var versionToken by remember(entry.id) { mutableIntStateOf(0) }
+    var editingVersion by remember(entry.id) { mutableStateOf(false) }
+    var moreOpen by remember(entry.id) { mutableStateOf(false) }
+    val setVersion by produceState<String?>(null, entry.id, versionToken) {
+        value = withContext(Dispatchers.IO) { dev.droidtop.library.SetVersions.get(context, entry.id) }
+    }
+    var cloudToken by remember(entry.id) { mutableIntStateOf(0) }
+    var cloudStatus by remember(entry.id) { mutableStateOf<String?>(null) }
+    val cloudStore = remember(entry) {
+        (dev.droidtop.library.PcSource.of(entry) as? dev.droidtop.library.PcSource.Store)?.let { dev.droidtop.library.stores.StoreLibraries.byId(it.storeId) }
+    }
+    val lastSync by produceState<dev.droidtop.library.stores.StoreSaves.LastSync?>(null, entry.id, cloudToken) {
+        value = if (cloudStore?.hasCloudSaves == true) withContext(Dispatchers.IO) { dev.droidtop.library.stores.StoreSaves.lastSync(context, entry.id) } else null
+    }
+    val online = remember(cloudToken) { isOnline(context) }
+    val cloudRow = remember(cloudStore, lastSync, online, cloudStatus, entry.pcInfo?.installed) {
+        cloudStore?.takeIf { entry.pcInfo?.installed == true }?.let { store ->
+            val line = cloudSavesLine(store.label, store.hasCloudSaves, lastSync, online, System.currentTimeMillis())
+            PageFact(
+                "Cloud saves",
+                cloudStatus ?: line.first,
+                subtitle = line.second,
+                onActivate = if (store.hasCloudSaves && entry.isStoreRow()) {
+                    {
+                        scope.launch {
+                            cloudStatus = "Syncing\u2026"
+                            cloudStatus = dev.droidtop.library.stores.StoreSaves
+                                .sync(context, entry.id, GameNaming.displayName(entry.title), dev.droidtop.library.stores.SaveSyncPhase.MANUAL)
+                                ?.line ?: "No cloud saves for this game"
+                            cloudToken++
+                        }
+                    }
+                } else {
+                    null
+                },
+            )
+        }
+    }
+    val originText by produceState<String?>(null, entry.id) {
+        value = withContext(Dispatchers.IO) { dev.droidtop.library.originLabel(entry, 1, roots = pcRootsOf(context)).full }
+    }
+    val sizeLine = (folderSize ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) }
+    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText) {
         pageRows(
             entry, play, runner, siblings,
+            origin = originText,
+            size = sizeLine,
+            cloudSaves = cloudRow,
+            setVersion = setVersion,
+            onSetVersion = if (isFolder) ({ editingVersion = true }) else null,
+            onClearVersion = {
+                scope.launch {
+                    withContext(Dispatchers.IO) { dev.droidtop.library.SetVersions.set(context, entry.id, null) }
+                    versionToken++
+                }
+            },
+            moreOpen = moreOpen,
+            onToggleMore = { moreOpen = !moreOpen },
             scrapeStatus = scrapeStatus,
             latest = links?.latestKnown ?: entry.latestKnown,
             onOpenLink = { url ->
@@ -298,12 +354,12 @@ internal fun PcGamePage(
             parts,
         )
     }
-    val strip = remember(entry, runner, folderSize, siblings) {
+    val strip = remember(entry, runner, folderSize, siblings, setVersion) {
         factsStrip(
             entry = entry,
             now = System.currentTimeMillis(),
             folderSizeBytes = folderSize,
-            installedVersion = installedVersions(entry, siblings).firstOrNull(),
+            installedVersion = installedVersions(entry, siblings, setVersion).firstOrNull(),
             runsWith = runner?.label,
             formatSize = { android.text.format.Formatter.formatShortFileSize(context, it) },
         )
@@ -635,6 +691,22 @@ internal fun PcGamePage(
     PluginPageScreen(pluginRows)
     programScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { programScreen = null }) }
     infoScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { infoScreen = null }) }
+    if (editingVersion) {
+        // Prefilled with what the folder's name says, or what was set; blank goes back to the folder's name.
+        TextEditDialog(
+            title = "Set version",
+            subtitle = "Blank uses the folder's name",
+            initial = setVersion ?: dev.droidtop.library.SetVersions.shown(entry, null)?.first.orEmpty(),
+            onCommit = { text ->
+                editingVersion = false
+                scope.launch {
+                    withContext(Dispatchers.IO) { dev.droidtop.library.SetVersions.set(context, entry.id, text) }
+                    versionToken++
+                }
+            },
+            onDismiss = { editingVersion = false },
+        )
+    }
     val linking = editingSource
     if (linking != null && library != null) {
         SourceLinkSheet(
@@ -954,6 +1026,41 @@ internal fun ownershipSentence(entry: LibraryEntry): Pair<String, String>? {
     }
 }
 
+/**
+ * The Cloud saves row of a store copy (docs/SPEC.md 7i): when the saves last
+ * matched the store's cloud, that the last sync failed (A retries), that the
+ * device is offline and since when nothing synced, or that the store keeps no
+ * cloud saves droidtop reaches ("GOG cloud saves are not supported"). Value
+ * then line. Pure.
+ */
+internal fun cloudSavesLine(
+    store: String,
+    hasCloudSaves: Boolean,
+    last: dev.droidtop.library.stores.StoreSaves.LastSync?,
+    online: Boolean,
+    now: Long,
+): Pair<String, String?> {
+    if (!hasCloudSaves) return "Not supported" to "$store cloud saves are not supported"
+    val since = last?.okAt?.let { lastPlayedPhrase(now, it) }
+    return when {
+        !online -> "Offline" to (since?.let { "Not synced since $it" } ?: "Not synced yet")
+        last?.failedAt != null -> "Last sync failed" to "Select to retry"
+        since != null -> "Synced $since" to "Select to sync now"
+        else -> "Not synced yet" to "Select to sync now"
+    }
+}
+
+/** Whether the device has a network that reaches the internet now; a system service read, no I/O. */
+private fun isOnline(context: android.content.Context): Boolean = runCatching {
+    val manager = context.getSystemService(android.net.ConnectivityManager::class.java)
+    val caps = manager?.getNetworkCapabilities(manager.activeNetwork)
+    caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+}.getOrDefault(true)
+
+/** The person's game folders, for the Source row's folder name; a preferences read of a few paths. */
+private fun pcRootsOf(context: android.content.Context): List<String> =
+    runCatching { dev.droidtop.library.GamesRoots.configured(context).map { it.absolutePath } }.getOrDefault(emptyList())
+
 internal data class PageFact(
     val title: String,
     val value: String? = null,
@@ -981,6 +1088,16 @@ private fun pageRows(
     onOpenLink: (String) -> Unit = {},
     // "Get the new installer" for a copy a store installed outside droidtop: its account library (docs/SPEC.md 7g).
     onGetInstaller: (dev.droidtop.library.StoreMarker) -> Unit = {},
+    // The page's Details (docs/SPEC.md 7i, "The game page"): where it came from in full, its size on this device,
+    // its cloud saves' row, the version the person set, and whether More is open.
+    origin: String? = null,
+    size: String? = null,
+    cloudSaves: PageFact? = null,
+    setVersion: String? = null,
+    onSetVersion: (() -> Unit)? = null,
+    onClearVersion: (() -> Unit)? = null,
+    moreOpen: Boolean = false,
+    onToggleMore: () -> Unit = {},
     onScrape: () -> Unit,
 ): List<PageFact> = buildList {
     // Each fact is on ONE tab, and none repeats the facts strip under the
@@ -1006,9 +1123,22 @@ private fun pageRows(
 
     // A version comes from a folder's own name (docs/SPEC.md 7m); a store
     // row has none to derive.
-    val availableVersions = installedVersions(entry, siblings)
+    val availableVersions = installedVersions(entry, siblings, setVersion)
+    val shownVersion = dev.droidtop.library.SetVersions.shown(entry, setVersion)
     if (availableVersions.isNotEmpty()) {
-        add(PageFact("Version", availableVersions.first(), subtitle = if (availableVersions.size > 1) "Also here: ${availableVersions.drop(1).joinToString(", ")}" else null))
+        add(
+            PageFact(
+                "Version",
+                availableVersions.first(),
+                subtitle = if (availableVersions.size > 1) "Also here: ${availableVersions.drop(1).joinToString(", ")}" else null,
+                onActivate = onSetVersion,
+            ),
+        )
+    } else if (onSetVersion != null) {
+        add(PageFact("Version", "Set", subtitle = "The folder's name says no version", onActivate = onSetVersion))
+    }
+    if (setVersion != null && onClearVersion != null) {
+        add(PageFact(CLEAR_VERSION_ROW, "Use folder name", onActivate = onClearVersion, tab = PageTab.VERSIONS))
     }
     latest?.let { add(PageFact("Latest", it)) }
     // A copy a store installed outside droidtop (its marker, docs/SPEC.md 7g): the store's newer build is had
@@ -1056,13 +1186,27 @@ private fun pageRows(
     }
 
     val owned = siblings.mapNotNull { it.ownership() }
-    val ownedLine = owned.ownershipLabel().removePrefix("Owned on ").takeIf { it.isNotBlank() }
+    val ownedLine = owned.ownershipLabel().takeIf { owned.map { it.store }.distinct().size > 1 }
     val folderPath = entry.groupingPath()
-    add(PageFact("Store", ownedLine ?: (dev.droidtop.library.PcSource.of(entry) as? dev.droidtop.library.PcSource.Store)?.label() ?: "Your folders"))
+    // Where it came from, in full ("Steam · Shared with you", "GOG · via Heroic", "Folder: Games").
+    add(PageFact("Source", origin ?: dev.droidtop.library.PcSource.of(entry)?.detail() ?: "Folder", subtitle = ownedLine))
     // How the account holds it, only when that is not simply owned (docs/SPEC.md 7g, "Ownership is a fact").
     ownershipSentence(entry)?.let { (value, sentence) -> add(PageFact("Ownership", value, subtitle = sentence)) }
-    // Where it lives as a person names it; the whole path is the tooltip.
-    folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it)) }
+    size?.let { add(PageFact("Size", it)) }
+    cloudSaves?.let(::add)
+    // The technical facts, folded away until asked for (docs/SPEC.md 7i).
+    val more = buildList {
+        entry.pcInfo?.storeId?.takeIf { entry.isStoreRow() }?.let { add(PageFact("Store id", it)) }
+        entry.pcInfo?.marker?.let { add(PageFact("Store id", it.key, subtitle = "From the store's files in the game's folder")) }
+        entry.pcInfo?.installedVersion?.let { add(PageFact("Installed build", it)) }
+        // Where it lives as a person names it; the whole path is the tooltip.
+        folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it)) }
+        shownVersion?.let { (version, from) -> add(PageFact("Version from", from.words, subtitle = version)) }
+    }
+    if (more.isNotEmpty()) {
+        add(PageFact(MORE_ROW, if (moreOpen) "Hide" else "Show", subtitle = if (moreOpen) null else more.joinToString(", ") { it.title }, onActivate = onToggleMore))
+        if (moreOpen) more.forEach { add(it.copy(tab = PageTab.DETAILS)) }
+    }
     // The name as it is on disk, beside the title drawn from it (docs/SPEC.md
     // 7n): the raw name is never altered, only parsed.
     folderPath?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() && it != GameNaming.displayName(entry.title) }
@@ -1173,17 +1317,40 @@ internal enum class PageTab(val label: String, val emptyLine: String) {
  */
 internal fun pageTabOf(title: String): PageTab = when (title) {
     "About", "Not scraped yet", "Compatibility", "Install state", "Times played" -> PageTab.OVERVIEW
-    "Version", "Latest", "Update", OPEN_SOURCE_ROW -> PageTab.VERSIONS
+    "Version", "Latest", "Update", OPEN_SOURCE_ROW, CLEAR_VERSION_ROW -> PageTab.VERSIONS
     "Manual", "Video", "Where these facts came from" -> PageTab.EXTRAS
     else -> PageTab.DETAILS
+}
+
+/** The rows a game page folds under More (docs/SPEC.md 7i), and the row that opens them. */
+internal const val MORE_ROW = "More"
+internal const val CLEAR_VERSION_ROW = "Clear set version"
+private val MORE_ROWS = setOf("Store id", "Installed build", "Install location", "Version from")
+
+/**
+ * Details in order of use (docs/SPEC.md 7i, "The game page"): where it came
+ * from, how it is held, its size, its cloud saves, its DLC, then the rest,
+ * then More and what More opens.
+ */
+private val DETAILS_ORDER = listOf("Source", "Ownership", "Size", "Cloud saves", "DLC")
+
+private fun detailsRank(title: String): Int = when (title) {
+    in DETAILS_ORDER -> DETAILS_ORDER.indexOf(title)
+    MORE_ROW -> DETAILS_ORDER.size + 1
+    in MORE_ROWS -> DETAILS_ORDER.size + 2
+    else -> DETAILS_ORDER.size
 }
 
 /** Every row under its tab, in row order; the multi-part list leads Overview. Pure, for the tests. */
 internal fun groupRowsByTab(rows: List<PageFact>, parts: List<PageFact>): Map<PageTab, List<PageFact>> =
     PageTab.values().associateWith { tab ->
         val own = rows.filter { (it.tab ?: pageTabOf(it.title)) == tab }
-        // An available update leads Versions: it is what a person opens the tab for.
-        val ordered = if (tab == PageTab.VERSIONS) own.sortedBy { if (it.title == "Update") 0 else 1 } else own
+        val ordered = when (tab) {
+            // An available update leads Versions: it is what a person opens the tab for.
+            PageTab.VERSIONS -> own.sortedBy { if (it.title == "Update") 0 else 1 }
+            PageTab.DETAILS -> own.sortedBy { detailsRank(it.title) }
+            else -> own
+        }
         (if (tab == PageTab.OVERVIEW) parts else emptyList()) + ordered
     }
 
@@ -1214,8 +1381,8 @@ internal fun partFacts(siblings: List<LibraryEntry>): List<PageFact> {
  * derive. The ONE place the page reads "installed version" from, for the
  * Version row and the facts strip alike.
  */
-internal fun installedVersions(entry: LibraryEntry, siblings: List<LibraryEntry>): List<String> {
-    val own = entry.groupingPath()?.let { GameNaming.derive(it).version.takeIf(String::isNotBlank) }
+internal fun installedVersions(entry: LibraryEntry, siblings: List<LibraryEntry>, setVersion: String? = null): List<String> {
+    val own = dev.droidtop.library.SetVersions.shown(entry, setVersion)?.first
     val others = siblings.mapNotNull { it.groupingPath() }
         .mapNotNull { GameNaming.derive(it).version.takeIf { v -> v.isNotBlank() } }
     return (listOfNotNull(own) + others).distinct()
