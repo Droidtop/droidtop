@@ -9407,6 +9407,32 @@ available shelf and the Update filter already read; a store that names no
 version reads "A newer build" so `GameUpdates.line` is still the one wording
 ("A newer build is available").
 
+**A store's collections (2026-10-09, Droidtop/tracker#232).** A person with
+hundreds of Steam games has already sorted them, and re-sorting on a handheld
+with a d-pad is the cost. `StoreLibrary.collections` gives a store's own
+groupings from droidtop's copy (null when the store has none or has not
+answered). Steam's are its static collections (cloud config store, namespace 1,
+`user-collections.<id>`; `SteamCollections`, lifted from GameNative like the
+rest of the Steam stack), read with the connection each library sync already
+holds and kept in `steam/collections.json`; a dynamic collection is a filter
+Steam evaluates itself and is counted, not copied, and Steam's hidden-games
+list is not a grouping and is left out. The decision: **mirror, read-only,
+never write back.** After a good read, `StoreSyncs.run` has `StoreCollections`
+make droidtop collections named "<store>: <name>" (ids start `import:<store>:`)
+whose members are that store's games by library id (`steam:440`), in one
+transaction (`RomDao.replaceImportedCollections`); a collection the store no
+longer has goes, and the person's own collections are never touched. They are
+droidtop's ordinary collections, so they show where those show (the Gaming
+shell's Collections and the game menu's Collections row); an edit made to one
+lasts until the next sync, which makes it the store's again. A store that
+cannot answer leaves what was imported as it is. **Open for the owner:**
+free-form tags as a facet of the PC library, and a collection shelf on the PC
+Games strip (`PcShelves`); a collection is a group with a name, which is what
+a tag is, so a tag may simply be a collection the person names, and neither
+screen belongs to this change. Membership belongs to a store row's id, so
+a merged card (7g, "One game across stores") keeps the 7m known limit: the
+union the issue asks for is not built.
+
 **How droidtop learns a game's thread: the user tells it.** A folder game's
 detail has an "F95zone thread" row; the user pastes the thread's link (the
 browser's `f95zone.to/threads/<name>.<id>/`, the short form, or the bare

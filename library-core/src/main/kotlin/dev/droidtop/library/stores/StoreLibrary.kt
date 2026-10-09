@@ -161,6 +161,13 @@ interface StoreAccountSignIn {
     fun close()
 }
 
+/**
+ * A grouping the person made in a store (a Steam collection): its [name] and
+ * the store's own ids of the games in it ([StoreGame.gameId]). docs/SPEC.md 7g,
+ * "Collections".
+ */
+data class StoreCollection(val id: String, val name: String, val gameIds: Set<String>)
+
 /** What a store answers about a newer build of one installed game. */
 data class StoreUpdateCheck(val update: StoreUpdate, val latest: String? = null)
 
@@ -228,6 +235,14 @@ interface StoreLibrary {
 
     /** Every game of this store the device knows about, from droidtop's own copy. No network. */
     suspend fun games(context: Context): List<StoreGame>
+
+    /**
+     * The groupings the person made in the store, as the last [sync] read
+     * them, from droidtop's own copy (no network); null when the store has
+     * none to read or has not yet given an answer, which leaves what was
+     * imported as it is. A read-only copy: nothing is written back.
+     */
+    suspend fun collections(context: Context): List<StoreCollection>? = null
 
     /** How many DLC the account holds for its own games, for the store page; null when the store does not say. No network. */
     suspend fun dlcCount(context: Context): Int? = null

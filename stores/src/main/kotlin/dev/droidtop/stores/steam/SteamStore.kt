@@ -9,6 +9,7 @@ import dev.droidtop.library.stores.SaveConflictResolver
 import dev.droidtop.library.stores.SaveSyncPhase
 import dev.droidtop.library.stores.SaveSyncResult
 import dev.droidtop.library.stores.StoreContentChoice
+import dev.droidtop.library.stores.StoreCollection
 import dev.droidtop.library.stores.StoreContentOptions
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreHolding
@@ -95,9 +96,20 @@ class SteamStore : StoreLibrary {
             SteamSession.use(context) { steam ->
                 SteamSession.logOn(context).getOrThrow()
                 val apps = SteamSession.apps ?: error("Steam is not connected")
-                SteamLibrarySync.run(context, steam, apps, SteamSession.licences())
+                val count = SteamLibrarySync.run(context, steam, apps, SteamSession.licences())
+                // The person's collections ride the connection the read already holds; a failure here never fails the library read.
+                runCatching { SteamCollections.fetch(steam)?.let { SteamCollections.save(context, it) } }
+                    .onFailure { Timber.tag("SteamStore").w(it, "Steam collections could not be read") }
+                count
             }
         }
+    }
+
+    /** Steam's static collections as the last sync read them, without Steam's hidden-games list. */
+    override suspend fun collections(context: Context): List<StoreCollection>? = withContext(Dispatchers.IO) {
+        SteamCollections.load(context)?.collections
+            ?.filter { it.id != SteamCollections.ID_HIDDEN }
+            ?.map { StoreCollection(it.id, it.name, it.appIds.mapTo(HashSet()) { app -> app.toString() }) }
     }
 
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {

@@ -262,6 +262,29 @@ interface RomDao {
     @Query("SELECT collection_id FROM collection_members WHERE game_id = :gameId")
     suspend fun getCollectionsOf(gameId: String): List<String>
 
+    /**
+     * Makes the collections whose ids start with [prefix] exactly [imported]
+     * (each with its members' game ids): a store's own groupings, copied in
+     * (docs/SPEC.md 7g, "Collections"). One that is no longer in the list is
+     * removed with its members; the person's own collections, whose ids never
+     * start with an import prefix, are not touched. One transaction.
+     */
+    @androidx.room.Transaction
+    suspend fun replaceImportedCollections(prefix: String, imported: List<Pair<CollectionEntity, List<String>>>) {
+        val keep = imported.mapTo(HashSet()) { it.first.id }
+        for (old in getCollections()) {
+            if (old.id.startsWith(prefix) && old.id !in keep) {
+                deleteCollectionMembers(old.id)
+                deleteCollection(old.id)
+            }
+        }
+        for ((collection, games) in imported) {
+            upsertCollection(collection)
+            deleteCollectionMembers(collection.id)
+            for (game in games) addCollectionMember(CollectionMemberEntity(collection.id, game))
+        }
+    }
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addCollectionMember(member: CollectionMemberEntity)
 
