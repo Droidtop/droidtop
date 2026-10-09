@@ -232,6 +232,19 @@ internal object StoresCatalog {
                 },
             ),
             CatalogGroup(
+                id = "stores_storage_group",
+                title = null,
+                items = listOf(
+                    NestedScreenItem(
+                        id = "stores_storage",
+                        title = "Storage",
+                        subtitle = "What installed store games take, the room left, and uninstalling",
+                        inline = StorageCatalog.screen(),
+                        icon = CatalogIcon.GLOBAL,
+                    ),
+                ),
+            ),
+            CatalogGroup(
                 id = "stores_sync_group",
                 title = null,
                 items = listOf(

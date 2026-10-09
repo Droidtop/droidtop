@@ -13130,7 +13130,14 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   notifications. The "last synced"
   time is recorded by `StoreSyncs` when a read worked (a failed read records
   nothing), so it survives a restart and covers the sign-in's own read; it is
-  absent until the first successful read ("Not synced yet"). The store names are written once
+  absent until the first successful read ("Not synced yet"). **Storage**
+  (`StorageCatalog`, Droidtop/tracker#227) is a page of the Stores place: the
+  room each game folder has (the same `installVolumes` the install offer
+  reads), then each store's installed games biggest first with the size the
+  store recorded, each with an Uninstall that confirms and goes through the
+  store's own `StoreLibrary.uninstall` and reports the removed folder to the
+  library like the game page's Uninstall (nothing is walked). No size or free
+  space is read while a list draws. The store names are written once
   (`PcStoreNames`), for the code that makes them and the code that filters
   by them. Per-store settings do not exist yet: nothing in the backend is
   configurable per store, and no row is shown for it.
