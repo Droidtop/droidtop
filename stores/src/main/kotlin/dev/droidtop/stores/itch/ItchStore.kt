@@ -34,6 +34,12 @@ class ItchStore : StoreLibrary {
     override val id = "itch"
     override val label = PcStoreNames.ITCH
 
+    override val webPages = dev.droidtop.library.stores.StoreWebPages(
+        home = "https://itch.io/",
+        hosts = listOf("itch.io"),
+        searchPage = "https://itch.io/search?q=",
+    )
+
     private fun dao(context: Context) = StoresDatabase.get(context).itchGameDao()
 
     override fun signedIn(context: Context): Boolean = ItchAuthManager.hasStoredCredentials(context)

@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
@@ -25,22 +26,24 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * droidtop's own web view for a plugin's signed-in session (docs/plugin-api.md 3 G3). A plugin cannot show a web page
- * (a contained one has no window and no network), so the broker shows this, in droidtop's process, during a call the
- * person started, and waits: [show] blocks the broker's binder thread until the person is done, backs out, or ten
- * minutes pass.
+ * droidtop's own web view, the one every signed-in web page droidtop shows goes through: a plugin's session
+ * (docs/plugin-api.md 3 G3) and a store's own pages (docs/SPEC.md 7g, "A store's own pages"). It runs in droidtop's
+ * process, headed with whose session it is and the site the page is on, so a person always sees where they are typing.
  *
- * - **Sign-in**: the site's own page; the person signs in there (the plugin never sees the password or the cookies).
- *   Done (or the site setting the plugin's `doneCookie`) ends it, and the cookies of the plugin's declared sites are
- *   handed back to be sealed in the plugin's vault. Back with nothing done is "not signed in".
- * - **Open**: a protected link opened with the stored session; the first download the page starts is captured (its
- *   address, the cookies it needs, the user agent and the page it came from) and the view closes.
+ * - **Sign-in** (a plugin): the site's own page; the person signs in there (the plugin never sees the password or the
+ *   cookies). Done (or the site setting the plugin's `doneCookie`) ends it, and the cookies of the plugin's declared
+ *   sites are handed back to be sealed in the plugin's vault. Back with nothing done is "not signed in".
+ * - **Open** (a plugin): a protected link opened with the stored session; the first download the page starts is
+ *   captured (its address, the cookies it needs, the user agent and the page it came from) and the view closes.
+ * - **Browse** (a store): the store's pages, to look around, claim and buy. Only https pages load. The view reads
+ *   nothing of a page: there is no script bridge and no script is run in it, so what a person types into a store's
+ *   checkout (a card, an address) goes to the store and nowhere else; droidtop learns only the addresses of the pages
+ *   shown ([WebSessionRequest.onPage]), which is how a store's own "thank you" page is recognised.
  *
- * The header names the plugin and shows the site the page is on, so a person always sees whose session this is and
- * where they are typing. droidtop's cookie store is shared by every web view in its process, so the plugin's cookies
- * are put in only while this view is open and taken out of it when it closes ([purge]).
+ * droidtop's cookie store is shared by every web view in its process, so cookies a request puts in
+ * ([WebSessionRequest.domains]) are there only while this view is open and are taken out when it closes ([purge]).
  */
-class PluginWebSessionActivity : Activity() {
+class WebSessionActivity : Activity() {
     private var answered = false
     private var webView: WebView? = null
     private var location: TextView? = null
@@ -51,11 +54,12 @@ class PluginWebSessionActivity : Activity() {
         super.onCreate(savedInstanceState)
         val id = intent.getStringExtra(EXTRA_ID)
         val asked = id?.let { requests[it] }
-        if (id == null || asked == null || waiting[id] == null) {
+        if (id == null || asked == null || closers[id] == null) {
             finish()
             return
         }
         request = asked
+        val browse = asked.mode == WebSessionRequest.Mode.BROWSE
         val cookies = CookieManager.getInstance()
         cookies.setAcceptCookie(true)
         asked.domains.forEach { purge(cookies, it) }
@@ -73,7 +77,11 @@ class PluginWebSessionActivity : Activity() {
         }
         val titles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         titles.addView(TextView(this).apply {
-            text = if (asked.mode == WebSessionRequest.Mode.SIGN_IN) "Sign in for ${asked.pluginLabel}" else "${asked.pluginLabel}: open in your session"
+            text = when (asked.mode) {
+                WebSessionRequest.Mode.SIGN_IN -> "Sign in for ${asked.label}"
+                WebSessionRequest.Mode.OPEN -> "${asked.label}: open in your session"
+                WebSessionRequest.Mode.BROWSE -> asked.label
+            }
             setTextColor(Color.WHITE)
             textSize = 18f
         })
@@ -91,14 +99,15 @@ class PluginWebSessionActivity : Activity() {
         }
         bar.addView(Button(this).apply {
             text = "Close"
-            setOnClickListener { finishWith(completed = asked.mode == WebSessionRequest.Mode.OPEN, download = null) }
+            setOnClickListener { finishWith(completed = asked.mode != WebSessionRequest.Mode.SIGN_IN, download = null) }
         })
         root.addView(bar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         root.addView(TextView(this).apply {
-            text = if (asked.mode == WebSessionRequest.Mode.SIGN_IN) {
-                "Sign in on the site's own page. Press Done when you are signed in. B goes back a page."
-            } else {
-                "Choose the download on the page; droidtop takes the file into Downloads. B goes back a page."
+            text = when (asked.mode) {
+                WebSessionRequest.Mode.SIGN_IN -> "Sign in on the site's own page. Press Done when you are signed in. B goes back a page."
+                WebSessionRequest.Mode.OPEN -> "Choose the download on the page; droidtop takes the file into Downloads. B goes back a page."
+                WebSessionRequest.Mode.BROWSE ->
+                    "${asked.label}'s own pages. Paying happens on them; droidtop never sees or keeps payment details. B goes back a page."
             }
             setTextColor(Color.rgb(170, 180, 190))
             textSize = 12f
@@ -108,18 +117,23 @@ class PluginWebSessionActivity : Activity() {
         val view = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             asked.session?.userAgent?.let { settings.userAgentString = it }
             cookies.setAcceptThirdPartyCookies(this, true)
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                    // Only web pages: an intent:, market: or other app link never leaves droidtop from here.
+                    // Only web pages: an intent:, market: or other app link never leaves droidtop from here. A store's
+                    // pages, where people pay, load only over https.
                     val scheme = request.url.scheme?.lowercase()
-                    return scheme != "http" && scheme != "https"
+                    return if (browse) scheme != "https" else scheme != "http" && scheme != "https"
                 }
 
                 override fun onPageFinished(view: WebView, url: String?) {
                     location?.text = url?.let { NetScope.hostOf(it) }.orEmpty()
+                    if (url != null && browse) asked.onPage?.invoke(url)
                     val done = asked.doneCookie ?: return
                     if (asked.mode != WebSessionRequest.Mode.SIGN_IN) return
                     val set = asked.domains.any { domain ->
@@ -157,14 +171,14 @@ class PluginWebSessionActivity : Activity() {
             if (view != null && view.canGoBack()) {
                 view.goBack()
             } else {
-                finishWith(completed = request?.mode == WebSessionRequest.Mode.OPEN, download = null)
+                finishWith(completed = request?.mode != WebSessionRequest.Mode.SIGN_IN, download = null)
             }
             return true
         }
         return super.onKeyDown(keyCode, event)
     }
 
-    /** Reads the session the page left, takes the plugin's cookies out of droidtop's store, answers and closes. */
+    /** Reads the session the page left, takes the request's cookies out of droidtop's store, answers and closes. */
     private fun finishWith(completed: Boolean, download: WebSessionDownload?) {
         if (answered) return
         answered = true
@@ -179,7 +193,8 @@ class PluginWebSessionActivity : Activity() {
         }
         asked?.domains?.forEach { purge(cookies, it) }
         cookies.flush()
-        id?.let { waiting.remove(it)?.complete(WebSessionResult(completed, session, download)) }
+        id?.let { requests.remove(it) }
+        id?.let { closers.remove(it)?.invoke(WebSessionResult(completed, session, download)) }
         webView?.apply {
             stopLoading()
             destroy()
@@ -199,29 +214,45 @@ class PluginWebSessionActivity : Activity() {
     companion object {
         private const val EXTRA_ID = "dev.droidtop.pluginhost.web.id"
 
-        /** How long the person has; then the answer is "nothing done". */
+        /** How long a plugin's call waits for the person ([show]); then the answer is "nothing done". */
         private const val TIMEOUT_MS = 10L * 60 * 1000
 
-        private val waiting = ConcurrentHashMap<String, CompletableDeferred<WebSessionResult>>()
+        private val closers = ConcurrentHashMap<String, (WebSessionResult) -> Unit>()
         private val requests = ConcurrentHashMap<String, WebSessionRequest>()
 
-        /** Shows the web view for [request] and blocks the calling (binder) thread until it closes. */
-        fun show(context: Context, request: WebSessionRequest): WebSessionResult {
+        /**
+         * Shows the web view for [request] and returns at once; [onClosed] gets the answer when the view closes, on the
+         * main thread. False when the view could not be started, and then [onClosed] is never called.
+         */
+        fun open(context: Context, request: WebSessionRequest, onClosed: (WebSessionResult) -> Unit): Boolean {
             val id = UUID.randomUUID().toString()
-            val answer = CompletableDeferred<WebSessionResult>()
-            waiting[id] = answer
+            closers[id] = onClosed
             requests[id] = request
-            val intent = Intent(context, PluginWebSessionActivity::class.java).apply {
+            val intent = Intent(context, WebSessionActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(EXTRA_ID, id)
             }
-            return try {
-                if (runCatching { context.startActivity(intent) }.isFailure) return WebSessionResult(false, null, null)
-                runBlocking { withTimeoutOrNull(TIMEOUT_MS) { answer.await() } } ?: WebSessionResult(false, null, null)
-            } finally {
-                waiting.remove(id)
-                requests.remove(id)
-            }
+            if (runCatching { context.startActivity(intent) }.isSuccess) return true
+            closers.remove(id)
+            requests.remove(id)
+            return false
+        }
+
+        /** Shows the web view for [request] and blocks the calling (binder) thread until it closes or ten minutes pass. */
+        fun show(context: Context, request: WebSessionRequest): WebSessionResult {
+            val answer = CompletableDeferred<WebSessionResult>()
+            if (!open(context, request) { answer.complete(it) }) return WebSessionResult(false, null, null)
+            return runBlocking { withTimeoutOrNull(TIMEOUT_MS) { answer.await() } } ?: WebSessionResult(false, null, null)
+        }
+
+        /**
+         * Takes every cookie droidtop's store holds for [domains] (and their subdomains, at the root path) out of it: a
+         * store's web session when the person signs out of that store. Call on the main thread.
+         */
+        fun forget(domains: List<String>) {
+            val cookies = CookieManager.getInstance()
+            domains.forEach { purge(cookies, it) }
+            cookies.flush()
         }
 
         /** Puts a stored `name=value; ...` header back for [domain] (and its subdomains). */

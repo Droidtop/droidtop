@@ -115,15 +115,20 @@ internal object HostWebApis {
     )
 }
 
-/** What the broker asks droidtop's web view to show for a plugin. */
+/** What droidtop's web view ([WebSessionActivity]) is asked to show: a plugin's session, or a store's own pages. */
 data class WebSessionRequest(
-    val pluginLabel: String,
+    /** Whose session it is, for the view's header: the plugin's name, or the store's. */
+    val label: String,
     val mode: Mode,
     val url: String,
+    /** The sites whose cookies [session] puts in while the view is open and the view takes out when it closes. */
     val domains: List<String>,
     val session: WebSessions.Stored?,
     /** Sign-in ends by itself when the site sets this cookie (the site's "signed in" cookie). */
     val doneCookie: String?,
+    /** [Mode.BROWSE]: told the address of each page the view finishes showing, on the main thread. Nothing else of a page is read. */
+    val onPage: ((String) -> Unit)? = null,
 ) {
-    enum class Mode { SIGN_IN, OPEN }
+    /** A plugin's sign-in, a plugin's protected link, or a store's own pages (docs/SPEC.md 7g, "A store's own pages"). */
+    enum class Mode { SIGN_IN, OPEN, BROWSE }
 }

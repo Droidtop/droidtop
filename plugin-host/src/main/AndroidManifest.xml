@@ -103,14 +103,15 @@
           person started. Not exported.
         -->
         <!--
-          droidtop's own web view for a plugin's signed-in session
-          (docs/plugin-api.md 3 G3): a site's sign-in page, or a protected
-          link whose download droidtop captures. Shown only during a call the
-          person started; the plugin never sees the page's cookies. Not
-          exported.
+          droidtop's own web view: a plugin's signed-in session
+          (docs/plugin-api.md 3 G3), a site's sign-in page or a protected
+          link whose download droidtop captures, shown only during a call the
+          person started, the plugin never seeing the page's cookies; and a
+          store's own pages with the account's session (docs/SPEC.md 7g).
+          Not exported.
         -->
         <activity
-            android:name="dev.droidtop.pluginhost.PluginWebSessionActivity"
+            android:name="dev.droidtop.pluginhost.WebSessionActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"

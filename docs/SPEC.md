@@ -10473,6 +10473,44 @@ follows:
   download runs, Verify files where the store keeps a file list, and Uninstall
   (a two-step press: the second press confirms, moving to another row
   disarms; it deletes the files, the store still lists the game).
+- **A store's own pages** (owner, 2026-10-09, Droidtop/tracker#407: "We also
+  need to be able to add games to library, make purchases through webview").
+  Each store names its pages (`StoreLibrary.webPages`, `StoreWebPages`: its
+  front page, its own sites, each covering its subdomains, and its search
+  page), and `StoreWeb` shows them in droidtop's one web view
+  (`WebSessionActivity`, the view a plugin's session uses, docs/plugin-api.md
+  3 G3) in its browse mode: the store's name and the site the page is on head
+  it, only https pages load, B goes back a page and closes at the first. The
+  person browses, claims free games and buys there. **droidtop never sees
+  payment details**: the view has no script bridge and runs no script in a
+  page, so nothing typed on a page reaches droidtop; it learns only the
+  address of each page shown, and keeps none of them. The page is signed in
+  as the account droidtop holds: GOG, Epic and Amazon sign in on their own
+  pages in droidtop's web view, whose cookie store keeps the web session
+  that sign-in leaves (where a store's pages ask again, the person signs in
+  on them once);
+  itch.io signs in with a key, so its pages are signed in once the person
+  signs in on them; Steam signs in over its client connection, which leaves
+  no web session, so `SteamStore.webSession` asks Steam for an access token
+  for the device's refresh token (GenerateAccessTokenForApp, no renewal,
+  nothing written) and the view carries it as Steam's `steamLoginSecure`
+  cookie on the store and community sites while it is open, taking it out when
+  it closes. Signing out of a store in the Stores place also takes that
+  store's cookies out of the web view (`StoreWeb.forget`). **What the person
+  got appears in the library**: when a page is an order's outcome
+  (`StoreWeb.isOrderDone`: an address on the store's sites naming an order,
+  a checkout, a purchase, a claim or a free licence, and an outcome, success,
+  thanks, a receipt, complete, confirmed or approved; read from the address,
+  written from the stores' public pages and not yet watched on a live
+  order) the store is synced at once, and it is synced again when the view
+  closes, which catches a store whose outcome page the rule does not
+  recognise. Each sync is the store's one sync (`StoreSyncs`), followed by
+  the store part's re-read (`StoreChanges`), and names the games that were
+  not there when the view opened, one short message ("Added to your library
+  from GOG: <title>"). A store's page in the Stores place has a Store group:
+  "Open <store>" and "Find a game", which opens the store's search for what
+  the person types. A store that is not signed in still opens its pages,
+  and nothing is synced.
 - **itch.io** (`ItchStore`): sync is `/profile/owned-keys`; an install picks
   the upload the game last installed, else the first Windows or Linux build
   that is not a demo, else the first, and unpacks it (`ArchiveExtractor`, the

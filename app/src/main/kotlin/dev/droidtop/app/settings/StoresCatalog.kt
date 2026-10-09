@@ -29,6 +29,7 @@ import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreSyncs
+import dev.droidtop.library.stores.StoreWeb
 import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.runtime.windows.PcLibrary
 import dev.droidtop.pluginhost.PluginJobsCenter
@@ -93,7 +94,11 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
     /** The store's own sign-out; a failure carries the reason. */
     suspend fun signOut(context: Context): Result<Unit> {
         val store = own ?: return Result.failure(IllegalStateException("This build has no $label store"))
-        return store.signOut(context).onSuccess { StoreChanges.announce(context) }
+        return store.signOut(context).onSuccess {
+            StoreChanges.announce(context)
+            // The store's own pages leave their sign-in in droidtop's web view; signing out of the store ends it too.
+            StoreWeb.forget(store)
+        }
     }
 
     /**
@@ -410,6 +415,29 @@ internal object StoresCatalog {
             }
         }
 
+        // The store's own pages in droidtop's web view (docs/SPEC.md 7g, "A store's own pages"): browse, claim, buy.
+        val shop = store.own?.takeIf { it.webPages != null }?.let { webStore ->
+            listOf(
+                ActionItem(
+                    id = "store_${store.key}_pages",
+                    title = "Open ${store.label}",
+                    subtitle = if (signedIn) {
+                        "Browse, claim free games and buy on ${store.label}'s own pages. What you get is added to your library"
+                    } else {
+                        "Browse ${store.label}'s own pages. Sign in here first to have what you get added to your library"
+                    },
+                    run = { ctx -> StoreWeb.open(ctx, webStore) },
+                ),
+                TextInputItem(
+                    id = "store_${store.key}_find",
+                    title = "Find a game",
+                    subtitle = "Opens ${store.label}'s search for what you type",
+                    value = "",
+                    onChange = { ctx, text -> StoreWeb.search(ctx, webStore, text) },
+                ),
+            )
+        }.orEmpty()
+
         // The store's own settings (Steam's status, cloud saves and message notifications), once signed in.
         val own = if (signedIn) runCatching { store.own?.settingsItems(context) }.getOrNull().orEmpty() else emptyList()
         listOfNotNull(
@@ -421,6 +449,7 @@ internal object StoresCatalog {
             ),
             CatalogGroup(id = "store_${store.key}_settings_group", title = "Settings", items = own).takeIf { own.isNotEmpty() },
             CatalogGroup(id = "store_${store.key}_library_group", title = "Library", items = library),
+            CatalogGroup(id = "store_${store.key}_shop_group", title = "Store", items = shop).takeIf { shop.isNotEmpty() },
             CatalogGroup(
                 id = "store_${store.key}_downloads_group",
                 title = "Downloads",

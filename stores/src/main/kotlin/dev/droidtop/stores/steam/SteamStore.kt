@@ -27,6 +27,7 @@ import dev.droidtop.stores.util.StoreFiles
 import dev.droidtop.stores.util.StoreLanguage
 import `in`.dragonbra.javasteam.enums.EOSType
 import `in`.dragonbra.javasteam.types.DepotManifest
+import `in`.dragonbra.javasteam.types.SteamID
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
@@ -48,10 +49,34 @@ import timber.log.Timber
 class SteamStore : StoreLibrary {
     override val id = "steam"
     override val label = PcStoreNames.STEAM
+
+    override val webPages = dev.droidtop.library.stores.StoreWebPages(
+        home = "https://store.steampowered.com/",
+        hosts = listOf("steampowered.com", "steamcommunity.com"),
+        searchPage = "https://store.steampowered.com/search/?term=",
+    )
     override val signInKind = StoreSignInKind.ACCOUNT
     override val canVerify = true
 
     private fun db(context: Context) = SteamDatabase.get(context)
+
+    /**
+     * The account's web sign-in for Steam's pages (docs/SPEC.md 7g, "A store's own pages"). droidtop signs in to
+     * Steam over its client connection, which leaves no cookie behind, so a fresh access token is asked for the
+     * refresh token the device holds (Steam's GenerateAccessTokenForApp, the call SteamKit's own samples make for a
+     * web session; the refresh token is not renewed and nothing is written) and handed to the web view as Steam's
+     * `steamLoginSecure` cookie, "<steam id>||<token>", for the store and the community. The view takes it out again
+     * when it closes. Null when nobody is signed in or Steam gives no token; the pages then open signed out.
+     */
+    override suspend fun webSession(context: Context): Map<String, String>? = withContext(Dispatchers.IO) {
+        val credentials = SteamCredentials.load(context)?.takeIf { it.steamId64 != 0L } ?: return@withContext null
+        val token = SteamSession.use(context) { steam ->
+            steam.authentication.generateAccessTokenForApp(SteamID(credentials.steamId64), credentials.refreshToken).await()
+        }.accessToken.takeIf { it.isNotBlank() } ?: return@withContext null
+        val cookie = "steamLoginSecure=${credentials.steamId64}%7C%7C$token"
+        webPages.hosts.associateWith { cookie }
+    }
+
 
     override fun signedIn(context: Context): Boolean = SteamCredentials.exists(context)
 

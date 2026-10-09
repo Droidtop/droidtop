@@ -38,6 +38,12 @@ import timber.log.Timber
 class AmazonStore : StoreLibrary {
     override val id = "amazon"
     override val label = PcStoreNames.AMAZON
+
+    override val webPages = dev.droidtop.library.stores.StoreWebPages(
+        home = "https://gaming.amazon.com/",
+        hosts = listOf("amazon.com"),
+        searchPage = "https://www.amazon.com/s?i=videogames&k=",
+    )
     override val signInKind = StoreSignInKind.WEB_PAGE
     override val canVerify = true
 

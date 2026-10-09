@@ -43,6 +43,12 @@ import timber.log.Timber
 class EpicStore : StoreLibrary {
     override val id = "epic"
     override val label = PcStoreNames.EPIC
+
+    override val webPages = dev.droidtop.library.stores.StoreWebPages(
+        home = "https://store.epicgames.com/",
+        hosts = listOf("epicgames.com"),
+        searchPage = "https://store.epicgames.com/browse?q=",
+    )
     override val signInKind = StoreSignInKind.WEB_PAGE
     override val canVerify = true
 

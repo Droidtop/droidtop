@@ -303,6 +303,20 @@ interface StoreLibrary {
     suspend fun unlockBranch(context: Context, gameId: String, branchId: String, password: String): Result<Unit> =
         Result.failure(UnsupportedOperationException("$label has no locked branches"))
 
+    /**
+     * The store's own web pages (its front page, its sites, its search), shown in droidtop's web view to browse, claim
+     * and buy ([StoreWeb], docs/SPEC.md 7g "A store's own pages"); null for a store with none (the default).
+     */
+    val webPages: StoreWebPages? get() = null
+
+    /**
+     * Cookies that sign [webPages] in as the account this device holds, by site ("steampowered.com" to
+     * "name=value"), for a store whose sign-in leaves no web session of its own (Steam signs in over its client
+     * connection). Put into the web view only while it is open. Null when the store's own sign-in page already left
+     * the web session, or nobody is signed in (the default). May reach the network: never on the main thread.
+     */
+    suspend fun webSession(context: Context): Map<String, String>? = null
+
     /** The store's friends and chat as a social provider (docs/SPEC.md "Social"), when it has them and stays connected while signed in (Steam); null otherwise. */
     val social: SocialProvider? get() = null
 

@@ -38,6 +38,12 @@ import timber.log.Timber
 class GOGStore : StoreLibrary {
     override val id = "gog"
     override val label = PcStoreNames.GOG
+
+    override val webPages = dev.droidtop.library.stores.StoreWebPages(
+        home = "https://www.gog.com/",
+        hosts = listOf("gog.com"),
+        searchPage = "https://www.gog.com/en/games?query=",
+    )
     override val signInKind = StoreSignInKind.WEB_PAGE
 
     private fun dao(context: Context) = StoresDatabase.get(context).gogGameDao()
