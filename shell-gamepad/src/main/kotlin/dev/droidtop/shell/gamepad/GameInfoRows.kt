@@ -7,21 +7,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
+import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.achievements.RaAchievement
 import dev.droidtop.library.achievements.RaProgress
 import dev.droidtop.library.achievements.RaResult
 import dev.droidtop.library.achievements.RetroAchievements
 import dev.droidtop.library.achievements.RetroAchievementsClient
+import dev.droidtop.library.gameinfo.CompatResult
+import dev.droidtop.library.gameinfo.EmulatorCompat
+import dev.droidtop.library.gameinfo.HowLongToBeat
+import dev.droidtop.library.gameinfo.HltbResult
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * One fact a game's page gets from outside the library: its achievements (docs/SPEC.md 7h, "RetroAchievements").
- * The plain detail screen of a console game draws it as a line and, when there is something to open, a chip.
+ * One fact a game's page gets from outside the library: its achievements, how long it takes, how an emulator
+ * runs it (docs/SPEC.md 7h, "Game info"). The PC game page draws it as one of its rows (`PageFact`), the plain
+ * detail screen of a console game as a line and, when there is something to open, a chip.
  */
 internal data class GameInfoRow(
     val title: String,
@@ -36,17 +44,34 @@ internal data class GameInfoRow(
 )
 
 /**
- * The rows for [entry], filled in off the main thread: RetroAchievements (a console game, once the person is
- * signed in). Asked when the page opens, never while a list draws, and cached by [RetroAchievements]. A fact
- * nothing knows is not a row; a failure is one, except being offline, which on a handheld is ordinary and says
- * nothing. [enabled] is false for something that is not a game.
+ * The rows for [entry], each filled in off the main thread as its source answers: RetroAchievements (a console
+ * game, once the person is signed in), HowLongToBeat and an emulator's compatibility list. The sources are asked
+ * when the page opens, never while a list draws, and what they learn is cached (RetroAchievements, HowLongToBeat
+ * and the lists each keep their own). A fact nothing knows is not a row; a failure is one, except being offline,
+ * which on a handheld is ordinary and says nothing. [enabled] is false for something that is not a game.
  */
 @Composable
 internal fun rememberGameInfoRows(entry: LibraryEntry, enabled: Boolean = true): List<GameInfoRow> {
     val context = LocalContext.current.applicationContext
     val rows by produceState(emptyList<GameInfoRow>(), entry.id, enabled) {
         if (!enabled) return@produceState
-        value = withContext(Dispatchers.IO) { achievementRows(context, entry) }
+        var achievements = emptyList<GameInfoRow>()
+        var playTime = emptyList<GameInfoRow>()
+        var compatibility = emptyList<GameInfoRow>()
+        coroutineScope {
+            launch {
+                achievements = withContext(Dispatchers.IO) { achievementRows(context, entry) }
+                value = achievements + playTime + compatibility
+            }
+            launch {
+                playTime = withContext(Dispatchers.IO) { playTimeRows(context, entry) }
+                value = achievements + playTime + compatibility
+            }
+            launch {
+                compatibility = withContext(Dispatchers.IO) { compatibilityRows(context, entry) }
+                value = achievements + playTime + compatibility
+            }
+        }
     }
     return rows
 }
@@ -76,6 +101,45 @@ internal fun achievementRows(context: Context, entry: LibraryEntry): List<GameIn
                 )
             }
         }
+    }
+
+internal fun playTimeRows(context: Context, entry: LibraryEntry): List<GameInfoRow> {
+    val title = entry.gameName ?: GameNaming.displayName(entry.title)
+    return when (val result = HowLongToBeat.lookup(context, title)) {
+        HltbResult.Off, HltbResult.NotFound -> emptyList()
+        is HltbResult.Failed -> if (offline(result.message)) emptyList() else listOf(GameInfoRow("How long to beat", "Not loaded", result.message))
+        is HltbResult.Found -> {
+            val summary = HowLongToBeat.summary(result.game)
+            if (summary.isEmpty()) {
+                emptyList()
+            } else {
+                val close = if (result.exact) "" else "Closest match: ${result.game.name}. "
+                listOf(
+                    GameInfoRow(
+                        "How long to beat",
+                        summary,
+                        close + "From HowLongToBeat players, a guide and not a promise.",
+                        url = result.game.pageUrl,
+                        chip = "HowLongToBeat",
+                    ),
+                )
+            }
+        }
+    }
+}
+
+internal fun compatibilityRows(context: Context, entry: LibraryEntry): List<GameInfoRow> =
+    when (val result = EmulatorCompat.lookup(context, entry)) {
+        CompatResult.Off, CompatResult.Unsupported, is CompatResult.NotListed -> emptyList()
+        is CompatResult.Failed -> if (offline(result.message)) emptyList() else listOf(GameInfoRow("Emulator compatibility", "Not loaded", result.message))
+        is CompatResult.Found -> listOf(
+            GameInfoRow(
+                "Emulator compatibility",
+                result.info.rating,
+                "From ${result.info.emulator}'s own list: other people's results on other hardware, not a verdict.",
+                url = result.info.listUrl,
+            ),
+        )
     }
 
 /** The achievements as a page of rows: earned ones first, then the rest, and a way to the game on retroachievements.org. */

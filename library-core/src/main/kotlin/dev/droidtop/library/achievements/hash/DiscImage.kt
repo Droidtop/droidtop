@@ -214,3 +214,46 @@ internal class Iso9660(private val track: DiscTrack) {
 
     private fun le32(b: ByteArray, at: Int): Long = le24(b, at).toLong() or ((b[at + 3].toLong() and 0xFF) shl 24)
 }
+
+/** The executable a PlayStation (BOOT) or PlayStation 2 (BOOT2) disc names in SYSTEM.CNF, found as rcheevos finds it. */
+internal object PlayStationBoot {
+    class Boot(val name: String, val file: DiscFile)
+
+    fun find(track: DiscTrack, bootKey: String, prefix: String, psxFallback: Boolean): Boot? {
+        val volume = Iso9660(track)
+        val cnf = volume.find("SYSTEM.CNF")
+        if (cnf != null) {
+            val text = track.readSector(cnf.sector, 2047)?.let { String(it, Charsets.ISO_8859_1) }.orEmpty()
+            for (line in text.lineSequence()) {
+                if (!line.startsWith(bootKey)) continue
+                var rest = line.substring(bootKey.length).trimStart()
+                if (!rest.startsWith("=")) continue
+                rest = rest.substring(1).trimStart()
+                if (rest.startsWith(prefix)) rest = rest.substring(prefix.length)
+                rest = rest.trimStart('\\')
+                val name = rest.takeWhile { !it.isWhitespace() && it != ';' }.take(63)
+                val file = volume.find(name)
+                if (file != null) return Boot(name, file)
+                break
+            }
+        }
+        if (psxFallback) volume.find("PSX.EXE")?.let { return Boot("PSX.EXE", it) }
+        return null
+    }
+}
+
+/** A disc's serial as emulators' game databases write it (DuckStation: SLUS-01234), from the boot file's name. */
+object DiscSerials {
+    private val BOOT_NAME = Regex("([A-Z]{4})_(\\d{3})\\.(\\d{2})")
+
+    fun playstation(file: File): String? = try {
+        DiscImages.open(file)?.use { track ->
+            PlayStationBoot.find(track, "BOOT", "cdrom:", psxFallback = false)?.name?.let { serial(it) }
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    internal fun serial(bootName: String): String? =
+        BOOT_NAME.matchEntire(bootName.substringAfterLast('\\'))?.let { "${it.groupValues[1]}-${it.groupValues[2]}${it.groupValues[3]}" }
+}

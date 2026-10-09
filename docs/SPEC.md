@@ -11562,6 +11562,32 @@ it in Settings. The hash of a file is cached by its path, size and modified time
 own RetroAchievements login stays RetroArch's: droidtop neither reads it nor writes it, and earning an achievement
 happens in the emulator.
 
+**Game info: how long it takes and how an emulator runs it (directed 2026-10-09, Droidtop/tracker#142).** A game's
+own page also asks two kinds of public source about the game, once when the page opens and never while a list draws:
+- **HowLongToBeat** (`HowLongToBeat.lookup`): the community's times, "Main 12 h, extras 14 h, all of it 24 h", only the
+  times that exist, as a row "How long to beat" that opens the game's page on howlongtobeat.com. The site has no
+  published API; the request is the shape the public client libraries document (howlongtobeatpy): a token from
+  `api/s/init`, then the search POSTed to `api/s/` with the token, the key and the value as headers and in the body, so
+  two requests for a title nothing is cached for, sent with an honest user agent and only the title's words. The
+  answer is accepted only when a title or alias normalises to the library's title (the first, most popular such game);
+  a title with the same words and numbers in another order is offered as "Closest match: X" and says so. Cached per
+  title: a game found for thirty days, "not on HowLongToBeat" for a week, a failure for an hour. If the site changes the
+  shape the row says it did not answer; nothing else is affected. Unverified against the live site until a rig run.
+- **Emulator compatibility** (`EmulatorCompat`): the emulator's own public list, keyed by the game's identity and never
+  by its name. PlayStation discs (ISO, CUE/BIN, CHD) by serial, from the boot file name in SYSTEM.CNF, against
+  DuckStation's `gamedb.yaml` (`compatibility: rating:`, the `codes:` of a game as extra serials); Nintendo 3DS
+  cartridge dumps (.3ds, .cci) by the partition 0 title id of the NCSD header against Azahar's
+  `compatibility_list.json` (0 Perfect to 5 Does not boot; 99, not tested, is no row). The row "Emulator compatibility"
+  is that emulator's word with whose it is, "other people's results on other hardware, not a verdict", and never
+  hides, orders or blocks anything. A list is downloaded the first time a game of its system opens its page and kept
+  for thirty days as only the rows needed (DuckStation's file is about 5 MB). Other emulators publish no list droidtop
+  can read by identity (Dolphin and PCSX2 keep wiki pages); a list is added with its identity rule, not by name.
+Both are on the PC game page's Overview as rows (`GameInfoRow` to `PageFact`) and, for a console game, lines and chips
+on its detail screen. A missing fact is not a row; a failure is one, except being offline, which is ordinary on a
+handheld and draws nothing. One switch, "Play times and compatibility" under Settings > Accounts and sources
+(`GameInfoPrefs`, on by default), turns both off: no request is then made. RetroAchievements has no such switch: not
+signing in is its off.
+
 **The whole library, and a scrape names what it missed (directed 2026-10-08, Droidtop/tracker#374).**
 "Scrape all systems" walked console folders only, so installed Windows and engine games stayed text-only
 cards, and its dialog said "no match for 2" without saying which two.

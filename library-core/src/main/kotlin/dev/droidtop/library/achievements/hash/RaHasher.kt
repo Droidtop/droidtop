@@ -293,29 +293,8 @@ object RaHasher {
 
     /** rc_hash_psx and rc_hash_ps2: the boot file's name, then its bytes (a PS-X EXE by its own header's length plus 2048). */
     private fun playstation(track: DiscTrack, bootKey: String, prefix: String, psx: Boolean): String? {
-        val volume = Iso9660(track)
-        var name = ""
-        var executable: DiscFile? = null
-        val cnf = volume.find("SYSTEM.CNF")
-        if (cnf != null) {
-            val text = track.readSector(cnf.sector, 2047)?.let { String(it, Charsets.ISO_8859_1) }.orEmpty()
-            for (line in text.lineSequence()) {
-                if (!line.startsWith(bootKey)) continue
-                var rest = line.substring(bootKey.length).trimStart()
-                if (!rest.startsWith("=")) continue
-                rest = rest.substring(1).trimStart()
-                if (rest.startsWith(prefix)) rest = rest.substring(prefix.length)
-                rest = rest.trimStart('\\')
-                name = rest.takeWhile { !it.isWhitespace() && it != ';' }.take(63)
-                executable = volume.find(name)
-                break
-            }
-        }
-        if (executable == null && psx) {
-            executable = volume.find("PSX.EXE")
-            if (executable != null) name = "PSX.EXE"
-        }
-        val file = executable ?: return null
+        val boot = PlayStationBoot.find(track, bootKey, prefix, psxFallback = psx) ?: return null
+        val file = boot.file
         var size = file.size
         if (psx) {
             val head = track.readSector(file.sector, 32) ?: return null
@@ -327,7 +306,7 @@ object RaHasher {
             return null
         }
         val digest = MessageDigest.getInstance("MD5")
-        digest.update(name.toByteArray(Charsets.ISO_8859_1))
+        digest.update(boot.name.toByteArray(Charsets.ISO_8859_1))
         return if (hashDiscFile(digest, track, file.sector, size)) hex(digest.digest()) else null
     }
 

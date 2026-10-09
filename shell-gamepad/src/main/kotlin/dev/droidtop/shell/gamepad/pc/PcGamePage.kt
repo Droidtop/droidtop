@@ -265,6 +265,10 @@ internal fun PcGamePage(
     }
     // What plugins add to this game's page, under the tabs they name (docs/plugin-api.md 3 C4, C18).
     val pluginRows = rememberPluginPageRows(entry)
+    // What the page learns from outside the library: play time, an emulator's compatibility list and, where a
+    // service has them, achievements (docs/SPEC.md 7h, "Game info"). Asked for once when the page opens.
+    var infoScreen by remember(entry.id) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
+    val infoRows = dev.droidtop.shell.gamepad.rememberGameInfoRows(entry)
     // Which program a Windows game runs (docs/SPEC.md 7i, "Which program
     // runs"): the folder is read for this one open game, on IO, and again
     // when the choice sheet closes.
@@ -286,8 +290,11 @@ internal fun PcGamePage(
         )
     }
     val tabs = remember { PageTab.values() }
-    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle) {
-        groupRowsByTab(rows + listOfNotNull(programFact) + pluginRows.facts, parts)
+    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, infoRows) {
+        groupRowsByTab(
+            rows + listOfNotNull(programFact) + pluginRows.facts + infoRows.map { it.toPageFact(context) { screen -> infoScreen = screen } },
+            parts,
+        )
     }
     val strip = remember(entry, runner, folderSize, siblings) {
         factsStrip(
@@ -625,6 +632,7 @@ internal fun PcGamePage(
     }
     PluginPageScreen(pluginRows)
     programScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { programScreen = null }) }
+    infoScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { infoScreen = null }) }
     val linking = editingSource
     if (linking != null && library != null) {
         SourceLinkSheet(
@@ -909,6 +917,23 @@ internal fun pageActionLabel(button: Int, primaryVerb: String): String = when (b
     0 -> primaryVerb
     1 -> "Favourite"
     else -> "Options"
+}
+
+/** A fact from outside the library as a row of Overview: A opens its page of rows or its address. */
+private fun dev.droidtop.shell.gamepad.GameInfoRow.toPageFact(
+    context: android.content.Context,
+    openScreen: (dev.droidtop.library.settings.CatalogScreen) -> Unit,
+): PageFact {
+    val page = screen
+    val address = url
+    val action: (() -> Unit)? = if (page != null) {
+        ({ openScreen(page) })
+    } else if (address != null) {
+        ({ dev.droidtop.shell.gamepad.openAddress(context, address) })
+    } else {
+        null
+    }
+    return PageFact(title, value, subtitle, onActivate = action, tip = address, tab = PageTab.OVERVIEW)
 }
 
 /** One fact on the page: a row title, what it says, and what A does on it when it does anything. */

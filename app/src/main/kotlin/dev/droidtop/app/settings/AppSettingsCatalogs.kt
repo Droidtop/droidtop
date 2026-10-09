@@ -73,6 +73,7 @@ import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.pluginhost.AddKeyOutcome
 import dev.droidtop.library.consoles.resolvePlayer
 import dev.droidtop.library.scraper.ScraperKeyCheck
+import dev.droidtop.library.gameinfo.GameInfoPrefs
 import dev.droidtop.library.scraper.ScraperKeyService
 import dev.droidtop.library.scraper.ScraperSource
 import dev.droidtop.library.scraper.ScraperSourcePrefs
@@ -1372,9 +1373,17 @@ object AppSettingsCatalogs {
             ),
             CatalogGroup(
                 id = "accounts_achievements",
-                title = "Achievements",
+                title = "Achievements and game info",
                 items = listOf(
                     guidedKeyRow(context, ScraperKeyService.RETROACHIEVEMENTS, "RetroAchievements"),
+                    ToggleItem(
+                        id = "accounts_game_info",
+                        title = "Play times and compatibility",
+                        subtitle = "When a game's page opens, asks HowLongToBeat how long it takes and the emulator's public " +
+                            "compatibility list how it runs. Sends the game's title to HowLongToBeat; a list is downloaded",
+                        current = GameInfoPrefs.lookupsOn(context),
+                        onToggle = { ctx, value -> GameInfoPrefs.setLookups(ctx, value) },
+                    ),
                 ),
             ),
             CatalogGroup(
