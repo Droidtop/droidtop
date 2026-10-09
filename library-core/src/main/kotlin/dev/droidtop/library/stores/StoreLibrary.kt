@@ -201,7 +201,11 @@ interface StoreLibrary {
     /** The store's short id, the store half of an entry id ("gog"). */
     val id: String
 
-    /** The store's name as the library shows it ([dev.droidtop.library.PcStoreNames]). */
+    /**
+     * The store's one name, everywhere it is drawn (the Stores place, PC Games'
+     * Source filter, a game's focus line), read through [dev.droidtop.library.PcSource].
+     * It also names the store's install folder ([StoreInstallJob.folderName]), so it does not change.
+     */
     val label: String
 
     /** Whether this device holds a sign-in for the store. A file check, cheap enough for a row. */

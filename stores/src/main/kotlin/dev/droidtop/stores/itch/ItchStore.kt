@@ -1,7 +1,6 @@
 package dev.droidtop.stores.itch
 
 import android.content.Context
-import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLibrary
@@ -32,7 +31,7 @@ import timber.log.Timber
  */
 class ItchStore : StoreLibrary {
     override val id = "itch"
-    override val label = PcStoreNames.ITCH
+    override val label = "itch.io"
 
     override val webPages = dev.droidtop.library.stores.StoreWebPages(
         home = "https://itch.io/",

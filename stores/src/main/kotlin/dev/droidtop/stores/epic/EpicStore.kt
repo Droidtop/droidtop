@@ -2,7 +2,6 @@ package dev.droidtop.stores.epic
 
 import android.content.Context
 import android.net.Uri
-import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLaunch
@@ -42,7 +41,7 @@ import timber.log.Timber
  */
 class EpicStore : StoreLibrary {
     override val id = "epic"
-    override val label = PcStoreNames.EPIC
+    override val label = "Epic"
 
     override val webPages = dev.droidtop.library.stores.StoreWebPages(
         home = "https://store.epicgames.com/",

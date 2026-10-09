@@ -2,6 +2,7 @@ package dev.droidtop.shell.gamepad.pc
 
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
+import dev.droidtop.library.PcSource
 import dev.droidtop.library.displayName
 import dev.droidtop.shell.gamepad.query.FAVOURITES_YES
 import dev.droidtop.shell.gamepad.query.INSTALLED_YES
@@ -145,12 +146,12 @@ internal fun pcShelves(
         }
         val installed = games.filter { it.isInstalled }
         if (installed.size < games.size) shelf(SHELF_INSTALLED, "Installed", installed)?.let(::add)
-        fun storeOf(entry: LibraryEntry): String? = entry.pcInfo?.source?.takeIf { it != "Folder" }
+        fun storeOf(entry: LibraryEntry): PcSource.Store? = PcSource.of(entry) as? PcSource.Store
         games.filter { storeOf(it) != null }
             .groupBy { storeOf(it)!! }
             .entries
-            .sortedWith(compareByDescending<Map.Entry<String, List<LibraryEntry>>> { it.value.size }.thenBy { it.key })
-            .forEach { (store, rows) -> shelf("store:$store", store, rows)?.let(::add) }
+            .sortedWith(compareByDescending<Map.Entry<PcSource.Store, List<LibraryEntry>>> { it.value.size }.thenBy { it.key.label() })
+            .forEach { (store, rows) -> shelf("store:${store.id}", store.label(), rows)?.let(::add) }
         games.filter { storeOf(it) == null }
             .groupBy { it.kind.displayName() }
             .entries
@@ -197,7 +198,7 @@ private val NON_ENGINE_KINDS = setOf(
 internal fun kindBadgeOf(entry: LibraryEntry, systemNames: Map<String, String>): KindBadge = when {
     entry.appFacts != null || entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP -> KindBadge(BadgeKind.APP, null)
     entry.inPcFold -> {
-        val store = entry.pcInfo?.source?.takeIf { entry.isStoreRow() }
+        val store = PcSource.of(entry)?.takeIf { entry.isStoreRow() }?.label()
         KindBadge(if (entry.kind in NON_ENGINE_KINDS) BadgeKind.PC else BadgeKind.ENGINE, store)
     }
     else -> KindBadge(BadgeKind.RETRO, entry.systemId?.let { systemNames[it] ?: it })
@@ -283,14 +284,14 @@ internal val pcBuiltInViews: List<NamedLibraryView> = listOf(
 )
 
 /**
- * How many games each built-in view and each store holds, by view name,
- * worked out once per library change off the main thread (one pass of the
- * view's own filter over the folded library, no sort): the strip's counts
- * (docs/SPEC.md 7i). Every key that is not a built-in view name is a store.
+ * How many games each built-in view and each store holds, worked out once per
+ * library change off the main thread (one pass of the view's own filter over
+ * the folded library, no sort): the strip's counts (docs/SPEC.md 7i). A
+ * built-in view is keyed by its name, a store by its [PcSource] id.
  */
 internal fun pcViewCounts(games: List<LibraryEntry>, scope: LibraryQueryScope): Map<String, Int> =
     pcBuiltInViews.associate { view -> view.name to games.count { view.query.matches(it, scope) } } +
-        games.mapNotNull { it.pcInfo?.source?.takeIf { source -> source != "Folder" } }
+        games.mapNotNull { (PcSource.of(it) as? PcSource.Store)?.id }
             .groupingBy { it }
             .eachCount()
 
@@ -303,12 +304,15 @@ internal fun pcStripViews(counts: Map<String, Int>, saved: List<NamedLibraryView
         (view.name != VIEW_UPDATES && view.name != VIEW_FAVOURITES) || (counts[view.name] ?: 0) > 0
     }
     val names = pcBuiltInViews.map { it.name }.toSet()
-    val stores = counts.filter { (name, count) -> name !in names && count > 0 }.entries
+    val stores = counts.filter { (key, count) -> key !in names && count > 0 }.entries
         .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
-        .map { NamedLibraryView(it.key, LibraryQuery().withToggled(LibraryFacet.STORE, it.key, true)) }
+        .map { NamedLibraryView(PcSource.fromId(it.key).label(), LibraryQuery().withToggled(LibraryFacet.SOURCE, it.key, true)) }
     return builtIn + stores + saved
 }
 
 /** A chip's label: a built-in view or a store carries its count ("Installed · 12"), a saved view is just its name. */
-internal fun pcStripLabel(view: NamedLibraryView, counts: Map<String, Int>): String =
-    counts[view.name]?.let { "${view.name} · $it" } ?: view.name
+internal fun pcStripLabel(view: NamedLibraryView, counts: Map<String, Int>): String {
+    val count = counts[view.name]
+        ?: view.query.selected(LibraryFacet.SOURCE).singleOrNull()?.takeIf { view.query.facets.size == 1 }?.let { counts[it] }
+    return count?.let { "${view.name} · $it" } ?: view.name
+}

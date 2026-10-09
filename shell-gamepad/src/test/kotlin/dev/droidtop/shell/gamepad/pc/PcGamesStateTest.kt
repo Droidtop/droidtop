@@ -17,8 +17,8 @@ class PcGamesStateTest {
     @Test
     fun `showing a store selects only that store and opens the grid`() {
         val state = PcGamesState()
-        state.showStore("GOG")
-        assertEquals(setOf("GOG"), state.query.selected(LibraryFacet.STORE))
+        state.showSource("gog")
+        assertEquals(setOf("gog"), state.query.selected(LibraryFacet.SOURCE))
         assertEquals(1, state.query.facets.size)
         assertEquals(PcView.GRID, state.view)
         assertFalse(state.home)
@@ -47,7 +47,7 @@ class PcGamesStateTest {
     @Test
     fun `choosing PC Games while one of its grid views shows keeps that view`() {
         val state = PcGamesState()
-        state.showStore("GOG")
+        state.showSource("gog")
         state.itemIndex = 7
         state.open(home = false)
         assertEquals(PcView.GRID, state.view)
@@ -78,8 +78,8 @@ class PcGamesStateTest {
     @Test
     fun `showing another store replaces the first rather than adding to it`() {
         val state = PcGamesState()
-        state.showStore("GOG")
-        state.showStore("Epic")
-        assertEquals(setOf("Epic"), state.query.selected(LibraryFacet.STORE))
+        state.showSource("gog")
+        state.showSource("epic")
+        assertEquals(setOf("epic"), state.query.selected(LibraryFacet.SOURCE))
     }
 }

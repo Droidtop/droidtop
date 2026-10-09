@@ -79,7 +79,7 @@ internal fun storeStageOf(entry: LibraryEntry, download: StoreDownloads.Progress
 
 /** Whether a store owns this row: it carries a store's id and is not a folder or a Wine shortcut. */
 internal fun LibraryEntry.isStoreRow(): Boolean =
-    pcInfo?.let { it.storeId != null && it.source != "Folder" && it.source != "Wine" } == true
+    dev.droidtop.library.PcSource.storeIdOf(pcInfo?.storeId) != null
 
 /** The store id an entry's live download is filed under, or null for a game no store owns. */
 internal fun LibraryEntry.downloadKey(): String? = pcInfo?.storeId

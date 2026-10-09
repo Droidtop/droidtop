@@ -295,21 +295,12 @@ data class GameLink(val label: String, val url: String) {
 }
 
 /**
- * The store names [PcInfo.source] carries, written once for the code that
- * makes them (`:runtime-windows`) and the code that filters by them (the
- * PC Games tab's Store facet, a store page's "Open library").
+ * The group a store's games held as something other than owned are listed
+ * under in [PcInfo.source]. Store names themselves are each store's own
+ * label ([dev.droidtop.library.stores.StoreLibrary.label]), read through
+ * [PcSource]; nothing keeps a list of them.
  */
 object PcStoreNames {
-    const val STEAM = "Steam"
-    const val GOG = "GOG"
-    const val EPIC = "Epic"
-    const val AMAZON = "Amazon"
-    const val ITCH = "itch.io"
-    val ALL = listOf(STEAM, GOG, EPIC, AMAZON, ITCH)
-
-    /** The catalog item id prefix of a store page's "Open library" row; the label follows. */
-    const val LIBRARY_ITEM_PREFIX = "store_library:"
-
     /**
      * Where a store's games held as [holding] are listed: the store's own name
      * for its owned games, "Steam Family" for another account's, "Steam Free"

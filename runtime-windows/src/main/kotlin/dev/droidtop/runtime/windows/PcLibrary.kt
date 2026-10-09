@@ -7,6 +7,7 @@ import dev.droidtop.library.EngineVerdictStore
 import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.PcFolderScan
 import dev.droidtop.library.PcInfo
+import dev.droidtop.library.PcSource
 import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.ScanActivity
 import dev.droidtop.library.ScanBudget
@@ -48,19 +49,12 @@ import kotlinx.coroutines.withContext
  */
 object PcLibrary {
 
-    /**
-     * Where a game came from. Mirrors gamenative's own `GameSource` (the
-     * unified model already in the fork) rather than inventing a second
-     * vocabulary, but is droidtop's own type so library-core and the
-     * shells never import `app.gamenative.*`.
-     */
-    enum class Source { STEAM, GOG, EPIC, AMAZON, ITCH, FOLDER }
-
     /** One PC game, whatever it came from. */
     data class Game(
         /** Stable across scans and unique across sources: `"steam:440"`. */
         val id: String,
-        val source: Source,
+        /** Where it came from: a store by its id, or the game folder it was found under ([PcSource]). */
+        val source: PcSource,
         /** The id this game's own store/scanner uses, unprefixed. */
         val nativeId: String,
         val title: String,
@@ -144,7 +138,7 @@ object PcLibrary {
             // schema drift) costs that store's games, not the whole library.
             for (store in StoreLibraries.all()) {
                 addAll(
-                    runCatching { store.games(context).mapNotNull { it.toGame() } }
+                    runCatching { store.games(context).map { it.toGame() } }
                         .onFailure {
                             if (it is CancellationException) throw it
                             failed += store.label
@@ -408,16 +402,11 @@ object PcLibrary {
     @Volatile
     private var folderSourceInstalls: List<StoreInstall> = emptyList()
 
-    /**
-     * A row of a store droidtop runs itself. Null for a store this enum
-     * does not name yet: a store is a [Source] before its rows can be
-     * filtered on or drawn with its name.
-     */
-    private fun StoreGame.toGame(): Game? {
-        val source = Source.entries.firstOrNull { it != Source.FOLDER && it.name.equals(store, ignoreCase = true) } ?: return null
+    /** A row of a store droidtop runs itself, built in or plugged in: every registered store's rows are listed alike. */
+    private fun StoreGame.toGame(): Game {
         return Game(
             id = key,
-            source = source,
+            source = PcSource.Store(store),
             nativeId = gameId,
             title = title,
             installed = installed,
@@ -701,7 +690,9 @@ object PcLibrary {
         val title = folderPath?.let { GameTitleParser.parse(it, root).title }?.takeIf { it.isNotBlank() } ?: name
         return Game(
             id = "folder:$appId",
-            source = Source.FOLDER,
+            // The game folder it was found under; a folder the person gave the
+            // vendored scanner outside them has none.
+            source = PcSource.Folder(root.orEmpty()),
             nativeId = appId,
             title = title,
             installed = true,
@@ -736,7 +727,7 @@ fun PcLibrary.Game.toStoreInstall(): StoreInstall? = installDir?.let { dir ->
  */
 fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
     // A lent or unplayed free game is listed under a name of its own, so it has its own tab and badge.
-    source = PcStoreNames.groupOf(source.displayName(), holding),
+    source = if (source is PcSource.Store) PcStoreNames.groupOf(source.label(), holding) else "Folder",
     storeId = id,
     installed = installed,
     sizeBytes = sizeBytes,
@@ -746,12 +737,3 @@ fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
     latestVersion = StoreUpdates.resultFor(id)?.latest,
     update = StoreUpdates.resultFor(id)?.update ?: StoreUpdate.UNKNOWN,
 )
-
-fun PcLibrary.Source.displayName(): String = when (this) {
-    PcLibrary.Source.STEAM -> PcStoreNames.STEAM
-    PcLibrary.Source.GOG -> PcStoreNames.GOG
-    PcLibrary.Source.EPIC -> PcStoreNames.EPIC
-    PcLibrary.Source.AMAZON -> PcStoreNames.AMAZON
-    PcLibrary.Source.ITCH -> PcStoreNames.ITCH
-    PcLibrary.Source.FOLDER -> "Folder"
-}

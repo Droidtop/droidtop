@@ -23,8 +23,6 @@ import java.io.File
  * device's games, is the agent core's file `files/agent/library.json`.
  */
 object ComputerLibrary {
-    private val STORES = setOf("steam", "gog", "epic", "amazon", "itch", "battlenet")
-
     fun stateFile(context: Context): File = File(Computers.folder(context), "library.json")
 
     /** A title as the agent keys a game without a store id: lower case, letters and digits, single spaces. */
@@ -33,8 +31,8 @@ object ComputerLibrary {
 
     /** The key a game goes by on every device: its store id, a ROM's system and file name, or its title. */
     fun keyOf(entry: LibraryEntry): String {
-        val prefix = entry.id.substringBefore(':', "")
-        if (prefix in STORES) return entry.id
+        // A row of any registered store is known by its store id on every device.
+        if (dev.droidtop.library.stores.StoreLibraries.forKey(entry.id) != null) return entry.id
         if (entry.kind == LibraryEntryKind.CONSOLE_ROM && entry.systemId != null) {
             val stem = if ('/' in entry.id) File(entry.id).nameWithoutExtension else entry.title
             return "rom:${entry.systemId}/${titleKey(stem).removePrefix("title:")}"

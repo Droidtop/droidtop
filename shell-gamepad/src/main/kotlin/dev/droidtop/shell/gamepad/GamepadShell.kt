@@ -84,7 +84,7 @@ import dev.droidtop.library.AppCategoryRules
 import dev.droidtop.library.AppGameMarks
 import dev.droidtop.library.AppUsageAccess
 import dev.droidtop.library.LibraryKinds
-import dev.droidtop.library.PcStoreNames
+import dev.droidtop.library.PcSource
 import dev.droidtop.shell.gamepad.query.APPS_SCOPE_ID
 import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryFilterSheet
@@ -1284,10 +1284,11 @@ private fun GamepadShellBody(
                         // something here too, for the reason Settings' is.
                         shownSection.placeScreenId != null -> {
                             canGoBack = true
+                            // Every registered store's Open library, built in or plugged in.
                             val storeLibraries = remember {
-                                PcStoreNames.ALL.associate { label ->
-                                    "${PcStoreNames.LIBRARY_ITEM_PREFIX}$label" to {
-                                        pcGames.showStore(label)
+                                dev.droidtop.library.stores.StoreLibraries.all().associate { store ->
+                                    "${PcSource.LIBRARY_ITEM_PREFIX}${store.id}" to {
+                                        pcGames.showSource(store.id)
                                         nav.openSection(GamingSection.PC_GAMES)
                                     }
                                 }

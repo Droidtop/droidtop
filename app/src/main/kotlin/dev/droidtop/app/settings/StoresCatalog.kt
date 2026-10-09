@@ -7,6 +7,7 @@ import android.util.Log
 import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.LauncherGamesActivity
 import dev.droidtop.app.OpenWithSource
+import dev.droidtop.library.PcSource
 import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreLinkPrefs
 import dev.droidtop.library.integrations.PluginJobsScreen
@@ -38,7 +39,6 @@ import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.runtime.windows.AddGame
 import dev.droidtop.runtime.windows.PcLibrary
 import dev.droidtop.pluginhost.PluginJobsCenter
-import dev.droidtop.runtime.windows.displayName
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -60,19 +60,19 @@ import kotlinx.coroutines.withContext
  * made on the store's site, and Steam signs in step by step on droidtop's
  * own screen (a QR code, or a password Steam checks and droidtop does not keep).
  */
-internal enum class PcStore(val key: String, val label: String, val source: PcLibrary.Source) {
-    STEAM("steam", "Steam", PcLibrary.Source.STEAM),
-    GOG("gog", "GOG", PcLibrary.Source.GOG),
-    EPIC("epic", "Epic Games", PcLibrary.Source.EPIC),
-    AMAZON("amazon", "Amazon Games", PcLibrary.Source.AMAZON),
-    ITCH("itch", "itch.io", PcLibrary.Source.ITCH),
+internal enum class PcStore(val key: String) {
+    STEAM("steam"),
+    GOG("gog"),
+    EPIC("epic"),
+    AMAZON("amazon"),
+    ITCH("itch"),
     ;
 
     /** The store, or null when this build has none of that id. */
     val own: StoreLibrary? get() = StoreLibraries.byId(key)
 
-    /** The name this store's games carry in the library (the Store filter's value). */
-    val libraryName: String get() = source.displayName()
+    /** The store's one name, the same in the Stores place, PC Games' Source filter and a game's focus line ([PcSource]). */
+    val label: String get() = PcSource.Store(key).label()
 
     /** How the store's own sign-in screen describes itself, for the row's tooltip. */
     val signInNote: String
@@ -142,8 +142,8 @@ internal suspend fun syncAllStores(context: Context): String {
 internal data class StoreCounts(val total: Int, val installed: Int, val family: Int = 0, val free: Int = 0)
 
 /** The account's own games of [source]; a family's and unplayed free ones are counted apart. */
-internal fun storeCounts(games: List<PcLibrary.Game>, source: PcLibrary.Source): StoreCounts {
-    val all = games.filter { it.source == source }
+internal fun storeCounts(games: List<PcLibrary.Game>, storeId: String): StoreCounts {
+    val all = games.filter { it.source == PcSource.Store(storeId) }
     val mine = all.filter { it.holding == StoreHolding.OWNED }
     return StoreCounts(
         mine.size,
@@ -420,7 +420,7 @@ internal object StoresCatalog {
 
     private suspend fun pageGroups(context: Context, store: PcStore): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val signedIn = store.signedIn(context)
-        val counts = storeCounts(runCatching { PcLibrary.storeGames(context) }.getOrDefault(emptyList()), store.source)
+        val counts = storeCounts(runCatching { PcLibrary.storeGames(context) }.getOrDefault(emptyList()), store.key)
         val jobs = storeJobs(store)
 
         // Who is signed in is the page's first chip; the account's rows are what can be done about it.
@@ -484,10 +484,10 @@ internal object StoresCatalog {
             }
             if (counts.total > 0) {
                 add(
-                    // The Gaming shell fulfils this by id (PcStoreNames.LIBRARY_ITEM_PREFIX): PC Games opened
-                    // on this store's filter. Anywhere else the games screen opens unfiltered.
+                    // The Gaming shell fulfils this by id (PcSource.LIBRARY_ITEM_PREFIX): PC Games opened
+                    // on this store's Source filter. Anywhere else the games screen opens unfiltered.
                     ActionItem(
-                        id = "${PcStoreNames.LIBRARY_ITEM_PREFIX}${store.libraryName}",
+                        id = "${PcSource.LIBRARY_ITEM_PREFIX}${store.key}",
                         title = "Open library",
                         subtitle = "Shows only ${store.label} games in PC Games",
                         run = { ctx ->

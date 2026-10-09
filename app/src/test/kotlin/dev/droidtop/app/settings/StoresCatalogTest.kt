@@ -1,5 +1,6 @@
 package dev.droidtop.app.settings
 
+import dev.droidtop.library.PcSource
 import dev.droidtop.runtime.windows.PcLibrary
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -7,9 +8,9 @@ import org.junit.Test
 /** What a store page says about its library and when it last synced (docs/SPEC.md 7j "Places"). */
 class StoresCatalogTest {
 
-    private fun game(id: String, source: PcLibrary.Source, installed: Boolean) = PcLibrary.Game(
+    private fun game(id: String, store: String, installed: Boolean) = PcLibrary.Game(
         id = id,
-        source = source,
+        source = PcSource.Store(store),
         nativeId = id,
         title = id,
         installed = installed,
@@ -19,17 +20,17 @@ class StoresCatalogTest {
     )
 
     private val games = listOf(
-        game("a", PcLibrary.Source.GOG, installed = true),
-        game("b", PcLibrary.Source.GOG, installed = false),
-        game("c", PcLibrary.Source.GOG, installed = false),
-        game("d", PcLibrary.Source.EPIC, installed = true),
+        game("a", "gog", installed = true),
+        game("b", "gog", installed = false),
+        game("c", "gog", installed = false),
+        game("d", "epic", installed = true),
     )
 
     @Test
     fun `counts are per store and say how many are installed`() {
-        assertEquals(StoreCounts(3, 1), storeCounts(games, PcLibrary.Source.GOG))
-        assertEquals(StoreCounts(1, 1), storeCounts(games, PcLibrary.Source.EPIC))
-        assertEquals(StoreCounts(0, 0), storeCounts(games, PcLibrary.Source.AMAZON))
+        assertEquals(StoreCounts(3, 1), storeCounts(games, "gog"))
+        assertEquals(StoreCounts(1, 1), storeCounts(games, "epic"))
+        assertEquals(StoreCounts(0, 0), storeCounts(games, "amazon"))
     }
 
     @Test

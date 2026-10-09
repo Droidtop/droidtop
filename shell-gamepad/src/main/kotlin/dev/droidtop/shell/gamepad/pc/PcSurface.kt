@@ -2,6 +2,7 @@ package dev.droidtop.shell.gamepad.pc
 
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
+import dev.droidtop.library.PcSource
 import dev.droidtop.library.displayName
 import dev.droidtop.library.scraper.isPcOrEngineGame
 
@@ -35,8 +36,8 @@ internal val LibraryEntry.onPcGamesTab: Boolean
     get() = isPcOrEngineGame || systemId == null ||
         systemId == PC_SYSTEM_ID || systemId == WINDOWS_SYSTEM_ID
 
-/** Where this game came from. A store row says so itself; anything else is a folder droidtop found. */
-internal fun LibraryEntry.sourceLabel(): String = pcInfo?.source ?: "Folder"
+/** Where this game came from ([PcSource]): its store's name, "Folder", "Wine shortcut". */
+internal fun LibraryEntry.sourceLabel(): String = PcSource.of(this)?.detail() ?: "Folder"
 
 /** The detected engine, or null for a PC entry that has none -- a Steam game is still a game. */
 internal fun LibraryEntry.engineLabel(): String? =

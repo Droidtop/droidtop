@@ -2,7 +2,6 @@ package dev.droidtop.stores.amazon
 
 import android.content.Context
 import android.net.Uri
-import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLibrary
@@ -37,7 +36,7 @@ import timber.log.Timber
  */
 class AmazonStore : StoreLibrary {
     override val id = "amazon"
-    override val label = PcStoreNames.AMAZON
+    override val label = "Amazon"
 
     override val webPages = dev.droidtop.library.stores.StoreWebPages(
         home = "https://gaming.amazon.com/",

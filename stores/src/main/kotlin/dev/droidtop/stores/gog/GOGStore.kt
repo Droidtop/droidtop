@@ -2,7 +2,6 @@ package dev.droidtop.stores.gog
 
 import android.content.Context
 import android.net.Uri
-import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLaunch
@@ -37,7 +36,7 @@ import timber.log.Timber
  */
 class GOGStore : StoreLibrary {
     override val id = "gog"
-    override val label = PcStoreNames.GOG
+    override val label = "GOG"
 
     override val webPages = dev.droidtop.library.stores.StoreWebPages(
         home = "https://www.gog.com/",

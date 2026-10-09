@@ -3,11 +3,11 @@ package dev.droidtop.shell.gamepad.query
 import android.content.Context
 import dev.droidtop.library.AppCategoryRules
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.PcSource
 import dev.droidtop.library.appSourceLabel
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.shell.gamepad.pc.engineLabel
 import dev.droidtop.shell.gamepad.pc.isInstalled
-import dev.droidtop.shell.gamepad.pc.sourceLabel
 import org.json.JSONObject
 
 /**
@@ -22,8 +22,8 @@ import org.json.JSONObject
  * the one filter+sort pass. A console gamelist and the PC library differ
  * only in the scope they build; nothing here knows which is which.
  *
- * Semantics: values within one facet OR (Steam or GOG), facets AND
- * (Steam and installed), the search text ANDs with everything. A facet
+ * Semantics: values within one facet OR (one store or another), facets AND
+ * (a store and installed), the search text ANDs with everything. A facet
  * value an entry does not have excludes the entry, and an entry the facet
  * does not apply to at all (a folder game has no install state) is
  * excluded while that facet filters -- a filter that cannot match is not
@@ -47,10 +47,13 @@ enum class LibrarySortKey(val label: String, val naturalOrder: String, val flipp
 /**
  * One filterable fact. [valuesOf] is every value this entry carries for
  * the facet -- an entry a facet does not apply to answers empty, and an
- * empty answer never matches a selection.
+ * empty answer never matches a selection. A value is an id where the fact
+ * has one (a [PcSource] id), drawn through [valueLabel]; a saved view keeps
+ * the id, so a renamed store or folder needs nothing migrated.
  */
 enum class LibraryFacet(val key: String, val label: String) {
-    STORE("store", "Store"),
+    // Where a PC game came from: a store, a game folder, a Wine shortcut (docs/SPEC.md 7j).
+    SOURCE("source", "Source"),
     ENGINE("engine", "Engine"),
     RUNNER("runner", "Runner"),
     INSTALLED("installed", "Install state"),
@@ -81,7 +84,7 @@ enum class LibraryFacet(val key: String, val label: String) {
     ;
 
     fun valuesOf(entry: LibraryEntry, context: LibraryQueryContext): List<String> = when (this) {
-        STORE -> listOf(entry.sourceLabel())
+        SOURCE -> PcSource.of(entry, context.pcRoots)?.let { listOf(it.id) }.orEmpty()
         ENGINE -> entry.engineLabel()?.let { listOf(it) }.orEmpty()
         RUNNER -> context.runnerLabelOf(entry)?.let { listOf(it) }.orEmpty()
         // The one answer the Installed shelf reads too (LibraryEntry.isInstalled): a
@@ -131,6 +134,18 @@ enum class LibraryFacet(val key: String, val label: String) {
         APP_SOURCE -> entry.appFacts?.let { listOf(appSourceLabel(it)) }.orEmpty()
     }
 
+    /** What a person reads for one of this facet's values: a source's name for its id, the value itself otherwise. */
+    fun valueLabel(value: String): String = when (this) {
+        SOURCE -> PcSource.fromId(value).label()
+        else -> value
+    }
+
+    /** The order a facet's values are listed in: sources in the registry's order ([PcSource.ORDER]), the rest by name. */
+    fun valueOrder(): Comparator<FacetValueCount> = when (this) {
+        SOURCE -> compareBy<FacetValueCount, PcSource>(PcSource.ORDER) { PcSource.fromId(it.value) }
+        else -> compareBy<FacetValueCount> { it.value.lowercase() }
+    }
+
     /**
      * Every value present in [entries] with how many entries carry it, in
      * display order -- the facet's sheet list. A value no entry has is
@@ -139,7 +154,7 @@ enum class LibraryFacet(val key: String, val label: String) {
     fun valueCounts(entries: List<LibraryEntry>, context: LibraryQueryContext): List<FacetValueCount> {
         val counts = LinkedHashMap<String, Int>()
         entries.forEach { entry -> valuesOf(entry, context).forEach { counts[it] = (counts[it] ?: 0) + 1 } }
-        return counts.map { FacetValueCount(it.key, it.value) }.sortedBy { it.value.lowercase() }
+        return counts.map { FacetValueCount(it.key, it.value) }.sortedWith(valueOrder())
     }
 }
 
@@ -190,6 +205,8 @@ data class LibraryQueryContext(
     /** When the entry was last played or used: droidtop's launch log, and Usage access where granted. */
     val lastUsedOf: (LibraryEntry) -> Long? = { it.lastPlayedEpochMs },
     val now: () -> Long = System::currentTimeMillis,
+    /** The person's game folders (absolute paths), loaded once off the main thread: the Source facet's folder values. */
+    val pcRoots: List<String> = emptyList(),
 )
 
 /** What one list offers: which facets, which sorts, and how to read the facts. */
@@ -276,7 +293,7 @@ data class LibraryQuery(
             // A selected value nothing has right now (Running, with nothing
             // running) stays listed at zero so it can be taken off again.
             val absent = selected(facet).filter { value -> counted.none { it.value == value } }.map { FacetValueCount(it, 0) }
-            val values = (counted + absent).sortedBy { it.value.lowercase() }
+            val values = (counted + absent).sortedWith(facet.valueOrder())
             val narrowsNothing = counted.size == 1 && absent.isEmpty() && counted[0].count == over.size && selected(facet).isEmpty()
             if (values.isEmpty() || narrowsNothing) null else FacetOffer(facet, values)
         }
@@ -296,7 +313,7 @@ data class FacetOffer(val facet: LibraryFacet, val values: List<FacetValueCount>
  * drawn and what is applied cannot differ.
  */
 data class QueryChip(val facet: LibraryFacet?, val value: String) {
-    val label: String get() = if (facet == null) "\"$value\"" else value
+    val label: String get() = if (facet == null) "\"$value\"" else facet.valueLabel(value)
 }
 
 /**
@@ -464,7 +481,14 @@ object LibraryViewPrefs {
     fun savedViews(context: Context, scopeId: String): List<NamedLibraryView> {
         val raw = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
             .getString(VIEWS_PREFIX + scopeId, null) ?: return emptyList()
-        return decodeViews(raw)
+        val views = decodeViews(raw)
+        // Once, the first time views saved before facet values were ids are read.
+        if (views.none { LEGACY_STORE_KEY in it.query.facets }) return views
+        val roots = rootsOf(context)
+        val migrated = views.map { it.copy(query = migrateLegacyStore(it.query, ::storeIdForLabel, roots)) }
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+            .edit().putString(VIEWS_PREFIX + scopeId, encodeViews(migrated)).apply()
+        return migrated
     }
 
     /** Saving a name again replaces it, keeping the order it was first saved in. */
@@ -485,8 +509,47 @@ object LibraryViewPrefs {
     fun activeQuery(context: Context, scopeId: String, default: LibraryQuery = LibraryQuery()): LibraryQuery {
         val raw = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
             .getString(ACTIVE_PREFIX + scopeId, null) ?: return default
-        return decodeQuery(raw) ?: LibraryQuery()
+        val query = decodeQuery(raw) ?: LibraryQuery()
+        if (LEGACY_STORE_KEY !in query.facets) return query
+        return migrateLegacyStore(query, ::storeIdForLabel, rootsOf(context)).also { setActiveQuery(context, scopeId, it) }
     }
+
+    /**
+     * The facet views saved before facet values were ids filtered stores by:
+     * key "store", values the names a library row carried ("Steam", "Steam
+     * Family", "Folder", "Wine").
+     */
+    internal const val LEGACY_STORE_KEY = "store"
+
+    /**
+     * [query] with its old Store selections as Source ids, so a saved view
+     * filters the same games it did (docs/SPEC.md 7j, "Filters"): a store's
+     * name, and its "<name> Family" and "<name> Free" groups, become the
+     * store's id; "Folder" becomes every game folder ([roots]) and the folders
+     * outside them; "Wine" the Wine shortcuts. A name no store has becomes the
+     * store id it spells. Pure, for the JVM tests.
+     */
+    internal fun migrateLegacyStore(query: LibraryQuery, storeIdForLabel: (String) -> String?, roots: List<String>): LibraryQuery {
+        val old = query.facets[LEGACY_STORE_KEY] ?: return query
+        val ids = old.flatMap { label ->
+            when (label) {
+                "Folder" -> roots.map { PcSource.Folder(it).id } + PcSource.Folder("").id
+                "Wine" -> listOf(PcSource.WineShortcut.id)
+                else -> {
+                    val name = label.removeSuffix(" Family").removeSuffix(" Free")
+                    listOf(storeIdForLabel(label) ?: storeIdForLabel(name) ?: name.lowercase())
+                }
+            }
+        }.toSet()
+        val facets = query.facets - LEGACY_STORE_KEY
+        return query.copy(facets = if (ids.isEmpty()) facets else facets + (LibraryFacet.SOURCE.key to ids))
+    }
+
+    private fun storeIdForLabel(label: String): String? =
+        dev.droidtop.library.stores.StoreLibraries.all().firstOrNull { it.label.equals(label, ignoreCase = true) }?.id
+
+    private fun rootsOf(context: Context): List<String> =
+        runCatching { dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath } }.getOrDefault(emptyList())
 
     fun setActiveQuery(context: Context, scopeId: String, query: LibraryQuery) {
         context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)

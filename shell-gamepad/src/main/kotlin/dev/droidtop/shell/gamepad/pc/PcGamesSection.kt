@@ -177,11 +177,11 @@ internal class PcGamesState {
 
     /**
      * The grid filtered to one store (a store page's "Open library",
-     * docs/SPEC.md 7j "Places"): the Store facet selected, nothing else.
-     * Marks the query loaded so the saved query is not read over it.
+     * docs/SPEC.md 7j "Places"): the Source facet selected on the store's id,
+     * nothing else. Marks the query loaded so the saved query is not read over it.
      */
-    fun showStore(label: String) {
-        query = LibraryQuery().withToggled(LibraryFacet.STORE, label, true)
+    fun showSource(id: String) {
+        query = LibraryQuery().withToggled(LibraryFacet.SOURCE, id, true)
         queryLoaded = true
         view = PcView.GRID
         stripFocused = false
@@ -293,13 +293,22 @@ internal fun PcGamesSection(
     fun partsOf(entry: LibraryEntry): Int =
         folded?.siblings?.get(entry.id)?.count { it.pcInfo?.installed != false } ?: 1
 
-    val scope = remember {
+    // The person's game folders, the Source facet's folder values: a
+    // preference read, once, off the main thread.
+    var pcRoots by remember { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(Unit) {
+        pcRoots = withContext(Dispatchers.IO) {
+            runCatching { dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath } }.getOrDefault(emptyList())
+        }
+    }
+    val scope = remember(pcRoots) {
         LibraryQueryScope(
             id = "pc",
+            context = dev.droidtop.shell.gamepad.query.LibraryQueryContext(pcRoots = pcRoots),
             // Runner, ready and ProtonDB are left off: they cost a folder
             // walk or a network ask per entry, which a list never pays.
             facets = listOf(
-                LibraryFacet.STORE, LibraryFacet.ENGINE, LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES,
+                LibraryFacet.SOURCE, LibraryFacet.ENGINE, LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES,
                 LibraryFacet.PLAYED, LibraryFacet.RECENTLY_PLAYED, LibraryFacet.GENRE, LibraryFacet.DEVELOPER,
                 LibraryFacet.YEAR, LibraryFacet.UPDATE, LibraryFacet.MISSING_ART, LibraryFacet.HIDDEN,
             ),
@@ -376,12 +385,12 @@ internal fun PcGamesSection(
         pcShelfList = next
     }
     val shelves = if (state.home) homeShelfList else pcShelfList
-    LaunchedEffect(games) {
+    LaunchedEffect(games, scope) {
         val all = games ?: return@LaunchedEffect
         counts = withContext(Dispatchers.Default) { pcViewCounts(all, scope) }
     }
     var grid by remember { mutableStateOf(emptyList<LibraryEntry>()) }
-    LaunchedEffect(games, state.query) {
+    LaunchedEffect(games, state.query, scope) {
         val all = games ?: return@LaunchedEffect
         val query = state.query
         grid = withContext(Dispatchers.Default) { query.applyTo(all, scope) }

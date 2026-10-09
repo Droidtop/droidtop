@@ -401,7 +401,7 @@ internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: StoreDow
  */
 @Composable
 private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownloads.Progress?, parts: Int, badge: KindBadge?) {
-    val source = entry.pcInfo?.source?.firstOrNull()?.uppercaseChar()
+    val source = dev.droidtop.library.PcSource.of(entry)?.label()?.firstOrNull()?.uppercaseChar()
     if (badge != null) {
         KindMark(badge, Modifier.align(Alignment.BottomStart))
     } else if (entry.isStoreRow() && source != null) {
@@ -451,7 +451,7 @@ private fun CapsuleChip(text: String, ink: Color, fill: Color, modifier: Modifie
  */
 internal fun focusLine(entry: LibraryEntry, play: PcPlayState?, parts: Int): String = buildList {
     add(GameNaming.displayName(entry.title))
-    entry.pcInfo?.takeIf { entry.isStoreRow() }?.let { add(it.source) }
+    dev.droidtop.library.PcSource.of(entry)?.takeIf { entry.isStoreRow() }?.let { add(it.label()) }
     play?.takeIf { it.store != null }?.let { add(if (it.progress != null) "${it.verb} ${(it.progress * 100).toInt()}%" else it.verb) }
     entry.pcInfo?.installedVersion?.let { add(it) }
     // The version-management fact a shelf or the grid owes the focused game:

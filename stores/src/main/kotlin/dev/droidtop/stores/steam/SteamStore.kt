@@ -1,7 +1,6 @@
 package dev.droidtop.stores.steam
 
 import android.content.Context
-import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.social.SocialProvider
@@ -48,7 +47,7 @@ import timber.log.Timber
  */
 class SteamStore : StoreLibrary {
     override val id = "steam"
-    override val label = PcStoreNames.STEAM
+    override val label = "Steam"
 
     override val webPages = dev.droidtop.library.stores.StoreWebPages(
         home = "https://store.steampowered.com/",

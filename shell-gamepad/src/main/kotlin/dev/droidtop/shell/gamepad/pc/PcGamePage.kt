@@ -995,7 +995,7 @@ private fun pageRows(
     val owned = siblings.mapNotNull { it.ownership() }
     val ownedLine = owned.ownershipLabel().removePrefix("Owned on ").takeIf { it.isNotBlank() }
     val folderPath = entry.groupingPath()
-    add(PageFact("Store", ownedLine ?: if (entry.pcInfo?.source == null || entry.pcInfo?.source == "Folder") "Your folders" else entry.sourceLabel()))
+    add(PageFact("Store", ownedLine ?: (dev.droidtop.library.PcSource.of(entry) as? dev.droidtop.library.PcSource.Store)?.label() ?: "Your folders"))
     // Where it lives as a person names it; the whole path is the tooltip.
     folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it)) }
     // The name as it is on disk, beside the title drawn from it (docs/SPEC.md

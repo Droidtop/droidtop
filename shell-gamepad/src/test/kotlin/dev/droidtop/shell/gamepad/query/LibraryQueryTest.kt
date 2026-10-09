@@ -5,6 +5,7 @@ import dev.droidtop.library.InstalledAppFacts
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.PcInfo
+import dev.droidtop.library.PcSource
 import dev.droidtop.library.SwitchGameFacts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -76,7 +77,7 @@ class LibraryQueryTest {
 
     @Test
     fun `values within one facet are or`() {
-        val query = LibraryQuery(facets = mapOf(LibraryFacet.STORE.key to setOf("Steam", "GOG")))
+        val query = LibraryQuery(facets = mapOf(LibraryFacet.SOURCE.key to setOf("steam", "gog")))
 
         val shown = query.applyTo(listOf(steamInstalled, gogNotInstalled, folder), scope)
 
@@ -85,7 +86,7 @@ class LibraryQueryTest {
 
     @Test
     fun `facets are and`() {
-        val query = LibraryQuery(facets = mapOf(LibraryFacet.STORE.key to setOf("Steam"), LibraryFacet.INSTALLED.key to setOf("Installed")))
+        val query = LibraryQuery(facets = mapOf(LibraryFacet.SOURCE.key to setOf("steam"), LibraryFacet.INSTALLED.key to setOf("Installed")))
 
         val shown = query.applyTo(listOf(steamInstalled, gogNotInstalled, folder), scope)
 
@@ -106,8 +107,8 @@ class LibraryQueryTest {
 
     @Test
     fun `a facet with nothing selected stops filtering`() {
-        val selected = LibraryQuery(facets = mapOf(LibraryFacet.STORE.key to setOf("Steam")))
-            .withToggled(LibraryFacet.STORE, "Steam", on = false)
+        val selected = LibraryQuery(facets = mapOf(LibraryFacet.SOURCE.key to setOf("steam")))
+            .withToggled(LibraryFacet.SOURCE, "steam", on = false)
 
         assertTrue(selected.facets.isEmpty())
         // The folder game is hidden, and a hidden game is out of the list unless the Hidden facet asks.
@@ -227,7 +228,7 @@ class LibraryQueryTest {
     fun `a query and its saved views survive the store's round trip`() {
         val query = LibraryQuery(
             text = "witcher",
-            facets = mapOf(LibraryFacet.STORE.key to setOf("GOG", "Steam"), LibraryFacet.INSTALLED.key to setOf(INSTALLED_YES)),
+            facets = mapOf(LibraryFacet.SOURCE.key to setOf("gog", "steam"), LibraryFacet.INSTALLED.key to setOf(INSTALLED_YES)),
             sort = LibrarySortKey.PLAYTIME,
         )
 
@@ -301,21 +302,24 @@ class LibraryQueryTest {
             LibraryQuery(facets = mapOf(LibraryFacet.HIDDEN.key to setOf(HIDDEN_YES))).applyTo(listOf(shown, hidden), scope).map { it.title },
         )
         // A scope that does not offer the facet keeps every entry, as a console list always did.
-        val noHiddenFacet = scope.copy(facets = listOf(LibraryFacet.STORE))
+        val noHiddenFacet = scope.copy(facets = listOf(LibraryFacet.SOURCE))
         assertEquals(2, LibraryQuery().applyTo(listOf(shown, hidden), noHiddenFacet).size)
         assertEquals(1, LibraryQuery().totalIn(listOf(shown, hidden), scope))
     }
 
     @Test
     fun `facets are offered with counts, and one that would narrow nothing is not`() {
-        val a = game("a", pcInfo = PcInfo(source = "Steam", installed = true), favorite = true)
-        val b = game("b", pcInfo = PcInfo(source = "Steam", installed = true))
-        val c = game("c", pcInfo = PcInfo(source = "GOG", installed = true))
+        val a = game("steam:a", pcInfo = PcInfo(source = "Steam", installed = true), favorite = true)
+        val b = game("steam:b", pcInfo = PcInfo(source = "Steam", installed = true))
+        val c = game("gog:c", pcInfo = PcInfo(source = "GOG", installed = true))
 
         val offers = LibraryQuery().facetOffers(listOf(a, b, c), scope)
 
-        val store = offers.first { it.facet == LibraryFacet.STORE }
-        assertEquals(listOf(FacetValueCount("GOG", 1), FacetValueCount("Steam", 2)), store.values)
+        // Values are store ids; what is drawn is the store's own name.
+        val source = offers.first { it.facet == LibraryFacet.SOURCE }
+        // Listed in the registry's order, which other tests may have filled.
+        assertEquals(mapOf("gog" to 1, "steam" to 2), source.values.associate { it.value to it.count })
+        assertEquals(PcSource.Store("gog").label(), LibraryFacet.SOURCE.valueLabel("gog"))
         // Every game is installed: that facet narrows nothing, so it is not offered.
         assertTrue(offers.none { it.facet == LibraryFacet.INSTALLED })
         assertEquals(listOf(FacetValueCount(FAVOURITES_YES, 1)), offers.first { it.facet == LibraryFacet.FAVOURITES }.values)
@@ -334,15 +338,18 @@ class LibraryQueryTest {
     fun `active chips follow the scope's facet order, a cleared view keeps the sort, a chip comes off alone`() {
         val query = LibraryQuery(
             text = " quest ",
-            facets = mapOf(LibraryFacet.INSTALLED.key to setOf(INSTALLED_YES), LibraryFacet.STORE.key to setOf("Steam", "GOG")),
+            facets = mapOf(LibraryFacet.INSTALLED.key to setOf(INSTALLED_YES), LibraryFacet.SOURCE.key to setOf("steam", "gog")),
             sort = LibrarySortKey.RATING,
             reversed = true,
         )
 
         val chips = query.activeChips(scope)
 
-        assertEquals(listOf("\"quest\"", "GOG", "Steam", INSTALLED_YES), chips.map { it.label })
-        assertEquals(setOf("Steam"), query.without(chips[1]).selected(LibraryFacet.STORE))
+        assertEquals(
+            listOf("\"quest\"", PcSource.Store("gog").label(), PcSource.Store("steam").label(), INSTALLED_YES),
+            chips.map { it.label },
+        )
+        assertEquals(setOf("steam"), query.without(chips[1]).selected(LibraryFacet.SOURCE))
         assertEquals("", query.without(chips[0]).text)
         val cleared = query.cleared
         assertTrue(cleared.isEmpty)
@@ -465,5 +472,36 @@ class LibraryQueryTest {
         assertEquals(listOf("Zelda"), LibraryQuery().withToggled(LibraryFacet.FAVOURITES, FAVOURITES_YES, true).applyTo(all, launcher).map { it.title })
         assertEquals(listOf("Alpha"), LibraryQuery().withToggled(LibraryFacet.HIDDEN, HIDDEN_YES, true).applyTo(all, launcher).map { it.title })
         assertEquals(LibrarySortKey.NAME, launcher.sorts.first())
+    }
+
+    @Test
+    fun `views saved with store names become source ids that filter the same games`() {
+        val ids = mapOf("Steam" to "steam", "GOG" to "gog")
+        val roots = listOf("/storage/card/Games", "/storage/emulated/0/PC")
+        val old = LibraryQuery(
+            facets = mapOf(
+                LibraryViewPrefs.LEGACY_STORE_KEY to setOf("Steam", "Steam Family", "Folder", "Wine"),
+                LibraryFacet.INSTALLED.key to setOf(INSTALLED_YES),
+            ),
+            sort = LibrarySortKey.RECENT,
+        )
+
+        val migrated = LibraryViewPrefs.migrateLegacyStore(old, ids::get, roots)
+
+        assertEquals(
+            setOf("steam", "folder:/storage/card/Games", "folder:/storage/emulated/0/PC", "folder:", "wine"),
+            migrated.selected(LibraryFacet.SOURCE),
+        )
+        assertEquals(setOf(INSTALLED_YES), migrated.selected(LibraryFacet.INSTALLED))
+        assertEquals(LibrarySortKey.RECENT, migrated.sort)
+        assertFalse(LibraryViewPrefs.LEGACY_STORE_KEY in migrated.facets)
+        // A view with nothing to migrate is left as it is.
+        assertEquals(migrated, LibraryViewPrefs.migrateLegacyStore(migrated, ids::get, roots))
+    }
+
+    @Test
+    fun `the PC-only Source facet never reaches a Retro list`() {
+        assertFalse(LibraryFacet.SOURCE in retroQueryScope("snes").facets)
+        assertFalse(LibraryFacet.SOURCE in launcherGamesQueryScope().facets)
     }
 }

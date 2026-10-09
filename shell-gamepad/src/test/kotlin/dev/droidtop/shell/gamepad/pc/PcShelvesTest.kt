@@ -193,8 +193,8 @@ class PcShelvesTest {
             now,
         )
 
-        assertEquals(listOf("store:GOG", "store:Steam", "kind:Visual Novels", "kind:RPG Maker"), shelves.map { it.id })
-        assertEquals("GOG", shelves[0].title)
+        assertEquals(listOf("store:gog", "store:steam", "kind:Visual Novels", "kind:RPG Maker"), shelves.map { it.id })
+        assertEquals(dev.droidtop.library.PcSource.Store("gog").label(), shelves[0].title)
         assertEquals("Visual Novels", shelves[2].title)
     }
 

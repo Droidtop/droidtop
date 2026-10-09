@@ -177,7 +177,9 @@ class PcCapsuleStateTest {
         assertEquals(3, counts[VIEW_INSTALLED])
         assertEquals(1, counts[VIEW_UPDATES])
         assertEquals(1, counts[VIEW_FAVOURITES])
-        assertEquals(3, counts["Steam"])
+        // A store is counted under its id; a folder game is no store's.
+        assertEquals(2, counts["steam"])
+        assertEquals(1, counts["gog"])
         assertNull(counts["Folder"])
     }
 

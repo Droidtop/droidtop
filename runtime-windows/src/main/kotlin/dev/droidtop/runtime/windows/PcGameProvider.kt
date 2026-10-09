@@ -311,7 +311,7 @@ class PcGameProvider(
             .getOrDefault(emptyList())
             .filterNot { shortcut -> installDirs.any { shortcut.path.startsWith(it) } }
             .map { it.toLibraryEntry() }
-        val bySource = storeGames.groupingBy { it.source.name.lowercase() }.eachCount().entries
+        val bySource = storeGames.groupingBy { it.source.id }.eachCount().entries
             .sortedBy { it.key }.joinToString(", ") { "${it.key} ${it.value}" }
         dev.droidtop.library.ScanLog.write(
             "pc library: ${storeGames.size} store games ($bySource), ${shortcutEntries.size} Wine shortcuts, " +
@@ -397,8 +397,9 @@ class PcGameProvider(
     override suspend fun launch(entry: LibraryEntry) {
         // A store/folder entry's id is "<source>:<nativeId>", not a
         // shortcut path, so it launches through the PC runtime seam
-        // against its own install directory instead.
-        if (entry.id.substringBefore(':') in STORE_ID_PREFIXES) {
+        // against its own install directory instead. Any registered store's
+        // row does, built in or plugged in.
+        if (StoreLibraries.forKey(entry.id) != null || entry.id.startsWith("folder:")) {
             launchStoreGame(entry)
             return
         }
@@ -487,9 +488,5 @@ class PcGameProvider(
             else -> error("Can't launch ${entry.title} with ${resolved.label} from the PC library.")
         }
         check(result.succeeded) { "Launching ${entry.title} failed: ${result.detail}" }
-    }
-
-    private companion object {
-        val STORE_ID_PREFIXES = setOf("steam", "gog", "epic", "amazon", "itch", "folder")
     }
 }

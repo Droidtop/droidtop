@@ -13062,6 +13062,18 @@ remembered per scope id (`LibraryViewPrefs`, written off the main thread),
 so each view keeps its own filters and sort. Pure and unit-tested
 (`LibraryQueryTest`).
 - Values within a facet OR, facets AND, the search text ANDs with both.
+- **Facet values are ids where the fact has one** (Droidtop/tracker#397
+  slice A): the PC library's **Source** facet (which replaced "Store") holds
+  `PcSource` ids, a store's id ("gog"), a game folder's (`folder:<path>`, one
+  value per root, a game counted under the most specific root only) or the
+  Wine shortcuts (`wine`), listed stores first in the registry's order, then
+  folders by name, then Wine shortcuts, and drawn by name when drawn
+  (`LibraryFacet.valueLabel`). A saved view keeps the id, so a renamed store
+  or folder needs nothing done. Views saved before were migrated once, when
+  first read: a store's name, and its "Family" and "Free" groups, became the
+  store's id, "Folder" every root, "Wine" the Wine shortcuts
+  (`LibraryViewPrefs.migrateLegacyStore`). Source never appears in a Retro
+  list's sheet.
 - **Sort direction.** Each sort has a natural direction (`naturalOrder`:
   "A to Z", "Latest first", ...). Picking the sort that is on flips it
   ("Z to A"); picking another starts it in its natural order. Entries the
@@ -13582,9 +13594,10 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   shows its own sign-in page or takes the key the person made on its site, and Steam signs in
   on droidtop's own screen by QR code, or by a password Steam checks and droidtop does not
   keep (7g "Stores"). **Open library** sets the PC Games
-  tab's Store filter to that store and opens the tab (`PcGamesState.showStore`),
+  tab's Source filter to that store's id and opens the tab (`PcGamesState.showSource`),
   so a store is a filter on the one library and not a second place to
-  browse. **Sync library** reads the store in place and says how
+  browse. The shell fulfils Open library for every registered store
+  (`StoreLibraries`, built in or plugged in), by id. **Sync library** reads the store in place and says how
   many games it holds, Steam's included, and **Sync all libraries** (on the
   Stores page itself, once any store is signed in) does that for every
   signed-in store one after the other. Both, and the read a sign-in ends with,
@@ -13616,9 +13629,11 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   store recorded, each with an Uninstall that confirms and goes through the
   store's own `StoreLibrary.uninstall` and reports the removed folder to the
   library like the game page's Uninstall (nothing is walked). No size or free
-  space is read while a list draws. The store names are written once
-  (`PcStoreNames`), for the code that makes them and the code that filters
-  by them. Per-store settings do not exist yet: nothing in the backend is
+  space is read while a list draws. A store is named once, by its own
+  `StoreLibrary.label`, and every reader (the Stores place, the Source
+  filter, the focus line, the capsule badge) reads it through `PcSource`
+  (Droidtop/tracker#397 slice A); no reader keeps a list of stores, and
+  `StoreNeutralityTest` runs the same checks for every registered store. Per-store settings do not exist yet: nothing in the backend is
   configurable per store, and no row is shown for it.
   **Shape (Droidtop/tracker#363 slice 9, 2026-10-08, DroidDeck's `StorePage`):**
   the pages open with **header chips**, a page's facts at a glance and never
