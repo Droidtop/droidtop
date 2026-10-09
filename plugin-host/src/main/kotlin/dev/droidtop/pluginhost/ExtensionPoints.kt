@@ -66,6 +66,9 @@ object ExtensionPoints {
         // docs/plugin-api.md 3 E8, E9: long-running and periodic work; each entry also has its own switch on the plugin's page.
         ExtensionPoint("jobs.service", "Keep running in the background", PointRisk.HIGH, lets = "Lets it keep a task running while you use other things, shown in droidtop's notification."),
         ExtensionPoint("jobs.schedule", "Scheduled tasks", PointRisk.LOW, lets = "Lets it run a task on a schedule, such as a check every few hours."),
+        // docs/plugin-api.md 3 F8: the program a context needs on the person's computers, which droidtop-agent installs there
+        // only after the person approves it on that computer.
+        ExtensionPoint("computers.context_adapter", "A program for your computers", PointRisk.MEDIUM, lets = "Lets it offer a program that droidtop-agent installs on your computer once you approve it there, to keep its data in step with an app on that computer."),
     )
 
     private val byId = all.associateBy { it.id }

@@ -1837,12 +1837,26 @@ thread or mark a version installed in F95Checker on the PC, and the F95
 plugin on the device shows it. Do the same in the plugin, and F95Checker's
 database on the PC follows.
 
-- **Contexts droidtop can carry.** Each context needs an adapter in
-  droidtop-agent that reads and writes the program's own store on the
-  computer. droidtop accepts only context ids the agent knows. The first is
-  `f95checker`: F95Checker's `db.sqlite3`, `games` table, one record per
-  watched thread, keyed by thread id. The adapter never reads the `cookies`
-  table or the settings' passwords and tokens.
+- **Contexts droidtop can carry.** Each context needs an adapter on the
+  computer: a program that reads and writes the other app's own store
+  there (droidtop-agent docs/DESIGN.md section 8, adapter protocol 1). The
+  plugin publishes it and declares it in its signed manifest, and droidtop
+  accepts only the context ids a plugin declares that way.
+  **EP `computers.context_adapter@1`. Risk medium.** One `provides` entry
+  per context:
+  `{"point": "computers.context_adapter", "version": 1, "id": "<context>",
+  "label": "<shown name>", "programs": {"windows-x86_64": {"url": "https://...",
+  "sha256": "<hex>"}, "linux-x86_64": {...}, "macos-aarch64": {...}}}`
+  (system keys are Rust's OS and arch names). `context.sync` sends that offer
+  with each sync. A computer without an adapter for the context keeps the
+  offer and installs nothing until the person runs `droidtop-agent contexts
+  approve <context>` there; it then fetches the program, checks the SHA-256
+  and that the program serves that context. Later versions from the same
+  plugin follow without asking again. The F95 plugin's adapter is
+  gamegrab-sources/droidtop-agent-f95-adapter, context `f95checker`:
+  F95Checker's `db.sqlite3`, `games` table, one record per watched thread,
+  keyed by thread id. It never reads the `cookies` table or the settings'
+  passwords and tokens.
 - **The plugin declares the context** with `context.open`. A record is a map
   of fields. Each field has:
   - a `direction`: `both`, `to_device` (computer to device) or

@@ -19,9 +19,28 @@ internal object HostContextApis {
     private fun contextsOf(env: BrokerEnvironment): PluginContexts =
         env.contexts() ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop has no context sync")
 
-    private fun contextId(args: JSONObject): String {
+    /** The point a plugin declares each context's adapter in: the program droidtop-agent needs on the computer. */
+    const val ADAPTER_POINT = "computers.context_adapter"
+
+    /** The adapter [manifest] declares for [context], or null. */
+    fun adapterFor(manifest: PluginManifest, context: String): ProvidedPoint? =
+        manifest.v2.provides.firstOrNull { it.point == ADAPTER_POINT && it.id == context && ExtensionPoints.supports(it.point, it.version) }
+
+    /**
+     * The offer droidtop sends the computer for [context]: the plugin, and the
+     * program for each system with its SHA-256, as the signed manifest states
+     * them. The computer fetches it only after the person approves it there.
+     */
+    fun adapterOffer(manifest: PluginManifest, context: String): JSONObject? {
+        val point = adapterFor(manifest, context) ?: return null
+        val programs = runCatching { JSONObject(point.extra).optJSONObject("programs") }.getOrNull() ?: JSONObject()
+        return JSONObject().put("plugin", manifest.id).put("label", point.label ?: manifest.label).put("programs", programs)
+    }
+
+    /** A context the plugin may use: one its manifest declares an adapter for. */
+    private fun contextId(manifest: PluginManifest, args: JSONObject): String {
         val id = args.optString("context")
-        if (id !in PluginContexts.KNOWN) invalid("context is one of ${PluginContexts.KNOWN.keys.joinToString()}")
+        if (adapterFor(manifest, id) == null) invalid("context is one the plugin's manifest declares in $ADAPTER_POINT")
         return id
     }
 
@@ -44,13 +63,13 @@ internal object HostContextApis {
 
     val ops: List<HostOp> = listOf(
         HostOp("context", "open", permission = "context.sync", target = { it.optString("context") }) { env, record, args ->
-            val id = contextId(args)
+            val id = contextId(record.manifest, args)
             val state = contextsOf(env).open(record.manifest.id, id, declaration(id, args))
             JSONObject().put("records", state.records.length()).put("conflicts", state.conflicts)
         },
         // Records a page at a time: a large context does not fit one reply.
         HostOp("context", "get", permission = "context.sync", target = { it.optString("context") }) { env, record, args ->
-            val id = contextId(args)
+            val id = contextId(record.manifest, args)
             val state = contextsOf(env).load(record.manifest.id, id) ?: invalid("open the $id context first")
             val keys = state.records.keys().asSequence().sorted().toList()
             val after = args.optString("after")
@@ -65,20 +84,21 @@ internal object HostContextApis {
         },
         HostOp("context", "put", permission = "context.sync", target = { "${it.optString("context")} ${it.optString("key")}" }) { env, record, args ->
             val fields = args.optJSONObject("fields") ?: invalid("fields is required")
-            contextsOf(env).put(record.manifest.id, contextId(args), key(args), fields)
+            contextsOf(env).put(record.manifest.id, contextId(record.manifest, args), key(args), fields)
             JSONObject().put("stored", true)
         },
         HostOp("context", "remove", permission = "context.sync", target = { "${it.optString("context")} ${it.optString("key")}" }) { env, record, args ->
-            JSONObject().put("removed", contextsOf(env).remove(record.manifest.id, contextId(args), key(args)))
+            JSONObject().put("removed", contextsOf(env).remove(record.manifest.id, contextId(record.manifest, args), key(args)))
         },
         // Reaches the person's own computers: always in the activity log.
         HostOp("context", "sync", permission = "context.sync", alwaysAudit = true, target = { it.optString("context") }) { env, record, args ->
-            contextsOf(env).sync(record.manifest.id, contextId(args))
+            val id = contextId(record.manifest, args)
+            contextsOf(env).sync(record.manifest.id, id, adapterOffer(record.manifest, id))
         },
         HostOp("context", "resolve", permission = "context.sync", target = { "${it.optString("context")} ${it.optString("key")}" }) { env, record, args ->
             val keep = args.optString("keep").takeIf { it == "device" || it == "computer" } ?: invalid("keep is device or computer")
             val field = args.optString("field").takeIf { KEY.matches(it) } ?: invalid("field is required")
-            JSONObject().put("settled", contextsOf(env).resolve(record.manifest.id, contextId(args), key(args), field, keep))
+            JSONObject().put("settled", contextsOf(env).resolve(record.manifest.id, contextId(record.manifest, args), key(args), field, keep))
         },
     )
 }

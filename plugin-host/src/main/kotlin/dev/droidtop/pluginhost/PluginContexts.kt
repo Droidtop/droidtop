@@ -83,11 +83,13 @@ class PluginContexts(private val appContext: Context) {
 
     /**
      * Merges the context with every paired computer, one after the other.
+     * [adapter] is the program the plugin's manifest offers for this context
+     * (HostContextApis.adapterOffer), for a computer that has none yet.
      * Blocks on the network: the broker runs it on a binder thread, never the
      * main thread. Returns one line per computer and the conflicts left.
      */
     @Synchronized
-    fun sync(pluginId: String, contextId: String): JSONObject {
+    fun sync(pluginId: String, contextId: String, adapter: JSONObject? = null): JSONObject {
         var state = opened(pluginId, contextId)
         val lines = JSONArray()
         for (computer in Computers.list(appContext)) {
@@ -97,7 +99,7 @@ class PluginContexts(private val appContext: Context) {
                 appContext,
                 computer,
                 "sync_context",
-                JSONObject().put("decl", state.decl).put("device", state.records).put("baseline", baseline),
+                JSONObject().put("decl", state.decl).put("device", state.records).put("baseline", baseline).apply { adapter?.let { put("adapter", it) } },
             )
             val failure = reply.optString("error").ifBlank { reply.optString("unreachable") }
             if (failure.isNotBlank()) {
@@ -154,10 +156,5 @@ class PluginContexts(private val appContext: Context) {
         baselineFile.writeText(baseline.toString())
         save(pluginId, contextId, State(state.decl, state.records, left))
         return true
-    }
-
-    companion object {
-        /** The contexts droidtop-agent can serve on a computer, by id. */
-        val KNOWN: Map<String, String> = mapOf("f95checker" to "F95Checker's watched threads")
     }
 }
