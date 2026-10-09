@@ -8924,9 +8924,12 @@ reconciliation, a file read and the paths named, never a walk.
 - `StoreInstallJob` reports the store's own answer for where the game is
   (the store's folder when the store cannot say) when the install ends. A
   store uninstall reports the folder removed. Sign-in, sign-out and sync
-  change store rows with no file to name; they keep the background rescan
-  (`StoreChanges`, now `LibraryRescan.requestInBackground`, which belongs to
-  the library and not to any screen).
+  change store rows with no file to name: `StoreChanges.announce` reports
+  the first store's install folder in the first games folder as changed,
+  which makes the PC provider read the stores' rows again and replace only
+  the store part (`PcGameProvider.indexPath`, database reads, no folder
+  walked). Only with no games folder (so no PC part to hold the rows) does
+  it fall back to `LibraryRescan.requestInBackground`.
 - A source plugin's `acquire` job that wrote the file itself: the job's reply
   names what it wrote (`placed`, a JSON list of paths inside `destination`;
   `filePath` for contract 1), or the plugin reports it with the host call

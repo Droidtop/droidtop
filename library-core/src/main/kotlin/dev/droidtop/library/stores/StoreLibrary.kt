@@ -1,12 +1,19 @@
 package dev.droidtop.library.stores
 
 import android.content.Context
+import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.settings.CatalogItem
+import dev.droidtop.library.settings.LibraryPaths
 import dev.droidtop.library.settings.LibraryRescan
+import dev.droidtop.library.settings.PathChange
 import dev.droidtop.library.social.SocialProvider
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 /**
  * One game a store says the person owns: Playnite's `GameMetadata`, a row
@@ -354,12 +361,31 @@ object StoreLibraries {
 
 /**
  * Says that a store's rows changed with no file to name (a sign-in, a sync, a
- * sign-out): the library walks again in the background so the change shows,
- * the same "Rescan library" every other source change runs ([LibraryRescan]).
- * Returns at once; never on the caller's thread. An install or a removal is
- * not this: its files are known, and it reports them
- * ([dev.droidtop.library.settings.LibraryPaths]) so nothing is walked.
+ * sign-out). The library reads the stores' rows again and replaces only the
+ * store part of the PC library; no folder is walked (docs/SPEC.md 7g,
+ * "Targeted indexing", Droidtop/tracker#354). That is what a path report for
+ * a store's own install folder already does
+ * (`PcGameProvider.indexPath`), so this reports the
+ * first store's folder in the first games folder as changed: the folder is
+ * the name of the part, nothing is read from it. With no games folder there
+ * is no such path and no PC part to hold the rows, so the full background
+ * rescan remains ([LibraryRescan]). Returns at once; never on the caller's
+ * thread. An install or a removal is not this: its files are known, and it
+ * reports them directly.
  */
 object StoreChanges {
-    fun announce(context: Context) = LibraryRescan.requestInBackground(context)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    fun announce(context: Context) {
+        val app = context.applicationContext
+        scope.launch {
+            val store = StoreLibraries.all().firstOrNull()
+            val gamesFolder = runCatching { GamesRoots.current(app).firstOrNull() }.getOrNull()
+            if (store == null || gamesFolder == null) {
+                LibraryRescan.requestInBackground(app)
+            } else {
+                LibraryPaths.report(app, PathChange(changed = listOf(StoreInstallJob.rootFor(gamesFolder.path, store).path)))
+            }
+        }
+    }
 }
