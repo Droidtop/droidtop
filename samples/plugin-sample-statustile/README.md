@@ -46,3 +46,10 @@ favourites on Home (`gaming.rows`, op `rows`, built from the
 
 The rig item (`dq-plugins-01`, `/root/coordination/device/QUEUE.md`) uses
 the resulting `.tar.xz`.
+
+## Access
+
+It runs contained (docs/plugin-api.md 5.3): an isolated process of its own, with no
+network, no files and no permissions. Its toast, its library shelf and its vault value
+are all broker calls, each one gated by a permission its manifest declares. The plugin's
+page in Settings shows "Contained", and Advanced > Containment check shows the wall.

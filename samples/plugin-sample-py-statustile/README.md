@@ -49,3 +49,11 @@ returns: a `main` section with an `info` row (`about`), a `toggle`
 `show_count` and `greeting` are stored in `data_dir/settings.json` when
 a call carries them in `args["values"]`. The status tile keeps the
 `force-crash` test (raise `RuntimeError`) for the rig.
+
+## Access
+
+It runs contained (docs/plugin-api.md 5.3), in an isolated process with its own
+interpreter: no network, no files, no permissions. Its settings are kept by droidtop
+through the data API (`droidtop.host.call("data", "read" / "write", {"name": ...})`),
+and its panel's Network line asks droidtop (`net.state`) instead of opening a socket.
+`test_plugin.py` checks that `plugin.py` opens no file.

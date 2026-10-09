@@ -108,6 +108,16 @@ class SampleSocialProviderTest(unittest.TestCase):
         self.assertEqual("Bo wrote to you", panel("ping")["data"]["message"])
         self.assertEqual("bo", calls[-1][2]["friendId"])
 
+    def test_notify_me_asks_droidtop_to_post_and_reports_a_refusal(self):
+        global next_reply
+        next_reply = {"ok": True, "data": {"posted": True}}
+        self.assertEqual("Posted a notification", panel("notify")["data"]["message"])
+        api, op, args, version = calls[-1]
+        self.assertEqual(("notify", "post"), (api, op))
+        self.assertEqual("Sample chat", args["title"])
+        next_reply = {"ok": False, "error": {"code": "RATE_LIMITED", "message": "at most 5 notifications an hour"}}
+        self.assertIn("at most 5", panel("notify")["data"]["message"])
+
     def test_the_manifest_provides_the_point_and_declares_notifications(self):
         with open("manifest.template.json") as f:
             manifest = json.load(f)

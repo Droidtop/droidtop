@@ -76,6 +76,7 @@
           "required": { "type": "boolean" },
           "domains": { "type": "array", "items": { "type": "string" } },
           "packages": { "type": "array", "items": { "type": "string" } },
+          "paths": { "type": "array", "items": { "type": "string" }, "description": "files.shared.read / files.shared.write: folders relative to a storage volume, or \"*\" for all of it." },
           "scope": { "type": "string" }
         }
       }

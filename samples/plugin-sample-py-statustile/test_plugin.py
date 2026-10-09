@@ -7,9 +7,26 @@ import unittest
 
 calls = []
 next_reply = {"ok": True, "data": {"shown": True}}
+# The plugin's own data as droidtop keeps it (the data API): the plugin has no files of its own.
+store = {}
+
+
+def fake_call(api, op, args=None, version=1):
+    args = args or {}
+    if api == "data":
+        if op == "read":
+            if args["name"] not in store:
+                return {"ok": False, "error": {"code": "NOT_FOUND", "message": "no data named %s" % args["name"]}}
+            return {"ok": True, "data": {"text": store[args["name"]], "size": len(store[args["name"]]), "eof": True}}
+        if op == "write":
+            store[args["name"]] = args["text"]
+            return {"ok": True, "data": {"size": len(args["text"])}}
+    calls.append((api, op, args, version))
+    return next_reply
+
 
 fake_host = types.ModuleType("droidtop.host")
-fake_host.call = lambda api, op, args=None, version=1: (calls.append((api, op, args, version)), next_reply)[1]
+fake_host.call = fake_call
 fake_pkg = types.ModuleType("droidtop")
 fake_pkg.__path__ = []
 fake_pkg.host = fake_host
@@ -28,6 +45,7 @@ class SamplePanelTest(unittest.TestCase):
     def setUp(self):
         global next_reply
         calls.clear()
+        store.clear()
         next_reply = {"ok": True, "data": {"shown": True}}
 
     def test_panel_has_a_hello_button_that_calls_the_panel_op(self):
@@ -50,6 +68,23 @@ class SamplePanelTest(unittest.TestCase):
         reply = panel_call("hello")
         self.assertTrue(reply["ok"])
         self.assertIn("Show toasts is turned off", reply["data"]["message"])
+
+    def test_settings_live_in_droidtops_data_api_not_in_files(self):
+        plugin.handle(json.dumps({"point": "ui.settings", "op": "greet", "args": {"values": {"greeting": "hi"}}}))
+        self.assertEqual("hi", json.loads(store["settings.json"])["greeting"])
+        reply = json.loads(plugin.handle(json.dumps({"point": "ui.settings", "op": "greet", "args": {}})))
+        self.assertEqual("hi, from the sample plugin", reply["data"]["message"])
+        with open("src/plugin.py") as f:
+            source = f.read()
+        self.assertNotIn("open(", source, "a contained plugin can open no file; it uses the data API")
+
+    def test_the_panel_asks_droidtop_whether_it_is_online(self):
+        global next_reply
+        next_reply = {"ok": True, "data": {"online": True, "type": "wifi", "vpn": False}}
+        items = panel_call("panel")["data"]["sections"][0]["items"]
+        network = [i for i in items if i["id"] == "network"][0]
+        self.assertEqual("Online (wifi)", network["value"])
+        self.assertIn(("net", "state"), [(api, op) for api, op, _, _ in calls])
 
     def test_the_manifest_declares_the_toast_permission(self):
         with open("manifest.template.json") as f:

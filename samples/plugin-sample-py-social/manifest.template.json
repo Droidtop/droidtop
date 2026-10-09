@@ -3,11 +3,11 @@
   "origin": "droidtop",
   "label": "Sample social provider (Python)",
   "description": "A fake chat service that proves droidtop's social provider API end to end (docs/plugin-api.md C19); see build.sh in this folder.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "kind": "python",
   "contractVersion": 2,
   "permissions": [
-    {"id": "notify.post", "reason": "Shows a notification when a sample friend writes to you"}
+    {"id": "notify.post", "reason": "Shows a notification when a sample friend writes to you, or when you press Notify me"}
   ],
   "requestsRoot": false,
   "abis": [],

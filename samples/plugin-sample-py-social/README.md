@@ -32,3 +32,10 @@ chat" is under Accounts; Ada, Bo and Cy are under Friends. Write to Bo: the
 answer arrives a moment later. On the Quick Menu, Plugins, Sample chat, "Get a
 message" makes Bo write with the conversation closed, which raises a
 notification and the Social tile's count.
+
+## Access
+
+It runs contained (docs/plugin-api.md 5.3). Its panel's "Notify me" posts a
+notification through droidtop (`notify.post`); droidtop asks Android for its own
+notification permission the first time, during that press, and keeps at most five an
+hour per plugin.

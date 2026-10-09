@@ -3,11 +3,14 @@
   "origin": "droidtop",
   "label": "Sample status tile (Flutter)",
   "description": "Harmless flutter_embed-kind sample exercising the plugin API end to end (SPEC 12a); see build.sh in this folder.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "kind": "flutter_embed",
   "contractVersion": 2,
   "runtimeVersion": "af7e796e161ae0bb1ff0758c71a7105418bd9ded",
   "requestsRoot": false,
+  "permissions": [
+    {"id": "host.full_trust", "required": true, "reason": "A Flutter engine loads its code and assets from files and opens its own screen, which a contained plugin cannot (docs/plugin-api.md 5.3)"}
+  ],
   "provides": [
     {"point":"ui.status_tile","version":1,"id":"state","label":"Sample tile (Flutter)","surfaces":["gaming.quick_menu"]},
     {"point":"ui.settings","version":1,"target":"plugin"},

@@ -94,3 +94,11 @@ final reply = jsonDecode(replyJson!) as Map<String, dynamic>;
 The broker call runs off the main Looper, and its reply returns through
 the original method result. A malformed request returns the broker reply
 shape with error code `INVALID_ARGS`.
+
+## Access
+
+A Flutter plugin cannot run contained (docs/plugin-api.md 5.3, "Spike results"): the
+engine loads `libapp.so` and `flutter_assets` from files and `ui.main` is an activity.
+So the manifest asks for `host.full_trust` (needed), and the plugin runs, in a process
+of its own under droidtop's UID, only once the person allows "Run with droidtop's full
+access". Its page shows "Full access".

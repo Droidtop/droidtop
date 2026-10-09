@@ -29,12 +29,17 @@ droidtop.host.call("ui.toast", "show", ...), which needs "overlay.toast" in the
 manifest's permissions. A refusal comes back as an ordinary error reply, never
 an exception.
 
+The plugin runs contained (docs/plugin-api.md 5.3): an isolated process with no
+network and no files of its own, so on_load's data_dir is empty and nothing can
+be opened by path. Its settings live in droidtop's data API instead
+(droidtop.host.call("data", "read" / "write", {"name": ...})), and the panel's
+network line asks droidtop (net.state) rather than opening a socket.
+
 handle receives the contract 2 envelope (JSON text in, JSON text out)
 and must reply with {"ok": true, "data": {...}} or
 {"ok": false, "error": {"code": "UNSUPPORTED", "message": "..."}}.
 """
 import json
-import os
 import threading
 import time
 
@@ -47,32 +52,39 @@ import time
 import droidtop.host
 
 _load_count = 0
-_settings_path = None
+
+# The plugin's settings, by name in its own data kept by droidtop (docs/plugin-api.md 3 H1).
+_SETTINGS = "settings.json"
+_DEFAULTS = {"show_count": True, "greeting": "hello"}
 
 
 def _load_settings():
-    defaults = {"show_count": True, "greeting": "hello"}
-    if not _settings_path or not os.path.isfile(_settings_path):
-        return defaults.copy()
+    reply = droidtop.host.call("data", "read", {"name": _SETTINGS})
+    if not reply.get("ok"):
+        return dict(_DEFAULTS)
     try:
-        with open(_settings_path, "r") as f:
-            settings = json.load(f)
-        if "show_count" not in settings:
-            settings["show_count"] = defaults["show_count"]
-        if "greeting" not in settings:
-            settings["greeting"] = defaults["greeting"]
-        return settings
-    except Exception:
-        return defaults.copy()
+        settings = json.loads((reply.get("data") or {}).get("text") or "{}")
+    except ValueError:
+        return dict(_DEFAULTS)
+    for key, value in _DEFAULTS.items():
+        settings.setdefault(key, value)
+    return settings
 
 
 def _save_settings(settings):
-    if _settings_path:
-        try:
-            with open(_settings_path, "w") as f:
-                json.dump(settings, f)
-        except Exception:
-            pass
+    droidtop.host.call("data", "write", {"name": _SETTINGS, "text": json.dumps(settings)})
+
+
+def _network_line():
+    """Whether the device is online, as droidtop sees it: the plugin itself has no network to look at."""
+    reply = droidtop.host.call("net", "state")
+    if not reply.get("ok"):
+        error = reply.get("error") or {}
+        return "Not allowed: %s" % (error.get("message") or "no reason given")
+    data = reply.get("data") or {}
+    if not data.get("online"):
+        return "Offline"
+    return "Online (%s%s)" % (data.get("type", "unknown"), ", VPN" if data.get("vpn") else "")
 
 
 def _say_hello():
@@ -86,12 +98,9 @@ def _say_hello():
 
 
 def on_load(data_dir):
-    global _load_count, _settings_path
+    # data_dir is empty for a contained plugin: everything of its own goes through the data API.
+    global _load_count
     _load_count += 1
-    if data_dir:
-        _settings_path = os.path.join(data_dir, "settings.json")
-    else:
-        _settings_path = None
 
 
 def invoke(payload_json):
@@ -241,6 +250,12 @@ def handle(call_json):
                                         "id": "loads",
                                         "title": "Loaded",
                                         "value": "%d time(s)" % _load_count,
+                                    },
+                                    {
+                                        "type": "info",
+                                        "id": "network",
+                                        "title": "Network",
+                                        "value": _network_line(),
                                     },
                                     {
                                         "type": "toggle",

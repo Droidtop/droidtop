@@ -17,7 +17,12 @@ A friend answers a sent message a moment later, from a worker thread, and the pl
 says so with droidtop.host.call("social", "changed", {...}): that is how a provider with
 a live connection tells droidtop something happened without being polled. The panel's
 "Get a message" button does the same on demand. The message only becomes a notification
-because the manifest declares notify.post; without it the unread count still moves.
+because the manifest declares notify.post; without it the unread count still moves. The
+panel's "Notify me" button posts one through droidtop itself (notify.post), which asks
+Android for its own notification permission the first time, during that press.
+
+It runs contained (docs/plugin-api.md 5.3): everything it does beyond its own process is
+one of the broker calls above.
 
 Standard library only (json, threading, time), like every python-kind plugin.
 """
@@ -152,6 +157,13 @@ def _panel(op, args):
                                 "subtitle": "Bo writes to you, as a real service's friend would",
                                 "action": {"kind": "call", "op": "ping"},
                             },
+                            {
+                                "type": "button",
+                                "id": "notify",
+                                "title": "Notify me",
+                                "subtitle": "droidtop posts a notification for the sample service",
+                                "action": {"kind": "call", "op": "notify"},
+                            },
                         ],
                     }
                 ],
@@ -164,6 +176,12 @@ def _panel(op, args):
             return _ok({"message": "Bo wrote to you"})
         error = reply.get("error") or {}
         return _ok({"message": "droidtop did not take it: %s" % (error.get("message") or "no reason given")})
+    if op == "notify":
+        reply = droidtop.host.call("notify", "post", {"title": "Sample chat", "text": "A notification from the sample service"})
+        if reply.get("ok") and (reply.get("data") or {}).get("posted"):
+            return _ok({"message": "Posted a notification"})
+        error = reply.get("error") or {}
+        return _ok({"message": "droidtop did not post it: %s" % (error.get("message") or "no reason given")})
     return _error("UNSUPPORTED", "ui.panel has no op %s" % op)
 
 
