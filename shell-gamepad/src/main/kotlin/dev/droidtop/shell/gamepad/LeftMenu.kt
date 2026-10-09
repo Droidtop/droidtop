@@ -61,7 +61,6 @@ import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
-import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 
 /**
  * One place the left menu can take the user. Home is the PC Games section
@@ -186,7 +185,7 @@ internal fun LeftMenu(
                         GamepadAction.UP, GamepadAction.DOWN -> {
                             heldStep = p.repeat
                             val next = menuStep(focusIndex, rowCount, if (p.action == GamepadAction.UP) -1 else 1)
-                            if (next != focusIndex) EsDeNavigationSounds.play("scroll")
+                            moveCue(next != focusIndex, p.repeat)
                             focusIndex = next
                         }
                         GamepadAction.A -> if (focusIndex < resumeRows) onResume() else entries.getOrNull(focusIndex - resumeRows)?.let(onSelect)

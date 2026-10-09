@@ -112,6 +112,7 @@ import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.showsShoulderGlyphs
 import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import dev.droidtop.shell.gamepad.theme.UiSound
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -362,7 +363,7 @@ internal fun PcGamePage(
     // L1/R1, Left/Right on the strip, and a tap: one tab change.
     fun selectTab(next: Int) {
         val clamped = next.coerceIn(0, tabs.lastIndex)
-        if (clamped != tab) EsDeNavigationSounds.play("scroll")
+        if (clamped != tab) EsDeNavigationSounds.play(UiSound.TAB)
         tab = clamped
         row = 0
         if (zone == PageZone.CONTENT && rowsByTab[tabs[clamped]].isNullOrEmpty()) zone = PageZone.TABS
@@ -391,6 +392,11 @@ internal fun PcGamePage(
         )
     }
 
+    // Into and out of a game's page each have a cue (Steam's, docs/SPEC.md "Interface sounds").
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        EsDeNavigationSounds.play(UiSound.PAGE_IN)
+        onDispose { EsDeNavigationSounds.play(UiSound.PAGE_OUT) }
+    }
     Dialog(
         onDismissRequest = closePage,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -421,30 +427,30 @@ internal fun PcGamePage(
                                 // direction stops at the edge instead of running
                                 // through the whole page.
                                 PageZone.TABS -> if (!press.repeat) {
-                                    EsDeNavigationSounds.play("scroll")
+                                    EsDeNavigationSounds.play(UiSound.MOVE)
                                     zone = PageZone.ACTIONS
                                 }
                                 PageZone.CONTENT -> if (row > 0) {
-                                    EsDeNavigationSounds.play("scroll")
+                                    EsDeNavigationSounds.play(UiSound.MOVE)
                                     row -= 1
                                 } else if (!press.repeat) {
-                                    EsDeNavigationSounds.play("scroll")
+                                    EsDeNavigationSounds.play(UiSound.MOVE)
                                     zone = PageZone.TABS
                                 }
                             }
                             GamepadAction.DOWN -> when (zone) {
                                 PageZone.ACTIONS -> if (!press.repeat) {
-                                    EsDeNavigationSounds.play("scroll")
+                                    EsDeNavigationSounds.play(UiSound.MOVE)
                                     zone = PageZone.TABS
                                 }
                                 PageZone.TABS -> if (!press.repeat && current.isNotEmpty()) {
-                                    EsDeNavigationSounds.play("scroll")
+                                    EsDeNavigationSounds.play(UiSound.MOVE)
                                     zone = PageZone.CONTENT
                                     row = 0
                                 }
                                 PageZone.CONTENT -> {
                                     val next = menuStep(row, current.size, +1)
-                                    if (next != row) EsDeNavigationSounds.play("scroll")
+                                    if (next != row) EsDeNavigationSounds.play(UiSound.MOVE)
                                     row = next
                                 }
                             }
@@ -453,7 +459,7 @@ internal fun PcGamePage(
                                 when (zone) {
                                     PageZone.ACTIONS -> {
                                         val next = menuStep(button, buttons, step)
-                                        if (next != button) EsDeNavigationSounds.play("scroll")
+                                        if (next != button) EsDeNavigationSounds.play(UiSound.MOVE)
                                         button = next
                                     }
                                     PageZone.TABS -> selectTab(tab + step)

@@ -199,7 +199,11 @@ internal fun QuickMenu(
                 }
                 GamepadAction.L, GamepadAction.R -> {
                     val step = if (press.action == GamepadAction.L) -1 else 1
-                    section = QuickTiles.stepSection(sections, section, step)
+                    val next = QuickTiles.stepSection(sections, section, step)
+                    dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.play(
+                        if (next != section) dev.droidtop.shell.gamepad.theme.UiSound.TAB else dev.droidtop.shell.gamepad.theme.UiSound.BUMP,
+                    )
+                    section = next
                     true
                 }
                 else -> false

@@ -103,7 +103,9 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.input.PadPress
+import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
+import dev.droidtop.shell.gamepad.theme.UiSound
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
@@ -372,6 +374,7 @@ fun CatalogNavigator(
     // B: a pushed screen pops; the pane's first level hands the pad back
     // to the column; the column (or a navigator without one) leaves.
     fun back() {
+        EsDeNavigationSounds.play(UiSound.BACK)
         when {
             stack.size > 1 -> pop()
             categoryMode && !inColumn -> inColumn = true
@@ -402,6 +405,7 @@ fun CatalogNavigator(
 
     fun adjust(item: CatalogItem, direction: Int) {
         if (item is ToggleItem) {
+            EsDeNavigationSounds.play(if (item.current) UiSound.TOGGLE_OFF else UiSound.TOGGLE_ON)
             scope.launch {
                 statusById[item.id] = "Working..."
                 runCatching { item.onToggle(context, !item.current) }
@@ -409,7 +413,12 @@ fun CatalogNavigator(
                 if (statusById[item.id] == "Working...") statusById.remove(item.id)
                 refresh()
             }
-        } else if (adjustCatalogItem(context, item, direction)) refresh()
+        } else if (adjustCatalogItem(context, item, direction)) {
+            EsDeNavigationSounds.play(UiSound.SLIDER)
+            refresh()
+        } else {
+            EsDeNavigationSounds.play(UiSound.BUMP)
+        }
     }
 
     fun activate(item: CatalogItem) {
@@ -618,17 +627,23 @@ fun CatalogNavigator(
             GamepadAction.UP -> {
                 heldStep = press.repeat
                 when {
-                    columnOnSearch -> return press.repeat
+                    columnOnSearch -> return press.repeat.also { moveCue(false, press.repeat) }
                     categoryIndex == 0 && showSearch -> columnOnSearch = true
-                    categoryIndex == 0 -> return press.repeat
+                    categoryIndex == 0 -> return press.repeat.also { moveCue(false, press.repeat) }
                     else -> chooseCategory(categoryIndex - 1)
                 }
+                moveCue(true, press.repeat)
             }
             GamepadAction.DOWN -> {
                 heldStep = press.repeat
+                val moved = columnOnSearch || categoryIndex < categories.lastIndex
+                moveCue(moved, press.repeat)
                 if (columnOnSearch) chooseCategory(0) else chooseCategory(categoryIndex + 1)
             }
-            GamepadAction.A -> if (columnOnSearch) searchOpen = true else inColumn = false
+            GamepadAction.A -> {
+                EsDeNavigationSounds.play(UiSound.CONFIRM)
+                if (columnOnSearch) searchOpen = true else inColumn = false
+            }
             GamepadAction.RIGHT -> if (!columnOnSearch) inColumn = false
             GamepadAction.B -> back()
             else -> return false
@@ -650,6 +665,7 @@ fun CatalogNavigator(
             GamepadAction.Y -> row?.let { infoRow = it.item }
             GamepadAction.DOWN -> {
                 heldStep = press.repeat
+                moveCue(selected < rows.lastIndex, press.repeat)
                 setSelected((selected + 1).coerceAtMost(rows.lastIndex))
             }
             // Owned only while the selection can really move: a fresh Up at
@@ -658,8 +674,9 @@ fun CatalogNavigator(
             // otherwise finds nothing -- the top bar cannot take focus
             // (docs/SPEC.md 7j). A held Up stops at the first row.
             GamepadAction.UP -> {
-                if (selected == 0) return press.repeat
+                if (selected == 0) return press.repeat.also { moveCue(false, press.repeat) }
                 heldStep = press.repeat
+                moveCue(true, press.repeat)
                 setSelected(selected - 1)
             }
             GamepadAction.LEFT -> when {
@@ -667,7 +684,11 @@ fun CatalogNavigator(
                 row != null -> adjust(row.item, -1)
             }
             GamepadAction.RIGHT -> if (row != null && (!categoryMode || row.item.stepsInPlace())) adjust(row.item, +1)
-            GamepadAction.A -> row?.let { activate(it.item) }
+            GamepadAction.A -> row?.let {
+                // A toggle and a stepped choice make their own cue (adjust); everything else confirms.
+                if (it.item !is ToggleItem && !(it.item is ChoiceItem && (it.item as ChoiceItem).options.size <= 6)) EsDeNavigationSounds.play(UiSound.CONFIRM)
+                activate(it.item)
+            }
             else -> return false
         }
         return true

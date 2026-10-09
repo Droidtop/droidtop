@@ -23,7 +23,6 @@ import dev.droidtop.library.stores.SaveSide
 import dev.droidtop.library.stores.StoreSaves
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.menuStep
-import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 
 /**
  * Hosts the question a store's cloud-save sync asks when a game's saves
@@ -78,14 +77,15 @@ internal fun SaveConflictDialog(gameTitle: String, conflict: SaveConflict, onAns
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Cloud saves differ",
+            title = "Cloud saves differ",
             onPad = { pad ->
                 when (pad.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> {
                         val next = menuStep(selected, 3, if (pad.action == GamepadAction.UP) -1 else 1)
+                        moveCue(next != selected, pad.repeat)
                         if (next != selected) {
                             selected = next
                             armed = null
-                            EsDeNavigationSounds.play("scroll")
                         }
                     }
                     GamepadAction.A -> press(selected)
@@ -95,21 +95,28 @@ internal fun SaveConflictDialog(gameTitle: String, conflict: SaveConflict, onAns
                 true
             },
         ) {
-            Text("Cloud saves differ", style = MaterialTheme.typography.titleMedium, color = MenuTokens.OnSurface)
-            Text(gameTitle, style = MaterialTheme.typography.bodySmall, color = MenuTokens.OnSurfaceMuted)
-            MenuRow(
-                title = "This device",
-                subtitle = if (armed == 0) "Replaces the saves in ${conflict.cloudLabel}" else describe(conflict.local, newerIsLocal),
-                selected = selected == 0,
-                onClick = { press(0) },
+            Text(gameTitle, style = TypeRole.supporting, color = MenuTokens.OnSurfaceMuted)
+            // The two sides first, the way out last on its own (Steam's dialog order). The side that is
+            // armed says what it will replace, in the danger colour: a second A does it.
+            DialogChoices(
+                groups = listOf(
+                    listOf(
+                        DialogChoice(
+                            "This device",
+                            if (armed == 0) "Replaces the saves in ${conflict.cloudLabel}" else describe(conflict.local, newerIsLocal),
+                            danger = armed == 0,
+                        ),
+                        DialogChoice(
+                            conflict.cloudLabel,
+                            if (armed == 1) "Replaces the saves on this device" else describe(conflict.cloud, !newerIsLocal),
+                            danger = armed == 1,
+                        ),
+                    ),
+                    listOf(DialogChoice("Decide later")),
+                ),
+                selected = selected,
+                onChoose = ::press,
             )
-            MenuRow(
-                title = conflict.cloudLabel,
-                subtitle = if (armed == 1) "Replaces the saves on this device" else describe(conflict.cloud, !newerIsLocal),
-                selected = selected == 1,
-                onClick = { press(1) },
-            )
-            MenuRow(title = "Decide later", selected = selected == 2, onClick = { press(2) })
         }
     }
 }

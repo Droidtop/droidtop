@@ -139,6 +139,7 @@ import dev.droidtop.shell.gamepad.input.ownPadButtons
 import dev.droidtop.shell.gamepad.input.rememberHintList
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import dev.droidtop.shell.gamepad.theme.UiSound
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
 import dev.droidtop.shell.gamepad.theme.EsDeSystemElementLayer
@@ -435,6 +436,7 @@ private fun GamepadShellBody(
     // Gaming's Animations switch and Android's animator scale (docs/SPEC.md
     // "Gaming motion and focus"), observed for as long as the shell is drawn.
     MotionSync()
+    dev.droidtop.shell.gamepad.theme.SoundSync()
     // Observed, not read once: the row that sets it is in this shell's
     // own Settings section (see ScreensaverPrefs.changes).
     val screensaverMode by remember { dev.droidtop.library.settings.ScreensaverPrefs.changes(context) }
@@ -535,7 +537,7 @@ private fun GamepadShellBody(
             displayChoice = DisplayChoiceRequest(options, canRemember, onChosen)
         }
         dev.droidtop.library.LaunchDisplay.beforeDispatch = {
-            if (pendingLaunchSound.getAndSet(false)) EsDeNavigationSounds.play("launch")
+            if (pendingLaunchSound.getAndSet(false)) EsDeNavigationSounds.play(UiSound.LAUNCH)
         }
         // The dispatch itself runs after the audio hand-off, so a failure
         // there arrives here rather than through library.launch.
@@ -642,7 +644,7 @@ private fun GamepadShellBody(
         dev.droidtop.runtime.AudioHandOff.mark(
             "A pressed on a game: launch begins; open: ${dev.droidtop.runtime.AudioHandOff.openStreams()}",
         )
-        if (dev.droidtop.runtime.LaunchSoundPlan.launchSoundAtPress(soundVariant)) EsDeNavigationSounds.play("launch")
+        if (dev.droidtop.runtime.LaunchSoundPlan.launchSoundAtPress(soundVariant)) EsDeNavigationSounds.play(UiSound.LAUNCH)
         if (dev.droidtop.runtime.LaunchSoundPlan.launchSoundAtDispatch(soundVariant)) pendingLaunchSound.set(true)
         if (dev.droidtop.runtime.LaunchSoundPlan.quietFromPress(soundVariant)) {
             dev.droidtop.runtime.AudioHandOff.setQuiet("A pressed", true)
@@ -896,7 +898,7 @@ private fun GamepadShellBody(
             // Real ES-DE favorite sound -- played on an actual toggle
             // (GamelistBase.cpp:273-286), which is why it's after the
             // null-check: a kind with no favorite concept makes no sound.
-            EsDeNavigationSounds.play("favorite")
+            EsDeNavigationSounds.play(UiSound.FAVORITE)
             gameEntries = gameEntries?.map { if (it.id == entry.id) it.copy(favorite = newFavorite) else it }
         }
     }
@@ -2637,7 +2639,7 @@ private fun GamesSection(
         // gamelist for the system view plays BACKSOUND) -- this dispatcher
         // route and the onKeyEvent branch below are the same real drill-up,
         // just different hardware paths (see this handler's own comment).
-        EsDeNavigationSounds.play("back")
+        EsDeNavigationSounds.play(UiSound.BACK)
         // One level at a time: a group's own options screen is above the
         // group, so back leaves THAT first.
         nav.back()
@@ -2684,7 +2686,7 @@ private fun GamesSection(
                     // (owner, 2026-09-27), so they fall through to the root.
                     GamepadAction.LEFT, GamepadAction.RIGHT -> {
                         if (group == null || orderedGroups.size <= 1) return@onPad false
-                        EsDeNavigationSounds.play("quicksysselect")
+                        EsDeNavigationSounds.play(UiSound.TAB)
                         val index = orderedGroups.indexOf(group)
                         val step = if (press.action == GamepadAction.LEFT) -1 else 1
                         selectGroup(orderedGroups[(index + step + orderedGroups.size) % orderedGroups.size])
@@ -2699,7 +2701,7 @@ private fun GamesSection(
                         if (!headless) return@onPad false
                         val next = (focusedGameIndex + if (press.action == GamepadAction.UP) -1 else 1)
                             .coerceIn(0, systemGamesForGroup.size - 1)
-                        if (next != focusedGameIndex) EsDeNavigationSounds.play("scroll")
+                        if (next != focusedGameIndex) EsDeNavigationSounds.play(UiSound.MOVE)
                         focusedGameIndex = next
                         true
                     }
@@ -2910,7 +2912,7 @@ private fun GamesSection(
                                     // system from the system view plays
                                     // SELECTSOUND (SystemView.cpp:129).
                                     onSelect = {
-                                        EsDeNavigationSounds.play("select")
+                                        EsDeNavigationSounds.play(UiSound.CONFIRM)
                                         selectGroup(entryGroup)
                                     },
                                 )
@@ -3010,7 +3012,7 @@ private fun GamesSection(
                             // callback also fires for the initial focus
                             // attach, which is not a browse.
                             val onSystemFocused: (Int) -> Unit = {
-                                if (it != focusedSystemIndex) EsDeNavigationSounds.play("systembrowse")
+                                if (it != focusedSystemIndex) EsDeNavigationSounds.play(UiSound.SYSTEM)
                                 focusedSystemIndex = it
                             }
                             val systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
@@ -3184,7 +3186,7 @@ private fun GamesSection(
                     // h:105-108) -- guarded on a real index change,
                     // same reason as the system carousel.
                     onFocusedIndexChanged = {
-                        if (it != focusedGameIndex) EsDeNavigationSounds.play("scroll")
+                        if (it != focusedGameIndex) EsDeNavigationSounds.play(UiSound.MOVE)
                         focusedGameIndex = it
                     },
                     focusedSystemEntries = systemGamesForGroup,
@@ -3413,11 +3415,10 @@ private fun AppsSection(
             coroutineScope.launch {
                 withContext(Dispatchers.IO) { AppGameMarks.set(context, entry.id, nowGame) }
                 marksTick++
-                Toast.makeText(
+                dev.droidtop.shell.gamepad.theme.shellToast(
                     context,
                     if (nowGame) "${entry.title} marked as a game" else "${entry.title} is not a game",
-                    Toast.LENGTH_SHORT,
-                ).show()
+                )
             }
         }
     }
@@ -3447,7 +3448,7 @@ private fun AppsSection(
     OwnShoulders { step ->
         val next = if (activeView < 0) 0 else menuStep(activeView, views.size, step)
         if (next != activeView) {
-            EsDeNavigationSounds.play("scroll")
+            EsDeNavigationSounds.play(UiSound.MOVE)
             query = appsViewQuery(views[next], query)
         }
     }

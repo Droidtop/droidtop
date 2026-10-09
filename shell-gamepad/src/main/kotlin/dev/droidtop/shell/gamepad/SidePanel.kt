@@ -32,6 +32,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
+import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import dev.droidtop.shell.gamepad.theme.UiSound
 import kotlinx.coroutines.launch
 
 /** The edge a [SidePanelFrame] slides in from. */
@@ -90,13 +92,19 @@ internal fun SidePanelFrame(
     val close: () -> Unit = {
         if (!closing) {
             closing = true
+            EsDeNavigationSounds.play(UiSound.PANEL_CLOSE)
             scope.launch {
                 shown.animateTo(0f, Motion.panelOut())
                 dismiss()
             }
         }
     }
-    LaunchedEffect(Unit) { shown.animateTo(1f, Motion.panelIn()) }
+    // Each side menu opens and closes with its own cue (Steam's side-menu sounds, docs/SPEC.md
+    // "Interface sounds"); swapping to the other menu is that menu opening.
+    LaunchedEffect(Unit) {
+        EsDeNavigationSounds.play(UiSound.PANEL_OPEN)
+        shown.animateTo(1f, Motion.panelIn())
+    }
     Dialog(
         onDismissRequest = close,
         properties = DialogProperties(usePlatformDefaultWidth = false),

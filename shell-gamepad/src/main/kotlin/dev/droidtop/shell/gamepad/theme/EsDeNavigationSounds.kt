@@ -6,6 +6,7 @@ import android.os.SystemClock
 import dev.droidtop.library.theme.EsDeTheme
 import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.runtime.AudioHandOff
+import dev.droidtop.shell.gamepad.input.PadModality
 import java.io.File
 import java.io.RandomAccessFile
 import kotlinx.coroutines.CoroutineScope
@@ -65,12 +66,15 @@ fun navigationSoundPaths(theme: EsDeTheme?): Map<String, String> {
  * loads each of the seven sounds from the theme's own `<sound>` elements,
  * falling back PER FILE to its own bundled default .wav resources
  * (`:/sounds/<name>.wav`, Sound::getFromTheme) when a theme doesn't
- * declare one or the declared file doesn't exist. droidtop deliberately
- * has NO bundled fallback sounds -- ES-DE's own .wav resources aren't
- * ours to redistribute and inventing replacement audio would violate this
- * project's no-fabricated-assets rule -- so an undeclared/missing sound
- * simply plays nothing, same honest-gap convention the badge/systemstatus
- * renderers already use for ES-DE's bundled icon art.
+ * declare one or the declared file doesn't exist. droidtop never ships
+ * ES-DE's own .wav resources (they aren't ours to redistribute) and never
+ * invents audio; its fallback is its own bundled set, a CC0 pack under
+ * `assets/ui-sounds/` named by role ([UiSound.packFile], [attachPack];
+ * Droidtop/tracker#211), and a role neither supplies plays nothing.
+ *
+ * What plays is asked by ROLE ([UiSound], docs/SPEC.md "Interface
+ * sounds"): Steam's cue vocabulary, each role mapped to the theme's sound
+ * where ES-DE has one, the theme overriding the bundled set role by role.
  *
  * SoundPool, not MediaPlayer: these are sub-second UI feedback samples
  * fired on every keypress -- SoundPool pre-decodes to PCM in memory and
@@ -117,6 +121,38 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
 
     @Volatile
     private var soundIdByName: Map<String, Int> = emptyMap()
+
+    /** The bundled set's samples by file stem ([UiSound.packFile]), loaded by [attachPack]. */
+    @Volatile
+    private var packIdByStem: Map<String, Int> = emptyMap()
+
+    /** The context [attachPack] was given, so [reopen] can load the set again after a hand-off. */
+    private var packContext: android.content.Context? = null
+
+    /**
+     * Loads droidtop's bundled interface sounds, `assets/ui-sounds/<role>.ogg` or `.wav`, once per
+     * process and again after a hand-off; the folder is listed off the main thread. An empty or
+     * missing folder binds nothing, and every role without a theme sample then plays nothing.
+     */
+    fun attachPack(context: android.content.Context) {
+        val app = context.applicationContext
+        packContext = app
+        if (AudioHandOff.handedOff.value || packIdByStem.isNotEmpty()) return
+        val generation = loadGeneration
+        loadScope.launch {
+            val files = withContext(Dispatchers.IO) {
+                runCatching { app.assets.list(PACK_DIR)?.toList() }.getOrNull().orEmpty()
+                    .filter { it.endsWith(".ogg") || it.endsWith(".wav") }
+            }
+            if (files.isEmpty() || generation != loadGeneration || AudioHandOff.handedOff.value) return@launch
+            val pool = obtainPool()
+            packIdByStem = files.mapNotNull { file ->
+                runCatching { app.assets.openFd("$PACK_DIR/$file").use { pool.load(it, 1) } }.getOrNull()
+                    ?.let { file.substringBeforeLast('.') to it }
+            }.toMap()
+            AudioHandOff.mark("bundled interface sounds: ${packIdByStem.size} loaded")
+        }
+    }
 
     /** Quiet: the launch-static experiment mutes every navigation sound but the launch sample ([setQuiet]). */
     @Volatile private var quiet = false
@@ -212,27 +248,51 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
         }
     }
 
-    /** Plays one of [ES_DE_NAVIGATION_SOUND_NAMES]; silent no-op when the active theme doesn't provide it (see this object's doc comment -- no bundled fallback sounds, deliberately). */
-    fun play(name: String) {
+    /**
+     * Gaming's Navigation sounds switch ([SoundSync]): off, no role plays. Hand-off bookkeeping still
+     * runs, because navigation input is also what brings droidtop's audio back after a launch.
+     */
+    @Volatile var enabled: Boolean = true
+
+    private val throttle = CueThrottle()
+
+    /**
+     * Plays an interface-sound role (docs/SPEC.md "Interface sounds"): the theme's own sample where it
+     * binds the role's navigation sound, else the bundled set's ([attachPack]), else nothing
+     * ([uiSoundSource]). A direction role is not played for a touch-driven move, and no more than one
+     * cue sounds per 50 ms ([CueThrottle]); the launch cue is never held back.
+     */
+    fun play(sound: UiSound) {
         // A navigation sound only ever answers input to droidtop's own
         // shell, so the user is back even if no activity was paused (a
         // launch onto the other screen of a dual-screen device).
         if (AudioHandOff.handedOff.value) {
-            AudioHandOff.mark("play $name: droidtop is handed off, reopening instead")
+            AudioHandOff.mark("play $sound: droidtop is handed off, reopening instead")
             AudioHandOff.reopen("navigation input")
             return
         }
-        if (quiet && name != "launch") {
+        if (!enabled) return
+        if (sound.move && !PadModality.showsFocus) return
+        if (!throttle.allow(sound, SystemClock.uptimeMillis())) return
+        when (val source = uiSoundSource(sound, soundIdByName.keys, packIdByStem.keys)) {
+            is UiSoundSource.Theme -> playSample(sound, soundIdByName[source.name], pathByName[source.name])
+            is UiSoundSource.Pack -> playSample(sound, packIdByStem[source.file], null)
+            UiSoundSource.None -> AudioHandOff.mark("play $sound: no sample for this role")
+        }
+    }
+
+    private fun playSample(sound: UiSound, id: Int?, path: String?) {
+        val name = sound.name
+        if (quiet && sound != UiSound.LAUNCH) {
             AudioHandOff.mark("play $name: skipped, droidtop sounds are silenced")
             return
         }
-        val id = soundIdByName[name]
         val stream = if (id != null) soundPool?.play(id, 1f, 1f, 1, 0, 1f) else null
         if (stream == null || stream == 0) {
             AudioHandOff.mark("play $name: nothing played (${if (id == null) "no sample bound" else "sample $id refused: not loaded yet, or no stream"})")
             return
         }
-        val sounding = Sounding(stream, pathByName[name], SystemClock.elapsedRealtime())
+        val sounding = Sounding(stream, path, SystemClock.elapsedRealtime())
         val live = synchronized(liveStreams) {
             liveStreams.addLast(sounding)
             while (liveStreams.size > MAX_STREAMS) liveStreams.removeFirst()
@@ -291,14 +351,17 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
         describedPaths.clear()
         soundIdsByPath.clear()
         soundIdByName = emptyMap()
+        packIdByStem = emptyMap()
         return "SoundPool released ($samples samples; waited ${waited} ms for a sounding sample to finish)"
     }
 
     override suspend fun reopen() {
         load(boundTheme)
+        packContext?.let(::attachPack)
     }
 
     private const val MAX_STREAMS = 4
+    private const val PACK_DIR = "ui-sounds"
     private const val PLAY_OUT_CAP_MS = 3000L
 
     private class Sounding(val streamId: Int, val path: String?, val startedAt: Long)

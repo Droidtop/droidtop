@@ -59,6 +59,7 @@ object GamingSettingsCatalog {
     const val ID_DEFAULT_SECTION = "pref_gaming_default_section"
     const val ID_SHOW_HINTS = "pref_gaming_show_hints"
     const val ID_ANIMATIONS = "pref_gaming_animations"
+    const val ID_NAVIGATION_SOUNDS = "pref_gaming_navigation_sounds"
     const val ID_SCRAPER = "pref_gaming_scraper"
     const val ID_ACCOUNTS_AND_SOURCES = "pref_gaming_accounts_and_sources"
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
@@ -155,6 +156,7 @@ object GamingSettingsCatalog {
                 add(defaultSectionItem(context))
                 add(showHintsItem(context))
                 add(animationsItem(context))
+                add(navigationSoundsItem(context))
                 // Nested catalog screens whose DATA lives in :app -- resolved
                 // through SettingsScreenRegistry (registered at process start
                 // by :app's SettingsCatalogInitProvider), so they render
@@ -806,6 +808,24 @@ object GamingSettingsCatalog {
 
     /** The Animations switch's value: on unless the person turned it off. */
     fun animationsOn(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(ID_ANIMATIONS, true)
+
+    /**
+     * The one switch for the shell's interface sounds (docs/SPEC.md "Interface sounds"): every cue role,
+     * whether the theme or droidtop's own set supplies it. Off, nothing the shell's chrome does makes a
+     * sound; a game's own audio is not touched.
+     */
+    private fun navigationSoundsItem(context: Context) = ToggleItem(
+        id = ID_NAVIGATION_SOUNDS,
+        title = "Navigation sounds",
+        subtitle = "A sound for moving, choosing, going back, opening menus and launching; the theme's own where it has them",
+        current = navigationSoundsOn(context),
+        onToggle = { ctx, value ->
+            CatalogPrefs.prefs(ctx).edit().putBoolean(ID_NAVIGATION_SOUNDS, value).apply()
+        },
+    )
+
+    /** The Navigation sounds switch's value: on unless the person turned it off. */
+    fun navigationSoundsOn(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(ID_NAVIGATION_SOUNDS, true)
 
     // The one role model (MainScreen): this row and Swap screens both
     // write it, and both Gaming and Desktop read it -- hence "Main

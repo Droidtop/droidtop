@@ -23,6 +23,7 @@ import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import dev.droidtop.shell.gamepad.theme.UiSound
 import kotlinx.coroutines.launch
 
 /** One game the picker offers: its name, and why it is offered and where it is. */
@@ -84,7 +85,7 @@ internal fun SameGamePicker(
     fun move(to: Int) {
         focusIndex = to
         armed = null
-        EsDeNavigationSounds.play("scroll")
+        EsDeNavigationSounds.play(UiSound.MOVE)
     }
 
     BackHandler { onDismiss() }

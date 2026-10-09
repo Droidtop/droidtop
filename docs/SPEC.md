@@ -7609,6 +7609,40 @@ A launch counts as played only when the shell is not started again within
 (`LaunchDisplay.bouncedBack`): a launch that leaves the shell in front put
 nothing on screen.
 
+**Interface sounds (2026-10-08, Droidtop/tracker#363 slice 10, #211).** The
+shell asks for a sound by ROLE (`UiSound`), Steam's cue vocabulary restated as
+droidtop's own: move, bump (a press that went nowhere: a fresh press at a
+list's end, a shoulder at a strip's end, a step a row cannot take), tab (a
+strip or rail stepping), system (Retro Games' system carousel), slider (a
+stepped value), confirm, back, launch, favourite, side menu open and close
+(`SidePanelFrame`), modal show and hide (`MenuPanel`, so every sheet and
+dialog), page in and out (the game page), toggle on and off, toast. Nothing
+of Valve's is used. Each role plays the active ES-DE theme's own sample where
+it maps to one of ES-DE's seven navigation sounds (move and slider: scroll; tab:
+quicksysselect; system: systembrowse; confirm, open, page in and toggle on:
+select; back, close, page out and toggle off: back; launch; favourite), else
+droidtop's bundled set (`assets/ui-sounds/<role>.ogg` or `.wav`, a CC0 pack;
+not bundled yet, waiting on the owner's approval of the download), else nothing
+(`uiSoundSource`): the theme overrides the bundled set role by role (#211). At
+most one cue sounds per 50 ms, the launch cue excepted (`CueThrottle`); the
+direction roles (move, bump, tab, system, slider) are not played for a
+touch-driven move, as Steam plays nothing for a pointer hover; a direction held
+against an end does not keep bumping (`moveCue`). One switch silences every role,
+Settings > Home & modes > Shell > **Navigation sounds** (on by default;
+`SoundSync` observes it). The bundled set loads into the same SoundPool as the
+theme's samples, so the launch hand-off below releases and reloads it too.
+**Toasts** go through one helper (`shellToast`): the toast cue, then Android's
+own toast, kept on purpose because Android draws it above every window, where a
+toast drawn in the shell's own window would sit under an open menu or the game
+page (so Steam's toast motion is not taken). **Dialogs** draw their choices with
+one component (`DialogChoices`, Steam's power dialog): flat rows on one plate,
+groups split by a thin rule in the scrim role, the safe choices first and the
+way out (OK, Cancel, Decide later) last in a group of its own, the row under the
+cursor the solid selected inversion; the page behind is dimmed to the scrim
+role's 80% (`ModalScrim`). The launch failure dialog, the launch screen chooser
+(which gained a Cancel row in place of its "B cancels" line) and the cloud-save
+conflict dialog use it.
+
 **Launch audio hand-off (2026-09-30, redecided 2026-10-01, tracker#160).**
 When another app comes in front, droidtop has NO audio output stream of
 its own open: not playing, not paused, not idle. Pausing was not enough
@@ -8649,7 +8683,8 @@ transitions (the `<transitions>` profile selection of "View
 transitions": automatic, a declared profile, builtin-slide, builtin-fade
 or instant) and controller family (the `controller` badge and helpsystem
 glyphs). Each row is offered only when the active theme declares that
-axis, as ES-DE greys them out. Navigation sounds have an on/off row. The
+axis, as ES-DE greys them out. Navigation sounds have one on/off row,
+Settings > Home & modes > Shell > Navigation sounds (see "Interface sounds"). The
 two `ThemePrefs` writers that exist with no reader (transitions,
 controller family) are what these rows write, and the renderer reads
 them.

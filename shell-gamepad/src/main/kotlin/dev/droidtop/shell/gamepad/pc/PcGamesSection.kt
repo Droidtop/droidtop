@@ -85,6 +85,7 @@ import dev.droidtop.shell.gamepad.query.LibrarySearchDialog
 import dev.droidtop.shell.gamepad.query.LibrarySortKey
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import dev.droidtop.shell.gamepad.theme.UiSound
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -486,7 +487,7 @@ internal fun PcGamesSection(
         onCanGoBackChanged(canGoBack)
     }
     BackHandler(enabled = canGoBack && !showingSetup) {
-        EsDeNavigationSounds.play("back")
+        EsDeNavigationSounds.play(UiSound.BACK)
         state.stripIndex = 0
         // A grid view goes back to Overview, Overview back to Home, the hub.
         if (state.view == PcView.GRID) state.showOverview() else state.open(home = true)
@@ -511,8 +512,11 @@ internal fun PcGamesSection(
         val active = activeChip.takeIf { it >= 0 } ?: state.stripIndex.coerceIn(0, stripCount - 1)
         val next = menuStep(active, stripCount, step)
         if (next != active) {
-            EsDeNavigationSounds.play("scroll")
+            EsDeNavigationSounds.play(UiSound.TAB)
             activateChip(next)
+        } else {
+            // A shoulder at the strip's end goes nowhere (its glyph is already at half strength).
+            EsDeNavigationSounds.play(UiSound.BUMP)
         }
     }
 
@@ -569,7 +573,7 @@ internal fun PcGamesSection(
     }
 
     fun moveTo(shelf: Int, item: Int) {
-        if (shelf != state.shelfIndex || item != state.itemIndex) EsDeNavigationSounds.play("scroll")
+        if (shelf != state.shelfIndex || item != state.itemIndex) EsDeNavigationSounds.play(UiSound.MOVE)
         currentShelf?.let { state.shelfItems[it.id] = state.itemIndex }
         state.shelfIndex = shelf
         state.itemIndex = item
@@ -614,7 +618,7 @@ internal fun PcGamesSection(
                                 val next = state.shelfIndex + 1
                                 moveTo(next, state.shelfItems[shelves[next].id] ?: 0)
                             } else if (state.home) {
-                                EsDeNavigationSounds.play("scroll")
+                                EsDeNavigationSounds.play(UiSound.MOVE)
                                 state.destFocused = true
                             }
                             else -> gridPadTarget(state.itemIndex, grid.size, gridColumns(), FocusDirection.Down)
@@ -625,12 +629,12 @@ internal fun PcGamesSection(
                             when {
                                 onDest -> {
                                     val next = menuStep(state.destIndex, HOME_DESTINATIONS.size, step)
-                                    if (next != state.destIndex) EsDeNavigationSounds.play("scroll")
+                                    if (next != state.destIndex) EsDeNavigationSounds.play(UiSound.MOVE)
                                     state.destIndex = next
                                 }
                                 state.stripFocused -> {
                                     val next = menuStep(state.stripIndex, stripCount, step)
-                                    if (next != state.stripIndex) EsDeNavigationSounds.play("scroll")
+                                    if (next != state.stripIndex) EsDeNavigationSounds.play(UiSound.MOVE)
                                     state.stripIndex = next
                                 }
                                 state.onShelves -> moveTo(state.shelfIndex, menuStep(state.itemIndex, currentList.size, step))

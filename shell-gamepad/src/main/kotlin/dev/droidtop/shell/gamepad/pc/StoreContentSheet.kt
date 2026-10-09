@@ -35,6 +35,7 @@ import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import dev.droidtop.shell.gamepad.theme.UiSound
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -153,7 +154,7 @@ internal fun StoreContentSheet(
                         val next = menuStep(selected, rowCount, if (pad.action == GamepadAction.UP) -1 else 1)
                         if (next != selected) {
                             selected = next
-                            EsDeNavigationSounds.play("scroll")
+                            EsDeNavigationSounds.play(UiSound.MOVE)
                         }
                     }
                     GamepadAction.A -> press(selected)

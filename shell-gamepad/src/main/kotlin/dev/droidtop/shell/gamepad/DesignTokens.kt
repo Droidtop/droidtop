@@ -222,6 +222,15 @@ object ProgressLook {
 }
 
 /**
+ * A modal dialog's choice list (`DialogChoices`, Steam's power dialog): rows at least
+ * [RowMinHeight] tall on one plate, groups split by a [RuleHeight] rule in the scrim role.
+ */
+object DialogLook {
+    val RowMinHeight: Dp = 40.dp
+    val RuleHeight: Dp = 2.dp
+}
+
+/**
  * The type scale, and the job of each role. droidtop's chrome supplies
  * this to [MaterialTheme] rather than inheriting the platform default, so
  * two screens in the same flow cannot use different roles for the same

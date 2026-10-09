@@ -32,6 +32,7 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import dev.droidtop.shell.gamepad.theme.UiSound
 
 /**
  * Fullscreen browser for everything scraped for one game (real ES-DE has
@@ -73,7 +74,7 @@ internal fun MediaViewer(title: String, media: List<Pair<String, String>>, onClo
                             press.repeat -> index
                             else -> (next + media.size) % media.size
                         }
-                        if (moved != index) EsDeNavigationSounds.play("scroll")
+                        if (moved != index) EsDeNavigationSounds.play(UiSound.MOVE)
                         index = moved
                         true
                     }

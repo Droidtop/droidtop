@@ -112,7 +112,7 @@ fun PcLaunchOfferSheet(launch: PcLaunch) {
 }
 
 private fun say(context: Context, line: String?) {
-    line?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+    line?.let { dev.droidtop.shell.gamepad.theme.shellToast(context, it, long = true) }
 }
 
 /**

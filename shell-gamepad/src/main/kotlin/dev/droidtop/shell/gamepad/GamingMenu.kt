@@ -66,6 +66,8 @@ import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.input.PadPress
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
+import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import dev.droidtop.shell.gamepad.theme.UiSound
 
 /*
  * The Gaming shell's shared menu language, in one place. Its colours
@@ -750,6 +752,11 @@ internal fun MenuPanel(
     GatePadInThisDialog()
     DeclareLayerHints(hints)
     ModalScrim()
+    // Every modal shows and hides with its own cue (Steam's modal sounds, docs/SPEC.md "Interface sounds").
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        EsDeNavigationSounds.play(UiSound.MODAL_SHOW)
+        onDispose { EsDeNavigationSounds.play(UiSound.MODAL_HIDE) }
+    }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, focusLabel) }
     val shown = remember { androidx.compose.animation.core.Animatable(if (Motion.enabled) 0f else 1f) }
@@ -825,6 +832,60 @@ internal fun ModalScrim() {
     androidx.compose.runtime.SideEffect { dialogWindow?.setDimAmount(strength) }
 }
 
+/** One choice of a modal dialog ([DialogChoices]): its label, a short line under it (a date, what it will do), and whether it is one-way. */
+internal class DialogChoice(val label: String, val detail: String? = null, val danger: Boolean = false)
+
+/**
+ * A modal's choices, Steam's dialog list (its power dialog, docs/SPEC.md 7k "Dialogs"): flat rows on
+ * one plate, groups split by a thin dark rule ([DialogLook.RuleHeight]), the safe choices first and
+ * the way out (Cancel, OK, Decide later) last in a group of its own. The row under the cursor is the
+ * solid selected inversion, with the window's one ring. [selected] counts rows across the groups,
+ * in order; a tap chooses ([onChoose]). One component for every dialog, so they read alike.
+ */
+@Composable
+internal fun DialogChoices(groups: List<List<DialogChoice>>, selected: Int, onChoose: (Int) -> Unit) {
+    val window = LocalShellWindow.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = Space.Sm)
+            .clip(Corners.Crisp)
+            .background(MenuTokens.Surface),
+    ) {
+        var index = 0
+        groups.filter { it.isNotEmpty() }.forEachIndexed { g, group ->
+            if (g > 0) Box(Modifier.fillMaxWidth().height(DialogLook.RuleHeight).background(MenuTokens.Scrim))
+            group.forEach { choice ->
+                val row = index++
+                val inverted = row == selected && PadModality.showsFocus
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // A row is a button here, so it is at least as big as a finger on a screen without a pad.
+                        .heightIn(min = if (window.touchFirst) window.minTouchTarget else DialogLook.RowMinHeight)
+                        .selectionFrame(row == selected, Corners.Crisp, rest = Color.Transparent, selectedFill = MenuTokens.Selected)
+                        .clickable { onChoose(row) }
+                        .padding(horizontal = Space.Lg, vertical = Space.Sm),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        choice.label,
+                        color = when {
+                            inverted -> MenuTokens.OnSelected
+                            choice.danger -> MenuTokens.Danger
+                            else -> MenuTokens.OnSurface
+                        },
+                        style = TypeRole.body,
+                    )
+                    choice.detail?.let {
+                        Text(it, color = if (inverted) MenuTokens.OnSelected else MenuTokens.OnSurfaceMuted, style = TypeRole.supporting)
+                    }
+                }
+            }
+        }
+    }
+}
+
 /**
  * The foot of a scrolling column fading out while it can still scroll down,
  * so a cut row reads as "more below" rather than as the end. Drawn in the
@@ -872,12 +933,25 @@ private fun MoreBelowArrow(modifier: Modifier = Modifier) {
 
 /**
  * Up or Down on a menu's cursor: ES-DE's menus stop at both ends
- * ([menuStep]), and a move that happens plays ES-DE's own scroll sound.
+ * ([menuStep]); a move that happens plays the move cue, and a fresh press
+ * at an end that goes nowhere plays the bump cue ([moveCue]).
  */
 internal fun menuMove(index: Int, count: Int, press: PadPress): Int {
     val next = menuStep(index, count, if (press.action == GamepadAction.UP) -1 else 1)
-    if (next != index) dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.play("scroll")
+    moveCue(next != index, press.repeat)
     return next
+}
+
+/**
+ * The one sound rule for a cursor step (docs/SPEC.md "Interface sounds"): [moved], the move cue;
+ * not moved, the bump cue (Steam's "a press that went nowhere"), but only for a fresh press, so a
+ * direction held against an end does not keep bumping.
+ */
+internal fun moveCue(moved: Boolean, repeat: Boolean) {
+    when {
+        moved -> EsDeNavigationSounds.play(UiSound.MOVE)
+        !repeat -> EsDeNavigationSounds.play(UiSound.BUMP)
+    }
 }
 
 /**

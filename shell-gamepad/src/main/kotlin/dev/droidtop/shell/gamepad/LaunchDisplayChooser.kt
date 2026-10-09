@@ -2,15 +2,9 @@ package dev.droidtop.shell.gamepad
 
 import dev.droidtop.shell.gamepad.input.GamepadAction
 
-import androidx.compose.foundation.clickable
 
 
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 
@@ -19,11 +13,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LaunchDisplayOption
@@ -58,6 +49,16 @@ internal fun LaunchDisplayChooserDialog(
                 emptyList()
             }
     }
+    // Steam's dialog order: the screens, then the remembered choices, then Cancel last on its own.
+    val groups = remember(rows) {
+        listOf(
+            rows.filterNot { it.remember }.map { DialogChoice(it.label) },
+            rows.filter { it.remember }.map { DialogChoice(it.label) },
+            listOf(DialogChoice("Cancel")),
+        )
+    }
+    val count = rows.size + 1
+    val choose: (Int) -> Unit = { index -> rows.getOrNull(index)?.let { onPick(it.option, it.remember) } ?: onCancel() }
     var selected by remember { mutableStateOf(0) }
 
     val window = LocalShellWindow.current
@@ -67,39 +68,23 @@ internal fun LaunchDisplayChooserDialog(
         MenuPanel(
             modifier = Modifier.width(window.panelWidth(400.dp)),
             focusLabel = "Launch display chooser",
+            title = "Launch on which screen?",
             onPad = { press ->
                 when (press.action) {
-                    GamepadAction.UP, GamepadAction.DOWN -> selected = menuMove(selected, rows.size, press)
-                    GamepadAction.A -> rows.getOrNull(selected)?.let { onPick(it.option, it.remember) }
+                    GamepadAction.UP, GamepadAction.DOWN -> selected = menuMove(selected, count, press)
+                    GamepadAction.A -> choose(selected)
                     GamepadAction.B -> onCancel()
                     else -> Unit
                 }
                 true
             },
         ) {
-            Text("Launch on which screen?", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
-            Text(
-                if (canRemember) "\"Always\" remembers for this game · B cancels the launch" else "B cancels the launch",
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
-            )
-            rows.forEachIndexed { index, row ->
-                Text(
-                    row.label,
-                    color = if (index == selected) MenuTokens.OnSurface else MenuTokens.Value,
-                    fontWeight = if (index == selected) FontWeight.SemiBold else FontWeight.Normal,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        // A row is a button here, so it is at least as
-                        // big as a finger on a screen without a pad.
-                        .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
-                        .clip(RoundedCornerShape(8.dp))
-                        .selectionFrame(index == selected, RoundedCornerShape(8.dp), rest = Color.Transparent)
-                        .clickable { onPick(row.option, row.remember) }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                )
+            if (canRemember) {
+                Text("\"Always\" remembers for this game", color = MenuTokens.OnSurfaceMuted, style = TypeRole.supporting)
+            }
+            DialogChoices(groups, selected) { index ->
+                selected = index
+                choose(index)
             }
         }
     }
