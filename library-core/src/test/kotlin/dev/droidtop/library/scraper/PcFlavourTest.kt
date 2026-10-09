@@ -149,7 +149,7 @@ class PcFlavourTest {
             id = "/storage/games/Doki Doki Literature Club",
             title = "Doki Doki Literature Club",
             kind = LibraryEntryKind.RENPY,
-            pcInfo = PcInfo(source = "Steam", storeId = "steam:698780", installed = true),
+            pcInfo = PcInfo(storeId = "steam:698780", installed = true),
         )
         assertEquals(698780, PcGameIds.of(engine).steamAppId)
         assertEquals(PcStoreId("steam", "698780"), PcGameIds.of(engine).storeId)

@@ -23,7 +23,6 @@ class StoreIdentityTest {
             kind = LibraryEntryKind.WINE_PROFILE,
             gameName = gameName,
             pcInfo = PcInfo(
-                source = id.substringBefore(':'),
                 storeId = id,
                 installed = installed,
                 installPath = installPath,

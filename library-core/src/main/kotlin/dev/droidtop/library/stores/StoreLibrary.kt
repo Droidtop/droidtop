@@ -48,7 +48,7 @@ data class StoreGame(
      * today.
      */
     val externalIds: Map<String, String> = emptyMap(),
-    /** How the account holds the game; anything but [StoreHolding.OWNED] is listed apart. */
+    /** How the account holds the game ([StoreHolding]); one row per game per store, at its strongest holding. */
     val holding: StoreHolding = StoreHolding.OWNED,
 ) {
     /** The id the library knows this row by: `"gog:1207658691"`. */
@@ -56,20 +56,34 @@ data class StoreGame(
 }
 
 /**
- * How an account holds a store's game (docs/SPEC.md 7g, "Stores"). Only
- * [OWNED] games count as the person's library; the others are listed apart,
- * each under its own name ([PcStoreNames.groupOf]), the way Steam keeps a
- * family's games and unplayed free games out of a profile's count.
+ * How an account holds a store's game (docs/SPEC.md 7g, "Stores"): a fact on
+ * the row ([dev.droidtop.library.PcInfo.holding]), the same meanings for every
+ * store. Which lists show a row is the list's rule (`listExclusion`, 7j), not
+ * a name of its own. The declaration order is the strength order: when a
+ * store reports one game under more than one holding, its one row carries the
+ * strongest ([strongest]).
  */
-enum class StoreHolding {
-    /** Bought, keyed or gifted, or free and played or installed. */
-    OWNED,
+enum class StoreHolding(
+    /** The one label every surface draws (the Ownership filter, a store page's rows). */
+    val label: String,
+) {
+    /** In the account's library on that store, however it got there: bought, keyed, gifted, a claimed giveaway, a free game added or played. */
+    OWNED("Owned"),
 
-    /** Free, added to the account, never played and not installed. */
-    FREE,
+    /** Lent to this account by another account on the same store (a Steam family). */
+    FAMILY("Shared with you"),
 
-    /** Another account's, lent (Steam Families). */
-    FAMILY,
+    /** A free-to-play catalogue row the account holds a licence for but never added. No store maps "free" or "claimed" to it. */
+    FREE("Free to play (not in your library)"),
+
+    /** Installed on the device but no longer held by the account (a licence ended, or signed out). */
+    NOT_OWNED("No longer in your library"),
+    ;
+
+    companion object {
+        /** The strongest of [holdings]: OWNED, then FAMILY, then FREE, then NOT_OWNED. */
+        fun strongest(holdings: Collection<StoreHolding>): StoreHolding = holdings.minByOrNull { it.ordinal } ?: OWNED
+    }
 }
 
 /**

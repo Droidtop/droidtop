@@ -75,7 +75,7 @@ class LibraryPathIndexingTest {
         title = File(path).name,
         kind = LibraryEntryKind.WINE_PROFILE,
         systemId = "pc",
-        pcInfo = PcInfo(source = "Folder", installed = true, installPath = path),
+        pcInfo = PcInfo(installed = true, installPath = path),
     )
 
     private fun touch(path: String): File = File(temp.root, path).also {
@@ -171,7 +171,7 @@ class LibraryPathIndexingTest {
         val folder = File(temp.root, "Games/GOG/Game").path
         val row = LibraryEntry(
             id = "gog:1", title = "Game", kind = LibraryEntryKind.WINE_PROFILE, systemId = "pc",
-            pcInfo = PcInfo(source = "GOG", installed = false, installPath = folder),
+            pcInfo = PcInfo(installed = false, installPath = folder),
         )
         val provider = PathProvider(LibraryEntryKind.WINE_PROFILE, temp.root.path, listOf(ScanStep.WHOLE to listOf(row)))
         val (library, index, records) = walked(provider)

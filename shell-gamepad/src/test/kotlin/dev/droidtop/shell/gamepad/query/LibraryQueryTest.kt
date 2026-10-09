@@ -64,13 +64,13 @@ class LibraryQueryTest {
     )
 
     private val steamInstalled = game(
-        "steam:1", "Half", pcInfo = PcInfo(source = "Steam", installed = true, sizeBytes = 20),
+        "steam:1", "Half", pcInfo = PcInfo(installed = true, sizeBytes = 20),
         playtimeSeconds = 300, lastPlayedEpochMs = 999_999_000, rating = 0.8f,
         releaseDate = "20041116T000000", genre = "Shooter", developer = "Valve",
         artworkUri = "file:///half.png",
     )
     private val gogNotInstalled = game(
-        "gog:2", "Wiedzm", pcInfo = PcInfo(source = "GOG", installed = false, sizeBytes = 30),
+        "gog:2", "Wiedzm", pcInfo = PcInfo(installed = false, sizeBytes = 30),
         favorite = true,
     )
     private val folder = game("/games/folder/Game Three", pcInfo = null, hidden = true)
@@ -153,8 +153,8 @@ class LibraryQueryTest {
 
     @Test
     fun `playtime, rating and size sorts read only real facts`() {
-        val big = game("big", pcInfo = PcInfo(source = "Steam", installed = true, sizeBytes = 30), playtimeSeconds = 10, rating = 0.5f)
-        val small = game("small", pcInfo = PcInfo(source = "Steam", installed = true, sizeBytes = 10), playtimeSeconds = 90, rating = 0.9f)
+        val big = game("big", pcInfo = PcInfo(installed = true, sizeBytes = 30), playtimeSeconds = 10, rating = 0.5f)
+        val small = game("small", pcInfo = PcInfo(installed = true, sizeBytes = 10), playtimeSeconds = 90, rating = 0.9f)
 
         assertEquals(
             listOf("small", "big"),
@@ -309,9 +309,9 @@ class LibraryQueryTest {
 
     @Test
     fun `facets are offered with counts, and one that would narrow nothing is not`() {
-        val a = game("steam:a", pcInfo = PcInfo(source = "Steam", installed = true), favorite = true)
-        val b = game("steam:b", pcInfo = PcInfo(source = "Steam", installed = true))
-        val c = game("gog:c", pcInfo = PcInfo(source = "GOG", installed = true))
+        val a = game("steam:a", pcInfo = PcInfo(installed = true), favorite = true)
+        val b = game("steam:b", pcInfo = PcInfo(installed = true))
+        val c = game("gog:c", pcInfo = PcInfo(installed = true))
 
         val offers = LibraryQuery().facetOffers(listOf(a, b, c), scope)
 

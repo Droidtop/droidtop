@@ -435,6 +435,9 @@ internal fun LibrarySearchDialog(
     local: (suspend (String) -> List<LocalSearchRow>)? = null,
     // Changes when what [local] reads changed (the library finished loading): the search runs again for the same text.
     localKey: Any? = null,
+    // Switches under the field that widen what [local] matches (the launcher's
+    // "Include hidden games"); the caller holds their state, off each time it opens.
+    switches: List<SearchSwitch> = emptyList(),
 ) {
     // The field reopens with what was typed and the caret at its END, so Backspace deletes the last letter
     // (Droidtop/tracker#376: a plain String field put the caret at the start).
@@ -545,6 +548,9 @@ internal fun LibrarySearchDialog(
             )
             // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).
             dev.droidtop.shell.gamepad.OwnFieldKeyboard()
+            switches.forEach { switch ->
+                MenuRow(title = switch.label, value = if (switch.on) "On" else "Off", onClick = switch.toggle)
+            }
             if (local == null) {
                 Text(
                     if (text.isBlank()) {
@@ -665,6 +671,9 @@ internal fun LibrarySearchDialog(
         }
     }
 }
+
+/** A switch under the search field: its label, whether it is on, and what pressing it does. */
+internal data class SearchSwitch(val label: String, val on: Boolean, val toggle: () -> Unit)
 
 /** One row of the one list: an app with its icon, a library game, or a source's result. */
 @Composable

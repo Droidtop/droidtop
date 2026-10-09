@@ -8,7 +8,6 @@ import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.PcFolderScan
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.PcSource
-import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.ScanActivity
 import dev.droidtop.library.ScanBudget
 import dev.droidtop.library.ScanLog
@@ -726,10 +725,9 @@ fun PcLibrary.Game.toStoreInstall(): StoreInstall? = installDir?.let { dir ->
  * merged entry to disagree with the one it replaced.
  */
 fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
-    // A lent or unplayed free game is listed under a name of its own, so it has its own tab and badge.
-    source = if (source is PcSource.Store) PcStoreNames.groupOf(source.label(), holding) else "Folder",
     storeId = id,
     installed = installed,
+    holding = holding,
     sizeBytes = sizeBytes,
     installPath = installPath,
     installedVersion = installedVersion,

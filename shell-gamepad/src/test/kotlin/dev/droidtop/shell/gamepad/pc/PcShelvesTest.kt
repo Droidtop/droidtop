@@ -92,7 +92,7 @@ class PcShelvesTest {
         assertEquals(KindBadge(BadgeKind.ENGINE, null), kindBadgeOf(engine, names))
         assertEquals("Retro · Super Nintendo", kindBadgeOf(rom, names).text)
         assertEquals("Retro · gba", kindBadgeOf(rom.copy(systemId = "gba"), names).text)
-        val steam = game("/steam", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(source = "Steam", storeId = "steam:1", installed = true))
+        val steam = game("/steam", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(storeId = "steam:1", installed = true))
         assertEquals("PC · Steam", kindBadgeOf(steam, names).text)
     }
 
@@ -171,7 +171,7 @@ class PcShelvesTest {
         val allFolders = pcShelves(listOf(game("/a"), game("/b")), now)
         assertNull(allFolders.firstOrNull { it.id == SHELF_INSTALLED })
 
-        val store = PcInfo(source = "Steam", installed = false)
+        val store = PcInfo(installed = false)
         val mixed = pcShelves(listOf(game("/a"), game("steam:1", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = store)), now)
         assertEquals(listOf("/a"), mixed.first { it.id == SHELF_INSTALLED }.entries.map { it.id })
 
@@ -183,9 +183,9 @@ class PcShelvesTest {
     fun `store rows shelve per store, folder games per engine family, largest first`() {
         val shelves = pcShelves(
             listOf(
-                game("steam:1", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(source = "Steam", installed = true)),
-                game("gog:1", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(source = "GOG", installed = true)),
-                game("gog:2", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(source = "GOG", installed = true)),
+                game("steam:1", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(installed = true)),
+                game("gog:1", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(installed = true)),
+                game("gog:2", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(installed = true)),
                 game("/vn1"),
                 game("/vn2"),
                 game("/rm", kind = LibraryEntryKind.RPG_MAKER_MV),

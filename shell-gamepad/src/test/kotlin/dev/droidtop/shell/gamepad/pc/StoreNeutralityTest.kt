@@ -62,7 +62,7 @@ class StoreNeutralityTest {
         id = "${store.id}:$n",
         title = "${store.label} game $n",
         kind = LibraryEntryKind.WINE_PROFILE,
-        pcInfo = PcInfo(source = store.label, storeId = "${store.id}:$n", installed = n % 2 == 0),
+        pcInfo = PcInfo(storeId = "${store.id}:$n", installed = n % 2 == 0),
     )
 
     @Test

@@ -73,6 +73,12 @@ import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.keepCentred
 import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.query.LibraryFacet
+import dev.droidtop.shell.gamepad.query.LibraryViewPrefs
+import dev.droidtop.shell.gamepad.query.OwnershipOptions
+import dev.droidtop.library.PcSource
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import dev.droidtop.shell.gamepad.query.pillText
 import dev.droidtop.shell.gamepad.query.LibraryFilterSheet
 import dev.droidtop.shell.gamepad.query.LibrarySortSheet
@@ -270,6 +276,7 @@ internal fun PcGamesSection(
 ) {
     val context = LocalContext.current
     val window = LocalShellWindow.current
+    val coroutines = rememberCoroutineScope()
 
     // ONE card per game, not per folder (docs/SPEC.md 7m), off the main
     // thread; null until the first fold so an empty library is never shown
@@ -293,22 +300,32 @@ internal fun PcGamesSection(
     fun partsOf(entry: LibraryEntry): Int =
         folded?.siblings?.get(entry.id)?.count { it.pcInfo?.installed != false } ?: 1
 
-    // The person's game folders, the Source facet's folder values: a
-    // preference read, once, off the main thread.
-    var pcRoots by remember { mutableStateOf(emptyList<String>()) }
+    // The person's game folders, the Source facet's folder values, and the
+    // ownership List options (docs/SPEC.md 7j): preference reads, once, off
+    // the main thread. Null until read.
+    var pcRoots by remember { mutableStateOf<List<String>?>(null) }
+    var ownership by remember { mutableStateOf(OwnershipOptions()) }
     LaunchedEffect(Unit) {
-        pcRoots = withContext(Dispatchers.IO) {
-            runCatching { dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath } }.getOrDefault(emptyList())
+        val (roots, options) = withContext(Dispatchers.IO) {
+            runCatching { dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath } }.getOrDefault(emptyList()) to
+                LibraryViewPrefs.ownershipOptions(context)
         }
+        ownership = options
+        pcRoots = roots
     }
-    val scope = remember(pcRoots) {
+    fun setOwnership(next: OwnershipOptions) {
+        ownership = next
+        coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setOwnershipOptions(context, next) } }
+    }
+    val scope = remember(pcRoots, ownership) {
         LibraryQueryScope(
             id = "pc",
-            context = dev.droidtop.shell.gamepad.query.LibraryQueryContext(pcRoots = pcRoots),
+            context = dev.droidtop.shell.gamepad.query.LibraryQueryContext(pcRoots = pcRoots.orEmpty()),
+            ownership = ownership,
             // Runner, ready and ProtonDB are left off: they cost a folder
             // walk or a network ask per entry, which a list never pays.
             facets = listOf(
-                LibraryFacet.SOURCE, LibraryFacet.ENGINE, LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES,
+                LibraryFacet.SOURCE, LibraryFacet.OWNERSHIP, LibraryFacet.ENGINE, LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES,
                 LibraryFacet.PLAYED, LibraryFacet.RECENTLY_PLAYED, LibraryFacet.GENRE, LibraryFacet.DEVELOPER,
                 LibraryFacet.YEAR, LibraryFacet.UPDATE, LibraryFacet.MISSING_ART, LibraryFacet.HIDDEN,
             ),
@@ -361,10 +378,36 @@ internal fun PcGamesSection(
     // shown first with the plugin shelves it already had; the plugins' (from an answer kept for 15 minutes, so a
     // library change rarely asks them) follow when ready. Real entries only.
     var pluginShelfList by remember { mutableStateOf(emptyList<PcShelf>()) }
-    LaunchedEffect(games, others) {
+    // Recently added is what a source added since its first sync or scan
+    // (docs/SPEC.md 7g): the baselines, read and moved off the main thread
+    // as the library publishes, once the game folders are known.
+    var baselines by remember { mutableStateOf<Map<String, dev.droidtop.library.SyncBaselines.Baseline>?>(null) }
+    LaunchedEffect(games, pcRoots) {
+        val all = games ?: return@LaunchedEffect
+        val roots = pcRoots ?: return@LaunchedEffect
+        baselines = withContext(Dispatchers.IO) {
+            val kept = dev.droidtop.library.SyncBaselines.load(context)
+            val rows = all.mapNotNull { entry -> PcSource.of(entry, roots)?.let { it.id to entry.firstSeenEpochMs } }
+            dev.droidtop.library.SyncBaselines.update(kept, rows, System.currentTimeMillis())
+                .also { if (it != kept) dev.droidtop.library.SyncBaselines.save(context, it) }
+        }
+    }
+    val recentlyAdded: (LibraryEntry) -> Boolean = remember(baselines, pcRoots) {
+        val known = baselines.orEmpty()
+        val roots = pcRoots.orEmpty();
+        { entry ->
+            if (!entry.inPcFold) {
+                true
+            } else {
+                val source = PcSource.of(entry, roots)
+                source != null && dev.droidtop.library.SyncBaselines.isRecentlyAdded(source.id, entry.firstSeenEpochMs, known)
+            }
+        }
+    }
+    LaunchedEffect(games, others, ownership, recentlyAdded) {
         val all = games ?: return@LaunchedEffect
         onHomeActivityChanged(all + others)
-        val own = withContext(Dispatchers.Default) { withRetroHero(homeShelves(all, others)) }
+        val own = withContext(Dispatchers.Default) { withRetroHero(homeShelves(all, others, options = ownership, isRecentlyAdded = recentlyAdded)) }
         val next = own + pluginShelfList
         if (state.home && !state.stripFocused) keepCursor(homeShelfList, next)
         homeShelfList = next
@@ -378,9 +421,9 @@ internal fun PcGamesSection(
             homeShelfList = own + fresh
         }
     }
-    LaunchedEffect(games) {
+    LaunchedEffect(games, ownership, recentlyAdded) {
         val all = games ?: return@LaunchedEffect
-        val next = withContext(Dispatchers.Default) { pcShelves(all) }
+        val next = withContext(Dispatchers.Default) { pcShelves(all, options = ownership, isRecentlyAdded = recentlyAdded) }
         if (state.view == PcView.OVERVIEW && !state.stripFocused) keepCursor(pcShelfList, next)
         pcShelfList = next
     }
@@ -390,18 +433,32 @@ internal fun PcGamesSection(
         counts = withContext(Dispatchers.Default) { pcViewCounts(all, scope) }
     }
     var grid by remember { mutableStateOf(emptyList<LibraryEntry>()) }
+    // The free-to-play rows not in the library that this view keeps out (or,
+    // with the List option on, shows): the grid's last row says so, so they
+    // never disappear in silence (docs/SPEC.md 7j).
+    var freeRows by remember { mutableIntStateOf(0) }
     LaunchedEffect(games, state.query, scope) {
         val all = games ?: return@LaunchedEffect
         val query = state.query
-        grid = withContext(Dispatchers.Default) { query.applyTo(all, scope) }
+        val (shown, free) = withContext(Dispatchers.Default) { query.applyTo(all, scope) to query.freeNotInLibrary(all, scope) }
+        grid = shown
+        freeRows = free
+    }
+    val hasFreeRow = !state.onShelves && freeRows > 0
+    val onFreeRow = hasFreeRow && !state.stripFocused && state.itemIndex == grid.size
+    fun toggleFree() {
+        EsDeNavigationSounds.play(UiSound.CONFIRM)
+        setOwnership(ownership.copy(showFree = !ownership.showFree))
     }
 
     // The library, as this tab shows it right now, and the game under the cursor.
     val currentShelf = shelves.getOrNull(state.shelfIndex)
     val currentList: List<LibraryEntry> = if (state.onShelves) currentShelf?.entries.orEmpty() else grid
-    LaunchedEffect(shelves.size, currentList.size) {
+    LaunchedEffect(shelves.size, currentList.size, hasFreeRow) {
         state.shelfIndex = state.shelfIndex.coerceIn(0, (shelves.size - 1).coerceAtLeast(0))
-        state.itemIndex = state.itemIndex.coerceIn(0, (currentList.size - 1).coerceAtLeast(0))
+        // The grid's free-to-play row is one more stop after the last game.
+        val last = if (hasFreeRow) currentList.size else currentList.size - 1
+        state.itemIndex = state.itemIndex.coerceIn(0, last.coerceAtLeast(0))
     }
     // Home's destination row is the list's last stop, and the only one when
     // nothing is on the shelves yet.
@@ -533,7 +590,7 @@ internal fun PcGamesSection(
     // Sort By (docs/SPEC.md 7j), Select the focused game's menu: only what
     // dispatches, re-read as the cursor moves.
     val verb = focusedPlay?.first?.verb
-    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view, onDest) {
+    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view, onDest, onFreeRow) {
         // Steam's order: the list's own actions, then A and B. Start (Menu)
         // is the shell's, drawn at the row's left; L1/R1 are the glyphs at
         // the strip's ends, not hints.
@@ -541,8 +598,8 @@ internal fun PcGamesSection(
             HintBinding(GamepadAction.X, "Filter"),
             HintBinding(GamepadAction.Y, "Sort By"),
             HintBinding(GamepadAction.SELECT, "Options"),
-            HintBinding(GamepadAction.A, if (onDest) "Open" else if (state.stripFocused) "Select" else verb ?: "Play") {
-                onDest || state.stripFocused || focusedEntry != null
+            HintBinding(GamepadAction.A, if (onDest) "Open" else if (state.stripFocused || onFreeRow) "Select" else verb ?: "Play") {
+                onDest || state.stripFocused || onFreeRow || focusedEntry != null
             },
             HintBinding(GamepadAction.B, "Back") { state.view != PcView.HOME },
         )
@@ -615,6 +672,8 @@ internal fun PcGamesSection(
                             } else if (!state.home) {
                                 state.stripFocused = true
                             }
+                            // From the free-to-play row back to the last game.
+                            onFreeRow -> if (grid.isNotEmpty()) moveTo(state.shelfIndex, grid.lastIndex) else state.stripFocused = true
                             else -> {
                                 val target = gridPadTarget(state.itemIndex, grid.size, gridColumns(), FocusDirection.Up)
                                 if (target == null) state.stripFocused = true else moveTo(state.shelfIndex, target)
@@ -622,7 +681,7 @@ internal fun PcGamesSection(
                         }
                         GamepadAction.DOWN -> when {
                             onDest -> Unit
-                            state.stripFocused -> if (currentList.isNotEmpty()) state.stripFocused = false
+                            state.stripFocused -> if (currentList.isNotEmpty() || hasFreeRow) state.stripFocused = false
                             state.onShelves -> if (state.shelfIndex < shelves.lastIndex) {
                                 val next = state.shelfIndex + 1
                                 moveTo(next, state.shelfItems[shelves[next].id] ?: 0)
@@ -630,8 +689,11 @@ internal fun PcGamesSection(
                                 EsDeNavigationSounds.play(UiSound.MOVE)
                                 state.destFocused = true
                             }
+                            onFreeRow -> Unit
+                            // Down from the last row reaches the free-to-play row; nothing wraps onto it.
                             else -> gridPadTarget(state.itemIndex, grid.size, gridColumns(), FocusDirection.Down)
                                 ?.let { moveTo(state.shelfIndex, it) }
+                                ?: run { if (hasFreeRow) moveTo(state.shelfIndex, grid.size) }
                         }
                         GamepadAction.LEFT, GamepadAction.RIGHT -> {
                             val step = if (press.action == GamepadAction.LEFT) -1 else 1
@@ -647,6 +709,7 @@ internal fun PcGamesSection(
                                     state.stripIndex = next
                                 }
                                 state.onShelves -> moveTo(state.shelfIndex, menuStep(state.itemIndex, currentList.size, step))
+                                onFreeRow -> Unit
                                 else -> gridPadTarget(
                                     state.itemIndex, grid.size, gridColumns(),
                                     if (step < 0) FocusDirection.Left else FocusDirection.Right,
@@ -655,7 +718,9 @@ internal fun PcGamesSection(
                         }
                         GamepadAction.A -> {
                             if (onDest) HOME_DESTINATIONS.getOrNull(state.destIndex)?.let { onOpenSection(it.section) }
-                            else if (state.stripFocused) activateChip(state.stripIndex) else focusedEntry?.let(activate)
+                            else if (state.stripFocused) activateChip(state.stripIndex)
+                            else if (onFreeRow) toggleFree()
+                            else focusedEntry?.let(activate)
                         }
                         GamepadAction.X -> state.filterOpen = true
                         GamepadAction.Y -> state.sortOpen = true
@@ -713,7 +778,7 @@ internal fun PcGamesSection(
                     mixed = state.home,
                 )
                 else -> {
-                    if (grid.isEmpty()) {
+                    if (grid.isEmpty() && !hasFreeRow) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("No games match this view", color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
                         }
@@ -742,6 +807,18 @@ internal fun PcGamesSection(
                                     onLongPress = { state.pageId = entry.id },
                                     download = entry.downloadKey()?.let { downloads[it] },
                                     parts = partsOf(entry),
+                                )
+                            }
+                            // The last item, across the whole width: what the
+                            // List option keeps out, and the way to change it.
+                            if (hasFreeRow) item(key = "free-to-play-row", span = { GridItemSpan(maxLineSpan) }) {
+                                dev.droidtop.shell.gamepad.MenuRow(
+                                    title = freeRowText(freeRows, ownership.showFree),
+                                    selected = onFreeRow,
+                                    onClick = {
+                                        state.stripFocused = false
+                                        if (onFreeRow) toggleFree() else moveTo(state.shelfIndex, grid.size)
+                                    },
                                 )
                             }
                         }
@@ -784,7 +861,7 @@ internal fun PcGamesSection(
             // the stores) are one row from here, and from Select when no
             // game is under the cursor.
             footerActions = listOf(
-                SheetAction("List options", "Jump to a letter, scrape, game folders and stores") {
+                SheetAction("List options", "Shared and free-to-play games, jump to a letter, scrape, game folders and stores") {
                     state.filterOpen = false
                     state.optionsOpen = true
                 },
@@ -828,6 +905,15 @@ internal fun PcGamesSection(
             onScraped = onRequestRescan,
             onDismiss = { state.optionsOpen = false },
             games = listed,
+            // The ownership List options (docs/SPEC.md 7j): global, not part of a view.
+            listOptions = listOf(
+                ("Show games shared with you: " + if (ownership.showShared) "On" else "Off") to {
+                    setOwnership(ownership.copy(showShared = !ownership.showShared))
+                },
+                ("Show free-to-play games not in your library: " + if (ownership.showFree) "On" else "Off") to {
+                    setOwnership(ownership.copy(showFree = !ownership.showFree))
+                },
+            ),
             onJumpTo = { index ->
                 if (state.onShelves) {
                     // The letters were counted over the whole library in

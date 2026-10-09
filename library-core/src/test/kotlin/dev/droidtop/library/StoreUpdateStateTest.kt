@@ -12,7 +12,7 @@ import org.junit.Test
 class StoreUpdateStateTest {
 
     private fun pc(installed: Boolean = true, update: StoreUpdate = StoreUpdate.UNKNOWN, latest: String? = null) =
-        PcInfo(source = "Steam", storeId = "steam:1", installed = installed, latestVersion = latest, update = update)
+        PcInfo(storeId = "steam:1", installed = installed, latestVersion = latest, update = update)
 
     private fun row(id: String, pcInfo: PcInfo) =
         LibraryEntry(id = id, title = "Game", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = pcInfo)

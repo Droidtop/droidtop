@@ -77,6 +77,13 @@ internal fun storeStageOf(entry: LibraryEntry, download: StoreDownloads.Progress
     }
 }
 
+/**
+ * The name of the store this row is from, or null for a folder game: the key
+ * the install offer remembers a store's game folder under
+ * ([StoreInstallVolumePrefs]), the store's own label, whatever the row's holding.
+ */
+internal fun LibraryEntry.storeLabel(): String? = (dev.droidtop.library.PcSource.of(this) as? dev.droidtop.library.PcSource.Store)?.label()
+
 /** Whether a store owns this row: it carries a store's id and is not a folder or a Wine shortcut. */
 internal fun LibraryEntry.isStoreRow(): Boolean =
     dev.droidtop.library.PcSource.storeIdOf(pcInfo?.storeId) != null
@@ -97,7 +104,7 @@ internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: St
             PcPlayState(
                 "Install",
                 when {
-                    own -> size ?: "Downloads it from ${entry.pcInfo?.source.orEmpty().ifBlank { "the store" }}"
+                    own -> size ?: "Downloads it from ${entry.storeLabel() ?: "the store"}"
                     size != null -> "$size. Opens the store's install screen"
                     else -> "Opens the store's install screen"
                 },
@@ -230,7 +237,7 @@ internal suspend fun startOwnStoreInstall(context: Context, entry: LibraryEntry,
     val folder = folderPath.ifBlank {
         withContext(Dispatchers.IO) {
             installFolderFor(
-                StoreInstallVolumePrefs.remembered(context, entry.pcInfo?.source.orEmpty()),
+                StoreInstallVolumePrefs.remembered(context, entry.storeLabel().orEmpty()),
                 GamesRoots.configured(context).map { it.absolutePath },
             )
         }.orEmpty()

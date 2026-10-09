@@ -48,12 +48,10 @@ class StoreGameOwnershipTest {
     private fun storeInstall(
         installDir: File,
         storeId: String = "steam:440",
-        source: String = "Steam",
         artworkUri: String? = "https://cdn.example/steam/440.jpg",
     ) = StoreInstall(
         installDir = installDir,
         pcInfo = PcInfo(
-            source = source,
             storeId = storeId,
             installed = true,
             sizeBytes = 1_234_567L,
@@ -163,7 +161,7 @@ class StoreGameOwnershipTest {
         assertNull(merged.systemId)
         // Everything only the pc entry knew comes with it.
         val pc = merged.pcInfo!!
-        assertEquals("Steam", pc.source)
+        assertEquals(PcSource.Store("steam"), PcSource.of(merged))
         assertEquals("steam:440", pc.storeId)
         assertTrue(pc.installed)
         assertEquals(1_234_567L, pc.sizeBytes)
@@ -193,8 +191,8 @@ class StoreGameOwnershipTest {
     @Test
     fun `two stores naming the same install directory resolve identically either way round`() {
         val install = renpyInstall("Owned Twice")
-        val steam = storeInstall(install, storeId = "steam:440", source = "Steam")
-        val gog = storeInstall(install, storeId = "gog:12345", source = "GOG")
+        val steam = storeInstall(install, storeId = "steam:440")
+        val gog = storeInstall(install, storeId = "gog:12345")
         // Same winner whichever order the DAOs happened to return them in.
         assertEquals("gog:12345", listOf(steam, gog).byInstallDir().forFolder(install)?.pcInfo?.storeId)
         assertEquals("gog:12345", listOf(gog, steam).byInstallDir().forFolder(install)?.pcInfo?.storeId)

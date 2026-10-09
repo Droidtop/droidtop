@@ -14,16 +14,16 @@ class PcSourceTest {
 
     @Test
     fun `a store row is its store, whatever store it is`() {
-        assertEquals(PcSource.Store("gog"), PcSource.of(entry("gog:1207658691", PcInfo(source = "GOG", storeId = "gog:1207658691", installed = false))))
+        assertEquals(PcSource.Store("gog"), PcSource.of(entry("gog:1207658691", PcInfo(storeId = "gog:1207658691", installed = false))))
         // A store this build has no code for is still a store, not dropped.
-        assertEquals(PcSource.Store("battlenet"), PcSource.of(entry("battlenet:wow", PcInfo(source = "x", storeId = "battlenet:wow", installed = true))))
+        assertEquals(PcSource.Store("battlenet"), PcSource.of(entry("battlenet:wow", PcInfo(storeId = "battlenet:wow", installed = true))))
     }
 
     @Test
     fun `an engine folder that absorbed a store install keeps the store`() {
         val absorbed = entry(
             "/storage/card/Games/Steam/Some Game",
-            PcInfo(source = "Steam", storeId = "steam:440", installed = true, installPath = "/storage/card/Games/Steam/Some Game"),
+            PcInfo(storeId = "steam:440", installed = true, installPath = "/storage/card/Games/Steam/Some Game"),
             kind = LibraryEntryKind.RENPY,
         )
         assertEquals(PcSource.Store("steam"), PcSource.of(absorbed, roots))
@@ -34,7 +34,7 @@ class PcSourceTest {
         val plain = entry("/storage/card/Games/Indie/Game One", kind = LibraryEntryKind.RENPY)
         val nested = entry(
             "folder:CUSTOM_GAME_7",
-            PcInfo(source = "Folder", storeId = "folder:CUSTOM_GAME_7", installed = true, installPath = "/storage/card/Games/BATTLE.NET/Diablo"),
+            PcInfo(storeId = "folder:CUSTOM_GAME_7", installed = true, installPath = "/storage/card/Games/BATTLE.NET/Diablo"),
         )
         assertEquals(PcSource.Folder("/storage/card/Games"), PcSource.of(plain, roots))
         assertEquals(PcSource.Folder("/storage/card/Games/BATTLE.NET"), PcSource.of(nested, roots))
@@ -44,7 +44,7 @@ class PcSourceTest {
 
     @Test
     fun `a hand-made Wine shortcut is its own source`() {
-        val shortcut = entry("/data/prefix/desktop/Game.desktop", PcInfo(source = "Wine", installed = true))
+        val shortcut = entry("/data/prefix/desktop/Game.desktop", PcInfo(installed = true))
         assertEquals(PcSource.WineShortcut, PcSource.of(shortcut, roots))
     }
 

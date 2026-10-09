@@ -139,7 +139,7 @@ fun installFolderFor(remembered: String?, configured: List<String>): String? =
  * offer's choice outlives the offer, so the next install from the same store
  * names the same folder first. A remembered folder that is no longer one of
  * the person's game folders is not offered (the offer falls back to the
- * first). The key is the store's own display name ([PcStoreNames]).
+ * first). The key is the store's own name ([dev.droidtop.library.stores.StoreLibrary.label]).
  */
 object StoreInstallVolumePrefs {
     private const val PREFS_NAME = "droidtop_store_install_volume"

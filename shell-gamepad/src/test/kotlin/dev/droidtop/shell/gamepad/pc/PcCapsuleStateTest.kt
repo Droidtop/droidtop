@@ -29,14 +29,13 @@ class PcCapsuleStateTest {
         size: Long = 0L,
         availableUpdate: String? = null,
         favorite: Boolean = false,
-        source: String = "Steam",
     ) = LibraryEntry(
         id = id,
         title = "Game $id",
         kind = LibraryEntryKind.WINE_PROFILE,
         favorite = favorite,
         availableUpdate = availableUpdate,
-        pcInfo = PcInfo(source = source, storeId = id, installed = installed, sizeBytes = size, update = update),
+        pcInfo = PcInfo(storeId = id, installed = installed, sizeBytes = size, update = update),
     )
 
     private fun folder(id: String = "/games/a", missing: Boolean = false, update: String? = null) =
@@ -46,7 +45,7 @@ class PcCapsuleStateTest {
             kind = LibraryEntryKind.RENPY,
             missing = missing,
             availableUpdate = update,
-            pcInfo = PcInfo(source = "Folder", installed = true),
+            pcInfo = PcInfo(installed = true),
         )
 
     @Test

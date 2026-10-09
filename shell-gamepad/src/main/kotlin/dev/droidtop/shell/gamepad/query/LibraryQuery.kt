@@ -5,6 +5,7 @@ import dev.droidtop.library.AppCategoryRules
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.PcSource
 import dev.droidtop.library.appSourceLabel
+import dev.droidtop.library.stores.StoreHolding
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.shell.gamepad.pc.engineLabel
 import dev.droidtop.shell.gamepad.pc.isInstalled
@@ -54,6 +55,8 @@ enum class LibrarySortKey(val label: String, val naturalOrder: String, val flipp
 enum class LibraryFacet(val key: String, val label: String) {
     // Where a PC game came from: a store, a game folder, a Wine shortcut (docs/SPEC.md 7j).
     SOURCE("source", "Source"),
+    // How the account holds a store row ([StoreHolding], docs/SPEC.md 7g); values are the holding's name.
+    OWNERSHIP("ownership", "Ownership"),
     ENGINE("engine", "Engine"),
     RUNNER("runner", "Runner"),
     INSTALLED("installed", "Install state"),
@@ -85,6 +88,8 @@ enum class LibraryFacet(val key: String, val label: String) {
 
     fun valuesOf(entry: LibraryEntry, context: LibraryQueryContext): List<String> = when (this) {
         SOURCE -> PcSource.of(entry, context.pcRoots)?.let { listOf(it.id) }.orEmpty()
+        // A store row only: a folder game is no store's to hold.
+        OWNERSHIP -> entry.holding()?.let { listOf(it.name) }.orEmpty()
         ENGINE -> entry.engineLabel()?.let { listOf(it) }.orEmpty()
         RUNNER -> context.runnerLabelOf(entry)?.let { listOf(it) }.orEmpty()
         // The one answer the Installed shelf reads too (LibraryEntry.isInstalled): a
@@ -137,12 +142,14 @@ enum class LibraryFacet(val key: String, val label: String) {
     /** What a person reads for one of this facet's values: a source's name for its id, the value itself otherwise. */
     fun valueLabel(value: String): String = when (this) {
         SOURCE -> PcSource.fromId(value).label()
+        OWNERSHIP -> StoreHolding.entries.firstOrNull { it.name == value }?.label ?: value
         else -> value
     }
 
     /** The order a facet's values are listed in: sources in the registry's order ([PcSource.ORDER]), the rest by name. */
     fun valueOrder(): Comparator<FacetValueCount> = when (this) {
         SOURCE -> compareBy<FacetValueCount, PcSource>(PcSource.ORDER) { PcSource.fromId(it.value) }
+        OWNERSHIP -> compareBy<FacetValueCount> { offer -> StoreHolding.entries.indexOfFirst { it.name == offer.value } }
         else -> compareBy<FacetValueCount> { it.value.lowercase() }
     }
 
@@ -221,6 +228,8 @@ data class LibraryQueryScope(
     /** What one entry of this list is called, for "12 of 80 apps". */
     val noun: String = "game",
     val nounPlural: String = "games",
+    /** The ownership List options (docs/SPEC.md 7j); null for a list with no store rows, which the ownership rules leave alone. */
+    val ownership: OwnershipOptions? = null,
 ) {
     fun sortLabel(key: LibrarySortKey): String = sortLabels[key] ?: key.label
 }
@@ -264,12 +273,47 @@ data class LibraryQuery(
     /** Whether the entry passes the search text and every selected facet value. */
     fun matches(entry: LibraryEntry, scope: LibraryQueryScope): Boolean {
         if (!matchesSearchText(entry, text)) return false
-        // Hidden entries are out of every list unless the Hidden facet asks
-        // for them (docs/SPEC.md 7j): one rule for games and apps alike.
-        if (entry.hidden && LibraryFacet.HIDDEN in scope.facets && HIDDEN_YES !in selected(LibraryFacet.HIDDEN)) return false
-        return scope.facets.all { facet ->
-            val selected = selected(facet)
-            selected.isEmpty() || facet.valuesOf(entry, scope.context).any { it in selected }
+        // Hidden entries, and store rows the person's library does not hold,
+        // are out of a list by the one rule (docs/SPEC.md 7j, listExclusion).
+        if (exclusionOf(entry, scope) != null) return false
+        return matchesFacets(entry, scope)
+    }
+
+    private fun matchesFacets(entry: LibraryEntry, scope: LibraryQueryScope): Boolean = scope.facets.all { facet ->
+        val selected = selected(facet)
+        selected.isEmpty() || facet.valuesOf(entry, scope.context).any { it in selected }
+    }
+
+    /**
+     * Why [listExclusion] keeps [entry] out of this list, or null. A list that
+     * does not offer the Hidden facet keeps hidden entries, as a console list
+     * always did; one with no ownership options has no ownership rule.
+     */
+    fun exclusionOf(entry: LibraryEntry, scope: LibraryQueryScope): Exclusion? =
+        listExclusion(
+            entry,
+            place = placeOf(),
+            options = scope.ownership,
+            query = this,
+            includeHidden = LibraryFacet.HIDDEN !in scope.facets,
+        )
+
+    /** Installed and Recently played are about what is on the device and what was played: they ignore ownership (7j). */
+    private fun placeOf(): ListPlace =
+        if (INSTALLED_YES in selected(LibraryFacet.INSTALLED) || selected(LibraryFacet.RECENTLY_PLAYED).isNotEmpty()) ListPlace.ACTIVITY else ListPlace.LIST
+
+    /**
+     * How many free-to-play rows not in the person's library this view would
+     * show but for the List option (rule 4 of [listExclusion]), or, with the
+     * option on, shows because of it: the grid's footer row (docs/SPEC.md 7j).
+     * 0 while the Ownership facet chooses for itself. One pass.
+     */
+    fun freeNotInLibrary(base: List<LibraryEntry>, scope: LibraryQueryScope): Int {
+        if (scope.ownership == null || selected(LibraryFacet.OWNERSHIP).isNotEmpty() || placeOf() == ListPlace.ACTIVITY) return 0
+        return base.count { entry ->
+            entry.holding() == StoreHolding.FREE && !entry.freeInLibrary() &&
+                (!entry.hidden || HIDDEN_YES in selected(LibraryFacet.HIDDEN)) &&
+                matchesSearchText(entry, text) && matchesFacets(entry, scope)
         }
     }
 
@@ -286,9 +330,18 @@ data class LibraryQuery(
      * Hidden entries count only toward the Hidden facet. One pass per facet.
      */
     fun facetOffers(base: List<LibraryEntry>, scope: LibraryQueryScope): List<FacetOffer> {
-        val visible = base.filter { !it.hidden }
+        // Counts are over what the list shows with nothing filtered; the
+        // Ownership facet counts every holding (its values are how to see
+        // the rows the options keep out), Hidden counts the hidden too.
+        val notHidden = base.filter { !it.hidden }
+        val unfiltered = LibraryQuery(facets = facets.filterKeys { it == LibraryFacet.OWNERSHIP.key })
+        val visible = notHidden.filter { unfiltered.exclusionOf(it, scope) == null }
         return scope.facets.mapNotNull { facet ->
-            val over = if (facet == LibraryFacet.HIDDEN) base else visible
+            val over = when (facet) {
+                LibraryFacet.HIDDEN -> base
+                LibraryFacet.OWNERSHIP -> notHidden
+                else -> visible
+            }
             val counted = facet.valueCounts(over, scope.context)
             // A selected value nothing has right now (Running, with nothing
             // running) stays listed at zero so it can be taken off again.
@@ -299,10 +352,77 @@ data class LibraryQuery(
         }
     }
 
-    /** How many entries the list shows with no filter on: hidden ones are not part of it unless the Hidden facet asks. */
-    fun totalIn(base: List<LibraryEntry>, scope: LibraryQueryScope): Int =
-        if (LibraryFacet.HIDDEN !in scope.facets || HIDDEN_YES in selected(LibraryFacet.HIDDEN)) base.size else base.count { !it.hidden }
+    /**
+     * How many entries the list shows with no filter on: hidden ones and rows
+     * the ownership options keep out are not part of it unless the Hidden or
+     * Ownership facet asks for them.
+     */
+    fun totalIn(base: List<LibraryEntry>, scope: LibraryQueryScope): Int {
+        val unfiltered = LibraryQuery(facets = facets.filterKeys { it == LibraryFacet.HIDDEN.key || it == LibraryFacet.OWNERSHIP.key })
+        val holdings = unfiltered.selected(LibraryFacet.OWNERSHIP)
+        return base.count { entry ->
+            unfiltered.exclusionOf(entry, scope) == null && (holdings.isEmpty() || entry.holding()?.name in holdings)
+        }
+    }
 }
+
+/**
+ * The two global List options that decide which held store rows an ordinary
+ * list shows (docs/SPEC.md 7j): games another account shares (on by
+ * default) and free-to-play games the account never added (off). They are
+ * not part of a saved view: a view that wants free games selects Ownership.
+ */
+data class OwnershipOptions(val showShared: Boolean = true, val showFree: Boolean = false)
+
+/** Which kind of list asks [listExclusion]. */
+enum class ListPlace {
+    /** An ordinary list: All games, a saved view, a shelf of the library, search. */
+    LIST,
+
+    /** Installed, Continue playing, Recently played: what is on the device or was played, whoever holds it. */
+    ACTIVITY,
+}
+
+/** Why [listExclusion] keeps an entry out. */
+enum class Exclusion { HIDDEN, SHARED, FREE }
+
+/**
+ * THE rule for which games a list shows (docs/SPEC.md 7j, "Hidden is one
+ * rule", extended by Droidtop/tracker#397): every list, count, shelf and the
+ * launcher's search reads it. Highest first:
+ * 1. Hidden is out unless [includeHidden] or the Hidden facet is selected in [query].
+ * 2. With the Ownership facet selected, the list shows exactly those holdings
+ *    (the facet filters; the options below step aside).
+ * 3. [ListPlace.ACTIVITY] ignores ownership.
+ * 4. Otherwise OWNED and NOT_OWNED are in, FAMILY unless [OwnershipOptions.showShared]
+ *    is off, FREE only with [OwnershipOptions.showFree].
+ * 5. A FREE row is in the library while installed or ever played ([freeInLibrary]):
+ *    derived, never stored. To keep a tried free game out, the person hides it.
+ * [options] null means the list has no ownership rule (a console list).
+ * Pure; one look at fields the entry already carries.
+ */
+fun listExclusion(
+    entry: LibraryEntry,
+    place: ListPlace,
+    options: OwnershipOptions?,
+    query: LibraryQuery? = null,
+    includeHidden: Boolean = false,
+): Exclusion? {
+    if (entry.hidden && !includeHidden && (query == null || HIDDEN_YES !in query.selected(LibraryFacet.HIDDEN))) return Exclusion.HIDDEN
+    if (options == null || place == ListPlace.ACTIVITY) return null
+    if (query != null && query.selected(LibraryFacet.OWNERSHIP).isNotEmpty()) return null
+    return when (entry.holding()) {
+        null, StoreHolding.OWNED, StoreHolding.NOT_OWNED -> null
+        StoreHolding.FAMILY -> if (options.showShared) null else Exclusion.SHARED
+        StoreHolding.FREE -> if (options.showFree || entry.freeInLibrary()) null else Exclusion.FREE
+    }
+}
+
+/** A store row's holding, or null for anything no store holds (a folder game, a Wine shortcut, a ROM, an app). */
+internal fun LibraryEntry.holding(): StoreHolding? = pcInfo?.takeIf { PcSource.storeIdOf(it.storeId) != null }?.holding
+
+/** Rule 5: a free game counts as the person's once installed or played. */
+internal fun LibraryEntry.freeInLibrary(): Boolean = isInstalled || playCount > 0 || lastPlayedEpochMs != null
 
 /** A facet as the filter sheet offers it: the values the list holds, with counts. */
 data class FacetOffer(val facet: LibraryFacet, val values: List<FacetValueCount>)
@@ -550,6 +670,26 @@ object LibraryViewPrefs {
 
     private fun rootsOf(context: Context): List<String> =
         runCatching { dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath } }.getOrDefault(emptyList())
+
+    private const val SHOW_SHARED = "droidtop_library_show_shared"
+    private const val SHOW_FREE = "droidtop_library_show_free"
+
+    /** The ownership List options (docs/SPEC.md 7j), global, not per view. A preferences read: off the main thread. */
+    fun ownershipOptions(context: Context): OwnershipOptions {
+        val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+        val defaults = OwnershipOptions()
+        return OwnershipOptions(
+            showShared = prefs.getBoolean(SHOW_SHARED, defaults.showShared),
+            showFree = prefs.getBoolean(SHOW_FREE, defaults.showFree),
+        )
+    }
+
+    fun setOwnershipOptions(context: Context, options: OwnershipOptions) {
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(SHOW_SHARED, options.showShared)
+            .putBoolean(SHOW_FREE, options.showFree)
+            .apply()
+    }
 
     fun setActiveQuery(context: Context, scopeId: String, query: LibraryQuery) {
         context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)

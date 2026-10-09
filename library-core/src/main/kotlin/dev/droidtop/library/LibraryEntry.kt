@@ -295,25 +295,6 @@ data class GameLink(val label: String, val url: String) {
 }
 
 /**
- * The group a store's games held as something other than owned are listed
- * under in [PcInfo.source]. Store names themselves are each store's own
- * label ([dev.droidtop.library.stores.StoreLibrary.label]), read through
- * [PcSource]; nothing keeps a list of them.
- */
-object PcStoreNames {
-    /**
-     * Where a store's games held as [holding] are listed: the store's own name
-     * for its owned games, "Steam Family" for another account's, "Steam Free"
-     * for free games never played.
-     */
-    fun groupOf(store: String, holding: dev.droidtop.library.stores.StoreHolding): String = when (holding) {
-        dev.droidtop.library.stores.StoreHolding.OWNED -> store
-        dev.droidtop.library.stores.StoreHolding.FAMILY -> "$store Family"
-        dev.droidtop.library.stores.StoreHolding.FREE -> "$store Free"
-    }
-}
-
-/**
  * Facts that only a PC game from a store or a scanned folder has, kept
  * as one nested value rather than four loose fields, so [LibraryEntry]'s
  * own vocabulary stays ES-DE's metadata schema (docs/SPEC.md §7g).
@@ -323,8 +304,6 @@ object PcStoreNames {
  */
 @Serializable
 data class PcInfo(
-    /** Display name of where it came from: "Steam", "GOG", "Epic", "Amazon", "Folder". */
-    val source: String,
     /**
      * The id the PC provider identifies this game by ("steam:440"),
      * carried on the entry rather than being the entry's own
@@ -340,6 +319,13 @@ data class PcInfo(
      */
     val storeId: String? = null,
     val installed: Boolean,
+    /**
+     * How the account holds this store row (docs/SPEC.md 7g, "Stores"): a
+     * fact, never a name. Which lists show it is
+     * `listExclusion`'s question (7j); where it came from is [PcSource], read
+     * from [storeId]. A folder or a Wine shortcut is [StoreHolding.OWNED].
+     */
+    val holding: dev.droidtop.library.stores.StoreHolding = dev.droidtop.library.stores.StoreHolding.OWNED,
     /** On-disk size when installed, download size when not, 0 when unknown. */
     val sizeBytes: Long = 0,
     val installPath: String? = null,
@@ -467,7 +453,7 @@ internal fun List<StoreInstall>.byInstallDir(): Map<String, StoreInstall> {
     return byDir
 }
 
-private fun StoreInstall.tieBreakKey(): String = pcInfo.storeId ?: pcInfo.source
+private fun StoreInstall.tieBreakKey(): String = pcInfo.storeId ?: installDir.absolutePath
 
 /** The [StoreInstall] a detected game folder belongs to, if any store claims it. */
 internal fun Map<String, StoreInstall>.forFolder(folder: File): StoreInstall? =

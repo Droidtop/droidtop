@@ -10,7 +10,7 @@ class StorePagesTest {
         id = id,
         title = id,
         kind = LibraryEntryKind.CONSOLE_ROM,
-        pcInfo = storeId?.let { PcInfo(source = "test", storeId = it, installed = true) },
+        pcInfo = storeId?.let { PcInfo(storeId = it, installed = true) },
     )
 
     @Test

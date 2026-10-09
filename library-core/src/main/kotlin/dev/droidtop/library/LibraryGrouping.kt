@@ -151,7 +151,7 @@ object LibraryGrouping {
         val (stores, ungroupedRows) = entries.filter { it.groupingPath() == null }.partition { it.ownership() != null }
         val storeGames = StoreIdentity.group(stores).map { merged ->
             val copies = merged.entries.map { entry ->
-                GameCopy(path = entry.id, source = entry.pcInfo?.source, installed = entry.pcInfo?.installed != false)
+                GameCopy(path = entry.id, source = PcSource.of(entry)?.label(), installed = entry.pcInfo?.installed != false)
             }
             LibraryGameGroup(
                 GroupedGame(merged.name, listOf(GameVersion(version = "", copies = copies))),

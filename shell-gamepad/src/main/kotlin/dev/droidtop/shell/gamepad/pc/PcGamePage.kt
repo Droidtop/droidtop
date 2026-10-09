@@ -912,6 +912,23 @@ internal fun pageActionLabel(button: Int, primaryVerb: String): String = when (b
 }
 
 /** One fact on the page: a row title, what it says, and what A does on it when it does anything. */
+/**
+ * The Ownership row of a game the account does not simply own: the holding's
+ * label and one sentence, or null for an owned game, a folder game or a Wine
+ * shortcut. The lender's name is not known to droidtop yet, so a shared game
+ * names the store's family instead. Pure.
+ */
+internal fun ownershipSentence(entry: LibraryEntry): Pair<String, String>? {
+    val holding = entry.pcInfo?.holding ?: return null
+    val store = entry.storeLabel() ?: return null
+    return when (holding) {
+        dev.droidtop.library.stores.StoreHolding.OWNED -> null
+        dev.droidtop.library.stores.StoreHolding.FAMILY -> holding.label to "Shared by another account in your $store family"
+        dev.droidtop.library.stores.StoreHolding.FREE -> holding.label to "Free to play on $store. It counts as yours once you install it or play it"
+        dev.droidtop.library.stores.StoreHolding.NOT_OWNED -> holding.label to "This game left your library. $store may refuse to start it"
+    }
+}
+
 internal data class PageFact(
     val title: String,
     val value: String? = null,
@@ -976,9 +993,9 @@ private fun pageRows(
             // Already said above, under the same row.
             entry.availableUpdate != null -> Unit
             pc.update == dev.droidtop.library.StoreUpdate.UNKNOWN ->
-                add(PageFact("Update", "Not known", subtitle = "${pc.source} has not said whether a newer build exists yet; it is asked in the background, and an install made before its build was recorded is checked after its next update"))
+                add(PageFact("Update", "Not known", subtitle = "${dev.droidtop.library.PcSource.of(entry)?.label() ?: "The store"} has not said whether a newer build exists yet; it is asked in the background, and an install made before its build was recorded is checked after its next update"))
             pc.update == dev.droidtop.library.StoreUpdate.CURRENT ->
-                add(PageFact("Update", "Up to date", subtitle = "${pc.source} says this is the newest build"))
+                add(PageFact("Update", "Up to date", subtitle = "${dev.droidtop.library.PcSource.of(entry)?.label() ?: "The store"} says this is the newest build"))
             else -> Unit
         }
     }
@@ -996,6 +1013,8 @@ private fun pageRows(
     val ownedLine = owned.ownershipLabel().removePrefix("Owned on ").takeIf { it.isNotBlank() }
     val folderPath = entry.groupingPath()
     add(PageFact("Store", ownedLine ?: (dev.droidtop.library.PcSource.of(entry) as? dev.droidtop.library.PcSource.Store)?.label() ?: "Your folders"))
+    // How the account holds it, only when that is not simply owned (docs/SPEC.md 7g, "Ownership is a fact").
+    ownershipSentence(entry)?.let { (value, sentence) -> add(PageFact("Ownership", value, subtitle = sentence)) }
     // Where it lives as a person names it; the whole path is the tooltip.
     folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it)) }
     // The name as it is on disk, beside the title drawn from it (docs/SPEC.md

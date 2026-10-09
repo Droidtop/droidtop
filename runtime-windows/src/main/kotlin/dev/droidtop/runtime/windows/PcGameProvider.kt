@@ -27,7 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Raise it when a store's rule for what is a library entry changes; see [PcGameProvider.storeStamp]. */
-private const val STORE_LIST_RULES = 5L
+private const val STORE_LIST_RULES = 6L
 
 /**
  * Real "PC" games -- ES-DE's own `"pc"` system id (per direction: "PC", not
@@ -391,7 +391,7 @@ class PcGameProvider(
         artworkUri = iconFile?.takeIf { it.isFile }?.absolutePath,
         // A hand-made shortcut inside a prefix the user built: installed
         // by definition, and no store behind it to know a size.
-        pcInfo = PcInfo(source = "Wine", installed = true),
+        pcInfo = PcInfo(installed = true),
     )
 
     override suspend fun launch(entry: LibraryEntry) {

@@ -48,7 +48,6 @@ class StoreEngineGameTest {
     private fun storeInstall(install: File) = StoreInstall(
         installDir = install,
         pcInfo = PcInfo(
-            source = "Steam",
             storeId = "steam:730",
             installed = true,
             sizeBytes = 2_500_000_000L,
@@ -99,7 +98,7 @@ class StoreEngineGameTest {
 
         // One entry, routed by the engine, carrying what only the store knew.
         assertEquals(LibraryEntryKind.RENPY, entry.kind)
-        assertEquals("Steam", entry.pcInfo?.source)
+        assertEquals(PcSource.Store("steam"), PcSource.of(entry))
         assertEquals("steam:730", entry.pcInfo?.storeId)
         assertTrue(entry.pcInfo!!.installed)
         assertEquals(2_500_000_000L, entry.pcInfo!!.sizeBytes)

@@ -4,8 +4,10 @@ import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
@@ -47,6 +49,11 @@ class LauncherSearchApp(
  * read; matching it is a filter over that list in memory, nothing more
  * (no per-game disk lookups while typing). [findApps] answers for the
  * launcher's app list off the main thread.
+ *
+ * Which games it matches is [listExclusion]'s answer (docs/SPEC.md 7j), with
+ * the default ownership options: hidden games and free-to-play games the
+ * account never added are out, each with a switch under the field to take
+ * them in. The switches are off every time search opens.
  */
 @Composable
 fun LauncherSearchScreen(
@@ -58,7 +65,12 @@ fun LauncherSearchScreen(
 ) {
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         val context = LocalContext.current
-        val playable = remember(games) { games.orEmpty().filter { !it.hidden && !it.missing } }
+        var includeHidden by remember { mutableStateOf(false) }
+        var includeFree by remember { mutableStateOf(false) }
+        val playable = remember(games, includeHidden, includeFree) {
+            val options = OwnershipOptions(showFree = includeFree)
+            games.orEmpty().filter { !it.missing && listExclusion(it, ListPlace.LIST, options, includeHidden = includeHidden) == null }
+        }
         val suggestions by produceState(emptyList<Recommendation>(), playable) {
             value = LocalSimilarityRecommendations({ playable })
                 .recommend(context, RecommendationScope.Overall, 5)
@@ -77,6 +89,10 @@ fun LauncherSearchScreen(
             onDismiss = onDismiss,
             suggestions = suggestions,
             localKey = playable to systemNames,
+            switches = listOf(
+                SearchSwitch("Include hidden games", includeHidden) { includeHidden = !includeHidden },
+                SearchSwitch("Include free-to-play games not in your library", includeFree) { includeFree = !includeFree },
+            ),
             local = { text ->
                 val apps = findApps(text).map { app ->
                     LocalSearchRow(app.key, SearchRowKind.APP, app.title, APP_DETAIL, app.icon, app.open)

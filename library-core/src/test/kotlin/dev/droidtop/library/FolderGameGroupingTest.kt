@@ -21,7 +21,7 @@ class FolderGameGroupingTest {
         kind = LibraryEntryKind.WINE_PROFILE,
         systemId = "pc",
         gameName = gameName,
-        pcInfo = PcInfo(source = "Folder", installed = true, installPath = installPath),
+        pcInfo = PcInfo(installed = true, installPath = installPath),
     )
 
     private fun group(vararg entries: LibraryEntry, finished: Set<String> = emptySet()) =

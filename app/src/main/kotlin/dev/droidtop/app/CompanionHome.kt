@@ -321,7 +321,7 @@ private fun FocusedGameCard(entry: LibraryEntry) {
         entry.pcInfo?.let { pc ->
             FactLine(
                 buildList {
-                    add(pc.source)
+                    dev.droidtop.library.PcSource.of(entry)?.let { add(it.detail()) }
                     if (!pc.installed) add("Not installed")
                     if (pc.sizeBytes > 0) add(formatSize(pc.sizeBytes))
                     pc.compatibility?.let { add(it.summary()) }

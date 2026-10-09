@@ -81,7 +81,7 @@ internal fun StoreInstallOfferSheet(
     val offer = offer ?: return
     val context = LocalContext.current
     val entry = offer.entry
-    val store = entry.pcInfo?.source.orEmpty()
+    val store = entry.storeLabel().orEmpty()
     // A store droidtop runs installs into a game folder; Steam still opens its own screen.
     val own = entry.ownStore() != null
     // null until the folders are read, so "no game folder yet" is never

@@ -9,6 +9,9 @@ import dev.droidtop.shell.gamepad.query.INSTALLED_YES
 import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryQuery
 import dev.droidtop.shell.gamepad.query.LibraryQueryScope
+import dev.droidtop.shell.gamepad.query.ListPlace
+import dev.droidtop.shell.gamepad.query.OwnershipOptions
+import dev.droidtop.shell.gamepad.query.listExclusion
 import dev.droidtop.shell.gamepad.query.NamedLibraryView
 import dev.droidtop.shell.gamepad.query.UPDATE_YES
 
@@ -55,7 +58,9 @@ internal fun homeShelves(
     games: List<LibraryEntry>,
     others: List<LibraryEntry>,
     now: Long = System.currentTimeMillis(),
-): List<PcShelf> = pcShelves(games, now, others).filter { it.id in HOME_SHELF_IDS }
+    options: OwnershipOptions = OwnershipOptions(),
+    isRecentlyAdded: (LibraryEntry) -> Boolean = { true },
+): List<PcShelf> = pcShelves(games, now, others, options, isRecentlyAdded).filter { it.id in HOME_SHELF_IDS }
 
 /**
  * The shelves plugins asked Home for (docs/plugin-api.md 3 C11) as Home's own shelves: the real entries from
@@ -106,12 +111,23 @@ internal fun pluginHomeShelves(
  * Within a shelf: most recently played first, then by name, so a long
  * shelf shows what the person touches rather than the start of the
  * alphabet.
+ *
+ * Which of [games] a shelf holds is [listExclusion]'s answer (docs/SPEC.md
+ * 7j): Continue playing and Installed ignore ownership, every other shelf
+ * keeps out what the ownership [options] keep out of a list, and no shelf
+ * holds a hidden game. A PC game is Recently added only when
+ * [isRecentlyAdded] says its source added it since its first sync
+ * ([dev.droidtop.library.SyncBaselines]).
  */
 internal fun pcShelves(
     games: List<LibraryEntry>,
     now: Long = System.currentTimeMillis(),
     others: List<LibraryEntry> = emptyList(),
+    options: OwnershipOptions = OwnershipOptions(),
+    isRecentlyAdded: (LibraryEntry) -> Boolean = { true },
 ): List<PcShelf> {
+    val listed = games.filter { listExclusion(it, ListPlace.LIST, options) == null }
+    val active = games.filter { listExclusion(it, ListPlace.ACTIVITY, options) == null }
     val byRecency = compareByDescending<LibraryEntry> { it.lastPlayedEpochMs ?: 0L }.thenBy { it.title.lowercase() }
     fun shelf(id: String, title: String, all: List<LibraryEntry>): PcShelf? {
         if (all.isEmpty()) return null
@@ -123,7 +139,7 @@ internal fun pcShelves(
         // with `hero`), the game the person most likely wants.
         // Local vals, not smart casts: LibraryEntry's properties are
         // declared in another module, which Kotlin will not smart-cast.
-        val activity = games + others
+        val activity = active + others
         shelf(
             SHELF_CONTINUE,
             "Continue playing",
@@ -132,27 +148,27 @@ internal fun pcShelves(
                 last != null && last <= now
             },
         )?.let(::add)
-        val recentlyAdded = activity.filter { it.addedEpochMs() > 0L }
+        val recentlyAdded = (listed + others).filter { it.addedEpochMs() > 0L && isRecentlyAdded(it) }
             .sortedWith(compareByDescending<LibraryEntry> { it.addedEpochMs() }.thenBy { it.title.lowercase() })
         if (recentlyAdded.isNotEmpty()) {
             add(PcShelf(SHELF_RECENTLY_ADDED, "Recently added", recentlyAdded.take(SHELF_LIMIT), recentlyAdded.size))
         }
-        shelf(SHELF_UPDATES, "Update available", games.filter { it.availableUpdate != null })?.let(::add)
-        shelf(SHELF_FAVOURITES, "Favourites", games.filter { it.favorite })?.let(::add)
-        if (games.any { it.lastPlayedEpochMs != null }) {
-            val unplayed = games.filter { it.lastPlayedEpochMs == null && it.isInstalled }
+        shelf(SHELF_UPDATES, "Update available", listed.filter { it.availableUpdate != null })?.let(::add)
+        shelf(SHELF_FAVOURITES, "Favourites", listed.filter { it.favorite })?.let(::add)
+        if (listed.any { it.lastPlayedEpochMs != null }) {
+            val unplayed = listed.filter { it.lastPlayedEpochMs == null && it.isInstalled }
                 .sortedWith(compareByDescending<LibraryEntry> { it.addedEpochMs() }.thenBy { it.title.lowercase() })
             if (unplayed.isNotEmpty()) add(PcShelf(SHELF_NOT_PLAYED, "Not played yet", unplayed.take(SHELF_LIMIT), unplayed.size))
         }
-        val installed = games.filter { it.isInstalled }
-        if (installed.size < games.size) shelf(SHELF_INSTALLED, "Installed", installed)?.let(::add)
+        val installed = active.filter { it.isInstalled }
+        if (installed.size < listed.size) shelf(SHELF_INSTALLED, "Installed", installed)?.let(::add)
         fun storeOf(entry: LibraryEntry): PcSource.Store? = PcSource.of(entry) as? PcSource.Store
-        games.filter { storeOf(it) != null }
+        listed.filter { storeOf(it) != null }
             .groupBy { storeOf(it)!! }
             .entries
             .sortedWith(compareByDescending<Map.Entry<PcSource.Store, List<LibraryEntry>>> { it.value.size }.thenBy { it.key.label() })
             .forEach { (store, rows) -> shelf("store:${store.id}", store.label(), rows)?.let(::add) }
-        games.filter { storeOf(it) == null }
+        listed.filter { storeOf(it) == null }
             .groupBy { it.kind.displayName() }
             .entries
             .sortedWith(compareByDescending<Map.Entry<String, List<LibraryEntry>>> { it.value.size }.thenBy { it.key })
@@ -291,7 +307,8 @@ internal val pcBuiltInViews: List<NamedLibraryView> = listOf(
  */
 internal fun pcViewCounts(games: List<LibraryEntry>, scope: LibraryQueryScope): Map<String, Int> =
     pcBuiltInViews.associate { view -> view.name to games.count { view.query.matches(it, scope) } } +
-        games.mapNotNull { (PcSource.of(it) as? PcSource.Store)?.id }
+        games.filter { listExclusion(it, ListPlace.LIST, scope.ownership) == null }
+            .mapNotNull { (PcSource.of(it) as? PcSource.Store)?.id }
             .groupingBy { it }
             .eachCount()
 
@@ -308,6 +325,16 @@ internal fun pcStripViews(counts: Map<String, Int>, saved: List<NamedLibraryView
         .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
         .map { NamedLibraryView(PcSource.fromId(it.key).label(), LibraryQuery().withToggled(LibraryFacet.SOURCE, it.key, true)) }
     return builtIn + stores + saved
+}
+
+/**
+ * The grid's last row while the List option keeps free-to-play games the
+ * account never added out of a view, or shows them (docs/SPEC.md 7j): no
+ * game leaves a list in silence. Pure.
+ */
+internal fun freeRowText(count: Int, showing: Boolean): String {
+    val games = "%,d free-to-play %s not in your library".format(count, if (count == 1) "game" else "games")
+    return if (showing) "Showing $games. Hide them" else "$games ${if (count == 1) "is" else "are"} not shown. Show them"
 }
 
 /** A chip's label: a built-in view or a store carries its count ("Installed · 12"), a saved view is just its name. */

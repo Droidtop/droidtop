@@ -91,6 +91,9 @@ internal fun GamelistOptionsMenu(
     // docs/SPEC.md 7j) over this gamelist; null where the list has none.
     onOpenSort: (() -> Unit)? = null,
     onOpenFilter: (() -> Unit)? = null,
+    // The list's own options, each a row whose label says its state and an
+    // action that changes it (the PC library's ownership options, docs/SPEC.md 7j).
+    listOptions: List<Pair<String, () -> Unit>> = emptyList(),
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -183,6 +186,7 @@ internal fun GamelistOptionsMenu(
             // is -- not a collection that merely happens to contain a PC
             // entry, which is not where a game folder belongs.
             if (systemId == PC_SYSTEM_ID) add(PC_SETUP)
+            listOptions.forEach { add(it.first) }
         }
         add("Close")
     }
@@ -359,6 +363,7 @@ internal fun GamelistOptionsMenu(
                 if (screen != null) acquireScreen = screen else status = "Settings screen unavailable"
             }
             "Close" -> onDismiss()
+            else -> listOptions.firstOrNull { it.first == actions[index] }?.second?.invoke()
         }
     }
 

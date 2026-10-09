@@ -8,7 +8,6 @@ import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.LauncherGamesActivity
 import dev.droidtop.app.OpenWithSource
 import dev.droidtop.library.PcSource
-import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.StoreLinkPrefs
 import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.settings.ActionItem
@@ -114,9 +113,9 @@ internal enum class PcStore(val key: String) {
     suspend fun requestSync(context: Context): String {
         val own = own ?: return "This build has no $label store"
         return StoreSyncs.run(context, own).fold(
-            onSuccess = { count ->
+            onSuccess = { change ->
                 StoreChanges.announce(context)
-                "$count ${if (count == 1) "game" else "games"}"
+                change.line()
             },
             onFailure = { exc ->
                 Log.w("droidtop.stores", "Sync failed for $label", exc)
@@ -464,8 +463,8 @@ internal object StoresCatalog {
                 add(
                     ActionItem(
                         id = "store_${store.key}_family",
-                        title = PcStoreNames.groupOf(store.label, StoreHolding.FAMILY),
-                        subtitle = "Games another account lends you, listed apart from yours",
+                        title = StoreHolding.FAMILY.label,
+                        subtitle = "Games another account lends you. PC Games lists them unless List options says otherwise",
                         value = "${counts.family} ${if (counts.family == 1) "game" else "games"}",
                         run = {},
                     ),
@@ -475,8 +474,8 @@ internal object StoresCatalog {
                 add(
                     ActionItem(
                         id = "store_${store.key}_free",
-                        title = PcStoreNames.groupOf(store.label, StoreHolding.FREE),
-                        subtitle = "Free games on the account, not counted as yours until played, listed apart",
+                        title = StoreHolding.FREE.label,
+                        subtitle = "Free games the account holds but never added. PC Games shows them once played or installed, or from List options",
                         value = "${counts.free} ${if (counts.free == 1) "game" else "games"}",
                         run = {},
                     ),

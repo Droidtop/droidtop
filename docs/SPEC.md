@@ -10805,8 +10805,7 @@ follows:
   FreeCommercialLicense 15, read from each package's product info into
   `steam_license.billing_type`); a free licence (those three types: a free
   game the person added) makes it theirs only once Steam's own owned-games
-  answer lists it or it is installed, and until then it is listed apart as
-  "Steam Free". That answer (`SteamOwnedGames`: the Player service's
+  answer lists it or it is installed, and until then it is held as FREE. That answer (`SteamOwnedGames`: the Player service's
   GetOwnedGames, read on each sync and kept in `steam/owned-games.txt`) is
   asked as the profile counts, free games only once played
   (`include_played_free_games`) and no free sub, and a game it lists is the
@@ -10814,12 +10813,12 @@ follows:
   free sub names, say); on 1535, counting free games by playtime alone, own
   was 1,193 against the profile's 1,245. A licence another
   account holds (Steam Families: the licence list carries the lender's
-  account id) lends it, listed apart as "Steam Family"; an expired or
+  account id) lends it, held as FAMILY; an expired or
   cancelled licence grants nothing; and package 0, the free sub every account
   holds, which names every free app on Steam, grants nothing either
-  (GetOwnedGames leaves it out unless `include_free_sub`). Each group apart
-  has its own PC Games tab and badge, and the store page counts it
-  separately. Until 2026-10-08 every unexpired licence counted: the owner's
+  (GetOwnedGames leaves it out unless `include_free_sub`). An installed game
+  no licence grants any more is held as NOT_OWNED, not OWNED. The store page
+  counts each holding on a row of its own. Until 2026-10-08 every unexpired licence counted: the owner's
   library listed 3,281 games and 2,636 DLC where his Steam profile shows
   1,245 and 782; on 1523, with the family and the free sub apart, still 2,703
   own, while 2,655 of the account's 4,760 packages were billed FreeOnDemand
@@ -10829,8 +10828,8 @@ follows:
   aside are one card), the store page counts the store's rows, so the two can
   differ by the rows that fold into another row's card (21 on 1523); the
   store page's Library row says so. Its value stays short ("N games, M
-  installed") and the DLC, Steam Family and Steam Free counts are rows of
-  their own, so every value fits its column. The store page and the sync line
+  installed") and the DLC, "Shared with you" and "Free to play (not in your
+  library)" counts are rows of their own, so every value fits its column. The store page and the sync line
   count from the same rows (`SteamLibraryRows`). The DLC count is the DLC
   any own live licence grants whose base game is one of the person's own
   games (`SteamLibraryRows.dlcOfOwnGames`); whether Steam's profile counts
@@ -10992,6 +10991,46 @@ follows:
   moved out of GameNative's Steam service (`RuntimeDownloads`, still
   GameNative's host). Since the runtime lift (2026-10-08, §9) GameNative's
   `SteamService` is not compiled at all.
+
+### Ownership is a fact (Droidtop/tracker#397 slice B)
+
+How the account holds a store row is `PcInfo.holding` (`StoreHolding`), the
+same four meanings for every store, never a name of its own (the old "Steam
+Family" and "Steam Free" groups, `PcStoreNames.groupOf`, and `PcInfo.source`
+are gone; where a game came from is `PcSource`, read from the store id):
+- **OWNED**: in the account's library on that store, however it got there. A
+  claimed giveaway (Epic's weekly game, GOG, Amazon Prime) is OWNED.
+- **FAMILY**: lent by another account on the same store (today: a Steam family).
+- **FREE**: a free-to-play catalogue row the account holds a licence for but
+  never added (today: Steam only). No store maps "free" or "claimed" to it.
+- **NOT_OWNED**: installed on the device but no longer held by the account.
+- **One row per game per store.** When a store reports one game under more
+  than one holding, its row carries the strongest: OWNED, then FAMILY, then
+  FREE, then NOT_OWNED (`StoreHolding.strongest`; Steam's `SteamOwnership.statusOf`
+  already answers in that order). It is one card and counts once.
+Labels are one function (`StoreHolding.label`): "Owned", "Shared with you",
+"Free to play (not in your library)", "No longer in your library". Which
+lists show which holding is 7j's `listExclusion`. `STORE_LIST_RULES` 6 makes
+every store row read again with its holding.
+
+**Recently added** means added since that source's first sync or scan
+(`SyncBaselines`, one record per `PcSource` id, stores and game folders
+alike): the first time a source's rows are seen, the newest first-seen time
+among them is its baseline, so signing in to a store or adding a folder puts
+nothing on the shelf. A first folder scan publishes a part at a time, so rows
+first seen within 15 minutes of the baseline being set move it with them. A
+game a later sync or Rescan brings has a later first-seen time and is
+Recently added. Free-to-play rows not in the library never are (they are out
+of the shelf by `listExclusion`).
+
+**While a store syncs** its old rows stay: the store part is replaced in one
+transaction once its new list is complete (`LibraryIndexDao.replacePart`).
+The sync line on the store page says what changed against the rows the store
+held before ("1,193 games: 12 new, 2 removed", `StoreSyncs.SyncChange`); a
+first read says only the count. It stays a line, not a pop-up, and is not
+pressable; installed games that left the library are found with Ownership =
+No longer in your library. How many updates a sync brought is not said yet:
+a sync does not ask for builds (the update check runs on its own).
 
 ### What the store services give, and what they do not
 
@@ -13079,9 +13118,38 @@ so each view keeps its own filters and sort. Pure and unit-tested
   ("Z to A"); picking another starts it in its natural order. Entries the
   sort has no fact for (never played, no release date) are last in both
   directions.
-- **Hidden is one rule.** An entry marked hidden is out of every list that
-  offers the Hidden facet unless that facet is selected; counts and the
-  "12 of 80" line leave hidden entries out too.
+- **Hidden is one rule, and ownership extends it** (`listExclusion`,
+  Droidtop/tracker#397 slice B). Every list, count, shelf and the launcher's
+  search read the one predicate; highest first:
+  1. **Hidden** is out of every list that offers the Hidden facet unless that
+     facet is selected (or search's "Include hidden games" is on): the grid,
+     the shelves (Continue playing included), counts and the "12 of 80" line,
+     search, and the footer row's count. Collections tiles and Storage follow
+     with their slices.
+  2. With the **Ownership** facet selected, the list shows exactly the
+     selected holdings; the two options below step aside.
+  3. **Installed**, **Continue playing** and **Recently played** ignore
+     ownership: they are about the device and what was played.
+  4. Otherwise OWNED and NOT_OWNED are in; FAMILY is in unless the List option
+     **Show games shared with you** (on by default) is off; FREE is out unless
+     **Show free-to-play games not in your library** (off by default) is on.
+     The two options are global (List options, beside Jump to a letter), not
+     part of a saved view: a view that wants free games selects Ownership.
+  5. A FREE row is in the library while it is installed or has been played:
+     derived from facts the row has, never stored. To keep a tried free game
+     out, the person hides it.
+  **No silent disappearance:** when rule 4 keeps free rows out of a grid view,
+  its last item is a row, "1,506 free-to-play games not in your library are not
+  shown. Show them"; A turns the option on and the row reads "Showing 1,506
+  free-to-play games not in your library. Hide them". Down from the last row
+  reaches it, nothing wraps onto it, and no row speaks of Hidden games.
+  **Ownership** is a PC facet (Owned, Shared with you, Free to play (not in your
+  library), No longer in your library) counted over every row that is not
+  hidden, so its counts add up to the store rows; other facets count what the
+  list shows. The launcher's **search** has two switches under its field,
+  "Include hidden games" and "Include free-to-play games not in your library",
+  both off each time search opens; each result shows its Retro system or its
+  PC/Engine word.
 - **Counts.** Every facet is offered with the values the list actually
   holds and how many entries carry each (counted over the whole list, one
   pass per facet, off the main thread). A facet no entry has a value for is

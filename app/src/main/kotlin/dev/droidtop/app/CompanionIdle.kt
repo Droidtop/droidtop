@@ -88,7 +88,7 @@ internal fun CompanionIdle(entries: List<LibraryEntry>) {
                 )
                 val subtitle = shown.systemId
                     ?.let { dev.droidtop.library.consoles.PlatformsDatabase.displayNameOrNull(it) }
-                    ?: shown.pcInfo?.source
+                    ?: dev.droidtop.library.PcSource.of(shown)?.detail()
                 if (subtitle != null) {
                     Text(
                         subtitle,

@@ -26,12 +26,12 @@ internal object SteamLibraryRows {
             holdingOf(status)?.let { Row(app, it, installs[app.id]) }
         }
         val ownedIds = owned.mapTo(HashSet()) { it.app.id }
-        // Installed and no longer owned (signed out, a licence gone) still shows, with its files.
+        // Installed and no longer held (signed out, a licence gone) still shows, with its files, as what it is.
         val installedOnly = installs.keys.filter { it !in ownedIds }
             .mapNotNull { db.apps().find(it) }
             // A DLC's own install row is not a game of its own.
             .filter { SteamLibrarySync.isLibraryGame(it, keepInstalledKinds = true) }
-            .map { Row(it, StoreHolding.OWNED, installs[it.id]) }
+            .map { Row(it, StoreHolding.NOT_OWNED, installs[it.id]) }
         return (owned + installedOnly).filter { it.app.name.isNotBlank() }
     }
 
