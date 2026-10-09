@@ -263,9 +263,28 @@ script (`ContainerLauncher`, `runtime-common`):
 - *Boundary.* The container can name only a token droidtop itself
   published. An unknown token, a name that is not a token, and requests
   left from an earlier session are ignored; nothing the container writes is
-  run, parsed as a command or passed to Android as an argument. With no
+  run, parsed as a command or passed to Android as an argument, apart
+  from the one bounded link or file of Open on Android below. With no
   Desktop shell showing there is nobody to answer and the request is
   dropped with a log line.
+
+**Open on Android (decided 2026-10-09, Droidtop/tracker#388).** The same
+channel carries one more request, bounded: a second helper,
+`.../bin/droidtop-view`, takes one http or https link, or one file under
+`/run/droidtop-shared-storage` (a `file://` URI or an absolute path),
+writes it whole into a `view.<pid>.request` file and renames it in.
+droidtop reads at most a few kilobytes of it, deletes it, and
+(`ContainerLauncher.parseViewRequest`) accepts only an http(s) URL with a
+host, or a shared-storage path with no `.` or `..` segment; the file is
+then resolved on its Android volume, must stay inside it after symlinks are
+followed and must be a file, and is handed over as a FileProvider content
+URI with read access. Both go through Android's own chooser, so the person
+picks the app. Nothing else crosses: no other scheme, no app-private path,
+no intent extras. The helper is registered as a hidden "Open on Android"
+desktop entry for links and everyday document and media types, and a
+`mimeapps.list` beside the library's entries makes it the http(s) default
+only where nothing else is: it is last on `XDG_DATA_DIRS`, so a browser the
+person installs or their own `~/.config/mimeapps.list` wins.
 
 **The desktop panel (decided 2026-10-09, Droidtop/tracker#353).** The sway
 desktop starts Waybar with wofi as its panel and launcher by default, the

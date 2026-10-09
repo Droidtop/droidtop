@@ -1,7 +1,10 @@
 package dev.droidtop.app
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.webkit.MimeTypeMap
+import androidx.core.content.FileProvider
 import android.os.FileObserver
 import android.util.Log
 import dev.droidtop.library.Library
@@ -71,6 +74,10 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
         helper.parentFile?.mkdirs()
         val script = ContainerLauncher.helperScript()
         if (!helper.isFile || helper.readText() != script) helper.writeText(script)
+        // Open on Android (Droidtop/tracker#388): its helper, its hidden entry and the lowest-precedence mimeapps.list.
+        writeIfChanged(ContainerLauncher.hostViewHelper(filesDir), ContainerLauncher.viewHelperScript())
+        writeIfChanged(File(applicationsDir, ContainerLauncher.VIEW_ENTRY), ContainerLauncher.viewEntry())
+        writeIfChanged(File(applicationsDir, "mimeapps.list"), ContainerLauncher.mimeApps())
         // Requests from a session that has ended are not this session's to answer.
         requestsDir.listFiles()?.forEach { it.delete() }
     }
@@ -80,6 +87,10 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
         val watched = object : FileObserver(requestsDir.absolutePath, FileObserver.MOVED_TO) {
             override fun onEvent(event: Int, path: String?) {
                 val name = path ?: return
+                if (ContainerLauncher.isViewRequest(name)) {
+                    openOnAndroid(File(requestsDir, name))
+                    return
+                }
                 val token = ContainerLauncher.requestToken(name) ?: return
                 File(requestsDir, name).delete()
                 val id = published.get()[token]
@@ -91,6 +102,46 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
         }
         watched.startWatching()
         observer = watched
+    }
+
+    private fun writeIfChanged(file: File, text: String) {
+        file.parentFile?.mkdirs()
+        if (!file.isFile || file.readText() != text) file.writeText(text)
+    }
+
+    /**
+     * A view request ([ContainerLauncher.parseViewRequest]): an http(s) link
+     * goes to Android as itself, a shared-storage file as a FileProvider
+     * content URI with read access, each through Android's own chooser so the
+     * person picks the app. Everything else is refused with a log line. The
+     * file is read once, at most a few kilobytes, and deleted first.
+     */
+    private fun openOnAndroid(request: File) {
+        val text = runCatching { request.takeIf { it.length() <= 8192 }?.readText() }.getOrNull()
+        request.delete()
+        val target = text?.let(ContainerLauncher::parseViewRequest)
+        val intent = when (target) {
+            is ContainerLauncher.ViewTarget.Link -> Intent(Intent.ACTION_VIEW, Uri.parse(target.url))
+            is ContainerLauncher.ViewTarget.SharedFile -> sharedFileIntent(target)
+            null -> null
+        }
+        if (intent == null) {
+            Log.w(TAG, "Refused to open on Android: not an http(s) link or a file on shared storage")
+            return
+        }
+        val chooser = Intent.createChooser(intent, "Open with").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(chooser) }.onFailure { Log.w(TAG, "Could not open it on Android", it) }
+    }
+
+    private fun sharedFileIntent(target: ContainerLauncher.ViewTarget.SharedFile): Intent? {
+        val volume = SharedVolume.mounted(context).firstOrNull { it.name == target.volume } ?: return null
+        val root = volume.root.canonicalFile
+        val file = File(root, target.relativePath).canonicalFile
+        // A symlink inside shared storage must not lead out of it.
+        if (!file.path.startsWith(root.path + "/") || !file.isFile) return null
+        val uri = runCatching { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file) }.getOrNull() ?: return null
+        val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase()) ?: "application/octet-stream"
+        return Intent(Intent.ACTION_VIEW).setDataAndType(uri, type).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
     private fun write(entries: List<LibraryEntry>) {

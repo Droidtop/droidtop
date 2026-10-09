@@ -59,6 +59,48 @@ class ContainerLauncherTest {
     }
 
     @Test
+    fun `only http(s) links and shared-storage files may be opened on Android`() {
+        val link = ContainerLauncher.ViewTarget.Link("https://example.org/a?b=c")
+        assertEquals(link, ContainerLauncher.parseViewRequest("https://example.org/a?b=c\n"))
+        assertEquals(
+            ContainerLauncher.ViewTarget.SharedFile("primary", "Download/a b.pdf"),
+            ContainerLauncher.parseViewRequest("/run/droidtop-shared-storage/primary/Download/a b.pdf"),
+        )
+        assertEquals(
+            ContainerLauncher.ViewTarget.SharedFile("1234-ABCD", "x.png"),
+            ContainerLauncher.parseViewRequest("file:///run/droidtop-shared-storage/1234-ABCD/x.png"),
+        )
+        listOf(
+            "intent://scan/#Intent;scheme=zxing;end",
+            "content://dev.droidtop.app.fileprovider/root/data/data/dev.droidtop.app/files/x",
+            "javascript:alert(1)",
+            "https://",
+            "/etc/passwd",
+            "/run/droidtop-app-storage/proot/x",
+            "/run/droidtop-shared-storage/primary/../../../etc/passwd",
+            "/run/droidtop-shared-storage/primary/./x",
+            "/run/droidtop-shared-storage/primary",
+            "file://host/run/droidtop-shared-storage/primary/x",
+            "https://example.org/\u0000",
+            "",
+        ).forEach { assertNull(it, ContainerLauncher.parseViewRequest(it)) }
+    }
+
+    @Test
+    fun `open on Android is a hidden handler, the default for links only when nothing else is`() {
+        val entry = ContainerLauncher.viewEntry().lines()
+        assertTrue("Exec=sh /run/droidtop-app-storage/desktop-launcher/bin/droidtop-view %u" in entry)
+        assertTrue("NoDisplay=true" in entry)
+        assertTrue(entry.first { it.startsWith("MimeType=") }.contains("x-scheme-handler/https;"))
+        assertFalse(ContainerLauncher.VIEW_ENTRY.startsWith(ContainerLauncher.ENTRY_PREFIX))
+        assertTrue(ContainerLauncher.mimeApps().contains("x-scheme-handler/https=${ContainerLauncher.VIEW_ENTRY}\n"))
+        assertTrue(ContainerLauncher.isViewRequest("view.42.request"))
+        assertFalse(ContainerLauncher.isViewRequest(".view.42"))
+        assertNull(ContainerLauncher.requestToken("view.42.request"))
+        assertTrue(ContainerLauncher.viewHelperScript().contains("http://* | https://* | file://* | /*) ;;"))
+    }
+
+    @Test
     fun `host paths sit under the files directory the containers see`() {
         val files = File("/data/user/0/dev.droidtop.app/files")
         assertEquals(
