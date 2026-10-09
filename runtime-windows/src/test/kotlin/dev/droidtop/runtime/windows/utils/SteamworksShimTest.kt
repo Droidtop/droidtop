@@ -39,8 +39,7 @@ class SteamworksShimTest {
         assertEquals(10, SteamworksShim.detect("steam:10", File(tmp.root, "b"))?.appId)
         // Not a Steam game by any sign: nothing to answer as.
         assertNull(SteamworksShim.detect("gog:5", File(tmp.root, "b")))
-        file("b/steam_appid.txt", "42
-")
+        file("b/steam_appid.txt", "42\n")
         val shipped = SteamworksShim.detect("folder:1", File(tmp.root, "b"))
         assertEquals(42, shipped?.appId)
         // The id says which Steam app it is, not that Steam owns this copy.
