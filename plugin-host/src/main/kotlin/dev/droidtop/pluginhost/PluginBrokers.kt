@@ -158,6 +158,20 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         true
     }.getOrDefault(false)
 
+    override fun openLink(uri: String, title: String?): String? {
+        val view = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(uri)).addCategory(Intent.CATEGORY_BROWSABLE)
+        return try {
+            if (appContext.packageManager.queryIntentActivities(view, 0).isEmpty()) {
+                if (uri.startsWith("magnet:", ignoreCase = true)) "no app opens magnet links" else "no app opens this link"
+            } else {
+                appContext.startActivity(Intent.createChooser(view, title ?: "Open with").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                null
+            }
+        } catch (e: Exception) {
+            "the link could not be opened"
+        }
+    }
+
     override fun toast(pluginLabel: String, text: String): Boolean {
         // Posted, never run on the binder thread; the plugin's name leads so it is never mistaken for droidtop's own words.
         return android.os.Handler(android.os.Looper.getMainLooper()).post {

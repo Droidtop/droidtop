@@ -52,6 +52,12 @@ interface BrokerEnvironment {
     fun launchApp(packageName: String): Boolean
     fun launchAppWithExtras(packageName: String, extras: Map<String, String>, action: String?): Boolean
 
+    /**
+     * Hands [uri] (already checked by [AppLinks]) to another app through Android's own chooser, titled [title]. Null when the
+     * chooser was shown; otherwise the plain reason it was not ("no app opens magnet links").
+     */
+    fun openLink(uri: String, title: String?): String?
+
     /** Shows [text] as a short message attributed to [pluginLabel], on whatever surface is in front; false when it could not. */
     fun toast(pluginLabel: String, text: String): Boolean
 
@@ -216,6 +222,7 @@ class HostOp(
 /** The host's own APIs. Everything a plugin can do beyond its own process goes through one of these or through a provider. */
 object HostApis {
     const val MAX_PACKAGES = 50
+    const val MAX_LINK_TITLE = 60
 
     private fun invalid(message: String): Nothing = throw BrokerException(PluginErrorCode.INVALID_ARGS, message)
 
@@ -329,6 +336,21 @@ object HostApis {
         ) { env, _, args ->
             val pkg = args.optString("package").takeIf { it.isNotBlank() } ?: invalid("package is required")
             JSONObject().put("launched", env.launchApp(pkg))
+        },
+        // docs/plugin-api.md 3 F2: a link handed to another app (a magnet to a torrent app, a page to the browser). droidtop
+        // builds the intent and shows Android's chooser; the plugin never sees an Intent. Only during a call the person started.
+        HostOp(
+            "apps", "view",
+            permission = "apps.view",
+            userOnly = true,
+            alwaysAudit = true,
+            target = { AppLinks.target(it.optString("uri")) },
+        ) { env, _, args ->
+            val uri = args.optString("uri").trim()
+            AppLinks.refusal(uri)?.let { invalid(it) }
+            val title = args.optString("title").trim().take(MAX_LINK_TITLE).takeIf { it.isNotEmpty() }
+            val reason = env.openLink(uri, title)
+            JSONObject().put("opened", reason == null).also { if (reason != null) it.put("reason", reason) }
         },
         HostOp(
             "apps", "intent",

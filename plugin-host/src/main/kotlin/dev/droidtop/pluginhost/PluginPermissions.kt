@@ -89,6 +89,7 @@ object PluginPermissions {
         PluginPermission("apps.check", PermissionTier.NORMAL, "Check whether listed apps are installed"),
         PluginPermission("apps.list", PermissionTier.DANGEROUS, "See all apps installed on this device"),
         PluginPermission("apps.launch", PermissionTier.NORMAL, "Open other apps"),
+        PluginPermission("apps.view", PermissionTier.NORMAL, "Open links in other apps"),
         PluginPermission("apps.intents.out", PermissionTier.NORMAL, "Send information to listed apps / to any app", scopedTier = PermissionTier.DANGEROUS),
         PluginPermission("intents.in", PermissionTier.DANGEROUS, "Be opened by other apps and links"),
         PluginPermission("apps.install", PermissionTier.DANGEROUS, "Install and update apps (Android asks you each time)"),

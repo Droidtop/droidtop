@@ -52,6 +52,12 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
         launched += Triple(packageName, extras, action)
         return packageName in installed
     }
+    val links = mutableListOf<Pair<String, String?>>()
+    var linkRefusal: String? = null
+    override fun openLink(uri: String, title: String?): String? {
+        links += uri to title
+        return linkRefusal
+    }
     val toasts = mutableListOf<Pair<String, String>>()
     override fun toast(pluginLabel: String, text: String): Boolean {
         toasts += pluginLabel to text
