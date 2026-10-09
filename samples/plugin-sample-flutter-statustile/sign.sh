@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Signs and packages an already-built plugin bundle (build.sh output:
-# manifest.json + payload/{lib,flutter_assets} -- either built locally or
+# manifest.json + payload/{lib,flutter_assets,dex} -- either built locally or
 # downloaded from the sample-plugin-flutter CI job's unsigned artifact)
 # into droidtop.sample-flutter-statustile.droidplugin.tar.xz.
 #
@@ -48,9 +48,13 @@ fi
 # "$BUNDLE_DIR/$BUNDLE_DIR/payload" and failed to open. Absolute paths for
 # both -C arguments sidestep that entirely.
 BUNDLE_ABS="$(cd "$BUNDLE_DIR" && pwd)"
+# Every top-level entry of the payload, so the bundle carries exactly what manifest.json lists (build.sh hashes the
+# whole payload tree): lib, flutter_assets, and dex when the APK had one. Listing two of them by name left dex/ out
+# while the manifest named dex/classes.dex, and the installer refused the bundle (rig, v0.2.0-dev.1649).
+PAYLOAD_ROOTS=$(cd "$BUNDLE_ABS/payload" && ls -A)
 tar --sort=name -cf - \
   -C "$BUNDLE_ABS" manifest.json manifest.sig $CERT_FILE \
-  -C "$BUNDLE_ABS/payload" lib flutter_assets \
+  -C "$BUNDLE_ABS/payload" $PAYLOAD_ROOTS \
   | xz -9e > droidtop.sample-flutter-statustile.droidplugin.tar.xz
 
 echo "Signed droidtop.sample-flutter-statustile.droidplugin.tar.xz"

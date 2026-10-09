@@ -46,6 +46,11 @@ flutter create --platforms=android --org dev.droidtop.samples --project-name flu
 cp pubspec.yaml build/scaffold/pubspec.yaml
 rm -rf build/scaffold/lib
 cp -r lib build/scaffold/lib
+# The dex this build ships (dex/classes*.dex) runs against droidtop's own Flutter embedding, not the APK's: obfuscated,
+# R8 renames io.flutter.embedding.engine.FlutterEngine inside it, and GeneratedPluginRegistrant.registerWith then takes a
+# class droidtop's engine is not (emulator-5560: "registerWith [class io.flutter.embedding.engine.FlutterEngine]" not
+# found). Flutter's Gradle plugin adds android/app/proguard-rules.pro to a release build, so names are kept there.
+printf '%s\n' '# droidtop flutter_embed: the shipped dex links against droidtop'"'"'s embedding by name.' '-dontobfuscate' > build/scaffold/android/app/proguard-rules.pro
 
 (
   cd build/scaffold
