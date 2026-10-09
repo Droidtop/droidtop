@@ -60,6 +60,33 @@ object ElevatedAccess {
         }
     }
 
+    /** Where the person changes the source of elevated access; every reason below names it. */
+    const val SETTINGS_PLACE = "Settings > Accounts and sources > Plugins and integrations"
+
+    private const val NOT_ALLOWED = "droidtop is not allowed in Shizuku yet: $SETTINGS_PLACE > Allow droidtop in Shizuku"
+
+    /**
+     * Why [choice] gives no elevated access with the backends in these states, or null when it does
+     * ([ElevatedShell.unavailableReason]). The Shizuku app running over ADB without having allowed droidtop is the
+     * likely console case (build 1649: Quick Menu Kill said only "Not confirmed" three times while Shizuku ran).
+     */
+    fun unavailableReason(choice: ElevatedChoice, app: BackendState, plugin: BackendState): String? = when (choice) {
+        ElevatedChoice.OFF -> "Elevated access is Off: $SETTINGS_PLACE > Elevated access"
+        ElevatedChoice.SHIZUKU_APP -> when (app) {
+            BackendState.READY -> null
+            BackendState.NEEDS_PERMISSION -> NOT_ALLOWED
+            BackendState.ABSENT -> "The Shizuku app is not running: start it, or pick another source in $SETTINGS_PLACE > Elevated access"
+        }
+        ElevatedChoice.SHIZUKU_PLUGIN ->
+            if (plugin == BackendState.READY) null
+            else "The Shizuku plugin picked in $SETTINGS_PLACE > Elevated access is not running"
+        ElevatedChoice.AUTO -> when {
+            app == BackendState.READY || plugin == BackendState.READY -> null
+            app == BackendState.NEEDS_PERMISSION -> NOT_ALLOWED
+            else -> "Shizuku is not running: start the Shizuku app, or add the Shizuku plugin"
+        }
+    }
+
     /**
      * The choices the row offers: only what is actually there. With neither backend present the list is empty and
      * the row is not drawn. Off and Auto appear as soon as there is anything to choose between.
@@ -103,6 +130,16 @@ class ElevatedShell(
     override fun capabilities(): TaskPrivileges = target().capabilities()
 
     override fun available(): TaskPrivileges = capabilities()
+
+    /** Only the Shizuku app's binder arrives late; the plugin backend is a registry lookup with nothing to wait for. */
+    override fun connect(timeoutMs: Long) {
+        when (choice()) {
+            ElevatedChoice.OFF, ElevatedChoice.SHIZUKU_PLUGIN -> Unit
+            ElevatedChoice.AUTO, ElevatedChoice.SHIZUKU_APP -> app.connect(timeoutMs)
+        }
+    }
+
+    override fun unavailableReason(): String? = ElevatedAccess.unavailableReason(choice(), app.state(), plugin.state())
 
     override fun forceStop(packageName: String): ForceStopResult = target().forceStop(packageName)
 

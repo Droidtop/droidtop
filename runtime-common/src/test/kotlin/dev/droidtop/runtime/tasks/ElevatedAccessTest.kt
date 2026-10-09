@@ -146,6 +146,44 @@ class ElevatedAccessTest {
     }
 
     @Test
+    fun `no elevated access says why and where to change it`() {
+        assertNull(ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, ready, absent))
+        assertNull(ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, needs, ready))
+        // Shizuku running over ADB that has not allowed droidtop: the console case behind "Not confirmed".
+        val notAllowed = ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, needs, absent)!!
+        assertTrue(notAllowed.contains("not allowed in Shizuku"))
+        assertTrue(notAllowed.contains("Allow droidtop in Shizuku"))
+        assertEquals(notAllowed, ElevatedAccess.unavailableReason(ElevatedChoice.SHIZUKU_APP, needs, ready))
+        assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, absent, absent)!!.startsWith("Shizuku is not running"))
+        assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.SHIZUKU_PLUGIN, ready, absent)!!.contains("Shizuku plugin"))
+        assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.OFF, ready, ready)!!.startsWith("Elevated access is Off"))
+    }
+
+    @Test
+    fun `the shell waits for the Shizuku app's binder only where the app can serve`() {
+        var connected = 0
+        val app = object : ElevatedBackend {
+            override fun state() = BackendState.ABSENT
+            override fun connect(timeoutMs: Long) {
+                connected++
+            }
+            override fun forceStop(packageName: String) = ForceStopResult.NoProvider
+            override fun exec(argv: List<String>): ShellOutput? = null
+        }
+        val plugin = FakeBackend(absent, full, "plugin")
+        var choice = ElevatedChoice.AUTO
+        val shell = ElevatedShell(app, plugin, { choice })
+        shell.connect(1)
+        choice = ElevatedChoice.SHIZUKU_APP
+        shell.connect(1)
+        choice = ElevatedChoice.SHIZUKU_PLUGIN
+        shell.connect(1)
+        choice = ElevatedChoice.OFF
+        shell.connect(1)
+        assertEquals(2, connected)
+    }
+
+    @Test
     fun `privileged controls hide when no backend is usable`() {
         val app = FakeBackend(absent, full, "app")
         val plugin = FakeBackend(absent, full, "plugin")

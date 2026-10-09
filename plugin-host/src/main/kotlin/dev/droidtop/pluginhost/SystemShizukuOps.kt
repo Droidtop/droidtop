@@ -12,9 +12,13 @@ import dev.droidtop.runtime.tasks.ElevatedFiles
 import dev.droidtop.runtime.tasks.ForceStopResult
 import dev.droidtop.runtime.tasks.ShellOutput
 import dev.droidtop.runtime.tasks.TaskPrivileges
+import android.net.Uri
+import android.os.Bundle
 import java.io.File
 import java.io.InputStream
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import moe.shizuku.api.BinderContainer
 import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuProvider
 import rikka.sui.Sui
@@ -47,6 +51,31 @@ class SystemShizukuOps : ElevatedBackend {
         }
 
     override fun available(): TaskPrivileges = capabilities()
+
+    /**
+     * Waits up to [timeoutMs] for Shizuku's binder when this process has none yet. The binder reaches the main process
+     * only by asking the `:pluginhost` provider or by its broadcast ([ShizukuTransport]), and both start on the first
+     * [state] call, which then answers ABSENT at once: a Kill that was the first privileged call fell back to the
+     * unconfirmable background kill. Asks the provider again first, for a binder the broadcast missed.
+     */
+    override fun connect(timeoutMs: Long) {
+        ShizukuTransport.ensureStarted()
+        if (binderAlive()) return
+        ShizukuTransport.askProvider()
+        // Only the Shizuku app delivers a binder later; without it installed there is nothing to wait for (Sui answers
+        // at once, through ensureStarted).
+        if (binderAlive() || !ShizukuTransport.shizukuAppInstalled()) return
+        val arrived = CountDownLatch(1)
+        val listener = Shizuku.OnBinderReceivedListener { arrived.countDown() }
+        runCatching { Shizuku.addBinderReceivedListenerSticky(listener) }
+        try {
+            arrived.await(timeoutMs, TimeUnit.MILLISECONDS)
+        } finally {
+            runCatching { Shizuku.removeBinderReceivedListener(listener) }
+        }
+    }
+
+    private fun binderAlive(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
 
     override fun forceStop(packageName: String): ForceStopResult {
         if (!PACKAGE_NAME.matches(packageName)) return ForceStopResult.Failed("not a package name")
@@ -257,8 +286,43 @@ object ShizukuTransport {
     fun install(context: Context) {
         appContext = context.applicationContext
         val name = if (Build.VERSION.SDK_INT >= 28) Application.getProcessName() else legacyProcessName()
-        ShizukuProvider.enableMultiProcessSupport(name?.endsWith(PROVIDER_PROCESS_SUFFIX) == true)
+        providerProcess = name?.endsWith(PROVIDER_PROCESS_SUFFIX) == true
+        ShizukuProvider.enableMultiProcessSupport(providerProcess)
     }
+
+    @Volatile
+    private var providerProcess = false
+
+    /**
+     * Asks the `:pluginhost` provider for the binder it holds, as [ShizukuProvider.requestBinderForNonProviderProcess]
+     * does, but without registering another broadcast receiver each time. For a process whose one request at start
+     * found the provider empty and whose broadcast never came. Blocks on the provider: background only.
+     */
+    fun askProvider() {
+        val context = appContext ?: return
+        if (providerProcess) return
+        runCatching {
+            val reply = context.contentResolver.call(
+                Uri.parse("content://${context.packageName}.shizuku"),
+                ShizukuProvider.METHOD_GET_BINDER,
+                null,
+                Bundle(),
+            ) ?: return
+            reply.classLoader = BinderContainer::class.java.classLoader
+            @Suppress("DEPRECATION")
+            val container = reply.getParcelable<BinderContainer>(EXTRA_BINDER)
+            container?.binder?.let { Shizuku.onBinderReceived(it, context.packageName) }
+        }
+    }
+
+    /** Whether the Shizuku app itself is installed (ShizukuProvider.MANAGER_APPLICATION_ID). A PackageManager read: background only. */
+    fun shizukuAppInstalled(): Boolean {
+        val context = appContext ?: return false
+        return runCatching { context.packageManager.getPackageInfo(ShizukuProvider.MANAGER_APPLICATION_ID, 0) }.isSuccess
+    }
+
+    // ShizukuProvider's own extra name (private there, ShizukuProvider.java EXTRA_BINDER, Shizuku-API 13).
+    private const val EXTRA_BINDER = "moe.shizuku.privileged.api.intent.extra.BINDER"
 
     /** The process name before API 28: the first NUL-terminated entry of the process's own command line. */
     private fun legacyProcessName(): String? =

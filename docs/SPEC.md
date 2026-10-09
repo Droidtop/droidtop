@@ -2944,7 +2944,16 @@ a close path of its own. Every call works off the main thread.
   the force-stop; `Requested` when droidtop only asked Android and cannot tell; `Failed` with the
   provider's own words. `Requested` says "Not confirmed" (`TaskPolicy.NOT_CONFIRMED`), with
   `NOT_CONFIRMED_TIP` as the tooltip saying what Android does not report and that an elevated backend
-  closes apps for real. A
+  closes apps for real. "Not confirmed" never stands alone when droidtop knows why no helper ended the
+  app: `PrivilegedShell.unavailableReason` (pure rule `ElevatedAccess.unavailableReason`) follows it,
+  naming the fix and where it is ("droidtop is not allowed in Shizuku yet: Settings > Accounts and
+  sources > Plugins and integrations > Allow droidtop in Shizuku", "Shizuku is not running", "Elevated
+  access is Off", the picked plugin not running). Console, build 1649: Quick Menu Kill on RetroArch said
+  only "Not confirmed" three times while Shizuku ran over ADB. Before choosing a path, `AppCloser` gives the
+  helper up to 3 s to arrive (`PrivilegedShell.connect`): the Shizuku app's binder reaches droidtop's
+  main process only through the `:pluginhost` provider or its broadcast, both started by the first
+  privileged call, which otherwise answered "no helper" while the binder was on its way; the wait also
+  asks the provider again for a binder whose broadcast was missed. A
   surface never does nothing silently, and only `Closed` is the Quick Menu's `QuitResult.Ended`
   (droidtop's running-game state clears on that alone, as the rule above already says).
 - **The app in front is what droidtop last started.** `LaunchDisplay.dispatch`, the one point every

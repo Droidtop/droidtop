@@ -111,5 +111,8 @@ object TaskPolicy {
     /** What a row says after a close Android never confirmed; [NOT_CONFIRMED_TIP] explains it on hover, long-press or focus. */
     const val NOT_CONFIRMED = "Not confirmed"
 
+    /** [NOT_CONFIRMED], followed by why no helper ended the app when that is known ([PrivilegedShell.unavailableReason]). */
+    fun notConfirmed(reason: String?): String = if (reason.isNullOrBlank()) NOT_CONFIRMED else "$NOT_CONFIRMED. $reason"
+
     const val NOT_CONFIRMED_TIP = "Android does not report whether the app closed. The Shizuku plugin closes apps for real."
 }

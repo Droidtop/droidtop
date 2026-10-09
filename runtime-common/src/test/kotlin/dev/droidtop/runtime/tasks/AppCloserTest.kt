@@ -8,10 +8,18 @@ class AppCloserTest {
     private class FakeOps(
         private val privileges: TaskPrivileges,
         private val result: ForceStopResult = ForceStopResult.NoProvider,
+        private val reason: String? = null,
     ) : PrivilegedShell {
         val forceStops = mutableListOf<String>()
+        var connects = 0
 
         override fun available() = privileges
+
+        override fun connect(timeoutMs: Long) {
+            connects++
+        }
+
+        override fun unavailableReason() = reason
 
         override fun forceStop(packageName: String): ForceStopResult {
             forceStops += packageName
@@ -50,6 +58,17 @@ class AppCloserTest {
         assertTrue(ops.forceStops.isEmpty())
         assertEquals(listOf("com.android.calendar"), killed)
         assertTrue(closed.isEmpty())
+    }
+
+    @Test
+    fun `a close that could only ask Android says why no helper ended it`() {
+        val ops = FakeOps(TaskPrivileges.NONE, reason = "droidtop is not allowed in Shizuku yet")
+
+        val outcome = closer(ops).close("com.retroarch.aarch64")
+
+        assertTrue(outcome is CloseOutcome.Requested)
+        assertEquals("Not confirmed. droidtop is not allowed in Shizuku yet", outcome.text)
+        assertEquals(1, ops.connects)
     }
 
     @Test

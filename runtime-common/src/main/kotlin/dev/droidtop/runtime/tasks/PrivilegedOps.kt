@@ -27,6 +27,21 @@ interface PrivilegedShell {
     /** Compatibility entry point for existing provider adapters. */
     fun available(): TaskPrivileges = TaskPrivileges.NONE
 
+    /**
+     * Gives a helper that reaches droidtop asynchronously (the Shizuku app's binder comes by broadcast from the
+     * `:pluginhost` provider) up to [timeoutMs] to arrive, so the first privileged call after droidtop starts is not
+     * answered "nothing there" while the binder is on its way. Returns at once when the helper is there or cannot
+     * come. Blocks: background threads only.
+     */
+    fun connect(timeoutMs: Long) = Unit
+
+    /**
+     * Why [capabilities] holds nothing right now, as a sentence that says what to change (allow droidtop in Shizuku,
+     * start Shizuku, the source picked in Settings); null when a helper is ready or there is nothing more to say.
+     * Pings binders: not for the main thread.
+     */
+    fun unavailableReason(): String? = null
+
     fun forceStop(packageName: String): ForceStopResult
 
     fun exec(argv: List<String>): ShellOutput?
