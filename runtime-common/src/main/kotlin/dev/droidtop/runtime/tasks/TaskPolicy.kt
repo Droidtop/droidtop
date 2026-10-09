@@ -32,6 +32,8 @@ data class TaskPrivileges(
     val forceStop: Boolean,
     val shell: Boolean,
     val grantPermission: Boolean = false,
+    /** [PrivilegedShell.readFile] and [PrivilegedShell.writeFile] are served. */
+    val files: Boolean = false,
 ) {
     /** A task snapshot requires shell access to read the system task dump. */
     val listTasks: Boolean get() = shell

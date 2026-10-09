@@ -106,6 +106,11 @@ class ElevatedShell(
         target().grantPermission(packageName, permission)
 
     override fun spawn(argv: List<String>): Process? = target().spawn(argv)
+
+    override fun readFile(path: String): ByteArray? = if (ElevatedFiles.allowed(path)) target().readFile(path) else null
+
+    override fun writeFile(path: String, data: ByteArray): Boolean =
+        ElevatedFiles.allowed(path) && data.size <= ElevatedFiles.MAX_WRITE_BYTES && target().writeFile(path, data)
 }
 
 /** The user's pick, kept in droidtop's own preferences and read once. */

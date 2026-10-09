@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import dev.droidtop.runtime.tasks.BackendState
 import dev.droidtop.runtime.tasks.ElevatedBackend
+import dev.droidtop.runtime.tasks.ElevatedFiles
 import dev.droidtop.runtime.tasks.ForceStopResult
 import dev.droidtop.runtime.tasks.ShellOutput
 import dev.droidtop.runtime.tasks.TaskPrivileges
@@ -37,7 +38,11 @@ class SystemShizukuOps : ElevatedBackend {
     }
 
     override fun capabilities(): TaskPrivileges =
-        if (state() == BackendState.READY) TaskPrivileges(forceStop = true, shell = true, grantPermission = true) else TaskPrivileges.NONE
+        if (state() == BackendState.READY) {
+            TaskPrivileges(forceStop = true, shell = true, grantPermission = true, files = true)
+        } else {
+            TaskPrivileges.NONE
+        }
 
     override fun available(): TaskPrivileges = capabilities()
 
@@ -70,6 +75,51 @@ class SystemShizukuOps : ElevatedBackend {
         if (!PACKAGE_NAME.matches(packageName) || !PERMISSION_NAME.matches(permission)) return false
         if (notReady() != null) return false
         return run(listOf("pm", "grant", packageName, permission), STOP_TIMEOUT_MS)?.exit == 0
+    }
+
+    /** `cat` as Shizuku's user; the bytes as they are, refused past [ElevatedFiles.MAX_READ_BYTES]. */
+    override fun readFile(path: String): ByteArray? {
+        if (!ElevatedFiles.allowed(path) || notReady() != null) return null
+        val process = newProcess(listOf("cat", path)) ?: return null
+        val err = Capture(process.errorStream).also { it.start() }
+        return try {
+            val bytes = process.inputStream.use { input -> input.readNBytesCompat(ElevatedFiles.MAX_READ_BYTES + 1) }
+            if (!process.waitFor(EXEC_TIMEOUT_MS, TimeUnit.MILLISECONDS)) return null
+            err.join(STREAM_JOIN_MS)
+            bytes.takeIf { process.exitValue() == 0 && it.size <= ElevatedFiles.MAX_READ_BYTES }
+        } catch (t: Throwable) {
+            null
+        } finally {
+            runCatching { process.destroy() }
+        }
+    }
+
+    /**
+     * Writes through `dd` beside the target and renames it over the target only once it is whole, so an emulator
+     * never reads a half-written config or BIOS file.
+     */
+    override fun writeFile(path: String, data: ByteArray): Boolean {
+        if (!ElevatedFiles.allowed(path) || data.size > ElevatedFiles.MAX_WRITE_BYTES || notReady() != null) return false
+        if (run(listOf("mkdir", "-p", path.substringBeforeLast('/')), STOP_TIMEOUT_MS)?.exit != 0) return false
+        val staged = "$path.droidtop-part"
+        val process = newProcess(listOf("dd", "of=$staged")) ?: return false
+        val out = Capture(process.inputStream).also { it.start() }
+        val err = Capture(process.errorStream).also { it.start() }
+        val written = try {
+            process.outputStream.use { it.write(data) }
+            process.waitFor(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS) && process.exitValue() == 0
+        } catch (t: Throwable) {
+            false
+        } finally {
+            out.join(STREAM_JOIN_MS)
+            err.join(STREAM_JOIN_MS)
+            runCatching { process.destroy() }
+        }
+        if (!written || run(listOf("mv", "-f", staged, path), STOP_TIMEOUT_MS)?.exit != 0) {
+            run(listOf("rm", "-f", staged), STOP_TIMEOUT_MS)
+            return false
+        }
+        return true
     }
 
     /**
@@ -131,6 +181,18 @@ class SystemShizukuOps : ElevatedBackend {
         null
     }
 
+    /** Up to [limit] bytes of the stream (InputStream.readNBytes is API 33). */
+    private fun InputStream.readNBytesCompat(limit: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(1 shl 16)
+        while (out.size() < limit) {
+            val n = read(buffer, 0, minOf(buffer.size, limit - out.size()))
+            if (n < 0) break
+            out.write(buffer, 0, n)
+        }
+        return out.toByteArray()
+    }
+
     /** Reads one stream on its own thread so a full pipe never stalls the command, keeping the first [MAX_STREAM_CHARS] characters. */
     private class Capture(private val stream: InputStream) : Thread() {
         private val text = StringBuilder()
@@ -160,6 +222,7 @@ class SystemShizukuOps : ElevatedBackend {
         private const val STREAM_JOIN_MS = 500L
         private const val STOP_TIMEOUT_MS = 8_000L
         private const val EXEC_TIMEOUT_MS = 15_000L
+        private const val FILE_TIMEOUT_MS = 60_000L
         private val PACKAGE_NAME = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+\$")
         private val PERMISSION_NAME = Regex("^[A-Za-z][A-Za-z0-9_.]*\$")
     }

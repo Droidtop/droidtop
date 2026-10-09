@@ -456,6 +456,11 @@ class HostApiCaller(private val env: BrokerEnvironment) {
     fun hasProvider(api: String, version: Int): Boolean =
         PluginApiResolver.providerFor(env.resolution(), "", RequiredApi(api, "$version.0", optional = true), env.providerChoice(api)) != null
 
+    /** True when the running provider of [api] exports [op], so a caller offers only what the provider can do. */
+    fun hasOp(api: String, version: Int, op: String): Boolean =
+        PluginApiResolver.providerFor(env.resolution(), "", RequiredApi(api, "$version.0", optional = true), env.providerChoice(api))
+            ?.export?.ops?.any { it.op == op } == true
+
     /**
      * [personStarted]: the call is for something the person just did in droidtop (Quit to Library, the task manager's
      * End). Only then may a provider that has not been allowed full access ask for it on the first-use sheet; droidtop's

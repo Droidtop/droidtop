@@ -2453,6 +2453,28 @@ arrays under the manifest's own keys (`V2Declarations`).
     through a shell, and each stream is capped at 64 KiB.
   The other `priv.packages` ops of §2.2 (install, uninstall, grant, appop)
   are not specified or built.
+- **Ops for the emulator setup helper** (specified 2026-10-08,
+  Droidtop/tracker#130, #248; droidtop's side is built, the Shizuku provider
+  plugin is to add them). Both are `priv.shell@1` ops, permission
+  `priv.shell.adb`, and the provider refuses any `path` that is not a file in
+  shared storage: absolute, under `/storage/` or `/sdcard/`, no empty, `.` or
+  `..` part, not ending in `/` (`ElevatedFiles.allowed`, which droidtop
+  checks before it asks). Their purpose is other apps' `Android/data`
+  folders, which the shell user reaches and droidtop cannot since Android 11
+  (an emulator's config file and BIOS folder).
+  - `read_file {path, offset, length} -> {dataBase64, eof}`: `length` at most
+    262144; `eof` true when the file ends within this piece. A missing file is
+    an error, not an empty reply.
+  - `write_file {path, offset, dataBase64, last} -> {}`: pieces arrive in
+    order from offset 0 (offset 0 starts a new file). The provider writes them
+    to `<path>.droidtop-part`, creating the folder, and on `last` renames it
+    over `path`, so the target is never half-written; any error removes the
+    part file. A file over 64 MiB is refused.
+  droidtop sends at most 192 KiB of raw data per call
+  (`PluginPrivilegedOps.FILE_CHUNK`) and offers the file actions only when the
+  running provider exports both ops (`HostApiCaller.hasOp`). The Shizuku app
+  backend (`SystemShizukuOps`) does the same with `cat`, `dd` and `mv` in
+  Shizuku's server.
 - **The transport.** Shizuku's server pushes its binder to a content
   provider named `<applicationId>.shizuku` in each app the user allowed.
   `:plugin-host` declares Shizuku's own `ShizukuProvider` under that name in

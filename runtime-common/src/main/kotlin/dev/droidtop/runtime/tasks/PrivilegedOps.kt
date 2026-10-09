@@ -42,6 +42,18 @@ interface PrivilegedShell {
      * not for the main thread.
      */
     fun spawn(argv: List<String>): Process? = null
+
+    /**
+     * Reads a file in shared storage as the provider's user, which reaches other apps' `Android/data` folders where
+     * droidtop cannot ([ElevatedFiles.allowed]). Null when it cannot, or past [ElevatedFiles.MAX_READ_BYTES].
+     */
+    fun readFile(path: String): ByteArray? = null
+
+    /**
+     * Writes [data] as the file [path] in shared storage as the provider's user, creating its folder and replacing
+     * the file whole (never half-written). False when it cannot. [ElevatedFiles] decides which paths are asked for.
+     */
+    fun writeFile(path: String, data: ByteArray): Boolean = false
 }
 
 /** No helper installed: every call is "nothing to ask". */
