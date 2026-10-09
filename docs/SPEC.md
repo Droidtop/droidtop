@@ -12209,6 +12209,23 @@ Deck's library tabs are the better shape.
 
 ### The game page
 
+**Which copy the button acts on (Droidtop/tracker#397 slice H).** A card can
+stand for several copies (a Steam row and a GOG row of one game, a GOG offline
+install and the account's row). Highest first, its button acts on: an
+installed copy, the chosen one when that is installed; the copy the person
+chose ("Use this copy for this game"); the stores' order. So Play always plays
+something installed, and a chosen copy sticks once it is installed. One rule
+(`CopyChoices.acting`, read by `LibraryGameGroup.defaultCopy`, so the card, its
+button and its play state agree). The choice is kept per card by the card's
+identity (`CopyChoices.cardKey`, the name as `StoreIdentity.titleKey` reads it)
+and dropped when the copy it names leaves the card (a store signed out, a row
+gone after a sync; only asked of a card holding a store row, so a library still
+loading drops nothing). **Versions and updates** lists each copy of a card with
+a store row: where it is from, what A does to it (its own Play, Install or
+Update) and which one the button plays; Select on a copy's row opens its
+Options, "Use this copy for this game" first, and "Let droidtop choose" on the
+chosen one.
+
 **Details in order of use (Droidtop/tracker#397 slice G).** The Details tab
 leads with Source (`originLabel`'s full text; "Owned on Steam and GOG" under it
 when a card holds several stores), Ownership (only when not simply owned, with

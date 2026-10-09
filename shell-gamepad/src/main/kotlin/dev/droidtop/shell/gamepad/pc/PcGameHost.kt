@@ -40,7 +40,10 @@ internal class FoldedPcLibrary(
 
 /** ONE card per game, not per folder (docs/SPEC.md 7m). Call off the main thread: it reads the games roots and part progress. */
 internal fun foldPcLibrary(context: Context, entries: List<LibraryEntry>): FoldedPcLibrary {
-    val groups = LibraryGrouping.group(entries, PartProgress.finished(context), GamesRoots.current(context).map { it.absolutePath })
+    // Which copy each card's button acts on (docs/SPEC.md 7i, "Which copy"); a choice whose copy left its card is dropped.
+    val choices = dev.droidtop.library.CopyChoices.all(context)
+    val groups = LibraryGrouping.group(entries, PartProgress.finished(context), GamesRoots.current(context).map { it.absolutePath }, choices)
+    dev.droidtop.library.CopyChoices.forget(context, dev.droidtop.library.CopyChoices.stale(groups, choices))
     return FoldedPcLibrary(
         games = groups.map { it.displayEntry },
         siblings = groups.associate { group -> group.displayEntry.id to group.entriesByPath.values.toList() },
@@ -166,6 +169,7 @@ fun PcGameStandalone(
                 entry = game,
                 siblings = fold.siblings[game.id] ?: listOf(game),
                 onPlay = { launch.launch(game) },
+                onPlayCopy = { copy -> launch.launch(copy) },
                 onToggleFavorite = { scope.launch { library.toggleFavorite(game) } },
                 onOpenOptions = {
                     menuEntryId = game.id

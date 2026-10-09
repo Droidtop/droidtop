@@ -322,7 +322,9 @@ internal fun PcGamesSection(
     var folded by remember { mutableStateOf<FoldedPcLibrary?>(null) }
     // Bumped when the person marks a part finished, so Play moves on at once.
     var progressToken by remember { mutableIntStateOf(0) }
-    LaunchedEffect(entries, progressToken) {
+    // A copy chosen for a game ("Use this copy for this game") folds the library again.
+    val copyChoices by dev.droidtop.library.CopyChoices.changes.collectAsState()
+    LaunchedEffect(entries, progressToken, copyChoices) {
         // A Windows setup Activity can briefly publish an empty library
         // while its providers resume. Keep the last usable snapshot until
         // the refreshed entries arrive instead of replacing the grid with
@@ -1177,6 +1179,8 @@ internal fun PcGamesSection(
             entry = pageEntry,
             siblings = folded?.siblings?.get(pageEntry.id) ?: listOf(pageEntry),
             onPlay = { launch(pageEntry) },
+            // A copy's own row on Versions: its Install, Update or Play.
+            onPlayCopy = { copy -> launch(copy) },
             onToggleFavorite = { onToggleFavorite(pageEntry) },
             onOpenOptions = { state.menuId = pageEntry.id },
             onChooseEngine = {

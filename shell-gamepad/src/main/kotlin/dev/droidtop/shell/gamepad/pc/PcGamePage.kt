@@ -115,6 +115,7 @@ import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.UiSound
 import dev.droidtop.shell.gamepad.TextEditDialog
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -187,6 +188,8 @@ internal fun PcGamePage(
     onOpenOptions: () -> Unit,
     // "Choose a runner" on a game no runner offers: opens the Engine picker (Droidtop/tracker#287).
     onChooseEngine: () -> Unit = onOpenOptions,
+    // A copy's own Install, Update or Play from its row on Versions (docs/SPEC.md 7i, "Which copy"); null draws no copy rows' action.
+    onPlayCopy: ((LibraryEntry) -> Unit)? = null,
     onClose: () -> Unit,
     // The library, for the game's update sources (the source link rows);
     // null draws the page without them.
@@ -219,6 +222,23 @@ internal fun PcGamePage(
     }
     val updateSources by produceState(emptyList<UpdateSources.Source>(), library, isFolder) {
         value = if (library != null && isFolder) library.updateSources() else emptyList()
+    }
+    // Which copy the button acts on, and the person's choice (docs/SPEC.md 7i, "Which copy").
+    val cardKey = remember(entry.title) { dev.droidtop.library.CopyChoices.cardKey(entry.title) }
+    val choiceToken by dev.droidtop.library.CopyChoices.changes.collectAsState()
+    val chosenCopy by produceState<String?>(null, cardKey, choiceToken) {
+        value = withContext(Dispatchers.IO) { dev.droidtop.library.CopyChoices.all(context)[cardKey] }
+    }
+    var copyOptions by remember(entry.id) { mutableStateOf<LibraryEntry?>(null) }
+    val copies = remember(siblings, chosenCopy) {
+        copyRows(
+            siblings,
+            chosenCopy,
+            acting = entry.id,
+            origin = { dev.droidtop.library.originLabel(it, 1).full },
+            onRun = { copy -> if (copy.id == entry.id) onPlay() else onPlayCopy?.invoke(copy) },
+            onOptions = { copy -> copyOptions = copy },
+        )
     }
     var versionToken by remember(entry.id) { mutableIntStateOf(0) }
     var editingVersion by remember(entry.id) { mutableStateOf(false) }
@@ -348,9 +368,9 @@ internal fun PcGamePage(
         )
     }
     val tabs = remember { PageTab.values() }
-    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, infoRows) {
+    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, infoRows, copies) {
         groupRowsByTab(
-            rows + listOfNotNull(programFact) + pluginRows.facts + infoRows.map { it.toPageFact(context) { screen -> infoScreen = screen } },
+            rows + copies + listOfNotNull(programFact) + pluginRows.facts + infoRows.map { it.toPageFact(context) { screen -> infoScreen = screen } },
             parts,
         )
     }
@@ -456,6 +476,7 @@ internal fun PcGamePage(
             },
             HintBinding(GamepadAction.X, "Favourite"),
             HintBinding(GamepadAction.L2, "Game options"),
+            HintBinding(GamepadAction.SELECT, "Copy options") { zone == PageZone.CONTENT && current.getOrNull(row)?.onOptions != null },
             HintBinding(GamepadAction.B, "Back"),
         )
     }
@@ -552,6 +573,9 @@ internal fun PcGamePage(
                             }
                             GamepadAction.X -> onToggleFavorite()
                             GamepadAction.L2 -> onOpenOptions()
+                            // Select on a copy's row is that copy's Options; anywhere else the game's.
+                            GamepadAction.SELECT -> current.getOrNull(row)?.takeIf { zone == PageZone.CONTENT }?.onOptions?.invoke()
+                                ?: onOpenOptions()
                             else -> return@onPad false
                         }
                         true
@@ -691,6 +715,45 @@ internal fun PcGamePage(
     PluginPageScreen(pluginRows)
     programScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { programScreen = null }) }
     infoScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { infoScreen = null }) }
+    copyOptions?.let { copy ->
+        val from = dev.droidtop.library.originLabel(copy, 1).full
+        dev.droidtop.shell.gamepad.CatalogSheet(
+            root = dev.droidtop.library.settings.CatalogScreen(
+                id = "pc_copy_options",
+                title = from,
+                subtitle = GameNaming.displayName(entry.title),
+                groups = {
+                    listOf(
+                        dev.droidtop.library.settings.CatalogGroup(
+                            id = "pc_copy_options_group",
+                            title = null,
+                            items = listOfNotNull(
+                                dev.droidtop.library.settings.ActionItem(
+                                    id = "pc_copy_use",
+                                    title = "Use this copy for this game",
+                                    subtitle = "The button plays it whenever it is installed",
+                                    run = { ctx ->
+                                        copyOptions = null
+                                        scope.launch { withContext(Dispatchers.IO) { dev.droidtop.library.CopyChoices.choose(ctx, cardKey, copy.id) } }
+                                    },
+                                ),
+                                dev.droidtop.library.settings.ActionItem(
+                                    id = "pc_copy_auto",
+                                    title = "Let droidtop choose",
+                                    subtitle = "An installed copy, in the stores' order",
+                                    run = { ctx ->
+                                        copyOptions = null
+                                        scope.launch { withContext(Dispatchers.IO) { dev.droidtop.library.CopyChoices.choose(ctx, cardKey, null) } }
+                                    },
+                                ).takeIf { chosenCopy == copy.id },
+                            ),
+                        ),
+                    )
+                },
+            ),
+            onExit = { copyOptions = null },
+        )
+    }
     if (editingVersion) {
         // Prefilled with what the folder's name says, or what was set; blank goes back to the folder's name.
         TextEditDialog(
@@ -1070,7 +1133,48 @@ internal data class PageFact(
     val tip: String? = null,
     /** The tab this row lives on when its title cannot say ([pageTabOf]). */
     val tab: PageTab? = null,
+    /** What Select does on this row (a copy's Options); null for a row that has none. */
+    val onOptions: (() -> Unit)? = null,
 )
+
+/**
+ * One row per copy of a game on Versions and updates (docs/SPEC.md 7i, "Which
+ * copy", Droidtop/tracker#397 slice H): where it is from and how it is held,
+ * what A does to it (its own Install, Update or Play) and whether it is the one
+ * the person chose. Only for a card of more than one copy, one of them a
+ * store's row (a folder game's versions are its Version rows). Pure.
+ */
+internal fun copyRows(
+    copies: List<LibraryEntry>,
+    chosen: String?,
+    acting: String,
+    origin: (LibraryEntry) -> String,
+    onRun: (LibraryEntry) -> Unit,
+    onOptions: (LibraryEntry) -> Unit,
+): List<PageFact> {
+    if (copies.size < 2 || copies.none { it.ownership() != null }) return emptyList()
+    return copies.map { copy ->
+        val installed = copy.pcInfo?.installed ?: !copy.missing
+        val state = when {
+            copy.availableUpdate != null && installed -> "Update"
+            installed -> "Play"
+            else -> "Install"
+        }
+        val notes = listOfNotNull(
+            "The button plays this one".takeIf { copy.id == acting },
+            "Chosen for this game".takeIf { copy.id == chosen && copy.id != acting },
+            if (installed) "Installed" else "Not installed",
+        )
+        PageFact(
+            origin(copy),
+            state,
+            subtitle = notes.joinToString(" \u00b7 "),
+            onActivate = { onRun(copy) },
+            tab = PageTab.VERSIONS,
+            onOptions = { onOptions(copy) },
+        )
+    }
+}
 
 /**
  * The page's rows, in the order a store page lists them: how you have

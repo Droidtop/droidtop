@@ -18,9 +18,17 @@ data class LibraryGameGroup(
     val entriesByPath: Map<String, LibraryEntry>,
     /** The ids of the entries the person marked finished ([PartProgress]); only the parts of a multi-part game use them. */
     val finished: Set<String> = emptySet(),
+    /** The copy the person chose for this game ([CopyChoices]), by entry id; null leaves it to the card's own order. */
+    val chosen: String? = null,
 ) {
-    /** The version and copy the card stands on: newest version of the first segment. */
-    val defaultCopy: GameCopy? get() = game.defaultVersion?.playable
+    /**
+     * The version and copy the card stands on, and so the one its button acts
+     * on ([CopyChoices]): the chosen copy when it is installed or nothing is,
+     * else the newest version of the first segment, an installed copy of it
+     * first, in the stores' order.
+     */
+    val defaultCopy: GameCopy?
+        get() = CopyChoices.acting(game.allVersions.flatMap { it.copies }, chosen) ?: game.defaultVersion?.playable
 
     /**
      * The copy Play starts (docs/SPEC.md 7n): for a game of several parts,
@@ -126,6 +134,8 @@ object LibraryGrouping {
         // The games roots: nothing at or above one is read as a game's title,
         // so a `game` folder straight under a root is unidentified, not "games".
         roots: Collection<String> = emptyList(),
+        // The copy each card's button acts on, by card ([CopyChoices.cardKey]) to entry id.
+        chosen: Map<String, String> = emptyMap(),
     ): List<LibraryGameGroup> {
         val folders = entries.mapNotNull { entry -> entry.groupingPath()?.let { entry to it } }
         val byPath = folders.associate { (entry, _) -> entry.id to entry }
@@ -166,7 +176,12 @@ object LibraryGrouping {
                 mapOf(entry.id to entry),
             )
         }
-        return (folderGames + storeOnly + ungrouped).sortedBy { it.game.name.lowercase() }
+        val all = (folderGames + storeOnly + ungrouped).sortedBy { it.game.name.lowercase() }
+        if (chosen.isEmpty()) return all
+        return all.map { group ->
+            val pick = chosen[CopyChoices.cardKey(group.game.name)]?.takeIf { it in group.entriesByPath }
+            if (pick == null) group else group.copy(chosen = pick)
+        }
     }
 
     /**
