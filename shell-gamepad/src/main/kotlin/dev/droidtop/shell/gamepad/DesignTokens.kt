@@ -538,6 +538,9 @@ object MenuTokens {
     const val UniformValueMaxLines = 2
     val ValueColumnMaxWidth = 220.dp
 
+    /** The most of a row's free width its value may take; the title keeps the rest (tracker#316). */
+    const val ValueMaxShare = 0.55f
+
     /**
      * The value column's own width, so the values down a screen line up
      * as a column instead of each one starting where its label stopped.

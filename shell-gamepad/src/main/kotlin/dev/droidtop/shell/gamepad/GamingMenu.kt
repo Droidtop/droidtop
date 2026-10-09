@@ -48,6 +48,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -545,7 +546,7 @@ internal fun MenuRow(
             if (adjustable && onAdjust != null && window.touchFirst) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = if (columnWidth != null) Modifier.width(columnWidth + window.minTouchTarget * 2) else Modifier,
+                    modifier = (if (columnWidth != null) Modifier.width(columnWidth + window.minTouchTarget * 2) else Modifier).valueShare(),
                 ) {
                     AdjustArrow("‹") { onAdjust(-1) }
                     Text(
@@ -571,11 +572,13 @@ internal fun MenuRow(
                     textAlign = TextAlign.End,
                     maxLines = valueLines,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = if (columnWidth != null) {
-                        Modifier.width(columnWidth)
-                    } else {
-                        Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth, max = MenuTokens.ValueColumnMaxWidth)
-                    },
+                    modifier = (
+                        if (columnWidth != null) {
+                            Modifier.width(columnWidth)
+                        } else {
+                            Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth, max = MenuTokens.ValueColumnMaxWidth)
+                        }
+                        ).valueShare(),
                 )
             }
         }
@@ -584,7 +587,7 @@ internal fun MenuRow(
             // In the shared value column, so switches line up with the
             // values of the rows around them.
             Box(
-                modifier = LocalValueColumnWidth.current?.let { Modifier.width(it) } ?: Modifier,
+                modifier = (LocalValueColumnWidth.current?.let { Modifier.width(it) } ?: Modifier).valueShare(),
                 contentAlignment = Alignment.CenterEnd,
             ) { ShellSwitch(switchOn) }
         }
@@ -593,6 +596,19 @@ internal fun MenuRow(
             Text("›", color = MenuTokens.Placeholder, style = MaterialTheme.typography.bodyLarge)
         }
     }
+}
+
+/**
+ * A row's value column never takes more than [MenuTokens.ValueMaxShare] of the width left to it. The shared value
+ * column is up to [MenuTokens.ValueColumnMaxWidth] wide, and the Quick Menu's pane is about as wide as that, so a
+ * long value pushed the title to zero width and an info row read as a bare value (rig, build 1715, Quick Menu >
+ * Plugins > Sample, Droidtop/tracker#316). Capping the outer constraint leaves the inner width modifiers to settle
+ * inside it.
+ */
+private fun Modifier.valueShare(): Modifier = layout { measurable, constraints ->
+    val cap = if (constraints.hasBoundedWidth) (constraints.maxWidth * MenuTokens.ValueMaxShare).toInt() else constraints.maxWidth
+    val placeable = measurable.measure(constraints.copy(minWidth = minOf(constraints.minWidth, cap), maxWidth = cap))
+    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
 }
 
 /**
