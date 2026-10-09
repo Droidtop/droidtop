@@ -110,6 +110,21 @@ class PluginTiersTest {
     }
 
     @Test
+    fun `the plugin's page warns in plain words while the graphics chip is allowed`() {
+        val r = record(manifest { it.put("permissions", arr(gpu)) })
+        assertNull("not granted, no warning", PluginTiers.caution(r, grants()))
+        assertNull(PluginTiers.caution(r, grants(PluginTiers.GPU_RENDER to GrantState.ASK)))
+        val caution = PluginTiers.caution(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED))!!
+        assertTrue(caution.contains("reach past droidtop's checks"))
+        assertTrue(caution.contains("source you trust"))
+        // No tier names where a person reads (Droidtop/tracker#378, owner 2026-10-08).
+        listOf("tier", "contained", "isolated", "sandbox", "GPU").forEach { assertTrue(it, !caution.contains(it, ignoreCase = true)) }
+        // Full access already carries the stronger warning.
+        val both = record(manifest { it.put("permissions", arr(fullTrust, gpu)) })
+        assertNull(PluginTiers.caution(both, grants(PluginTiers.FULL_TRUST to GrantState.GRANTED, PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+    }
+
+    @Test
     fun `gpu render never substitutes for the privilege a non-containable plugin needs`() {
         // apps.bind cannot run contained; granting gpu.render does not let it dodge the full-access requirement.
         val r = record(manifest { it.put("permissions", arr(obj("id" to "apps.bind"), gpu)) })

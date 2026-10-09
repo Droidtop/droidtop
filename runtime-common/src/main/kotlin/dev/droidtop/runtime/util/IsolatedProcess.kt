@@ -13,4 +13,22 @@ object IsolatedProcess {
     @JvmStatic
     fun isIsolated(): Boolean =
         if (Build.VERSION.SDK_INT >= 28) Process.isIsolated() else (Process.myUid() % 100_000) in 99_000..99_999
+
+    /**
+     * Whether this process runs a plugin's own code: a contained plugin's isolated process, or a `gpu.render` plugin's
+     * graphics process (`:plugin_gpu0` to `:plugin_gpu7`, docs/plugin-api.md 5.3). The latter has droidtop's UID, so
+     * droidtop's application classes must start nothing there either: no crash reporter, no databases, no sign-ins kept
+     * in memory next to the plugin's code.
+     */
+    @JvmStatic
+    fun runsPluginCode(): Boolean = isIsolated() || processName()?.substringAfter(':', "")?.startsWith("plugin_gpu") == true
+
+    private fun processName(): String? =
+        if (Build.VERSION.SDK_INT >= 28) {
+            android.app.Application.getProcessName()
+        } else {
+            runCatching {
+                Class.forName("android.app.ActivityThread").getDeclaredMethod("currentProcessName").invoke(null) as? String
+            }.getOrNull()
+        }
 }

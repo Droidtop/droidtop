@@ -39,7 +39,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         super.onCreate()
         // A contained plugin's isolated process (docs/plugin-api.md 5.3) starts nothing of droidtop's: it has no files,
         // no preferences, no network and no permissions, and the plugin in it reaches droidtop only through its broker.
-        if (dev.droidtop.runtime.util.IsolatedProcess.isIsolated()) return
+        // Nor does a gpu.render plugin's graphics process, which has droidtop's UID: nothing of droidtop's is kept in
+        // memory beside the plugin's code there.
+        if (dev.droidtop.runtime.util.IsolatedProcess.runsPluginCode()) return
         // The scan log goes to logcat AND to a file droidtop owns, and
         // says which build is writing it -- shared core, every mode, so
         // a scan is diagnosable from a rig whatever the device's logcat

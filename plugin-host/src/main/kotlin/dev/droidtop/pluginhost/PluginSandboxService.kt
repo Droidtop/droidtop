@@ -134,10 +134,24 @@ class PluginSandboxSlot7 : PluginSandboxService()
 // A `gpu.render` plugin's process (docs/plugin-api.md 5.3): the same broker-only loader as the sandbox, but in a process
 // of droidtop's own UID that is NOT isolated, so the graphics chip is reachable and Flutter draws with hardware. Eight
 // slots `:plugin_gpu0` to `:plugin_gpu7` in this module's manifest; there is no API 29 per-instance form because
-// bindIsolatedService is for isolated processes only.
+// bindIsolatedService is for isolated processes only. Before any of the plugin's code loads, the process takes
+// droidtop's system-call filter ([GpuSyscallFilter]), which takes away the network droidtop's UID would otherwise give
+// it; a process that cannot take the filter does not run the plugin.
 open class PluginGpuService : PluginSandboxService() {
     override val requiresIsolation: Boolean get() = false
     override val softwareRendering: Boolean get() = false
+
+    @Volatile private var filter: String? = null
+
+    override fun loadFromFiles(pluginId: String, manifest: PluginManifest, files: Map<String, ParcelFileDescriptor>, broker: IPluginHostBroker): Boolean {
+        val report = GpuSyscallFilter.install().also { filter = it }
+        if (!GpuSyscallFilter.isOn(report)) {
+            return failLoad(pluginId, "its process could not take droidtop's system-call filter ($report), so it is not run with the graphics chip")
+        }
+        return super.loadFromFiles(pluginId, manifest, files, broker)
+    }
+
+    override fun loadNotes(): JSONObject = super.loadNotes().apply { filter?.let { put("syscallFilter", it) } }
 }
 class PluginGpuSlot0 : PluginGpuService()
 class PluginGpuSlot1 : PluginGpuService()
@@ -147,6 +161,26 @@ class PluginGpuSlot4 : PluginGpuService()
 class PluginGpuSlot5 : PluginGpuService()
 class PluginGpuSlot6 : PluginGpuService()
 class PluginGpuSlot7 : PluginGpuService()
+
+/**
+ * The seccomp-bpf filter of a `gpu.render` process (docs/plugin-api.md 5.3, "The graphics tier";
+ * `native/src/gpu_filter.c`): no socket but a local datagram one (so no internet and no DNS), no io_uring, no ptrace,
+ * on every thread and for good. An app may add such a filter to its own process (Chrome does for its renderers); it
+ * cannot filter by path or look inside a binder call, which is what the permission's warning is about.
+ */
+internal object GpuSyscallFilter {
+    init {
+        System.loadLibrary("droidtoppy")
+    }
+
+    @JvmStatic private external fun nativeInstall(): String
+
+    /** Installs the filter once per process; returns what happened, starting "on:" or "error:". */
+    @Synchronized
+    fun install(): String = nativeInstall()
+
+    fun isOn(report: String): Boolean = report.startsWith("on:")
+}
 
 /** Dex code from a descriptor, for a process that can open no file (docs/plugin-api.md 5.3). */
 internal object ContainedDex {

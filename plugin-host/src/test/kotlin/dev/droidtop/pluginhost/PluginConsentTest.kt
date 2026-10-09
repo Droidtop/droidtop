@@ -29,6 +29,18 @@ class PluginConsentTest {
     private fun arr(vararg o: JSONObject) = JSONArray(o.toList())
 
     @Test
+    fun `the graphics chip's approval line says it could reach past droidtop's checks`() {
+        val m = TestPlugins.manifest { it.put("permissions", arr(obj("id" to "gpu.render", "reason" to "Smooth animations"))) }
+        val ask = PluginConsent.of(m, listOf(record(m)), badgeFor = { "Added by you" }).asks.single()
+        assertEquals("Use the graphics chip to draw its screen", ask.line.title)
+        assertEquals(
+            "A plugin with this could reach past droidtop's checks, so only allow it for a plugin from a source you trust - Smooth animations",
+            ask.line.detail,
+        )
+        assertFalse("asks first, never pre-ticked", ask.line.ticked)
+    }
+
+    @Test
     fun `a v2 manifest shows each section`() {
         val provider = manifest(id = "droidtop.shizuku", origin = "droidtop") {
             it.put("exports", arr(obj("api" to "priv.shell", "version" to "1.0")))

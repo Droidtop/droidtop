@@ -21,6 +21,8 @@ add_library(droidtoppy SHARED
     src/droidtoppy_jni.c
     # The guarded hooks of a contained plugin's isolated process (docs/plugin-api.md 5.3).
     src/sandbox_hooks.c
+    # The system-call filter of a gpu.render plugin's process (docs/plugin-api.md 5.3, "The graphics tier").
+    src/gpu_filter.c
 )
 
 target_link_libraries(droidtoppy dl log)

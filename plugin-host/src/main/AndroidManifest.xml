@@ -51,11 +51,12 @@
           as the contained sandbox, but in a process of droidtop's own UID that
           is NOT isolated, so it may open the graphics chip (an isolated process
           may not: sepolicy isolated_app_all.te). That is the one hole the
-          gpu.render permission opens. It shares droidtop's UID, which an app on
-          Android cannot wall off, so its own native code could still reach the
-          network or droidtop's files; that trade-off is in docs/plugin-api.md
-          5.3 and shown to the person only under Advanced, never as a default.
-          Eight slots, one plugin each.
+          gpu.render permission opens. A system-call filter keeps it off the
+          network, but it shares droidtop's UID, which an app on Android cannot
+          wall off, so its own native code could still open droidtop's files or
+          ask Android's services for things as droidtop. The approval line and
+          the plugin's page warn about that in plain words (docs/plugin-api.md
+          5.3). Eight slots, one plugin each.
         -->
         <service android:name="dev.droidtop.pluginhost.PluginGpuSlot0" android:process=":plugin_gpu0" android:exported="false" android:isolatedProcess="false" />
         <service android:name="dev.droidtop.pluginhost.PluginGpuSlot1" android:process=":plugin_gpu1" android:exported="false" android:isolatedProcess="false" />

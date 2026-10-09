@@ -2220,12 +2220,12 @@ Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
 | --- | --- | --- | --- |
 | Process | an isolated process of its own: a random UID, no permissions, the `isolated_app` SELinux domain | a process of its own (one of eight slots) under droidtop's UID, **not** isolated, so it may open the GPU | a process of its own (one of eight slots) under droidtop's UID |
 | Graphics chip | no: an isolated process may not open `gpu_device` (sepolicy), so Flutter draws in software | yes: hardware rendering into a droidtop-owned surface | yes |
-| Network | none: not in the `inet` group, so `socket()` is refused; `net.http`/`net.download` only, checked against `net.domains`/`net.any`/`net.local` per hop and logged | the broker refuses network APIs it was not granted, **but** its own native code shares droidtop's `INTERNET` and Android gives an app no way to drop it per process: a hostile native library could open a socket unseen | droidtop's `INTERNET`: any socket, unseen by droidtop |
+| Network | none: not in the `inet` group, so `socket()` is refused; `net.http`/`net.download` only, checked against `net.domains`/`net.any`/`net.local` per hop and logged | none of its own: droidtop's system-call filter refuses every socket but a local datagram one (§5.3), so `net.http`/`net.download` only, as contained; **but** its own code could ask Android's services (the system download manager, say) to fetch something as droidtop, unseen | droidtop's `INTERNET`: any socket, unseen by droidtop |
 | droidtop's files (databases, preferences, sign-in tokens, other plugins' data) | none | the broker hands over nothing, **but** its own native code shares droidtop's UID and could read them directly; this cannot be walled off by an app | all of them |
 | Its own files | the `data` API on its own folder only | the `data` API on its own folder only (same caveat as above for raw native syscalls) | its own folder by path, and everything else droidtop's UID reaches |
 | Shared storage | `files.shared` within its declared folders, `files.pick` documents, logged | the same as contained through the broker (same native caveat) | all of it (`MANAGE_EXTERNAL_STORAGE`) |
 | Installed apps, usage stats, secure settings, logs | through declared host APIs only | through declared host APIs only | whatever droidtop's UID holds (`QUERY_ALL_PACKAGES`, `PACKAGE_USAGE_STATS`, `WRITE_SECURE_SETTINGS` and `READ_LOGS` if granted) |
-| Shizuku, `su` | none (no binder, no permission; it can reach privilege only through a `priv.*` provider, with its own grant) | none through the broker; it holds no Shizuku binder and no `priv.*` grant of its own | Shizuku's binder if droidtop was allowed, and `su` if the root manager granted droidtop's UID |
+| Shizuku, `su` | none (no binder, no permission; it can reach privilege only through a `priv.*` provider, with its own grant) | none through the broker, and the filter refuses the stream socket a root manager's `su` talks over; **but** as droidtop's UID its own code could ask Shizuku for a binder if droidtop was allowed it | Shizuku's binder if droidtop was allowed, and `su` if the root manager granted droidtop's UID |
 | Other plugins | only through the broker (§2) | only through the broker | other full-trust plugins' files (same UID); not their objects (separate processes) |
 | The broker | the caller is the binder object; grant, scope, quota and audit on every call | the same | the same for what it asks droidtop to do |
 
@@ -2379,7 +2379,8 @@ library ART loads keeps its class-loader namespace and its JNI binding).
 A virtual path nobody registered is `ENOENT`; every other path reaches libc
 unchanged. The Containment check reports which libraries were hooked and how
 many import slots.
-**The graphics tier (`gpu.render`, built plugin-enforce-4, 2026-10-09).**
+**The graphics tier (`gpu.render`, built plugin-enforce-4, 2026-10-09;
+narrowed plugin-enforce-6, 2026-10-09).**
 Some plugins need the GPU and nothing else: a Flutter screen that janks in
 software, a small game engine. An isolated process may never open the GPU
 (the `gpu_device` neverallow above), so these would otherwise be pushed to
@@ -2392,34 +2393,71 @@ opens that one hole:
 - **The platform shape.** Granting it runs the plugin in a droidtop-owned
   process (`PluginGpuService`, slots `:plugin_gpu0..7`) that is **not**
   `android:isolatedProcess`. That is the only process an app may run that
-  can open the GPU: Android gives apps no `seccomp`, no user namespaces and
-  no per-process capability dropping, and `isolated_compute_app` (the one
-  isolated domain the sepolicy exempts from the GPU neverallow) is reserved
-  for the system's OnDevicePersonalization service and cannot be requested
-  by an ordinary app. So the non-isolated-but-locked-down process is the
-  workable shape; a droidtop-owned renderer that mediates every draw call
-  (Chrome's GPU-process model) is the only alternative and is far too large
-  for one permission.
+  can open the GPU (see "Narrowing it further" below for every alternative
+  looked at). droidtop's application classes start nothing in it
+  (`IsolatedProcess.runsPluginCode`): no crash reporter, no database, no
+  sign-in is held in memory beside the plugin's code.
 - **What is still locked down.** The plugin's code is loaded exactly as a
   contained plugin's is: from descriptors through `InMemoryDexClassLoader`
   and the guarded hooks, with a broker-only `PluginContext` (no private
   folder, no root, no Shizuku). Every host API it uses goes through the
   broker with the same grant, scope, quota and audit. It draws into a
-  droidtop-owned `Surface` (`PluginScreenActivity`), now with hardware
-  instead of `--enable-software-rendering`.
-- **What it cannot stop, stated plainly.** The process shares droidtop's
-  UID, so its own **native** code could open a socket (droidtop holds
-  `INTERNET`) or read droidtop's files directly, below the broker and the
-  class loader, and no app on Android can prevent that for one of its own
-  processes. `gpu.render` is therefore a real trust decision, not a free
-  one: for a Flutter or dex plugin whose Kotlin/Dart stays on the broker it
-  is a tight boundary; for a plugin shipping hostile native code it is close
-  to full access. The Containment check (Advanced) says so for the plugin in
-  front of the person, and only there — the person's approval list shows one
-  plain line, "Use the graphics chip to draw its screen", never the tier.
+  droidtop-owned `Surface` (`PluginScreenActivity`), with hardware instead
+  of `--enable-software-rendering`.
+- **The system-call filter (plugin-enforce-6).** Before any of the plugin's
+  code loads, the process installs a seccomp-bpf filter on every thread
+  (`native/src/gpu_filter.c`, `GpuSyscallFilter`; `SECCOMP_FILTER_FLAG_TSYNC`
+  after `PR_SET_NO_NEW_PRIVS`), which nothing in the process can lift. It
+  refuses `socket()` for every family but `AF_UNIX`, and `AF_UNIX` for
+  everything but datagrams (liblog's socket to logd), with `EACCES` as an
+  isolated process gets: no internet socket and no DNS lookup (netd's
+  resolver socket is a stream socket), and no stream socket to a root
+  manager's daemon or to a relay droidtop runs. It refuses `io_uring`
+  (`ENOSYS`; its operations open files and sockets without passing through
+  the filter), `ptrace` and `process_vm_readv`/`writev` (`EPERM`), and any
+  foreign system-call ABI (x86_64's x32 numbers). A process that cannot take
+  the filter does not run the plugin. The Containment check (Advanced)
+  shows "System-call filter: on: ..." and the network line reads "refused".
+- **What it cannot stop, stated plainly.** The process still has droidtop's
+  UID. seccomp sees system-call numbers and integer arguments only ("BPF
+  programs may not dereference pointers", kernel
+  Documentation/userspace-api/seccomp_filter.rst), so it cannot tell an
+  `openat` of the GPU's device node from one of droidtop's database, and it
+  cannot look inside a binder call. The plugin's own native code (and a
+  Flutter plugin's Dart, which is machine code in `libapp.so` with `dart:ffi`)
+  could therefore still open droidtop's files and shared storage by path, and
+  ask Android's services for things as droidtop (the system download manager,
+  media store, starting activities, droidtop's own components, Shizuku if
+  droidtop's UID was allowed it), below the broker and unseen by it.
+- **So the person is told, in plain words** (owner, 2026-10-09: "no
+  sandboxing is perfectly effective, and as with any third party code, users
+  are cautioned to be careful what they install ... if it's not mitigatable,
+  make the warning more explicit"). The approval line reads "Use the
+  graphics chip to draw its screen", with the detail "A plugin with this
+  could reach past droidtop's checks, so only allow it for a plugin from a
+  source you trust" (`PluginPermission.caution`). While it is granted, the
+  plugin's page carries the row "Could reach past droidtop's checks" with
+  the same sentence (`PluginTiers.caution`), its Permissions screen shows the
+  sentence on the permission's own line (where it can be blocked again), and
+  its Activity screen says that what it did past those checks would not be
+  listed. No tier name appears anywhere a person reads.
 - **The general rule.** One permission opens one hole. Full trust stays
   reserved for UID-level privilege that no per-permission process can give:
   Shizuku, root and `apps.bind`.
+
+**Narrowing it further: what was looked at (Droidtop/tracker#378,
+2026-10-09; reference material only, no probes).**
+
+| Idea | What the platform allows | Outcome |
+| --- | --- | --- |
+| seccomp-bpf installed by the app itself | Allowed. Chrome adds its own seccomp-bpf filter to its Android renderers from inside the app process ("Chrome applies a layer-two sandbox in the form of a Seccomp-BPF system call filter", Chromium docs/security/android-sandbox.md; `sandbox/linux/seccomp-bpf-helpers/seccomp_starter_android.cc` starts it `MULTI_THREADED`, i.e. with TSYNC). Android's own app filter (bionic `libc/seccomp/seccomp_policy.cpp`) stays underneath: "seccomp-bpf policies stack and can only be made more restrictive" (same doc). The earlier note here that "Android gives apps no seccomp" was wrong. | **Built** (above). Filters numbers and integer arguments only, so it closes the network, `io_uring`, `ptrace` and root-daemon sockets, not paths or binder. |
+| An app zygote (`android:useAppZygote`, `ZygotePreload`) to set the process up before it runs | Only for an `isolatedProcess` service ("An `isolatedProcess <service>` can be declared with `android:useAppZygote`", android-sandbox.md, "Zygote"), and the `app_zygote` domain is "allowed to fork into `isolated_app`" only, which may not open the GPU. | Not usable for a GPU process, and not needed: the filter is installed in the process itself before the plugin loads. |
+| A restricted class loader plus an allowlist of native libraries | The class loader already gives the plugin nothing but its broker. A class loader cannot stop JNI or reflection inside the same process, and a Flutter plugin's Dart is native code (`libapp.so`, `dart:ffi`). An allowlist of library hashes would admit only libraries droidtop has reviewed, which is origin trust (Official), not a sandbox. | Not done. |
+| A file broker: trap `open` and let droidtop open only allowed paths | What Chrome's Linux GPU process does: a broker process with per-GPU-vendor file lists, and the driver loaded and warmed up before the sandbox starts (`content/common/gpu_pre_sandbox_hook_linux.cc`, e.g. `AddArmMaliGpuPermissions`; `sandbox/linux/syscall_broker/broker_process.h`). On Android Chrome does not do this: its GPU process runs "under untrusted_app and the same UID as the browser process ... no privilege separation" (android-sandbox.md). Each GPU vendor's driver opens its own device nodes, firmware and caches, so the lists are per driver and only a device shows them; and binder would stay open regardless. | Not done: driver-specific, untestable off-device, and it would not close the binder path, so the warning stays either way. Recorded as the next step if a plugin ever needs more than the warning. |
+| Mediated rendering: the plugin stays isolated and sends GL/Vulkan commands to a droidtop-owned renderer | The design that closes the hole: Chrome's renderers never touch the GPU and send commands through the GPU process's command buffer; the Android emulator's gfxstream and Mesa's virtio-gpu Venus forward GLES/Vulkan the same way. It means an encoder the isolated plugin's engine loads as its graphics driver and a validating decoder in droidtop for the whole API subset Flutter and an engine use. | Not done: a graphics-stack project far larger than one permission, with a per-frame cost on a handheld. |
+| `AHardwareBuffer`/`SurfaceControl` handed from an isolated process to a droidtop renderer | An isolated process can be handed buffers and write them with the CPU (that is what contained Flutter does today), but drawing into them with the GPU needs the GPU device it may not open; and it may not reach the window manager for a `SurfaceControlViewHost` of its own (servicemanager `find` only `activity`, `display`, `webviewupdate`). | Gives nothing beyond the software path that exists. |
+| `isolated_compute_app` | Selected by `isIsolatedComputeApp=true` in `seapp_contexts`, which the system sets for its own services; AOSP warns it "should not be used unless it is intended to provide isolated processes with relaxed security restrictions". Its policy (`private/isolated_compute_app.te`) is exempted from the `gpu_device` neverallow but grants no `gpu_device` access itself. | Not available to an app, and would not give the GPU anyway. |
+| Landlock (unprivileged path rules, Linux 5.13+) | Would close the file path without a broker, but needs a 5.13 kernel with Landlock enabled; a Snapdragon 865 handheld such as the RP5 runs a 4.19 kernel. | Not usable on the target device. |
 
 - **Full trust, by grant.** droidtop's UID, but **one process per
   plugin** from eight declared slots (`:pluginhost`, `:pluginhost1` to

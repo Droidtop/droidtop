@@ -111,7 +111,7 @@ object PluginConsent {
             val androidNote = PluginPermissions.find(declared.id)?.android?.takeIf { it.fromSdk > 0 }?.let { "Android asks you too, the first time" }
             val line = ConsentLine(
                 title = label + (scope?.let { " ($it)" } ?: ""),
-                detail = listOfNotNull(declared.reason, androidNote).joinToString(" - ").ifEmpty { null },
+                detail = listOfNotNull(PluginPermissions.find(declared.id)?.caution, declared.reason, androidNote).joinToString(" - ").ifEmpty { null },
                 id = if (newContract) declared.id else null,
                 highRisk = risky,
                 ticked = !risky,

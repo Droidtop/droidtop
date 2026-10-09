@@ -1746,14 +1746,18 @@ object AppSettingsCatalogs {
             // are the action; keep the trust/status row for plugins that already have a decision.
             if (record.trust != PluginTrustState.PENDING) {
                 add(ActionItem(id = "plugin_${m.id}_status", title = statusLine, subtitle = trustLine, run = {}))
-                // The only access row the person ever sees is the full-access warning, or a plugin that needs it and has
-                // not been allowed it (docs/plugin-api.md 4.6). A plugin on the safe default carries no access row: what
-                // it may do is the one list on its Permissions screen, not a tier for the person to understand.
+                // The only access rows the person ever sees are the full-access warning, a plugin that needs it and has
+                // not been allowed it (docs/plugin-api.md 4.6), and the plain warning of a granted permission that lets
+                // the plugin reach past droidtop's checks (gpu.render, 5.3). A plugin on the safe default carries no
+                // access row: what it may do is the one list on its Permissions screen, not a tier to understand.
                 val refusal = PluginTiers.refusal(record, grantSnapshot)
                 val accessBadge = PluginTiers.badge(record, grantSnapshot)
+                val caution = PluginTiers.caution(record, grantSnapshot)
                 when {
                     refusal != null -> add(ActionItem(id = "plugin_${m.id}_access", title = if (PluginTiers.declaresFullTrust(m)) "Needs full access to work" else "Needs an update", subtitle = refusal, run = {}))
                     accessBadge != null -> add(ActionItem(id = "plugin_${m.id}_access", title = accessBadge, subtitle = accessLine(record, grantSnapshot), run = {}))
+                    // A granted permission that lets its own code reach past droidtop's checks (gpu.render, docs/plugin-api.md 5.3).
+                    caution != null -> add(ActionItem(id = "plugin_${m.id}_access", title = CAUTION_TITLE, subtitle = caution, run = {}))
                 }
             }
             // A stopped plugin always has something to press: the newer version when the catalog has one (the row under
@@ -2155,7 +2159,9 @@ object AppSettingsCatalogs {
         }
     }
 
-    /** What the access badge means for [record], in one sentence (docs/plugin-api.md 4.6, 5.3). */
+    /** The title of the access row of a plugin holding a permission with a caution (`gpu.render`, docs/plugin-api.md 5.3). */
+    private const val CAUTION_TITLE = "Could reach past droidtop's checks"
+
     /** The subtitle of the full-access row (docs/plugin-api.md 4.6): the one warning, in plain words. */
     private fun accessLine(record: dev.droidtop.pluginhost.PluginRecord, grants: PluginGrants.Snapshot): String =
         "This plugin can do anything droidtop can. Only what it asks droidtop to do is listed under Activity. Allow it only if you trust the plugin."
@@ -2174,7 +2180,8 @@ object AppSettingsCatalogs {
         for (declared in m.v2.permissions) {
             if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) continue
             val state = PluginGrants.stateOf(record, snap, declared.id) ?: continue
-            rows += PermissionRow(declared.id, PluginPermissions.labelFor(declared.id) ?: providerLabels[declared.id] ?: declared.id, declared.reason, PluginGrants.tierOf(declared), state)
+            val reason = listOfNotNull(PluginPermissions.find(declared.id)?.caution, declared.reason).joinToString(" - ").ifEmpty { null }
+            rows += PermissionRow(declared.id, PluginPermissions.labelFor(declared.id) ?: providerLabels[declared.id] ?: declared.id, reason, PluginGrants.tierOf(declared), state)
         }
         for (entry in m.v2.provides) {
             val point = ExtensionPoints.find(entry.point) ?: continue
@@ -2221,6 +2228,8 @@ object AppSettingsCatalogs {
             record == null -> "This plugin was removed; its activity is kept for 7 days"
             PluginTiers.of(record, grants) == PluginTier.FULL_TRUST ->
                 "This plugin has full access; only what it asks droidtop to do is listed."
+            PluginTiers.caution(record, grants) != null ->
+                "Everything this plugin asks droidtop to do is listed here. One permission it holds could let it reach past droidtop's checks, and anything it did that way would not be listed."
             else ->
                 "droidtop carries out everything this plugin does. Its network and shared-file use and every sensitive action are listed here; everyday things (its own data, short messages) are not."
         }
@@ -2332,6 +2341,7 @@ object AppSettingsCatalogs {
                 refusal != null -> ActionItem(id = "plugin_permissions_access_row", title = if (PluginTiers.declaresFullTrust(record.manifest)) "Needs full access to work" else "Needs an update", subtitle = refusal, run = {})
                 record.manifest.contractVersion < 2 -> ActionItem(id = "plugin_permissions_access_row", title = badge ?: "Full access (older plugin)", subtitle = "Written before permissions existed: it can do anything droidtop can, and only what it asks droidtop to do is listed under Activity", run = {})
                 badge != null -> ActionItem(id = "plugin_permissions_access_row", title = badge, subtitle = accessLine(record, snap), run = {})
+                // A permission's caution (gpu.render) is on its own line below, where the person can take it back.
                 else -> null
             }
         }

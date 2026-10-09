@@ -16207,17 +16207,29 @@ Advanced.
   a plugin that needs the GPU and nothing else declares `gpu.render` and the
   person ticks it. Granting it runs the plugin in a droidtop-owned process
   that is NOT `android:isolatedProcess` (slots `:plugin_gpu0..7`) — the only
-  process an app may run that can open the GPU, since Android gives apps no
-  `seccomp`, namespaces or per-process capability dropping and the one GPU-
-  capable isolated domain (`isolated_compute_app`) is system-only. Its code
-  still loads from descriptors through the guarded hooks with a broker-only
-  context, and it draws into a droidtop-owned surface with hardware instead
-  of software. The honest limit, stated in `docs/plugin-api.md` §5.3 and in
-  the Advanced Containment check: it shares droidtop's UID, so its own native
-  code could reach the network or droidtop's files below the broker, which no
-  app can prevent for one of its own processes. One permission opens one
-  hole; it never substitutes for the privilege a non-containable plugin
-  needs.
+  process an app may run that can open the GPU (`isolated_compute_app` is
+  system-only and grants no GPU either). droidtop starts nothing of its own
+  in that process. Its code still loads from descriptors through the guarded
+  hooks with a broker-only context, and it draws into a droidtop-owned
+  surface with hardware instead of software. Before the plugin loads, the
+  process installs a seccomp-bpf filter on every thread (decided
+  2026-10-09, plugin-enforce-6, as Chrome does for its Android renderers): no
+  socket but a local datagram one, so no network or DNS of its own, no
+  `io_uring`, no `ptrace`; a process that cannot take it does not run the
+  plugin. **The limit stands, so the warning is explicit** (owner,
+  2026-10-09: "no sandboxing is perfectly effective ... if it's not
+  mitigatable, make the warning more explicit"): seccomp cannot filter paths
+  or binder, so its own code could still open droidtop's files or ask
+  Android's services for things as droidtop. The approval line's detail
+  says "A plugin with this could reach past droidtop's checks, so only allow
+  it for a plugin from a source you trust", and while it is granted the
+  plugin's page repeats it ("Could reach past droidtop's checks") and so does
+  the permission's line on its Permissions screen. Every alternative looked
+  at (file broker, mediated GL/Vulkan, buffer handoff, app zygote, Landlock)
+  and why it was not taken
+  is in `docs/plugin-api.md` §5.3, "Narrowing it further". One permission
+  opens one hole; it never substitutes for the privilege a non-containable
+  plugin needs.
 - **Full trust** is only the critical `host.full_trust` grant, which a
   plugin that needs UID-level privilege must declare
   (`apps.bind`, the `priv.*`/`root.*` providers), and every contract 1

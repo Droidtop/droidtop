@@ -14,6 +14,10 @@ enum class PermissionTier { NORMAL, DANGEROUS, CRITICAL }
  * is the Android permission droidtop itself holds to do this for a plugin
  * (docs/plugin-api.md 4.1, "Android permissions"): a plugin may declare the
  * row under that Android name, and droidtop asks Android for it on first use.
+ * [caution] is a plain warning shown with the label wherever the person
+ * decides on the permission or sees it granted: for a permission whose grant
+ * lets a plugin's own code reach past what droidtop can check (`gpu.render`,
+ * docs/plugin-api.md 5.3, "The graphics tier").
  */
 data class PluginPermission(
     val id: String,
@@ -22,6 +26,7 @@ data class PluginPermission(
     val officialOnly: Boolean = false,
     val scopedTier: PermissionTier? = null,
     val android: AndroidNeed? = null,
+    val caution: String? = null,
 )
 
 /**
@@ -45,7 +50,10 @@ object PluginPermissions {
         PluginPermission("perf.read", PermissionTier.NORMAL, "See performance readings (CPU, temperature, battery)"),
         PluginPermission("perf.profile.set", PermissionTier.DANGEROUS, "Change performance and fan settings"),
         PluginPermission("overlay.toast", PermissionTier.NORMAL, "Show short messages during games"),
-        PluginPermission("gpu.render", PermissionTier.DANGEROUS, "Use the graphics chip to draw its screen"),
+        PluginPermission(
+            "gpu.render", PermissionTier.DANGEROUS, "Use the graphics chip to draw its screen",
+            caution = "A plugin with this could reach past droidtop's checks, so only allow it for a plugin from a source you trust",
+        ),
         PluginPermission("notify.post", PermissionTier.NORMAL, "Send you notifications", android = AndroidNeed("android.permission.POST_NOTIFICATIONS", fromSdk = 33)),
         PluginPermission("net.state", PermissionTier.NORMAL, "See whether you are online", android = AndroidNeed("android.permission.ACCESS_NETWORK_STATE")),
         PluginPermission("net.wifi_details", PermissionTier.DANGEROUS, "See the name of your Wi-Fi network"),
