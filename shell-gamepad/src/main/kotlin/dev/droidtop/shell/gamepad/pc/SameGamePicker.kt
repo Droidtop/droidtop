@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.menuStep
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.width
@@ -90,6 +91,7 @@ internal fun SameGamePicker(
 
     BackHandler { onDismiss() }
     Dialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(620.dp)),
             focusLabel = focusLabel,

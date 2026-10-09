@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -387,6 +388,7 @@ internal fun GamelistOptionsMenu(
         }
     }
     Dialog(onDismissRequest = goBack) {
+        GatePadInThisDialog()
         MenuPanel(
             // A fixed 520dp panel is wider than a phone, and the part
             // that falls off the edge is the part with the buttons on it.

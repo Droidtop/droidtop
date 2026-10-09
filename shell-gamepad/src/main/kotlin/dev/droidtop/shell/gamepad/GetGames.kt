@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,6 +48,7 @@ internal fun CatalogSheet(root: CatalogScreen, onExit: () -> Unit) {
         onDismissRequest = onExit,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        GatePadInThisDialog()
         DeclareLayerHints(CATALOG_SHEET_HINTS)
         Box(
             modifier = Modifier

@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -145,6 +146,7 @@ internal fun StoreContentSheet(
         )
     }
     Dialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(520.dp)),
             focusLabel = "Store content",

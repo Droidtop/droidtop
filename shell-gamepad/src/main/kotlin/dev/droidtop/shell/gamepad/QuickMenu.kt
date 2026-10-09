@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
@@ -721,6 +722,7 @@ private fun PluginsTab(
     replyScreen?.let { screen ->
         val close = { replyScreen = null }
         androidx.compose.ui.window.Dialog(onDismissRequest = close) {
+            GatePadInThisDialog()
             CatalogNavigator(root = screen, onExit = close)
         }
     }

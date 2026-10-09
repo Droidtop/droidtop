@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -56,6 +57,7 @@ private fun PluginGrantSheet(pending: PluginGrantPrompts.Pending) {
 
     // A dismissal that is not a choice (the system closing the dialog) is Not now, never Allow.
     Dialog(onDismissRequest = { answer(GrantAnswer.NOT_NOW) }) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(window.panelWidth(460.dp)),
             focusLabel = "Plugin permission sheet",

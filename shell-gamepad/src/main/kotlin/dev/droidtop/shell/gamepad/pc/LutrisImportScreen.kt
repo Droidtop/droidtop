@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.menuMove
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.width
@@ -192,6 +193,7 @@ internal fun LutrisImportScreen(
     BackHandler { back() }
     // The system back key steps back a stage, as B does.
     Dialog(onDismissRequest = { back() }) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(680.dp)),
             focusLabel = "Import a Lutris install script",

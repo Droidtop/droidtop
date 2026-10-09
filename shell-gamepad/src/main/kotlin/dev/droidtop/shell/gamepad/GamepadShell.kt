@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.util.Log
 import dev.droidtop.library.userFacingErrorMessage
@@ -1909,6 +1910,7 @@ private fun EntryDetailScreen(
     pluginActionScreen?.let { screen ->
         val close = { pluginActionScreen = null }
         androidx.compose.ui.window.Dialog(onDismissRequest = close) {
+            GatePadInThisDialog()
             dev.droidtop.shell.gamepad.CatalogNavigator(root = screen, onExit = close)
         }
     }

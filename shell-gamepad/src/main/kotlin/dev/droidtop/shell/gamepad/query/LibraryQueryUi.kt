@@ -230,6 +230,7 @@ internal fun LibraryFilterSheet(
     }
 
     Dialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Filter",
@@ -297,6 +298,7 @@ internal fun LibrarySortSheet(
 ) {
     var focusIndex by remember { mutableIntStateOf(scope.sorts.indexOf(query.sort).coerceAtLeast(0)) }
     Dialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Sort by",
@@ -657,7 +659,10 @@ internal fun LibrarySearchDialog(
             activeCatalog = null
             searchTick += 1
         }
-        Dialog(onDismissRequest = close) { CatalogNavigator(root = screen, onExit = close) }
+        Dialog(onDismissRequest = close) {
+            GatePadInThisDialog()
+            CatalogNavigator(root = screen, onExit = close)
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -74,6 +75,7 @@ internal fun SaveConflictDialog(gameTitle: String, conflict: SaveConflict, onAns
         return listOfNotNull(whenText, files, "Newer".takeIf { newer }).joinToString(" · ")
     }
     Dialog(onDismissRequest = { onAnswer(null) }) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Cloud saves differ",

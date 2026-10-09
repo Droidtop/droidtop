@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.library.friendlyLocation
 import dev.droidtop.shell.gamepad.menuMove
 import androidx.compose.foundation.layout.fillMaxSize
@@ -976,6 +977,7 @@ internal fun PcGameMenu(
     val childOpen = (contentOpen && ownStore != null) || storeOffer != null || pickingMatch ||
         pickingReplacement || (pickingSameGame && grouping != null) || renaming || editingSource != null
     if (!childOpen) Dialog(onDismissRequest = goBack) {
+        GatePadInThisDialog()
         HideSystemBarsInThisDialog()
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
@@ -1063,6 +1065,7 @@ private fun FullScreenOverlay(onDismiss: () -> Unit, content: @Composable () -> 
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        GatePadInThisDialog()
         content()
     }
 }

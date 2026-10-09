@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 
 
@@ -63,6 +64,7 @@ internal fun LaunchDisplayChooserDialog(
 
     val window = LocalShellWindow.current
     Dialog(onDismissRequest = onCancel) {
+        GatePadInThisDialog()
         // The shell's one modal panel: focus, the pipeline's front for this
         // dialog and the pad's presses are handled there (docs/SPEC.md 6e).
         MenuPanel(

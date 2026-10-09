@@ -5919,8 +5919,12 @@ not queued); and a release, or a repeat, goes only to the layer that took
 its DOWN, so the A that opened a menu releases into nothing and the B that
 closed one does not back out of the screen beneath. The rule lives once, in
 the gate, so the Quick Menu, the left menu, sheets and side panels share it
-instead of each guarding its own opening. A dialog that does not call
-`GatePadInThisDialog` is not on the stack.
+instead of each guarding its own opening. Every `Dialog` in
+`:shell-gamepad` calls `GatePadInThisDialog` first thing in its content
+(the Quick Menu and the left menu through `SidePanel`'s dialog), so a new
+dialog window joins the stack by the same one line. The window is the
+stack token, so a `MenuPanel` inside an already-gated dialog is the same
+layer, not a second one.
 
 **3. The edge rule and the cadence (`Modifier.onPad`).** A screen takes
 the pad with `onPad { press -> ... }` and gets a `PadPress`: an action,

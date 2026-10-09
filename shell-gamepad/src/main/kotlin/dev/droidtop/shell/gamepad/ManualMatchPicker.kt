@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -122,6 +123,7 @@ internal fun ManualMatchPicker(
 
     BackHandler { onDismiss() }
     Dialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(620.dp)),
             focusLabel = "Manual match",

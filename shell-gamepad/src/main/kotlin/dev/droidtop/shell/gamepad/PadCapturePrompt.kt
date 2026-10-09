@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -37,6 +38,7 @@ internal fun PadCapturePrompt(light: Boolean, onDone: () -> Unit) {
     val window = LocalShellWindow.current
     val pad = ControllerLayouts.activePadName
     Dialog(onDismissRequest = onDone) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier
                 .width(window.panelWidth(420.dp))

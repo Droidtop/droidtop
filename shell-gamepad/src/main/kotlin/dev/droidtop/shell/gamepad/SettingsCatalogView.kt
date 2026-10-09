@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
 import android.content.Context
@@ -1306,6 +1307,7 @@ internal fun CatalogDetailStrip(text: String) {
 @Composable
 private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(520.dp)),
             focusLabel = "Settings info",
@@ -1403,6 +1405,7 @@ internal fun TextEditDialog(
 ) {
     var value by remember(title, initial) { mutableStateOf(initial) }
     Dialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
         Column(
             Modifier
                 .clip(MenuTokens.OverlayShape)

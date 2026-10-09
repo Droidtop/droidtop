@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -43,6 +44,7 @@ internal fun LaunchFailureDialog(
 
     val window = LocalShellWindow.current
     Dialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
         // The shell's one modal panel: focus, the pipeline's front for this
         // dialog and the pad's presses are handled there (docs/SPEC.md 6e).
         MenuPanel(

@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.hosted
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -173,6 +174,7 @@ fun HostedListSheet(
     }
     CompositionLocalProvider(LocalShellWindow provides window) {
         Dialog(onDismissRequest = onClose) {
+            GatePadInThisDialog()
             MenuPanel(
                 modifier = modifier.width(window.panelWidth(440.dp)).onPreviewKeyEvent { event ->
                     val typed = onTyped

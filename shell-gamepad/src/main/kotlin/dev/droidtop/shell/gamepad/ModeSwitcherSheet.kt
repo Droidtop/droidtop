@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -35,6 +36,7 @@ fun ModeSwitcherSheet(choices: List<ModeSwitcherChoice>, onDismiss: () -> Unit) 
             onDismiss()
         }
         Dialog(onDismissRequest = onDismiss) {
+            GatePadInThisDialog()
             MenuPanel(
                 modifier = Modifier.width(LocalShellWindow.current.panelWidth(420.dp)),
                 focusLabel = "Switch mode",

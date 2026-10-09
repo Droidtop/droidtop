@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,6 +44,7 @@ internal fun ScrapeOfferDialog(
 
     val window = LocalShellWindow.current
     Dialog(onDismissRequest = onNotNow) {
+        GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(window.panelWidth(400.dp)),
             focusLabel = "Fetch box art offer",

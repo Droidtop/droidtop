@@ -483,9 +483,10 @@ class PadGate(
 fun GatePadInThisDialog() {
     val view = LocalView.current
     val overlays = LocalOverlayKeys.current
-    val token = androidx.compose.runtime.remember { Any() }
     DisposableEffect(view, overlays) {
         val window = (view.parent as? DialogWindowProvider)?.window
+        // The window is the token, so a panel inside an already-gated dialog is the same layer, not a second one.
+        val token: Any = window ?: Any()
         // Pushed before the window has focus: from here the screen beneath
         // gets no keys (OverlayKeys).
         overlays?.push(token)
