@@ -313,6 +313,15 @@ object ShowOverEditor : SecondScreenKeyboard.ShowRequests {
         }
     }
 
+    /** A tap on the focused field asks for the keyboard again: a Hide holds only until the next ask (tracker#369). */
+    override fun reasked() {
+        main.post {
+            val editor = dismissedFor ?: return@post
+            dismissedFor = null
+            requested(editor)
+        }
+    }
+
     override fun ended() {
         main.post {
             dismissedFor = null

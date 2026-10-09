@@ -978,6 +978,16 @@ public class LatinIME extends InputMethodService implements
     }
 
     @Override
+    public boolean onShowInputRequested(int flags, boolean configChange) {
+        // droidtop patch (tracker#369): an app asking for the keyboard again, as a tap on a field that already has
+        // focus does, brings back a keyboard droidtop drew for it and the user hid.
+        if (!configChange) {
+            SecondScreenKeyboard.onShowReasked();
+        }
+        return super.onShowInputRequested(flags, configChange);
+    }
+
+    @Override
     public void onFinishInputView(boolean finishingInput) {
         super.onFinishInputView(finishingInput);
         SecondScreenKeyboard.onShowEnded();

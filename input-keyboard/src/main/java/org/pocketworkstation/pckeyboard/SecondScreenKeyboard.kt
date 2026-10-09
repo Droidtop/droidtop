@@ -91,6 +91,9 @@ object SecondScreenKeyboard {
         fun requested(editorPackage: String?)
 
         fun ended()
+
+        /** The editor asked again while its keyboard may be hidden by the user's Hide (a second tap on the field). */
+        fun reasked() = Unit
     }
 
     @Volatile
@@ -100,6 +103,12 @@ object SecondScreenKeyboard {
     @JvmStatic
     fun onShowRequested(editorPackage: String?) {
         runCatching { showRequests?.requested(editorPackage) }
+    }
+
+    /** LatinIME.onShowInputRequested: the app asked for the keyboard again (a tap on the focused field). */
+    @JvmStatic
+    fun onShowReasked() {
+        runCatching { showRequests?.reasked() }
     }
 
     /** LatinIME.onFinishInputView and onFinishInput: the keyboard is no longer wanted. */

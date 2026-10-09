@@ -1,10 +1,13 @@
 package dev.droidtop.shell.gamepad
 
 import android.app.Activity
+import android.graphics.Rect
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
+import android.view.Window
 import android.widget.FrameLayout
 import dev.droidtop.runtime.keyboard.AddonKeyboard
 import dev.droidtop.runtime.keyboard.AddonKeyboardRules
@@ -42,11 +45,28 @@ object InWindowKeyboard {
     fun attach(activity: Activity) {
         if (attached.put(activity, true) != null) return
         val decor = activity.window?.decorView as? ViewGroup ?: return
-        decor.viewTreeObserver.addOnPreDrawListener(Watcher(activity, decor))
+        val watcher = Watcher(activity, decor)
+        decor.viewTreeObserver.addOnPreDrawListener(watcher)
+        decor.viewTreeObserver.addOnGlobalFocusChangeListener(watcher)
+        val window = activity.window
+        val callback = window.callback ?: return
+        window.callback = EditorTaps(callback, watcher::tapped)
+    }
+
+    /** The window's callback, told of each touch that starts; everything else goes straight to [base]. */
+    private class EditorTaps(private val base: Window.Callback, private val tapped: (MotionEvent) -> Unit) : Window.Callback by base {
+        override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) tapped(event)
+            return base.dispatchTouchEvent(event)
+        }
     }
 
     /** Decides on every frame of the window, which costs a focus lookup and a flag: no allocation, no I/O. */
-    private class Watcher(private val activity: Activity, private val decor: ViewGroup) : ViewTreeObserver.OnPreDrawListener {
+    private class Watcher(private val activity: Activity, private val decor: ViewGroup) :
+        ViewTreeObserver.OnPreDrawListener,
+        ViewTreeObserver.OnGlobalFocusChangeListener {
+        private val bounds = Rect()
+
         private var panel: KeyboardPanel? = null
         private var elsewhere: KeyboardTargets.Request? = null
         private var dismissed = false
@@ -56,6 +76,19 @@ object InWindowKeyboard {
         private val hide = Runnable {
             hidePending = false
             hideNow()
+        }
+
+        /** A field took focus: a Hide pressed for the last one does not apply to it (tracker#369). */
+        override fun onGlobalFocusChanged(oldFocus: View?, newFocus: View?) {
+            if (newFocus != null && newFocus !== oldFocus && newFocus.onCheckIsTextEditor()) dismissed = false
+        }
+
+        /** A touch landed on the focused field: a Hide holds only until the field is tapped again (tracker#369). */
+        fun tapped(event: MotionEvent) {
+            if (!dismissed) return
+            val focused = decor.findFocus() ?: return
+            if (!focused.onCheckIsTextEditor() || !focused.getGlobalVisibleRect(bounds)) return
+            if (bounds.contains(event.x.toInt(), event.y.toInt())) dismissed = false
         }
 
         override fun onPreDraw(): Boolean {

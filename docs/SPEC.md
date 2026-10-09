@@ -3698,7 +3698,10 @@ rig check in the commit message.
     requesting field while the request lasts, and is on the tab it was on again when the field
     loses focus, its Hide is pressed or the request ends any other way. The tab the person chose is
     never overwritten: the Input tab is what the strip shows while a request stands (`shown` in
-    `CompanionTabs`), so there is no remembered tab to lose (Droidtop/tracker#369). It hosts only while a companion host is started on another
+    `CompanionTabs`), so there is no remembered tab to lose (Droidtop/tracker#369). A Hide holds only
+    until the field is asked for again: another field taking focus, a tap on the focused field
+    (`InWindowKeyboard`), or the app asking the input method for the keyboard again
+    (`LatinIME.onShowInputRequested`, `ShowRequests.reasked`) brings the keyboard back. It hosts only while a companion host is started on another
     display (lifecycle ON_START to ON_STOP) and the companion's own setting allows it, so a companion
     that is off, hidden by Kiosk or Kid, covered by a full-screen app, or absent on a single-display
     device leaves the keyboard on the field's screen.
