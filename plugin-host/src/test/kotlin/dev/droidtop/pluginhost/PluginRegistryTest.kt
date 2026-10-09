@@ -23,8 +23,8 @@ class PluginRegistryTest {
         val rows = table.lines().drop(2).takeWhile { it.startsWith("|") }.map { line ->
             line.trim().trim('|').split("|").map { it.trim() }
         }
-        assertEquals(65, rows.size)
-        assertEquals(65, PluginPermissions.all.size)
+        assertEquals(66, rows.size)
+        assertEquals(66, PluginPermissions.all.size)
         for (cells in rows) {
             val id = Regex("`([^`]+)`").find(cells[0])!!.groupValues[1]
             val entry = PluginPermissions.find(id)
