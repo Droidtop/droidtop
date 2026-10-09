@@ -27,6 +27,25 @@ class HostApiCallerTest {
     }
 
     @Test
+    fun `the level of the export that served travels with the call, and stream reads are not logged`() {
+        val shell = TestPlugins.provider(
+            "droidtop.shizuku", level = "adb", origin = "droidtop",
+            ops = listOf("exec" to false, "exec_stream" to false, "stream_read" to false, "stream_write" to false, "stream_kill" to false),
+        )
+        val env = FakeEnv(shell)
+        val caller = HostApiCaller(env)
+        caller.call("priv.shell", 1, "exec_stream", obj("session" to "s1"))
+        caller.call("priv.shell", 1, "stream_read", obj("session" to "s1"))
+        caller.call("priv.shell", 1, "stream_write", obj("session" to "s1"))
+        caller.call("priv.shell", 1, "stream_kill", obj("session" to "s1"))
+        assertEquals("adb", env.forwards.first().second.caller.getString("level"))
+        assertEquals(listOf("served exec_stream for droidtop", "served stream_kill for droidtop"), env.audits.map { it.second.op })
+        // No root export: a root request finds no provider and nothing is forwarded.
+        assertEquals(PluginErrorCode.PROVIDER_UNAVAILABLE, caller.call("priv.shell", 1, "exec_stream", obj(), minLevel = "root").code)
+        assertFalse(caller.hasProvider("priv.shell", 1, "root"))
+    }
+
+    @Test
     fun `the provider's side is audited because the permission is critical`() {
         val env = FakeEnv(shizuku())
         HostApiCaller(env).call("priv.packages", 1, "force_stop", obj("package" to "org.example.emulator"))

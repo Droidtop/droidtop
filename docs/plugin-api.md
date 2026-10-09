@@ -745,7 +745,10 @@ The **provider** declares, in `exports`:
     "attributes": { "level": "adb" },
     "ops": [
       { "op": "exec", "permission": "priv.shell.adb", "job": false },
-      { "op": "exec_stream", "permission": "priv.shell.adb", "job": true }
+      { "op": "exec_stream", "permission": "priv.shell.adb", "job": false },
+      { "op": "stream_read", "permission": "priv.shell.adb", "job": false },
+      { "op": "stream_write", "permission": "priv.shell.adb", "job": false },
+      { "op": "stream_kill", "permission": "priv.shell.adb", "job": false }
     ] },
   { "api": "droidtop.shizuku.status", "version": "1.0",
     "permissions": [
@@ -935,6 +938,45 @@ never disables its callers.
      command, so a stale report only means a refused call. This is what
      `PluginContext.hasRootApproval()` and `plugins.available` with
      `minLevel: "root"` answer from.
+   - **The level travels with the call.** The broker puts the level of
+     the export that served the call in `caller.level` (and, for a plugin
+     caller, the op's permission in `caller.grants`), so a provider runs it
+     at that level. droidtop's own calls (`HostApiCaller`) ask for a level
+     with `minLevel` (the rooted desktop stack asks for `root`) and are
+     otherwise served by the lowest export (least privilege). A provider
+     that cannot run a plugin's call at its granted level refuses it
+     rather than run it higher: Shizuku running as root cannot drop to the
+     shell user without `su`, so it refuses an adb-level plugin call then
+     and says to allow "Run commands as root".
+   - **Stream sessions (`exec_stream`, built 2026-10-09,
+     plugin-enforce-5).** A command that outlives one call or takes input
+     (droidtop's `PrivilegedShell.spawn`, the rooted desktop stack,
+     Droidtop/tracker#394). Four quick ops on `priv.shell`, each gated by
+     the same per-level permission as `exec`:
+     - `exec_stream {argv, session}`: starts `argv` directly (no shell
+       unless `argv` names one). `session` is a token the caller chooses
+       (a random UUID), so it exists before the reply. A provider keeps a
+       session per caller (a plugin id, or droidtop) and at most 8 per
+       caller.
+     - `stream_read {session, waitMs ≤ 5000, maxBytes ≤ 65536}`: waits
+       up to `waitMs` for output and returns `{stdout, stderr}` (base64)
+       and, once both streams are drained after the process ended,
+       `{exited: true, exit}`. The provider stops reading a stream whose
+       unread output reaches 1 MiB, so a caller that does not read
+       blocks the command, as a pipe would.
+     - `stream_write {session, data, close?}`: `data` (base64, at most
+       64 KiB) to stdin; `close: true` closes stdin.
+     - `stream_kill {session}`: ends the command and the session.
+     They are quick ops, not a job: droidtop's own calls cannot run job ops,
+     a brokered job is one blocking call capped at 30 minutes, and a job's
+     id never reaches the provider, so it could not address stdin and
+     stdout. `exec_stream` and `stream_kill` are logged like any privileged
+     call; the reads and writes in between are not (fixed by droidtop for
+     this interface, `BrokerCore.isSessionPlumbing`), or a running session
+     would push everything else out of the activity log. A session ends
+     with its process; if the provider's process dies, Shizuku ends the
+     commands it started. `ProviderProcess` (plugin-host) is the
+     `java.lang.Process` over these ops that droidtop's `spawn` returns.
 3. **Providers run in the full-trust tier.** Shizuku grants its
    permission to droidtop's UID, and root managers grant `su` per UID, so
    an isolated process can use neither (§5.3). This is the reason the

@@ -469,8 +469,8 @@ internal fun privilegedExportBlock(env: BrokerEnvironment, provider: PluginRecor
  */
 class HostApiCaller(private val env: BrokerEnvironment) {
     /** True when a running plugin provides [api] at [version], so a caller can tell "no helper installed" from "the helper failed". */
-    fun hasProvider(api: String, version: Int): Boolean =
-        PluginApiResolver.providerFor(env.resolution(), "", RequiredApi(api, "$version.0", optional = true), env.providerChoice(api)) != null
+    fun hasProvider(api: String, version: Int, minLevel: String? = null): Boolean =
+        PluginApiResolver.providerFor(env.resolution(), "", RequiredApi(api, "$version.0", optional = true, minLevel = minLevel), env.providerChoice(api)) != null
 
     /** True when the running provider of [api] exports [op], so a caller offers only what the provider can do. */
     fun hasOp(api: String, version: Int, op: String): Boolean =
@@ -482,8 +482,10 @@ class HostApiCaller(private val env: BrokerEnvironment) {
      * End). Only then may a provider that has not been allowed full access ask for it on the first-use sheet; droidtop's
      * own background use of a provider never shows one.
      */
-    fun call(api: String, version: Int, op: String, args: JSONObject, personStarted: Boolean = false): PluginReply {
-        val required = RequiredApi(api, "$version.0", optional = true)
+    fun call(api: String, version: Int, op: String, args: JSONObject, personStarted: Boolean = false, minLevel: String? = null): PluginReply {
+        // [minLevel]: droidtop's own feature needs this level (the rooted desktop stack asks for "root"); without it the
+        // lowest export serves (least privilege, docs/plugin-api.md 2.7).
+        val required = RequiredApi(api, "$version.0", optional = true, minLevel = minLevel)
         val provider = PluginApiResolver.providerFor(env.resolution(), "", required, env.providerChoice(api))
             ?: return PluginReply.error(PluginErrorCode.PROVIDER_UNAVAILABLE, "no plugin provides $api")
         val exportedOp = provider.export.ops.firstOrNull { it.op == op }
@@ -499,12 +501,12 @@ class HostApiCaller(private val env: BrokerEnvironment) {
             point = "api:$api",
             version = version,
             op = op,
-            caller = JSONObject().put("kind", "host"),
+            caller = JSONObject().put("kind", "host").put("level", provider.export.level),
             args = args,
         )
         val reply = env.forward(record, call, timeout, personStarted)
         val permission = PluginPermissions.find(exportedOp.permission)
-        if (permission == null || permission.tier != PermissionTier.NORMAL) {
+        if ((permission == null || permission.tier != PermissionTier.NORMAL) && !BrokerCore.isSessionPlumbing(api, op)) {
             env.audit(
                 record.manifest.id,
                 AuditEntry(env.nowMs(), exportedOp.permission, api, "served $op for droidtop", args.optString("package"), emptyList(), if (reply.ok) "ok" else (reply.code?.name ?: "FAILED")),
@@ -763,6 +765,9 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
                 .put("trust", env.trustBadge(record.manifest.origin))
                 .put("grants", JSONArray(listOf(exportedOp.permission)))
                 .put("via", JSONArray(chain))
+                // Which of the provider's exports served the call (docs/plugin-api.md 2.7): a provider offering one API at two
+                // levels runs it at this one, the level the caller's grant was checked for.
+                .put("level", export.level)
             val remaining = env.remainingMs(callerId) ?: PluginRunner.CALL_TIMEOUT_MS
             val timeout = minOf(PluginRunner.CALL_TIMEOUT_MS - PROVIDER_MARGIN_MS, remaining - PROVIDER_MARGIN_MS).coerceAtLeast(MIN_PROVIDER_MS)
             val call = PluginCall(
@@ -786,7 +791,7 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
             result = e.code.name
             throw e
         } finally {
-            if (tier != PermissionTier.NORMAL) {
+            if (tier != PermissionTier.NORMAL && !isSessionPlumbing(request.api, request.op)) {
                 val now = env.nowMs()
                 env.audit(callerId, AuditEntry(now, exportedOp.permission, request.api, request.op, "", listOf(provider.plugin.manifest.id), result))
                 env.audit(provider.plugin.manifest.id, AuditEntry(now, exportedOp.permission, request.api, "served ${request.op} for $callerId", "", chain, result))
@@ -795,6 +800,14 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
     }
 
     companion object {
+        /**
+         * The I/O of a `priv.shell` stream session (docs/plugin-api.md 2.7): the session's start (`exec_stream`, with its
+         * argv) and its end (`stream_kill`) are logged like any privileged call, the reads and writes in between are not,
+         * or a running session would push everything else out of the activity log. Fixed by droidtop for the standard
+         * interface; a provider cannot mark its own ops unlogged.
+         */
+        fun isSessionPlumbing(api: String, op: String): Boolean = api == "priv.shell" && (op == "stream_read" || op == "stream_write")
+
         const val BURST = 50
         const val SUSTAINED_PER_SEC = 10.0
         const val MAX_CHAIN = 3
