@@ -53,7 +53,12 @@ import dev.droidtop.library.message
 import dev.droidtop.pluginhost.JobsSummary
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.runtime.systemstatus.NotificationsStore
+import dev.droidtop.runtime.systemstatus.GameMode
+import dev.droidtop.runtime.systemstatus.GameModeControl
+import dev.droidtop.runtime.systemstatus.OverlayLevel
 import dev.droidtop.runtime.systemstatus.PerformanceMonitor
+import dev.droidtop.runtime.systemstatus.PerformanceOverlay
+import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
@@ -348,11 +353,16 @@ private fun QuickRail(
 }
 
 /**
- * The Performance section: what a non-root app can read about how the device is doing, as readouts.
+ * The Performance section: the overlay's level and the game's performance mode, then what a non-root app can read
+ * about how the device is doing, as readouts (docs/SPEC.md, "Performance overlay").
  * It reads the shared sampler ([PerformanceMonitor], the one the companion's Performance tab reads
  * too), which takes a sample every two seconds only while some surface runs [PerformanceMonitor.watch]:
  * here that is this section's own composition, so with the sheet closed or another section showing,
  * nothing polls. Readings Android does not give an app are named as such, never drawn as a number.
+ *
+ * Two rows lead. "Overlay" cycles Off, FPS, Basic and Full on A (or Left and Right), and with no way to draw
+ * over a game yet A opens the one grant that gives it instead. "Performance mode" is drawn only with a
+ * running `priv.shell` provider and a game in front. Up and Down walk the rows, then scroll the readouts.
  */
 @Composable
 private fun PerformanceSection(onDismiss: () -> Unit) {
@@ -362,6 +372,45 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
     val s = history.lastOrNull()
     val focusRequester = remember { FocusRequester() }
     val scroll = rememberScrollState()
+    val touch = rememberGamepadTouch()
+
+    val overlayLevel by PerformanceOverlay.level.collectAsState()
+    val canDraw = remember { PerformanceOverlay.canDraw(context) }
+    val hasShell = remember { PerformanceOverlay.hasShell() }
+    val game = remember { dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName }
+    var mode by remember { mutableStateOf<GameMode?>(null) }
+    var modeNote by remember { mutableStateOf<String?>(null) }
+    val rowCount = if (hasShell && game != null) 2 else 1
+    var focusIndex by remember { mutableStateOf(0) }
+
+    val cycleOverlay = {
+        if (!canDraw) {
+            SettingsLaunch.start(
+                context,
+                android.content.Intent(
+                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:${context.packageName}"),
+                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+            onDismiss()
+        } else {
+            PerformanceOverlay.setLevel(context, overlayLevel.next())
+        }
+    }
+    val cycleMode = {
+        val next = (mode ?: GameMode.STANDARD).next()
+        val pkg = game
+        if (pkg != null) {
+            modeNote = "Setting..."
+            scope.launch {
+                val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    GameModeControl.set(dev.droidtop.runtime.tasks.TaskManager.shell, next, pkg)
+                }
+                if (ok) mode = next
+                modeNote = if (ok) "Set for this game" else "Android refused"
+            }
+        }
+    }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     LaunchedEffect(Unit) { PerformanceMonitor.watch(context) }
@@ -373,8 +422,16 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
             .focusable()
             .onPad { press ->
                 when (press.action) {
-                    GamepadAction.UP -> scope.launch { scroll.animateScrollTo((scroll.value - 240).coerceAtLeast(0)) }
-                    GamepadAction.DOWN -> scope.launch { scroll.animateScrollTo(scroll.value + 240) }
+                    GamepadAction.UP ->
+                        if (scroll.value > 0) scope.launch { scroll.animateScrollTo((scroll.value - 240).coerceAtLeast(0)) }
+                        else focusIndex = menuStep(focusIndex, rowCount, -1)
+                    GamepadAction.DOWN ->
+                        if (focusIndex < rowCount - 1) focusIndex = menuStep(focusIndex, rowCount, 1)
+                        else scope.launch { scroll.animateScrollTo(scroll.value + 240) }
+                    GamepadAction.A, GamepadAction.RIGHT -> if (focusIndex == 0) cycleOverlay() else cycleMode()
+                    GamepadAction.LEFT -> if (focusIndex == 0 && canDraw) {
+                        PerformanceOverlay.setLevel(context, OverlayLevel.values()[(overlayLevel.ordinal + OverlayLevel.values().size - 1) % OverlayLevel.values().size])
+                    }
                     GamepadAction.B -> onDismiss()
                     else -> Unit
                 }
@@ -385,6 +442,30 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
             modifier = Modifier.weight(1f).verticalScroll(scroll),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            MenuRow(
+                title = "Overlay",
+                value = if (canDraw) overlayLevel.label else "Needs display over apps",
+                subtitle = if (overlayLevel != OverlayLevel.OFF && !hasShell) "FPS, CPU and GPU need the Shizuku plugin" else null,
+                adjustable = canDraw,
+                selected = focusIndex == 0,
+                onClick = {
+                    focusIndex = 0
+                    touch(GamepadAction.A)
+                },
+            )
+            if (hasShell && game != null) {
+                MenuRow(
+                    title = "Performance mode",
+                    value = mode?.label ?: "Unchanged",
+                    subtitle = modeNote,
+                    adjustable = true,
+                    selected = focusIndex == 1,
+                    onClick = {
+                        focusIndex = 1
+                        touch(GamepadAction.A)
+                    },
+                )
+            }
             if (s == null) {
                 Text("Reading the device...", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             } else {
@@ -422,11 +503,11 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
                     null,
                     alarm = (s.thermalStatus ?: 0) >= 3,
                 )
-                ReadoutRow("GPU and frame rate", "Needs privilege", null, null)
+                ReadoutRow("GPU and frame rate", if (hasShell) "Use the overlay" else "Needs privilege", null, null)
             }
         }
         HintRow(
-            bindings = listOf(HintBinding(GamepadAction.B, "Close")),
+            bindings = listOf(HintBinding(GamepadAction.A, "Change"), HintBinding(GamepadAction.B, "Close")),
             background = Color.Transparent,
             modifier = Modifier.padding(top = 8.dp),
         )

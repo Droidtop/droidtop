@@ -107,6 +107,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // Typing on the add-on display (SPEC 4c, tracker#314): with elevated access Android's own keyboard is set to
         // show on each second display; without it droidtop draws its own keyboard over an app there. Main process only.
         AddonKeyboardHost.install(this)
+        // The in-game performance overlay (SPEC "Performance overlay", tracker#83): drawn over the game while its level
+        // (Quick Menu > Performance) is not Off. Main process only.
+        PerformanceOverlayHost.install(this)
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).
         LibraryCore.followGamesRoots(this)

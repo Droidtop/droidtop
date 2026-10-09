@@ -2659,9 +2659,8 @@ the `ContainerRuntime` interface that already exists (§3):
   shape as the brightness and DND grant rows (`QuickMenu.kt:326`), so
   there is one empty-state rule for grants (Droidtop/tracker#180, decided
   2026-10-01 from the product review). Honest limitation:
-  the menu overlays the SHELL only — games are separate activities, and
-  a Deck-style in-game overlay is future work tied to this section's
-  overlay plans, not claimed here.
+  the menu overlays the SHELL only: games are separate activities. The
+  Deck-style in-game overlay is the separate performance overlay below.
 - **Game tab (decided 2026-09-28, Droidtop/tracker#82)**: before this,
   R2 drew the exact same Notifications/System pair whether or not a
   game was running — no "you are in a game" surface at all, against
@@ -2709,6 +2708,49 @@ the `ContainerRuntime` interface that already exists (§3):
   a plugin's `ui.quick_tile@1` (docs/plugin-api.md C2, tracker#73) has.
   A plugin's tiles live in that plugin's panel under Plugins (below),
   never in this tab.
+- **Performance overlay (decided 2026-10-09, Droidtop/tracker#83; Steam Deck's graduated overlay is the
+  reference).** A small text window droidtop draws over the game, at four levels the user picks in the
+  Quick Menu's Performance section (the first row, **Overlay**: A or Right cycles Off, FPS, Basic, Full,
+  Left goes back): **FPS** (frame rate), **Basic** (FPS, CPU load, GPU load, battery), **Full** (Basic plus the
+  average and worst frame time of the last second, CPU, GPU and battery temperatures, memory used and total).
+  The level is kept across restarts (`PerformanceOverlay`, `:runtime-common`); Off is the default and
+  draws and samples nothing. The window (`PerformanceOverlayHost`, `:app`) is a never-focused, never-touchable
+  text view in the top-left corner of the display the game was launched on (`LaunchLedger.last`); it exists
+  while the level is not Off and droidtop believes a game it launched is still running, and it is removed
+  with the level or when the ledger forgets the game. It rides droidtop's accessibility overlay when that
+  service is on (no grant, as the keyboard overlay does, "Typing on the add-on display") and otherwise an application overlay, which
+  needs "Display over other apps": with neither, the Overlay row's value reads "Needs display over apps"
+  and A opens that grant's screen (the permission table, "Permissions are asked at the feature", lists it).
+  **Where each figure comes from, and what a normal app cannot read.** Nothing Android gives an unprivileged
+  app reports another app's frames: Choreographer, FrameMetrics and `dumpsys gfxinfo` see only a process's
+  own HWUI windows, and a game draws into a SurfaceView or its own GL surface. The most reliable source is
+  SurfaceFlinger's own present log for the game's layer, `dumpsys SurfaceFlinger --latency <layer>` (the layer
+  is the game package's SurfaceView layer from `--list`, `PerformanceOverlayModel.pickLayer`), read through
+  the running `priv.shell` provider (Shizuku) once a second as ONE command that also reads `/proc/stat`
+  (whole-device CPU load, hidden from apps), the Adreno GPU busy percentage
+  (`/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage`) and, at Full, the thermal zones named `cpu` and `gpu`
+  (`PerformanceOverlayModel.PROBE_SCRIPT`; the layer and level are arguments, never spliced into the
+  script). The frame rate is the frames presented in the last second; a layer that has presented nothing
+  for two seconds reads 0. This is the same route the companion's per-app load uses (`TaskManager.shell`),
+  not a new privileged path. The companion's Performance tab does not read frames; it still says "root or
+  Shizuku" for them, and the Quick Menu's old "GPU and frame rate: Needs privilege" row now points at the overlay
+  when a provider is running. Battery level, charging state, battery temperature and memory come from
+  `PerformanceMonitor`'s unprivileged sampler, so without a provider those lines work and FPS, CPU, GPU and
+  the CPU and GPU temperatures read `--` (a missing reading is a dash, never a guess), and the row says so
+  ("FPS, CPU and GPU need the Shizuku plugin"). GPU load is read for Adreno (the Retroid Pocket 5); another
+  GPU reads `--` until its counter is added. Games running inside droidtop's own process (the Wine view)
+  have no separate layer to find and read `--` for FPS.
+  **The one control the console allows without root: a per-game performance mode.** With a running
+  `priv.shell` provider and a game in front, a second row, **Performance mode**, cycles Standard,
+  Performance and Battery saver through Android's GameManager: `cmd game set --mode <mode> --user 0 <package>`
+  (Android 14) with `cmd game mode --user 0 <mode> <package>` (Android 12 and 13) as the fallback
+  (`GameModeControl`). The row reports "Set for this game" or "Android refused"; Android keeps the mode, so
+  it applies on later launches, and droidtop cannot read it back, so the row shows what droidtop set this
+  session ("Unchanged" before). Android applies a mode only to a package it counts as a game. A fixed
+  performance power mode, CPU governors and clock caps stay not built: they need root or a vendor API,
+  and root is never the standard path (the Battery tile paragraph in "What Gaming offers beyond the theme" stands). Not built: an overlay
+  position or size setting, a frame-time graph, and plugin-supplied readings (`perf.source` is declared and
+  has no consumer yet).
 - **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
   Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
   navigation and the places things live. The owner's direction: "branch our quick menu out a
@@ -6656,7 +6698,7 @@ each is asked:
 | Modify system settings | brightness, adaptive brightness, screen timeout, auto-rotate tiles | the tile, on first use |
 | Notification policy | the Do Not Disturb tile | the tile, on first use |
 | Post notifications (API 33+) | the desktop session's foreground notification, download progress | starting the desktop session; the first download |
-| Draw over other apps | nothing; droidtop draws no overlay over another app | never asked |
+| Draw over other apps | the performance overlay and, without the accessibility service, the keyboard over another app's field | the Quick Menu's Performance section (Overlay row), the keyboard row |
 
 Every one of these screens, and App info and Android's Home choice, is started through `SettingsLaunch.start`
 (`:runtime-common`), which logs one debug line, tag `droidtop.settings`, with the screen asked for and the
