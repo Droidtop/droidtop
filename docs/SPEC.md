@@ -9380,9 +9380,18 @@ three-valued `StoreUpdate`: `UNKNOWN`, `CURRENT`, `AVAILABLE`. Every
 store answers through `StoreLibrary.checkUpdate` (7g "Stores"): Steam
 compares the build of each depot installed (read off the depot manifests
 the download keeps in the game's folder) with the one Steam serves on the
-branch now and names the build ("build 1234567"); Amazon compares the installed version id with the live one and
-says `CURRENT` or `AVAILABLE`, and a request that could not be made is no
-answer at all, never `CURRENT`. A store with no check stays `UNKNOWN`, and
+branch now and names the build ("build 1234567"); Epic compares the installed build with the one it serves now; Amazon
+compares the installed version id with the live one and says `CURRENT` or
+`AVAILABLE`; GOG compares the build id the install was made from (recorded as
+the download ends, `GOGGame.installedBuildId`, with its version name for the
+page) with the newest Windows build GOG lists, by the one rule the download
+takes its build with (`GOGApiClient.latestWindowsBuild`); itch.io compares the
+installed upload's `updated_at` with the one it lists now
+(`ItchGame.installedStamp`), because itch keeps an upload's id when a developer
+pushes a new build and names no version. An install made before GOG's build or
+itch's stamp was recorded stays `UNKNOWN` until it is next installed or
+updated. A request that could not be made is no answer at all, never
+`CURRENT`. A store with no check (a plugin store may have none) stays `UNKNOWN`, and
 its game page says "<store> does not tell droidtop whether a newer build
 exists"; nothing ever shows a store
 game as up to date unless its store said so. The answers are asked in the

@@ -78,6 +78,19 @@ internal class GOGApiClient(
             }
         }
 
+    /**
+     * The build an install or an update takes: the newest Windows build of
+     * the modern generation (2), else of the legacy one (1); null when GOG
+     * lists neither. One rule for the download and for the update check, so
+     * a check never names a build the download would not take.
+     */
+    suspend fun latestWindowsBuild(gameId: String, platform: String = "windows"): Result<GOGBuild?> {
+        val modern = getBuildsForGame(gameId, platform, generation = 2).getOrElse { return Result.failure(it) }
+        parser.selectBuild(modern.items, preferredGeneration = 2, platform = platform)?.let { return Result.success(it) }
+        val legacy = getBuildsForGame(gameId, platform, generation = 1).getOrElse { return Result.failure(it) }
+        return Result.success(parser.selectBuild(legacy.items, preferredGeneration = 1, platform = platform))
+    }
+
     suspend fun fetchDependencyRepository(url: String): Result<DependencyRepository> = withContext(Dispatchers.IO){
         try {
             val credentials = GOGAuthManager.getStoredCredentials(context).getOrNull()

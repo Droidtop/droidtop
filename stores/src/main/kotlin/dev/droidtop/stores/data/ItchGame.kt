@@ -50,6 +50,15 @@ data class ItchGame(
     @ColumnInfo("size_bytes")
     val sizeBytes: Long = 0,
 
+    /**
+     * The chosen upload's `updated_at` as itch gave it when the game was
+     * installed: itch re-uploads a build under the same upload id, so this
+     * stamp is what says a newer build exists. Empty for an install made
+     * before it was recorded, which the update check then cannot judge.
+     */
+    @ColumnInfo(name = "installed_stamp", defaultValue = "''")
+    val installedStamp: String = "",
+
     @ColumnInfo(name = "exclude", defaultValue = "0")
     val exclude: Boolean = false,
 )
@@ -64,4 +73,6 @@ data class ItchUpload(
     val platformLinux: Boolean,
     val platformAndroid: Boolean,
     val isDemo: Boolean,
+    /** itch's `updated_at` for the upload, empty when it names none. */
+    val updatedAt: String = "",
 )

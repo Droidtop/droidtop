@@ -2,11 +2,13 @@ package dev.droidtop.stores.itch
 
 import android.content.Context
 import dev.droidtop.library.PcStoreNames
+import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
+import dev.droidtop.library.stores.StoreUpdateCheck
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.data.ItchGame
 import dev.droidtop.stores.data.ItchUpload
@@ -24,8 +26,8 @@ import timber.log.Timber
  * `ItchService` did (sync the owned keys, install one upload, uninstall),
  * run by droidtop with droidtop's own screens. An install is one upload,
  * downloaded and unpacked into the folder the person picked; itch.io names
- * no version and keeps no file list, so there is no update check and no
- * verify.
+ * no version and keeps no file list, so there is no verify, and an update is
+ * known only by the upload's own stamp ([checkUpdate]).
  */
 class ItchStore : StoreLibrary {
     override val id = "itch"
@@ -115,7 +117,13 @@ class ItchStore : StoreLibrary {
         }.getOrElse { throw it }
         withContext(Dispatchers.IO) {
             dao.update(
-                game.copy(isInstalled = true, installPath = installPath, installedUploadId = upload.id, sizeBytes = upload.sizeBytes),
+                game.copy(
+                    isInstalled = true,
+                    installPath = installPath,
+                    installedUploadId = upload.id,
+                    sizeBytes = upload.sizeBytes,
+                    installedStamp = upload.updatedAt,
+                ),
             )
         }
         return "Installed ${game.title}"
@@ -143,8 +151,23 @@ class ItchStore : StoreLibrary {
                 val parent = dir.parentFile ?: error("${game.installPath} is not a game folder")
                 check(SafeDelete.deleteWithin(parent, dir)) { "Could not remove ${game.installPath}" }
             }
-            dao.update(game.copy(isInstalled = false, installPath = "", installedUploadId = 0))
+            dao.update(game.copy(isInstalled = false, installPath = "", installedUploadId = 0, installedStamp = ""))
         }.onFailure { Timber.tag(TAG).e(it, "Failed to uninstall itch.io game $gameId") }
+    }
+
+    /**
+     * The upload the install came from against what itch lists for it now.
+     * itch keeps an upload's id when its developer pushes a new build, so
+     * the answer is the upload's `updated_at`. An install with no stamp
+     * recorded, or whose upload itch no longer lists, stays unknown.
+     */
+    override suspend fun checkUpdate(context: Context, gameId: String): StoreUpdateCheck? = withContext(Dispatchers.IO) {
+        val game = dao(context).getById(gameId) ?: return@withContext null
+        if (!game.isInstalled || game.installedStamp.isBlank()) return@withContext null
+        val apiKey = ItchAuthManager.getStoredApiKey(context) ?: return@withContext null
+        val uploads = ItchApiClient.uploads(apiKey, gameId, game.downloadKeyId).getOrNull() ?: return@withContext null
+        val state = updateState(game.installedStamp, uploads.firstOrNull { it.id == game.installedUploadId }) ?: return@withContext null
+        StoreUpdateCheck(state)
     }
 
     override fun changeStamp(context: Context): Long =
@@ -152,6 +175,16 @@ class ItchStore : StoreLibrary {
 
     internal companion object {
         private const val TAG = "ItchStore"
+
+        /**
+         * Whether the upload an install came from has a newer build: its
+         * stamp now against the one recorded. Null (not known) when no stamp
+         * was recorded, the upload is no longer listed or names no stamp.
+         */
+        fun updateState(installedStamp: String, live: ItchUpload?): StoreUpdate? {
+            if (installedStamp.isBlank() || live == null || live.updatedAt.isBlank()) return null
+            return if (live.updatedAt == installedStamp) StoreUpdate.CURRENT else StoreUpdate.AVAILABLE
+        }
 
         /**
          * The upload an install takes: the one the game last installed, else

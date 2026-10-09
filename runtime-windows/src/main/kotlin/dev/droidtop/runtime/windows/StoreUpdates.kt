@@ -22,7 +22,8 @@ import org.json.JSONObject
  * Every store answers through its own
  * [dev.droidtop.library.stores.StoreLibrary.checkUpdate] (Steam compares
  * each installed depot's build with the one it serves now, Amazon the
- * installed version id with the live one). A store with
+ * installed version id with the live one, GOG the build id the install was
+ * made from with the newest, itch.io the upload's stamp). A store with
  * no check stays [StoreUpdate.UNKNOWN] and the game page says so; nothing
  * here ever claims "up to date" for a store that was not asked. A check runs off the main thread, at most every few
  * hours, never inside a scan, and only for a store that is signed in; its

@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import dev.droidtop.stores.data.AmazonGame
 import dev.droidtop.stores.data.EpicGame
@@ -24,7 +25,7 @@ import java.io.File
  */
 @Database(
     entities = [GOGGame::class, EpicGame::class, AmazonGame::class, ItchGame::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(StringListConverter::class)
@@ -40,12 +41,22 @@ abstract class StoresDatabase : RoomDatabase() {
         /** GameNative's tables of these four stores, brought across when this database is first made. */
         private val GAMENATIVE_TABLES = listOf("gog_games", "epic_games", "amazon_games", "itch_games")
 
+        /** 1 to 2: the build an install was made from, so GOG and itch can say a newer one exists. */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE gog_games ADD COLUMN installed_build_id TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE gog_games ADD COLUMN installed_version_name TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE itch_games ADD COLUMN installed_stamp TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         @Volatile
         private var instance: StoresDatabase? = null
 
         fun get(context: Context): StoresDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(context.applicationContext, StoresDatabase::class.java, NAME)
+                    .addMigrations(MIGRATION_1_2)
                     .addCallback(
                         object : RoomDatabase.Callback() {
                             // Once, as the database is first made: what GameNative's database holds.

@@ -971,7 +971,7 @@ private fun pageRows(
             // Already said above, under the same row.
             entry.availableUpdate != null -> Unit
             pc.update == dev.droidtop.library.StoreUpdate.UNKNOWN ->
-                add(PageFact("Update", "Not known", subtitle = "${pc.source} does not tell droidtop whether a newer build exists"))
+                add(PageFact("Update", "Not known", subtitle = "${pc.source} has not said whether a newer build exists yet; it is asked in the background, and an install made before its build was recorded is checked after its next update"))
             pc.update == dev.droidtop.library.StoreUpdate.CURRENT ->
                 add(PageFact("Update", "Up to date", subtitle = "${pc.source} says this is the newest build"))
             else -> Unit

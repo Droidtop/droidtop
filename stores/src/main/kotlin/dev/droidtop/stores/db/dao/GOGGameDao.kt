@@ -59,6 +59,8 @@ interface GOGGameDao {
                     isInstalled = existingGame.isInstalled,
                     installPath = existingGame.installPath,
                     installSize = existingGame.installSize,
+                    installedBuildId = existingGame.installedBuildId,
+                    installedVersionName = existingGame.installedVersionName,
                 )
                 insert(gameToInsert)
             } else {

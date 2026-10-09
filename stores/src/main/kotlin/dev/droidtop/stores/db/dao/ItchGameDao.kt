@@ -49,6 +49,7 @@ interface ItchGameDao {
                         isInstalled = existing.isInstalled,
                         installPath = existing.installPath,
                         installedUploadId = existing.installedUploadId,
+                        installedStamp = existing.installedStamp,
                         sizeBytes = if (existing.isInstalled) existing.sizeBytes else newGame.sizeBytes,
                     ),
                 )

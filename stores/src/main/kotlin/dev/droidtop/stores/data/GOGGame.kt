@@ -68,6 +68,14 @@ data class GOGGame(
 
     @ColumnInfo(name = "exclude", defaultValue = "0")
     val exclude: Boolean = false,
+
+    /** GOG's id of the build the install was made from; the update check compares it with the newest. Empty before it was recorded. */
+    @ColumnInfo(name = "installed_build_id", defaultValue = "''")
+    val installedBuildId: String = "",
+
+    /** That build's version name as GOG words it ("1.2.3"), for the game page. */
+    @ColumnInfo(name = "installed_version_name", defaultValue = "''")
+    val installedVersionName: String = "",
 )
 
 data class GOGCredentials(

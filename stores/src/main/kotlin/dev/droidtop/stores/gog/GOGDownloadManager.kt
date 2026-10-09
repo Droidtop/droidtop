@@ -141,31 +141,11 @@ internal class GOGDownloadManager(
             downloadInfo.updateStatusMessage("Fetching builds...")
 
             // Step 1: Get available builds — prefer Gen 2, fall back to Gen 1 (legacy)
-            val selectedBuild = run {
-                val gen2Result = apiClient.getBuildsForGame(gameId, WINDOWS_OS_VERSION, generation = 2)
-                if (gen2Result.isFailure) {
-                    return@withContext Result.failure(
-                        gen2Result.exceptionOrNull() ?: Exception("Failed to fetch Gen 2 builds"),
-                    )
-                }
-                parser.selectBuild(gen2Result.getOrThrow().items, preferredGeneration = 2, platform = WINDOWS_OS_VERSION)
-                    ?.let { return@run it }
-                val gen1Result = apiClient.getBuildsForGame(gameId, WINDOWS_OS_VERSION, generation = 1)
-                if (gen1Result.isFailure) {
-                    return@withContext Result.failure(
-                        gen1Result.exceptionOrNull() ?: Exception("Failed to fetch builds"),
-                    )
-                }
-                val builds = gen1Result.getOrThrow()
-                parser.selectBuild(builds.items, preferredGeneration = 1, platform = WINDOWS_OS_VERSION)
-                    ?: run {
-                        val hint = when {
-                            builds.items.isEmpty() -> "No builds returned for Windows (game may be Linux/Mac only)."
-                            else -> "No Windows build. Available: ${builds.items.joinToString { "Gen ${it.generation}/${it.platform}" }}."
-                        }
-                        return@withContext Result.failure(Exception("No suitable build found for Windows. $hint"))
-                    }
-            }
+            val selectedBuild = apiClient.latestWindowsBuild(gameId, WINDOWS_OS_VERSION).getOrElse {
+                return@withContext Result.failure(it)
+            } ?: return@withContext Result.failure(
+                Exception("No suitable build found for Windows. GOG lists no Windows build for this game (it may be Linux or Mac only)."),
+            )
 
             Timber.tag("GOG").i("Selected build: ${selectedBuild.buildId} (Gen ${selectedBuild.generation}, Platform: ${selectedBuild.platform})")
             Timber.tag("GOG").d("Build productId: ${selectedBuild.productId}, input gameId: $gameId")
@@ -492,7 +472,7 @@ internal class GOGDownloadManager(
 
             saveManifestToGameDir(installPath, gameManifest, selectedBuild.buildId, selectedBuild.versionName, effectiveLang)
 
-            finalizeInstallSuccess(gameId, installPath, downloadInfo)
+            finalizeInstallSuccess(gameId, installPath, downloadInfo, selectedBuild)
             Timber.tag("GOG").i("Download completed successfully for game $gameId")
             Result.success(Unit)
         } catch (e: Exception) {
@@ -566,13 +546,27 @@ internal class GOGDownloadManager(
      * Shared finalization after a successful install: update DB, set download complete, emit events.
      * Used by both Gen 2 and Gen 1 success paths.
      */
-    private suspend fun finalizeInstallSuccess(gameId: String, installPath: File, downloadInfo: DownloadInfo) {
+    private suspend fun finalizeInstallSuccess(
+        gameId: String,
+        installPath: File,
+        downloadInfo: DownloadInfo,
+        build: dev.droidtop.stores.gog.api.GOGBuild,
+    ) {
         downloadInfo.updateStatusMessage("Updating database...")
         try {
             val game = gogManager.getGameFromDbById(gameId)
             if (game != null) {
                 val installSize = calculateDirectorySize(installPath)
-                gogManager.updateGame(game.copy(isInstalled = true, installPath = installPath.absolutePath, installSize = installSize))
+                gogManager.updateGame(
+                    game.copy(
+                        isInstalled = true,
+                        installPath = installPath.absolutePath,
+                        installSize = installSize,
+                        // What the update check compares with the newest build GOG lists.
+                        installedBuildId = build.buildId,
+                        installedVersionName = build.versionName,
+                    ),
+                )
                 downloadInfo.clearPersistedBytesDownloaded(installPath.absolutePath)
                 Timber.tag("GOG").i("Updated database: game marked as installed, size: ${installSize / 1_000_000} MB")
             } else {
@@ -775,7 +769,7 @@ internal class GOGDownloadManager(
 
             saveManifestToGameDir(installPath, gameManifest, selectedBuild.buildId, selectedBuild.versionName, effectiveLang)
 
-            finalizeInstallSuccess(gameId, installPath, downloadInfo)
+            finalizeInstallSuccess(gameId, installPath, downloadInfo, selectedBuild)
             Timber.tag("GOG").i("Gen 1 download completed for game $gameId")
             Result.success(Unit)
         } catch (e: Exception) {

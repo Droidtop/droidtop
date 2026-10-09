@@ -3,12 +3,14 @@ package dev.droidtop.stores.gog
 import android.content.Context
 import android.net.Uri
 import dev.droidtop.library.PcStoreNames
+import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLaunch
 import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
+import dev.droidtop.library.stores.StoreUpdateCheck
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.db.StoresDatabase
 import dev.droidtop.stores.gog.api.GOGApiClient
@@ -83,6 +85,7 @@ class GOGStore : StoreLibrary {
                 installPath = game.installPath.takeIf { game.isInstalled && it.isNotBlank() },
                 sizeBytes = if (game.isInstalled) game.installSize else game.downloadSize,
                 artUrl = game.verticalCoverUrl.ifEmpty { game.imageUrl }.ifEmpty { game.iconUrl }.takeIf { it.isNotBlank() },
+                installedVersion = game.installedVersionName.takeIf { game.isInstalled && it.isNotBlank() },
             )
         }
     }
@@ -137,8 +140,22 @@ class GOGStore : StoreLibrary {
                 check(SafeDelete.deleteWithin(parent, dir)) { "Could not remove ${game.installPath}" }
             }
             dropChunkCache(context, gameId)
-            dao.update(game.copy(isInstalled = false, installPath = "", installSize = 0))
+            dao.update(game.copy(isInstalled = false, installPath = "", installSize = 0, installedBuildId = "", installedVersionName = ""))
         }.onFailure { Timber.tag(TAG).e(it, "Failed to uninstall GOG game $gameId") }
+    }
+
+    /**
+     * The build the install was made from against the newest Windows build
+     * GOG lists now, by GOG's build id (the way its own client decides). An
+     * install made before the build was recorded cannot be judged, so it
+     * stays unknown until it is next installed or updated.
+     */
+    override suspend fun checkUpdate(context: Context, gameId: String): StoreUpdateCheck? = withContext(Dispatchers.IO) {
+        val game = dao(context).getById(gameId) ?: return@withContext null
+        if (!game.isInstalled || game.installedBuildId.isBlank()) return@withContext null
+        val client = GOGApiClient(context.applicationContext, GOGManifestParser())
+        val live = client.latestWindowsBuild(gameId).getOrNull() ?: return@withContext null
+        StoreUpdateCheck(updateState(game.installedBuildId, live.buildId), live.versionName.takeIf { it.isNotBlank() })
     }
 
     override suspend fun launch(context: Context, gameId: String): StoreLaunch? =
@@ -155,6 +172,10 @@ class GOGStore : StoreLibrary {
 
     internal companion object {
         private const val TAG = "GOGStore"
+
+        /** A different build id from the one the install was made from is a newer build (GOG's own client decides the same way). */
+        fun updateState(installedBuildId: String, liveBuildId: String): StoreUpdate =
+            if (liveBuildId == installedBuildId) StoreUpdate.CURRENT else StoreUpdate.AVAILABLE
 
         /** Whether [address] is GOG's sign-in return page ([GOGConstants.GOG_REDIRECT_URI]): same scheme, host and path. */
         fun isReturnPage(address: String): Boolean = runCatching {

@@ -130,6 +130,7 @@ internal object ItchApiClient {
                             platformLinux = upload.optBoolean("p_linux") || "p_linux" in traitSet,
                             platformAndroid = upload.optBoolean("p_android") || "p_android" in traitSet,
                             isDemo = "demo" in traitSet,
+                            updatedAt = upload.optString("updated_at"),
                         )
                     }
                     Result.success(uploads)
