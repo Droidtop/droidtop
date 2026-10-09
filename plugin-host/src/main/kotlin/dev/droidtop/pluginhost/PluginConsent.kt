@@ -118,7 +118,7 @@ object PluginConsent {
             )
             if (!risky) can.add(line) else asks.add(ConsentAsk(tier, line, declared.required))
         }
-        val offers = v2.exports.map { ConsentLine("Offer ${it.api} to other plugins", id = GRANT_EXPORT_PREFIX + it.api) }
+        val offers = v2.exports.map { ConsentLine(it.offerLabel(), id = GRANT_EXPORT_PREFIX + it.grantKey) }
 
         val uses = v2.requires.map { req ->
             val provider = installed.firstOrNull { rec ->

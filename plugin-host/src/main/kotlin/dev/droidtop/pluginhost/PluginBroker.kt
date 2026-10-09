@@ -142,6 +142,9 @@ interface BrokerEnvironment {
 
     /** Asks [caller]'s own job [jobId] to stop (a provider's job or a host download); false when it has no such running job. */
     fun cancelBrokeredJob(caller: PluginRecord, jobId: String): Boolean = false
+
+    /** Records the privilege level [provider] holds right now for its export of [api] ([ProviderLevels]); false when not kept. */
+    fun reportProviderLevel(provider: PluginRecord, api: String, level: String): Boolean = false
 }
 
 /** At most [perHour] uses per key in any hour (docs/plugin-api.md 8: notifications). */
@@ -284,6 +287,16 @@ object HostApis {
                     .put("label", provider.plugin.manifest.label)
             }
             out
+        },
+        // A provider says which privilege level it holds right now (docs/plugin-api.md 2.7): its root-level export is offered
+        // only while it reports "root". Only for an API it exports at a level it declared; it grants nothing by itself.
+        HostOp("plugins", "report_level") { env, record, args ->
+            val api = args.optString("api").takeIf { it.isNotBlank() } ?: invalid("api is required")
+            val level = args.optString("level").takeIf { it in setOf("none", "adb", "root") } ?: invalid("level is none, adb or root")
+            val declared = record.manifest.v2.exports.filter { it.api == api }.map { it.level }
+            if (declared.isEmpty()) invalid("this plugin does not export $api")
+            if (level != "none" && level !in declared) invalid("$api is not exported at level $level")
+            JSONObject().put("recorded", env.reportProviderLevel(record, api, level))
         },
         HostOp("plugins", "job_status") { env, record, args ->
             val id = args.optString("jobId").takeIf { it.isNotBlank() } ?: invalid("jobId is required")

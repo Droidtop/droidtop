@@ -113,6 +113,7 @@ object PluginStore {
         PluginVault.forContext(context).clear(pluginId)
         PluginFileTokens.forPluginsRoot(root(context)).delete(pluginId)
         PluginBrokers.forget(pluginId)
+        ProviderLevels.forContext(context).forget(pluginId)
         File(root(context), pluginId).deleteRecursively()
         PluginEpoch.bump()
     }

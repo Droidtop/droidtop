@@ -57,13 +57,13 @@ object PluginApiResolver {
      * [exportAllowed] says whether a plugin's export is switched on (an
      * update's new export waits for the user).
      */
-    fun resolve(records: List<PluginRecord>, exportAllowed: (pluginId: String, api: String) -> Boolean = { _, _ -> true }): ApiResolution {
+    fun resolve(records: List<PluginRecord>, exportAllowed: (pluginId: String, export: ExportedApi) -> Boolean = { _, _ -> true }): ApiResolution {
         var active = records.filter { it.runnable() }
         var providers: Map<String, List<ApiProvider>> = emptyMap()
         val waitingAll = linkedMapOf<String, List<RequiredApi>>()
         while (true) {
             providers = active
-                .flatMap { rec -> rec.manifest.v2.exports.filter { exportAllowed(rec.manifest.id, it.api) }.map { ApiProvider(rec, it) } }
+                .flatMap { rec -> rec.manifest.v2.exports.filter { exportAllowed(rec.manifest.id, it) }.map { ApiProvider(rec, it) } }
                 .sortedBy { it.plugin.manifest.id }
                 .groupBy { it.export.api }
             val current = providers
@@ -90,16 +90,26 @@ object PluginApiResolver {
      * `minLevel` is not offered to that caller.
      */
     fun providerFor(resolution: ApiResolution, callerId: String, required: RequiredApi, chosen: String? = null): ApiProvider? {
-        val candidates = resolution.providers[required.api].orEmpty()
-            .filter { it.plugin.manifest.id != callerId && satisfies(it.export, required) }
+        val candidates = leastFirst(
+            resolution.providers[required.api].orEmpty().filter { it.plugin.manifest.id != callerId && satisfies(it.export, required) },
+        )
         return candidates.firstOrNull { it.plugin.manifest.id == chosen } ?: candidates.firstOrNull()
     }
 
     /** The provider of [api] for a plain availability question (`plugins.available`), honouring the user's choice. */
     fun providerOf(resolution: ApiResolution, api: String, minLevel: String? = null, chosen: String? = null): ApiProvider? {
-        val candidates = resolution.providers[api].orEmpty().filter { minLevel == null || satisfies(it.export, RequiredApi(api, it.export.version, minLevel = minLevel)) }
+        val candidates = leastFirst(
+            resolution.providers[api].orEmpty().filter { minLevel == null || satisfies(it.export, RequiredApi(api, it.export.version, minLevel = minLevel)) },
+        )
         return candidates.firstOrNull { it.plugin.manifest.id == chosen } ?: candidates.firstOrNull()
     }
+
+    /**
+     * Least privilege first: when a provider exports one API at two levels, a caller that asked for no level, or for
+     * `adb`, is served by the `adb` export and carries the `priv.shell.adb` grant, never the root one (docs/plugin-api.md
+     * 2.7). Stable, so the plugin order and the user's choice are otherwise unchanged.
+     */
+    private fun leastFirst(candidates: List<ApiProvider>): List<ApiProvider> = candidates.sortedBy { LEVELS.indexOf(it.export.level) }
 
     private val lock = Any()
     private var cachedEpoch = -1
@@ -114,8 +124,11 @@ object PluginApiResolver {
         val epoch = PluginEpoch.current()
         cached?.takeIf { cachedEpoch == epoch }?.let { return@synchronized it }
         val grants = PluginGrants.forContext(context)
-        val resolved = resolve(PluginStore.installed(context)) { pluginId, api ->
-            PluginGrants.exportState(grants.read(pluginId), api) == GrantState.GRANTED
+        val levels = ProviderLevels.forContext(context)
+        val resolved = resolve(PluginStore.installed(context)) { pluginId, export ->
+            PluginGrants.exportState(grants.read(pluginId), export.grantKey) == GrantState.GRANTED &&
+                // A root-level export is offered only while its provider reports it holds root (docs/plugin-api.md 2.7).
+                (export.level != "root" || levels.held(pluginId, export.api) == "root")
         }
         cached = resolved
         cachedEpoch = epoch

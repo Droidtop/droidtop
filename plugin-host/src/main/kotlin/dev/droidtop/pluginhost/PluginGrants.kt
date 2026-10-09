@@ -40,7 +40,7 @@ data class PermissionDiff(
         fun between(old: PluginManifest, new: PluginManifest): PermissionDiff {
             val oldPermissions = old.v2.permissions.map { it.id }.toSet()
             val oldPoints = old.v2.provides.map { it.point }.toSet()
-            val oldExports = old.v2.exports.map { it.api }.toSet()
+            val oldExports = old.v2.exports.map { it.grantKey }.toSet()
             // A contract 1 plugin holds what it could always do: only its high-risk news is asked about.
             val v2 = new.contractVersion >= 2
             return PermissionDiff(
@@ -52,7 +52,7 @@ data class PermissionDiff(
                     .filter { it.point !in oldPoints && ExtensionPoints.find(it.point)?.let { p -> v2 || p.risk.needsConsent } == true }
                     .map { it.point }
                     .distinct(),
-                exports = new.v2.exports.map { it.api }.filter { it !in oldExports }.distinct(),
+                exports = new.v2.exports.map { it.grantKey }.filter { it !in oldExports }.distinct(),
             )
         }
     }
@@ -184,7 +184,7 @@ class PluginGrants(private val dir: File) {
             if (ExtensionPoints.find(entry.point) == null) continue
             states[PluginPermissions.PROVIDE_PREFIX + entry.point] = answerFor(PluginPermissions.PROVIDE_PREFIX + entry.point, PermissionTier.NORMAL, on)
         }
-        for (export in record.manifest.v2.exports) states[EXPORT_PREFIX + export.api] = answerFor(EXPORT_PREFIX + export.api, PermissionTier.NORMAL, on)
+        for (export in record.manifest.v2.exports) states[EXPORT_PREFIX + export.grantKey] = answerFor(EXPORT_PREFIX + export.grantKey, PermissionTier.NORMAL, on)
         writeLocked(record.manifest.id, Snapshot(states = states))
     }
 
@@ -222,7 +222,7 @@ class PluginGrants(private val dir: File) {
             states[declared.id] = stateOf(old, snap, declared.id) ?: continue
         }
         for (entry in old.manifest.v2.provides) states[PluginPermissions.PROVIDE_PREFIX + entry.point] = provideState(old, snap, entry.point)
-        for (export in old.manifest.v2.exports) states[EXPORT_PREFIX + export.api] = exportState(snap, export.api)
+        for (export in old.manifest.v2.exports) states[EXPORT_PREFIX + export.grantKey] = exportState(snap, export.grantKey)
         // Explicit entries the user set win over what was just derived.
         states.putAll(snap.states.filterKeys { it in states })
         // Category and call overrides (Droidtop/tracker#263) are the user's own and outlive an update.
@@ -238,8 +238,8 @@ class PluginGrants(private val dir: File) {
             if (key !in states) states[key] = if (entry.point in diff.points) GrantState.ASK else provideState(new, Snapshot(), entry.point)
         }
         for (export in new.manifest.v2.exports) {
-            val key = EXPORT_PREFIX + export.api
-            if (key !in states) states[key] = if (export.api in diff.exports) GrantState.ASK else GrantState.GRANTED
+            val key = EXPORT_PREFIX + export.grantKey
+            if (key !in states) states[key] = if (export.grantKey in diff.exports) GrantState.ASK else GrantState.GRANTED
         }
         val fresh = buildSet {
             addAll(diff.permissions)
@@ -297,7 +297,7 @@ class PluginGrants(private val dir: File) {
                 val point = ExtensionPoints.find(entry.point) ?: continue
                 if (!v2 || !point.risk.needsConsent) add(PluginPermissions.PROVIDE_PREFIX + entry.point)
             }
-            for (export in record.manifest.v2.exports) add(EXPORT_PREFIX + export.api)
+            for (export in record.manifest.v2.exports) add(EXPORT_PREFIX + export.grantKey)
         }
 
         /** The tier a declared permission is asked at. An id the registry does not know is a provider's own permission: asked like a dangerous one. */
@@ -357,10 +357,10 @@ class PluginGrants(private val dir: File) {
             return pointRefusal(record, snapshot, point)
         }
 
-        /** Whether the plugin's export of [api] is on: an update's new export waits for a grant. */
-        fun exportState(snapshot: Snapshot, api: String): GrantState {
+        /** Whether the plugin's export under [key] ([ExportedApi.grantKey]) is on: an update's new export waits for a grant. */
+        fun exportState(snapshot: Snapshot, key: String): GrantState {
             if (snapshot.corrupt) return GrantState.ASK
-            return snapshot.states[EXPORT_PREFIX + api] ?: GrantState.GRANTED
+            return snapshot.states[EXPORT_PREFIX + key] ?: GrantState.GRANTED
         }
     }
 }

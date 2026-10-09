@@ -194,6 +194,24 @@ data class ExportedApi(
     val ops: List<ExportedOp> = emptyList(),
     val permissions: List<ProvidedPermission> = emptyList(),
 ) {
+    /** The `level` attribute (`adb`, `root`), or empty. */
+    val level: String get() = runCatching { JSONObject(attributes).optString("level") }.getOrDefault("")
+
+    /**
+     * The key the provider's own "offer this to other plugins" grant is kept under (docs/plugin-api.md 2.7): the API
+     * name, plus `@root` for a root-level export, so a provider offering one API at two levels has a grant for each and
+     * the person can allow the system-level one without the root one. Every other export keeps its plain API name.
+     */
+    val grantKey: String get() = if (level == "root") "$api@root" else api
+
+    /**
+     * The plain line the provider's approval list shows for this export: what other plugins may then do, from the
+     * registry label of the permission its ops are gated by ("Other plugins may: Run commands as root").
+     */
+    fun offerLabel(): String =
+        ops.firstNotNullOfOrNull { PluginPermissions.labelFor(it.permission) }?.let { "Other plugins may: $it" }
+            ?: "Offer $api to other plugins"
+
     fun toJson(): JSONObject = JSONObject().apply {
         put("api", api)
         put("version", version)

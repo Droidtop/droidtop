@@ -104,7 +104,41 @@ class PluginApiResolverTest {
 
     @Test
     fun `an export the user has not allowed does not provide`() {
-        val res = PluginApiResolver.resolve(listOf(shizuku, caller)) { id, api -> !(id == "droidtop.shizuku" && api == "priv.shell") }
+        val res = PluginApiResolver.resolve(listOf(shizuku, caller)) { id, export -> !(id == "droidtop.shizuku" && export.api == "priv.shell") }
         assertTrue(res.isWaiting("acme.caller"))
+    }
+
+    @Test
+    fun `one API at two levels has a grant for each, in plain words`() {
+        val adb = ExportedApi("priv.shell", attributes = "{\"level\":\"adb\"}", ops = listOf(ExportedOp("exec", "priv.shell.adb")))
+        val root = ExportedApi("priv.shell", attributes = "{\"level\":\"root\"}", ops = listOf(ExportedOp("exec", "priv.shell.root")))
+        // The system-level export keeps the plain key an installed provider already has; root gets its own.
+        assertEquals("priv.shell", adb.grantKey)
+        assertEquals("priv.shell@root", root.grantKey)
+        assertEquals("Other plugins may: Run commands as the system (adb)", adb.offerLabel())
+        assertEquals("Other plugins may: Run commands as root", root.offerLabel())
+    }
+
+    @Test
+    fun `a root-level export serves minLevel root only while it is offered`() {
+        val both = TestPlugins.provider("droidtop.shizuku", level = "root")
+        val wantsRoot = RequiredApi("priv.shell", "1.0", optional = true, minLevel = "root")
+        val offered = PluginApiResolver.resolve(listOf(both))
+        assertTrue(PluginApiResolver.providerOf(offered, "priv.shell", "root") != null)
+        // What current() does while the provider has not reported root: the root export is not offered.
+        val held = PluginApiResolver.resolve(listOf(both)) { _, export -> export.level != "root" }
+        assertNull(PluginApiResolver.providerOf(held, "priv.shell", "root"))
+        assertFalse(PluginApiResolver.satisfies(ExportedApi("priv.shell", attributes = "{\"level\":\"adb\"}"), wantsRoot))
+    }
+
+    @Test
+    fun `a caller that asks for no level is served by the lower export`() {
+        val adb = TestPlugins.provider("droidtop.shizuku", level = "adb").manifest.v2.exports.single()
+        val root = adb.copy(attributes = "{\"level\":\"root\"}", ops = listOf(ExportedOp("exec", "priv.shell.root")))
+        val rec = TestPlugins.provider("droidtop.shizuku", level = "adb")
+        val both = rec.copy(manifest = rec.manifest.copy(v2 = rec.manifest.v2.copy(exports = listOf(root, adb))))
+        val res = PluginApiResolver.resolve(listOf(both))
+        assertEquals("adb", PluginApiResolver.providerOf(res, "priv.shell")!!.export.level)
+        assertEquals("root", PluginApiResolver.providerOf(res, "priv.shell", "root")!!.export.level)
     }
 }

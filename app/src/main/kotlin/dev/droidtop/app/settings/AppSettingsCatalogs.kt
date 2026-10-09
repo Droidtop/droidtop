@@ -2106,7 +2106,7 @@ object AppSettingsCatalogs {
             rows += PermissionRow(id, point.label, point.lets.ifEmpty { null }, tier, PluginGrants.provideState(record, snap, entry.point))
         }
         for (export in m.v2.exports) {
-            rows += PermissionRow(PluginGrants.EXPORT_PREFIX + export.api, "Offer ${export.api} to other plugins", null, PermissionTier.NORMAL, PluginGrants.exportState(snap, export.api))
+            rows += PermissionRow(PluginGrants.EXPORT_PREFIX + export.grantKey, export.offerLabel(), null, PermissionTier.NORMAL, PluginGrants.exportState(snap, export.grantKey))
         }
         return rows.distinctBy { it.id }
     }

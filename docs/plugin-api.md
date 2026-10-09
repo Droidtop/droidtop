@@ -913,8 +913,28 @@ never disables its callers.
    core function with no provider installed, the provider present but
    the device not rooted, or the grant declined.
 2. **Only providers touch privilege.** The Shizuku provider holds the
-   Shizuku binder, and the root provider runs `su`. Every other plugin
-   reaches them only through `priv.*`/`root.*` calls with its own grant.
+   Shizuku binder; root comes only from Shizuku running as root, Sui, or a
+   Magisk-module provider (owner rule: droidtop never runs `su`). Every
+   other plugin reaches them only through `priv.*`/`root.*` calls with its
+   own grant.
+   - **Levels (built 2026-10-09, plugin-enforce-5).** A provider may export
+     the same API at two levels, `{"level":"adb"}` and `{"level":"root"}`.
+     Each export is its own grant on the provider's approval list, in plain
+     words from the op's permission ("Other plugins may: Run commands as
+     the system (adb)", "Other plugins may: Run commands as root"); the
+     root one is kept under the key `priv.shell@root`, the adb one under the
+     API's plain name. Callers declare `priv.shell.adb` or `priv.shell.root`,
+     each its own critical grant.
+   - **A root export is offered only while root is held.** The provider
+     reports what it holds right now with the host op
+     `plugins.report_level {api, level}` (`none`, `adb` or `root`, and only
+     a level it exports). droidtop keeps the last report
+     (`ProviderLevels`, kept across restarts) and offers the root export to
+     a `minLevel: "root"` caller only while it says `root`; a manifest can
+     never claim root by itself. The provider checks again before every
+     command, so a stale report only means a refused call. This is what
+     `PluginContext.hasRootApproval()` and `plugins.available` with
+     `minLevel: "root"` answer from.
 3. **Providers run in the full-trust tier.** Shizuku grants its
    permission to droidtop's UID, and root managers grant `su` per UID, so
    an isolated process can use neither (§5.3). This is the reason the
@@ -1921,8 +1941,8 @@ wording the host uses, so it is identical in every mode.
 | `plugins.export` | normal | Offer features to other plugins | §2.8 |
 | `plugins.export_privileged` | critical | Give other plugins root or system-level access | §2.7 |
 | `host.full_trust` | critical | Run with droidtop's full access | §5.3 |
-| `priv.shell.adb` | critical | Run system commands with ADB-level access (through *provider*) | F7, §2 |
-| `priv.shell.root` | critical | Run commands as root (through *provider*) | F7, §2 |
+| `priv.shell.adb` | critical | Run commands as the system (adb) | F7, §2 |
+| `priv.shell.root` | critical | Run commands as root | F7, §2 |
 | `priv.packages` | critical | Install, remove and change permissions of apps without asking (through *provider*) | F7 |
 | `priv.settings` | critical | Change protected system settings (through *provider*) | F7 |
 | `root.modules` | critical | Install and remove root modules (through *provider*) | F7 |

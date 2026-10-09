@@ -430,6 +430,11 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         }
     }
 
+    override fun reportProviderLevel(provider: PluginRecord, api: String, level: String): Boolean {
+        ProviderLevels.forContext(appContext).set(provider.manifest.id, api, level)
+        return true
+    }
+
     override fun cancelBrokeredJob(caller: PluginRecord, jobId: String): Boolean {
         val entry = PluginJobsCenter.find(jobId)?.takeIf { it.pluginId == caller.manifest.id && !it.done } ?: return false
         PluginJobsCenter.cancel(entry.jobId)

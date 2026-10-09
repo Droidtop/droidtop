@@ -16312,7 +16312,12 @@ process also checks that root is reachable before granting it, so
 2026-10-09 (plugin-enforce-4) that check is a running `priv.shell` provider
 at root level (`plugins.available`), never `su`: droidtop does not run `su`
 itself (owner rule; root only through the Shizuku/Sui or Magisk-module
-provider plugin).
+provider plugin). The Shizuku plugin is that provider (2026-10-09,
+plugin-enforce-5): while Shizuku's server runs as uid 0 (started as root,
+or Sui) it reports `root` through `plugins.report_level` and its
+`priv.shell` root export is offered, each level its own grant on the
+usual list ("Run commands as the system (adb)", "Run commands as root";
+`docs/plugin-api.md` §2.7).
 
 **Root is an opt-in, per-plugin enhancement — never a requirement, never
 standard.** droidtop's own launcher and handheld code still never needs
