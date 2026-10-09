@@ -16307,11 +16307,12 @@ threaded `PluginRecord.rootApproved` across the `loadPlugin` binder call
 the settings screen could still never see it granted. `IPluginRuntime.
 loadPlugin` now carries `rootApproved` (`NativePluginRunner.load` already
 had the whole `PluginRecord`, just never passed the one field on); the
-process also checks the device itself (`id -u` as root through the elevated
-helper, `RootProcess.accessNow`; it was `su -c id` until 2026-10-09) before granting it,
-cached for that process's lifetime, so `hasRootApproval()` finally means
-"device has root AND user approved" the way its own doc comment always
-said it did.
+process also checks that root is reachable before granting it, so
+`hasRootApproval()` means "root is available AND user approved". Since
+2026-10-09 (plugin-enforce-4) that check is a running `priv.shell` provider
+at root level (`plugins.available`), never `su`: droidtop does not run `su`
+itself (owner rule; root only through the Shizuku/Sui or Magisk-module
+provider plugin).
 
 **Root is an opt-in, per-plugin enhancement — never a requirement, never
 standard.** droidtop's own launcher and handheld code still never needs

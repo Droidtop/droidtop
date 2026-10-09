@@ -102,7 +102,18 @@ open class PluginRuntimeService : PluginProcessService() {
         private val dataDir = File(installDir, "data")
 
         override fun privateDataDir(): String = dataDir.apply { mkdirs() }.absolutePath
-        override fun hasRootApproval(): Boolean = rootApproved && deviceHasRoot
+        override fun hasRootApproval(): Boolean = rootApproved && rootProviderAvailable()
+
+        /**
+         * Whether a running provider plugin offers `priv.shell` at root level (Shizuku running as root, Sui, or a Magisk
+         * module provider), asked through the broker's `plugins.available`. droidtop itself never runs `su` (owner rule):
+         * root is reached only through such a provider, so its presence is the root check. Not cached: a provider can be
+         * started or stopped between calls.
+         */
+        private fun rootProviderAvailable(): Boolean = runCatching {
+            val reply = JSONObject(call("plugins", 1, "available", JSONObject().put("api", "priv.shell").put("minLevel", "root").toString()))
+            reply.optBoolean("ok") && reply.optJSONObject("data")?.optBoolean("available") == true
+        }.getOrDefault(false)
         override fun hasShizukuAccess(): Boolean = checkShizukuAccess(applicationContext)
     }
 
@@ -119,14 +130,6 @@ open class PluginRuntimeService : PluginProcessService() {
             context.checkSelfPermission(SHIZUKU_PERMISSION) == android.content.pm.PackageManager.PERMISSION_GRANTED
         }.getOrDefault(false)
     }
-
-    /**
-     * Whether this device has root at all, folded into [PluginContext.hasRootApproval] with the plugin's own
-     * approval: the elevated helper (Shizuku or Sui) running `id -u` as root ([dev.droidtop.runtime.RootProcess]);
-     * droidtop never runs `su` itself. Cached for the process, since a device does not gain or lose root between one
-     * call and the next.
-     */
-    private val deviceHasRoot: Boolean by lazy { dev.droidtop.runtime.RootProcess.accessNow().available }
 
     companion object {
         // The permission Shizuku's manager grants once the user pairs and approves droidtop there.

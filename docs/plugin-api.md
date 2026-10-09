@@ -2369,9 +2369,9 @@ into the v2 shape at parse time, so the host has one model internally.
 
 **The legacy shim for root and Shizuku.**
 
-- **While no root provider is installed,** a v1 plugin with
-  `rootApproved` keeps today's behaviour: `hasRootApproval()` means
-  "device has root (`su -c id`) AND the user ticked it".
+- **While no root provider is installed,** `hasRootApproval()` is false:
+  droidtop never probes with `su` (removed 2026-10-09, owner rule: root only
+  through a provider plugin).
 - **Once a `priv.shell@root` provider is installed and resolved,** the
   shim answers from the provider's status instead. v1 code keeps calling
   `su` itself (it is full-trust), and the audit log marks it "direct
