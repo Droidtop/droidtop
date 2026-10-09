@@ -238,7 +238,9 @@ private class PluginPage(
     private suspend fun load(context: Context) {
         pending?.join()
         val op = op ?: return
-        if (!stale) return
+        // A denied page asks again each time its rows are read: the person may have allowed the point on the Permissions
+        // screen it links to and come back with B, and a refused call never reaches the plugin (docs/plugin-api.md 4.3).
+        if (!stale && !denied) return
         val reply = PluginViews.call(context, record, point, op, PluginViewCall.args(args, values, hostContext))
         stale = false
         denied = !reply.ok && reply.code == PluginErrorCode.PERMISSION_DENIED

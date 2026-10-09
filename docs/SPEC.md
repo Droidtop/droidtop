@@ -17247,7 +17247,8 @@ of what is built. The decisions, briefly:
     ticked subset: a point that is not granted is never called, a denied
     host API returns `PERMISSION_DENIED` to the plugin, and a plugin view for
     a denied point is the standard error state saying it was not allowed,
-    with a row to its Permissions screen. The choices stay editable on the
+    with a row to its Permissions screen; the page asks again whenever its rows
+    are read, so allowing the point there and pressing B shows the page. The choices stay editable on the
     plugin's Permissions screen, and an update asks only about the items it
     added, on the same list. The plugin detail page's "What it provides"
     summary reflects the currently granted extension points (or the current
