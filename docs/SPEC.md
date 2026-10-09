@@ -14486,6 +14486,12 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
     open; the code works once, and three wrong codes end the attempt;
   - neither a desktop PC nor the Retroid Pocket 5 has a camera, so the QR
     code is for a laptop webcam or a phone acting for the computer.
+  - the other way round, for a device the computer cannot reach (an
+    emulator, a guest network): `droidtop-agent pair` with nothing after it
+    shows the computer's addresses and a code (it listens on TCP 47612), and
+    "Use a code from the computer" on the same screen takes them and
+    connects (`pair_connect`); the computer is then kept at that address on
+    the agent's port 47610.
 - **No resident process.** droidtop reaches a computer only:
   - before a game starts and after it ends;
   - when the person presses "Sync the library now";
