@@ -347,6 +347,23 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!--
+          The companion on a device with one screen: a pull-down sheet over Standard's home
+          screen or a tray panel over Desktop's taskbar (CompanionSheet). Translucent, its
+          own task. Not exported.
+        -->
+        <activity
+            android:name="dev.droidtop.app.CompanionSheetActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="dev.droidtop.app.action.COMPANION_SHEET" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name="dev.droidtop.app.UiModePasskeyActivity"
             android:exported="false"

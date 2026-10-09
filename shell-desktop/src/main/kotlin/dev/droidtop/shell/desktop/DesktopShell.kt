@@ -632,6 +632,7 @@ private fun BoxScope.Taskbar(
                 Text("Settings")
             }
             PluginTaskbarItems()
+            CompanionTaskbarItem()
             ClipboardNotice()
             SystemTray(onClick = onOpenQuickMenu)
             Text(
@@ -1103,6 +1104,22 @@ internal fun openSettings(context: Context) {
 
 private fun formatClock(): String =
     SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
+
+/**
+ * "Companion" on the taskbar while the device has one screen (docs/SPEC.md "The companion's tabs", One screen): the
+ * companion's tabs as a tray panel over the taskbar. With a second screen the companion is there instead.
+ */
+@Composable
+private fun CompanionTaskbarItem() {
+    val context = LocalContext.current
+    var offered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        offered = withContext(Dispatchers.IO) { dev.droidtop.runtime.CompanionSheet.offered(context) }
+    }
+    if (offered) {
+        TaskbarButton(onClick = { dev.droidtop.runtime.CompanionSheet.open(context, true) }) { Text("Companion") }
+    }
+}
 
 /** How often the taskbar checks again whether any plugin has a panel for Desktop; also when the bar is first drawn. */
 private const val PLUGINS_RECHECK_MS = 60_000L

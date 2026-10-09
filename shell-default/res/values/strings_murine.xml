@@ -95,6 +95,9 @@
     <string name="gesture_action_open_recents">Open recent apps</string>
     <string name="gesture_action_open_recents_summary">Opens the list of recent apps</string>
     <string name="gesture_action_clear_all_apps">Close all apps</string>
+    <string name="gesture_action_open_companion">Companion</string>
+    <string name="gesture_action_open_companion_summary">Pulls down droidtop\'s companion: pinned controls, notifications, apps and more</string>
+    <string name="droidtop_companion_option">Companion</string>
     <string name="gesture_action_clear_all_apps_summary">Ends every open app except droidtop, after asking when there are several</string>
 
     <!-- Murine search bar -->

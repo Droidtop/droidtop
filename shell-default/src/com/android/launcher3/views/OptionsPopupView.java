@@ -229,6 +229,18 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
                     v.getContext().startActivity(games);
                     return true;
                 }));
+        // droidtop patch: the companion as a pull-down sheet, while the device has no second
+        // screen to hold it (docs/SPEC.md "The companion's tabs", One screen).
+        if (dev.droidtop.runtime.CompanionSheet.offered(launcher)) {
+            options.add(new OptionItem(launcher,
+                    R.string.droidtop_companion_option,
+                    R.drawable.ic_widget,
+                    IGNORE,
+                    v -> {
+                        dev.droidtop.runtime.CompanionSheet.open(v.getContext(), false);
+                        return true;
+                    }));
+        }
         // droidtop patch: plugins on the Android home screen (docs/plugin-api.md 1.9): their
         // panels ("Plugins") and their launcher.actions, answered from memory by droidtop.
         for (dev.droidtop.library.settings.PluginShellHooks.MenuEntry entry

@@ -3550,6 +3550,13 @@ row of recent apps, became Home's Recent apps section for every mode.
   natural scrolling on; scroll momentum and drag lock off. Connected controllers show with their batteries
   (`InputDevice.getBatteryState`, Android 12 and later), and Home's status line names the one in hand ("Pad 80%")
   when exactly one reports a battery.
+- **One screen (slice C13, owner question 2's default).** A device with no second screen gets the same
+  `CompanionTabs` in `CompanionSheetActivity`: a pull-down sheet from the top over Standard's home screen, opened
+  from the home screen's menu ("Companion", offered only while Android lists one display, `CompanionSheet.offered`)
+  or by the launcher's swipe-down slot set to Companion (`GestureAction.OPEN_COMPANION`; the slot's default stays
+  Android's notifications), and a tray panel at the bottom right over Desktop's taskbar ("Companion" on the taskbar,
+  on one screen only). A tap outside, Back, or a pull up on the sheet's handle closes it. A first-run tip says how to
+  open it again, until dismissed.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 

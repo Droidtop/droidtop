@@ -40,6 +40,8 @@ data class CompanionSettings(
     val handleEdge: String = CompanionPrefs.HANDLE_BOTTOM,
     /** The screen Input types to when the person pinned one (its unique id), else null: the mode's own target. */
     val inputPin: String? = null,
+    /** The one-screen sheet's first-run tip was dismissed (slice C13). */
+    val sheetTipSeen: Boolean = false,
 ) {
     /** The two ask-first rules as [GameControls] takes them. */
     val ask: AskFirst get() = AskFirst(askBeforeStopping, askBeforeLoad)
@@ -81,6 +83,7 @@ object CompanionPrefs {
     private const val KEY_PIP = "pip_to_companion"
     private const val KEY_HANDLE = "input_handle_edge"
     private const val KEY_INPUT_PIN = "input_pin"
+    private const val KEY_SHEET_TIP = "sheet_tip_seen"
     private const val TP = "trackpad_"
 
     const val HANDLE_BOTTOM = "bottom"
@@ -167,7 +170,13 @@ object CompanionPrefs {
         },
         handleEdge = (all[KEY_HANDLE] as? String)?.takeIf { it == HANDLE_TOP } ?: HANDLE_BOTTOM,
         inputPin = (all[KEY_INPUT_PIN] as? String)?.takeIf { it.isNotBlank() },
+        sheetTipSeen = all[KEY_SHEET_TIP] as? Boolean ?: false,
     )
+
+    fun setSheetTipSeen(context: Context) {
+        update { it.copy(sheetTipSeen = true) }
+        prefs(context).edit().putBoolean(KEY_SHEET_TIP, true).apply()
+    }
 
     /** The trackpad's settings after [change], kept and stored. */
     fun setTrackpad(context: Context, change: (TrackpadSettings) -> TrackpadSettings) {
