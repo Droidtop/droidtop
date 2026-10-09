@@ -2701,7 +2701,7 @@ a close path of its own. Every call works off the main thread.
   (audio hand-off, display cover, ledger). For an open app that resumes its task; whether Android also
   moves the task to the other display is Android's decision, so the UI says "asked", not "moved". There
   is no shell-side `move-task` fallback.
-- **The Quick Menu's Running apps section and the companion Tasks tab share one vertical list** (`SharedRunningAppsList`): one row per running app (icon, name, screen, Close, and Move when another screen exists; a tap on the row switches to the app), with Clear all at the top. Rows use the source's most-recent-first order and one row height. The companion is touch-only and takes no controller focus; the Quick Menu keeps pad navigation, with A switching, X closing and Y asking for the other screen. Both surfaces use the same task actions and touch buttons.
+- **The Quick Menu's Running apps section and the companion Tasks tab share one vertical list** (`SharedRunningAppsList`): one row per running app (icon, name, screen, Close, and Move when another screen exists; a tap on the row switches to the app), with Clear all at the top. With nothing running the list is the one line "Nothing running" (or "Nothing seen (limited list)" when the system gave only a partial list), with no Clear all row, in the Quick Menu as on the companion (Droidtop/tracker#367). Rows use the source's most-recent-first order and one row height. The companion is touch-only and takes no controller focus; the Quick Menu keeps pad navigation, with A switching, X closing and Y asking for the other screen. Both surfaces use the same task actions and touch buttons.
 - **Clear all apps: one action, four surfaces** (tracker#252). `TaskManager.clearAllTargets` reads the
   list fresh and applies `TaskPolicy.clearAllTargets`; `TaskManager.clearAll` closes each target by the
   one close path and returns a `ClearAllSummary` whose sentence says how many were closed, how many
@@ -11542,6 +11542,14 @@ environment?") before the download or reinstall starts; the game page's
 primary button shows Installing N% (not pressable while it runs) or the failure
 reason under it. A failure is kept across restarts until the next attempt
 starts; a second ask during an install waits for the first, never runs two.
+
+The same row (`windowsSetupItem`, with a tooltip saying what it downloads, that it asks first and that it uses the
+game folders already added) is the first row of a game's Wine and graphics page while there is no environment, so
+the page is never a dead end (Droidtop/tracker#372), and Wine builds and sources, which need no environment, are
+offered there and on Settings > Library > Windows games before setup. The Wine build, emulation and graphics
+choices themselves are rows of an environment and appear once it exists. The runner reason for a Windows game
+without an environment is "The Windows environment is not set up yet", never the action's own name
+(Droidtop/tracker#367).
 
 **Root never gates a Gaming game.** Native Linux inside a container
 needs root today and is therefore "not on this device" on an unrooted

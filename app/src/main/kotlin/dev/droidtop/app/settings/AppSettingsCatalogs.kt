@@ -1227,25 +1227,22 @@ object AppSettingsCatalogs {
                     // The row says where setup is (its value) and asks once before
                     // the long download or reinstall starts (Droidtop/tracker#299);
                     // the same WindowsSetup path launch and the game page use.
-                    add(
-                        AsyncActionItem(
-                            id = "windows_provision",
-                            title = if (provisioned) "Reinstall the Windows environment" else "Set up Windows games",
-                            value = dev.droidtop.library.WindowsSetup.label(setupState),
-                            confirmTitle = if (provisioned) "Reinstall the Windows environment?" else "Download Windows system files?",
-                            run = { ctx, onStatus ->
-                                val result = dev.droidtop.library.WindowsSetup.provision(ctx, onStatus)
-                                if (result.succeeded) result.detail else "Failed: ${result.detail}"
-                            },
-                        ),
-                    )
+                    add(windowsSetupItem(provisioned, setupState))
                 },
             ),
         ) + (
             // The shared environment's Wine build, emulation, graphics
             // driver and Direct3D: the default every game without settings
             // of its own runs with (docs/SPEC.md 5a).
-            if (wineOptions && runtime != null && provisioned) WineOptionsCatalog.groups(context, entryId = null, title = null) else emptyList()
+            // Before setup the build and source choices are not rows of the environment, but the sources
+            // need none, so they are offered (Droidtop/tracker#372).
+            if (wineOptions && runtime != null && provisioned) {
+                WineOptionsCatalog.groups(context, entryId = null, title = null)
+            } else if (wineOptions && runtime != null) {
+                listOf(CatalogGroup(id = "windows_sources_before_setup", title = null, items = listOf(sourcesBeforeSetupItem())))
+            } else {
+                emptyList()
+            }
         ) + listOf(
             CatalogGroup(
                 id = "windows_drives",

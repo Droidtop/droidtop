@@ -1,7 +1,10 @@
 package dev.droidtop.app.settings
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dev.droidtop.library.WindowsPrograms
+import dev.droidtop.library.WindowsSetup
 import dev.droidtop.library.WineSettingsScreen
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -55,12 +58,11 @@ object WineOptionsCatalog {
                 id = "wine_options_none",
                 title = null,
                 items = listOf(
-                    ActionItem(
-                        id = "wine_options_not_set_up",
-                        title = "No Windows environment yet",
-                        subtitle = "Run Set up Windows games first; these settings belong to the environment it makes",
-                        run = {},
-                    ),
+                    // The page is a dead end without a way to the one step that makes it (Droidtop/tracker#372):
+                    // the same row Settings > Library > Windows games has, asking first, and the Wine builds
+                    // and sources, which do not need the environment, so a build can be chosen before the first download.
+                    windowsSetupItem(provisioned = false, state = withContext(Dispatchers.IO) { WindowsSetup.current(context) }),
+                    sourcesBeforeSetupItem(),
                 ),
             ),
         )
@@ -203,3 +205,30 @@ object WineOptionsCatalog {
         )
     }
 }
+
+/**
+ * The one "Set up Windows games" row (or "Reinstall" once it exists): Settings > Library > Windows games and
+ * the Wine and graphics page before setup both draw it, with the state in the value column and a question
+ * before the long download starts (Droidtop/tracker#299, #367, #372). The same [WindowsSetup.provision] path
+ * launch and the game page use.
+ */
+internal fun windowsSetupItem(provisioned: Boolean, state: WindowsSetup.State): AsyncActionItem = AsyncActionItem(
+    id = "windows_provision",
+    title = if (provisioned) "Reinstall the Windows environment" else "Set up Windows games",
+    subtitle = "Downloads the Wine build, graphics driver and Windows system files, then makes the one Windows environment " +
+        "every Windows game runs in. Asks first; uses the game folders you have added.",
+    value = WindowsSetup.label(state),
+    confirmTitle = if (provisioned) "Reinstall the Windows environment?" else "Download Windows system files?",
+    run = { ctx, onStatus ->
+        val result = WindowsSetup.provision(ctx, onStatus)
+        if (result.succeeded) result.detail else "Failed: ${result.detail}"
+    },
+)
+
+/** The Wine builds and sources screen, which needs no environment, for the pages that are otherwise empty before setup. */
+internal fun sourcesBeforeSetupItem(): NestedScreenItem = NestedScreenItem(
+    id = "wine_component_sources",
+    title = "Wine builds and sources",
+    subtitle = "Add any Wine build by link or file, and choose which sources are offered, before Windows games are set up",
+    inline = ComponentSourcesCatalog.screen(),
+)
