@@ -73,6 +73,10 @@ class GameTitleParserTest {
         Row("Love Of MagicBook", "Love Of MagicBook"),
         // A version written onto the title with no separator is still the version.
         Row("SevenDayWYandereGirlV0.80", "Seven Day W Yandere Girl", version = "0.80"),
+        // A single capital that starts a word stays its own word: the capital run ends one letter early.
+        Row("SomeDayWThingGirl", "Some Day W Thing Girl"),
+        Row("AWonderfulDay", "A Wonderful Day"),
+        Row("NekoParadise", "Neko Paradise"),
         // A short name that is a game's whole title keeps it: the version is cut, not the name.
         Row("REC_v0.4.3.5", "REC", version = "0.4.3.5"),
         Row("RTS_0.032_WIN2", "RTS", version = "0.032"),

@@ -15336,7 +15336,13 @@ are `REC` and `RTS` (a build-stage folder under a titled game still takes
 the game's title, `isReleaseTagFolder`). The grid's name line under the
 focused game is the theme's `name` field, `LibraryEntry.title`, so it is
 the parsed title too; what read as raw names there were names the parser
-had no rule for.
+had no rule for. A single capital that starts a word stays its own word
+(`SomeDayWThingGirl` is `Some Day W Thing Girl`, `AWonderfulDay` is
+`A Wonderful Day`); a split that guesses dictionary words is not attempted. A
+change to these rules raises `GameTitleParser.RULES_VERSION`, which the PC
+walk's stamp holds, so the next slow pass walks every folder again: titles are
+stored at the source, and a folder whose mtime did not move was never
+re-titled (rig, build 1715).
 
 **Entry titles are the parsed title at the source (Droidtop/tracker#174,
 #282).** Every provider stores `LibraryEntry.title` already parsed, so every

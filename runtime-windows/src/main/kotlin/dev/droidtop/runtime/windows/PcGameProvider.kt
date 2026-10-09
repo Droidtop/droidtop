@@ -159,7 +159,8 @@ class PcGameProvider(
         // Which rows a store lists is a rule in code (games only, no DLC): a
         // change to it moves the stamp, so rows an older rule listed leave
         // the index on the next slow pass without a rescan.
-        var stamp = 17L * 31 + STORE_LIST_RULES
+        // The same for the title rules: a parser change re-titles every folder, not only the ones that changed on disk.
+        var stamp = (17L * 31 + STORE_LIST_RULES) * 31 + dev.droidtop.library.GameTitleParser.RULES_VERSION
         for (root in roots) stamp = 31 * stamp + root.hashCode()
         for (path in paths) {
             // Inside a root is the folder walk's part, and its stamp.

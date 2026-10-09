@@ -168,6 +168,15 @@ data class ParsedTitle(
  */
 object GameTitleParser {
 
+    /**
+     * Raise it when a rule here or in [GameNaming] changes what a folder name reads as. The PC walk's stamp holds it
+     * (PcGameProvider.storeStamp), so the next slow pass walks every folder again instead of skipping those whose
+     * mtime did not move, and the titles already in the index are made again by the new rules. Without it a parser
+     * fix reached only folders that changed on disk (rig, build 1715: a run-together name stayed unsplit after
+     * the run-together rule landed, Droidtop/tracker#282).
+     */
+    const val RULES_VERSION = 2L
+
     private val BRACKET = Regex("""[\[({]([^\[\]{}()]*)[\])}]""")
     private val SHORT_NUMBER = Regex("""\d{1,3}""")
     private val YEAR = Regex("""(?:19|20)\d\d""")
