@@ -9,6 +9,7 @@ import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
+import dev.droidtop.library.stores.StoreSyncs
 import dev.droidtop.library.stores.StoreUpdateCheck
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.db.StoresDatabase
@@ -62,7 +63,7 @@ class AmazonStore : StoreLibrary {
 
     override suspend fun completeSignIn(context: Context, secret: String): Result<String?> {
         AmazonAuthManager.authenticateWithCode(context, secret).getOrElse { return Result.failure(it) }
-        sync(context).onFailure { Timber.tag(TAG).w(it, "First Amazon library read failed") }
+        StoreSyncs.run(context, this).onFailure { Timber.tag(TAG).w(it, "First Amazon library read failed") }
         // Amazon's sign-in names no account.
         return Result.success(null)
     }

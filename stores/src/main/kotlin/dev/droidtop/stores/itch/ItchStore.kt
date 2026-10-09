@@ -8,6 +8,7 @@ import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
+import dev.droidtop.library.stores.StoreSyncs
 import dev.droidtop.library.stores.StoreUpdateCheck
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.data.ItchGame
@@ -46,7 +47,7 @@ class ItchStore : StoreLibrary {
     override suspend fun completeSignIn(context: Context, secret: String): Result<String?> {
         val username = ItchAuthManager.signIn(context, secret).getOrElse { return Result.failure(it) }
         // Signed in either way; a library that failed to read says so on the next sync.
-        sync(context).onFailure { Timber.tag(TAG).w(it, "First itch.io library read failed") }
+        StoreSyncs.run(context, this).onFailure { Timber.tag(TAG).w(it, "First itch.io library read failed") }
         return Result.success(username)
     }
 

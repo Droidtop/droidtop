@@ -4,6 +4,7 @@ import android.content.Context
 import dev.droidtop.library.stores.AccountSignInStep
 import dev.droidtop.library.stores.StoreAccountSignIn
 import dev.droidtop.library.stores.StoreChanges
+import dev.droidtop.library.stores.StoreSyncs
 import `in`.dragonbra.javasteam.enums.EOSType
 import `in`.dragonbra.javasteam.enums.EResult
 import `in`.dragonbra.javasteam.steam.authentication.AuthPollResult
@@ -153,7 +154,7 @@ internal class SteamSignIn(context: Context, private val store: SteamStore) : St
         SteamConnection.refresh(app)
         // The library is read after the screen has said so; it may take a while.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            store.sync(app)
+            StoreSyncs.run(app, store)
                 .onSuccess { StoreChanges.announce(app) }
                 .onFailure { Timber.tag(TAG).w(it, "First Steam library read failed") }
         }

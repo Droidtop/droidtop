@@ -13103,7 +13103,7 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   Epic, Amazon Games, itch.io) with its account (signed in, as whom where
   the store keeps that in the open, sign in or out), its library (how many
   games the library has read from it and how many are installed, a way into
-  it, a sync and when droidtop last asked for one) and a way to the
+  it, a sync and when it was last read) and a way to the
   downloads. `PcStore` is the one place that knows how each store signs in,
   signs out, syncs and says whether it is signed in; the checks that were
   written out three times in the accounts screen are gone, and **Accounts
@@ -13117,13 +13117,20 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   tab's Store filter to that store and opens the tab (`PcGamesState.showStore`),
   so a store is a filter on the one library and not a second place to
   browse. **Sync library** reads the store in place and says how
-  many games it holds (`StoreLibrary.sync`, Droidtop/tracker#225), Steam's
-  included: the library is read when asked, after a sign-in and before an
-  install. A store adds its own rows to its page (`StoreLibrary.settingsItems`):
+  many games it holds, Steam's included, and **Sync all libraries** (on the
+  Stores page itself, once any store is signed in) does that for every
+  signed-in store one after the other. Both, and the read a sign-in ends with,
+  go through the one `StoreSyncs.run` (`:library-core`, Droidtop/tracker#225)
+  around `StoreLibrary.sync`: the library is read when asked and after a
+  sign-in, not on a timer: a background loop against five stores' servers
+  was not asked for (a worker's 30-minute loop was bounced for that), so an
+  automatic periodic read is open until the owner says so.
+  A store adds its own rows to its page (`StoreLibrary.settingsItems`):
   Steam's status (Online, Invisible, Offline), cloud saves and message
   notifications. The "last synced"
-  time is droidtop's own note of when it asked, absent until the first sync
-  from here. The store names are written once
+  time is recorded by `StoreSyncs` when a read worked (a failed read records
+  nothing), so it survives a restart and covers the sign-in's own read; it is
+  absent until the first successful read ("Not synced yet"). The store names are written once
   (`PcStoreNames`), for the code that makes them and the code that filters
   by them. Per-store settings do not exist yet: nothing in the backend is
   configurable per store, and no row is shown for it.

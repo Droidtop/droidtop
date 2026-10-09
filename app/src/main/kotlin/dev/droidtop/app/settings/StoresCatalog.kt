@@ -23,6 +23,7 @@ import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
+import dev.droidtop.library.stores.StoreSyncs
 import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.runtime.windows.PcLibrary
 import dev.droidtop.pluginhost.PluginJobsCenter
@@ -91,35 +92,35 @@ internal enum class PcStore(val key: String, val label: String, val source: PcLi
     }
 
     /**
-     * Asks the store to re-read its library (docs/SPEC.md 7i, Droidtop/tracker#225) and says
-     * how many games it holds. The time is droidtop's own note of when it asked. Returns the
-     * outcome line.
+     * Reads the store's library again through the one sync every store has
+     * ([StoreSyncs], docs/SPEC.md 7g and 7j, Droidtop/tracker#225) and says
+     * how many games it holds, or why it could not. Returns the outcome line.
      */
     suspend fun requestSync(context: Context): String {
         val own = own ?: return "This build has no $label store"
-        return withContext(Dispatchers.IO) {
-            val line = own.sync(context).fold(
-                onSuccess = { count ->
-                    StoreChanges.announce(context)
-                    "$count ${if (count == 1) "game" else "games"}"
-                },
-                onFailure = { exc ->
-                    Log.w("droidtop.stores", "Sync failed for $label", exc)
-                    return@withContext userFacingErrorMessage(exc)
-                },
-            )
-            context.getSharedPreferences(SYNC_PREFS, Context.MODE_PRIVATE).edit().putLong(key, System.currentTimeMillis()).apply()
-            line
-        }
+        return StoreSyncs.run(context, own).fold(
+            onSuccess = { count ->
+                StoreChanges.announce(context)
+                "$count ${if (count == 1) "game" else "games"}"
+            },
+            onFailure = { exc ->
+                Log.w("droidtop.stores", "Sync failed for $label", exc)
+                userFacingErrorMessage(exc)
+            },
+        )
     }
 
-    /** When droidtop last asked this store to sync, or null. */
-    fun lastSyncRequested(context: Context): Long? =
-        context.getSharedPreferences(SYNC_PREFS, Context.MODE_PRIVATE).getLong(key, 0L).takeIf { it > 0 }
+    /** When this store's library was last read, or null. */
+    fun lastSynced(context: Context): Long? = StoreSyncs.lastSynced(context, key)
+}
 
-    private companion object {
-        const val SYNC_PREFS = "store_library_sync"
-    }
+/** Reads every signed-in store's library again, one after the other; one line naming each store's outcome. */
+internal suspend fun syncAllStores(context: Context): String {
+    val signedIn = withContext(Dispatchers.IO) { PcStore.entries.filter { it.signedIn(context) } }
+    if (signedIn.isEmpty()) return "No store is signed in"
+    val lines = mutableListOf<String>()
+    for (store in signedIn) lines += "${store.label}: ${store.requestSync(context)}"
+    return lines.joinToString(". ")
 }
 
 /** One store's games as the library has them. */
@@ -144,9 +145,9 @@ internal fun countsLine(counts: StoreCounts, signedIn: Boolean): String = when {
     else -> "Sign in to read this store's library"
 }
 
-/** "Synced 5 min ago": when droidtop last asked for a sync, in the coarsest unit that is honest. */
+/** "Synced 5 min ago": when the library was last read, in the coarsest unit that is honest. */
 internal fun syncedAgo(nowMs: Long, thenMs: Long?): String {
-    if (thenMs == null) return "Not synced from here yet"
+    if (thenMs == null) return "Not synced yet"
     val minutes = (nowMs - thenMs).coerceAtLeast(0L) / 60_000L
     val days = minutes / (60 * 24)
     return when {
@@ -205,7 +206,8 @@ internal object StoresCatalog {
     private suspend fun rootGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val signedInByStore = PcStore.entries.associateWith { it.signedIn(context) }
         val installing = PcStore.entries.sumOf { store -> storeJobs(store).count { !it.paused } }
-        listOf(
+        val anySignedIn = signedInByStore.values.any { it }
+        listOfNotNull(
             CatalogGroup(
                 id = "stores_list",
                 title = null,
@@ -229,6 +231,18 @@ internal object StoresCatalog {
                     )
                 },
             ),
+            CatalogGroup(
+                id = "stores_sync_group",
+                title = null,
+                items = listOf(
+                    AsyncActionItem(
+                        id = "stores_sync_all",
+                        title = "Sync all libraries",
+                        subtitle = "Re-reads every signed-in store for games added since the last read",
+                        run = { ctx, _ -> syncAllStores(ctx) },
+                    ),
+                ),
+            ).takeIf { anySignedIn },
         )
     }
 

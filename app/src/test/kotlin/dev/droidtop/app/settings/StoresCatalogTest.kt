@@ -46,7 +46,7 @@ class StoresCatalogTest {
     fun `the synced line uses the coarsest honest unit`() {
         val now = 10_000_000_000L
         val minute = 60_000L
-        assertEquals("Not synced from here yet", syncedAgo(now, null))
+        assertEquals("Not synced yet", syncedAgo(now, null))
         assertEquals("Synced just now", syncedAgo(now, now - 30_000L))
         assertEquals("Synced 5 min ago", syncedAgo(now, now - 5 * minute))
         assertEquals("Synced 3 h ago", syncedAgo(now, now - 3 * 60 * minute))
