@@ -261,6 +261,14 @@ object DroidtopWideSettings {
                             onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_TASKBAR_TOP, on).apply() },
                         ),
                         desktopScaleChoice(context),
+                        ToggleItem(
+                            id = "pref_desktop_keep_running",
+                            title = "Keep the desktop running in the background",
+                            subtitle = "Open windows survive a switch to another mode. Costs memory, battery and the desktop's " +
+                                "audio stream while you are elsewhere; Stop in its notification ends it",
+                            current = dev.droidtop.app.DesktopSetupPrefs.keepRunning(context),
+                            onToggle = { ctx, on -> dev.droidtop.app.DesktopSetupPrefs.setKeepRunning(ctx, on) },
+                        ),
                         ChoiceItem(
                             id = "pref_desktop_panel",
                             title = "Desktop panel",

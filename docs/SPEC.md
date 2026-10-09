@@ -1694,7 +1694,12 @@ page (§3d), never from a boot receiver.
 **The session is Desktop mode's, and it ends with it (decided
 2026-09-25).** It ends when the shell leaves Desktop for Gaming
 (`MainActivity` switching mode; pressing Home into another launcher does
-not end it), when Desktop mode is switched off (`ModePiece.DESKTOP_SESSION`,
+not end it; and not when Desktop settings' "Keep the desktop running in the
+background" is on, off by default, decided 2026-10-09 for
+Droidtop/tracker#389: the session's foreground service and notification
+stay, the viewport's surface is gone so no frames are captured, and the
+compositor, its programs and the audio bridge's open output keep their
+memory and battery cost, which the row says), when Desktop mode is switched off (`ModePiece.DESKTOP_SESSION`,
 through `ModeStartup`), when the PRIMARY is stopped in Containers, and
 from the notification's Stop. Ending it stops the PRIMARY with everything
 on the desktop, including a primary still booting (the service tracks

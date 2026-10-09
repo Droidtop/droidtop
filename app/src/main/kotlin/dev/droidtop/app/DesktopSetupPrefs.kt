@@ -20,6 +20,20 @@ object DesktopSetupPrefs {
     private const val KEY_MICROPHONE = "droidtop_desktop_microphone"
     private const val KEY_ALL_LANGUAGE_FONTS = "droidtop_desktop_all_language_fonts"
     private const val KEY_PANEL = "droidtop_desktop_panel"
+    private const val KEY_KEEP_RUNNING = "droidtop_desktop_keep_running"
+
+    /**
+     * Whether leaving Desktop for another mode keeps the desktop running in
+     * the background (Droidtop/tracker#389). Off by default: a desktop
+     * nobody sees still holds its memory, its processes and the audio
+     * bridge's open output.
+     */
+    fun keepRunning(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_KEEP_RUNNING, false)
+
+    fun setKeepRunning(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_KEEP_RUNNING, on).apply()
+    }
 
     /** The panel and launcher the sway desktop starts (dev.droidtop.runtime.DesktopPanel, Droidtop/tracker#353). */
     fun panel(context: Context): dev.droidtop.runtime.DesktopPanel =
