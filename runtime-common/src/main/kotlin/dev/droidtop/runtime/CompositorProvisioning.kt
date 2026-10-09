@@ -82,6 +82,29 @@ object CompositorProvisioning {
      */
     const val ICON_THEME_PACKAGE = "adwaita-icon-theme"
 
+    /**
+     * sway's wallpaper program. The stock sway config sets a background,
+     * which sway draws by running `swaybg`; without the package the desktop
+     * stayed black and sway logged "failed to execute 'swaybg'" (rig
+     * emulator-5560, 2026-10-09). Same name in both distros.
+     */
+    const val SWAY_BACKGROUND_PACKAGE = "swaybg"
+
+    /** D-Bus, for the desktop's session bus ([SESSION_BUS_DAEMON]). Same name in both distros. */
+    const val SESSION_BUS_PACKAGE = "dbus"
+
+    /**
+     * The desktop's session bus, a daemon beside the compositor, listening
+     * in the shared socket directory ([ContainerLayout.SESSION_BUS_SOCKET];
+     * clients find it through `DBUS_SESSION_BUS_ADDRESS`,
+     * [ContainerLayout.clientEnvironment]). Waybar's tray and GTK programs
+     * need one; with none, GLib tried to autolaunch one, needs a machine id
+     * for that, and Waybar never started ("Cannot spawn a message bus
+     * without a machine-id", rig emulator-5560, 2026-10-09).
+     */
+    const val SESSION_BUS_DAEMON =
+        "dbus-daemon --session --nofork --nopidfile --address=unix:path=${ContainerLayout.SOCKET_DIR}/${ContainerLayout.SESSION_BUS_SOCKET}"
+
     /** CUPS's own package name, the same in both distros droidtop provisions. */
     const val PRINTING_PACKAGE = "cups"
 
@@ -148,20 +171,24 @@ object CompositorProvisioning {
     private fun basePlan(os: String, desktopEnvironment: String): PrimaryProvisioning? {
         // xkbcommon's command-line tool compiles the physical keyboard's layout (KeyboardLayouts, docs/SPEC.md 6b).
         val xkbcli = KeyboardLayouts.CLI_PACKAGES[os].orEmpty()
-        val terminal = "${ContainerTerminal.PACKAGE} $FILE_MANAGER_PACKAGE $ICON_THEME_PACKAGE $xkbcli".trimEnd()
+        val terminal = "${ContainerTerminal.PACKAGE} $FILE_MANAGER_PACKAGE $ICON_THEME_PACKAGE $xkbcli $SESSION_BUS_PACKAGE".trimEnd()
+        val bus = listOf(SESSION_BUS_DAEMON)
         return when (os to desktopEnvironment) {
             "debian" to "sway" -> PrimaryProvisioning(
                 installCommand = "$DEBIAN_NO_SERVICE_STARTS && export DEBIAN_FRONTEND=noninteractive && " +
-                    "apt-get update && apt-get install -y --no-install-recommends sway xwayland fonts-dejavu-core $terminal",
+                    "apt-get update && apt-get install -y --no-install-recommends sway $SWAY_BACKGROUND_PACKAGE xwayland fonts-dejavu-core $terminal",
                 compositorCommand = "sway",
+                daemons = bus,
             )
             "alpine" to "sway" -> PrimaryProvisioning(
-                installCommand = "apk add --no-cache sway xwayland font-dejavu $terminal",
+                installCommand = "apk add --no-cache sway $SWAY_BACKGROUND_PACKAGE xwayland font-dejavu $terminal",
                 compositorCommand = "sway",
+                daemons = bus,
             )
             "alpine" to "labwc" -> PrimaryProvisioning(
                 installCommand = "apk add --no-cache labwc font-dejavu $terminal",
                 compositorCommand = "labwc",
+                daemons = bus,
             )
             else -> null
         }

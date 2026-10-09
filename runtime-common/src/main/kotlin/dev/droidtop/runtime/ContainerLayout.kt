@@ -54,6 +54,21 @@ object ContainerLayout {
      */
     const val AUDIO_SOCKET = "audio.sock"
 
+    /**
+     * The desktop's D-Bus session bus, under [SOCKET_DIR], served by the
+     * primary's [CompositorProvisioning.SESSION_BUS_DAEMON] for every
+     * container (`DBUS_SESSION_BUS_ADDRESS`, [clientEnvironment]).
+     */
+    const val SESSION_BUS_SOCKET = "bus"
+
+    /**
+     * Written once per container, at its first boot: a stock image ships no
+     * machine id, and D-Bus and the programs that use it refuse to work
+     * without one (rig emulator-5560, 2026-10-09). 32 hex digits from the
+     * kernel's random UUID, the format machine-id(5) defines.
+     */
+    const val MACHINE_ID = "/etc/machine-id"
+
     /** Where the app's private storage root (`Context.getFilesDir()`) appears inside every container. */
     const val APP_STORAGE_DIR = "/run/droidtop-app-storage"
 
@@ -139,6 +154,9 @@ object ContainerLayout {
         put("XDG_RUNTIME_DIR", SOCKET_DIR)
         put("TZ", posixTimeZone(ZoneId.systemDefault()))
         put("XDG_DATA_DIRS", "/usr/local/share:/usr/share:${ContainerLauncher.DATA_DIR}")
+        // The primary's session bus. Until it is up (or with none), a program finds nothing listening there,
+        // the same as a desktop with no bus, and no longer tries to autolaunch one of its own.
+        put("DBUS_SESSION_BUS_ADDRESS", "unix:path=$SOCKET_DIR/$SESSION_BUS_SOCKET")
         // CUPS clients take a socket path here. With printing off nothing
         // listens there, which to a program is the same as no CUPS.
         put("CUPS_SERVER", "$SOCKET_DIR/$CUPS_SOCKET")
@@ -204,6 +222,7 @@ object ContainerLayout {
         appendLine("fi")
         appendLine("mkdir -p $SOCKET_DIR")
         appendLine("chmod 700 $SOCKET_DIR")
+        appendLine("[ -s $MACHINE_ID ] || tr -d '-' < /proc/sys/kernel/random/uuid > $MACHINE_ID")
         compositorEnvironment.forEach { (key, value) -> appendLine("export $key=$value") }
         // A daemon never holds up the desktop. Each runs in the foreground
         // of a background job, its output in its own log, and a watcher

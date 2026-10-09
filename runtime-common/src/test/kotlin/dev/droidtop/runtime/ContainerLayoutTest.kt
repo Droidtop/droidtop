@@ -61,6 +61,13 @@ class ContainerLayoutTest {
     }
 
     @Test
+    fun `every container gets a machine id once, and clients the shared session bus`() {
+        val script = ContainerLayout.primaryInitScript(CompositorProvisioning.plan("alpine", "sway")!!)
+        assertTrue(script.lines().contains("[ -s /etc/machine-id ] || tr -d '-' < /proc/sys/kernel/random/uuid > /etc/machine-id"))
+        assertEquals("unix:path=/run/droidtop-sockets/bus", ContainerLayout.clientEnvironment(null)["DBUS_SESSION_BUS_ADDRESS"])
+    }
+
+    @Test
     fun `menus find the distro's entries first, then the library's`() {
         assertEquals(
             "/usr/local/share:/usr/share:/run/droidtop-app-storage/desktop-launcher/share",

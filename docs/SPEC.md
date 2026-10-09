@@ -1676,6 +1676,19 @@ Debian's own mechanism for package installs in a chroot or container with
 no init; dbus's and polkitd's maintainer scripts otherwise try to start
 daemons and fail the install.
 
+**A session bus, a machine id and a wallpaper (rig emulator-5560,
+2026-10-09).** After the first Waybar desktop came up the screen stayed
+black: Waybar logged "Cannot spawn a message bus without a machine-id" and
+exited, and sway logged "failed to execute 'swaybg'". Every plan now
+installs `dbus` and starts the desktop's session bus among its daemons
+(`dbus-daemon --session --nofork` listening at
+`/run/droidtop-sockets/bus`). Every container's processes get
+`DBUS_SESSION_BUS_ADDRESS` pointing there, so a program finds the primary's
+bus the way it finds the compositor, and none tries to autolaunch its own.
+The boot script writes `/etc/machine-id` once, when the image has none: 32
+hex digits from the kernel's random UUID, the machine-id(5) format. sway
+plans install `swaybg`, which the stock sway config runs for its background.
+
 **The primary container is the user's desktop and persists.** The desktop
 session reuses the existing PRIMARY while it was made from the image the
 user still has chosen, and only pulls and recreates when that choice

@@ -60,6 +60,19 @@ class CompositorProvisioningTest {
     }
 
     @Test
+    fun `the desktop has a session bus, and sway its wallpaper program`() {
+        for ((os, de) in listOf("debian" to "sway", "alpine" to "sway", "alpine" to "labwc")) {
+            val plan = CompositorProvisioning.plan(os, de)!!
+            assertTrue(plan.installCommand.split(" ").contains("dbus"))
+            assertEquals(
+                "dbus-daemon --session --nofork --nopidfile --address=unix:path=/run/droidtop-sockets/bus",
+                plan.daemons.first(),
+            )
+            assertEquals(de == "sway", plan.installCommand.split(" ").contains("swaybg"))
+        }
+    }
+
+    @Test
     fun `unsupported combinations return null instead of a guessed plan`() {
         assertNull(CompositorProvisioning.plan("alpine", "hyprland"))
         assertNull(CompositorProvisioning.plan("fedora", "sway"))
@@ -116,8 +129,8 @@ class CompositorProvisioningTest {
         assertTrue(on.installCommand.startsWith(off.installCommand))
         assertTrue(on.installCommand.contains("apt-get install -y --no-install-recommends cups"))
         assertTrue(on.installCommand.contains("Listen ${ContainerLayout.SOCKET_DIR}/${ContainerLayout.CUPS_SOCKET}"))
-        assertEquals(listOf("cupsd -f"), on.daemons)
-        assertTrue(off.daemons.isEmpty())
+        assertEquals(listOf(CompositorProvisioning.SESSION_BUS_DAEMON, "cupsd -f"), on.daemons)
+        assertEquals(listOf(CompositorProvisioning.SESSION_BUS_DAEMON), off.daemons)
         // A different plan, so a container provisioned without it re-runs.
         assertFalse(ContainerLayout.planId(on) == ContainerLayout.planId(off))
         assertTrue(CompositorProvisioning.plan("alpine", "labwc", printing = true)!!.installCommand.contains("apk add --no-cache cups"))
@@ -135,9 +148,10 @@ class CompositorProvisioningTest {
     @Test
     fun `no daemon is waited for before the compositor starts`() {
         val script = ContainerLayout.primaryInitScript(CompositorProvisioning.plan("alpine", "sway", printing = true)!!)
-        // Every line that runs cupsd, or watches it, is a background job.
-        val jobs = script.substringBefore("exec sway").lines().filter { it.contains("cupsd -f") || it.contains("kill -0") }
-        assertEquals(2, jobs.size)
+        // Every line that runs a daemon (the session bus, cupsd), or watches one, is a background job.
+        val jobs = script.substringBefore("exec sway").lines()
+            .filter { it.contains("cupsd -f") || it.contains("dbus-daemon --session") || it.contains("kill -0") }
+        assertEquals(4, jobs.size)
         jobs.forEach { line -> assertTrue(line, line.trimEnd().endsWith("&")) }
         assertTrue(script.contains("droidtop: cupsd is running"))
         assertTrue(script.contains("droidtop: cupsd stopped"))
