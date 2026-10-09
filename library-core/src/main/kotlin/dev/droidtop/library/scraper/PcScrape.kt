@@ -291,6 +291,16 @@ val LibraryEntry.isPcOrEngineGame: Boolean
  */
 object PcScraper {
 
+    /**
+     * The order a pass works through games in, and the checkpoint's key: games a store identifies
+     * (a Steam or GOG id, answered certainly and without a picker) come first so the quick wins land
+     * early, then the rest, each group by id (docs/SPEC.md 7h, "The whole library").
+     */
+    internal fun orderKey(entry: LibraryEntry): String {
+        val ids = PcGameIds.of(entry)
+        return (if (ids.steamAppId != null || ids.gogId != null) "0|" else "1|") + entry.id
+    }
+
     /** Games are asked about at least this far apart: the Steam store allows about 200 requests in five minutes. */
     private const val GAME_PACE_MS = 1_600L
 
@@ -409,10 +419,10 @@ object PcScraper {
     suspend fun scrape(
         context: Context,
         entries: List<LibraryEntry>,
-        // The library-scrape job's checkpoint (docs/SPEC.md 12a "Jobs"): [entries] arrive sorted by
-        // id and every entry up to and including this id was finished by the previous run.
+        // The library-scrape job's checkpoint (docs/SPEC.md 12a "Jobs"): the [orderKey] of the last game
+        // the previous run finished; the games are worked through in [orderKey] order.
         resumeAfter: String? = null,
-        // Told after each game has been fully handled, never for one a pause or cancel interrupted.
+        // Told (with the game's [orderKey]) after each game has been fully handled, never for one a pause or cancel interrupted.
         onEntryDone: (String) -> Unit = {},
         // Told when the source refused every request this pass made, so a combined run does not go on asking.
         onRefusedEverything: () -> Unit = {},
@@ -430,10 +440,11 @@ object PcScraper {
         val dao = RomDatabase.get(context).romDao()
         // A library is thousands of entries, and one IN list that long can pass SQLite's limit on
         // variables; the rows are read in slices.
-        val existing = entries.map { it.id }.chunked(METADATA_READ_CHUNK)
+        val ordered = entries.sortedBy(::orderKey)
+        val existing = ordered.map { it.id }.chunked(METADATA_READ_CHUNK)
             .flatMap { dao.getGameMetadata(it) }.associateBy { it.id }
         val filter = ScrapeOptionsPrefs.filter(context)
-        val candidates = if (resumeAfter == null) entries else entries.filter { it.id > resumeAfter }
+        val candidates = if (resumeAfter == null) ordered else ordered.filter { orderKey(it) > resumeAfter }
         val targets = candidates.filter { entry ->
             val row = existing[entry.id]
             val noMeta = row?.description == null && row?.genre == null && row?.developer == null
@@ -505,7 +516,7 @@ object PcScraper {
                 dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] via ${source.label}: failed: ${t.message}")
                 android.util.Log.e("droidtop.Scraper", "Failed to scrape ${entry.title}", t)
             }
-            onEntryDone(entry.id)
+            onEntryDone(orderKey(entry))
         }
         if (counts.attempted > 0 && counts.refused == counts.attempted) onRefusedEverything()
         counts.flavourNotes = flavour.notes()

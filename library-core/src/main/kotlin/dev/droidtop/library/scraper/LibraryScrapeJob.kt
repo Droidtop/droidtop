@@ -38,6 +38,7 @@ object LibraryScrapeJob {
     private const val ARG_SYSTEM = "system"
     private const val ARG_FOLDER = "folder"
     private const val ARG_PC_ONLY = "pc_only"
+    private const val ARG_PC_IDS = "pc_ids"
 
     /** The queue item that stands for every PC and engine game; its checkpoint is the last entry id finished. */
     internal const val PC_ITEM = "pc:library"
@@ -83,6 +84,8 @@ object LibraryScrapeJob {
         folder: File? = null,
         // Only the PC and engine games of the whole library, not the console folders.
         pcOnly: Boolean = false,
+        // Only these PC and engine games (the list a person is looking at); implies [pcOnly].
+        pcIds: List<String>? = null,
         onFinished: (String) -> Unit = {},
     ): String? = PluginJobsCenter.startNative(
         context = context,
@@ -91,7 +94,8 @@ object LibraryScrapeJob {
         args = buildMap {
             systemId?.let { put(ARG_SYSTEM, it) }
             folder?.let { put(ARG_FOLDER, it.absolutePath) }
-            if (pcOnly) put(ARG_PC_ONLY, "1")
+            if (pcOnly || pcIds != null) put(ARG_PC_ONLY, "1")
+            pcIds?.let { put(ARG_PC_IDS, it.joinToString("\n")) }
         },
         onComplete = { result -> onFinished(if (result.ok) result.values["summary"] ?: "Done" else (result.error ?: "Failed")) },
     )
@@ -105,6 +109,7 @@ object LibraryScrapeJob {
         val systemId = args[ARG_SYSTEM]
         val folderArg = args[ARG_FOLDER]
         val pcOnly = args[ARG_PC_ONLY] == "1"
+        val pcIds = args[ARG_PC_IDS]?.split("\n")?.toSet()
         // Everything (no system named) covers the PC and engine games too; one system or folder does not.
         val wantConsoles = !pcOnly
         val wantPc = pcOnly || systemId == null
@@ -141,7 +146,7 @@ object LibraryScrapeJob {
             from = Position.decode(checkpoint),
             step = { index, resumeAfter, romDone, progress ->
                 if (index >= queue.size) {
-                    val games = libraryGames(context).filter { it.isPcOrEngineGame && !it.missing }.sortedBy { it.id }
+                    val games = libraryGames(context).filter { it.isPcOrEngineGame && !it.missing && (pcIds == null || it.id in pcIds) }
                     StepResult(
                         PcScraper.scrape(context, games, resumeAfter = resumeAfter, onEntryDone = romDone, onProgress = progress),
                     )

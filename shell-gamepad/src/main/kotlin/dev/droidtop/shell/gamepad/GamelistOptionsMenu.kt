@@ -206,8 +206,8 @@ internal fun GamelistOptionsMenu(
 
     // The scrape is a job (docs/SPEC.md 12a "Jobs"): this only starts it, or finds it already
     // running or paused. Its progress, Pause, Resume and Cancel live under Downloads and installs.
-    fun startScrapeJob(title: String, systemId: String?, pcOnly: Boolean = false) {
-        val started = dev.droidtop.library.scraper.LibraryScrapeJob.start(context, title, systemId, pcOnly = pcOnly) { summary ->
+    fun startScrapeJob(title: String, systemId: String?, pcOnly: Boolean = false, pcIds: List<String>? = null) {
+        val started = dev.droidtop.library.scraper.LibraryScrapeJob.start(context, title, systemId, pcOnly = pcOnly, pcIds = pcIds) { summary ->
             status = summary
             scope.launch { onScraped() }
         }
@@ -309,21 +309,14 @@ internal fun GamelistOptionsMenu(
                     onDismiss()
                 }
             }
+            // One label for two lists (SCRAPE_PC_GAMES is the same text): a console system scrapes its
+            // folders; the PC Games tab and a collection run the library job scoped to the PC and engine
+            // games on screen. Until now the first arm took both, and the PC tab asked for a console system "pc".
             "Get artwork and details" -> {
-                startScrapeJob(title = "Scrape $groupLabel", systemId = systemId)
-            }
-            SCRAPE_PC_GAMES -> {
-                if (busy) return
-                busy = true
-                val pcGames = games.filter { it.isPcOrEngineGame }
-                scope.launch {
-                    status = withContext(Dispatchers.IO) {
-                        dev.droidtop.library.scraper.PcScraper.scrape(context, pcGames) { done, total ->
-                            status = "Scraping PC & engine games: $done/$total"
-                        }
-                    }
-                    busy = false
-                    onScraped()
+                if (systemId == null || systemId == PC_SYSTEM_ID) {
+                    startScrapeJob(title = "Scrape $groupLabel", systemId = null, pcIds = games.filter { it.isPcOrEngineGame }.map { it.id })
+                } else {
+                    startScrapeJob(title = "Scrape $groupLabel", systemId = systemId)
                 }
             }
             "Import from ES-DE" -> {

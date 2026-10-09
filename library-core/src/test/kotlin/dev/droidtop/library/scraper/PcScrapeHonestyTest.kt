@@ -114,6 +114,15 @@ class PcScrapeHonestyTest {
     }
 
     @Test
+    fun `games a store identifies are worked through first, each group by id`() {
+        val folder = LibraryEntry(id = "/g/A Folder Game", title = "A", kind = LibraryEntryKind.RENPY)
+        val steam = LibraryEntry(id = "steam:440", title = "TF2", kind = LibraryEntryKind.WINE_PROFILE)
+        val gog = LibraryEntry(id = "gog:5", title = "G", kind = LibraryEntryKind.WINE_PROFILE)
+        val ordered = listOf(folder, steam, gog).sortedBy(PcScraper::orderKey).map { it.id }
+        assertEquals(listOf("gog:5", "steam:440", "/g/A Folder Game"), ordered)
+    }
+
+    @Test
     fun `a Steam storefront record is mapped onto ES-DE's metadata conventions`() {
         // The response SHAPE of store.steampowered.com/api/appdetails,
         // transcribed from Steam's own storefront format.

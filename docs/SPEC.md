@@ -10553,9 +10553,11 @@ cards, and its dialog said "no match for 2" without saying which two.
   source selection as the per-game Scrape). "Scrape all systems" is the console folders and then that item;
   "Scrape PC and engine games" (the Games options menu, and Settings > Library > Scraper > Scrape now) is
   that item alone; "Scrape the whole library" on the Scraper page is the same as "Scrape all systems".
-  A single system or folder stays console only. The games come from the library's own index
-  (`LibraryScrapeJob.libraryGames`, set by :app; a walk only when the index is empty), sorted by id; the
-  checkpoint is the last id finished, so Pause, Resume and a restart carry on after it. A source that is not
+  A single system or folder stays console only. The PC Games tab's "Get artwork and details" is the same
+  job scoped to the games on screen (the `pc_ids` argument). The games come from the library's own index
+  (`LibraryScrapeJob.libraryGames`, set by :app; a walk only when the index is empty). Games a store
+  identifies (a Steam or GOG id, matched with certainty) come first so the quick wins land early, then
+  the rest, each by id (`PcScraper.orderKey`); the checkpoint is the order key of the last game finished, so Pause, Resume and a restart carry on after it. A source that is not
   ready (`ScraperReadiness`) leaves its half out with its own sentence; the other half still runs, and a
   console source that refused everything does not stop the PC games, which ask a different source.
 - **Spacing.** Games in a PC pass are asked about at least 1.6 s apart (`PcScraper.GAME_PACE_MS`), because the
