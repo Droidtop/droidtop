@@ -5136,6 +5136,25 @@ proposal) is not built; these helpers are in the one settings tree that already 
   same sequence. Decision: macros are text lines in a setting, not JSON, because they are edited in a settings
   field on a handheld; the study's JSON form can be added as an import later.
 
+### Emoji panel and search (Droidtop/tracker#342)
+
+- **Data.** `assets/emoji/en.txt` is FlorisBoard's generated CLDR v48 list (Apache-2.0 app, Unicode data), copied
+  unchanged with its provenance in `assets/emoji/SOURCE.txt`; `EmojiCatalog` (JVM tested) reads it as it is:
+  groups, then `emoji;name;keywords`; skin-tone variants (tab-indented lines) are left out of the grid and of
+  search. `EmojiAssets` reads and parses it once per process on a background thread; the panel says "Loading"
+  until it is there. Other languages' lists (`de.txt`, `fr.txt`, ...) sit in the same upstream folder and are one
+  file each when wanted.
+- **Panel.** "Emoji panel" (preference, on) adds an Emoji button to the tool strip (`ToolsDeck`): group buttons
+  with Recent first (30, `EmojiRecents`, in the keyboard's preference store), a grid of the group, Search, Back. A
+  tap types the emoji through the sink the keys use; into a container, which has no text channel, it goes to the
+  Android clipboard like a clipboard entry does.
+- **Search is typed on the keyboard itself.** An input method cannot give a text field focus without leaving the
+  editor, so Search opens a line and a row of matches between the strip and the keys, and while it is open the
+  keys go to it instead of the editor (`KeyboardCapture`, offered by `LatinIME.onKey`/`onText` and by
+  `SecondScreenKeyboardListener`; Delete edits the query, Enter or Done closes it). Every word of the query has to
+  start a word of the emoji's name, or of a keyword; a name that equals or starts with the query ranks first,
+  then data order. Picking a match types it and closes the search.
+
 ## 6b. Desktop surface input (built 2026-09-01)
 
 The seat in §6 was a primitive with no caller. `:shell-desktop`'s

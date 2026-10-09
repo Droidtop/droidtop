@@ -328,6 +328,14 @@
             />
 
     <CheckBoxPreference
+            android:key="pref_emoji"
+            android:title="@string/title_emoji"
+            android:persistent="true"
+            android:defaultValue="true"
+            android:summary="@string/summary_emoji"
+            />
+
+    <CheckBoxPreference
             android:key="pref_incognito"
             android:title="@string/title_incognito"
             android:persistent="true"

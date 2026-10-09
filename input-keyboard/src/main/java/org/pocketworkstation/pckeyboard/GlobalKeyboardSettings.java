@@ -156,6 +156,19 @@ public final class GlobalKeyboardSettings {
             public int getFlags() { return FLAG_PREF_RECREATE_INPUT_VIEW; }
         });
 
+        // Which buttons the tool strip has is decided when it is built.
+        addBooleanPref("pref_emoji", new BooleanPref() {
+            public void set(boolean val) { }
+            public boolean getDefault() { return true; }
+            public int getFlags() { return FLAG_PREF_RECREATE_INPUT_VIEW; }
+        });
+
+        addBooleanPref("pref_clipboard_history", new BooleanPref() {
+            public void set(boolean val) { }
+            public boolean getDefault() { return true; }
+            public int getFlags() { return FLAG_PREF_RECREATE_INPUT_VIEW; }
+        });
+
         addBooleanPref("pref_touch_pos", new BooleanPref() {
             public void set(boolean val) { showTouchPos = val; }
             public boolean getDefault() { return false; }

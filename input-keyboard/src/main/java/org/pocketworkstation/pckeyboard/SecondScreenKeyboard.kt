@@ -282,6 +282,8 @@ class SecondScreenKeyboardListener(
             return
         }
 
+        if (KeyboardCapture.offerKey(primaryCode)) return
+
         if (deferSpace && primaryCode == SPACE) {
             spacePending = true
             spaceCancelled = false
@@ -350,6 +352,7 @@ class SecondScreenKeyboardListener(
     /** Popup keys and multi-character keys arrive whole rather than per key. */
     override fun onText(text: CharSequence?) {
         text ?: return
+        if (KeyboardCapture.offerText(text)) return
         val commit = commit
         if (commit != null) {
             commit(text)

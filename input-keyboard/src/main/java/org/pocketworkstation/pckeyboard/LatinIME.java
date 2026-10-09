@@ -2002,6 +2002,10 @@ public class LatinIME extends InputMethodService implements
     // Implementation of KeyboardViewListener
 
     public void onKey(int primaryCode, int[] keyCodes, int x, int y) {
+        // droidtop patch (Droidtop/tracker#342): an open emoji search takes the keys.
+        if (KeyboardCapture.offerKey(primaryCode)) {
+            return;
+        }
         long when = SystemClock.uptimeMillis();
         if (primaryCode != Keyboard.KEYCODE_DELETE
                 || when > mLastKeyTime + QUICK_PRESS) {
@@ -2156,6 +2160,9 @@ public class LatinIME extends InputMethodService implements
     }
 
     public void onText(CharSequence text) {
+        if (KeyboardCapture.offerText(text)) {
+            return;
+        }
         //mDeadAccentBuffer.clear();  // FIXME
         InputConnection ic = getCurrentInputConnection();
         if (ic == null)

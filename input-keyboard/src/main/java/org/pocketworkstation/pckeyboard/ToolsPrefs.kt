@@ -23,6 +23,12 @@ object ToolsPrefs {
     /** Dragging a finger along the space bar moves the cursor. */
     const val SPACE_DRAG = "pref_space_drag"
 
+    /** The emoji panel and its search. */
+    const val EMOJI = "pref_emoji"
+
+    /** The emoji used last, newest first, one per line. */
+    const val RECENT_EMOJI = "pref_emoji_recent"
+
     /** The macros, one per line (see [MacroParser]). */
     const val MACROS = "pref_macros"
 
@@ -34,6 +40,8 @@ object ToolsPrefs {
     fun incognito(context: Context): Boolean = prefs(context).getBoolean(INCOGNITO, false)
 
     fun clipboardHistory(context: Context): Boolean = prefs(context).getBoolean(CLIPBOARD, true)
+
+    fun emoji(context: Context): Boolean = prefs(context).getBoolean(EMOJI, true)
 
     fun spaceDrag(context: Context): Boolean = prefs(context).getBoolean(SPACE_DRAG, true)
 

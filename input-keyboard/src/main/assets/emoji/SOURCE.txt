@@ -1,0 +1,6 @@
+en.txt is the emoji list the keyboard's emoji panel and search read (Droidtop/tracker#342).
+
+Source: FlorisBoard, app/src/main/assets/ime/media/emoji/en.txt at commit
+fe1241f4921b3eae923571ff7a3e113a7e10d677 (github.com/florisboard/florisboard, Apache License 2.0).
+The file says it was generated from CLDR v48; the names and keywords are Unicode CLDR annotation data
+(Unicode License v3, unicode.org/copyright.html). Copied unchanged.

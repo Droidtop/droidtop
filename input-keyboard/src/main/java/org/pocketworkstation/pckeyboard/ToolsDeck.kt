@@ -34,12 +34,21 @@ class ToolsDeck private constructor(
     private var overlay: View? = null
     private var overlayId: String? = null
     private lateinit var incognitoButton: Button
+    private var searchBar: EmojiSearchBar? = null
+    private val notice = TextView(context)
 
     init {
         orientation = VERTICAL
         setBackgroundColor(BACKGROUND)
         isFocusable = false
         addView(buildStrip(), LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        notice.apply {
+            textSize = 12f
+            setTextColor(MUTED)
+            setPadding(dp(12), 0, dp(12), dp(2))
+            visibility = GONE
+        }
+        addView(notice)
         stack.addView(keyboard, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
         addView(stack, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
     }
@@ -52,6 +61,7 @@ class ToolsDeck private constructor(
             gravity = Gravity.CENTER_VERTICAL
         }
         if (ToolsPrefs.clipboardHistory(context)) row.addView(tool("Clipboard") { toggle("clipboard") { clipboardPanel() } })
+        if (ToolsPrefs.emoji(context)) row.addView(tool("Emoji") { toggle("emoji") { emojiPanel() } })
         row.addView(tool("Macros") { toggle("macros") { macroPanel() } })
         incognitoButton = tool("") { toggleIncognito() }
         row.addView(incognitoButton)
@@ -81,6 +91,7 @@ class ToolsDeck private constructor(
     private fun toggle(id: String, build: () -> View) {
         val open = overlayId == id
         hidePanel()
+        hideSearch()
         if (open) return
         val panel = build()
         overlay = panel
@@ -95,6 +106,77 @@ class ToolsDeck private constructor(
         overlay = null
         overlayId = null
         keyboard.visibility = VISIBLE
+    }
+
+    private fun showNotice(text: String) {
+        notice.text = text
+        notice.visibility = VISIBLE
+        notice.removeCallbacks(hideNotice)
+        notice.postDelayed(hideNotice, NOTICE_MS)
+    }
+
+    private val hideNotice = Runnable { notice.visibility = GONE }
+
+    /**
+     * Into an editor the text is typed where the cursor is. A container has no text channel, so the text goes to the
+     * Android clipboard, which the clipboard bridge hands to the container (SPEC 6d); the container pastes it.
+     * True when it was typed.
+     */
+    private fun insertText(text: String): Boolean {
+        if (sink.takesText) {
+            beforeInsert?.run()
+            sink.text(text)
+            return true
+        }
+        context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("", text))
+        showNotice("Copied. Paste it in the terminal.")
+        return false
+    }
+
+    private fun emojiPanel(): View = EmojiBrowser(
+        context,
+        recent = { EmojiRecents.decode(ToolsPrefs.prefs(context).getString(ToolsPrefs.RECENT_EMOJI, null)) },
+        onPick = { emoji ->
+            pickEmoji(emoji)
+            hidePanel()
+        },
+        onSearch = {
+            hidePanel()
+            showSearch()
+        },
+        onBack = { hidePanel() },
+    )
+
+    private fun pickEmoji(emoji: String) {
+        val prefs = ToolsPrefs.prefs(context)
+        val recent = EmojiRecents.push(EmojiRecents.decode(prefs.getString(ToolsPrefs.RECENT_EMOJI, null)), emoji)
+        prefs.edit().putString(ToolsPrefs.RECENT_EMOJI, EmojiRecents.encode(recent)).apply()
+        insertText(emoji)
+    }
+
+    /** The search line and its matches above the keys; the keys type its query while it is open. */
+    private fun showSearch() {
+        hideSearch()
+        val bar = EmojiSearchBar(
+            context,
+            onPick = { emoji ->
+                pickEmoji(emoji)
+                hideSearch()
+            },
+            onDone = { hideSearch() },
+        )
+        searchBar = bar
+        addView(bar, indexOfChild(stack))
+    }
+
+    private fun hideSearch() {
+        searchBar?.let { removeView(it) }
+        searchBar = null
+    }
+
+    override fun onDetachedFromWindow() {
+        hideSearch()
+        super.onDetachedFromWindow()
     }
 
     private fun toggleIncognito() {
@@ -154,7 +236,7 @@ class ToolsDeck private constructor(
             val entries = ClipboardHistoryStore.snapshot().filter { !incognito || it.pinned }
             status.text = if (incognito) "Incognito: nothing new is recorded." else ""
             if (entries.isEmpty()) rows.addView(label("Nothing copied yet.").apply { setPadding(dp(12), dp(8), dp(12), dp(8)) })
-            entries.forEach { rows.addView(clipboardRow(it, status)) }
+            entries.forEach { rows.addView(clipboardRow(it)) }
         }
         val listener: () -> Unit = { root.post { refresh() } }
         root.addOnAttachStateChangeListener(
@@ -173,7 +255,7 @@ class ToolsDeck private constructor(
         return root
     }
 
-    private fun clipboardRow(entry: ClipboardHistory.Entry, status: TextView): View {
+    private fun clipboardRow(entry: ClipboardHistory.Entry): View {
         val row = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -184,28 +266,15 @@ class ToolsDeck private constructor(
                 maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
                 setPadding(0, dp(8), dp(8), dp(8))
-                setOnClickListener { paste(entry.text, status) }
+                setOnClickListener {
+                    if (insertText(entry.text)) hidePanel()
+                }
             },
             LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f),
         )
         row.addView(tool(if (entry.pinned) "Unpin" else "Pin") { ClipboardHistoryStore.setPinned(entry.text, !entry.pinned) })
         row.addView(tool("Delete") { ClipboardHistoryStore.delete(entry.text) })
         return row
-    }
-
-    /**
-     * Into an editor the text is typed where the cursor is. A container has no text channel, so the text goes to the
-     * Android clipboard, which the clipboard bridge hands to the container (SPEC 6d); the container pastes it.
-     */
-    private fun paste(text: String, status: TextView) {
-        if (sink.takesText) {
-            beforeInsert?.run()
-            sink.text(text)
-            hidePanel()
-        } else {
-            context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("", text))
-            status.text = "Copied. Paste it in the terminal."
-        }
     }
 
     private fun macroPanel(): View {
@@ -236,6 +305,7 @@ class ToolsDeck private constructor(
     }
 
     companion object {
+        private const val NOTICE_MS = 3000L
         private val BACKGROUND = Color.rgb(32, 33, 36)
         private val PANEL = Color.rgb(41, 42, 45)
         private val TEXT = Color.WHITE
