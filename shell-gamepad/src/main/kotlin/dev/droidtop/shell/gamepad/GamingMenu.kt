@@ -420,6 +420,8 @@ internal fun MenuRow(
     // A leading picture the caller draws (an app's own icon in the task manager's list); [accent] and
     // [icon] win when given, since a row carries one leading mark at most.
     leading: (@Composable () -> Unit)? = null,
+    // A short tag on the row beside its title (CatalogItem.chip): "Unofficial". A fact, drawn on the row, not a tooltip.
+    chip: String? = null,
 ) {
     val window = LocalShellWindow.current
     // Real bug this fixes (owner, 2026-09-27): every menu built from
@@ -493,14 +495,21 @@ internal fun MenuRow(
             Spacer(Modifier.width(16.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(
-                title,
-                color = if (danger) MenuTokens.Danger else MenuTokens.OnSurface,
-                fontWeight = FontWeight.Medium,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = if (progress != null) 1 else 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    color = if (danger) MenuTokens.Danger else MenuTokens.OnSurface,
+                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = if (progress != null || chip != null) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (chip != null) {
+                    Spacer(Modifier.width(Space.Sm))
+                    StatusChip(chip, ink = MenuTokens.OnSurface, fill = MenuTokens.SurfaceSelected)
+                }
+            }
             if (progress != null) {
                 ShellProgressBar(progress, Modifier.fillMaxWidth().padding(top = Space.Sm))
             }

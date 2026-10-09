@@ -16808,7 +16808,15 @@ the secondary path for sources that publish no key.
   origin — no label ever borrows "Official"). A user-origin whose key is
   gone shows the flagged not-trusted state instead. The same words are on the plugin's page, in what other
   plugins' consent lists say about it, and, for an Unofficial plugin, as
-  an "Unofficial" row at the top of its approval screen.
+  an "Unofficial" row at the top of its approval screen. **An Unofficial
+  plugin carries an "Unofficial" chip where it appears (owner,
+  2026-10-09, Droidtop/tracker#399): on its card in the list (the row's
+  `CatalogItem.chip`, drawn beside the title), on its page's header (the
+  first group's `CatalogGroup.chips`) and on its approval screen, which
+  also states in a paragraph shown whole where it came from; in a
+  catalog's own plugin list each row carries it too. It is a chip on the
+  row, never only a tooltip: the Gaming settings keep a row's explanation
+  in its hint, so a fact the person must see cannot live there.**
 - **Storage.** `filesDir/plugin-user-keys.json`, droidtop's private
   storage, writable only by the app, written via a temp file + rename
   so a failed write cannot leave a half-written store:
@@ -17132,12 +17140,20 @@ what the index says is display data, never a trust decision.
     which the index must list under exactly that key)} and `disclaimer`
     {`version`, `text`}. A present but malformed block refuses the whole
     index.
-  - **Adding is fetch, review, Accept.** Fetching shows the catalog's
-    name, "Unofficial: not part of droidtop and not vetted by it", its
-    address, whether it is signed (and the catalog key's fingerprint), its
-    disclaimer text in full, and every origin it lists with its key
-    fingerprint and whether the person already trusts that key, a
-    different one, or none. Nothing is stored or trusted until "Accept and
+  - **Adding is fetch, review, Accept.** Fetching replaces the screen
+    with the review (the add form is not under it): the catalog's name with
+    an "Unofficial" chip and "not part of droidtop and not vetted by it",
+    its disclaimer text IN FULL as paragraphs on the screen above Accept
+    (`TextBlockItem`, scrolled with the pad or the finger; never a hint, a
+    tooltip or a sheet behind Y), and under it as rows its address,
+    whether it is signed, the catalog key's fingerprint and one row per
+    publisher (origin) with its key fingerprint in the value column and in
+    its title whether the person already trusts that key, a different one,
+    or none. Accept is greyed ("Read it first") until the text was
+    scrolled to its end or three seconds after it was first shown
+    (`AsyncActionItem.gate`; the Gaming renderer opens it on either, the
+    Preference renderer after the three seconds). The words on the screen
+    are plain: "notice", "publisher", "key", never "origin" or "master". Nothing is stored or trusted until "Accept and
     add" (behind a confirmation that names the catalog and how many
     origins it trusts). Accepting stores the catalog with the disclaimer
     version accepted, keeps the index it showed, and trusts each origin

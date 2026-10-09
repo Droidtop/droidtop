@@ -83,6 +83,12 @@ sealed interface CatalogItem {
      * under way whose size is not known yet (an empty track). Null for every row that is not a job.
      */
     val progress: Float? get() = null
+
+    /**
+     * A short tag drawn beside the title, on the row itself ("Unofficial" on a plugin from a catalog that is not
+     * droidtop's): a fact the person must see without opening anything, never a tooltip. Null draws none.
+     */
+    val chip: String? get() = null
 }
 
 data class ChoiceOption(val value: String, val label: String)
@@ -168,8 +174,27 @@ class ActionItem(
     // in a settings row and on a Quick Menu tile alike; null for an action with no such state.
     val state: Boolean? = null,
     override val progress: Float? = null,
+    override val chip: String? = null,
     val run: (Context) -> Unit,
 ) : CatalogItem
+
+/**
+ * A paragraph shown whole, wrapped in the row and never cut (a disclaimer the person must read before accepting it).
+ * It does nothing when pressed; the pad steps through the paragraphs, which is how a long text scrolls. [title], when
+ * not blank, is a heading line above the text. [gate] names a read-gate ([AsyncActionItem.gate]): the renderer opens
+ * it when the paragraph marked [last] is shown (the text was scrolled to its end) or three seconds after the first
+ * paragraph of the gate was shown, whichever comes first. The text of a screen short enough to need no scrolling is
+ * therefore read the moment it is shown.
+ */
+class TextBlockItem(
+    override val id: String,
+    val text: String,
+    override val title: String = "",
+    val gate: String? = null,
+    val last: Boolean = false,
+) : CatalogItem {
+    override val subtitle: String? get() = null
+}
 
 /**
  * An action with a real async lifecycle the surface should show. [run]
@@ -185,6 +210,9 @@ class AsyncActionItem(
     override val subtitle: String? = null,
     override val value: String? = null,
     val confirmTitle: String? = null,
+    /** A read-gate ([TextBlockItem.gate]): the row is greyed ("Read it first") and does nothing until the renderer has opened that gate. */
+    val gate: String? = null,
+    override val chip: String? = null,
     val run: suspend (Context, onStatus: (String) -> Unit) -> String,
 ) : CatalogItem
 
@@ -312,6 +340,7 @@ class NestedScreenItem(
     val accent: Int? = null,
     override val icon: CatalogIcon? = null,
     override val progress: Float? = null,
+    override val chip: String? = null,
 ) : CatalogItem {
     init {
         require((inline != null) != (registryId != null)) { "Exactly one of inline/registryId must be set" }

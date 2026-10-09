@@ -3,7 +3,12 @@ package app.murinelauncher.settings.common
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.os.Bundle
+import android.text.SpannableStringBuilder
+import android.text.style.BackgroundColorSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -23,6 +28,7 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceGroupAdapter
+import androidx.preference.PreferenceViewHolder
 import androidx.preference.SwitchPreferenceCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -43,9 +49,11 @@ import dev.droidtop.library.settings.SettingsSearchIndex
 import dev.droidtop.library.settings.SettingsSearchResult
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.SubScreenItem
+import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -126,6 +134,36 @@ class CatalogPreferenceNavigator(
     // AsyncActionItem keeps its result on the row (the gamepad renderer's
     // statusById does the same).
     private val statusById = HashMap<String, String>()
+
+    // Read-gates (TextBlockItem.gate): the gated row is greyed until READ_GATE_MS after its text was first drawn. Opened
+    // in place, not by a rebuild, which would put the list back at its top while the person is reading.
+    private val gateStarted = HashSet<String>()
+    private val gateOpen = HashSet<String>()
+    private val gatedRows = HashMap<String, MutableList<Pair<Preference, CharSequence?>>>()
+
+    private fun startGate(gate: String) {
+        if (!gateStarted.add(gate)) return
+        fragment.lifecycleScope.launch {
+            delay(READ_GATE_MS)
+            gateOpen += gate
+            gatedRows.remove(gate)?.forEach { (row, summary) ->
+                row.isEnabled = true
+                row.summary = summary
+            }
+        }
+    }
+
+    /** [title] with a small tag after it (CatalogItem.chip), so the fact is on the row and not in a tooltip. */
+    private fun titleWithChip(title: String, chip: String?): CharSequence {
+        if (chip == null) return title
+        val builder = SpannableStringBuilder(title).append("  ")
+        val start = builder.length
+        builder.append(" ").append(chip.uppercase()).append(" ")
+        builder.setSpan(BackgroundColorSpan(0x44888888), start, builder.length, 0)
+        builder.setSpan(StyleSpan(Typeface.BOLD), start, builder.length, 0)
+        builder.setSpan(RelativeSizeSpan(0.75f), start, builder.length, 0)
+        return builder
+    }
     private var pendingFolderPick: FolderPickItem? = null
     private val folderPickLauncher: ActivityResultLauncher<android.net.Uri?> =
         fragment.registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -605,7 +643,7 @@ class CatalogPreferenceNavigator(
         }
         is ActionItem -> Preference(context).apply {
             key = item.id
-            title = item.title
+            title = titleWithChip(item.title, item.chip)
             summary = item.subtitle
             isIconSpaceReserved = false
             setOnPreferenceClickListener {
@@ -616,11 +654,31 @@ class CatalogPreferenceNavigator(
                 true
             }
         }
+        is TextBlockItem -> object : Preference(context) {
+            override fun onBindViewHolder(holder: PreferenceViewHolder) {
+                super.onBindViewHolder(holder)
+                // The default row stops at ten lines; a text the person must read is shown whole.
+                (holder.findViewById(android.R.id.summary) as? TextView)?.maxLines = Int.MAX_VALUE
+            }
+        }.apply {
+            key = item.id
+            title = item.title.ifBlank { null }
+            summary = item.text
+            isSelectable = false
+            isIconSpaceReserved = false
+            item.gate?.let { startGate(it) }
+        }
         is AsyncActionItem -> Preference(context).apply {
             key = item.id
-            title = item.title
+            title = titleWithChip(item.title, item.chip)
             summary = statusById[item.id] ?: item.subtitle
             isIconSpaceReserved = false
+            val gate = item.gate
+            if (gate != null && gate !in gateOpen) {
+                isEnabled = false
+                gatedRows.getOrPut(gate) { mutableListOf() }.add(this to summary)
+                summary = "Available once you have read the text above"
+            }
             setOnPreferenceClickListener { pref ->
                 confirmThen(context, item.confirmTitle) {
                     pref.summary = "Working..."
@@ -646,7 +704,7 @@ class CatalogPreferenceNavigator(
         }
         is NestedScreenItem -> Preference(context).apply {
             key = item.id
-            title = item.title
+            title = titleWithChip(item.title, item.chip)
             summary = listOfNotNull(item.subtitle, item.valueLabel?.invoke(context)?.takeIf { it.isNotBlank() })
                 .joinToString("  ·  ")
                 .ifBlank { null }
@@ -671,6 +729,8 @@ class CatalogPreferenceNavigator(
 
     private companion object {
         /** Saved-state keys: the pushed screens' registry ids, and the row to refocus. */
+        /** How long after a gated text is first drawn its Accept opens (the Gaming renderer also opens it at the end of the text). */
+        const val READ_GATE_MS = 3000L
         const val KEY_STACK = "catalog_nav_stack"
         const val KEY_FOCUS_ROW = "catalog_nav_focus_row"
     }

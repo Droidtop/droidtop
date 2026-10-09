@@ -98,6 +98,7 @@ import dev.droidtop.library.settings.SettingsSearchResult
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.SubScreenItem
+import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -190,6 +191,9 @@ fun CatalogNavigator(
     val columnState = rememberLazyListState()
     // Live status text per item id (async progress/outcomes, pick errors).
     val statusById = remember { mutableStateMapOf<String, String>() }
+    // Read-gates (TextBlockItem.gate): true once the text was scrolled to its end or READ_GATE_MS after it was first shown.
+    val readGates = remember { mutableStateMapOf<String, Boolean>() }
+    val gateTimers = remember { mutableSetOf<String>() }
     // Two-step confirm: the armed destructive item, reset on any move.
     var confirmArmedId by remember { mutableStateOf<String?>(null) }
     var editingText by remember { mutableStateOf<TextInputItem?>(null) }
@@ -447,6 +451,7 @@ fun CatalogNavigator(
                 pendingDocumentPick = item
                 documentPickLauncher.launch(item.pickerIntent())
             }
+            is TextBlockItem -> {}
             is ActionItem -> {
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
                     confirmArmedId = item.id
@@ -457,6 +462,11 @@ fun CatalogNavigator(
                 refresh()
             }
             is AsyncActionItem -> {
+                val gate = item.gate
+                if (gate != null && readGates[gate] != true) {
+                    EsDeNavigationSounds.play(UiSound.BUMP)
+                    return
+                }
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
                     confirmArmedId = item.id
                     return
@@ -723,6 +733,14 @@ fun CatalogNavigator(
                 state = listState,
                 confirmArmedId = confirmArmedId,
                 statusById = statusById,
+                readGates = readGates,
+                onBlockShown = { block ->
+                    val gate = block.gate
+                    if (gate != null) {
+                        if (block.last) readGates[gate] = true
+                        if (gateTimers.add(gate)) scope.launch { delay(READ_GATE_MS); readGates[gate] = true }
+                    }
+                },
                 startPadding = startPadding,
                 onClick = { index ->
                     inColumn = false
@@ -792,6 +810,8 @@ private fun CatalogPane(
     state: LazyListState,
     confirmArmedId: String?,
     statusById: Map<String, String>,
+    readGates: Map<String, Boolean>,
+    onBlockShown: (TextBlockItem) -> Unit,
     startPadding: Dp,
     onClick: (Int) -> Unit,
     onLongClick: (Int) -> Unit,
@@ -837,16 +857,22 @@ private fun CatalogPane(
                 Column {
                     if (row.chipsAbove.isNotEmpty()) CatalogChipRow(row.chipsAbove)
                     row.headerAbove?.let { header -> MenuSectionLabel(header) }
-                    CatalogRowView(
-                        row = row,
-                        isSelected = isSelected,
-                        confirmArmed = confirmArmedId == row.item.id,
-                        status = statusById[row.item.id],
-                        tipShown = isSelected && PadModality.showsFocus,
-                        onClick = { onClick(index) },
-                        onLongClick = { onLongClick(index) },
-                        onAdjust = { direction -> onAdjust(index, direction) },
-                    )
+                    val block = row.item as? TextBlockItem
+                    if (block != null) {
+                        TextBlockRow(block, isSelected, onShown = { onBlockShown(block) }, onClick = { onClick(index) })
+                    } else {
+                        CatalogRowView(
+                            row = row,
+                            locked = (row.item as? AsyncActionItem)?.gate?.let { readGates[it] != true } ?: false,
+                            isSelected = isSelected,
+                            confirmArmed = confirmArmedId == row.item.id,
+                            status = statusById[row.item.id],
+                            tipShown = isSelected && PadModality.showsFocus,
+                            onClick = { onClick(index) },
+                            onLongClick = { onLongClick(index) },
+                            onAdjust = { direction -> onAdjust(index, direction) },
+                        )
+                    }
                 }
             }
         }
@@ -1198,6 +1224,7 @@ private const val SEARCH_ROW_ID = "__settings_search__"
 @Composable
 private fun CatalogRowView(
     row: CatalogRow,
+    locked: Boolean,
     isSelected: Boolean,
     confirmArmed: Boolean,
     status: String?,
@@ -1220,7 +1247,8 @@ private fun CatalogRowView(
     HintTip(text = tip, shown = tipShown) {
         MenuRow(
             title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
-            value = status ?: value ?: if (placeholder) "not set" else null,
+            value = if (locked) "Read it first" else status ?: value ?: if (placeholder) "not set" else null,
+            chip = item.chip,
             placeholder = placeholder,
             adjustable = status == null && item.stepsInPlace(),
             chevron = chevron,
@@ -1243,6 +1271,32 @@ private fun CatalogRowView(
             sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
             progress = item.progress,
         )
+    }
+}
+
+/** How long after a gated text is first shown its Accept opens even if the text was not scrolled to the end (owner, 2026-10-09). */
+private const val READ_GATE_MS = 3000L
+
+/**
+ * A paragraph of [TextBlockItem] in full: no cut, no value column, a heading when it has one. It is a stop of the pad
+ * like any row, which is how a long text is scrolled; pressing it does nothing. Shown means the gate may open
+ * ([onShown], once per composition of the row).
+ */
+@Composable
+private fun TextBlockRow(block: TextBlockItem, selected: Boolean, onShown: () -> Unit, onClick: () -> Unit) {
+    LaunchedEffect(block.id) { onShown() }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(MenuTokens.RowShape)
+            .selectionFrame(selected, MenuTokens.RowShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = MenuTokens.RowVerticalPadding),
+    ) {
+        if (block.title.isNotBlank()) {
+            Text(block.title, color = MenuTokens.OnSurface, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyLarge)
+        }
+        Text(block.text, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

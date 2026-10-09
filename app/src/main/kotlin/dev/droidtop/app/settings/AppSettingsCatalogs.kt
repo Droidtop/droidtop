@@ -78,6 +78,7 @@ import dev.droidtop.library.scraper.ScraperSource
 import dev.droidtop.library.scraper.ScraperSourcePrefs
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
+import dev.droidtop.library.settings.CatalogChip
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
@@ -89,6 +90,7 @@ import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SettingsScreenRegistry
+import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.theme.SystemThemeColors
@@ -1582,6 +1584,10 @@ object AppSettingsCatalogs {
         return entry.repo?.let { "Verified by: $it" } ?: "Added by you"
     }
 
+    /** True for a plugin whose publisher is trusted through a catalog that is not droidtop's: it carries the "Unofficial" chip wherever it appears. */
+    private fun isUnofficial(origin: String, userKeys: Map<String, UserOriginKey>): Boolean =
+        !PluginOriginKeys.isOfficial(origin) && userKeys[origin]?.catalog != null
+
     /** Added catalogs' display names by id, for the badge. Disk. */
     private fun catalogNames(context: Context): Map<String, String> =
         dev.droidtop.library.integrations.PluginCatalogSources.added(dev.droidtop.library.integrations.PluginCatalogSources.storeFile(context))
@@ -1632,6 +1638,7 @@ object AppSettingsCatalogs {
             subtitle = listOfNotNull(pluginSummary(m, enabledPoints), trustBadge, PluginTiers.badge(record, grants)).joinToString(" - "),
             inline = pluginDetailScreen(m.id, m.label),
             valueLabel = { state },
+            chip = if (isUnofficial(m.origin, userKeys)) "Unofficial" else null,
         )
     }
 
@@ -1714,12 +1721,11 @@ object AppSettingsCatalogs {
             // (docs/SPEC.md 12a "Added catalogs"): from a catalog that is not droidtop's, it is Unofficial.
             if (record.trust == PluginTrustState.PENDING && unofficialFrom != null) {
                 add(
-                    ActionItem(
+                    TextBlockItem(
                         id = "plugin_${m.id}_unofficial",
                         title = "Unofficial",
-                        subtitle = "From \"${catalogNames[unofficialFrom] ?: unofficialFrom}\", a catalog that is not part of droidtop. " +
-                            "droidtop has not vetted it; approve it only if you trust where it came from",
-                        run = {},
+                        text = "This plugin is from \"${catalogNames[unofficialFrom] ?: unofficialFrom}\", a catalog that is not part of droidtop. " +
+                            "droidtop has not checked it. Approve it only if you trust where it came from.",
                     ),
                 )
             }
@@ -2073,7 +2079,12 @@ object AppSettingsCatalogs {
         // the person is looking; an installed one (only its removal) stays further down.
         val runtimeGroupItem = if (runtimeGroup.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_runtime_group", title = "Runtime", items = runtimeGroup)
         return listOfNotNull(
-            CatalogGroup(id = "plugin_${m.id}_status_group", title = null, items = statusGroup),
+            CatalogGroup(
+                id = "plugin_${m.id}_status_group",
+                title = null,
+                items = statusGroup,
+                chips = if (isUnofficial(m.origin, userKeys)) listOf(CatalogChip("Unofficial")) else emptyList(),
+            ),
             runtimeGroupItem.takeIf { runtimeNeed != null },
             useGroup.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_use_group", title = null, items = it) },
         ) + newAccessGroups + consentGroups + listOfNotNull(

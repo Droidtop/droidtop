@@ -53,6 +53,7 @@ object SettingsSearchIndex {
                 // neither does its search.
                 if (group.quickOnly) continue
                 for (item in group.items) {
+                    if (item is TextBlockItem) continue
                     results += SettingsSearchResult(
                         target = screen,
                         screenTitle = screen.title,
