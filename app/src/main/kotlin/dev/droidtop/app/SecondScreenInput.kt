@@ -171,9 +171,54 @@ class SecondScreenInputView(
     private val status = TextView(context)
     private val imePicker = Button(context)
 
+    // The header (slice C12): where the keys go, Pin for that screen, and Tabs, which brings the companion's bar back
+    // over Input; then the chord keys and the controllers with their batteries.
+    private val target = TextView(context)
+    private val pin = Button(context)
+    private val tabs = Button(context)
+    private val controllers = TextView(context)
+
+    /** The screens Input can type to, read off the main thread when the view attaches or regains focus. */
+    @Volatile
+    private var screens: List<InputTarget.Screen> = emptyList()
+
     init {
         orientation = VERTICAL
         setBackgroundColor(ChromeColors.DarkBackground.toArgb())
+
+        val header = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        target.setTextColor(ChromeColors.DarkOnSurfaceVariant.toArgb())
+        target.textSize = 14f
+        header.addView(target, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        pin.setOnClickListener { togglePin() }
+        header.addView(pin, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+        tabs.text = "Tabs"
+        tabs.contentDescription = "Show tabs"
+        tabs.setOnClickListener { CompanionInputHandle.showTabs.value = !CompanionInputHandle.showTabs.value }
+        header.addView(tabs, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+        addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+
+        // The chord keys, played into the same destination as the keyboard ([CompanionChords]).
+        val chordSink = requestAwareSink(keyboardSink())
+        val player = org.pocketworkstation.pckeyboard.MacroPlayer({ code, down -> chordSink.key(code, down) }, { chordSink.text(it) })
+        val chords = LinearLayout(context).apply { orientation = HORIZONTAL }
+        CompanionChords.ALL.forEach { macro ->
+            chords.addView(
+                Button(context).apply {
+                    text = macro.name
+                    isAllCaps = false
+                    setOnClickListener { player.play(macro) }
+                },
+                LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT),
+            )
+        }
+        addView(
+            android.widget.HorizontalScrollView(context).apply { addView(chords) },
+            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
+        )
 
         // droidtop's one keyboard view (KeyboardPanel); only the destination is this surface's own. It suppresses
         // the input method's view while it is on screen, so the user never gets two keyboards.
@@ -195,7 +240,57 @@ class SecondScreenInputView(
         }
         addView(imePicker, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
+        controllers.setTextColor(ChromeColors.DarkOnSurfaceVariant.toArgb())
+        controllers.textSize = 13f
+        controllers.gravity = Gravity.CENTER
+        addView(controllers, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+
         addView(trackpad, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+    }
+
+    /** Re-reads the screens and the controllers off the main thread, then names the target. */
+    private fun refreshFacts() {
+        val app = context.applicationContext
+        Thread {
+            val outputs = runCatching { dev.droidtop.runtime.DisplayOutputRepository(app).currentOutputsSnapshot() }.getOrDefault(emptyList())
+            val names = runCatching { dev.droidtop.runtime.ScreenNaming.names(app, outputs) }.getOrDefault(emptyMap())
+            screens = outputs.map { InputTarget.Screen(it.androidDisplayId, it.uniqueId, names[it.androidDisplayId] ?: it.name) }
+            val pads = runCatching { Controllers.read(app) }.getOrDefault(emptyList())
+            post {
+                controllers.text = Controllers.line(pads)?.let { "Controllers: $it" }.orEmpty()
+                controllers.visibility = if (pads.isEmpty()) View.GONE else View.VISIBLE
+                syncTarget()
+            }
+        }.apply { isDaemon = true }.start()
+    }
+
+    private fun targetId(): Int? = InputTarget.displayId(
+        own = display?.displayId,
+        shell = ForegroundShell.current()?.window?.decorView?.display?.displayId,
+        screens = screens,
+        pinned = dev.droidtop.library.settings.CompanionPrefs.settings.value.inputPin,
+    )
+
+    private fun syncTarget() {
+        val desktop = mode == SecondaryDisplayContent.Mode.DESKTOP
+        val pinned = dev.droidtop.library.settings.CompanionPrefs.settings.value.inputPin
+        val id = targetId()
+        val screen = screens.firstOrNull { it.id == id }
+        target.text = InputTarget.label(desktop, screen, pinned != null && screen?.uniqueId == pinned)
+        pin.visibility = if (desktop || screen?.uniqueId == null) View.GONE else View.VISIBLE
+        pin.text = if (pinned != null) "Unpin" else "Pin"
+        pin.contentDescription = if (pinned != null) "Stop typing only to ${screen?.name}" else "Always type to ${screen?.name}"
+    }
+
+    /** Pins the screen Input types to now, or lets it follow the shell again. */
+    private fun togglePin() {
+        val app = context.applicationContext
+        val pinned = dev.droidtop.library.settings.CompanionPrefs.settings.value.inputPin
+        val next = if (pinned != null) null else screens.firstOrNull { it.id == targetId() }?.uniqueId
+        Thread {
+            dev.droidtop.library.settings.CompanionPrefs.setInputPin(app, next)
+            post { syncTarget() }
+        }.apply { isDaemon = true }.start()
     }
 
     override fun onAttachedToWindow() {
@@ -203,8 +298,10 @@ class SecondScreenInputView(
         // Built on attach rather than cached, so a desktop session that
         // connected after this view was created is picked up, and one that
         // went away leaves no sink pointing at a dead bridge.
-        trackpad.engine = TrackpadGestureEngine(trackpadOutput())
+        val settings = dev.droidtop.library.settings.CompanionPrefs.settings.value.trackpad
+        trackpad.engine = TrackpadGestureEngine(trackpadOutput(), trackpadConfig(settings))
         status.text = statusText()
+        refreshFacts()
         syncImePicker()
         Thread {
             elevated = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
@@ -220,6 +317,7 @@ class SecondScreenInputView(
         super.onWindowFocusChanged(hasWindowFocus)
         syncImePicker()
         status.text = statusText()
+        if (hasWindowFocus) refreshFacts()
     }
 
     private fun syncImePicker() {
@@ -237,12 +335,15 @@ class SecondScreenInputView(
     private fun trackpadOutput(): TrackpadOutput {
         val session = DesktopSessionService.state.value as? DesktopSessionState.Connected
         if (mode == SecondaryDisplayContent.Mode.DESKTOP && session != null) {
+            val settings = dev.droidtop.library.settings.CompanionPrefs.settings.value.trackpad
             return SeatTrackpadSink(
                 seat = InputSeats.of(session.hostBridge),
                 // Gain from the DESTINATION output's width, so the same
                 // hand movement crosses whatever the container renders at
                 // -- not from this panel's own size.
                 gainPxPerMm = session.primaryOutput.widthPx / TRACKPAD_TRAVEL_MM_PER_SCREEN_WIDTH,
+                userSpeed = trackpadSpeed(settings),
+                naturalScroll = settings.naturalScroll,
             )
         }
         return FocusNavTrackpadSink(emit = ForegroundShell::send)
@@ -269,7 +370,7 @@ class SecondScreenInputView(
             }
         } else {
             RoutedKeyboardSink(
-                displayId = { otherDisplay(context, display?.displayId) },
+                displayId = { targetId() },
                 elevated = { elevated },
                 onNoRoute = { status.text = statusText() },
             )
@@ -317,13 +418,6 @@ class SecondScreenInputView(
 
         else -> "Touchpad"
     }
-}
-
-/** The screen the companion types into: the shell's when it is elsewhere, else the first other display. */
-internal fun otherDisplay(context: Context, own: Int?): Int? {
-    val shell = ForegroundShell.current()?.window?.decorView?.display?.displayId
-    if (shell != null && shell != own) return shell
-    return dev.droidtop.runtime.tasks.TaskManager.displayIds(context).firstOrNull { it != own }
 }
 
 /**

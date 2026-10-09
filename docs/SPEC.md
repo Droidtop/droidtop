@@ -3535,6 +3535,21 @@ row of recent apps, became Home's Recent apps section for every mode.
   by the one quit path, writes the key through Emulator setup's one config write (`EmulatorSetup.write`) once RetroArch
   has ended, starts the game again and says "Done" or why not. Not in Kid or Kiosk. Standalone emulators get no
   such line: their save and load through plugins is its own issue.
+- **Input (slice C12).** Input fills the companion screen: the bar becomes a handle ("Show tabs", at least 48dp,
+  on the bottom edge or the top, Companion group "Show tabs handle"), opened by a tap or a pull of more than 24dp,
+  never by a drag that starts on the trackpad; the Tabs button in Input's header does the same, and picking a tab
+  hides the bar again. The header always names where keys go (`InputTarget`): in Desktop "Typing to: Linux desktop"
+  (the container's input seat, `DesktopInputRouter`, so the compositor gets Alt+Tab and Super and Android never sees
+  them as shortcuts); elsewhere the screen the shell is drawn on, else the first other screen, by its droidtop name,
+  never the companion's own, so touching the companion never moves the target. Pin keeps typing to that screen
+  while it is connected (stored by its unique id). Chord keys above the keyboard (Esc, Tab, Alt+Tab, Super, Ctrl+C,
+  Ctrl+V, Ctrl+Z) are played by the vendored keyboard's `MacroPlayer` into the same keyboard destination as typed
+  keys, which keeps its own sticky modifiers and macro keys. The trackpad's settings (Companion group > Trackpad,
+  `TrackpadSettings`) are libinput's options with libinput's defaults: pointer speed, tap to click, tap time, hold
+  to drag (the tap-and-drag window), two-finger scroll, two-finger tap right-click, three-finger tap middle-click,
+  natural scrolling on; scroll momentum and drag lock off. Connected controllers show with their batteries
+  (`InputDevice.getBatteryState`, Android 12 and later), and Home's status line names the one in hand ("Pad 80%")
+  when exactly one reports a battery.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 

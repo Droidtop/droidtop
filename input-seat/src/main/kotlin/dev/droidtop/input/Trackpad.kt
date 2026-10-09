@@ -36,12 +36,13 @@ import kotlin.math.hypot
  * - tap, then put a finger straight back down, is a drag with the left
  *   button held, released when that finger lifts
  *
- * Deliberately NOT included: drag lock (libinput ships it off by default,
- * and a button that stays down after the finger has left is astonishing),
- * software button areas along the bottom edge (a Retroid addon screen is
- * not a Thinkpad), and edge scrolling (superseded by two-finger scroll
- * everywhere). No gesture here is droidtop's own idea, which is the point:
- * a trackpad that behaves like every other trackpad needs no learning.
+ * Each of these is a setting ([TrackpadConfig], the companion's Trackpad settings, Droidtop/tracker#414 slice C12),
+ * on by default as libinput ships them. Two more are libinput's and off by default, as there: drag lock (a
+ * tap-and-drag's button stays down when the finger lifts, until the next tap) and momentum after a two-finger scroll
+ * (a kinetic coast, the macOS behaviour). Deliberately NOT included: software button areas along the bottom edge (a
+ * Retroid addon screen is not a Thinkpad) and edge scrolling (superseded by two-finger scroll everywhere). No gesture
+ * here is droidtop's own idea, which is the point: a trackpad that behaves like every other trackpad needs no
+ * learning.
  */
 object PointerAcceleration {
 
@@ -113,6 +114,18 @@ data class TrackpadConfig(
     val tapDragTimeoutMs: Long = 300L,
     /** Movement before two fingers count as scrolling rather than resting. Not a libinput constant. */
     val scrollSlopMm: Float = 1.5f,
+    /** A one-finger tap clicks (and starts tap-and-drag). libinput's tap-to-click. */
+    val tapToClick: Boolean = true,
+    /** Two fingers moving scroll. */
+    val twoFingerScroll: Boolean = true,
+    /** A two-finger tap is the right button. */
+    val twoFingerRightClick: Boolean = true,
+    /** A three-finger tap is the middle button. */
+    val threeFingerMiddleClick: Boolean = true,
+    /** libinput's drag lock, off by default: a tap-and-drag's button stays down after the finger lifts, until the next tap. */
+    val dragLock: Boolean = false,
+    /** A two-finger scroll coasts on after the fingers lift, slowing down; off by default. */
+    val momentum: Boolean = false,
 )
 
 /**
@@ -171,21 +184,56 @@ class TrackpadGestureEngine(
 
     private var dragging = false
 
+    /** Drag lock: the finger lifted mid-drag and the button is still down, waiting for the next tap. */
+    private var dragLocked = false
+
+    /** The current drag picked up a locked one: a tap now ends it instead of dragging on. */
+    private var resumedFromLock = false
+
+    /** Two-finger scroll speed in mm per ms, smoothed, for momentum. */
+    private var scrollVelX = 0f
+    private var scrollVelY = 0f
+
+    /** Momentum still coasting: its speed in mm per ms and when it last moved. */
+    private var coastVelX = 0f
+    private var coastVelY = 0f
+    private var coastAtMs: Long? = null
+
     /** Non-null while a tap's button is down waiting either for a drag or for its release. */
     private var pendingClickReleaseAtMs: Long? = null
 
     private var smoothedSpeed = 0f
 
     /** When [tick] must next be called, or null if nothing is pending. */
-    fun nextTimeoutAtMs(): Long? = pendingClickReleaseAtMs
+    fun nextTimeoutAtMs(): Long? = listOfNotNull(pendingClickReleaseAtMs, coastAtMs?.plus(COAST_FRAME_MS)).minOrNull()
 
     /** Delivers any timeout that has come due. Safe to call at any rate, including not at all. */
     fun tick(nowMs: Long) {
+        coast(nowMs)
         val due = pendingClickReleaseAtMs ?: return
         if (nowMs >= due) {
             pendingClickReleaseAtMs = null
             out.onButton(EvdevKeys.BTN_LEFT, pressed = false)
         }
+    }
+
+    /** One step of momentum: the distance coasted since the last, at a speed that decays exponentially, until slow. */
+    private fun coast(nowMs: Long) {
+        val since = coastAtMs ?: return
+        val dt = (nowMs - since).toFloat()
+        if (dt <= 0f) return
+        out.onScroll(coastVelX * dt, coastVelY * dt)
+        val decay = kotlin.math.exp(-dt / COAST_TAU_MS)
+        coastVelX *= decay
+        coastVelY *= decay
+        coastAtMs = nowMs
+        if (hypot(coastVelX, coastVelY) * 1000f < COAST_STOP_MM_PER_S) stopCoast()
+    }
+
+    private fun stopCoast() {
+        coastAtMs = null
+        coastVelX = 0f
+        coastVelY = 0f
     }
 
     /**
@@ -195,11 +243,14 @@ class TrackpadGestureEngine(
      * the other side, which is the worst failure this class can have.
      */
     fun cancel() {
-        if (dragging || pendingClickReleaseAtMs != null) {
+        if (dragging || dragLocked || pendingClickReleaseAtMs != null) {
             out.onButton(EvdevKeys.BTN_LEFT, pressed = false)
         }
         dragging = false
+        dragLocked = false
+        resumedFromLock = false
         pendingClickReleaseAtMs = null
+        stopCoast()
         previous = emptyMap()
         resetGesture()
     }
@@ -235,6 +286,18 @@ class TrackpadGestureEngine(
         scrollAccumX = 0f
         scrollAccumY = 0f
         smoothedSpeed = 0f
+        scrollVelX = 0f
+        scrollVelY = 0f
+        // A finger on the pad stops a coasting scroll, as on every trackpad with momentum.
+        stopCoast()
+
+        // Drag lock: the button is still down from the last drag; a finger picks the drag up again, and a tap ends it.
+        if (dragLocked && current.size == 1) {
+            dragLocked = false
+            dragging = true
+            resumedFromLock = true
+            return
+        }
 
         // A finger returning inside the tap-and-drag window turns the tap
         // that is still holding the button into a drag: the pending
@@ -251,8 +314,10 @@ class TrackpadGestureEngine(
         // A second finger landing mid-drag ends the drag rather than
         // dragging and scrolling at once. The button is released first so
         // the mode change cannot leave it down.
-        if (dragging && current.size > 1) {
+        if ((dragging || dragLocked) && current.size > 1) {
             dragging = false
+            dragLocked = false
+            resumedFromLock = false
             out.onButton(EvdevKeys.BTN_LEFT, pressed = false)
         }
 
@@ -277,7 +342,9 @@ class TrackpadGestureEngine(
                 if (dx != 0f || dy != 0f) out.onMove(dx, dy, smoothedSpeed)
             }
 
-            2 -> {
+            2 -> if (config.twoFingerScroll) {
+                scrollVelX = SPEED_SMOOTHING * (dx / dtMs) + (1f - SPEED_SMOOTHING) * scrollVelX
+                scrollVelY = SPEED_SMOOTHING * (dy / dtMs) + (1f - SPEED_SMOOTHING) * scrollVelY
                 scrollAccumX += dx
                 scrollAccumY += dy
                 if (!scrolling && hypot(scrollAccumX, scrollAccumY) > config.scrollSlopMm) {
@@ -297,20 +364,32 @@ class TrackpadGestureEngine(
     }
 
     private fun endGesture(nowMs: Long) {
-        if (dragging) {
-            dragging = false
-            out.onButton(EvdevKeys.BTN_LEFT, pressed = false)
-            resetGesture()
-            return
-        }
-
         val wasTap = !movedBeyondTapSlop &&
             !scrolling &&
             (nowMs - gestureStartMs) <= config.tapTimeoutMs
 
+        if (dragging) {
+            dragging = false
+            if (config.dragLock && !(resumedFromLock && wasTap)) {
+                // Drag lock: the finger lifted, the button stays down until the next tap.
+                dragLocked = true
+            } else {
+                out.onButton(EvdevKeys.BTN_LEFT, pressed = false)
+            }
+            resumedFromLock = false
+            resetGesture()
+            return
+        }
+
+        if (scrolling && config.momentum && hypot(scrollVelX, scrollVelY) * 1000f >= COAST_START_MM_PER_S) {
+            coastVelX = scrollVelX
+            coastVelY = scrollVelY
+            coastAtMs = nowMs
+        }
+
         if (wasTap) {
             when (maxFingers) {
-                1 -> {
+                1 -> if (config.tapToClick) {
                     // Pressed now, released when the tap-and-drag window
                     // closes -- because a finger returning inside that
                     // window means this was the start of a drag, not a
@@ -321,8 +400,8 @@ class TrackpadGestureEngine(
                     pendingClickReleaseAtMs = nowMs + config.tapDragTimeoutMs
                 }
 
-                2 -> click(EvdevKeys.BTN_RIGHT)
-                3 -> click(EvdevKeys.BTN_MIDDLE)
+                2 -> if (config.twoFingerRightClick) click(EvdevKeys.BTN_RIGHT)
+                3 -> if (config.threeFingerMiddleClick) click(EvdevKeys.BTN_MIDDLE)
                 else -> Unit
             }
         }
@@ -379,6 +458,12 @@ class TrackpadGestureEngine(
 
     private companion object {
         const val SPEED_SMOOTHING = 0.4f
+
+        /** Momentum: how fast a scroll must be going when the fingers lift, how it slows, and when it stops. */
+        const val COAST_START_MM_PER_S = 40f
+        const val COAST_STOP_MM_PER_S = 4f
+        const val COAST_TAU_MS = 325f
+        const val COAST_FRAME_MS = 16L
     }
 }
 

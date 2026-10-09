@@ -1158,6 +1158,23 @@ object GamingSettingsCatalog {
                     current = settings.askBeforeLoad,
                     onToggle = { c, on -> CompanionPrefs.setAskBeforeLoad(c, on) },
                 ),
+                NestedScreenItem(
+                    id = "companion_trackpad",
+                    title = "Trackpad",
+                    subtitle = "How the companion's Input trackpad moves, clicks and scrolls",
+                    inline = trackpadScreen(),
+                ),
+                ChoiceItem(
+                    id = "companion_handle_edge",
+                    title = "Show tabs handle",
+                    subtitle = "Input fills the companion screen; the handle that brings the tabs back sits on this edge",
+                    options = listOf(
+                        ChoiceOption(CompanionPrefs.HANDLE_BOTTOM, "Bottom (default)"),
+                        ChoiceOption(CompanionPrefs.HANDLE_TOP, "Top"),
+                    ),
+                    current = settings.handleEdge,
+                    onSelect = { c, value -> CompanionPrefs.setHandleEdge(c, value) },
+                ),
                 ChoiceItem(
                     id = "companion_low_battery",
                     title = "Low battery line",
@@ -1185,6 +1202,67 @@ object GamingSettingsCatalog {
             ),
         )
     }
+
+    /**
+     * The companion trackpad's settings (docs/SPEC.md "The companion's tabs", Input; slice C12): libinput's options with
+     * libinput's defaults, read by the trackpad when Input opens. Every row says what it does for the person.
+     */
+    private fun trackpadScreen(): CatalogScreen = CatalogScreen(
+        id = "companion_trackpad",
+        title = "Trackpad",
+        groups = { ctx ->
+            CompanionPrefs.load(ctx)
+            val t = CompanionPrefs.settings.value.trackpad
+            fun toggle(id: String, title: String, subtitle: String, current: Boolean, set: (TrackpadSettings, Boolean) -> TrackpadSettings) =
+                ToggleItem(
+                    id = "companion_trackpad_$id",
+                    title = title,
+                    subtitle = subtitle,
+                    current = current,
+                    onToggle = { c, on -> CompanionPrefs.setTrackpad(c) { set(it, on) } },
+                )
+            listOf(
+                CatalogGroup(
+                    id = "companion_trackpad",
+                    title = null,
+                    items = listOf(
+                        SliderItem(
+                            id = "companion_trackpad_speed",
+                            title = "Pointer speed",
+                            subtitle = "How far the pointer moves for the same finger movement",
+                            min = -10,
+                            max = 10,
+                            current = t.speed,
+                            onChange = { c, value -> CompanionPrefs.setTrackpad(c) { it.copy(speed = value) } },
+                        ),
+                        toggle("tap", "Tap to click", "A tap clicks, and tap then hold drags", t.tapToClick) { s, on -> s.copy(tapToClick = on) },
+                        ChoiceItem(
+                            id = "companion_trackpad_tap_ms",
+                            title = "Tap time",
+                            subtitle = "How long a touch can last and still count as a tap",
+                            options = listOf(120, 180, 250, 350).map { ChoiceOption(it.toString(), if (it == 180) "$it ms (default)" else "$it ms") },
+                            current = t.tapMs.toString(),
+                            onSelect = { c, value -> CompanionPrefs.setTrackpad(c) { it.copy(tapMs = value.toIntOrNull() ?: 180) } },
+                        ),
+                        ChoiceItem(
+                            id = "companion_trackpad_drag_ms",
+                            title = "Hold to drag",
+                            subtitle = "How soon after a tap your finger must come back down to drag instead of clicking",
+                            options = listOf(200, 300, 500).map { ChoiceOption(it.toString(), if (it == 300) "$it ms (default)" else "$it ms") },
+                            current = t.dragWindowMs.toString(),
+                            onSelect = { c, value -> CompanionPrefs.setTrackpad(c) { it.copy(dragWindowMs = value.toIntOrNull() ?: 300) } },
+                        ),
+                        toggle("two_scroll", "Two-finger scroll", "Two fingers moving scroll the page", t.twoFingerScroll) { s, on -> s.copy(twoFingerScroll = on) },
+                        toggle("two_right", "Two-finger tap right-clicks", "A tap with two fingers opens the menu a right click opens", t.twoFingerRightClick) { s, on -> s.copy(twoFingerRightClick = on) },
+                        toggle("three_middle", "Three-finger tap middle-clicks", "A tap with three fingers pastes or opens a link in a new tab", t.threeFingerMiddleClick) { s, on -> s.copy(threeFingerMiddleClick = on) },
+                        toggle("natural", "Natural scrolling", "The page moves with your fingers, as on a phone", t.naturalScroll) { s, on -> s.copy(naturalScroll = on) },
+                        toggle("momentum", "Scroll keeps going", "After a quick scroll the page coasts and slows down", t.momentum) { s, on -> s.copy(momentum = on) },
+                        toggle("drag_lock", "Drag lock", "While dragging, lifting your finger keeps holding; the next tap lets go", t.dragLock) { s, on -> s.copy(dragLock = on) },
+                    ),
+                ),
+            )
+        },
+    )
 
     /**
      * Typing on the add-on display (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314). With

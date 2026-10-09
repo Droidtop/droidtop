@@ -34,6 +34,12 @@ data class CompanionSettings(
     val askBeforeLoad: Boolean = true,
     /** Move picture-in-picture video to the companion (with the helper app); on by default. */
     val pipToCompanion: Boolean = true,
+    /** The Input tab's trackpad (slice C12). */
+    val trackpad: TrackpadSettings = TrackpadSettings(),
+    /** Where Input's "Show tabs" handle sits: [CompanionPrefs.HANDLE_BOTTOM] (the default) or [CompanionPrefs.HANDLE_TOP]. */
+    val handleEdge: String = CompanionPrefs.HANDLE_BOTTOM,
+    /** The screen Input types to when the person pinned one (its unique id), else null: the mode's own target. */
+    val inputPin: String? = null,
 ) {
     /** The two ask-first rules as [GameControls] takes them. */
     val ask: AskFirst get() = AskFirst(askBeforeStopping, askBeforeLoad)
@@ -41,6 +47,24 @@ data class CompanionSettings(
     fun chosen(mode: String): List<String> = chosen[mode] ?: CompanionPrefs.defaultChosen(mode)
     fun opening(mode: String): String = opening[mode] ?: CompanionPrefs.OPEN_DEFAULT
 }
+
+/**
+ * The companion trackpad's settings (docs/SPEC.md "The companion's tabs", Input): libinput's options, with its defaults.
+ * [speed] is libinput's pointer speed in tenths, -10..10 (0 unchanged); [tapMs] how long a touch may last and still be a
+ * tap; [dragWindowMs] how soon a finger must come back after a tap to drag.
+ */
+data class TrackpadSettings(
+    val speed: Int = 0,
+    val tapToClick: Boolean = true,
+    val tapMs: Int = 180,
+    val dragWindowMs: Int = 300,
+    val twoFingerScroll: Boolean = true,
+    val twoFingerRightClick: Boolean = true,
+    val threeFingerMiddleClick: Boolean = true,
+    val naturalScroll: Boolean = true,
+    val momentum: Boolean = false,
+    val dragLock: Boolean = false,
+)
 
 object CompanionPrefs {
     private const val PREFS = "companion"
@@ -55,6 +79,12 @@ object CompanionPrefs {
     private const val KEY_ASK_STOP = "ask_before_stopping"
     private const val KEY_ASK_LOAD = "ask_before_load"
     private const val KEY_PIP = "pip_to_companion"
+    private const val KEY_HANDLE = "input_handle_edge"
+    private const val KEY_INPUT_PIN = "input_pin"
+    private const val TP = "trackpad_"
+
+    const val HANDLE_BOTTOM = "bottom"
+    const val HANDLE_TOP = "top"
 
     const val MAX_CHOSEN = 4
     const val OPEN_DEFAULT = "default"
@@ -121,7 +151,52 @@ object CompanionPrefs {
         askBeforeStopping = all[KEY_ASK_STOP] as? Boolean ?: true,
         askBeforeLoad = all[KEY_ASK_LOAD] as? Boolean ?: true,
         pipToCompanion = all[KEY_PIP] as? Boolean ?: true,
+        trackpad = TrackpadSettings().let { d ->
+            TrackpadSettings(
+                speed = (all[TP + "speed"] as? Int ?: d.speed).coerceIn(-10, 10),
+                tapToClick = all[TP + "tap"] as? Boolean ?: d.tapToClick,
+                tapMs = all[TP + "tap_ms"] as? Int ?: d.tapMs,
+                dragWindowMs = all[TP + "drag_ms"] as? Int ?: d.dragWindowMs,
+                twoFingerScroll = all[TP + "two_scroll"] as? Boolean ?: d.twoFingerScroll,
+                twoFingerRightClick = all[TP + "two_right"] as? Boolean ?: d.twoFingerRightClick,
+                threeFingerMiddleClick = all[TP + "three_middle"] as? Boolean ?: d.threeFingerMiddleClick,
+                naturalScroll = all[TP + "natural"] as? Boolean ?: d.naturalScroll,
+                momentum = all[TP + "momentum"] as? Boolean ?: d.momentum,
+                dragLock = all[TP + "drag_lock"] as? Boolean ?: d.dragLock,
+            )
+        },
+        handleEdge = (all[KEY_HANDLE] as? String)?.takeIf { it == HANDLE_TOP } ?: HANDLE_BOTTOM,
+        inputPin = (all[KEY_INPUT_PIN] as? String)?.takeIf { it.isNotBlank() },
     )
+
+    /** The trackpad's settings after [change], kept and stored. */
+    fun setTrackpad(context: Context, change: (TrackpadSettings) -> TrackpadSettings) {
+        val next = change(state.value.trackpad)
+        update { it.copy(trackpad = next) }
+        prefs(context).edit()
+            .putInt(TP + "speed", next.speed)
+            .putBoolean(TP + "tap", next.tapToClick)
+            .putInt(TP + "tap_ms", next.tapMs)
+            .putInt(TP + "drag_ms", next.dragWindowMs)
+            .putBoolean(TP + "two_scroll", next.twoFingerScroll)
+            .putBoolean(TP + "two_right", next.twoFingerRightClick)
+            .putBoolean(TP + "three_middle", next.threeFingerMiddleClick)
+            .putBoolean(TP + "natural", next.naturalScroll)
+            .putBoolean(TP + "momentum", next.momentum)
+            .putBoolean(TP + "drag_lock", next.dragLock)
+            .apply()
+    }
+
+    fun setHandleEdge(context: Context, edge: String) {
+        update { it.copy(handleEdge = edge) }
+        prefs(context).edit().putString(KEY_HANDLE, edge).apply()
+    }
+
+    /** Pins Input's target to the screen with this unique id, or (null) follows the mode again. */
+    fun setInputPin(context: Context, uniqueId: String?) {
+        update { it.copy(inputPin = uniqueId) }
+        prefs(context).edit().putString(KEY_INPUT_PIN, uniqueId.orEmpty()).apply()
+    }
 
     fun setPipToCompanion(context: Context, on: Boolean) {
         update { it.copy(pipToCompanion = on) }

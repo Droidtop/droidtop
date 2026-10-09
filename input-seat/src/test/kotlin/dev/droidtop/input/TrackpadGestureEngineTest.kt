@@ -274,4 +274,108 @@ class TrackpadGestureEngineTest {
             out.buttons,
         )
     }
+
+    // ---- the companion's Trackpad settings (TrackpadConfig, Droidtop/tracker#414 slice C12) ----
+
+    @Test
+    fun `with tap to click off a tap clicks nothing`() {
+        val out = Recorder()
+        val engine = TrackpadGestureEngine(out, TrackpadConfig(tapToClick = false))
+        engine.onFrame(listOf(touch(0, 10f, 10f)), 0L)
+        engine.onFrame(emptyList(), 50L)
+        assertTrue(out.buttons.isEmpty())
+        assertNull(engine.nextTimeoutAtMs())
+    }
+
+    @Test
+    fun `two- and three-finger taps follow their settings`() {
+        val out = Recorder()
+        val engine = TrackpadGestureEngine(out, TrackpadConfig(twoFingerRightClick = false, threeFingerMiddleClick = false))
+        engine.onFrame(listOf(touch(0, 10f, 10f), touch(1, 20f, 10f)), 0L)
+        engine.onFrame(emptyList(), 50L)
+        engine.onFrame(listOf(touch(0, 10f, 10f), touch(1, 20f, 10f), touch(2, 30f, 10f)), 1000L)
+        engine.onFrame(emptyList(), 1050L)
+        assertTrue(out.buttons.isEmpty())
+    }
+
+    @Test
+    fun `with two-finger scroll off two fingers do nothing`() {
+        val out = Recorder()
+        val engine = TrackpadGestureEngine(out, TrackpadConfig(twoFingerScroll = false))
+        engine.onFrame(listOf(touch(0, 10f, 10f), touch(1, 20f, 10f)), 0L)
+        engine.onFrame(listOf(touch(0, 10f, 20f), touch(1, 20f, 20f)), 30L)
+        assertTrue(out.scrolls.isEmpty() && out.moves.isEmpty())
+    }
+
+    @Test
+    fun `drag lock keeps the button down after the finger lifts, until the next tap`() {
+        val out = Recorder()
+        val engine = TrackpadGestureEngine(out, TrackpadConfig(dragLock = true))
+        // Tap, then a finger back down and moving: a drag.
+        engine.onFrame(listOf(touch(0, 10f, 10f)), 0L)
+        engine.onFrame(emptyList(), 50L)
+        engine.onFrame(listOf(touch(1, 10f, 10f)), 120L)
+        engine.onFrame(listOf(touch(1, 40f, 10f)), 160L)
+        engine.onFrame(emptyList(), 200L)
+        // Lifted: still held.
+        assertEquals(listOf(Event.Button(EvdevKeys.BTN_LEFT, true)), out.buttons)
+        // A finger down and moving drags on.
+        engine.onFrame(listOf(touch(2, 40f, 10f)), 1000L)
+        engine.onFrame(listOf(touch(2, 60f, 10f)), 1040L)
+        engine.onFrame(emptyList(), 1080L)
+        assertEquals(1, out.buttons.size)
+        assertEquals(2, out.moves.size)
+        // The next tap ends it: one release, no click.
+        engine.onFrame(listOf(touch(3, 60f, 10f)), 2000L)
+        engine.onFrame(emptyList(), 2050L)
+        assertEquals(
+            listOf(Event.Button(EvdevKeys.BTN_LEFT, true), Event.Button(EvdevKeys.BTN_LEFT, false)),
+            out.buttons,
+        )
+        assertNull(engine.nextTimeoutAtMs())
+    }
+
+    @Test
+    fun `cancel releases a locked drag`() {
+        val out = Recorder()
+        val engine = TrackpadGestureEngine(out, TrackpadConfig(dragLock = true))
+        engine.onFrame(listOf(touch(0, 10f, 10f)), 0L)
+        engine.onFrame(emptyList(), 50L)
+        engine.onFrame(listOf(touch(1, 10f, 10f)), 120L)
+        engine.onFrame(listOf(touch(1, 40f, 10f)), 160L)
+        engine.onFrame(emptyList(), 200L)
+        engine.cancel()
+        assertEquals(Event.Button(EvdevKeys.BTN_LEFT, false), out.buttons.last())
+    }
+
+    @Test
+    fun `momentum coasts on after a fast scroll, slowing, and a finger stops it`() {
+        val out = Recorder()
+        val engine = TrackpadGestureEngine(out, TrackpadConfig(momentum = true))
+        engine.onFrame(listOf(touch(0, 10f, 10f), touch(1, 20f, 10f)), 0L)
+        engine.onFrame(listOf(touch(0, 10f, 20f), touch(1, 20f, 20f)), 20L)
+        engine.onFrame(listOf(touch(0, 10f, 30f), touch(1, 20f, 30f)), 40L)
+        engine.onFrame(emptyList(), 50L)
+        val scrolled = out.scrolls.size
+        assertNotNull(engine.nextTimeoutAtMs())
+        engine.tick(66L)
+        engine.tick(82L)
+        val coast = out.scrolls.drop(scrolled)
+        assertEquals(2, coast.size)
+        assertTrue(coast.all { it.dy > 0f })
+        assertTrue("it slows down", coast[1].dy < coast[0].dy)
+        engine.onFrame(listOf(touch(2, 10f, 10f)), 90L)
+        assertNull(engine.nextTimeoutAtMs())
+    }
+
+    @Test
+    fun `without momentum a scroll stops when the fingers lift`() {
+        val out = Recorder()
+        val engine = TrackpadGestureEngine(out)
+        engine.onFrame(listOf(touch(0, 10f, 10f), touch(1, 20f, 10f)), 0L)
+        engine.onFrame(listOf(touch(0, 10f, 20f), touch(1, 20f, 20f)), 20L)
+        engine.onFrame(listOf(touch(0, 10f, 30f), touch(1, 20f, 30f)), 40L)
+        engine.onFrame(emptyList(), 50L)
+        assertNull(engine.nextTimeoutAtMs())
+    }
 }

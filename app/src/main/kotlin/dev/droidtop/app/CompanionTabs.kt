@@ -1,6 +1,8 @@
 package dev.droidtop.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -326,6 +329,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         }
         fun select(id: String) {
             if (requested != null) KeyboardTargets.hideCompanion()
+            CompanionInputHandle.showTabs.value = false
             socialStart = null
             moreOpen = false
             autoTab = null
@@ -434,7 +438,19 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             }
         }
 
-        if (portrait) {
+        // Input fills the screen (slice C12): the bar becomes a handle on the edge the person picked, which a tap or a
+        // pull of more than 24dp opens; Input's own Tabs button does the same. It is its own strip, so a drag that
+        // starts as trackpad movement never opens it.
+        val showTabs by CompanionInputHandle.showTabs.collectAsState()
+        val inputFull = shown == CompanionTab.INPUT.id && requested == null && !moreOpen && !showTabs
+        if (inputFull) {
+            val top = settings.handleEdge == CompanionPrefs.HANDLE_TOP
+            Column(Modifier.fillMaxSize()) {
+                if (top) CompanionTabsHandle { CompanionInputHandle.showTabs.value = true }
+                Column(Modifier.weight(1f).fillMaxWidth(), content = content)
+                if (!top) CompanionTabsHandle { CompanionInputHandle.showTabs.value = true }
+            }
+        } else if (portrait) {
             Column(Modifier.fillMaxSize()) {
                 Column(Modifier.weight(1f).fillMaxWidth(), content = content)
                 TabRail(railTabs, railSelected, vertical = false, labelled = true, colors = railColors, onSelect = onRail)
@@ -453,6 +469,42 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                 Column(Modifier.weight(1f).fillMaxHeight(), content = content)
             }
         }
+    }
+}
+
+/**
+ * Input's handle in place of the bar: at least 48dp, labelled "Show tabs" for TalkBack, opened by a tap or by a pull
+ * of more than 24dp along it.
+ */
+@Composable
+private fun CompanionTabsHandle(onOpen: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val density = LocalDensity.current
+    val pullPx = with(density) { 24.dp.toPx() }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .background(colors.surface)
+            .clickable(role = Role.Button, onClickLabel = "Show tabs", onClick = onOpen)
+            .pointerInput(Unit) {
+                var pulled = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { pulled = 0f },
+                    onVerticalDrag = { change, amount ->
+                        pulled += amount
+                        if (kotlin.math.abs(pulled) > pullPx) {
+                            change.consume()
+                            pulled = 0f
+                            onOpen()
+                        }
+                    },
+                )
+            }
+            .semantics { contentDescription = "Show tabs" },
+    ) {
+        Box(Modifier.size(width = 48.dp, height = 5.dp).clip(RoundedCornerShape(50)).background(colors.onSurfaceVariant))
     }
 }
 
