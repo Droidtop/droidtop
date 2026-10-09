@@ -350,6 +350,21 @@ class FlutterDroidtopPlugin internal constructor(
                 }
                 engine.dartExecutor.executeDartEntrypoint(entrypoint)
                 engine.lifecycleChannel.appIsResumed()
+                // Once the framework listens, resumed again (LifecycleChannel drops a repeat, so inactive first): the
+                // resumed sent with the entrypoint arrived before the framework's binding and frames stayed disabled
+                // (Dart on emulator-5560: framesEnabled=false after runApp, true after this).
+                mainHandler.postDelayed({
+                    if (screenEngine === engine) {
+                        engine.lifecycleChannel.appIsInactive()
+                        engine.lifecycleChannel.appIsResumed()
+                    }
+                }, 250)
+                engine.renderer.addIsDisplayingFlutterUiListener(object : io.flutter.embedding.engine.renderer.FlutterUiDisplayListener {
+                    override fun onFlutterUiDisplayed() {
+                        android.util.Log.i("droidtop.plugin", "$pluginId: screen drew its first frame")
+                    }
+                    override fun onFlutterUiNoLongerDisplayed() = Unit
+                })
                 screenEngine = engine
                 screenTouch = AndroidTouchProcessor(engine.renderer, false)
                 screenKeys = KeyEventChannel(engine.dartExecutor.binaryMessenger)
@@ -366,6 +381,13 @@ class FlutterDroidtopPlugin internal constructor(
         return FlutterRenderer.ViewportMetrics().also {
             it.width = width
             it.height = height
+            // A fixed-size view, as FlutterView sends it: min and max equal to the size. Left at their default 0 the
+            // framework laid the screen out at zero size and every frame was empty (emulator-5560: black in both tiers,
+            // while Dart reported its first frame built).
+            it.minWidth = width
+            it.maxWidth = width
+            it.minHeight = height
+            it.maxHeight = height
             it.devicePixelRatio = density
         }
     }
