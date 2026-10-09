@@ -182,6 +182,8 @@ internal fun PcGameMenu(
     var removeArmed by remember(entry) { mutableStateOf(false) }
     LaunchedEffect(focusIndex, page) { removeArmed = false }
     val downloads by StoreDownloads.active.collectAsState()
+    val autoUpdateChoices by dev.droidtop.net.DownloadPolicy.games.collectAsState()
+    val downloadRules by dev.droidtop.net.DownloadPolicy.settings.collectAsState()
 
     LaunchedEffect(entry, reloadToken) {
         loaded = false
@@ -565,6 +567,21 @@ internal fun PcGameMenu(
                                 ?.line ?: "No cloud saves for this game"
                         }
                     }),
+                )
+            }
+            if (installed) {
+                val choice = autoUpdateChoices[key] ?: dev.droidtop.net.AutoUpdate.FOLLOW
+                val next = dev.droidtop.net.AutoUpdate.values()[(choice.ordinal + 1) % dev.droidtop.net.AutoUpdate.values().size]
+                add(
+                    PcActionRow(
+                        "Keep up to date",
+                        when (choice) {
+                            dev.droidtop.net.AutoUpdate.FOLLOW -> "Follows the default, which is ${if (downloadRules.autoUpdateDefault) "on" else "off"}"
+                            dev.droidtop.net.AutoUpdate.ON -> "On: installs a newer build when ${store.label} has one"
+                            dev.droidtop.net.AutoUpdate.OFF -> "Off: never updates by itself"
+                        },
+                        { scope.launch(Dispatchers.IO) { dev.droidtop.net.DownloadPolicy.setGame(context, key, next) } },
+                    ),
                 )
             }
             if (installed && store.canVerify) {

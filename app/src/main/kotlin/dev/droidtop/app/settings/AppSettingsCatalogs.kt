@@ -187,6 +187,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(pluginKeysScreen())
         SettingsScreenRegistry.register(PluginJobsScreen.screen())
+        SettingsScreenRegistry.register(DownloadRulesCatalog.screen())
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(WineOptionsCatalog.gameScreen())
         SettingsScreenRegistry.register(WindowsInstallCatalog.screen())
@@ -1292,6 +1293,12 @@ object AppSettingsCatalogs {
                         title = "Downloads",
                         subtitle = "What is downloading or waiting, with Pause, Resume and Cancel",
                         registryId = dev.droidtop.library.integrations.PluginJobsScreen.ID,
+                    ),
+                    NestedScreenItem(
+                        id = "pc_stores_download_rules",
+                        title = "Download rules",
+                        subtitle = "Wi-Fi only or mobile data, a time for updates, and which games keep themselves up to date",
+                        registryId = DownloadRulesCatalog.SCREEN_ID,
                     ),
                 ),
             ),

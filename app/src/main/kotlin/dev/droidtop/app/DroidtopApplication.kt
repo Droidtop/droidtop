@@ -1,6 +1,8 @@
 package dev.droidtop.app
 
 import android.app.Activity
+import android.app.Application
+import android.os.Build
 import android.os.Bundle
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -110,6 +112,13 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // The in-game performance overlay (SPEC "Performance overlay", tracker#83): drawn over the game while its level
         // (Quick Menu > Performance) is not Off. Main process only.
         PerformanceOverlayHost.install(this)
+        // The download policy (docs/SPEC.md "Download rules", tracker#226): every download job is held or let run by
+        // the person's rules, and games set to keep themselves up to date are checked a little after start.
+        // Main process only: the jobs registry lives there.
+        if (Build.VERSION.SDK_INT < 28 || Application.getProcessName() == packageName) {
+            dev.droidtop.pluginhost.DownloadGate.install(this)
+            dev.droidtop.library.stores.StoreAutoUpdates.requestLater(this)
+        }
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).
         LibraryCore.followGamesRoots(this)

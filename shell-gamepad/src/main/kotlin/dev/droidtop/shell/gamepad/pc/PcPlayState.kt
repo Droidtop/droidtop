@@ -243,7 +243,10 @@ internal suspend fun startOwnStoreInstall(context: Context, entry: LibraryEntry,
         }.orEmpty()
     }
     if (folder.isBlank()) return NO_GAME_FOLDER_LINE
-    return if (StoreInstallJob.start(context, key, GameNaming.displayName(entry.title), StoreInstallJob.rootFor(folder, store)) != null) {
+    return if (StoreInstallJob.start(
+            context, key, GameNaming.displayName(entry.title), StoreInstallJob.rootFor(folder, store),
+            sizeBytes = entry.pcInfo?.sizeBytes ?: 0L,
+        ) != null) {
         "Downloading. It is listed under Downloads"
     } else {
         "${store.label} cannot install this game in this build"

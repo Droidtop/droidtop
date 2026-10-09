@@ -611,14 +611,13 @@ object ContainersCatalog {
 
     private suspend fun fontItems(context: Context): List<CatalogItem> {
         val on = withContext(Dispatchers.IO) { DesktopSetupPrefs.allLanguageFonts(context) }
-        val metered = withContext(Dispatchers.IO) { DesktopSetupPrefs.fontsOnMetered(context) }
         return listOf(
             ToggleItem(
                 id = "container_all_language_fonts",
                 title = "Fonts for all languages",
                 subtitle = if (on) {
                     "Chinese, Japanese and Korean text and emoji. About 100 MB, downloaded as a job in Downloads and installs " +
-                        "while the desktop runs."
+                        "while the desktop runs, on the networks Download rules allow."
                 } else {
                     "Off: Chinese, Japanese and Korean text and emoji show as boxes."
                 },
@@ -627,13 +626,6 @@ object ContainersCatalog {
                     DesktopSetupPrefs.setAllLanguageFonts(ctx, value)
                     if (value) dev.droidtop.app.DesktopFontsJob.ensure(ctx)
                 },
-            ),
-            ToggleItem(
-                id = "container_fonts_on_metered",
-                title = "Download the fonts on mobile data",
-                subtitle = if (metered) "Also on metered networks" else "Off: the download waits for Wi-Fi or another unmetered network",
-                current = metered,
-                onToggle = { ctx, value -> DesktopSetupPrefs.setFontsOnMetered(ctx, value) },
             ),
         )
     }

@@ -57,6 +57,8 @@ dependencies {
     // dependency on it is `implementation`, not `api`, so it doesn't leak
     // transitively here; this shell needs its own explicit dependency.
     implementation(project(":runtime-common"))
+    // The download policy's per-game "Keep up to date" choice (docs/SPEC.md, "Download rules").
+    implementation(project(":net-core"))
     // droidtop's one keyboard view (KeyboardPanel, the embedded Hacker's
     // Keyboard grid): drawn under the shell's own text fields on a screen
     // Android draws no keyboard on (docs/SPEC.md 4c, tracker#314).

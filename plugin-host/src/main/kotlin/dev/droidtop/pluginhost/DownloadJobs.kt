@@ -9,6 +9,7 @@ import dev.droidtop.library.settings.LibraryPaths
 import dev.droidtop.library.settings.PathChange
 import dev.droidtop.runtime.util.Sha256
 import java.util.concurrent.ConcurrentHashMap
+import dev.droidtop.net.DownloadPolicy
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -27,6 +28,8 @@ data class DownloadRequest(
     val title: String,
     val name: String,
     val headers: Map<String, String> = emptyMap(),
+    /** Whether Android's download service may use a metered network for it (the download policy's say, docs/SPEC.md "Download rules"). */
+    val allowMetered: Boolean = true,
 )
 
 /** What DownloadManager's cursor says about one download, as plain values. */
@@ -110,6 +113,7 @@ class SystemDownloadBackend(context: Context) : DownloadBackend {
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(appContext, null, destination.relativeTo(root).path)
             .addRequestHeader("User-Agent", "droidtop")
+            .setAllowedOverMetered(request.allowMetered)
         request.headers.forEach { (key, value) -> queued.addRequestHeader(key, value) }
         return manager.enqueue(queued)
     }
@@ -204,6 +208,7 @@ object DownloadJobs {
             KIND,
             onCancel = { args, checkpoint -> cancelDownload(appContext, args, checkpoint) },
             reattachOnRestart = true,
+            download = true,
         ) { args, checkpoint, report -> execute(appContext, backendFactory(appContext), args, checkpoint, report) }
     }
 
@@ -244,6 +249,10 @@ object DownloadJobs {
         maxBytes: Long = 0L,
         headers: Map<String, String> = emptyMap(),
         extra: Map<String, String> = emptyMap(),
+        /** The file's size when the caller knows it: the download policy lets a small one use mobile data. */
+        sizeBytes: Long = 0L,
+        /** True for a download nobody just asked for: the policy's update window and "while playing" apply to it too. */
+        automatic: Boolean = false,
         onStatus: (String) -> Unit = {},
     ): PluginResult {
         val (secret, plain) = headers.entries.partition { entry ->
@@ -260,6 +269,8 @@ object DownloadJobs {
             sha256?.let { put(ARG_SHA256, it) }
             if (maxBytes > 0) put(ARG_MAX_BYTES, maxBytes.toString())
             if (plain.isNotEmpty()) put(ARG_HEADERS, JSONObject(plain.associate { it.key to it.value }).toString())
+            if (sizeBytes > 0) put(DownloadGate.ARG_BYTES, sizeBytes.toString())
+            if (automatic) put(DownloadGate.ARG_AUTOMATIC, "1")
         }
         val finished = CompletableDeferred<PluginResult>()
         val jobId = PluginJobsCenter.startNative(
@@ -301,7 +312,8 @@ object DownloadJobs {
             args[ARG_HEADERS]?.let { raw -> JSONObject(raw).let { o -> o.keys().forEach { put(it, o.getString(it)) } } }
             secretHeaders[name]?.let { putAll(it) }
         }
-        val request = DownloadRequest(requireNotNull(args[ARG_URL]) { "the download has no address" }, args[ARG_TITLE] ?: name, name, headers)
+        val allowMetered = DownloadPolicy.allowsMetered(DownloadPolicy.settings.value, args[DownloadGate.ARG_BYTES]?.toLongOrNull() ?: 0L)
+        val request = DownloadRequest(requireNotNull(args[ARG_URL]) { "the download has no address" }, args[ARG_TITLE] ?: name, name, headers, allowMetered)
         val file = fileFor(context, name)
         placedBeforeTheProcessEnded(backend, file, postName, args, checkpoint) { LibraryPaths.report(context, PathChange.added(it)) }?.let { return it }
         val id = withContext(Dispatchers.IO) {

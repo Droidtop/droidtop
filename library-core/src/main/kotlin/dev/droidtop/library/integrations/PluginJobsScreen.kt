@@ -37,6 +37,9 @@ import java.util.concurrent.ConcurrentHashMap
 object PluginJobsScreen {
     const val ID = "plugin_jobs"
 
+    /** The Download rules screen's registry id, registered by :app (`DownloadRulesCatalog`). */
+    const val RULES_SCREEN_ID = "download_rules"
+
     /**
      * The one place the list of "what is running" is reached; every store's installs are jobs in
      * it. [headed] false is for a host that already names the screen in its own header (the Quick
@@ -46,7 +49,7 @@ object PluginJobsScreen {
         id = ID,
         title = "Downloads and installs",
         subtitle = "Plugin downloads, library scrapes and other long-running actions, wherever they were started from".takeIf { headed },
-        groups = { _ -> groupsFor(PluginJobsCenter.entries().value, System.currentTimeMillis()) },
+        groups = { _ -> groupsFor(PluginJobsCenter.entries().value, System.currentTimeMillis()) + rulesGroup() },
         live = PluginJobsCenter.entries(),
     )
 
@@ -70,6 +73,20 @@ object PluginJobsScreen {
         )
     }
 
+    /** The way to the download rules (network, update window, automatic updates), from the place where downloads are seen. */
+    private fun rulesGroup() = CatalogGroup(
+        id = "plugin_jobs_rules",
+        title = null,
+        items = listOf(
+            NestedScreenItem(
+                id = "plugin_jobs_rules_link",
+                title = "Download rules",
+                subtitle = "Which network downloads use, when updates may run, and which games keep themselves up to date",
+                registryId = RULES_SCREEN_ID,
+            ),
+        ),
+    )
+
     private fun section(id: String, title: String, jobs: List<PluginJobsCenter.Entry>, nowMs: Long): CatalogGroup? =
         jobs.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = id, title = "$title (${it.size})", items = it.map { entry -> jobRow(entry, nowMs) }) }
 
@@ -87,6 +104,7 @@ object PluginJobsScreen {
      */
     internal fun progressLine(entry: PluginJobsCenter.Entry, timeLeft: String?): String {
         val first = when {
+            entry.hold != null -> entry.hold!!
             entry.paused -> "Paused"
             entry.percent >= 0 -> listOfNotNull("${entry.percent}%", timeLeft).joinToString(" · ")
             else -> entry.statusLine
@@ -152,11 +170,12 @@ object PluginJobsScreen {
                 ),
             )
             // A native job with no checkpoint yet pauses to a fresh start, so it may always be paused.
-            if (entry.pausable && entry.resumable && (entry.paused || entry.resumePayload != null || entry.nativeKind != null)) {
+            // A download the policy holds can always be started anyway, even a single file that has no Pause.
+            if (entry.hold != null || (entry.pausable && entry.resumable && (entry.paused || entry.resumePayload != null || entry.nativeKind != null))) {
                 add(
                     ActionItem(
                         id = "plugin_job_${jobId}_${if (entry.paused) "resume" else "pause"}",
-                        title = if (entry.paused) "Resume" else "Pause",
+                        title = if (entry.hold != null) "Download now" else if (entry.paused) "Resume" else "Pause",
                         run = { if (entry.paused) PluginJobsCenter.resume(jobId) else PluginJobsCenter.pause(jobId) },
                     ),
                 )

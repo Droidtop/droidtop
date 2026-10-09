@@ -28,6 +28,8 @@ object StoreSyncs {
             record(context, store.id)
             // The store's own groupings follow its library; a failure here never fails the read.
             runCatching { StoreCollections.import(context, store) }
+            // A freshly read library is the moment to look for updates of the games set to keep themselves current.
+            StoreAutoUpdates.request(context)
             SyncChange.between(count, before, rowKeys(context, store))
         }
     }

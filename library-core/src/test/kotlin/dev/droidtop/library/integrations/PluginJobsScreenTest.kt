@@ -55,6 +55,8 @@ class PluginJobsScreenTest {
         assertEquals("42% · About 3 min left\nDownloading… 12 MB of 300 MB", PluginJobsScreen.progressLine(job("a", 42), "About 3 min left"))
         assertEquals("Paused\nDownloading… 12 MB of 300 MB", PluginJobsScreen.progressLine(job("a", 42, paused = true), null))
         assertEquals("Waiting for Wi-Fi", PluginJobsScreen.progressLine(job("a", status = "Waiting for Wi-Fi"), null))
+        val held = job("h", 42, paused = true, status = "Waiting for Wi-Fi").copy(hold = "Waiting for Wi-Fi")
+        assertEquals("Waiting for Wi-Fi\nWaiting for Wi-Fi", PluginJobsScreen.progressLine(held, null))
     }
 
     @Test

@@ -5,6 +5,7 @@ import android.util.Log
 import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.settings.LibraryPaths
 import dev.droidtop.library.settings.PathChange
+import dev.droidtop.pluginhost.DownloadGate
 import dev.droidtop.pluginhost.PluginJobsCenter
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +66,7 @@ object StoreInstallJob {
         PluginJobsCenter.registerNative(
             kind = KIND,
             onCancel = { args, _ -> discard(app, args[ARG_KEY]) },
+            download = true,
         ) { args, _, report -> execute(app, args, report) }
         scope.launch {
             PluginJobsCenter.entries()
@@ -83,15 +85,22 @@ object StoreInstallJob {
 
     /**
      * Starts installing (or updating) the store row [key] under [root], or
-     * returns the job already doing it. Null when no store owns [key].
+     * returns the job already doing it. Null when no store owns [key]. [sizeBytes] (0 when unknown) and [automatic]
+     * (an update nobody just asked for, [StoreAutoUpdates]) are what the download policy decides on
+     * ([dev.droidtop.pluginhost.DownloadGate]).
      */
-    fun start(context: Context, key: String, title: String, root: File): String? {
+    fun start(context: Context, key: String, title: String, root: File, sizeBytes: Long = 0L, automatic: Boolean = false): String? {
         val store = StoreLibraries.forKey(key) ?: return null
         return PluginJobsCenter.startNative(
             context = context,
             kind = KIND,
             title = title,
-            args = mapOf(ARG_KEY to key, ARG_ROOT to root.absolutePath),
+            args = buildMap {
+                put(ARG_KEY, key)
+                put(ARG_ROOT, root.absolutePath)
+                if (sizeBytes > 0) put(DownloadGate.ARG_BYTES, sizeBytes.toString())
+                if (automatic) put(DownloadGate.ARG_AUTOMATIC, "1")
+            },
             owner = store.label,
         )
     }
