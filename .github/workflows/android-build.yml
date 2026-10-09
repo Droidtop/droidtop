@@ -124,6 +124,13 @@ jobs:
             echo "No SIGNING_KEYSTORE_BASE64 secret available (e.g. a fork PR) — building with Android's default debug signing instead."
           fi
 
+      - name: Report the runner's cores and memory
+        # What gradle.properties budgets the daemon heaps against
+        # (Droidtop/tracker#283): the log carries the real numbers.
+        run: |
+          nproc
+          free -m
+
       - name: Build release and debug APKs
         env:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}

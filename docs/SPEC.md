@@ -14528,8 +14528,10 @@ the other (`packageDebug` runs after `packageRelease`), and asset archives
 that are already compressed (`tzst`, `txz`, `zst`, `xz`) are stored rather
 than deflated again; both in `app/build.gradle.kts`. The packaging
 `OutOfMemoryError` of Droidtop/tracker#283 died in that deflate with both
-packaging runs in one daemon. The daemon heap itself is the owner's budget
-(`gradle.properties`).
+packaging runs in one daemon. The daemon heap is 6 GB (`gradle.properties`):
+the public-repository runner has 16 GB, not the 7 GB the old budget assumed,
+and `packageDebug` (unshrunk, 114 MB of dex) still ran the 4 GB daemon out of
+heap on 2026-10-08, after both fixes above (run 37808986646).
 
 **ABIs.** droidtop ships `arm64-v8a` (real hardware) and `x86_64` (x86
 devices and emulators). The release channel publishes one universal APK
