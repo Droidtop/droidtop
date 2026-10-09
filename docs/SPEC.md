@@ -3029,7 +3029,11 @@ row of recent apps, became Home's Recent apps section for every mode.
      of description, and Play. The library carries no achievements yet, so none are shown.
   2. **Continue playing** and **Recently added**: `CompanionRail`, ten 80dp 2:3 capsules each, tap or A
      launches through the one launch path; Recently added uses the library's first-seen time, an app's install
-     time as the fallback, and leaves out rows with neither. Then **Recent apps** (`CompanionAppsSection`):
+     time as the fallback, and leaves out rows with neither. Both rails draw from the list the shell's own Home
+     shelves are built from (the folded PC games, the Retro library and the launcher apps that are games,
+     published as `CompanionState.homeActivity`), not from the scanned games alone, which left out the apps and
+     so showed no Recently added where Home had items (rig 1523). The Displays > Companion > Home rows say a
+     section appears only when it has something to show. Then **Recent apps** (`CompanionAppsSection`):
      up to twelve apps from the launcher's own launch history (`RecentAppsStore`, the drawer's Recent row),
      a tap opens one on the companion's screen; nothing recorded, no section.
   3. **Downloads and updates**: the running jobs from `PluginJobsCenter` with their progress bars (at most

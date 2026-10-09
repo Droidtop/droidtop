@@ -197,6 +197,7 @@ fun GamepadShell(
     library: Library,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit = {},
     onEntriesChanged: (List<LibraryEntry>) -> Unit = {},
+    onHomeActivityChanged: (List<LibraryEntry>) -> Unit = {},
     deepLinkToken: Int = 0,
     startSectionName: String? = null,
     triggerRescan: Boolean = false,
@@ -212,6 +213,7 @@ fun GamepadShell(
                 library = library,
                 onFocusedEntryChanged = onFocusedEntryChanged,
                 onEntriesChanged = onEntriesChanged,
+                onHomeActivityChanged = onHomeActivityChanged,
                 deepLinkToken = deepLinkToken,
                 startSectionName = startSectionName,
                 triggerRescan = triggerRescan,
@@ -232,6 +234,12 @@ private fun GamepadShellBody(
      * anyone listening.
      */
     onEntriesChanged: (List<LibraryEntry>) -> Unit = {},
+    /**
+     * What Home's Continue playing and Recently added are built from (the folded PC games, the Retro
+     * library and the launcher apps that are games), published for the companion's Home so its rails match
+     * the shell's (Droidtop/tracker#328).
+     */
+    onHomeActivityChanged: (List<LibraryEntry>) -> Unit = {},
     // Real deep-link params from :app's MainActivity, which itself reads
     // them from an Intent extra sent by :shell-default's
     // SettingsGamingFragment -- a different module with no compile
@@ -1341,6 +1349,7 @@ private fun GamepadShellBody(
                                 },
                                 apps = if (uiMode.kidGamesOnly) emptyList() else appEntries.orEmpty(),
                                 library = library,
+                                onHomeActivityChanged = onHomeActivityChanged,
                                 state = pcGames,
                                 onLaunch = onLaunch,
                                 onToggleFavorite = onToggleFavorite,

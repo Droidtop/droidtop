@@ -262,6 +262,8 @@ internal fun PcGamesSection(
     onRequestRescan: () -> Unit,
     /** Home's destination row opens another section (Retro Games, PC Games). */
     onOpenSection: (GamingSection) -> Unit,
+    /** The folded PC games plus [retro] and game apps that Home's shelves are built from, for the companion's Home. */
+    onHomeActivityChanged: (List<LibraryEntry>) -> Unit = {},
 ) {
     val context = LocalContext.current
     val window = LocalShellWindow.current
@@ -349,6 +351,7 @@ internal fun PcGamesSection(
     var pluginShelfList by remember { mutableStateOf(emptyList<PcShelf>()) }
     LaunchedEffect(games, others) {
         val all = games ?: return@LaunchedEffect
+        onHomeActivityChanged(all + others)
         val own = withContext(Dispatchers.Default) { withRetroHero(homeShelves(all, others)) }
         val next = own + pluginShelfList
         if (state.home && !state.stripFocused) keepCursor(homeShelfList, next)

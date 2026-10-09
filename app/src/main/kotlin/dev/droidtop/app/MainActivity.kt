@@ -326,6 +326,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                     // screen the user is not driving and must not do
                     // work of its own.
                     onEntriesChanged = { CompanionState.libraryEntries.value = it },
+                    onHomeActivityChanged = { CompanionState.homeActivity.value = it },
                     deepLinkToken = gamingDeepLinkToken,
                     startSectionName = gamingStartSection,
                     triggerRescan = gamingTriggerRescan,

@@ -67,6 +67,13 @@ object CompanionState {
     val libraryEntries = MutableStateFlow<List<LibraryEntry>>(emptyList())
 
     /**
+     * What the Gaming shell's own Home builds Continue playing and Recently added from: the folded PC games,
+     * the Retro library and the launcher apps that are games. The companion's rails read this, so they show
+     * what Home shows; [libraryEntries] (games only, no apps) stands in until the shell has published it.
+     */
+    val homeActivity = MutableStateFlow<List<LibraryEntry>>(emptyList())
+
+    /**
      * Tap-to-launch, installed by MainActivity (the owner of the one
      * [dev.droidtop.library.Library] instance) and invoked by the
      * companion's recent-games rail. Null while no shell is alive to

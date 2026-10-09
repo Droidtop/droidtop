@@ -877,6 +877,9 @@ object GamingSettingsCatalog {
                                     ToggleItem(
                                         id = CompanionHomePrefs.itemId(section),
                                         title = section.label,
+                                        // Every section but these two draws nothing while it has nothing to show,
+                                        // so an ON row with no section on Home is not a fault (Droidtop/tracker#328).
+                                        subtitle = if (section in ALWAYS_SHOWN_HOME) null else "Appears when there is something to show",
                                         current = home.shows(section),
                                         onToggle = { c, on -> CompanionHomePrefs.setShown(c, section, on) },
                                     )
@@ -1139,3 +1142,6 @@ private fun keyboardSubtitle(context: android.content.Context): String {
         else -> "Select to switch keyboards"
     }
 }
+
+/** The companion Home sections that always draw when turned on; every other one hides itself while empty. */
+private val ALWAYS_SHOWN_HOME = setOf(CompanionHomeSection.NOTIFICATIONS, CompanionHomeSection.SYSTEM)

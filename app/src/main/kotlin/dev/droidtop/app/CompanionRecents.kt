@@ -29,23 +29,31 @@ import dev.droidtop.library.settings.CompanionHomeSection
  * yesterday" is the most common launcher action, so it is glanceable and one tap deep (docs/SPEC.md
  * section 4d, "The companion's tabs").
  *
- * Data comes from [CompanionState.libraryEntries] -- the same feed the idle rotation uses, published by
- * whatever drives the shell; the companion never runs its own scan. A tap goes through
+ * Data comes from [CompanionState.homeActivity] -- the list the shell's Home shelves are built from, with
+ * [CompanionState.libraryEntries] until it is published -- published by whatever drives the shell; the companion never runs its own scan. A tap goes through
  * [CompanionState.onLaunchEntry], which is the ordinary Library.launch path (launch-screen memory and the
  * chooser included), not a second launch mechanism.
  */
 @Composable
 internal fun CompanionRecents(layout: CompanionHomeLayout) {
-    val entries by CompanionState.libraryEntries.collectAsState()
+    val entries = railEntries()
     val recents = remember(entries) { companionRecents(entries) }
     CompanionRail(CompanionHomeSection.CONTINUE, layout, recents)
 }
 
 @Composable
 internal fun CompanionRecentlyAdded(layout: CompanionHomeLayout) {
-    val entries by CompanionState.libraryEntries.collectAsState()
+    val entries = railEntries()
     val added = remember(entries) { companionRecentlyAdded(entries) }
     CompanionRail(CompanionHomeSection.RECENTLY_ADDED, layout, added)
+}
+
+/** What the rails draw from: the shell Home's own activity list, else the scanned games until it is published. */
+@Composable
+private fun railEntries(): List<LibraryEntry> {
+    val home by CompanionState.homeActivity.collectAsState()
+    val scanned by CompanionState.libraryEntries.collectAsState()
+    return home.ifEmpty { scanned }
 }
 
 /** The games last played, newest first, one card per game, at most [MAX_RECENTS]. Pure. */
