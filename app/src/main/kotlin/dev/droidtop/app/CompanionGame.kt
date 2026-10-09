@@ -179,6 +179,8 @@ internal fun CompanionGameTab() {
         }
         // Rows from plugins whose panel declares the game ability (slice C9): RetroArch's save and load, a stream's controls.
         CompanionGamePluginRows(entry)
+        // "Save and load from here: Set up" while RetroArch runs it and a step is missing (slice C11).
+        CompanionRetroArchSetup(entry, rememberCompanionPanels(pluginMode(LocalCompanionMode.current)))
     }
 }
 

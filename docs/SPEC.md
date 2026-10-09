@@ -3526,6 +3526,15 @@ row of recent apps, became Home's Recent apps section for every mode.
   address only (`retroarch.command`, `RetroArchCommands`: UDP port 55355, an allowlist of RetroArch's in-game hotkey
   commands, no Quit), followed by `GET_STATUS`, so each row says what happened or "No answer from RetroArch"; a
   contained plugin has no sockets of its own. RetroArch reads them only with its Network Commands on.
+  **"Save and load from here: Set up" (slice C11):** a line on Game while RetroArch runs the game and finishing
+  the steps would make those rows appear: the RetroArch manager is not running but droidtop's official catalog offers
+  it (or it waits for approval), or RetroArch's `network_cmd_enable` is not on (`RetroArchSetupLine.steps`). Set up
+  opens one plain page with up to two buttons: Get the plugin (installs it from the catalog; approval is the usual
+  Plugins step) and Turn on. RetroArch reads its config at start and writes all of it back when it closes, so Turn on
+  asks first (Keep playing first; through the helper it also names the file, the Risky actions write), quits the game
+  by the one quit path, writes the key through Emulator setup's one config write (`EmulatorSetup.write`) once RetroArch
+  has ended, starts the game again and says "Done" or why not. Not in Kid or Kiosk. Standalone emulators get no
+  such line: their save and load through plugins is its own issue.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 
