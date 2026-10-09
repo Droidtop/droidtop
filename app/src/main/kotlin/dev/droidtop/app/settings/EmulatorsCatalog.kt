@@ -564,8 +564,10 @@ object EmulatorsCatalog {
             run = {},
         )
         if (!writable) return listOf(status)
-        return listOf(
+        return listOfNotNull(
             status,
+            // Only while a plugin that supplies BIOS files is installed and allowed (emulator.bios, Droidtop/tracker#415).
+            dev.droidtop.library.integrations.PluginBios.row(context, system.id, system.displayName, bios, folder, name, reach == EmulatorSetup.Reach.HELPER),
             DocumentPickItem(
                 id = "emulator_bios_add_${system.id}",
                 title = "Add a BIOS file",

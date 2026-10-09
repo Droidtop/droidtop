@@ -57,6 +57,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.pluginhost.DownloadJobs.register(appContext)
         dev.droidtop.library.integrations.PluginCatalog.registerDownloadPost()
         dev.droidtop.library.consoles.RetroArchCores.registerDownloadPost()
+        dev.droidtop.library.integrations.PluginBios.registerDownloadPost()
         dev.droidtop.pluginhost.PluginJobsCenter.attach(appContext)
         dev.droidtop.app.JobsSummaryNotification.start(appContext)
         dev.droidtop.app.LaunchWatchNotification.start(appContext)

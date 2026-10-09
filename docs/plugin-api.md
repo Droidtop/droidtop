@@ -1333,6 +1333,41 @@ writes real files that droidtop's own scan finds (A2).
   not files, such as cloud or streaming services, may need this
   reopened.
 
+**A11 BIOS providers.** EP `emulator.bios@1` (Droidtop/tracker#415, decided
+2026-10-09). Risk medium; no `provide:` consent (medium), it appears as an
+"Adds" tick box like the other medium points.
+- **For:** a plugin that can supply the BIOS files an emulated system needs,
+  so the Emulator setup helper (SPEC "Emulator setup helper") can offer "Get
+  the BIOS for this system" without the person hunting for files.
+- **Ops:**
+  - `list {system}` → `{files: [{name, md5?[], size?, source?}]}`: the files
+    the plugin can supply for droidtop's system id (the ES-DE short name, as
+    in `bios-database.json`), not what the system needs; the needs stay
+    droidtop's. At most 500 are read; `source` is a label of at most 60
+    characters that the confirmation shows ("Internet Archive").
+  - `acquire {system, name, md5[]}` → a **job** whose reply is the acquire
+    reply's single `download` descriptor (1.6; `md5`, `sha1` or `sha256`
+    verified by the Downloads job). A descriptor with `session`, or several
+    files, is refused.
+- **What droidtop does with it:** it matches each file of its own BIOS
+  database that the emulator's BIOS folder lacks to one of the plugin's files
+  (a shared md5 decides, then the same file name), so the plugin never names
+  where anything goes. The row "Get the BIOS for this system" appears only
+  while a provider is installed, running and not switched off, and only where
+  the helper can write the folder (itself, or through the privileged helper);
+  otherwise the helper stays "Add a BIOS file" (the person's own file). Each
+  file is a row "Get <file>" that first asks, naming the provider, its source
+  and the exact path (and, through the helper, whose folder). The download
+  runs as a Downloads job (`place_bios` post step): the file's md5 must be one
+  the database lists for that entry, and it is then written by the helper's one
+  write path, `EmulatorSetup.write`, which is the Risky actions gate
+  (`OTHER_APP_FILES`) for another app's folder. It is never placed in a games
+  folder. A download that fails its digest, or a placement that fails, keeps
+  the file in droidtop's downloads folder and the job says where.
+- **Permission:** `net.domains` for the source, as for `library.sources`; no
+  folder permission, because droidtop writes the file.
+- **Status:** built 2026-10-09 (`PluginBios`).
+
 ### B. Launch and runtime
 
 **B1 Launch providers.** EP `launch.provider@1`. Risk high.

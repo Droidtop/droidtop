@@ -72,6 +72,15 @@ object RiskyPrompts {
         "Put the file you pick into $folder in $app's folder? droidtop will write it as the system's shell user, " +
             "because Android keeps droidtop out of $app's folder."
 
+    /**
+     * What the helper's "Get the BIOS" row asks before it downloads: the provider, where from when it says, the exact
+     * file and the folder it goes to. Through the helper ([viaHelper]) it also says whose folder and as whom.
+     */
+    fun getBiosConfirm(plugin: String, source: String?, path: String, app: String, viaHelper: Boolean): String =
+        "Download this file with $plugin" + (source?.let { " from $it" } ?: "") + " and put it at $path? " +
+            if (viaHelper) "droidtop will write it into $app's folder as the system's shell user, because Android keeps droidtop out of it."
+            else "It goes into $app's BIOS folder."
+
     fun placeCoresConfirm(targets: List<String>, app: String): String =
         "Place " + (if (targets.size == 1) "this core" else "these ${targets.size} cores") + " in $app's private folder: " +
             targets.take(4).joinToString(", ") + (if (targets.size > 4) " and ${targets.size - 4} more" else "") +

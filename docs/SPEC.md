@@ -7975,6 +7975,14 @@ menu_displaylist.c and msg_hash_us.h). The rows and the manual steps read the sa
   says where RetroArch shows it). The row says which files are there when droidtop can list the folder.
   "Add a BIOS file" takes a file the person picks (the system picker; droidtop never downloads firmware),
   names it by the database (an md5 match decides, then the file name), and writes it whole into the folder.
+  **"Get the BIOS for this system" (Droidtop/tracker#415, decided 2026-10-09)** sits under it only while a plugin
+  that provides the extension point `emulator.bios@1` (docs/plugin-api.md 3 A11) is installed, running and allowed:
+  it opens a screen that asks each provider which of the missing files it can supply, and "Get <file>" asks first
+  (naming the plugin, its source and the exact path), downloads through the Downloads job and places the file
+  through the same write path as "Add a BIOS file", so another app's folder still goes through Risky actions. The
+  target name comes from the database, never from the plugin; the file's md5 must be one the database lists for it.
+  A failed placement keeps the download and says where. This is the one place droidtop fetches firmware, and only
+  at the person's press, from a plugin they approved; without a provider nothing changes.
 - **Emulator options.** Each setting row shows the value the emulator's own config holds and cycles it on A,
   changing only that key (`ConfigText`: every other line is kept; an INI key goes in its own section). An
   emulator that writes its config back when it closes (`writesOnExit`, RetroArch) is named in the row, since

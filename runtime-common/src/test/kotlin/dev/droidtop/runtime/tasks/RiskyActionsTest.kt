@@ -6,6 +6,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RiskyActionsTest {
+    @Test
+    fun theGetBiosConfirmNamesThePluginTheSourceThePathAndWhoseFolder() {
+        val viaHelper = RiskyPrompts.getBiosConfirm("BIOS downloader", "Internet Archive", "/Android/data/x/files/bios/scph5501.bin", "DuckStation", true)
+        assertTrue(viaHelper.contains("BIOS downloader"))
+        assertTrue(viaHelper.contains("Internet Archive"))
+        assertTrue(viaHelper.contains("/Android/data/x/files/bios/scph5501.bin"))
+        assertTrue(viaHelper.contains("DuckStation's folder as the system's shell user"))
+        val plain = RiskyPrompts.getBiosConfirm("BIOS downloader", null, "/sdcard/bios/a.bin", "RetroArch", false)
+        assertFalse(plain.contains(" from "))
+        assertFalse(plain.contains("shell user"))
+    }
+
     private class RecordingBackend : ElevatedBackend {
         val calls = mutableListOf<String>()
 
