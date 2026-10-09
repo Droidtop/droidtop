@@ -37,7 +37,7 @@ import kotlinx.coroutines.withContext
  *
  * Order, by relevance: the status line (and the last launch or quit error), Now (the running game, else the
  * game focused in the shell), Continue playing, Recently added, Downloads and updates, Social, the notification
- * group, System, then the user's widgets with the host's own add/remove controls. Each section after the status
+ * group, System, then the user's widgets with Add widget and Remove widget. Each section after the status
  * line folds from its heading and can be turned off in Displays > Companion ([CompanionHomePrefs]); a section
  * with nothing to show draws nothing. Both companion hosts draw this one composable (the second-screen host
  * and [CompanionActivity]).
@@ -45,22 +45,23 @@ import kotlinx.coroutines.withContext
 @Composable
 fun CompanionSurface(
     entry: LibraryEntry?,
-    widgetIds: List<Int>,
     widgetManager: AppWidgetManager,
     widgetHost: AppWidgetHost,
     modifier: Modifier = Modifier,
-    /**
-     * Widget add/remove controls, shown only by a host that can actually
-     * run them: binding a widget needs an Activity result, which a
-     * `Presentation` has no way to receive. A host without them simply
-     * shows the widgets the user already added; there is no line about it.
-     */
-    controls: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // The section choices are read once off the main thread; until then the defaults (everything shown) draw.
-    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { CompanionHomePrefs.load(context.applicationContext) } }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            CompanionHomePrefs.load(context.applicationContext)
+            CompanionWidgetPrefs.load(context.applicationContext)
+        }
+    }
     val layout by CompanionHomePrefs.layout.collectAsState()
+    val widgetIds by CompanionWidgetPrefs.ids.collectAsState()
+    // What Kid and Kiosk leave on Home: the status line and the volume and brightness pins (ControlAccess).
+    val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
+    fun shows(row: dev.droidtop.library.settings.ControlRow) = dev.droidtop.library.settings.ControlAccess.shows(uiMode, row)
     Box(modifier = modifier.fillMaxSize()) {
         // droidtop's own idle art stays the BACKGROUND layer; the page composites above it.
         CompanionContent(entry)
@@ -75,22 +76,29 @@ fun CompanionSurface(
             // Status line, always the first row (the controls live in the System section and tab).
             CompanionSystemBar()
             LaunchErrorLine()
-            if (layout.shows(CompanionHomeSection.NOW)) CompanionNowSection(entry, layout)
-            if (layout.shows(CompanionHomeSection.CONTINUE)) CompanionRecents(layout)
-            if (layout.shows(CompanionHomeSection.RECENTLY_ADDED)) CompanionRecentlyAdded(layout)
-            if (layout.shows(CompanionHomeSection.APPS)) CompanionAppsSection(layout)
-            if (layout.shows(CompanionHomeSection.ACTIVITY)) CompanionActivitySection(layout)
-            if (layout.shows(CompanionHomeSection.SOCIAL)) CompanionSocialSection(layout)
-            if (layout.shows(CompanionHomeSection.NOTIFICATIONS)) {
+            if (shows(dev.droidtop.library.settings.ControlRow.PINS)) CompanionPinsSection()
+            val library = shows(dev.droidtop.library.settings.ControlRow.LIBRARY)
+            if (library && layout.shows(CompanionHomeSection.NOW)) CompanionNowSection(entry, layout)
+            if (library && layout.shows(CompanionHomeSection.CONTINUE)) CompanionRecents(layout)
+            if (library && layout.shows(CompanionHomeSection.RECENTLY_ADDED)) CompanionRecentlyAdded(layout)
+            if (shows(dev.droidtop.library.settings.ControlRow.RECENT_APPS) && layout.shows(CompanionHomeSection.APPS)) {
+                CompanionAppsSection(layout)
+            }
+            if (library && layout.shows(CompanionHomeSection.ACTIVITY)) CompanionActivitySection(layout)
+            if (shows(dev.droidtop.library.settings.ControlRow.SOCIAL) && layout.shows(CompanionHomeSection.SOCIAL)) {
+                CompanionSocialSection(layout)
+            }
+            if (shows(dev.droidtop.library.settings.ControlRow.NOTIFICATIONS) && layout.shows(CompanionHomeSection.NOTIFICATIONS)) {
                 val open = layout.isOpen(CompanionHomeSection.NOTIFICATIONS)
                 CompanionNotifications(open = open) {
                     CompanionHomePrefs.setOpen(context, CompanionHomeSection.NOTIFICATIONS, !open)
                 }
             }
-            if (layout.shows(CompanionHomeSection.SYSTEM)) CompanionSystemSection(layout)
-            if (layout.shows(CompanionHomeSection.WIDGETS)) {
-                CompanionWidgetsSection(layout, widgetIds, widgetManager, widgetHost, controls)
+            if (library && layout.shows(CompanionHomeSection.SYSTEM)) CompanionSystemSection(layout)
+            if (library && layout.shows(CompanionHomeSection.WIDGETS)) {
+                CompanionWidgetsSection(layout, widgetIds, widgetManager, widgetHost)
             }
+            CompanionProviderLine()
         }
     }
 }
@@ -116,16 +124,14 @@ private fun LaunchErrorLine() {
     )
 }
 
-/** The user's Android widgets, then the host's add/remove controls as ordinary rows. */
+/** The user's Android widgets, then Add widget and Remove widget, the same on every host. */
 @Composable
 private fun CompanionWidgetsSection(
     layout: CompanionHomeLayout,
     widgetIds: List<Int>,
     widgetManager: AppWidgetManager,
     widgetHost: AppWidgetHost,
-    controls: (@Composable () -> Unit)?,
 ) {
-    if (widgetIds.isEmpty() && controls == null) return
     val density = LocalDensity.current
     CompanionHomeSectionFrame(CompanionHomeSection.WIDGETS, layout, summary = widgetIds.size.takeIf { it > 0 }?.toString()) {
         widgetIds.forEach { widgetId ->
@@ -147,6 +153,6 @@ private fun CompanionWidgetsSection(
                 )
             }
         }
-        controls?.invoke()
+        CompanionWidgetControls()
     }
 }

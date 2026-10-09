@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
@@ -44,7 +45,21 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun CompanionAppsSection(layout: CompanionHomeLayout) {
     val context = LocalContext.current
-    val apps by produceState(initialValue = emptyList<RecentApp>()) {
+    // The launcher records each launch in its own preferences file; re-read when it does, so an app opened from the
+    // launcher shows up here while Home is on screen (it was read once, and Recent apps never appeared, #347).
+    var launches by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val prefs = context.getSharedPreferences(
+            com.android.launcher3.LauncherFiles.SHARED_PREFERENCES_KEY,
+            android.content.Context.MODE_PRIVATE,
+        )
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (RecentAppsStore.isRecentKey(key)) launches++
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    val apps by produceState(initialValue = emptyList<RecentApp>(), launches) {
         value = withContext(Dispatchers.IO) {
             val pm = context.packageManager
             RecentAppsStore.current(context).take(MAX_RECENT_APPS).mapNotNull { component ->

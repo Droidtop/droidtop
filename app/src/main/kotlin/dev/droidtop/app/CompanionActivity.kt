@@ -38,15 +38,13 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * Floating/resizable apps reach this display through the launcher-wide
  * launch-display targeting, not through this Activity.
  *
- * Widget picking uses the system's own `ACTION_APPWIDGET_PICK` flow (the
- * picker handles bind permission + the widget's own configure Activity),
- * and bound widget ids persist in [CompanionWidgetPrefs] so the layout
- * survives restarts.
+ * Widget picking is [CompanionWidgetPickActivity] (the system's own
+ * `ACTION_APPWIDGET_PICK` flow), the same for every companion host, and bound
+ * widget ids persist in [CompanionWidgetPrefs] so the layout survives restarts.
  */
 class CompanionActivity : AppCompatActivity() {
     private lateinit var widgetHost: AppWidgetHost
     private lateinit var widgetManager: AppWidgetManager
-    private var widgetIds by mutableStateOf<List<Int>>(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,7 +57,6 @@ class CompanionActivity : AppCompatActivity() {
         dev.droidtop.display.CompanionSurfaceLifetime.bind(this, secondaryOnly = false)
         widgetManager = AppWidgetManager.getInstance(this)
         widgetHost = CompanionWidgets.host(this)
-        widgetIds = CompanionWidgetPrefs.widgetIds(this)
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
                 // Touch only: the D-pad never reaches these controls (dispatchKeyEvent below). Turned inside
@@ -73,71 +70,12 @@ class CompanionActivity : AppCompatActivity() {
                         val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(this@CompanionActivity)
                         CompanionTabs(mode) {
                             val entry = settledFocusedEntry()
-                            CompanionSurface(
-                                entry = entry,
-                                widgetIds = widgetIds,
-                                widgetManager = widgetManager,
-                                widgetHost = widgetHost,
-                            ) {
-                                androidx.compose.foundation.layout.Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                ) {
-                                    CompanionPill("Add widget") { pickWidget() }
-                                    if (widgetIds.isNotEmpty()) CompanionPill("Remove widget") { removeLastWidget() }
-                                }
-                            }
+                            CompanionSurface(entry = entry, widgetManager = widgetManager, widgetHost = widgetHost)
                         }
                     }
                 }
             }
         }
-    }
-
-    private fun pickWidget() {
-        val widgetId = widgetHost.allocateAppWidgetId()
-        @Suppress("DEPRECATION")
-        startActivityForResult(
-            Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId),
-            REQUEST_PICK_WIDGET,
-        )
-    }
-
-    private fun removeLastWidget() {
-        widgetIds.lastOrNull()?.let { widgetId ->
-            widgetHost.deleteAppWidgetId(widgetId)
-            widgetIds = widgetIds.dropLast(1)
-            CompanionWidgetPrefs.setWidgetIds(this, widgetIds)
-        }
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != REQUEST_PICK_WIDGET && requestCode != REQUEST_CONFIGURE_WIDGET) return
-        val widgetId = data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
-        if (resultCode != RESULT_OK || widgetId == -1) {
-            if (widgetId != -1) widgetHost.deleteAppWidgetId(widgetId)
-            return
-        }
-        if (requestCode == REQUEST_PICK_WIDGET) {
-            // A picked widget may need its own configuration Activity
-            // before it's usable — the standard host flow.
-            val info = widgetManager.getAppWidgetInfo(widgetId)
-            if (info?.configure != null) {
-                @Suppress("DEPRECATION")
-                startActivityForResult(
-                    Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
-                        .setComponent(info.configure)
-                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId),
-                    REQUEST_CONFIGURE_WIDGET,
-                )
-                return
-            }
-        }
-        widgetIds = widgetIds + widgetId
-        CompanionWidgetPrefs.setWidgetIds(this, widgetIds)
     }
 
     // singleTask (AndroidManifest.xml) resolves a repeat launch from
@@ -225,8 +163,6 @@ class CompanionActivity : AppCompatActivity() {
 
     companion object {
         const val ACTION_DISMISS = "dev.droidtop.app.action.DISMISS_COMPANION"
-        private const val REQUEST_PICK_WIDGET = 71
-        private const val REQUEST_CONFIGURE_WIDGET = 72
 
         /**
          * Whether a companion instance is currently started/visible — read
@@ -242,19 +178,37 @@ class CompanionActivity : AppCompatActivity() {
     }
 }
 
-/** Persisted companion widget layout — same shared-prefs convention as every other settings concern. */
+/**
+ * Persisted companion widget layout -- same shared-prefs convention as every other settings concern -- and observable
+ * ([ids]), so every companion host shows a widget added or removed from any of them. [load] reads the file: call it
+ * off the main thread.
+ */
 object CompanionWidgetPrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_WIDGET_IDS = "droidtop_companion_widget_ids"
 
-    fun widgetIds(context: android.content.Context): List<Int> =
-        context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+    private val state = kotlinx.coroutines.flow.MutableStateFlow<List<Int>>(emptyList())
+    val ids: kotlinx.coroutines.flow.StateFlow<List<Int>> = state
+
+    fun load(context: android.content.Context) {
+        state.value = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
             .getString(KEY_WIDGET_IDS, null)
             ?.split(',')
             ?.mapNotNull { it.toIntOrNull() }
             ?: emptyList()
+    }
 
-    fun setWidgetIds(context: android.content.Context, ids: List<Int>) {
+    fun add(context: android.content.Context, id: Int) = store(context, state.value + id)
+
+    /** Takes the last widget off Home and releases its id. */
+    fun removeLast(context: android.content.Context) {
+        val last = state.value.lastOrNull() ?: return
+        runCatching { CompanionWidgets.host(context).deleteAppWidgetId(last) }
+        store(context, state.value.dropLast(1))
+    }
+
+    private fun store(context: android.content.Context, ids: List<Int>) {
+        state.value = ids
         context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
             .edit().putString(KEY_WIDGET_IDS, ids.joinToString(",")).apply()
     }
@@ -376,6 +330,11 @@ internal fun CompanionSystemBar() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Mic muted, Mic in use, Camera in use: each its own words, read by TalkBack (VPN is in the line above).
+            rememberStatusIndicators(vpn = false).forEach { indicator ->
+                androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 6.dp))
+                Text(indicator, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+            }
         }
         DisplayFallbackNotice()
     }

@@ -3040,7 +3040,11 @@ a close path of its own. Every call works off the main thread.
     include an app the user already closed, so Clear all may ask Android about it too; that is
     harmless.
 
-**Privileged actions go through Shizuku or Sui, from one of two backends (Droidtop/tracker#262, #72).**
+**Privileged actions go through Shizuku or Sui, from one of two backends (Droidtop/tracker#262, #72).** With a provider
+running, Wi-Fi, Bluetooth and airplane mode are switches in the catalog (the shell's own `svc` and `cmd
+connectivity` commands, `SystemControls.radioCommand`), on the Quick Menu and the companion alike; without one
+they are rows that open Android's own panel. Location, Mute microphone (AudioManager) and the flashlight (the
+camera torch) need no provider (Droidtop/tracker#414, slice C5).
 `PrivilegedShell` in `:runtime-common` is the only privileged boundary used by task management and the
 companion's controls; its capability snapshot names listing tasks, force-stop, shell commands (appops,
 `svc`/`cmd` radios, package install) and permission grants. `ElevatedShell`, the one instance `TaskManager`
@@ -3362,7 +3366,16 @@ row of recent apps, became Home's Recent apps section for every mode.
 - **Home is the second screen's dashboard, one scrolling column (Droidtop/tracker#285, #328).**
   `CompanionSurface` draws a single vertically scrolling page over the idle art; nothing is stacked over
   anything else, the rails scroll sideways inside it, and a focused item scrolls itself into view. Order, by
-  relevance: the status line (clock, network, battery) and the last launch or quit error, then the sections:
+  relevance: the status line (clock, network, battery, and as their own spoken words "Mic muted", "Mic in use"
+  and "Camera in use" while any app records or holds a camera, from `AudioManager`'s recording callback, the
+  camera availability callback and the microphone-mute broadcast while the line is on screen, never polled;
+  `StatusIndicators`) and the last launch or quit error, then the **pins** (slice C5, Droidtop/tracker#414):
+  catalog items by id (`PinnedControls`, default volume, brightness, Wi-Fi (the network row), Do Not Disturb
+  and Mute microphone), drawn with the Quick Menu's own tile model (`QuickTiles.tile`, pressed by
+  `QuickTiles.pressKind`); a slider pin has a step button each side. "Edit pins" lists every System, Display and
+  Sound item with Pin or Unpin (no long-press needed). A pin for a control that needs the helper app is not
+  drawn without it; a pin whose grant is missing shows its grant row. Kid and Kiosk keep volume and brightness,
+  cannot edit, and Home shows nothing past the pins there (`ControlAccess`). Then the sections:
   1. **Now**: the running game (`LaunchDisplay.running`, the same parked launch the Quick Menu's Game section
      uses, now an observable flow carrying when the session started): art, name, this session's time, Resume
      (a relaunch of the entry, the Quick Menu's resume), Quit (`Library.quitRunning`, the one quit path both
@@ -3380,7 +3393,9 @@ row of recent apps, became Home's Recent apps section for every mode.
      so showed no Recently added where Home had items (rig 1523). The Displays > Companion > Home rows say a
      section appears only when it has something to show. Then **Recent apps** (`CompanionAppsSection`):
      up to twelve apps from the launcher's own launch history (`RecentAppsStore`, the drawer's Recent row),
-     a tap opens one on the companion's screen; nothing recorded, no section.
+     a tap opens one on the companion's screen; nothing recorded, no section. It re-reads when the launcher
+     records a launch (a preference listener), so an app opened while Home shows appears at once: it was read
+     once, and on Standard's second screen never appeared (rig, build 1702, Droidtop/tracker#347).
   3. **Downloads and updates**: the running jobs from `PluginJobsCenter` with their progress bars (at most
      four), and the number of games with an update waiting (the library's own `availableUpdate`).
   4. **Social**: unread conversations and friends in a game, from the same rows the Social tab draws; a tap
@@ -3388,7 +3403,14 @@ row of recent apps, became Home's Recent apps section for every mode.
   5. **Notifications**: the compact group (`CompanionNotifications`):
      folded, its heading is the count and the newest line; open, up to twelve with Dismiss.
   6. **System**: storage free and total, and All controls (the System tab).
-  7. **Widgets**: the user's Android widgets, then the host's own add/remove widget pills as ordinary rows.
+  7. **Widgets**: the user's Android widgets, then Add widget and Remove widget, the same on every host:
+     Add opens `CompanionWidgetPickActivity` (Android's picker needs an Activity result, which the
+     second-screen hosts cannot take) on the companion's own screen, and `CompanionWidgetPrefs.ids` is
+     observed, so Standard's second screen can add widgets too (it showed no Widgets section, rig, build 1702).
+  Home ends with "More controls need the helper app. Set up" while no `priv.shell` provider runs (not in Kid
+  or Kiosk). Set up opens a plain page: what the helper adds, that everything else works without it, that it
+  is fiddly (wireless debugging and a pairing code in Shizuku's own app) and that skipping it loses nothing
+  important, with one button for the next step (Get Shizuku, Open Shizuku, Allow droidtop) and Don't show again.
   Each section's heading folds it (tap or A; the fold is remembered), a section with nothing to show draws
   nothing, and Displays > Companion > Home turns any section off (`CompanionHomePrefs`). Defaults: every
   section shown, Notifications folded, the rest open. Every tab scrolls with the same vertical scroll

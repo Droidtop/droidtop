@@ -40,6 +40,10 @@ object RecentAppsStore {
             .apply()
     }
 
+    /** Whether a preferences change is to this list, for a surface that follows it (the companion's Recent apps). */
+    @JvmStatic
+    fun isRecentKey(key: String?): Boolean = key == KEY_RECENT_COMPONENTS
+
     /** Every tracked component, most-recent-first. */
     @JvmStatic
     fun current(context: Context): List<ComponentName> {

@@ -335,6 +335,18 @@
           Quick Menu's Leave row when a passkey is set, worked by pad or touch.
           Translucent over the shell, its own task like the mode switcher. Not exported.
         -->
+        <!--
+          Adds a widget to the companion's Home from any companion host (Android's
+          widget picker needs an Activity result). Translucent, on the companion's
+          own screen, its own task. Not exported.
+        -->
+        <activity
+            android:name="dev.droidtop.app.CompanionWidgetPickActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name="dev.droidtop.app.UiModePasskeyActivity"
             android:exported="false"

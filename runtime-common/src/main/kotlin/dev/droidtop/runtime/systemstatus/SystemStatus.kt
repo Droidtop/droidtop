@@ -209,6 +209,48 @@ object SystemControls {
     fun airplaneModeSettingsIntent(): Intent =
         Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+    fun locationOn(context: Context): Boolean = runCatching {
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+        if (android.os.Build.VERSION.SDK_INT >= 28) lm.isLocationEnabled
+        else lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
+    }.getOrDefault(false)
+
+    fun locationSettingsIntent(): Intent =
+        Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** Microphone mute for every app (AudioManager; MODIFY_AUDIO_SETTINGS, a normal permission). */
+    fun micMuted(context: Context): Boolean = runCatching {
+        (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).isMicrophoneMute
+    }.getOrDefault(false)
+
+    fun setMicMuted(context: Context, muted: Boolean) {
+        runCatching { (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).isMicrophoneMute = muted }
+    }
+
+    /** The first camera with a flash unit, which the torch switches; null on a device without one. */
+    private fun torchCamera(context: Context): String? = runCatching {
+        val cm = context.getSystemService(Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
+        cm.cameraIdList.firstOrNull { id ->
+            cm.getCameraCharacteristics(id).get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+        }
+    }.getOrNull()
+
+    fun hasFlashlight(context: Context): Boolean = torchCamera(context) != null
+
+    @Volatile
+    private var torch = false
+
+    /** The torch as droidtop last set it (Android reports changes only to a registered callback). */
+    fun flashlightOn(): Boolean = torch
+
+    fun setFlashlight(context: Context, on: Boolean) {
+        val camera = torchCamera(context) ?: return
+        runCatching {
+            (context.getSystemService(Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager).setTorchMode(camera, on)
+            torch = on
+        }
+    }
+
     /** The output switcher panel (API 29), else the Sound screen it grew out of. */
     fun audioOutputIntent(): Intent =
         Intent(

@@ -13,17 +13,15 @@ import dev.droidtop.library.LibraryEntry
  * only have a `Context` — notably the secondary-display registration,
  * which hands `:display` a composable and nothing else.
  *
- * No add/remove controls: this renders on whichever screen is NOT the one
- * the user is driving, and binding a widget needs an Activity result.
- * Widgets already added still render, and [CompanionActivity] remains
- * where the set is changed.
+ * Its Add widget opens [CompanionWidgetPickActivity] on this screen, as every
+ * host's does: binding a widget needs an Activity result, which this
+ * composable's host cannot receive itself.
  */
 @Composable
 fun CompanionSurfaceHost(entry: LibraryEntry?) {
     val context = LocalContext.current
     val widgetManager = remember { AppWidgetManager.getInstance(context) }
     val widgetHost = remember { CompanionWidgets.host(context) }
-    val widgetIds = remember { CompanionWidgetPrefs.widgetIds(context) }
 
     // Without listening, a hosted widget renders once and then never
     // updates -- no clock tick, no now-playing change. Reference counted,
@@ -33,11 +31,5 @@ fun CompanionSurfaceHost(entry: LibraryEntry?) {
         onDispose { CompanionWidgets.stopListening() }
     }
 
-    CompanionSurface(
-        entry = entry,
-        widgetIds = widgetIds,
-        widgetManager = widgetManager,
-        widgetHost = widgetHost,
-        controls = null,
-    )
+    CompanionSurface(entry = entry, widgetManager = widgetManager, widgetHost = widgetHost)
 }

@@ -93,6 +93,7 @@ object QuickTiles {
         GamingSettingsCatalog.ID_AUDIO_OUTPUT,
         GamingSettingsCatalog.ID_SYSTEM_DND,
         GamingSettingsCatalog.ID_SYSTEM_DND_GRANT,
+        GamingSettingsCatalog.ID_SYSTEM_MIC_MUTE,
     )
 
     val DISPLAY_IDS = listOf(
@@ -242,6 +243,8 @@ object QuickTiles {
         GamingSettingsCatalog.ID_SYSTEM_VPN -> QuickGlyph.VPN
         GamingSettingsCatalog.ID_SYSTEM_BATTERY -> QuickGlyph.BATTERY
         GamingSettingsCatalog.ID_SYSTEM_AIRPLANE -> QuickGlyph.AIRPLANE
+        GamingSettingsCatalog.ID_SYSTEM_WIFI -> QuickGlyph.NETWORK
+        GamingSettingsCatalog.ID_SYSTEM_MIC_MUTE -> QuickGlyph.VOLUME
         GamingSettingsCatalog.ID_SYSTEM_SLEEP -> QuickGlyph.MOON
         GamingSettingsCatalog.ID_SYSTEM_POWER_MENU,
         GamingSettingsCatalog.ID_SYSTEM_POWER_OFF,

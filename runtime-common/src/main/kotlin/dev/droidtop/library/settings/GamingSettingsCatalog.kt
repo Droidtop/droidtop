@@ -97,6 +97,10 @@ object GamingSettingsCatalog {
     const val ID_AUDIO_OUTPUT = "pref_gaming_audio_output"
     const val ID_ORIENTATION = "pref_screen_orientation_gaming"
     const val ID_PERFORMANCE_MODE = "pref_gaming_performance_mode"
+    const val ID_SYSTEM_MIC_MUTE = "pref_gaming_system_mic_mute"
+    const val ID_SYSTEM_FLASHLIGHT = "pref_gaming_system_flashlight"
+    const val ID_SYSTEM_LOCATION = "pref_gaming_system_location"
+    const val ID_SYSTEM_WIFI = "pref_gaming_system_wifi"
     const val ID_PRIVACY_DASHBOARD = "action_privacy_dashboard"
 
     private val TIMEOUT_OPTIONS = dev.droidtop.runtime.systemstatus.SystemControls.SCREEN_TIMEOUTS
@@ -706,27 +710,70 @@ object GamingSettingsCatalog {
                         run = { ctx -> SettingsLaunch.start(ctx, controls.batterySaverSettingsIntent()) },
                     ),
                 )
+                // With the helper app (a `priv.shell` provider) Wi-Fi, Bluetooth and airplane mode switch in place through
+                // the shell's own command; without it they open Android's own panel (docs/SPEC.md "Privileged actions").
+                val radios = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
+                if (radios) add(radioToggle(context, dev.droidtop.runtime.systemstatus.SystemControls.Radio.WIFI, ID_SYSTEM_WIFI, "Wi-Fi"))
+                if (radios) {
+                    add(radioToggle(context, dev.droidtop.runtime.systemstatus.SystemControls.Radio.BLUETOOTH, ID_SYSTEM_BLUETOOTH, "Bluetooth"))
+                } else {
+                    add(
+                        ActionItem(
+                            id = ID_SYSTEM_BLUETOOTH,
+                            title = "Bluetooth",
+                            subtitle = "Pair controllers and audio in the system Bluetooth screen",
+                            state = controls.bluetoothOn(context),
+                            run = { ctx -> SettingsLaunch.start(ctx, controls.bluetoothSettingsIntent()) },
+                        ),
+                    )
+                }
+                // Location: Android's own switch; an app can read it but not set it.
                 add(
                     ActionItem(
-                        id = ID_SYSTEM_BLUETOOTH,
-                        title = "Bluetooth",
-                        subtitle = "Pair controllers and audio in the system Bluetooth screen",
-                        state = controls.bluetoothOn(context),
-                        run = { ctx -> SettingsLaunch.start(ctx, controls.bluetoothSettingsIntent()) },
+                        id = ID_SYSTEM_LOCATION,
+                        title = "Location",
+                        subtitle = "Opens Android's location screen",
+                        state = controls.locationOn(context),
+                        run = { ctx -> SettingsLaunch.start(ctx, controls.locationSettingsIntent()) },
                     ),
                 )
-                // Airplane mode: Android gives an app no write to it (the
-                // radios are the system's), so like Network and Bluetooth the
-                // row shows the real state and opens the real screen.
+                // Microphone mute for every app at once (AudioManager), what a call's mute button does.
                 add(
-                    ActionItem(
-                        id = ID_SYSTEM_AIRPLANE,
-                        title = "Airplane mode",
-                        subtitle = "Opens the system screen: Android does not let an app switch it",
-                        state = controls.airplaneModeOn(context),
-                        run = { ctx -> SettingsLaunch.start(ctx, controls.airplaneModeSettingsIntent()) },
+                    ToggleItem(
+                        id = ID_SYSTEM_MIC_MUTE,
+                        title = "Mute microphone",
+                        subtitle = "Every app hears silence from the microphone while this is on",
+                        current = controls.micMuted(context),
+                        onToggle = { ctx, on -> controls.setMicMuted(ctx, on) },
                     ),
                 )
+                // The flashlight, where the device has one: the camera's torch, no permission needed.
+                if (controls.hasFlashlight(context)) {
+                    add(
+                        ToggleItem(
+                            id = ID_SYSTEM_FLASHLIGHT,
+                            title = "Flashlight",
+                            subtitle = "The light beside the camera",
+                            current = controls.flashlightOn(),
+                            onToggle = { ctx, on -> controls.setFlashlight(ctx, on) },
+                        ),
+                    )
+                }
+                // Airplane mode: Android gives an app no write to it (the radios are the system's), so without the
+                // helper app the row shows the real state and opens the real screen.
+                if (radios) {
+                    add(radioToggle(context, dev.droidtop.runtime.systemstatus.SystemControls.Radio.AIRPLANE, ID_SYSTEM_AIRPLANE, "Airplane mode"))
+                } else {
+                    add(
+                        ActionItem(
+                            id = ID_SYSTEM_AIRPLANE,
+                            title = "Airplane mode",
+                            subtitle = "Opens the system screen: Android does not let an app switch it",
+                            state = controls.airplaneModeOn(context),
+                            run = { ctx -> SettingsLaunch.start(ctx, controls.airplaneModeSettingsIntent()) },
+                        ),
+                    )
+                }
                 // Sleep (docs/SPEC.md 7f, "Sleep and return to game"): with a privilege provider it puts the
                 // console to sleep, the game suspended in place; without one the row only says what to press.
                 val power = dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand
@@ -918,6 +965,30 @@ object GamingSettingsCatalog {
     )
 
     /**
+     * A radio switched in place through the `priv.shell` provider's own command ([SystemControls.radioCommand]),
+     * off the main thread; only built when a provider is running.
+     */
+    private fun radioToggle(
+        context: Context,
+        radio: dev.droidtop.runtime.systemstatus.SystemControls.Radio,
+        id: String,
+        title: String,
+    ): ToggleItem {
+        val controls = dev.droidtop.runtime.systemstatus.SystemControls
+        return ToggleItem(
+            id = id,
+            title = title,
+            subtitle = "Switches $title through the helper app",
+            current = controls.radioOn(context, radio) == true,
+            onToggle = { _, on ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    dev.droidtop.runtime.tasks.TaskManager.shell.exec(controls.radioCommand(radio, on))
+                }
+            },
+        )
+    }
+
+    /**
      * Performance mode for the game in front (Android's GameManager profile, [GameModeControl]): one catalog item,
      * drawn by the Quick Menu's Performance section, the companion's System > Power card and its Game tab
      * (docs/SPEC.md "The companion's tabs"). Each press steps Standard, Performance, Battery saver. Null without a
@@ -1061,9 +1132,9 @@ object GamingSettingsCatalog {
                 ActionItem(
                     id = "companion_reset",
                     title = "Reset the companion to defaults",
-                    subtitle = "Puts the bar, the opening tab and the tips back as they came",
+                    subtitle = "Puts the bar, the opening tab, the pins and the tips back as they came",
                     confirmTitle = "Reset the companion?",
-                    run = { c -> CompanionPrefs.reset(c) },
+                    run = { c -> CompanionPrefs.reset(c); PinnedControls.reset(c) },
                 ),
             ),
         )
