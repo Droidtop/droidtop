@@ -10714,9 +10714,11 @@ identity line.
   store; droidtop never writes it and never deletes it. The scan itself
   stays [PcFolderScan]'s question (and the title parser's, tracker#264):
   the id store is the only thing the vendored scanner is still asked.
-  The scanner's other writes into a folder (an extracted `.ico` beside
-  the main executable, the Steam download marker for a recognised Steam
-  install) are not covered by this decision.
+  The icon pulled from a folder's one executable is written into
+  droidtop's cache (`cache/pc-icons/<id>.ico`), not beside the
+  executable; an `.extracted.ico` an older build left in a folder is
+  still read as an image the folder carries, never rewritten. The Steam
+  download marker was cut from the scanner with the runtime lift (":runtime-windows is droidtop's own").
 
 **Persisted engine verdicts are observable and must be reusable.** The
 engine verdicts (`PcFolderScan.EngineVerdicts`, one per process through

@@ -76,21 +76,7 @@ object CustomGameScanner {
         if (steamGridLogo != null) return steamGridLogo.absolutePath
 
         val uniqueExeRel = findUniqueExeRelativeToFolder(folder)
-        if (!uniqueExeRel.isNullOrEmpty()) {
-            val exeFile = File(folder, uniqueExeRel.replace('/', File.separatorChar))
-            if (exeFile.exists()) {
-                val outIco = File(exeFile.parentFile, exeFile.nameWithoutExtension + ".extracted.ico")
-                val useCached = outIco.exists() && outIco.lastModified() >= exeFile.lastModified()
-                if (useCached) return outIco.absolutePath
-                try {
-                    if (ExeIconExtractor.tryExtractMainIcon(exeFile, outIco)) {
-                        return outIco.absolutePath
-                    }
-                } catch (e: Exception) {
-                    // fall back below
-                }
-            }
-        }
+        extractedIcon(folder, idOf(appId), uniqueExeRel)?.let { return it.absolutePath }
         return findNearbyImageIcon(folder, uniqueExeRel)
     }
 
@@ -189,26 +175,34 @@ object CustomGameScanner {
         CustomGameCache.addEntry(idPart, folder.absolutePath)
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             try {
-                val hasExtractedIcon = folder.listFiles { file ->
-                    file.isFile && file.name.endsWith(".extracted.ico", ignoreCase = true)
-                }?.isNotEmpty() == true
-                if (!hasExtractedIcon) {
-                    val uniqueExeRel = findUniqueExeRelativeToFolder(folder)
-                    if (!uniqueExeRel.isNullOrEmpty()) {
-                        val exeFile = File(folder, uniqueExeRel.replace('/', File.separatorChar))
-                        if (exeFile.exists()) {
-                            val outIco = File(exeFile.parentFile, exeFile.nameWithoutExtension + ".extracted.ico")
-                            if (!outIco.exists() || outIco.lastModified() < exeFile.lastModified()) {
-                                ExeIconExtractor.tryExtractMainIcon(exeFile, outIco)
-                            }
-                        }
-                    }
-                }
+                extractedIcon(folder, idPart, findUniqueExeRelativeToFolder(folder))
             } catch (e: Exception) {
                 Timber.tag("CustomGameScanner").d(e, "Icon extraction failed for ${folder.name}")
             }
         }
     }
+
+    /**
+     * The icon of the folder's one executable, extracted into droidtop's own
+     * cache (never into the game folder: docs/SPEC.md 7g, tracker#269) and
+     * reused while the executable is not newer. Null when the folder has no
+     * single executable or its icon cannot be read.
+     */
+    private fun extractedIcon(folder: File, idPart: Int, uniqueExeRel: String?): File? {
+        if (uniqueExeRel.isNullOrEmpty() || StoragePaths.baseDataDirPath.isEmpty()) return null
+        val exeFile = File(folder, uniqueExeRel.replace('/', File.separatorChar))
+        if (!exeFile.exists()) return null
+        val outIco = File(File(StoragePaths.baseDataDirPath, "cache/pc-icons"), "$idPart.ico")
+        if (outIco.exists() && outIco.lastModified() >= exeFile.lastModified()) return outIco
+        outIco.parentFile?.mkdirs()
+        return try {
+            if (ExeIconExtractor.tryExtractMainIcon(exeFile, outIco)) outIco else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun idOf(appId: String): Int = appId.removePrefix("${CUSTOM_GAME}_").toIntOrNull() ?: 0
 
     /** The game [folderPath] is, with its id; null when it is not a folder. */
     fun createLibraryItemFromFolder(folderPath: String): ScannedGame? {
