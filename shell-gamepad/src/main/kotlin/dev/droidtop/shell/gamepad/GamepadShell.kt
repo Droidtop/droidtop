@@ -1647,6 +1647,9 @@ private fun EntryDetailScreen(
     // "choose match" branch that used to live here moved wholesale to
     // PcGameMenu rather than being duplicated across two screens.
     val isRomEntry = entry.kind == LibraryEntryKind.CONSOLE_ROM
+    // Achievements, play time and an emulator's compatibility, asked for once when the page opens (docs/SPEC.md 7h,
+    // "Game info"); a console game only, an app has none of them.
+    val gameInfo = rememberGameInfoRows(entry, enabled = isRomEntry)
 
     if (editingMetadata) {
         GameMetadataEditor(
@@ -1738,6 +1741,14 @@ private fun EntryDetailScreen(
         if (entry.playtimeSeconds > 0) {
             Text("Played ${entry.playtimeSeconds / 60} min", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
         }
+        gameInfo.forEach { row ->
+            Text(
+                row.value?.let { "${row.title}: $it" } ?: row.title,
+                color = MenuTokens.OnSurface,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            row.subtitle?.let { Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall) }
+        }
         // What this game's Switch files add up to -- "Update v131072 ·
         // 2 DLC", or, for a row that is itself an update/DLC whose base
         // game is missing, that fact. Empty (and so drawn not at all)
@@ -1760,6 +1771,16 @@ private fun EntryDetailScreen(
                     .onFocusChanged { onPrimaryFocus(if (it.isFocused) "Launch" else null) },
                 onClick = onLaunch,
             )
+            gameInfo.filter { it.chip != null }.forEach { row ->
+                ShellChip(
+                    row.chip.orEmpty(),
+                    onClick = {
+                        val page = row.screen
+                        val address = row.url
+                        if (page != null) pluginActionScreen = page else if (address != null) openAddress(context, address)
+                    },
+                )
+            }
             // Real ConsoleRomProvider-specific concept -- same honest
             // "not applicable" gating Library.toggleFavorite/
             // saveMetadata already use for a non-ROM entry.

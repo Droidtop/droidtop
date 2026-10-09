@@ -3320,7 +3320,7 @@ row of recent apps, became Home's Recent apps section for every mode.
      liveness signal Android gives, as the open Quick Menu does. With nothing running it is the game focused
      in the shell: system, title, developer, publisher, year, genre, playtime, last played, the player that
      will run it (`resolvePlayer`, read off the main thread), PC store facts, an available update, three lines
-     of description, and Play. The library carries no achievements yet, so none are shown.
+     of description, and Play. Achievements are on a game's own detail screen (7h, "RetroAchievements"), not here.
   2. **Continue playing** and **Recently added**: `CompanionRail`, ten 80dp 2:3 capsules each, tap or A
      launches through the one launch path; Recently added uses the library's first-seen time, an app's install
      time as the fallback, and leaves out rows with neither. Both rails draw from the list the shell's own Home
@@ -4556,8 +4556,10 @@ owner's own rule against fabricated content rules out inventing one for this pas
   real save, which becomes the cited row.
 - **Achievements.** DuckStation's own in-game menu has an Achievements row, which is
   RetroAchievements support living entirely inside that emulator's own process; droidtop
-  has no RetroAchievements client of its own and no channel to read that emulator's
-  in-process achievement state from outside it. Nothing to surface without inventing data.
+  has no channel to read that emulator's in-process achievement state, and does not try.
+  What droidtop shows on a game's detail screen is read from RetroAchievements itself with
+  the person's own account (7h, "RetroAchievements"); signing in to RetroAchievements inside
+  an emulator, hardcore mode and earning stay that emulator's.
 - **Per-core controls/hotkeys.** Each bundled emulator owns and lets the user reconfigure
   its own key bindings; droidtop has no reader for any of their configuration formats.
   Showing droidtop's own shell bindings here (A/B/Select/etc.) would be showing the WRONG
@@ -11166,10 +11168,12 @@ identity line.
   and say so in the scan log.
 - **Saves, states and achievements are the runner's.** droidtop does not
   read, write, back up or sync an emulator's save files or save states,
-  and it does not integrate RetroAchievements: each of those belongs to
-  the emulator, to enginehost (§7d) or to the Wine prefix, and the
-  game's detail links to where the runner keeps them rather than
-  modelling them a second time. Store cloud saves (§7g yardstick) are the
+  and it does not sign in to RetroAchievements for an emulator: each of
+  those belongs to the emulator, to enginehost (§7d) or to the Wine prefix,
+  and the game's detail links to where the runner keeps them rather than
+  modelling them a second time. What the person has earned on
+  RetroAchievements is a read of the service with their own account, for
+  display only (7h, "RetroAchievements"). Store cloud saves (§7g yardstick) are the
   store client's feature and are reached through its own screens.
 - **An unmounted root is skipped by every walk, never emptied.** A games
   root whose storage volume is not mounted (`StorageManager`'s volume
@@ -11540,6 +11544,23 @@ codecs chdman writes by default. A hunk in FLAC, Huffman or zstd, an older CHD, 
 does not implement (GameCube, Wii, Dreamcast, 3DO, PC-FX, Neo Geo CD, Jaguar CD) and any file the rule does not
 fit, hash to nothing; `RaConsoles.NONE` marks those consoles so the name can still match. Nothing here guesses a
 hash. Hashing reads the file, so it is never done on the main thread or while a list draws.
+
+**RetroAchievements: achievements and progress on the game's page (directed 2026-10-09, Droidtop/tracker#143).**
+A console game's detail screen (`EntryDetailScreen`, Y on a themed gamelist) gets an "Achievements" line and an
+Achievements chip once the person has entered their username and Web API Key (above); with no key it has nothing,
+because a missing fact is not a row. It is read when the screen opens, off the main thread, and never for a list
+(`RetroAchievements.lookup`): the game is recognised first by the hash of its file against the console's list of games
+and hashes (`API_GetGameList` with hashes, one request per console, kept a week), then, only when no hash matches
+or the file cannot be hashed, by a title that normalises to exactly one RetroAchievements title (`RaMatching`: case,
+punctuation, brackets, "the" and "&" ignored; two games with the same normalised title match nothing). The line says
+which of the two recognised it, so a name match is never presented as a hash match. The person's progress comes from
+`API_GetGameInfoAndUserProgress` for that game, cached ten minutes; offline, the last progress loaded is shown and
+says so, and being offline alone draws nothing. The chip opens the achievements as a page of rows in the settings
+catalog's own form (`achievementsScreen`): those earned (with the date, "Hardcore" where earned in hardcore), those
+not yet earned, and a row that opens the game on retroachievements.org in the browser. A refused key says to check
+it in Settings. The hash of a file is cached by its path, size and modified time, so a disc is read once. RetroArch's
+own RetroAchievements login stays RetroArch's: droidtop neither reads it nor writes it, and earning an achievement
+happens in the emulator.
 
 **The whole library, and a scrape names what it missed (directed 2026-10-08, Droidtop/tracker#374).**
 "Scrape all systems" walked console folders only, so installed Windows and engine games stayed text-only
@@ -11974,7 +11995,7 @@ it:
 | Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (nonzero indexed first-seen time, newest first), Update available, Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), then, when the library has more than one source (a store, a game folder, the Wine shortcuts: `PcSource`), one shelf per source in the Source filter's order, else one per pinned collection, else one per engine family (Visual Novels, RPG Maker, Windows, ...). On Overview, **Update available leads whenever it has rows**, above Continue playing, its heading always with its count; a tap on that heading opens the Updates tab (Droidtop/tracker#397 slice C). **The Collections tab** (`PcCollections.kt`, slice D) is a tile grid in three groups: your collections, your saved views, and each store's imported collections under "From <store>". A tile shows its name, its count and, when it is a tab, a mark, without needing focus; A opens the grid filtered to it (the **Collection** facet, static membership only, values OR), a saved view's tile applies the view. Hidden games do not count in a tile, and a collection whose every game here is hidden is not shown. Select on a tile: Pin as a tab (or Unpin), Pin all imported, Unpin all imported. A pinned collection's tab is a saved view over its Collection facet. **Home** keeps only recent activity across every library: Continue playing, Recently added and Update available (`homeShelves`, `HOME_SHELF_IDS`). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
 | Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip** (decided 2026-10-02, Droidtop/tracker#273 slice 2): the one row above PC Games' content, L1 and R1 glyphs at its ends: **Overview** (the shelves, `VIEW_OVERVIEW`, first and where PC Games opens), then the fixed built-in tabs **All games, Installed, Favourites, Collections**, then the person's **pinned views** in their own order (`pcStripTabs`, Droidtop/tracker#397 slice C). Built-in tabs never come and go: an empty one shows one line saying how to fill it (Collections: "Add a game to a collection from its menu (Select). Collections a store keeps appear here after it syncs."). List options > **Favourites tab / Collections tab** can hide those two; Overview, All games and Installed cannot be hidden, and the order is fixed so press counts stay the same. **Store tabs and the Updates tab are gone**: a store is a Source filter, and any filter can be saved as a tab. Everyone was given, once, a pinned view **"Updates"** over the Update available facet, first among the pinned views (`LibraryViewPrefs.withUpdatesView`); unpinning or removing it is the person's choice. Every grid tab, built-in or pinned, carries its count ("Installed · 12"). **Select on a pinned tab** opens its Options: Edit (a new name, then the Filter sheet over its filters and sort; saving writes the same view, same tab position), Unpin (it stays a saved view, listed in Collections), Move left, Move right, Move to first. The chips are Steam's tab pills (`ShellChip(tab = true)`, 2026-10-08): small bold capitals in the tab-label role, padded 6 by 16; the view on screen sits on a quiet plate (not the accent: it is a place, not a filter in effect), the chip under the cursor turns solid, and a shoulder glyph with nowhere to go is drawn at half strength. The full grid is one press away (R1 from Overview is All games). No Home chip (Home is a destination of its own and has no strip), no Filters chip (X opens the filter dialog), no Continue playing view (it is the first shelf). B from a grid view returns to Overview. The strip ends short of the floating status cluster (`StatusClusterRoom`, Droidtop/tracker#292), so its R1 glyph is never under the clock. The filters set that no strip view stands for show as ONE pill at the strip's end, naming every active filter, the first two by name and the rest as a number ("Steam · Shared with you · +2, 40 of 3,300 ✕"), on one line that shortens its own text and never pushes tabs off the strip, cleared by one press; there is no count line and no chip row on this page (the Filter sheet keeps its chips). The filter, sort, search and saved views are reached from X, Y and the sheets (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
 | 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule; that line carries the version management fact too: the installed build and, when a source knows a newer one, "v0.9.6 is available" (`focusLine`, `GameUpdates.line`). No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is Steam's, by the window's tier (`capsuleWidth`, `capsuleWidthFor`; 2026-10-08, Droidtop/tracker#363): 110dp up to an 853dp window (about six across on the console's 768dp window, so a shelf's last capsule is cut and says there is more; three on a phone held upright), 134dp up to 1279dp, 172dp from 1280dp. Shelves and the grid share it; the grid packs whole capsules of that width 12dp apart and centres the row in what is left (`GridCells.FixedSize`), never stretching a capsule to fill. |
-| Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons, a quiet facts strip, a tab strip (Overview, Versions and updates, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are not a row because droidtop has no achievement data (#143); when it does, this is where the row goes. |
+| Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons, a quiet facts strip, a tab strip (Overview, Versions and updates, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are one row of Overview, the same row for every source: RetroAchievements fills it for a console game on its detail screen (7h, "RetroAchievements"); a store's achievements (Droidtop/tracker#230) take this page's row when they exist. |
 | The page's rows are the same rows as Steam's settings | | **Settings' rows.** The page's facts are `MenuRow(uniformHeight = true)` at `uniformRowHeight()`, with one content-sized value column (`LocalValueColumnWidth`) and the selected row's full text in the detail strip under the list (`CatalogDetailStrip`, §7k "Text in rows and tiles"); a long description is read there, never by growing a row. |
 | A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A is the primary action** (owner, 2026-10-01: "A is Primary Action. We can make it contextual using the pills."): on a capsule A does what the hint pill says -- Play when the runner is ready, else the one setup step (`PcRunnerOptions.resolveAndPlay`, the one launch handler); the page is the first row of the game's menu (Select) and a long press. The page exists for looking and for the game's own actions, never as a step in front of Play. |
 
@@ -12446,7 +12467,7 @@ false "you have nothing", while it runs.
   it, and preexisting rows migrate with 0. A rebuild from game records
   also uses 0 because records do not establish when a game was first
   indexed. The shelf is still future UI work.
-- **Achievements** need a source (#143) before the page can carry them.
+- **Achievements** on this page wait for a store source (Droidtop/tracker#230); RetroAchievements has no console among the PC and engine systems, so its row never appears here.
 - **A rig check** of the tab by pad and touch on the emulator, and of the
   swapped face-button layout on the page, is listed in this change's
   commit message.
