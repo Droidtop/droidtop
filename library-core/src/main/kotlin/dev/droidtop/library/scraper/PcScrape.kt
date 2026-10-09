@@ -9,6 +9,7 @@ import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.GameMetadataEntity
 import dev.droidtop.library.consoles.RomDatabase
 import dev.droidtop.library.esDeSystemName
+import dev.droidtop.library.groupingPath
 import dev.droidtop.library.toLibraryEntryKind
 import dev.droidtop.runtime.prefs.PrefsFile
 import java.io.File
@@ -473,6 +474,9 @@ object PcScraper {
 
         val counts = PcScrapeCounts(targeted = targets.size)
         val flavour = PcFlavour(context)
+        // Metadata plugins (docs/plugin-api.md 3 A3), the same way the ROM pass asks them: after every built-in source,
+        // filling only what those left empty. One scrape path for ROMs and PC and engine games.
+        val plugins = if (wantMetadata) dev.droidtop.library.integrations.PluginMetadataSources.open(context) else null
         var consecutiveRefusals = 0
         for ((index, entry) in targets.withIndex()) {
             // A pause or cancel lands here, between games, never inside one.
@@ -489,6 +493,7 @@ object PcScraper {
             try {
                 val outcome = scrapeOne(context, entry, source, flavour)
                 logOutcome(source.label, entry, outcome)
+                plugins?.let { fillFromPlugins(context, entry, it) }
                 if (outcome is PcOutcome.Refused) {
                     consecutiveRefusals++
                     counts.lastRefusal = outcome.refusal
@@ -519,6 +524,7 @@ object PcScraper {
             onEntryDone(orderKey(entry))
         }
         if (counts.attempted > 0 && counts.refused == counts.attempted) onRefusedEverything()
+        plugins?.close()
         counts.flavourNotes = flavour.notes()
         formatPcScrapeSummary(source.label, counts).also {
             dev.droidtop.library.ScanLog.write("scrape: PC and engine games summary: ${it.replace('\n', ' ')}")
@@ -534,6 +540,30 @@ object PcScraper {
             is PcOutcome.Refused -> "refused, HTTP ${outcome.refusal.httpStatus}" + (outcome.refusal.reason?.let { ": $it" } ?: "")
         }
         dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] via $sourceLabel: $what")
+    }
+
+    /**
+     * What metadata plugins know about [entry], written into the fields the built-in sources left empty, each recorded
+     * under the plugin's name (docs/SPEC.md 7h). The facts a plugin gets: the title the scrape searched, the folder's
+     * name, the system folder, and the game's source links (docs/SPEC.md 7g), so a source the person linked the game to
+     * answers for exactly that record.
+     */
+    private suspend fun fillFromPlugins(
+        context: Context,
+        entry: LibraryEntry,
+        plugins: dev.droidtop.library.integrations.PluginMetadataSources.Session,
+    ) {
+        val facts = org.json.JSONObject().put("title", searchTitleFor(entry))
+        entry.groupingPath()?.let { facts.put("fileName", File(it).name) }
+        PcMediaLayout.systemFolderFor(entry)?.let { facts.put("systemId", it) }
+        val links = dev.droidtop.library.RoomGameLinksStore(context).getAll(listOf(entry.id))[entry.id]?.sources.orEmpty()
+        if (links.isNotEmpty()) facts.put("sourceLinks", org.json.JSONObject(links.associate { it.source to it.externalId }))
+        val found = plugins.lookup(facts).filterNot { it.isEmpty }
+        if (found.isEmpty()) return
+        val dao = RomDatabase.get(context).romDao()
+        val row = dao.getGameMetadataSingle(entry.id) ?: GameMetadataEntity(id = entry.id)
+        val (filled, sources) = PcPluginFields.fill(row, found)
+        if (sources.isNotEmpty()) dao.upsertGameMetadata(filled.copy(fieldSources = FieldSources.merge(row.fieldSources, sources)))
     }
 
     /** What happened to one game in the automatic pass; each lands in its own bucket of the summary. */

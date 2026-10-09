@@ -463,7 +463,17 @@ no destination, such as the PC library). Ops:
   indexes that file, from the download job, so the game appears even if the
   page that started it was closed or droidtop restarted meanwhile. Credential headers (Authorization, cookies, token and key
   headers) remain in memory only. A plugin may omit `download` and continue
-  doing its own transfer as before.
+  doing its own transfer as before. **Engine hint** (2026-10-09,
+  Droidtop/tracker#380, #355): with `download`, a job may return `engine`,
+  an engines-database id (`renpy`, `unity`, `html`, ...: the ids
+  `EngineRegistryParser.ENGINE_IDS` knows) naming the engine the source says
+  the game uses. droidtop pins the placed file, and the folder an archive of
+  that name unpacks to (its name less the archive extension, beside it), to
+  that engine and so its Enginehost player (`EngineOverridePrefs`, the same
+  pin as the game's Engine row) before the library indexes it; a pin the
+  person already set is kept, and they change or clear it on the Engine row
+  like any pin. An id droidtop does not know is ignored; the download goes
+  ahead either way.
 
 This reply extension is part of the additive 1.6 acquire contract; it does
 not change the view document's `view: 1` or the manifest's

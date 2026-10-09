@@ -9600,10 +9600,16 @@ compare -- Pythia skips that case too. With several sources linked, the
 first in source-key order that gives a version speaks for the game.
 
 **Details and downloads from the same source.** A source plugin's details
-for a game (description, tags, developer) arrive through `library.metadata`
-in the scrape pass (docs/plugin-api.md 3 A3), and its downloads through
+for a game (description, developer, engine as genre, score) arrive through
+`library.metadata` in the scrape pass, which asks metadata plugins for PC and
+engine games as well as ROMs (`PcScraper.scrape` after its built-in source,
+2026-10-09; docs/plugin-api.md 3 A3); the facts it hands a plugin carry the
+game's source links (`sourceLinks`, source key to id), so the source the person
+linked answers for exactly that record. Its downloads go through
 `library.sources` `acquire` into droidtop's own Downloads place (12a,
-"Downloads"; tracker#355). Neither is part of the update check.
+"Downloads"; tracker#355), with an engine hint (`engine`, an engines-database
+id) that pins the placed game to that engine's Enginehost player before it is
+indexed. Neither is part of the update check.
 
 **One wording, everywhere it shows** (`GameUpdates.line`, "v0.9.6 is
 available"): the card's second line (from `LibraryGameGroup.displayEntry`'s
@@ -16084,7 +16090,9 @@ of what is built. The decisions, briefly:
     is not a crash.
   - A metadata plugin never replaces a value a built-in scraper found. It
     fills the gaps, and each field records the plugin's name. ES-DE's model
-    of one selected scraper source is not changed by it.
+    of one selected scraper source is not changed by it. The ROM pass and the
+    PC and engine pass (`PcPluginFields`) ask plugins the same way, once per
+    game, after their built-in source (2026-10-09, Droidtop/tracker#380).
   - A context action whose plugin answers `enabled: false` is not offered
     at all, rather than shown greyed. One that does not answer in 500 ms is
     offered.

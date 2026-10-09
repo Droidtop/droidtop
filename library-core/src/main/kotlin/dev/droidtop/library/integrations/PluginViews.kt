@@ -143,7 +143,11 @@ object PluginViews {
                                 sha256 = descriptor.sha256,
                                 maxBytes = descriptor.size ?: 0L,
                                 headers = descriptor.headers + captured?.headers.orEmpty(),
-                                extra = mapOf("destinationPath" to destination, "targetName" to descriptor.fileName),
+                                extra = buildMap {
+                                    put("destinationPath", destination)
+                                    put("targetName", descriptor.fileName)
+                                    AcquireEngineHint.valid(result.values[AcquireEngineHint.KEY])?.let { put(AcquireEngineHint.KEY, it) }
+                                },
                                 onStatus = onStatus,
                             )
                         }

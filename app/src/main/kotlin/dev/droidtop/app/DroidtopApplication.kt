@@ -86,6 +86,11 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 dev.droidtop.library.integrations.PluginLibraryRead.snapshot(this@DroidtopApplication, LibraryCore.library(this@DroidtopApplication))
             }
         }
+        // A source's engine hint (docs/plugin-api.md 1.6, acquire reply `engine`) pins the placed download to that
+        // engine before the library indexes it.
+        dev.droidtop.pluginhost.DownloadJobs.onPlaced = { context, placed, args ->
+            dev.droidtop.library.integrations.AcquireEngineHint.apply(context, placed, args[dev.droidtop.library.integrations.AcquireEngineHint.KEY])
+        }
         // `social.changed` (docs/plugin-api.md 3 C19): a social provider plugin says something changed, and the
         // social hub asks it again off the binder thread (SPEC "Social").
         dev.droidtop.pluginhost.PluginBrokers.socialChanged = { pluginId, change ->

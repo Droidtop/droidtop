@@ -175,12 +175,22 @@ object DownloadJobs {
 
     internal var backendFactory: (Context) -> DownloadBackend = { SystemDownloadBackend(it) }
 
+    /**
+     * :app sets this at start: what to do with a file a download placed in a game folder, given the job's arguments,
+     * before the library is told about it. The library lives above this module, so the engine hint of a source's acquire
+     * reply (docs/plugin-api.md 1.6, `engine`) is applied there (`AcquireEngineHint` in :library-core).
+     */
+    @Volatile var onPlaced: (context: Context, placed: File, args: Map<String, String>) -> Unit = { _, _, _ -> }
+
     /** Registers the runner with the one jobs registry. Called once at process start, before jobs are restored. */
     fun register(context: Context) {
         val appContext = context.applicationContext
         registerPost(POST_PLACE_IN_FOLDER) { jobContext, file, args ->
             val target = withContext(Dispatchers.IO) {
                 placeInFolder(file, args).also {
+                    // What the job carries about the placed file beyond its bytes (a source's engine hint), applied
+                    // before the library looks at it, so the first index already reads it.
+                    runCatching { onPlaced(jobContext, it, args) }
                     // The file is the library's from here, said by the job and not by whatever screen started it, so
                     // a page that was closed, or a restart, loses nothing (docs/SPEC.md 7g, "Targeted indexing").
                     LibraryPaths.report(jobContext, PathChange.added(it))
