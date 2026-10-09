@@ -1164,16 +1164,10 @@ object AppSettingsCatalogs {
         ) + (
             // The shared environment's Wine build, emulation, graphics
             // driver and Direct3D: the default every game without settings
-            // of its own runs with (docs/SPEC.md 5a).
-            // Before setup the build and source choices are not rows of the environment, but the sources
-            // need none, so they are offered (Droidtop/tracker#372).
-            if (wineOptions && runtime != null && provisioned) {
-                WineOptionsCatalog.groups(context, entryId = null, title = null)
-            } else if (wineOptions && runtime != null) {
-                listOf(CatalogGroup(id = "windows_sources_before_setup", title = null, items = listOf(sourcesBeforeSetupItem())))
-            } else {
-                emptyList()
-            }
+            // of its own runs with (docs/SPEC.md 5a). Before setup they are
+            // the device's defaults, and the choices are setup's
+            // (Droidtop/tracker#372).
+            if (wineOptions && runtime != null) WineOptionsCatalog.groups(context, entryId = null, title = null) else emptyList()
         ) + listOf(
             CatalogGroup(
                 id = "windows_drives",

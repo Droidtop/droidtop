@@ -4588,6 +4588,23 @@ source (now `:runtime-windows`, §9):
     carried over from an arm64 device, since ARM code cannot run on x86.
   - **Global default = the shared environment** (container 1), edited in
     Settings > Windows games.
+  - **Reachable before setup (Droidtop/tracker#372).** Settings > Windows
+    games and a game's Wine and graphics page show the same rows before
+    "Set up Windows games" has run, not a dead end: the rows start from the
+    device's own defaults (`ContainerUtils.deviceDefaultContainerData`, what
+    setup would create) and a choice is kept as setup's choice
+    (`WineGameOptionsPrefs` under `droidtop:setup-defaults`: the names that
+    differ from the defaults, and `wine` for the Wine build), so the Wine
+    build, x86 emulation and graphics can be chosen before the first
+    download. Setup lays those choices over the defaults it creates the
+    environment from (`WineOptions.withSetupChoices`) and then drops them
+    (`setupDone`); afterwards the container's own fields are the truth. A
+    game's page also offers "Set up Windows games" as its first row, the
+    same row (`WineOptionsCatalog.windowsSetupItem`) as Settings. A game's
+    own choices, Steamworks and Frame generation work before setup as after;
+    its Wine build row only says a prefix of its own exists after setup
+    (that needs a prefix and a download). Rows that need a prefix (all
+    prefix settings, Wine configuration) appear after setup.
   - **Per game = launch-time choices over the shared prefix (owner,
     2026-10-02).** The game's "Wine and graphics" row (`WineOptionsCatalog`,
     a registered catalog screen deep-linked by entry id) shows the same
@@ -15244,14 +15261,23 @@ settings and the loader's ini live in the prefix's `C:\Program Files
 unmodified (SHA-256 checked in the build, licence and readme beside it) and
 `steamworks-shim.yml` publishes it as a pinned prerelease
 (`SteamworksShim`, `:runtime-windows`), downloaded at the first such launch.
-- **Which games:** every Steam game whose app id is known: droidtop's Steam
-  (`steam:<appid>`), a Steam library's `appmanifest_*.acf` whose `installdir`
-  is the game's folder (a Steam library on a games drive), or the game's own
-  `steam_appid.txt`. Not limited to folders where a `steam_api` file was
-  found (Unity keeps it three folders down, Unreal six; walking the tree on
-  every launch costs more than the loader costs a game that never calls
-  Steam). A game's Wine and graphics screen has a **Steamworks** row, on by
-  default, that turns it off for that game.
+- **Which games (owner, 2026-10-08: also non-Steam games):** switchable per
+  game, for any Windows game. A game Steam owns (droidtop's Steam,
+  `steam:<appid>`, or a Steam library's `appmanifest_*.acf` whose
+  `installdir` is the game's folder, a Steam library on a games drive) is
+  **on** unless the game turns it off. Any other game (GOG, itch.io, a
+  folder build) is **off** until it turns it on, because most of them never
+  call Steam; one that ships `steam_api*.dll` does. The game's Wine and
+  graphics screen has the **Steamworks** row (On/Off) and a **Steamworks app
+  ID** row. The app ID is the detected one (store id, manifest, or the
+  game's own `steam_appid.txt`, which names the Steam app but does not make
+  a copy Steam-owned) unless the person typed one; switched on with no id
+  known anywhere the game starts normally. Both are the game's own choices
+  (`WineGameOptionsPrefs`), kept when its Wine choices change
+  (`SteamworksShim.detect` and `resolve`, `WineOptions.steamworksNeed`).
+  Not limited to folders where a `steam_api` file was found (Unity keeps it
+  three folders down, Unreal six; walking the tree on every launch costs
+  more than the loader costs a game that never calls Steam).
 - **Who plays:** droidtop's Steam sign-in (`StoreLibrary.player`: SteamID,
   account name, the DLC droidtop installed with the game), else the DLC a
   Steam library's manifest lists as installed; a local profile when nobody is

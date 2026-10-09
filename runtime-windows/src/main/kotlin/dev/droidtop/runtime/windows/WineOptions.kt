@@ -8,6 +8,7 @@ import dev.droidtop.runtime.windows.utils.LsfgVkManager
 import dev.droidtop.runtime.windows.utils.ManifestComponentHelper
 import dev.droidtop.runtime.windows.utils.ManifestContentTypes
 import dev.droidtop.runtime.windows.utils.ManifestEntry
+import dev.droidtop.runtime.windows.utils.SteamworksShim
 import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
 import dev.droidtop.runtime.windows.utils.X86_64Graphics
 import com.winlator.container.Container
@@ -22,6 +23,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /** One choice of a [WineOptionRow], as the settings row shows it. */
 data class WineOptionChoice(val value: String, val label: String)
@@ -38,6 +40,8 @@ data class WineOptionRow(
     val choices: List<WineOptionChoice>,
     /** A game's own choice over the shared setting, rather than the shared value showing through. */
     val ownChoice: Boolean = false,
+    /** The value is typed, not picked ([current] is the text; [choices] are empty). */
+    val text: Boolean = false,
 )
 
 /**
@@ -53,6 +57,8 @@ data class WineOptionsState(
     val ownChoices: Int,
     val rows: List<WineOptionRow>,
     val missing: List<String>,
+    /** False before Set up Windows games: the rows then show the device's defaults and the choices made for the setup to use. */
+    val setUp: Boolean = true,
 )
 
 /**
@@ -95,14 +101,28 @@ object WineOptions {
     private const val LSFG_KEY = "lsfg"
     private const val LSFG_OFF = "off"
 
-    /** Whether a Steam game that uses Steamworks starts through the shim in its prefix (docs/SPEC.md 5b); a game's own choice, on unless turned off. */
+    /**
+     * Whether a game starts through the Steamworks shim in its prefix (docs/SPEC.md 5b), and as which Steam
+     * app: a game's own choices. Unchosen, a game Steam owns is on and any other is off; the app id is
+     * the detected one unless the person typed one.
+     */
     const val STEAMWORKS = "wine_steamworks"
+    const val STEAMWORKS_APPID = "wine_steamworks_appid"
     private const val STEAMWORKS_KEY = "steamworks"
+    private const val STEAMWORKS_APPID_KEY = "steamworks_appid"
     private const val STEAMWORKS_ON = "on"
     private const val STEAMWORKS_OFF = "off"
 
     /** A game's choices that are not prefix settings: kept when its Wine choices change or are dropped. */
-    private val OWN_KEYS = setOf(LSFG_KEY, STEAMWORKS_KEY)
+    private val OWN_KEYS = setOf(LSFG_KEY, STEAMWORKS_KEY, STEAMWORKS_APPID_KEY)
+
+    /**
+     * Where the choices made before Set up Windows games are kept (in [WineGameOptionsPrefs], under a name no
+     * library entry has): the [WineOptionPlan.GAME_KEYS] names that differ from the device's defaults, and
+     * "wine" for the Wine build. Setup creates the shared environment from them ([withSetupChoices]).
+     */
+    private const val SETUP_ENTRY = "droidtop:setup-defaults"
+    private const val WINE_KEY = "wine"
 
     private const val NOT_HERE = "downloads when used"
 
@@ -112,10 +132,10 @@ object WineOptions {
     @Volatile private var lastWrite: Job? = null
 
     /** Null when there is no Windows environment yet (the setup step, not an error). */
-    suspend fun state(context: Context, entryId: String?): WineOptionsState? = withContext(Dispatchers.IO) {
+    suspend fun state(context: Context, entryId: String?, gameRoot: String? = null): WineOptionsState = withContext(Dispatchers.IO) {
         lastWrite?.join()
         WindowsBackbone.awaitReady(context)
-        val container = PcContainers.forGame(context, entryId) ?: return@withContext null
+        val container = PcContainers.forGame(context, entryId) ?: return@withContext stateBeforeSetup(context, entryId, gameRoot)
         val own = entryId != null && PcContainers.isOwnPrefix(entryId, container)
         val data = ContainerUtils.toContainerData(container)
         val shared = read(data)
@@ -127,11 +147,64 @@ object WineOptions {
             prefixName = container.name?.takeIf { it.isNotBlank() } ?: container.id,
             ownPrefix = own,
             ownChoices = choices.size,
-            rows = rows(context, settings, Lists.load(context), choices.keys) +
-                listOfNotNull(entryId?.let { lsfgRow(context, it) }, entryId?.let { steamworksRow(context, it) }),
+            rows = rows(context, settings, Lists.load(context), choices.keys) + gameRows(context, entryId, gameRoot),
             missing = runCatching { WineComponents.missing(context, container) }.getOrDefault(emptyList()),
         )
     }
+
+    /** A game's rows that are not prefix settings: frame generation and Steamworks. Disk work. */
+    private suspend fun gameRows(context: Context, entryId: String?, gameRoot: String?): List<WineOptionRow> =
+        if (entryId == null) emptyList() else listOf(lsfgRow(context, entryId)) + steamworksRows(context, entryId, gameRoot?.let(::File))
+
+    /**
+     * The rows before Set up Windows games has made the environment: the device's own defaults (what setup
+     * will create) with the choices made so far over them, so the Wine build, emulation and graphics can be
+     * chosen before the first download. A game's own choices work as they do after setup, except the Wine
+     * build, which needs a prefix of its own to exist: that row only says so.
+     */
+    private suspend fun stateBeforeSetup(context: Context, entryId: String?, gameRoot: String?): WineOptionsState {
+        val data = ContainerUtils.deviceDefaultContainerData(context)
+        val shared = withSetupChoices(read(data), setupChoices(context))
+        val choices = if (entryId != null) gameChoices(context, entryId) else emptyMap()
+        val settings = WineOptionPlan.merge(shared, choices)
+        val rows = rows(context, settings, Lists.load(context), choices.keys).map { row ->
+            if (entryId != null && row.id == WINE) {
+                row.copy(
+                    summary = "A game can have a Wine build of its own once Windows games are set up. Until then it uses the shared one, " +
+                        "chosen under Settings > Library > Windows games.",
+                    choices = emptyList(),
+                )
+            } else {
+                row
+            }
+        }
+        return WineOptionsState(
+            prefixName = "Not set up yet",
+            ownPrefix = false,
+            ownChoices = choices.size,
+            rows = rows + gameRows(context, entryId, gameRoot),
+            missing = emptyList(),
+            setUp = false,
+        )
+    }
+
+    private fun setupChoices(context: Context): Map<String, String> = WineGameOptionsPrefs.get(context, SETUP_ENTRY)
+
+    /** [base] with the setup choices ([SETUP_ENTRY]) laid over it. */
+    private fun withSetupChoices(base: WineOptionPlan.Settings, chosen: Map<String, String>): WineOptionPlan.Settings =
+        WineOptionPlan.merge(base, chosen).copy(wine = chosen[WINE_KEY] ?: base.wine)
+
+    /**
+     * The device's [defaults] with the choices made before setup laid over them: what Set up Windows games
+     * creates the shared environment from. Preferences reads; never on the main thread.
+     */
+    fun withSetupChoices(context: Context, defaults: ContainerData): ContainerData {
+        val chosen = setupChoices(context)
+        return if (chosen.isEmpty()) defaults else write(defaults, withSetupChoices(read(defaults), chosen))
+    }
+
+    /** The environment exists now: the choices made before it are its settings, no longer pending. */
+    fun setupDone(context: Context) = WineGameOptionsPrefs.set(context, SETUP_ENTRY, emptyMap())
 
     /**
      * One choice for [entryId] (null: the shared environment). Returns at
@@ -153,10 +226,16 @@ object WineOptions {
                 }
                 if (rowId == STEAMWORKS && entryId != null) {
                     val stored = WineGameOptionsPrefs.get(app, entryId) - STEAMWORKS_KEY
-                    WineGameOptionsPrefs.set(app, entryId, if (value == STEAMWORKS_OFF) stored + (STEAMWORKS_KEY to value) else stored)
+                    WineGameOptionsPrefs.set(app, entryId, stored + (STEAMWORKS_KEY to value))
                     return@runCatching
                 }
-                val container = PcContainers.forGame(app, entryId) ?: return@runCatching
+                if (rowId == STEAMWORKS_APPID && entryId != null) {
+                    val stored = WineGameOptionsPrefs.get(app, entryId) - STEAMWORKS_APPID_KEY
+                    val appId = value.trim().toIntOrNull()?.takeIf { it > 0 }
+                    WineGameOptionsPrefs.set(app, entryId, if (appId != null) stored + (STEAMWORKS_APPID_KEY to appId.toString()) else stored)
+                    return@runCatching
+                }
+                val container = PcContainers.forGame(app, entryId) ?: return@runCatching selectBeforeSetup(app, entryId, rowId, value)
                 val data = ContainerUtils.toContainerData(container)
                 val shared = read(data)
                 if (entryId == null || PcContainers.isOwnPrefix(entryId, container)) {
@@ -172,6 +251,20 @@ object WineOptions {
                     setWineChoices(app, entryId, WineOptionPlan.diff(shared, next))
                 }
             }.onFailure { android.util.Log.w(TAG, "Wine option $rowId=$value not saved", it) }
+        }
+    }
+
+    /** A choice made before Set up Windows games: kept as the setup's choice, or as the game's own. */
+    private suspend fun selectBeforeSetup(context: Context, entryId: String?, rowId: String, value: String) {
+        val defaults = read(ContainerUtils.deviceDefaultContainerData(context))
+        val shared = withSetupChoices(defaults, setupChoices(context))
+        if (entryId == null) {
+            val next = apply(context, shared, rowId, value)
+            val chosen = WineOptionPlan.diff(defaults, next) + (if (next.wine != defaults.wine) mapOf(WINE_KEY to next.wine) else emptyMap())
+            WineGameOptionsPrefs.set(context, SETUP_ENTRY, chosen)
+        } else if (rowId != WINE) {
+            val next = apply(context, WineOptionPlan.merge(shared, gameChoices(context, entryId)), rowId, value)
+            setWineChoices(context, entryId, WineOptionPlan.diff(shared, next))
         }
     }
 
@@ -198,21 +291,46 @@ object WineOptions {
         WineGameOptionsPrefs.set(context, entryId, wine + own)
     }
 
-    /** Whether [entryId] starts through the Steamworks shim when it needs it: on unless the game turned it off. Preferences read. */
-    fun steamworksOn(context: Context, entryId: String?): Boolean =
-        entryId == null || WineGameOptionsPrefs.get(context, entryId)[STEAMWORKS_KEY] != STEAMWORKS_OFF
+    /**
+     * What [entryId] (folder [gameRoot]) starts through the Steamworks shim as, or null when it does not: its
+     * own choice, else on for a game Steam owns and off for any other ([SteamworksShim.resolve]). Disk work.
+     */
+    fun steamworksNeed(context: Context, entryId: String?, gameRoot: File?): SteamworksShim.Need? {
+        val detected = SteamworksShim.detect(entryId, gameRoot)
+        val own = entryId?.let { WineGameOptionsPrefs.get(context, it) }.orEmpty()
+        return SteamworksShim.resolve(own[STEAMWORKS_KEY], own[STEAMWORKS_APPID_KEY]?.toIntOrNull(), detected)
+    }
 
-    /** The Steamworks row of [entryId] (docs/SPEC.md 5b, "Steamworks in the prefix"). */
-    private fun steamworksRow(context: Context, entryId: String): WineOptionRow {
-        val on = steamworksOn(context, entryId)
-        return WineOptionRow(
-            STEAMWORKS, "Steamworks",
-            "For a Steam game that uses Steamworks: it starts as your droidtop Steam account through a stand-in for the Steam client " +
-                "in its prefix (gbe_fork), so it does not stop waiting for Steam. Achievements and multiplayer stay on this device. " +
-                "Nothing in the game's folder changes. Other games ignore it.",
-            if (on) STEAMWORKS_ON else STEAMWORKS_OFF,
-            listOf(WineOptionChoice(STEAMWORKS_ON, "On"), WineOptionChoice(STEAMWORKS_OFF, "Off")),
-            ownChoice = !on,
+    /** The Steamworks rows of [entryId] (docs/SPEC.md 5b, "Steamworks in the prefix"): the switch and the Steam app it starts as. Disk work. */
+    private fun steamworksRows(context: Context, entryId: String, gameRoot: File?): List<WineOptionRow> {
+        val own = WineGameOptionsPrefs.get(context, entryId)
+        val detected = SteamworksShim.detect(entryId, gameRoot)
+        val on = (own[STEAMWORKS_KEY] ?: if (detected?.owned == true) STEAMWORKS_ON else STEAMWORKS_OFF) == STEAMWORKS_ON
+        val typed = own[STEAMWORKS_APPID_KEY]
+        return listOf(
+            WineOptionRow(
+                STEAMWORKS, "Steamworks",
+                "For a game that calls Steam (steam_api.dll): it starts through a stand-in for the Steam client in its prefix (gbe_fork), " +
+                    "as your droidtop Steam account when signed in, so it does not stop waiting for Steam. " +
+                    "Achievements and multiplayer stay on this device. Nothing in the game's folder changes. " +
+                    "On for a Steam game; off for a game from anywhere else until you turn it on.",
+                if (on) STEAMWORKS_ON else STEAMWORKS_OFF,
+                listOf(WineOptionChoice(STEAMWORKS_ON, "On"), WineOptionChoice(STEAMWORKS_OFF, "Off")),
+                ownChoice = own[STEAMWORKS_KEY] != null,
+            ),
+            WineOptionRow(
+                STEAMWORKS_APPID, "Steamworks app ID",
+                when {
+                    typed != null -> "The Steam app ID you set for this game. Clear it to use " +
+                        (detected?.let { "the detected one (${it.appId}, from ${it.via})" } ?: "none: this game has no Steam app ID of its own") + "."
+                    detected != null -> "Detected from ${detected.via}. Type another number to use that instead."
+                    else -> "None found for this game. Type its Steam app ID (the number in its Steam store page address) to use Steamworks with it."
+                },
+                typed ?: detected?.appId?.toString().orEmpty(),
+                emptyList(),
+                ownChoice = typed != null,
+                text = true,
+            ),
         )
     }
 

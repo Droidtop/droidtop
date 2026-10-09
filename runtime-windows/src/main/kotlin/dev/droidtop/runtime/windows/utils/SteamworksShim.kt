@@ -32,10 +32,11 @@ import timber.log.Timber
  * library on a games drive) is found by its app manifest and plays as the
  * signed-in account, or as a local profile when nobody is signed in.
  *
- * Applies to every Steam game (one whose Steam app id is known: droidtop's
- * Steam, a Steam library's app manifest, or the game's own
- * `steam_appid.txt`) unless the game turned it off (its Wine and graphics
- * screen, [dev.droidtop.runtime.windows.WineOptions]'s Steamworks row). It
+ * Applies to every game Steam owns (droidtop's Steam or a Steam library's
+ * app manifest) unless the game turned it off, and to any other Windows game
+ * that turned it on, with the app id from its `steam_appid.txt` or typed by
+ * the person (its Wine and graphics screen,
+ * [dev.droidtop.runtime.windows.WineOptions]'s Steamworks rows, [resolve]). It
  * is not limited to folders where a `steam_api` file was found: Unity keeps
  * it three folders down and Unreal six, and walking a game's whole tree on
  * every launch costs more on a card than the loader does for a game that
@@ -50,21 +51,44 @@ object SteamworksShim {
     /** How a launch goes through the shim: the loader to start instead of the game, from where, and what the guest needs set. */
     data class Launch(val target: File, val workingDir: File, val arguments: List<String>, val env: Map<String, String>)
 
-    /** What [plan] found: the game's Steam app id, and where it came from (for the log). */
-    data class Need(val appId: Int, val via: String)
+    /**
+     * What [detect] found: the game's Steam app id, where it came from (for
+     * the log), and whether Steam owns the game ([owned]: droidtop's Steam or
+     * a Steam library's manifest) rather than the game merely shipping a
+     * `steam_appid.txt`, which a build from any store may.
+     */
+    data class Need(val appId: Int, val via: String, val owned: Boolean = true)
 
     /**
-     * Whether [entryId] (folder [gameRoot]) is a Steam game, and its app id.
-     * At most one listing of a Steam library's `steamapps` and one small
-     * file; never on the main thread.
+     * The Steam app id [entryId] (folder [gameRoot], null when unknown) can
+     * be identified as, or null. At most one listing of a Steam library's
+     * `steamapps` and one small file; never on the main thread.
      */
-    fun plan(entryId: String?, gameRoot: File): Need? {
+    fun detect(entryId: String?, gameRoot: File?): Need? {
         entryId?.takeIf { it.startsWith("steam:") }?.substringAfter(':')?.toIntOrNull()?.let { return Need(it, "droidtop's Steam") }
+        if (gameRoot == null) return null
         appIdFromManifest(gameRoot)?.let { return Need(it, "its Steam library's app manifest") }
-        // A game that ships its own id beside its program is a Steam build too.
+        // A game that ships its own id beside its program: the id of the game,
+        // but not proof that Steam owns this copy (GOG and folder builds ship it too).
         runCatching { File(gameRoot, "steam_appid.txt").takeIf { it.isFile }?.readText()?.trim()?.toInt() }.getOrNull()
-            ?.let { return Need(it, "the game's steam_appid.txt") }
+            ?.let { return Need(it, "the game's steam_appid.txt", owned = false) }
         return null
+    }
+
+    /**
+     * Whether a launch goes through the shim, and as which app: the game's
+     * own [choice] ("on" or "off"; null is the default, on for a game Steam
+     * owns and off for any other), and the app id [typed] by the person over
+     * what was [detected]. Null when it stays off, or when no app id is known.
+     */
+    fun resolve(choice: String?, typed: Int?, detected: Need?): Need? {
+        val on = when (choice) {
+            "on" -> true
+            "off" -> false
+            else -> detected?.owned == true
+        }
+        if (!on) return null
+        return if (typed != null) Need(typed, "the app ID set for this game") else detected
     }
 
     /**

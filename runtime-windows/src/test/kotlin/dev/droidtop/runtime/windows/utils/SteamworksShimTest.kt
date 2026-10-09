@@ -34,13 +34,34 @@ class SteamworksShimTest {
     }
 
     @Test
-    fun `a Steam game is known by its store id, its library's manifest or its own app id file`() {
+    fun `a game is identified by its store id, its library's manifest or its own app id file`() {
         file("b/Game.exe")
-        assertEquals(10, SteamworksShim.plan("steam:10", File(tmp.root, "b"))?.appId)
+        assertEquals(10, SteamworksShim.detect("steam:10", File(tmp.root, "b"))?.appId)
         // Not a Steam game by any sign: nothing to answer as.
-        assertNull(SteamworksShim.plan("gog:5", File(tmp.root, "b")))
-        file("b/steam_appid.txt", "42\n")
-        assertEquals(42, SteamworksShim.plan("folder:1", File(tmp.root, "b"))?.appId)
+        assertNull(SteamworksShim.detect("gog:5", File(tmp.root, "b")))
+        file("b/steam_appid.txt", "42
+")
+        val shipped = SteamworksShim.detect("folder:1", File(tmp.root, "b"))
+        assertEquals(42, shipped?.appId)
+        // The id says which Steam app it is, not that Steam owns this copy.
+        assertEquals(false, shipped?.owned)
+        assertEquals(true, SteamworksShim.detect("steam:10", null)?.owned)
+    }
+
+    @Test
+    fun `Steamworks is on for a game Steam owns and off for any other until its own choice says otherwise`() {
+        val owned = SteamworksShim.Need(10, "droidtop's Steam")
+        val shipped = SteamworksShim.Need(42, "the game's steam_appid.txt", owned = false)
+        assertEquals(owned, SteamworksShim.resolve(null, null, owned))
+        assertNull(SteamworksShim.resolve("off", null, owned))
+        assertNull(SteamworksShim.resolve(null, null, shipped))
+        assertNull(SteamworksShim.resolve(null, null, null))
+        assertEquals(42, SteamworksShim.resolve("on", null, shipped)?.appId)
+        // A typed app id wins over the detected one, and is enough on its own once switched on.
+        assertEquals(99, SteamworksShim.resolve("on", 99, shipped)?.appId)
+        assertEquals(99, SteamworksShim.resolve("on", 99, null)?.appId)
+        // Switched on with no app id known anywhere: nothing to start as.
+        assertNull(SteamworksShim.resolve("on", null, null))
     }
 
     @Test

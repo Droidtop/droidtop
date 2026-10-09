@@ -154,7 +154,8 @@ class DroidtopPcGameRuntime(
         // Proton run directly with software Vulkan. Every one of them is a
         // choice under Settings > Windows games and each game's Wine
         // settings (docs/SPEC.md 5a); these are only where they start.
-        val defaults = runCatching { ContainerUtils.deviceDefaultContainerData(context) }
+        // What the person chose before setup (Wine build, emulation, graphics) is laid over them.
+        val defaults = runCatching { WineOptions.withSetupChoices(context, ContainerUtils.deviceDefaultContainerData(context)) }
             .getOrElse { return@withContext failed("reading this device's defaults", it, it.message ?: "couldn't read this device's defaults") }
 
         // Stated before any of it exists. A container object is the only
@@ -365,6 +366,7 @@ class DroidtopPcGameRuntime(
             // nothing, and reporting success then is the silent "Set up"
             // loop of Droidtop/tracker#249.
             is WineEngineReadiness.Ready -> if (isProvisioned) {
+                WineOptions.setupDone(context)
                 PcProvisionResult(true, "Windows environment ready")
             } else {
                 failed(
@@ -449,12 +451,11 @@ class DroidtopPcGameRuntime(
             entryId?.let { WineGameSettingsPrefs.get(context, it) }?.environment?.let(GameLaunchOptions::launchEnvironment).orEmpty()
         }
 
-        // A Steam game that uses Steamworks starts through the shim in the
-        // prefix (docs/SPEC.md 5b, "Steamworks in the prefix"), unless the
-        // game turned it off; the game's own files are left as they are.
-        val shim = withContext(Dispatchers.IO) {
-            if (WineOptions.steamworksOn(context, entryId)) SteamworksShim.plan(entryId, gameRoot) else null
-        }
+        // A game Steam owns starts through the shim in the prefix unless it
+        // turned it off, and any other game when it turned it on
+        // (docs/SPEC.md 5b, "Steamworks in the prefix"); the game's own files
+        // are left as they are.
+        val shim = withContext(Dispatchers.IO) { WineOptions.steamworksNeed(context, entryId, gameRoot) }
         if (shim != null) {
             val launch = runCatching {
                 SteamworksShim.prepare(context, container, shim, entryId, executable, gameRoot, workingDir, arguments)

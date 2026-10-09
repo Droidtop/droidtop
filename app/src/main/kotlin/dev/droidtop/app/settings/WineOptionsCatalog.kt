@@ -14,9 +14,12 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.runtime.windows.WineOptionRow
 import dev.droidtop.runtime.windows.WineOptions
 import dev.droidtop.runtime.windows.WinePrefixes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Wine build, x86 emulation, graphics driver and Direct3D as settings rows
@@ -53,23 +56,18 @@ object WineOptionsCatalog {
 
     /** The rows for [entryId] (whose folder is [gameRoot]), or for the shared environment when it is null. */
     suspend fun groups(context: Context, entryId: String?, title: String?, gameRoot: String? = null): List<CatalogGroup> {
-        val state = WineOptions.state(context, entryId) ?: return listOf(
-            CatalogGroup(
-                id = "wine_options_none",
-                title = null,
-                items = listOf(
-                    // The page is a dead end without a way to the one step that makes it (Droidtop/tracker#372):
-                    // the same row Settings > Library > Windows games has, asking first, and the Wine builds
-                    // and sources, which do not need the environment, so a build can be chosen before the first download.
-                    windowsSetupItem(provisioned = false, state = withContext(Dispatchers.IO) { WindowsSetup.current(context) }),
-                    sourcesBeforeSetupItem(),
-                ),
-            ),
-        )
+        val state = WineOptions.state(context, entryId, gameRoot)
         val shared = entryId == null
         // A game sharing the prefix: its rows are its own choices over it.
         val overGame = !shared && !state.ownPrefix
         val items = buildList<CatalogItem> {
+            // Before setup the rows below are the device's defaults and the
+            // choices made for setup to use (Droidtop/tracker#372); a game's
+            // page has no other way to start it.
+            if (!state.setUp && !shared) {
+                val setup = withContext(Dispatchers.IO) { WindowsSetup.current(context) }
+                add(windowsSetupItem(provisioned = false, setup))
+            }
             if (!shared) {
                 add(
                     if (state.ownPrefix) {
@@ -142,7 +140,8 @@ object WineOptionsCatalog {
                     ),
                 )
             }
-            add(
+            // Both belong to a prefix that exists.
+            if (state.setUp) add(
                 NestedScreenItem(
                     id = "wine_options_all",
                     title = if (overGame) "All shared prefix settings" else "All prefix settings",
@@ -150,7 +149,7 @@ object WineOptionsCatalog {
                     inline = PrefixSettingsCatalog.screen(if (overGame) null else entryId, title),
                 ),
             )
-            add(
+            if (state.setUp) add(
                 AsyncActionItem(
                     id = "wine_options_winecfg",
                     title = "Wine configuration",
@@ -187,10 +186,19 @@ object WineOptionsCatalog {
         val label = row.choices.firstOrNull { it.value == row.current }?.label ?: row.current
         val summary = when {
             // Frame generation and Steamworks are always a game's own choice, in any prefix.
-            !overGame || row.id == WineOptions.LSFG || row.id == WineOptions.STEAMWORKS -> row.summary
+            !overGame || row.id == WineOptions.LSFG || row.id == WineOptions.STEAMWORKS || row.id == WineOptions.STEAMWORKS_APPID -> row.summary
             row.id == WineOptions.WINE -> row.summary + ". Another build gives this game a prefix of its own (a few hundred megabytes); its saves so far stay in the shared one."
             row.ownChoice -> row.summary + ". This game's own choice."
             else -> row.summary + ". The shared setting."
+        }
+        if (row.text) {
+            return TextInputItem(
+                id = row.id,
+                title = row.title,
+                subtitle = summary,
+                value = row.current,
+                onChange = { ctx, text -> WineOptions.select(ctx, entryId, title, row.id, text) },
+            )
         }
         if (row.choices.isEmpty()) {
             return ActionItem(id = row.id, title = row.title, subtitle = summary, value = label, run = {})
@@ -223,12 +231,4 @@ internal fun windowsSetupItem(provisioned: Boolean, state: WindowsSetup.State): 
         val result = WindowsSetup.provision(ctx, onStatus)
         if (result.succeeded) result.detail else "Failed: ${result.detail}"
     },
-)
-
-/** The Wine builds and sources screen, which needs no environment, for the pages that are otherwise empty before setup. */
-internal fun sourcesBeforeSetupItem(): NestedScreenItem = NestedScreenItem(
-    id = "wine_component_sources",
-    title = "Wine builds and sources",
-    subtitle = "Add any Wine build by link or file, and choose which sources are offered, before Windows games are set up",
-    inline = ComponentSourcesCatalog.screen(),
 )
