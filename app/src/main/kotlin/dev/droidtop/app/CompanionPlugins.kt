@@ -198,7 +198,8 @@ private fun CompanionPluginPanel(panel: PluginPanels.Panel, onBack: (() -> Unit)
 
 /**
  * The Game tab's rows from plugins: each running panel that declares the `game` ability, asked with
- * `<mode>.companion_game` and the running game. Not in Kid or Kiosk ([ControlRow.GAME_PLUGIN_ROWS]).
+ * `<mode>.companion_game` and the running game, and only while one of the apps it names in `gamePackages` runs the
+ * game (RetroArch's rows for RetroArch). Not in Kid or Kiosk ([ControlRow.GAME_PLUGIN_ROWS]).
  */
 @Composable
 internal fun CompanionGamePluginRows(entry: LibraryEntry) {
@@ -207,7 +208,8 @@ internal fun CompanionGamePluginRows(entry: LibraryEntry) {
     val uiMode by UiModeRefresh.mode.collectAsState()
     val settings by CompanionPrefs.settings.collectAsState()
     if (!ControlAccess.shows(uiMode, ControlRow.GAME_PLUGIN_ROWS)) return
-    val panels = rememberCompanionPanels(mode)?.filter { CompanionAbilities.GAME in it.abilities } ?: return
+    val runningPackage = LaunchDisplay.runningPackageName
+    val panels = rememberCompanionPanels(mode)?.filter { CompanionAbilities.gameRowsFor(it.entry, runningPackage) } ?: return
     val game = remember(entry.id) { gameTarget(entry) }
     panels.forEach { panel ->
         key(panel.pluginId) {

@@ -50,6 +50,7 @@ object PluginPermissions {
         PluginPermission("perf.read", PermissionTier.NORMAL, "See performance readings (CPU, temperature, battery)"),
         PluginPermission("perf.profile.set", PermissionTier.DANGEROUS, "Change performance and fan settings"),
         PluginPermission("overlay.toast", PermissionTier.NORMAL, "Show short messages during games"),
+        PluginPermission("retroarch.commands", PermissionTier.NORMAL, "Send commands to RetroArch while you play: save and load states, slots, shaders, fast-forward"),
         PluginPermission(
             "gpu.render", PermissionTier.DANGEROUS, "Use the graphics chip to draw its screen",
             caution = "A plugin with this could reach past droidtop's checks, so only allow it for a plugin from a source you trust",

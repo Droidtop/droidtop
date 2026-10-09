@@ -1491,6 +1491,25 @@ Risk low.
   `priv.*` grant.
 - **Status:** not built.
 
+**B8 RetroArch's network commands.** API `retroarch.command@1`. Risk low.
+- **For:** controlling the RetroArch that runs the game: save and load
+  states, the slot, fast-forward, shaders, RetroArch's own FPS line (the
+  RetroArch manager's rows on the companion's Game tab, C15).
+- **Ops:** `command {command}` sends one of RetroArch's own hotkey commands
+  (command.h `map[]`; droidtop's list in `RetroArchCommands.ALLOWED`: no
+  QUIT, which is droidtop's own Quit, and no memory reads) as a UDP line to
+  port 55355 on the loopback address, then asks `GET_STATUS` and waits half
+  a second. Reply `{sent, answered, state?, system?, content?}`; `answered`
+  false means RetroArch did not reply (its network commands are off, or it
+  is not running). RetroArch cannot be asked for its state slot, so a
+  plugin keeps count of the slot changes it made. `status {}` asks
+  `GET_STATUS` alone: `{answered, state?, system?, content?}`, for a panel
+  deciding what to show.
+- **Why droidtop sends it:** a contained plugin has no network (5.3), and
+  this needs no more than the loopback address and one port.
+- **Permission:** `retroarch.commands` (normal).
+- **Status:** built (2026-10-09).
+
 ### C. UI extension (always in context, always drawn by droidtop)
 
 **C1 Settings rows and pages.** EP `ui.settings@1`. Risk low.
@@ -1773,7 +1792,8 @@ dropped, one panel per plugin).
   shown on the panel's line before it is opened (unknown names are ignored):
   - `game`: the panel has rows for the running game. The companion's Game tab
     asks the panel with `context.surface` `<mode>.companion_game` and draws
-    the rows under its own (not in Kid or Kiosk).
+    the rows under its own (not in Kid or Kiosk). With `"gamePackages":
+    [...]` on the entry it asks only while one of those apps runs the game.
   - `keep_on`: the companion screen stays on while the panel shows.
   - `recording`: the plugin may raise droidtop's Recording state through the
     host API below.
@@ -2098,6 +2118,7 @@ wording the host uses, so it is identical in every mode.
 | `perf.read` | normal | See performance readings (CPU, temperature, battery) | B6 |
 | `perf.profile.set` | dangerous | Change performance and fan settings | B7 |
 | `overlay.toast` | normal | Show short messages during games | B4 |
+| `retroarch.commands` | normal | Send commands to RetroArch while you play: save and load states, slots, shaders, fast-forward | B8 |
 | `gpu.render` | dangerous | Use the graphics chip to draw its screen | §5.3 |
 | `notify.post` | normal | Send you notifications | C6 |
 | `net.state` | normal | See whether you are online | D1 |

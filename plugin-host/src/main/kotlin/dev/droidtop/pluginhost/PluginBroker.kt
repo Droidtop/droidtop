@@ -95,6 +95,13 @@ interface BrokerEnvironment {
     fun notify(pluginId: String, pluginLabel: String, title: String, text: String): Boolean =
         throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop posts no notifications for plugins")
 
+    /**
+     * B (docs/plugin-api.md 3, `retroarch.command`): sends one command line to RetroArch on this device
+     * ([RetroArchCommands]); with [replyMs] above zero, RetroArch's answer, or null when none came in time.
+     */
+    fun retroArchCommand(line: String, replyMs: Long): String? =
+        throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop sends no commands to RetroArch")
+
     /** D1 (docs/plugin-api.md 3): `{online, type, metered, vpn}`. */
     fun netState(): JSONObject = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop reports no network state")
 
@@ -406,6 +413,20 @@ object HostApis {
             if (args.has("message") && args.optJSONObject("message") == null) invalid("message must be an object")
             JSONObject().put("accepted", env.socialChanged(record.manifest.id, args))
         },
+        // docs/plugin-api.md 3 B: a command to the RetroArch running the game (save, load, slot, shader, fast-forward), sent by
+        // droidtop to the loopback address only, then RetroArch's status, so the plugin can say whether it answered.
+        HostOp(
+            "retroarch", "command",
+            permission = "retroarch.commands",
+            target = { it.optString("command") },
+        ) { env, _, args ->
+            val command = args.optString("command").trim()
+            if (command !in RetroArchCommands.ALLOWED) invalid("command must be one of ${RetroArchCommands.ALLOWED.sorted().joinToString()}")
+            env.retroArchCommand(command, 0)
+            retroArchStatus(env).put("sent", true)
+        },
+        // Whether RetroArch answers, and what it runs, without sending anything else: a panel decides what to show.
+        HostOp("retroarch", "status", permission = "retroarch.commands") { env, _, _ -> retroArchStatus(env) },
         // docs/plugin-api.md 3 C15: a recorder says it started or stopped, and the companion's status line shows "Recording"
         // with a timer. Only a plugin whose panel declares the `recording` ability, with that point still on, may say so.
         HostOp("companion", "recording") { env, record, args ->
@@ -462,6 +483,18 @@ object HostApis {
             JSONObject().put("keys", JSONArray(vaultOf(env).keys(record.manifest.id)))
         },
     )
+
+    /** RetroArch's answer to GET_STATUS as `{answered, state?, system?, content?}`. */
+    private fun retroArchStatus(env: BrokerEnvironment): JSONObject {
+        val status = RetroArchCommands.parseStatus(env.retroArchCommand("GET_STATUS", RetroArchCommands.STATUS_WAIT_MS))
+        return JSONObject().put("answered", status != null).apply {
+            if (status != null) {
+                put("state", status.state)
+                status.system?.let { put("system", it) }
+                status.content?.let { put("content", it) }
+            }
+        }
+    }
 
     /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
     val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostWebApis.ops }

@@ -3520,7 +3520,12 @@ row of recent apps, became Home's Recent apps section for every mode.
   plugin whose panel declares `recording` (windowcast, or another recorder) reports through the host API
   `companion.recording` (`PluginRecording`), and the status line shows "Recording 1:05", speaking it once with the
   plugin's name; it clears when the plugin says so or is turned off, disabled or removed. droidtop records nothing
-  itself.
+  itself. A panel can name the apps its Game rows are for (`gamePackages`), so they show only while one of them runs
+  the game. **RetroArch (slice C10):** the RetroArch manager plugin's Game rows (save and load state, slot, fast-forward,
+  shaders, RetroArch's FPS line) are RetroArch's network commands, which droidtop sends for it to the loopback
+  address only (`retroarch.command`, `RetroArchCommands`: UDP port 55355, an allowlist of RetroArch's in-game hotkey
+  commands, no Quit), followed by `GET_STATUS`, so each row says what happened or "No answer from RetroArch"; a
+  contained plugin has no sockets of its own. RetroArch reads them only with its Network Commands on.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 

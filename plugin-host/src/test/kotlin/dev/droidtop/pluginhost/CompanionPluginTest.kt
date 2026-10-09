@@ -6,6 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,6 +39,16 @@ class CompanionPluginTest {
         assertTrue(CompanionAbilities.of(ProvidedPoint("ui.panel", extra = """{"companion":["fly"]}""")).isEmpty())
         assertTrue(CompanionAbilities.of(null).isEmpty())
         assertTrue(CompanionAbilities.declares(recorder.manifest, CompanionAbilities.RECORDING))
+    }
+
+    @Test fun `game rows are asked only while one of the panel's apps runs the game`() {
+        val ra = ProvidedPoint("ui.panel", extra = """{"companion":["game"],"gamePackages":["com.retroarch","com.retroarch.aarch64"]}""")
+        assertTrue(CompanionAbilities.gameRowsFor(ra, "com.retroarch.aarch64"))
+        assertFalse(CompanionAbilities.gameRowsFor(ra, "org.ppsspp.ppsspp"))
+        assertFalse(CompanionAbilities.gameRowsFor(ra, null))
+        val any = ProvidedPoint("ui.panel", extra = """{"companion":["game"]}""")
+        assertTrue(CompanionAbilities.gameRowsFor(any, null))
+        assertFalse(CompanionAbilities.gameRowsFor(ProvidedPoint("ui.panel"), "com.retroarch"))
     }
 
     @Test fun `the abilities line says each ability and the tiles in plain words`() {

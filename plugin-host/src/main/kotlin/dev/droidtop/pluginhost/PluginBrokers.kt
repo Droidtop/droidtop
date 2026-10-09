@@ -215,6 +215,11 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         true
     }.getOrDefault(false)
 
+    // ---- RetroArch's network commands (docs/plugin-api.md 3 B) ----
+
+    override fun retroArchCommand(line: String, replyMs: Long): String? =
+        runCatching { RetroArchCommands.send(line, replyMs) }.getOrNull()
+
     // ---- Network (docs/plugin-api.md 3 D1, D2) ----
 
     override fun netState(): JSONObject {

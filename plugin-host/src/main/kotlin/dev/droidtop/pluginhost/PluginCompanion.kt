@@ -25,6 +25,19 @@ object CompanionAbilities {
         return buildSet { for (i in 0 until array.length()) array.optString(i).takeIf { it in KNOWN }?.let(::add) }
     }
 
+    /**
+     * The apps a panel's Game rows are for (`"gamePackages": [...]` on its `ui.panel` entry): the Game tab asks the panel
+     * only while one of them runs the game. Empty: every game.
+     */
+    fun gamePackages(entry: ProvidedPoint?): Set<String> {
+        val array = entry?.let { runCatching { JSONObject(it.extra).optJSONArray("gamePackages") }.getOrNull() } ?: return emptySet()
+        return buildSet { for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let(::add) }
+    }
+
+    /** Whether a panel's Game rows apply while [runningPackage] runs the game. Pure. */
+    fun gameRowsFor(entry: ProvidedPoint?, runningPackage: String?): Boolean =
+        GAME in of(entry) && gamePackages(entry).let { it.isEmpty() || runningPackage in it }
+
     /** Whether [manifest]'s panel declares [ability]. */
     fun declares(manifest: PluginManifest, ability: String): Boolean =
         manifest.v2.provides.any { it.point == PANEL_POINT && ability in of(it) }

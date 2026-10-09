@@ -81,6 +81,15 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
     var vaultStore: PluginVault? = null
     override fun vault(): PluginVault? = vaultStore
     val socialChanges = mutableListOf<Pair<String, JSONObject>>()
+    /** Lines sent to RetroArch, and what it answers to GET_STATUS (null: no answer). */
+    val retroArchLines = mutableListOf<String>()
+    var retroArchStatus: String? = "GET_STATUS PLAYING snes,Super Metroid\n"
+
+    override fun retroArchCommand(line: String, replyMs: Long): String? {
+        retroArchLines += line
+        return if (line == "GET_STATUS") retroArchStatus else null
+    }
+
     override fun socialChanged(pluginId: String, change: JSONObject): Boolean {
         socialChanges += pluginId to change
         return true
