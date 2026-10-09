@@ -42,8 +42,16 @@ class CatalogScreenActivity : AppCompatActivity() {
     // started or stopped, or a store signed in, while another screen was on top.
     private var resumed by mutableStateOf(0)
 
+    // Opened from Standard's home screen (a long press on droidtop's icon, a notification) in a task of
+    // its own: leaving it must land back on that home screen. Left to Android, the task's end resumes
+    // the HOME component, droidtop's trampoline, which forwards to the default mode, so B from Social
+    // landed in Gaming (rig, build 1535, Droidtop/tracker#346).
+    private var returnToStandard = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        returnToStandard = isTaskRoot &&
+            dev.droidtop.library.settings.Modes.lastMode(this) == dev.droidtop.library.settings.Mode.LAUNCHER.id
         AppSettingsCatalogs.ensureRegistered()
         val screenId = intent?.getStringExtra(CatalogScreenLink.EXTRA_SCREEN_ID)
         // Kiosk and Kid hide the places in every mode, as Gaming's left menu does: a shortcut or a
@@ -93,5 +101,17 @@ class CatalogScreenActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         resumed++
+    }
+
+    /** Every way out (B at the root, Back, a refused place) goes back to where the person came from. */
+    override fun finish() {
+        if (returnToStandard && !isChangingConfigurations) {
+            returnToStandard = false
+            dev.droidtop.shell.standard.BackButtonMenu.openHome(
+                this,
+                dev.droidtop.shell.standard.HomeRolePrefs.activeHomeImplementation(this),
+            )
+        }
+        super.finish()
     }
 }

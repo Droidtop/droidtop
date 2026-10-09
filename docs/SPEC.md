@@ -12662,7 +12662,11 @@ whatever the mode (with Gaming off, Desktop or nothing). Now:
   (`CatalogScreenLink`: `OPEN_SCREEN` and a screen id). It replaces
   `ContainersActivity`, which was the same host wired to the container manager;
   the Desktop taskbar's Containers opens through it too. It runs in a task of
-  its own, opened fresh each time, so Back returns to what opened it. A place
+  its own, opened fresh each time, so Back returns to what opened it. Opened
+  from Standard's home screen (a long press on droidtop's icon) it goes back
+  there explicitly (`BackButtonMenu.openHome`): left to Android, the task's end
+  resumed the HOME component, droidtop's trampoline, which forwards to the
+  default mode, so B from Social landed in Gaming (rig, build 1535). A place
   asked for in Kiosk or Kid is refused with a toast, so a shortcut or a
   notification is not a way around the UI mode.
 - **Standard**: the settings list has a "droidtop" group with the five places
