@@ -2169,7 +2169,11 @@ the `ContainerRuntime` interface that already exists (§3):
   running desktop and for an unmetered network (unless the second switch allows mobile data),
   then runs `DesktopFonts.installScript` in the primary: on Alpine each Noto package
   (`font-noto-cjk font-noto-emoji`) is fetched with `wget -c` into a cache directory and then
-  installed from the files, on Debian `apt-get --download-only` (which resumes from
+  installed from the files. The file's URL is the one apk names (`apk fetch --simulate --url`);
+  with an apk that cannot say, the package's name and version are tried in each repository in
+  turn, and the repositories that do not hold it are expected misses, kept out of the log (the
+  rig's first run read main's 404 for a package that lives in community as a failure). On Debian
+  `apt-get --download-only` (which resumes from
   `archives/partial`) then the install (`fonts-noto-cjk fonts-noto-color-emoji`). So Pause,
   a stopped desktop or a lost network resume where the download stopped; a restart of droidtop
   re-runs the job. The marker makes a finished install free to check. Turning the switch off

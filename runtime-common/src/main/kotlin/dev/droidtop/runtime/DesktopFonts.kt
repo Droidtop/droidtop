@@ -18,9 +18,10 @@ object DesktopFonts {
      * The install, run with `sh -c` in the primary; safe to run again after
      * any interruption. Alpine's apk cannot resume a package download, so
      * each package is fetched with busybox `wget -c` into a cache directory
-     * (its URL is the repository, the architecture and `apk search -x`'s
-     * name-version) and installed from the files, falling back to a plain
-     * `apk add` when that cannot be worked out. Debian's apt resumes partial
+     * (its URL is the one `apk fetch --simulate --url` names, or, with an apk
+     * that cannot say, `apk search -x`'s name-version tried in each
+     * repository with the expected misses kept quiet) and installed from the
+     * files, falling back to a plain `apk add` when that cannot be worked out. Debian's apt resumes partial
      * downloads in `archives/partial` itself, so it downloads first and then
      * installs. [MARKER] is written last.
      */
@@ -35,12 +36,23 @@ object DesktopFonts {
               apk update -q
               arch="${'$'}(apk --print-arch)"
               for p in font-noto-cjk font-noto-emoji; do
-                v="${'$'}(apk search -x "${'$'}p" 2>/dev/null | head -n 1)"
-                [ -n "${'$'}v" ] || continue
-                [ -f "${'$'}c/${'$'}v.apk.done" ] && continue
-                echo "droidtop: downloading ${'$'}v"
-                for r in ${'$'}(grep -v '^#' /etc/apk/repositories); do
-                  if wget -c -q -O "${'$'}c/${'$'}v.apk" "${'$'}r/${'$'}arch/${'$'}v.apk"; then touch "${'$'}c/${'$'}v.apk.done"; break; fi
+                # The exact file apk itself would fetch, from its own resolver; with an apk that cannot say,
+                # the package name and version tried in each repository in turn, a miss being expected.
+                u="${'$'}(apk fetch --simulate --url "${'$'}p" 2>/dev/null | grep -m 1 -E '^(https?|ftp)://' || true)"
+                if [ -n "${'$'}u" ]; then
+                  urls="${'$'}u"
+                else
+                  v="${'$'}(apk search -x "${'$'}p" 2>/dev/null | head -n 1)"
+                  [ -n "${'$'}v" ] || continue
+                  urls=""
+                  for r in ${'$'}(grep -v '^#' /etc/apk/repositories); do urls="${'$'}urls ${'$'}r/${'$'}arch/${'$'}v.apk"; done
+                fi
+                for url in ${'$'}urls; do
+                  f="${'$'}c/${'$'}{url##*/}"
+                  [ -f "${'$'}f.done" ] && break
+                  echo "droidtop: downloading ${'$'}url"
+                  if wget -c -q -O "${'$'}f" "${'$'}url" 2>/dev/null; then touch "${'$'}f.done"; break; fi
+                  [ -s "${'$'}f" ] || rm -f "${'$'}f"
                 done
               done
               if ls "${'$'}c"/*.apk >/dev/null 2>&1 && apk add --no-cache "${'$'}c"/*.apk; then :; else apk add --no-cache font-noto-cjk font-noto-emoji; fi
