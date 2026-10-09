@@ -101,6 +101,44 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun md5AndSha1AreAcceptedAndTheStrongestGivenIsTheOneChecked() {
+        val md5 = "d41d8cd98f00b204e9800998ecf8427e"
+        val sha1 = "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+        val sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        val descriptor = AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a.zip","fileName":"a.zip","md5":"$md5"}""")!!
+        assertEquals(md5, descriptor.md5)
+        assertNull(descriptor.sha256)
+        assertEquals("MD5" to md5, DownloadJobs.strongestDigest(null, null, md5))
+        assertEquals("SHA-1" to sha1, DownloadJobs.strongestDigest(null, sha1, md5))
+        assertEquals("SHA-256" to sha256, DownloadJobs.strongestDigest(sha256, sha1, md5))
+        assertNull(DownloadJobs.strongestDigest(null, null, null))
+        assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a.zip","fileName":"a.zip","md5":"abc"}"""))
+        assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a.zip","fileName":"a.zip","sha1":"$md5"}"""))
+    }
+
+    @Test
+    fun theDigestsOfAnEmptyFileMatchTheKnownValues() {
+        val file = File(dir, "empty.bin").also { it.writeBytes(ByteArray(0)) }
+        assertEquals("d41d8cd98f00b204e9800998ecf8427e", DownloadJobs.digestHex(file, "MD5"))
+        assertEquals("da39a3ee5e6b4b0d3255bfef95601890afd80709", DownloadJobs.digestHex(file, "SHA-1"))
+        assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", DownloadJobs.digestHex(file, "SHA-256"))
+    }
+
+    @Test
+    fun aWrongDigestDeletesTheFileAndFailsAndARightOneKeepsIt() = runBlocking {
+        val file = File(dir, "digest.bin").also { it.writeBytes(ByteArray(0)) }
+        DownloadJobs.verifyDigest(file, mapOf("md5" to "D41D8CD98F00B204E9800998ECF8427E"))
+        assertTrue(file.exists())
+        try {
+            DownloadJobs.verifyDigest(file, mapOf("md5" to "00000000000000000000000000000000"))
+            fail("a wrong digest must fail the job")
+        } catch (e: IllegalStateException) {
+            assertEquals(DownloadJobs.DIGEST_MISMATCH, e.message)
+        }
+        assertFalse(file.exists())
+    }
+
+    @Test
     fun acquireDownloadDescriptorRejectsUnsafeOrInvalidFields() {
         assertNull(AcquireDownloadDescriptor.parse("""{"url":"file:///etc/passwd","fileName":"game.zip"}"""))
         assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"../game.zip"}"""))

@@ -455,10 +455,12 @@ no destination, such as the PC library). Ops:
   `library.files` `changed` (A2), and a job that returns `download` has its
   file reported by droidtop when it is placed. A job that does neither
   still gets a background rescan, the only case left that does. Additive reply: a successful job may return `download` as a JSON
-  string containing `{url, headers?, fileName, sha256?, size?}` instead of
+  string containing `{url, headers?, fileName, sha256?, sha1?, md5?, size?}` instead of
   downloading the file itself. `url` is HTTP(S); `fileName` is a bare file
-  name; `sha256` is 64 hexadecimal characters and `size` is a positive
-  byte count used as a size cap. droidtop queues it through DownloadManager
+  name; `sha256` is 64, `sha1` 40 and `md5` 32 hexadecimal characters (a
+  source gives whichever it publishes; when several are given droidtop checks
+  the strongest, and a mismatch deletes the file and fails the job) and
+  `size` is a positive byte count used as a size cap. droidtop queues it through DownloadManager
   into its own downloads area, then places it in `context.destination` and
   indexes that file, from the download job, so the game appears even if the
   page that started it was closed or droidtop restarted meanwhile. Credential headers (Authorization, cookies, token and key

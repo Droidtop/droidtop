@@ -141,6 +141,8 @@ object PluginViews {
                                 url = descriptor.url,
                                 name = "acquire_${System.currentTimeMillis()}_${descriptor.fileName}",
                                 sha256 = descriptor.sha256,
+                                sha1 = descriptor.sha1,
+                                md5 = descriptor.md5,
                                 maxBytes = descriptor.size ?: 0L,
                                 headers = descriptor.headers + captured?.headers.orEmpty(),
                                 extra = buildMap {

@@ -24,6 +24,8 @@
         "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Credential values are held in memory only by droidtop and are not persisted with the job." },
         "fileName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
         "sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "sha1": { "type": "string", "pattern": "^[A-Fa-f0-9]{40}$", "description": "For a source that publishes no SHA-256. When several digests are given, droidtop checks the strongest (sha256, then sha1, then md5)." },
+        "md5": { "type": "string", "pattern": "^[A-Fa-f0-9]{32}$", "description": "For a source that publishes no stronger digest (the Internet Archive lists md5, sha1 and crc32)." },
         "size": { "type": "integer", "minimum": 1, "description": "Maximum accepted bytes." },
         "session": { "type": "string", "pattern": "^w-[0-9a-f-]{36}$", "description": "The one-use token web.session open_in_session gave for a download a page started in the plugin's web session (docs/plugin-api.md 3 G3); droidtop adds that download's cookies and headers, held in memory only." }
       },

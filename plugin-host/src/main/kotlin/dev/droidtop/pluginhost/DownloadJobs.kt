@@ -48,6 +48,8 @@ object DownloadJobs {
     private const val ARG_TITLE = "title"
     private const val ARG_POST = "post"
     private const val ARG_SHA256 = "sha256"
+    private const val ARG_SHA1 = "sha1"
+    private const val ARG_MD5 = "md5"
     private const val ARG_MAX_BYTES = "maxBytes"
     private const val ARG_HEADERS = "headers"
 
@@ -127,6 +129,9 @@ object DownloadJobs {
         url: String,
         name: String,
         sha256: String? = null,
+        /** Digests a source that publishes no SHA-256 gives (the Internet Archive lists MD5 and SHA-1); the strongest one given is checked. */
+        sha1: String? = null,
+        md5: String? = null,
         maxBytes: Long = 0L,
         headers: Map<String, String> = emptyMap(),
         extra: Map<String, String> = emptyMap(),
@@ -148,6 +153,8 @@ object DownloadJobs {
             put(ARG_TITLE, title)
             put(ARG_POST, post)
             sha256?.let { put(ARG_SHA256, it) }
+            sha1?.let { put(ARG_SHA1, it) }
+            md5?.let { put(ARG_MD5, it) }
             if (maxBytes > 0) put(ARG_MAX_BYTES, maxBytes.toString())
             if (plain.isNotEmpty()) put(ARG_HEADERS, JSONObject(plain.associate { it.key to it.value }).toString())
             if (sizeBytes > 0) put(DownloadGate.ARG_BYTES, sizeBytes.toString())
@@ -208,13 +215,7 @@ object DownloadJobs {
             withContext(Dispatchers.IO) { fetch(url, headers, file, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, report) }
             report(100, "Checking the download…", FETCHED)
         }
-        args[ARG_SHA256]?.let { expected ->
-            val actual = withContext(Dispatchers.IO) { sha256(file) }
-            if (!actual.equals(expected, ignoreCase = true)) {
-                withContext(Dispatchers.IO) { file.delete() }
-                throw IllegalStateException(DIGEST_MISMATCH)
-            }
-        }
+        verifyDigest(file, args)
         report(100, "Finishing…", null)
         val summary = post.process(context, file, args)
         if (postName != POST_KEEP) withContext(Dispatchers.IO) { file.delete() }
@@ -302,7 +303,37 @@ object DownloadJobs {
         return (if (p.restarted) "Started again: the server cannot resume. " else "") + "Downloading… $sizes"
     }
 
-    private fun sha256(file: File): String = Sha256.hex(file)
+    /** Checks [file] against the strongest digest [args] carry; a mismatch deletes the file and fails the job with a plain sentence. */
+    internal suspend fun verifyDigest(file: File, args: Map<String, String>) {
+        val (algorithm, expected) = strongestDigest(args[ARG_SHA256], args[ARG_SHA1], args[ARG_MD5]) ?: return
+        val actual = withContext(Dispatchers.IO) { digestHex(file, algorithm) }
+        if (!actual.equals(expected, ignoreCase = true)) {
+            withContext(Dispatchers.IO) { file.delete() }
+            throw IllegalStateException(DIGEST_MISMATCH)
+        }
+    }
+
+    /** The java.security algorithm and the expected hex of the strongest digest given (SHA-256, then SHA-1, then MD5); null when none is. */
+    internal fun strongestDigest(sha256: String?, sha1: String?, md5: String?): Pair<String, String>? = when {
+        sha256 != null -> "SHA-256" to sha256
+        sha1 != null -> "SHA-1" to sha1
+        md5 != null -> "MD5" to md5
+        else -> null
+    }
+
+    internal fun digestHex(file: File, algorithm: String): String {
+        if (algorithm == "SHA-256") return Sha256.hex(file)
+        val digest = java.security.MessageDigest.getInstance(algorithm)
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
 }
 
 /** Additive contract-2 acquire result field, kept separate from the plugin's own job implementation. */
@@ -312,6 +343,9 @@ data class AcquireDownloadDescriptor(
     val fileName: String,
     val sha256: String?,
     val size: Long?,
+    /** SHA-1 and MD5 for sources that publish no SHA-256; when several digests are given the strongest is checked. */
+    val sha1: String? = null,
+    val md5: String? = null,
     /** A download a page started in the plugin's web session, named by the one-use token `web.session open_in_session` gave (docs/plugin-api.md 3 G3). */
     val session: String? = null,
 ) {
@@ -325,6 +359,10 @@ data class AcquireDownloadDescriptor(
             require(fileName.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))
             val digest = value.optString("sha256").takeIf { it.isNotEmpty() }
             require(digest == null || digest.matches(Regex("[A-Fa-f0-9]{64}")))
+            val sha1 = value.optString("sha1").takeIf { it.isNotEmpty() }
+            require(sha1 == null || sha1.matches(Regex("[A-Fa-f0-9]{40}")))
+            val md5 = value.optString("md5").takeIf { it.isNotEmpty() }
+            require(md5 == null || md5.matches(Regex("[A-Fa-f0-9]{32}")))
             val size = if (value.has("size") && !value.isNull("size")) value.getLong("size") else null
             require(size == null || size > 0)
             val headersJson = value.optJSONObject("headers")
@@ -337,7 +375,7 @@ data class AcquireDownloadDescriptor(
             }
             val session = value.optString("session").takeIf { it.isNotEmpty() }
             require(session == null || session.matches(Regex("w-[0-9a-f-]{36}")))
-            AcquireDownloadDescriptor(url, headers, fileName, digest, size, session)
+            AcquireDownloadDescriptor(url, headers, fileName, digest, size, sha1, md5, session)
         }.getOrNull()
     }
 }
