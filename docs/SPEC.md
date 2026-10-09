@@ -14516,6 +14516,21 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
 The design's order (droidtop-agent docs/DESIGN.md section 10) holds:
 1. LAN direct, with a signed UDP discovery that only paired agents answer.
 2. Direct userspace WireGuard between the two paired keys.
+   - The computer's `hello` states where its WireGuard answers from outside
+     its network: a port the person forwarded on the router
+     (`droidtop-agent endpoint set <public address>:47611`) and its global
+     IPv6 addresses. `Computers` keeps them per computer (`endpoints` in
+     `computers.json`), replaced at each live session, and `Computers.call`
+     passes them with the LAN addresses on every call. The core tries the
+     LAN addresses, then the LAN broadcast, then every endpoint at once, and
+     keeps the one that answers; an address reached through the tunnel is not
+     kept as a LAN address.
+   - The computer's screen says whether it can be reached away from home
+     ("Away from home"), and how to make it so when it cannot.
+   - Hole punching between two NATs is not done: it needs both sides to
+     learn their public endpoint at the same moment, which waits on the
+     owner's decision about a discovery service (droidtop-agent DESIGN
+     decision 4).
 3. Store and forward through a folder of the person's own that their own
    sync tool carries to both sides.
 4. Later, a droidtop-run relay on the server VM (Droidtop/tracker#364).

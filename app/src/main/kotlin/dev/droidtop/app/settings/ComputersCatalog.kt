@@ -135,6 +135,16 @@ object ComputersCatalog {
                             withContext(Dispatchers.IO) { ComputerLibrary.sync(ctx, computer, entries) }
                         },
                     ),
+                    ActionItem(
+                        id = "computer_away",
+                        title = "Away from home",
+                        subtitle = if (computer.endpoints.isEmpty()) {
+                            "${computer.name} gave no way in from outside its network. On the computer, forward UDP 47611 on the router and run droidtop-agent endpoint set <public address>:47611, or let a global IPv6 address through its firewall"
+                        } else {
+                            "Reached through WireGuard at ${computer.endpoints.joinToString(", ") { it.removePrefix("wg:") }} when it is not on this network"
+                        },
+                        run = {},
+                    ),
                     NestedScreenItem(
                         id = "computer_games",
                         title = "Games on ${computer.name}",

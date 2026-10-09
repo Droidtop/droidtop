@@ -13,6 +13,12 @@ data class Computer(
     val name: String,
     /** Where it answered last, most recent first (`192.168.1.20:47610`). */
     val addresses: List<String>,
+    /**
+     * Where its WireGuard answers from outside the LAN, as it said the last
+     * time the two met (`wg:203.0.113.7:47611`, `wg:[2001:db8::7]:47611`): a
+     * port the person forwarded and its global IPv6 addresses.
+     */
+    val endpoints: List<String> = emptyList(),
     val pairedAtMs: Long,
     val lastSyncMs: Long = 0L,
     /** What the last sync with it did, as one line. */
@@ -85,16 +91,36 @@ object Computers {
     fun deviceName(context: Context): String =
         android.provider.Settings.Global.getString(context.contentResolver, "device_name")?.takeIf { it.isNotBlank() } ?: Build.MODEL
 
-    /** Runs [op] for [computer]. Blocks on the network: never on the main thread. */
+    /**
+     * Runs [op] for [computer]. Blocks on the network: never on the main thread.
+     *
+     * The core tries the computer's LAN addresses, then the LAN broadcast,
+     * then its WireGuard endpoints (droidtop-agent docs/DESIGN.md section 10),
+     * so a computer away from this network is still reached when its
+     * forwarded port or a global IPv6 address answers. A reply from a live
+     * session carries the endpoints the computer states now, which replace
+     * the ones kept; an address reached through the tunnel is not a LAN
+     * address and is not kept.
+     */
     fun call(context: Context, computer: Computer, op: String, args: JSONObject = JSONObject()): JSONObject {
         val seed = DeviceIdentity.seed(context) ?: return JSONObject().put("error", "this device's key could not be opened")
+        val known = list(context).firstOrNull { it.id == computer.id } ?: computer
         args.put("seed", seed)
             .put("peer", computer.id)
-            .put("addresses", JSONArray(computer.addresses))
+            .put("addresses", JSONArray(known.addresses + known.endpoints))
             .put("name", deviceName(context))
         val reply = AgentNative.call(op, args)
-        reply.optString("address").takeIf { it.isNotBlank() }?.let { address ->
-            update(context, computer.id) { it.copy(addresses = (listOf(address) + it.addresses).distinct().take(MAX_ADDRESSES)) }
+        val address = reply.optString("address").takeIf { it.isNotBlank() }
+        val endpoints = reply.optJSONArray("endpoints")
+            ?.takeIf { reply.has("computer") }
+            ?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.startsWith("wg:") }.take(MAX_ENDPOINTS) }
+        if (address != null || (endpoints != null && endpoints != known.endpoints)) {
+            update(context, computer.id) { c ->
+                c.copy(
+                    addresses = address?.let { (listOf(it) + c.addresses).distinct().take(MAX_ADDRESSES) } ?: c.addresses,
+                    endpoints = endpoints ?: c.endpoints,
+                )
+            }
         }
         return reply
     }
@@ -120,17 +146,19 @@ object Computers {
         .put("id", c.id)
         .put("name", c.name)
         .put("addresses", JSONArray(c.addresses))
+        .put("endpoints", JSONArray(c.endpoints))
         .put("pairedAtMs", c.pairedAtMs)
         .put("lastSyncMs", c.lastSyncMs)
         .put("lastLine", c.lastLine ?: JSONObject.NULL)
 
     private fun fromJson(o: JSONObject): Computer? {
         val id = o.optString("id").takeIf { ID.matches(it) } ?: return null
-        val addresses = o.optJSONArray("addresses")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+        fun strings(name: String) = o.optJSONArray(name)?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty().filter { it.isNotBlank() }
         return Computer(
             id = id,
             name = o.optString("name").ifBlank { "Computer" },
-            addresses = addresses.filter { it.isNotBlank() },
+            addresses = strings("addresses"),
+            endpoints = strings("endpoints"),
             pairedAtMs = o.optLong("pairedAtMs"),
             lastSyncMs = o.optLong("lastSyncMs"),
             lastLine = o.optString("lastLine").takeIf { o.has("lastLine") && !o.isNull("lastLine") },
@@ -138,4 +166,7 @@ object Computers {
     }
 
     private const val MAX_ADDRESSES = 4
+
+    /** A forwarded port and a few IPv6 addresses; more is a computer with many interfaces. */
+    private const val MAX_ENDPOINTS = 8
 }
