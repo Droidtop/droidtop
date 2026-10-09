@@ -86,6 +86,9 @@ object PluginStandardHooks : PluginShellHooks.Provider {
         }
     }
 
+    override fun companionTabs(context: Context, mode: String): List<Pair<String, String>> =
+        PluginPanels.companionTabs(context, mode)
+
     override fun homeMenu(context: Context): List<PluginShellHooks.MenuEntry> {
         if (current()?.panels != true) return emptyList()
         return listOf(

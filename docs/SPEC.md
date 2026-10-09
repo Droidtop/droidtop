@@ -3330,7 +3330,7 @@ row of recent apps, became Home's Recent apps section for every mode.
   `CompanionSurface`, the host's own add/remove controls where it has them), Game (only while a game runs: the
   running game's card), System, Apps (the task manager, formerly Tasks), Performance, Input (the keyboard and
   trackpad surface), Social (every provider's friends and conversations, with droidtop's own keyboard for
-  typing; see "Social", Droidtop/tracker#327) and Plugins (only while a plugin has a companion panel). Which
+  typing; see "Social", Droidtop/tracker#327) and Plugins (only while a plugin has a panel; see Plugins below). Which
   tabs a UI mode offers is `ControlAccess`'s (7f "UI modes and ControlAccess"): Kid and Kiosk get Home, Game
   and Performance. Only the selected tab is composed.
 - **The bar.** A window taller than wide draws a bar of labelled icons along the bottom; a wider one draws the
@@ -3381,7 +3381,7 @@ row of recent apps, became Home's Recent apps section for every mode.
   catalog items by id (`PinnedControls`, default volume, brightness, Wi-Fi (the network row), Do Not Disturb
   and Mute microphone), drawn with the Quick Menu's own tile model (`QuickTiles.tile`, pressed by
   `QuickTiles.pressKind`); a slider pin has a step button each side. "Edit pins" lists every System, Display and
-  Sound item with Pin or Unpin (no long-press needed), plus live stat tiles (slice C7): battery temperature and
+  Sound item with Pin or Unpin (no long-press needed), plugin tiles (slice C9, see Plugins), plus live stat tiles (slice C7): battery temperature and
   draw in watts (from the battery broadcast) and the fastest core's clock (from `PerformanceMonitor`, which runs
   only while that tile is on a Home that is on screen); a stat tile is not a live region. A pin for a control that needs the helper app is not
   drawn without it; a pin whose grant is missing shows its grant row. Kid and Kiosk keep volume and brightness,
@@ -3505,6 +3505,22 @@ row of recent apps, became Home's Recent apps section for every mode.
   and Kiosk always ask. The Quick Menu's Game section reads the same decision. The question starts on Keep playing,
   the two answers large and well apart; a pad press that reaches the companion while it is open closes it as
   Cancel and says "Cancelled. Tap Quit on this screen to quit." Restart is the one quit, then the one launch.
+- **Plugins (slice C9).** A plugin's companion panel is its Quick Menu panel (`ui.panel`, docs/plugin-api.md 3
+  C15 and C17), drawn for touch by `CompanionPluginsTab` with `context.surface` `<mode>.companion`: there is no
+  second panel point. The Plugins tab lists every running panel by name with one line of what it declares
+  (`CompanionAbilities`: "Rows on Game", "Shows when it records", "Keeps this screen on", and how many tiles it has
+  to pin); a tap opens it with Back. Plugins sits under More unless chosen, and any one panel can be chosen as a tab
+  of its own (the Companion group's tab choices list Plugins and each panel, through `PluginShellHooks`). A panel
+  that declares `keep_on` keeps the companion screen on while it shows. A panel that declares `game` gives rows for
+  the running game, drawn on the Game tab under droidtop's own rows (`<mode>.companion_game`; not in Kid or Kiosk).
+  A row a plugin flags `confirm` asks first by `GameControls.asksPluginRow` (Ask before load and overwrite, and
+  always in Kid and Kiosk), the same rule on every companion page. Home's Edit pins lists every plugin tile offered
+  on the companion, pinned by its key (`PinnedControls.TILE_PREFIX`); a pinned tile is drawn while its plugin runs,
+  asked for its state when Home shows and after each press, and pressed the Quick Menu's way. **Recording:** a
+  plugin whose panel declares `recording` (windowcast, or another recorder) reports through the host API
+  `companion.recording` (`PluginRecording`), and the status line shows "Recording 1:05", speaking it once with the
+  plugin's name; it clears when the plugin says so or is turned off, disabled or removed. droidtop records nothing
+  itself.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 

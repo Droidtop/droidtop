@@ -86,6 +86,27 @@ class SamplePanelTest(unittest.TestCase):
         self.assertEqual("Online (wifi)", network["value"])
         self.assertIn(("net", "state"), [(api, op) for api, op, _, _ in calls])
 
+    def test_recording_tells_droidtop_and_the_tile_follows(self):
+        reply = json.loads(plugin.handle(json.dumps({"point": "ui.quick_tile", "op": "toggle", "args": {"tileId": "recording"}})))
+        self.assertTrue(reply["ok"])
+        self.assertIn(("companion", "recording", {"on": True}), [(api, op, args) for api, op, args, _ in calls])
+        state = json.loads(plugin.handle(json.dumps({"point": "ui.quick_tile", "op": "state", "args": {"tileId": "recording"}})))
+        self.assertTrue(state["data"]["on"])
+        panel_call("record")
+        self.assertEqual({"on": False}, calls[-1][2])
+
+    def test_the_game_tab_gets_rows_and_the_load_row_asks_first(self):
+        call = {"point": "ui.panel", "op": "panel", "args": {"context": {"surface": "gaming.companion_game", "game": {"title": "Metroid"}}}}
+        items = json.loads(plugin.handle(json.dumps(call)))["data"]["sections"][0]["items"]
+        self.assertEqual("Metroid", items[0]["value"])
+        self.assertIn("confirm", [i for i in items if i["id"] == "sample_load"][0])
+
+    def test_the_manifest_declares_the_companion_abilities(self):
+        with open("manifest.template.json") as f:
+            manifest = json.load(f)
+        panel = [p for p in manifest["provides"] if p["point"] == "ui.panel"][0]
+        self.assertEqual(["game", "recording"], panel["companion"])
+
     def test_the_manifest_declares_the_toast_permission(self):
         with open("manifest.template.json") as f:
             manifest = json.load(f)

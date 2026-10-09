@@ -90,6 +90,8 @@ object PluginStore {
         val dir = root(context)
         val record = PluginBundleInstaller.readRecord(dir, pluginId) ?: return
         PluginBundleInstaller.writeRecord(dir, record.copy(enabled = enabled, disabledReason = if (enabled) null else record.disabledReason, disabledDetail = if (enabled) null else record.disabledDetail))
+        // A plugin that is off records nothing the companion should still show.
+        if (!enabled) PluginRecording.clear(pluginId)
     }
 
     /** [PluginCrashPolicy]'s write path -- the only other place [PluginRecord.disabledReason] gets set. */
@@ -97,6 +99,7 @@ object PluginStore {
         val dir = root(context)
         val record = PluginBundleInstaller.readRecord(dir, pluginId) ?: return
         PluginBundleInstaller.writeRecord(dir, record.copy(enabled = false, disabledReason = reason, disabledDetail = detail, disabledBuild = hostBuild(context)))
+        PluginRecording.clear(pluginId)
     }
 
     /** This droidtop's build number (its version code), or 0 when the system will not say. */
@@ -134,6 +137,7 @@ object PluginStore {
         PluginVault.forContext(context).clear(pluginId)
         PluginFileTokens.forPluginsRoot(root(context)).delete(pluginId)
         PluginBrokers.forget(pluginId)
+        PluginRecording.clear(pluginId)
         ProviderLevels.forContext(context).forget(pluginId)
         File(root(context), pluginId).deleteRecursively()
         PluginEpoch.bump()

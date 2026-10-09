@@ -97,6 +97,47 @@ def _say_hello():
     return "droidtop did not show the toast: %s" % (error.get("message") or "no reason given")
 
 
+# Whether the sample "records": nothing is recorded, it only tells droidtop so, which is how a real recorder
+# (windowcast) raises the companion's Recording line (docs/plugin-api.md 3 C15, companion.recording).
+_recording = False
+
+
+def _set_recording(on):
+    """Tells droidtop the sample started or stopped "recording" and says in words what happened."""
+    global _recording
+    reply = droidtop.host.call("companion", "recording", {"on": on})
+    if not reply.get("ok"):
+        error = reply.get("error") or {}
+        return "droidtop refused: %s" % (error.get("message") or "no reason given")
+    _recording = on
+    return "Recording (nothing is really recorded)" if on else "Stopped"
+
+
+def _game_rows(context):
+    """The rows the panel gives for the running game on the companion's Game tab (the `game` ability)."""
+    game = (context or {}).get("game") or {}
+    return {
+        "view": 1,
+        "title": "Sample (python)",
+        "sections": [
+            {
+                "id": "game",
+                "items": [
+                    {"type": "info", "id": "game", "title": "Game", "value": game.get("title") or "Not shared"},
+                    {
+                        "type": "button",
+                        "id": "sample_load",
+                        "title": "Sample load",
+                        "subtitle": "Asks first, like a real Load state",
+                        "confirm": "Load the sample slot? Nothing is really loaded.",
+                        "action": {"kind": "call", "op": "sample_load"},
+                    },
+                ],
+            }
+        ],
+    }
+
+
 def on_load(data_dir):
     # data_dir is empty for a contained plugin: everything of its own goes through the data API.
     global _load_count
@@ -232,8 +273,23 @@ def handle(call_json):
                 }
             )
 
-    # The Quick Menu panel (docs/plugin-api.md 3 C17): the plugin's own control point, a view droidtop draws.
+    # A quick tile the companion's Home can pin: it switches the sample's "recording" on and off.
+    if point == "ui.quick_tile" and args.get("tileId") == "recording":
+        if op == "state":
+            return json.dumps({"ok": True, "data": {"label": "Sample recording", "on": _recording}})
+        if op in ("toggle", "action"):
+            return json.dumps({"ok": True, "data": {"message": _set_recording(not _recording)}})
+
+    # The Quick Menu panel (docs/plugin-api.md 3 C17), also the companion's (C15): the plugin's own control point,
+    # a view droidtop draws. On the companion's Game tab (surface "<mode>.companion_game") it gives the game rows.
     if point == "ui.panel":
+        context = args.get("context") or {}
+        if op == "panel" and str(context.get("surface", "")).endswith(".companion_game"):
+            return json.dumps({"ok": True, "data": _game_rows(context)})
+        if op == "sample_load":
+            return json.dumps({"ok": True, "data": {"message": "Sample loaded (nothing changed)"}})
+        if op == "record":
+            return json.dumps({"ok": True, "data": {"message": _set_recording(not _recording)}})
         if op == "panel":
             settings = _load_settings()
             return json.dumps(
@@ -276,6 +332,13 @@ def handle(call_json):
                                         "title": "Say hello as a toast",
                                         "subtitle": "Calls droidtop from Python (ui.toast)",
                                         "action": {"kind": "call", "op": "hello"},
+                                    },
+                                    {
+                                        "type": "button",
+                                        "id": "record",
+                                        "title": "Stop recording" if _recording else "Start recording",
+                                        "subtitle": "Shows Recording on the companion; nothing is recorded",
+                                        "action": {"kind": "call", "op": "record"},
                                     },
                                 ],
                             }

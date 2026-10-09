@@ -1039,7 +1039,11 @@ object GamingSettingsCatalog {
         ControlPanel.PERFORMANCE to "Performance",
         ControlPanel.INPUT to "Input",
         ControlPanel.SOCIAL to "Social",
+        ControlPanel.PLUGINS to "Plugins",
     )
+
+    /** The names of plugin panels last offered as tab choices, so a bar's summary can name them without reading manifests. */
+    @Volatile private var companionPluginTabNames: Map<String, String> = emptyMap()
 
     private val COMPANION_MODE_NAMES = mapOf("GAMING" to "Gaming", "STANDARD" to "Standard", "DESKTOP" to "Desktop")
 
@@ -1052,7 +1056,7 @@ object GamingSettingsCatalog {
         val settings = CompanionPrefs.settings.value
         val tabOptions = COMPANION_TAB_CHOICES.map { (panel, label) -> ChoiceOption(CompanionPrefs.id(panel), label) }
         fun names(ids: List<String>) = ids.mapNotNull { id ->
-            COMPANION_TAB_CHOICES.firstOrNull { CompanionPrefs.id(it.first) == id }?.second
+            COMPANION_TAB_CHOICES.firstOrNull { CompanionPrefs.id(it.first) == id }?.second ?: companionPluginTabNames[id]
         }.joinToString(", ")
         val perMode = CompanionPrefs.MODES.map { mode ->
             val name = COMPANION_MODE_NAMES.getValue(mode)
@@ -1068,6 +1072,10 @@ object GamingSettingsCatalog {
                         CompanionPrefs.load(ctx)
                         val now = CompanionPrefs.settings.value
                         val chosen = now.chosen(mode)
+                        // One plugin's panel can be a tab of its own (docs/SPEC.md "The companion's tabs").
+                        val pluginTabs = PluginShellHooks.companionTabs(ctx, mode.lowercase())
+                        companionPluginTabNames = companionPluginTabNames + pluginTabs
+                        val modeTabOptions = tabOptions + pluginTabs.map { (id, label) -> ChoiceOption(id, label) }
                         listOf(
                             CatalogGroup(
                                 id = "companion_tabs_${mode}_bar",
@@ -1077,7 +1085,7 @@ object GamingSettingsCatalog {
                                         id = "companion_tab_${mode}_$slot",
                                         title = "Tab ${slot + 1}",
                                         subtitle = "Tabs not on the bar are under More; Game joins the bar while a game runs",
-                                        options = listOf(ChoiceOption("", "None")) + tabOptions,
+                                        options = listOf(ChoiceOption("", "None")) + modeTabOptions,
                                         current = chosen.getOrNull(slot).orEmpty(),
                                         onSelect = { c, value ->
                                             CompanionPrefs.setChosen(
@@ -1103,7 +1111,7 @@ object GamingSettingsCatalog {
                                                 if (mode == "DESKTOP") "Input (default)" else "Home (default)",
                                             ),
                                             ChoiceOption(CompanionPrefs.OPEN_LAST, "The last one used"),
-                                        ) + tabOptions,
+                                        ) + modeTabOptions,
                                         current = now.opening(mode),
                                         onSelect = { c, value -> CompanionPrefs.setOpening(c, mode, value) },
                                     ),

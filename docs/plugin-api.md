@@ -745,12 +745,13 @@ of surfaces of their own.
   2026-10-08), `host.info().modes` lists the modes that are on, and every
   call's `context.surface` names the place (`gaming.quick_menu`,
   `standard.home`, `desktop.taskbar`, `gaming.home`, `desktop.start_menu`,
-  `settings`).
+  `gaming.companion` and `gaming.companion_game` with each mode's own prefix
+  (C15), `settings`).
 - **Where each point is drawn** (`PluginModes.HOMES`):
 
 | Point | Gaming | Standard | Desktop |
 | --- | --- | --- | --- |
-| `ui.panel` and tiles (C17, C2, C3) | Quick Menu Plugins section | home screen's long-press menu: "Plugins", the same list, in droidtop's plugin window | taskbar "Plugins", the same list |
+| `ui.panel` and tiles (C17, C2, C3) | Quick Menu Plugins section; the companion (C15) | home screen's long-press menu: "Plugins", the same list, in droidtop's plugin window; the companion | taskbar "Plugins", the same list; the companion |
 | `gaming.rows` (C11) | Home shelves | — (no shelf of games) | Start menu sections of the same entries |
 | `ui.game_section`, `ui.context_action` (C18, C4) | game pages | — (no game page) | — |
 | `social.provider` (C19) | Social place, Quick Menu tile, companion | Settings → Social | Settings → Social |
@@ -1755,14 +1756,45 @@ Risk medium.
 - **Rules:** there is never a secret text field; those go through G1 and
   G2.
 
-**C15 Companion screen panels.** EP `ui.companion@1`. Risk low.
-- **For:** content for the second display (§4c, §4d): now playing, a
-  map, a manual page, a chat, a performance graph.
-- **What the plugin supplies:** the same template data as C10.
-- **Surfaces:** G: companion panels; A: `SECONDARY_HOME` panels; D: —
-  (the second screen is part of the desktop there).
-- **Permission:** none.
-- **Status:** not built (§7e has built-in now-playing and Discord).
+**C15 Companion screen panels.** No point of its own: a plugin's `ui.panel`
+(C17) is its companion panel too (decided 2026-10-09, Droidtop/tracker#414
+slice C9; the `ui.companion@1` point once listed here was never built and is
+dropped, one panel per plugin).
+- **For:** content and controls for the companion screen (SPEC "The
+  companion's tabs"): a stream's controls, save and load for an emulator, a
+  chat, a performance card.
+- **Where:** the companion's Plugins tab lists every panel with its abilities
+  on one line; a person can put one panel on the companion's bar as a tab of
+  its own; the panel's tiles (C2, C3) can be pinned on the companion's Home.
+  The call's `context.surface` is `<mode>.companion` (`gaming.companion`,
+  `standard.companion`, `desktop.companion`); `context.game` is the running
+  game under the `library.read` rule, as in the Quick Menu.
+- **Abilities**, declared on the `ui.panel` entry as `"companion": [...]` and
+  shown on the panel's line before it is opened (unknown names are ignored):
+  - `game`: the panel has rows for the running game. The companion's Game tab
+    asks the panel with `context.surface` `<mode>.companion_game` and draws
+    the rows under its own (not in Kid or Kiosk).
+  - `keep_on`: the companion screen stays on while the panel shows.
+  - `recording`: the plugin may raise droidtop's Recording state through the
+    host API below.
+- **Asking first:** a `button` with `confirm` asks through droidtop's one
+  rule (SPEC "The companion's tabs", Game): while "Ask before load and
+  overwrite" is on (the default), and always in Kid and Kiosk. A plugin
+  flags Load state and a save over a filled slot this way.
+- **Host API** `companion.recording@1 {on, sinceMs?}`: a recorder says it
+  started (`sinceMs`, when it began; never later than now) or stopped. The
+  companion's status line then shows "Recording 1:05" and speaks it once,
+  with the plugin's name. Refused unless the caller's `ui.panel` declares
+  `recording` and that point is on; cleared when the plugin is turned off,
+  disabled or removed. droidtop records nothing itself.
+- **Expected companion plugins:** the RetroArch manager (Game rows: save
+  state, load state, slot up and down, fast-forward, shader on/off, next and
+  previous; tiles to pin) and windowcast (stream rows such as bitrate and
+  latency, send Ctrl+Alt+Del, a Performance card, and the Recording state
+  while it records locally).
+- **Permission:** none beyond the approval of `ui.panel`.
+- **Status:** built (2026-10-09, `PluginPanels.surfaceCompanion`,
+  `CompanionAbilities`, `PluginRecording`).
 
 **C16 A plugin's own full-screen UI.** EP `ui.main@1`. Risk low.
 - **For:** a plugin that has a complete UI of its own to configure and use
@@ -1782,11 +1814,11 @@ Risk medium.
   plugin's label when absent).
 - **Ops:** `panel {context:{surface, game?}}` returns a view (1.6); the
   view's actions come back to this point. `surface` is
-  `gaming.quick_menu`, `standard.home`, `desktop.taskbar` or `settings`; `game` is the running game's
+  `gaming.quick_menu`, `standard.home`, `desktop.taskbar`, `<mode>.companion`, `<mode>.companion_game` (C15) or `settings`; `game` is the running game's
   `target` under the `library.read` rule (C4).
 - **Surfaces:** G: the Quick Menu's Plugins section; A: "Plugins" on the
   home screen's long-press menu; D: "Plugins" on the taskbar (1.9); G, S, D: a "Panel"
-  row on the plugin's page under Settings.
+  row on the plugin's page under Settings, and the companion screen (C15).
 - **Permission:** none beyond the approval of the point.
 - **Status:** built (2026-10-07, `PluginPanels`).
 

@@ -217,6 +217,9 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
     val runningId = running?.context?.gameId
     val runningKind = remember(runningId, entries) { runningId?.let { id -> entries.firstOrNull { it.id == id }?.kind } }
     val runningTabs = runningTabs(runningId != null, runnerWantsInput(runningKind))
+    // Plugin panels for this mode (manifests, read off the main thread): the Plugins tab, and any one of them as a tab.
+    val panels = rememberCompanionPanels(pluginMode(mode)).orEmpty()
+    val pluginTabs = remember(panels) { panels.map { CompanionTab.plugin(it.pluginId, it.label) } }
 
     // The Social tab's unread count over every provider, read when something changes, never polled.
     val social = ControlPanel.SOCIAL in ControlAccess.panels(uiMode, ControlSurface.COMPANION)
@@ -311,12 +314,12 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                 (maxOf(22.dp + 2.dp + text + 12.dp, 48.dp) + 4.dp).toPx()
             }
         }
-        val labels = remember(portrait, density) {
-            (CompanionTab.CHOOSABLE + CompanionTab.GAME + CompanionTab.PLUGINS).associate { it.id to extentOf(it.label) }
+        val labels = remember(portrait, density, pluginTabs) {
+            (CompanionTab.CHOOSABLE + CompanionTab.GAME + CompanionTab.PLUGINS + pluginTabs).associate { it.id to extentOf(it.label) }
         }
         val moreSize = remember(portrait, density) { extentOf(CompanionTab.MORE_LABEL) }
         val extent = with(density) { (if (portrait) maxWidth - 8.dp else maxHeight - 8.dp).toPx() }
-        val bar = slots(settings.chosen(modeName), uiMode, runningTabs, extent, labels, moreSize)
+        val bar = slots(settings.chosen(modeName), uiMode, runningTabs, extent, labels, moreSize, pluginTabs)
 
         val selected = (selectedId ?: openingTab(settings, modeName, bar)).let { id ->
             if (bar.all.any { it.id == id }) id else CompanionTab.HOME.id
@@ -405,7 +408,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                 if (moreOpen) {
                     CompanionMoreList(bar.more, shown, badges) { select(it.id) }
                 } else {
-                    CompositionLocalProvider(LocalCompanionNav provides nav) {
+                    CompositionLocalProvider(LocalCompanionNav provides nav, LocalCompanionMode provides mode) {
                         when (shown) {
                             CompanionTab.HOME.id -> home()
                             CompanionTab.GAME.id -> CompanionGameTab()
@@ -414,7 +417,8 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                             CompanionTab.PERFORMANCE.id -> CompanionPerformanceTab()
                             CompanionTab.SYSTEM.id -> CompanionSystemTab()
                             CompanionTab.INPUT.id -> SecondScreenInputSurface(mode)
-                            else -> Unit
+                            CompanionTab.PLUGINS.id -> CompanionPluginsTab(null)
+                            else -> if (shown.startsWith(CompanionPrefs.PLUGIN_PREFIX)) CompanionPluginsTab(shown)
                         }
                     }
                 }

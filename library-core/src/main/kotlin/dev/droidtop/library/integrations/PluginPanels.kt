@@ -7,6 +7,7 @@ import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.pluginhost.CompanionAbilities
 import dev.droidtop.pluginhost.ContextTarget
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginMainUi
@@ -41,6 +42,21 @@ object PluginPanels {
     const val SURFACE_STANDARD = PluginModes.Surfaces.STANDARD_HOME
     const val SURFACE_DESKTOP = PluginModes.Surfaces.DESKTOP_TASKBAR
 
+    /**
+     * The companion screen (docs/plugin-api.md 3 C15): the same panels, drawn for touch on its Plugins tab or as a tab
+     * of their own, with `context.surface` `<mode>.companion`; panels that declare the `game` ability also give rows for
+     * the running game on its Game tab (`<mode>.companion_game`).
+     */
+    fun surfaceCompanion(mode: String): String = PluginModes.Surfaces.companion(mode)
+    fun surfaceCompanionGame(mode: String): String = PluginModes.Surfaces.companionGame(mode)
+
+    /**
+     * The panels a person can put on the companion's bar in [mode] (`gaming`), as the tab id the Companion group stores
+     * ("plugin:<id>") and the name. Reads manifests: off the main thread.
+     */
+    fun companionTabs(context: Context, mode: String): List<Pair<String, String>> =
+        panelsFor(context, mode).map { dev.droidtop.library.settings.CompanionPrefs.PLUGIN_PREFIX + it.pluginId to it.label }
+
     const val QUICK_MENU_SCREEN_ID = "plugin_panels"
 
     /**
@@ -54,6 +70,12 @@ object PluginPanels {
     data class Panel(val record: PluginRecord, val entry: ProvidedPoint?, val tiles: List<PluginTiles.Tile>) {
         val pluginId: String get() = record.manifest.id
         val label: String get() = entry?.label ?: record.manifest.label
+
+        /** What the panel declares it does on the companion ([CompanionAbilities]): rows on Game, recording, keep-on. */
+        val abilities: Set<String> get() = CompanionAbilities.of(entry)
+
+        /** The companion's one line under the panel's name: its abilities and its pinnable tiles, in plain words. */
+        val abilitiesLine: String? get() = CompanionAbilities.line(abilities, tiles.size)
     }
 
     /**
@@ -228,7 +250,7 @@ object PluginPanels {
     }
 
     /** A tile's state as a value column: On or Off for a toggle, else what it reports. */
-    internal fun tileValue(state: TileState): String? = when (state.on) {
+    fun tileValue(state: TileState): String? = when (state.on) {
         true -> "On"
         false -> "Off"
         null -> state.value

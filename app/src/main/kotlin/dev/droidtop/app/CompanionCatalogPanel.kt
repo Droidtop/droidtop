@@ -40,6 +40,7 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SliderItem
+import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.settings.confirmText
 import dev.droidtop.shell.gamepad.QuickSection
@@ -90,11 +91,12 @@ internal fun CompanionCatalogItems(
     items: List<CatalogItem>,
     onChanged: () -> Unit,
     onOpenSocial: (() -> Unit)? = null,
+    asks: (CatalogItem) -> Boolean = { it.confirmText != null },
 ) {
     var nested by remember { mutableStateOf<CatalogScreen?>(null) }
     val open = nested
     if (open != null) {
-        CompanionNestedScreen(open, onBack = { nested = null }, onChanged = onChanged)
+        CompanionNestedScreen(open, onBack = { nested = null }, onChanged = onChanged, asks = asks)
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -106,16 +108,29 @@ internal fun CompanionCatalogItems(
                 is NestedScreenItem -> CatalogRow(item.title, item.subtitle, null) {
                     if (item.registryId == "social" && onOpenSocial != null) onOpenSocial() else nested = item.resolve()
                 }
-                is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged)
+                is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged, asks(item))
+                is TextBlockItem -> Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                    if (item.title.isNotBlank()) Text(item.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                    Text(item.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 else -> Unit
             }
         }
     }
 }
 
-/** A nested catalog screen (Updates, the Android settings index) opened in place, with a way back. */
+/**
+ * A nested catalog screen (Updates, the Android settings index, a plugin's panel) opened in place, with a way back.
+ * [lead] goes under the title (a plugin panel's abilities line).
+ */
 @Composable
-private fun CompanionNestedScreen(screen: CatalogScreen, onBack: () -> Unit, onChanged: () -> Unit) {
+internal fun CompanionNestedScreen(
+    screen: CatalogScreen,
+    onBack: (() -> Unit)?,
+    onChanged: () -> Unit,
+    asks: (CatalogItem) -> Boolean = { it.confirmText != null },
+    lead: String? = null,
+) {
     val context = LocalContext.current
     var version by remember { mutableStateOf(0) }
     val items by produceState<List<CatalogItem>?>(null, screen, version) {
@@ -123,11 +138,12 @@ private fun CompanionNestedScreen(screen: CatalogScreen, onBack: () -> Unit, onC
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CompanionPill("Back", onClick = onBack)
+            if (onBack != null) CompanionPill("Back", onClick = onBack)
             Text(screen.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
         }
+        lead?.let { CompanionNote(it) }
         val list = items
-        if (list == null) CompanionNote("Reading…") else CompanionCatalogItems(list, onChanged = { version++; onChanged() })
+        if (list == null) CompanionNote("Reading…") else CompanionCatalogItems(list, onChanged = { version++; onChanged() }, asks = asks)
     }
 }
 
@@ -244,10 +260,11 @@ private fun CatalogChoiceRow(item: ChoiceItem, onChanged: () -> Unit) {
 
 /**
  * An action: a tap runs it (an async one off the main thread, with its status in the value column). One that asks
- * first shows its question with the safe answer first, the two well apart.
+ * first ([asksFirst]: its own question by default, or the rule the caller passes, such as `GameControls` for a plugin's
+ * rows) shows its question with the safe answer first, the two well apart.
  */
 @Composable
-private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit) {
+private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst: Boolean) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var status by remember(item) { mutableStateOf<String?>(null) }
@@ -266,10 +283,10 @@ private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit) {
             else -> Unit
         }
     }
-    CatalogRow(item.title, item.subtitle, value) { if (item.confirmText != null) asking = true else run() }
+    CatalogRow(item.title, item.subtitle, value) { if (asksFirst) asking = true else run() }
     if (asking) {
         Column(modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) {
-            Text(item.confirmText.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(item.confirmText ?: "${item.title}?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
             Row(horizontalArrangement = Arrangement.spacedBy(32.dp), modifier = Modifier.padding(top = 6.dp)) {
                 CompanionPill("Cancel", selected = true) { asking = false }
                 CompanionPill(item.title) { run() }

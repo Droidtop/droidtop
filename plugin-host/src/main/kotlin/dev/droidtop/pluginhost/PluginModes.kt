@@ -88,5 +88,14 @@ object PluginModes {
         const val DESKTOP_TASKBAR = "desktop.taskbar"
         const val DESKTOP_START_MENU = "desktop.start_menu"
         const val SETTINGS = "settings"
+
+        /**
+         * The companion screen in [mode] (`gaming.companion`): a panel on its Plugins tab or as a tab of its own. The
+         * companion is in every mode, so its surface carries the mode like the others.
+         */
+        fun companion(mode: String): String = "$mode.companion"
+
+        /** A panel's rows for the running game on the companion's Game tab (`gaming.companion_game`). */
+        fun companionGame(mode: String): String = "$mode.companion_game"
     }
 }

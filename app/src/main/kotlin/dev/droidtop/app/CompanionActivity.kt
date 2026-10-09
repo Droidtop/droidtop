@@ -259,6 +259,9 @@ internal fun CompanionSystemBar() {
                 androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 6.dp))
                 Text(indicator, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
             }
+            // A plugin that records (windowcast or another recorder) says so: "Recording 1:05".
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 3.dp))
+            CompanionRecordingIndicator()
             // Time to empty or full, once the battery broadcasts give enough to say (about a minute).
             battery.second?.let { estimate ->
                 androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 6.dp))

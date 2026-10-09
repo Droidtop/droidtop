@@ -73,4 +73,15 @@ class PinnedControlsTest {
         assertFalse(PinnedControls.needsSampler(listOf(PinnedControls.STAT_TEMPERATURE, PinnedControls.STAT_WATTS)))
         assertFalse(PinnedControls.needsSampler(PinnedControls.visible(pins, UiMode.KID, withoutProvider)))
     }
+
+    @Test
+    fun `a plugin tile pins by its key and draws only while its plugin offers it, never in Kid or Kiosk`() {
+        val tile = PinnedControls.tileId("acme.rec/ui.quick_tile/rec")
+        assertEquals("tile:acme.rec/ui.quick_tile/rec", tile)
+        val pins = listOf(GamingSettingsCatalog.ID_SYSTEM_VOLUME, tile)
+        assertEquals(pins, PinnedControls.visible(pins, UiMode.FULL, withoutProvider + tile))
+        // The plugin is off or gone: its tile is not offered, so the pin is not drawn (and is kept for its return).
+        assertEquals(listOf(GamingSettingsCatalog.ID_SYSTEM_VOLUME), PinnedControls.visible(pins, UiMode.FULL, withoutProvider))
+        assertEquals(listOf(GamingSettingsCatalog.ID_SYSTEM_VOLUME), PinnedControls.visible(pins, UiMode.KID, withoutProvider + tile))
+    }
 }

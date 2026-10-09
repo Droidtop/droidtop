@@ -6,8 +6,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The controls pinned to the companion's Home (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): stored by
- * catalog id (later also a plugin tile id, an app or a shortcut), surface-neutral, so any surface that draws catalog
- * items can draw them. Read once with [load] off the main thread, then kept in [pins].
+ * catalog id, plugin tile ([TILE_PREFIX], slice C9) or live stat (later also an app or a shortcut), surface-neutral, so
+ * any surface that draws catalog items can draw them. Read once with [load] off the main thread, then kept in [pins].
  */
 object PinnedControls {
     private const val PREFS = "companion_pins"
@@ -46,6 +46,15 @@ object PinnedControls {
         STAT_CLOCK to "Fastest core clock",
         STAT_WATTS to "Battery draw",
     )
+
+    /**
+     * A plugin's quick or status tile, pinned by its key (`<plugin>/<point>/<tile id>`): drawn while that plugin runs and
+     * offers the tile on the companion, pressed and asked for its state the way the Quick Menu does. Not in Kid or Kiosk
+     * ([ControlRow.PLUGIN_PINS]).
+     */
+    const val TILE_PREFIX = "tile:"
+
+    fun tileId(key: String): String = TILE_PREFIX + key
 
     /** Whether Home must run the performance sampler for its pins. */
     fun needsSampler(pins: List<String>): Boolean = STAT_CLOCK in pins
@@ -86,10 +95,11 @@ object PinnedControls {
      * The pins Home draws now, in pin order, as the catalog ids to look up: only what [mode] lets a person pin
      * ([ControlAccess.pinnable]: volume and brightness in Kid and Kiosk), each as its stand-in where only that is in
      * the catalog, and only what the catalog has right now ([available]): a control that needs the helper app is not
-     * in the catalog without it, so its pin is not drawn either. Pure.
+     * in the catalog without it, so its pin is not drawn either; a plugin tile is available while its plugin runs and
+     * offers it. Pure.
      */
     fun visible(pins: List<String>, mode: UiMode, available: Set<String>): List<String> =
-        pins.filter { ControlAccess.pinnable(mode, it) }.mapNotNull { id ->
+        pins.filter { ControlAccess.pinnable(mode, it) && (!it.startsWith(TILE_PREFIX) || ControlAccess.shows(mode, ControlRow.PLUGIN_PINS)) }.mapNotNull { id ->
             when {
                 id in available -> id
                 id.startsWith(STAT_PREFIX) && STATS.any { it.first == id } -> id

@@ -50,6 +50,13 @@ returns: a `main` section with an `info` row (`about`), a `toggle`
 a call carries them in `args["values"]`. The status tile keeps the
 `force-crash` test (raise `RuntimeError`) for the rig.
 
+Since 1.4.0 its panel is also a companion panel (docs/plugin-api.md 3 C15): it
+declares `"companion": ["game", "recording"]`, gives a "Sample load" row (which
+asks first) on the companion's Game tab, and a "Start recording" button and a
+pinnable quick tile (`ui.quick_tile` `recording`) that call
+`droidtop.host.call("companion", "recording", {"on": ...})`, so the companion's
+status line shows "Recording" with a timer. Nothing is recorded.
+
 ## Access
 
 It runs contained (docs/plugin-api.md 5.3), in an isolated process with its own

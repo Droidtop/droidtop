@@ -3,7 +3,7 @@
   "origin": "droidtop",
   "label": "Sample status tile (Python)",
   "description": "Harmless python-kind sample exercising the plugin API end to end (SPEC 12a); see build.sh in this folder.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "kind": "python",
   "contractVersion": 2,
   "permissions": [
@@ -21,9 +21,16 @@
       "surfaces": ["gaming.quick_menu"]
     },
     {
+      "point": "ui.quick_tile",
+      "version": 1,
+      "id": "recording",
+      "label": "Sample recording"
+    },
+    {
       "point": "ui.panel",
       "version": 1,
-      "label": "Sample (python)"
+      "label": "Sample (python)",
+      "companion": ["game", "recording"]
     },
     {
       "point": "ui.settings",

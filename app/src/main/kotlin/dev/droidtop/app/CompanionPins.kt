@@ -38,6 +38,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.droidtop.library.integrations.PluginPanels
+import dev.droidtop.library.integrations.PluginTiles
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ControlAccess
@@ -47,6 +49,7 @@ import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.StatusIndicators
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.settings.UiModeRefresh
+import dev.droidtop.pluginhost.TileState
 import dev.droidtop.runtime.tasks.BackendState
 import dev.droidtop.runtime.tasks.TaskManager
 import dev.droidtop.shell.gamepad.QuickPress
@@ -61,8 +64,9 @@ import kotlinx.coroutines.withContext
  * Home's pinned tiles (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): catalog items by id
  * ([PinnedControls]), drawn from the same tile model the Quick Menu's grid uses ([QuickTiles.tile]). A slider pin
  * has a step button on each side. "Edit pins" lists every System, Display and Sound item with Pin or Unpin, so
- * pinning never needs a long-press; Kid and Kiosk get volume and brightness only and no editing. The catalog is built
- * off the main thread while Home shows and after each change.
+ * pinning never needs a long-press, plus the live stat tiles and every plugin tile offered on the companion (slice
+ * C9); Kid and Kiosk get volume and brightness only and no editing. The catalog and the plugin tiles are read off the
+ * main thread while Home shows and after each change.
  */
 @Composable
 internal fun CompanionPinsSection() {
@@ -79,9 +83,29 @@ internal fun CompanionPinsSection() {
                 .distinctBy { it.id }
         }
     }
+    // Plugin tiles offered on the companion (manifests, off the main thread), pinnable by key; none in Kid or Kiosk.
+    val mode = pluginMode(LocalCompanionMode.current)
+    val tiles by produceState<List<PluginTiles.Tile>>(emptyList(), mode, uiMode, dev.droidtop.pluginhost.PluginEpoch.current()) {
+        value = if (ControlAccess.shows(uiMode, dev.droidtop.library.settings.ControlRow.PLUGIN_PINS)) {
+            withContext(Dispatchers.IO) {
+                runCatching { PluginTiles.tilesFor(context.applicationContext, PluginPanels.surfaceCompanion(mode), mode) }.getOrDefault(emptyList())
+            }
+        } else {
+            emptyList()
+        }
+    }
     val items = pinnable ?: return
     val byId = items.associateBy { it.id }
-    val shown = PinnedControls.visible(state.pins, uiMode, byId.keys)
+    val tileById = tiles.associateBy { PinnedControls.tileId(it.key) }
+    val shown = PinnedControls.visible(state.pins, uiMode, byId.keys + tileById.keys)
+    // A pinned tile's state is asked for once while Home shows it, and again after each press; never polled.
+    var tileVersion by remember { mutableIntStateOf(0) }
+    val pinnedTiles = shown.mapNotNull { tileById[it] }
+    val tileStates by produceState<Map<String, TileState?>>(emptyMap(), pinnedTiles.map { it.key }, tileVersion) {
+        if (pinnedTiles.isNotEmpty()) {
+            value = withContext(Dispatchers.IO) { runCatching { PluginTiles.refresh(context.applicationContext, pinnedTiles) }.getOrDefault(emptyMap()) }
+        }
+    }
     // The clock tile needs the performance sampler: it runs while that pin is on a Home that is on screen.
     if (PinnedControls.needsSampler(shown)) {
         LaunchedEffect(Unit) { dev.droidtop.runtime.systemstatus.PerformanceMonitor.watch(context) }
@@ -100,7 +124,12 @@ internal fun CompanionPinsSection() {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { id ->
                             val item = byId[id]
-                            if (item != null) PinTile(item, Modifier.weight(1f)) { version++ } else StatTile(id, Modifier.weight(1f))
+                            val tile = tileById[id]
+                            when {
+                                item != null -> PinTile(item, Modifier.weight(1f)) { version++ }
+                                tile != null -> PluginTilePin(tile, tileStates[tile.key] ?: PluginTiles.cached(tile), Modifier.weight(1f)) { tileVersion++ }
+                                else -> StatTile(id, Modifier.weight(1f))
+                            }
                         }
                         repeat(columns - row.size) { Box(Modifier.weight(1f)) }
                     }
@@ -113,7 +142,8 @@ internal fun CompanionPinsSection() {
             }
             if (editing) {
                 val choices = items.filter { ControlAccess.pinnable(uiMode, it.id) && it.id !in PinnedControls.STAND_INS.values }
-                    .map { it.id to it.title } + PinnedControls.STATS
+                    .map { it.id to it.title } + PinnedControls.STATS +
+                    tiles.map { PinnedControls.tileId(it.key) to "${PluginTiles.cached(it)?.label ?: it.fallbackLabel} (${it.pluginLabel})" }
                 choices.forEach { (id, title) ->
                     val pinned = id in state.pins
                     Row(
@@ -199,6 +229,53 @@ private fun PinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit
     ) {
         Text(tile.label, style = MaterialTheme.typography.labelLarge, color = if (lit) colors.onPrimaryContainer else colors.onSurface, maxLines = 2)
         val value = status ?: tile.value ?: tile.on?.let { if (it) "On" else "Off" }
+        if (value != null) {
+            Text(value, style = MaterialTheme.typography.bodySmall, color = if (lit) colors.onPrimaryContainer else colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/**
+ * A plugin's tile pinned on Home: its label and value from the state last asked for; a quick tile is pressed the
+ * Quick Menu's way ([PluginTiles.press], `toggle` or `action`) off the main thread, and says what came back. A status
+ * tile only reports.
+ */
+@Composable
+private fun PluginTilePin(tile: PluginTiles.Tile, state: TileState?, modifier: Modifier, onPressed: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val colors = MaterialTheme.colorScheme
+    var status by remember(tile.key) { mutableStateOf<String?>(null) }
+    val label = state?.label ?: tile.fallbackLabel
+    val lit = state?.on == true
+    val value = status ?: state?.let(PluginPanels::tileValue)
+    Column(
+        modifier = modifier
+            .heightIn(min = 72.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (lit) colors.primaryContainer else colors.surface)
+            .let { base ->
+                if (!tile.quick) {
+                    base
+                } else {
+                    base.clickable(role = if (state?.on != null) Role.Switch else Role.Button) {
+                        scope.launch {
+                            status = "Working…"
+                            val outcome = withContext(Dispatchers.IO) { runCatching { PluginTiles.press(context.applicationContext, tile, PluginTiles.cached(tile)) }.getOrNull() }
+                            status = outcome?.message
+                            onPressed()
+                        }
+                    }
+                }
+            }
+            .semantics {
+                contentDescription = "$label, from ${tile.pluginLabel}"
+                stateDescription = value.orEmpty()
+            }
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = if (lit) colors.onPrimaryContainer else colors.onSurface, maxLines = 2)
         if (value != null) {
             Text(value, style = MaterialTheme.typography.bodySmall, color = if (lit) colors.onPrimaryContainer else colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }

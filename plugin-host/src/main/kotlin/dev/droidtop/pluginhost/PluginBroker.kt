@@ -406,6 +406,19 @@ object HostApis {
             if (args.has("message") && args.optJSONObject("message") == null) invalid("message must be an object")
             JSONObject().put("accepted", env.socialChanged(record.manifest.id, args))
         },
+        // docs/plugin-api.md 3 C15: a recorder says it started or stopped, and the companion's status line shows "Recording"
+        // with a timer. Only a plugin whose panel declares the `recording` ability, with that point still on, may say so.
+        HostOp("companion", "recording") { env, record, args ->
+            PluginGrants.pointRefusal(record, env.grants(record.manifest.id), "ui.panel")?.let {
+                throw BrokerException(PluginErrorCode.PERMISSION_DENIED, it)
+            }
+            if (!CompanionAbilities.declares(record.manifest, CompanionAbilities.RECORDING)) {
+                throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "${record.manifest.label}'s panel does not declare the recording ability")
+            }
+            val on = args.opt("on") as? Boolean ?: invalid("on must be true or false")
+            val since = if (args.has("sinceMs")) args.optLong("sinceMs", -1L).takeIf { it > 0 } ?: invalid("sinceMs must be a time in milliseconds") else null
+            JSONObject().put("changed", PluginRecording.report(record.manifest.id, record.manifest.label, on, since, env.nowMs()))
+        },
         // docs/plugin-api.md 3 A3: a plugin that put a file in a game folder (or took one out) says so, and droidtop looks at exactly
         // that, never at the whole library. The grant is the one that lets it write there at all; the paths must be inside the
         // person's game folders (a game folder itself is a rescan, not a report).
