@@ -58,6 +58,11 @@ android {
         jvmTarget = "17"
     }
 
+    // A key press on a hosted keyboard runs under Robolectric, which needs the merged resources.
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     lint {
         abortOnError = false
     }
@@ -71,4 +76,5 @@ dependencies {
     implementation(libs.androidx.core.ktx)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 }

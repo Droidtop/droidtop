@@ -508,7 +508,7 @@ public class LatinKeyboard extends Keyboard {
             paint.setTextAlign(Align.CENTER);
 
             final boolean allowVariableTextSize = true;
-            Locale locale = mLanguageSwitcher.getInputLocale();
+            Locale locale = mLanguageSwitcher != null ? mLanguageSwitcher.getInputLocale() : mLocale;
             //Log.i("PCKeyboard", "input locale: " + locale);
             final String language = layoutSpaceBar(paint, locale,
                     mButtonArrowLeftIcon, mButtonArrowRightIcon, width, height,
@@ -526,7 +526,7 @@ public class LatinKeyboard extends Keyboard {
             canvas.drawText(language, width / 2, baseline - descent, paint);
 
             // Put arrows that are already layed out on either side of the text
-            if (mLanguageSwitcher.getLocaleCount() > 1) {
+            if (localeCount() > 1) {
                 mButtonArrowLeftIcon.draw(canvas);
                 mButtonArrowRightIcon.draw(canvas);
             }
@@ -575,8 +575,17 @@ public class LatinKeyboard extends Keyboard {
         mSpaceKey.iconPreview.invalidateSelf();
     }
 
+    /**
+     * The number of input languages, or 0 when this keyboard has no language switcher. Only the input method sets
+     * one ({@link #setLanguageSwitcher}); the keyboards droidtop hosts itself (the companion, the in-window panel)
+     * have a single language, which must behave as one language, not crash (Droidtop/tracker, rig-5566 on 1702).
+     */
+    private int localeCount() {
+        return mLanguageSwitcher == null ? 0 : mLanguageSwitcher.getLocaleCount();
+    }
+
     public int getLanguageChangeDirection() {
-        if (mSpaceKey == null || mLanguageSwitcher.getLocaleCount() < 2
+        if (mSpaceKey == null || localeCount() < 2
                 || Math.abs(mSpaceDragLastDiff) < getSpacePreviewWidth() * SPACEBAR_DRAG_THRESHOLD) {
             return 0; // No change
         }
@@ -640,7 +649,7 @@ public class LatinKeyboard extends Keyboard {
             if (code == KEYCODE_DELETE) x -= key.width / 6;
         } else if (code == LatinIME.ASCII_SPACE) {
             y += LatinKeyboard.sSpacebarVerticalCorrection;
-            if (mLanguageSwitcher.getLocaleCount() > 1) {
+            if (localeCount() > 1) {
                 if (mCurrentlyInSpace) {
                     int diff = x - mSpaceDragStartX;
                     if (Math.abs(diff - mSpaceDragLastDiff) > 0) {
