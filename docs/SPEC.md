@@ -7702,9 +7702,54 @@ menu_displaylist.c and msg_hash_us.h). The rows and the manual steps read the sa
   own menus, or which files to copy into which folder, with the emulator one press away. The rows never
   name Shizuku or a tier; they say what will happen.
 - RetroArch cores keep their own row and path (`RetroArchCores`, 7e2c).
-- **Not built here:** granting an emulator All files access or a runtime permission from the helper.
-  The row "<Emulator> needs All files access" still opens Android's own screen for it (7e2's decision
-  stands until the owner confirms the grant from this session, Droidtop/tracker#248).
+- **Granting access** is built behind Settings > Risky actions (next section): "Let <Emulator> read your
+  game folders" (All files access, the appop `MANAGE_EXTERNAL_STORAGE`) and "Let <Emulator> use <permission>"
+  (`pm grant`, one row per runtime permission the emulator declares and does not hold,
+  `EmulatorAccess.missingRuntimePermissions`, at most six). Without the class on, the first stays the row that
+  opens Android's own All files access screen (7e2) and the second is not drawn.
+
+### Risky actions (owner, 2026-10-09, Droidtop/tracker#248)
+
+Owner, on giving an emulator permissions through the helper: "It's a yes, but gate it behind explicit checks,
+like most things. there should be a 'risky actions' settings section." So Settings > Risky actions
+(`RiskyActionsCatalog`, linked from Global settings, so every mode reaches it) holds the switches, all **off by
+default**: a master switch ("Allow risky actions") and one switch per class (`RiskyClass`), and a class does
+nothing while the master is off (`RiskySwitches.allows`). The classes, each a thing droidtop does to another app
+or the system through the privileged helper:
+
+- **Give another app access** (`GRANT_ACCESS`): `PrivilegedShell.setAppOp` and `grantPermission`.
+- **Write another app's files** (`OTHER_APP_FILES`): `PrivilegedShell.writeFile`, the emulator setup helper's
+  BIOS files and config options in an emulator's `Android/data`. A write droidtop can make itself, in a folder
+  of its own or one the person gave it, is not this class.
+- **Root-level commands** (`ROOT_COMMANDS`): commands run as root through a provider that holds it. Today that is
+  placing a RetroArch core in RetroArch's private folder (`RetroArchCores`); with the class off droidtop does not
+  even look at the cores folder through the root helper, and the core row opens RetroArch's Core Downloader as it
+  does without root.
+
+Two checks, both required:
+
+1. **The gate.** `ElevatedShell`, the one `PrivilegedShell` every caller uses, refuses `grantPermission`,
+   `setAppOp` and `writeFile` unless `RiskyActions.allows` the class (the check is at the call, so no surface can
+   skip it); `RetroArchCores` checks `ROOT_COMMANDS` in front of every root command. The switches are read from
+   droidtop's preferences on a background thread at start and answer from memory; **until they have loaded the
+   answer is no**.
+2. **The confirmation, every use.** A row that would use a class is a confirm row (`confirmTitle`): the Gaming
+   surface arms it and shows the sentence in place of the hint, with "press A again to confirm"; the Preference
+   surface asks in a dialog. The sentence (`RiskyPrompts`) names the app and the exact thing: the package and the
+   appop or permission name, or the file path (for "Add a BIOS file", the folder, since the file is picked after),
+   or the core files and RetroArch's folder, and says how to undo it. Wherever a row is shown without its class,
+   it says where to turn it on in plain words and keeps its manual steps.
+   A launch never places a core by itself any more: `RetroArchCores.ensure` places only for a `confirmed` call,
+   from the Core row or the RetroArch cores row. The launch watchdog's "Get the core" opens RetroArch's Core
+   Downloader (and names the Root-level commands switch).
+
+After a grant, droidtop reads the result back from Android (`emulatorReadsStoragePaths`, `checkPermission`)
+and says what it found, not what the helper replied. Providers: the Shizuku app backend does `appops set` and
+`pm grant` in Shizuku's server; the Shizuku plugin does it through `priv.packages` `set_appop` and
+`grant_permission` (docs/plugin-api.md 2.7, plugin 1.3.0), offered only while the running provider exports the
+op. droidtop never calls `su`. Not covered by a class, by decision of scope: reading files, `exec` of commands
+that change nothing of another app's (radios, the task list, force-stop), and the rooted desktop's container
+stack (`RootProcess`), which this section does not gate: bringing it under a class is a separate decision.
 
 ## 7f. Gaming mode: real, generic ES-DE theme engine
 

@@ -2,6 +2,8 @@ package dev.droidtop.library.consoles
 
 import android.content.Context
 import dev.droidtop.runtime.tasks.ElevatedFiles
+import dev.droidtop.runtime.tasks.RiskyActions
+import dev.droidtop.runtime.tasks.RiskyClass
 import dev.droidtop.runtime.tasks.TaskManager
 import org.json.JSONObject
 import java.io.File
@@ -134,8 +136,11 @@ object ConfigText {
  * background threads only.
  */
 object EmulatorSetup {
-    /** How droidtop can reach a file: itself, through the helper, or not at all. */
-    enum class Reach { DIRECT, HELPER, NONE }
+    /**
+     * How droidtop can reach a file: itself, through the helper, through the helper once Settings > Risky actions >
+     * Write another app's files is on ([LOCKED]), or not at all.
+     */
+    enum class Reach { DIRECT, HELPER, LOCKED, NONE }
 
     // --- pure parts --------------------------------------------------------------------------------------------
 
@@ -285,7 +290,8 @@ object EmulatorSetup {
         }.getOrDefault(false)
         return when {
             direct -> Reach.DIRECT
-            ElevatedFiles.allowed(path) && TaskManager.privileges().files -> Reach.HELPER
+            ElevatedFiles.allowed(path) && TaskManager.privileges().files ->
+                if (RiskyActions.allows(RiskyClass.OTHER_APP_FILES)) Reach.HELPER else Reach.LOCKED
             else -> Reach.NONE
         }
     }
@@ -311,7 +317,7 @@ object EmulatorSetup {
             }
         }.isSuccess
         Reach.HELPER -> TaskManager.shell.writeFile(path, data)
-        Reach.NONE -> false
+        Reach.LOCKED, Reach.NONE -> false
     }
 
     /** The files in [folder] as paths relative to it, when droidtop or the helper can list it; null when neither can. */

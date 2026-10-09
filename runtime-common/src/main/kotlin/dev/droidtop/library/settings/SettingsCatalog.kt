@@ -178,6 +178,15 @@ class ActionItem(
     val run: (Context) -> Unit,
 ) : CatalogItem
 
+/** The explicit-yes sentence an item asks for before it runs, or null. */
+val CatalogItem.confirmText: String?
+    get() = when (this) {
+        is ActionItem -> confirmTitle
+        is AsyncActionItem -> confirmTitle
+        is DocumentPickItem -> confirmTitle
+        else -> null
+    }
+
 /**
  * A paragraph shown whole, wrapped in the row and never cut (a disclaimer the person must read before accepting it).
  * It does nothing when pressed; the pad steps through the paragraphs, which is how a long text scrolls. [title], when
@@ -245,6 +254,8 @@ class DocumentPickItem(
     val createName: String? = null,
     /** A folder of the primary shared storage the picker opens in ("Download"), instead of wherever it last was. */
     val startIn: String? = null,
+    /** Asks the surface for an explicit yes before the picker opens, as on [ActionItem] (a pick that writes into another app's folder). */
+    val confirmTitle: String? = null,
     val onPicked: suspend (Context, Uri) -> String,
 ) : CatalogItem {
     fun pickerIntent(): Intent =

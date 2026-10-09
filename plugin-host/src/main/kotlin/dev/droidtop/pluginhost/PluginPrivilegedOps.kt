@@ -2,6 +2,8 @@ package dev.droidtop.pluginhost
 
 import android.content.Context
 import android.util.Base64
+import dev.droidtop.runtime.tasks.APPOP_MODES
+import dev.droidtop.runtime.tasks.APPOP_NAME
 import dev.droidtop.runtime.tasks.BackendState
 import dev.droidtop.runtime.tasks.ElevatedBackend
 import dev.droidtop.runtime.tasks.ElevatedFiles
@@ -26,6 +28,8 @@ class PluginPrivilegedOps(private val context: Context) : ElevatedBackend {
         TaskPrivileges(
             forceStop = caller.hasProvider("priv.packages", 1),
             shell = caller.hasProvider("priv.shell", 1),
+            grantPermission = caller.hasOp("priv.packages", 1, "grant_permission"),
+            appOps = caller.hasOp("priv.packages", 1, "set_appop"),
             files = caller.hasOp("priv.shell", 1, "read_file") && caller.hasOp("priv.shell", 1, "write_file"),
         )
 
@@ -45,6 +49,20 @@ class PluginPrivilegedOps(private val context: Context) : ElevatedBackend {
         val reply = caller.call("priv.shell", 1, "exec", JSONObject().put("argv", JSONArray(argv)))
         if (!reply.ok) return null
         return ShellOutput(reply.data.optInt("exit", -1), reply.data.optString("stdout"), reply.data.optString("stderr"))
+    }
+
+    /** `priv.packages` `grant_permission {package, permission}` (docs/plugin-api.md 2.7). */
+    override fun grantPermission(packageName: String, permission: String): Boolean {
+        if (!caller.hasOp("priv.packages", 1, "grant_permission")) return false
+        val args = JSONObject().put("package", packageName).put("permission", permission)
+        return caller.call("priv.packages", 1, "grant_permission", args, personStarted = true).ok
+    }
+
+    /** `priv.packages` `set_appop {package, op, mode}` (docs/plugin-api.md 2.7). */
+    override fun setAppOp(packageName: String, op: String, mode: String): Boolean {
+        if (!op.matches(APPOP_NAME) || mode !in APPOP_MODES || !caller.hasOp("priv.packages", 1, "set_appop")) return false
+        val args = JSONObject().put("package", packageName).put("op", op).put("mode", mode)
+        return caller.call("priv.packages", 1, "set_appop", args, personStarted = true).ok
     }
 
     /** `priv.shell` `read_file`, in [FILE_CHUNK] pieces (docs/plugin-api.md 2.7, "Ops for the emulator setup helper"). */

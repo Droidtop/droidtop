@@ -2665,8 +2665,22 @@ arrays under the manifest's own keys (`V2Declarations`).
     `exec {argv: [string], timeoutMs?} -> {exit, stdout, stderr}`,
     permission `priv.shell.adb` (critical). `argv` is executed directly, not
     through a shell, and each stream is capped at 64 KiB.
-  The other `priv.packages` ops of §2.2 (install, uninstall, grant, appop)
-  are not specified or built.
+  The other `priv.packages` ops of §2.2 (install, uninstall) are not
+  specified or built. Two more are (2026-10-09, Droidtop/tracker#248), for the
+  Emulator setup helper, both under the `priv.packages` permission:
+  - `set_appop {package, op, mode} -> {}`: `appops set <package> <op> <mode>`.
+    `op` is an upper-case AppOps name (`^[A-Z][A-Z0-9_]*$`, the helper uses
+    `MANAGE_EXTERNAL_STORAGE`, which is "All files access"); `mode` is `allow`,
+    `ignore`, `deny` or `default`. The provider checks both shapes before it runs
+    anything and reports an `Error` or `Unknown operation` line as a failure.
+  - `grant_permission {package, permission} -> {}`: `pm grant <package>
+    <permission>`; Android itself refuses a permission the app does not declare
+    or that is not a runtime permission.
+  droidtop calls them only for the person's own action: Settings > Risky actions
+  > "Give another app access" is on and that one use was confirmed with the app
+  and the exact permission or appop named (docs/SPEC.md "Risky actions"), and it
+  reads the result back from Android rather than trusting the reply. It offers
+  the rows only while the running provider exports the op (`HostApiCaller.hasOp`).
 - **Ops for the emulator setup helper** (specified 2026-10-08,
   Droidtop/tracker#130, #248; droidtop's side is built, the Shizuku provider
   plugin is to add them). Both are `priv.shell@1` ops, permission

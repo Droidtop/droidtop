@@ -101,6 +101,7 @@ import dev.droidtop.library.settings.SubScreenItem
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.library.settings.confirmText
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.PadModality
@@ -448,6 +449,11 @@ fun CatalogNavigator(
                 folderPickLauncher.launch(null)
             }
             is DocumentPickItem -> {
+                if (item.confirmTitle != null && confirmArmedId != item.id) {
+                    confirmArmedId = item.id
+                    return
+                }
+                confirmArmedId = null
                 pendingDocumentPick = item
                 documentPickLauncher.launch(item.pickerIntent())
             }
@@ -1243,8 +1249,10 @@ private fun CatalogRowView(
     val slider = item as? SliderItem
     val value = if (toggle != null) null else catalogRowValue(item, context)
     val placeholder = status == null && value == null && item is TextInputItem
-    val tip = listOfNotNull(status, item.subtitle).joinToString("\n").ifEmpty { null }
-    HintTip(text = tip, shown = tipShown) {
+    // Armed, the row says what pressing again will do (the app and the exact permission or file), in place of its hint.
+    val tip = (if (confirmArmed) item.confirmText else null)
+        ?: listOfNotNull(status, item.subtitle).joinToString("\n").ifEmpty { null }
+    HintTip(text = tip, shown = tipShown || (confirmArmed && item.confirmText != null)) {
         MenuRow(
             title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
             value = if (locked) "Read it first" else status ?: value ?: if (placeholder) "not set" else null,

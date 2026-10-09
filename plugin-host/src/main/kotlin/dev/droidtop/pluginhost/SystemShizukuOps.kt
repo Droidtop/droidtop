@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import dev.droidtop.runtime.tasks.APPOP_MODES
+import dev.droidtop.runtime.tasks.APPOP_NAME
 import dev.droidtop.runtime.tasks.BackendState
 import dev.droidtop.runtime.tasks.ElevatedBackend
 import dev.droidtop.runtime.tasks.ElevatedFiles
@@ -39,7 +41,7 @@ class SystemShizukuOps : ElevatedBackend {
 
     override fun capabilities(): TaskPrivileges =
         if (state() == BackendState.READY) {
-            TaskPrivileges(forceStop = true, shell = true, grantPermission = true, files = true)
+            TaskPrivileges(forceStop = true, shell = true, grantPermission = true, appOps = true, files = true)
         } else {
             TaskPrivileges.NONE
         }
@@ -75,6 +77,12 @@ class SystemShizukuOps : ElevatedBackend {
         if (!PACKAGE_NAME.matches(packageName) || !PERMISSION_NAME.matches(permission)) return false
         if (notReady() != null) return false
         return run(listOf("pm", "grant", packageName, permission), STOP_TIMEOUT_MS)?.exit == 0
+    }
+
+    override fun setAppOp(packageName: String, op: String, mode: String): Boolean {
+        if (!PACKAGE_NAME.matches(packageName) || !op.matches(APPOP_NAME) || mode !in APPOP_MODES) return false
+        if (notReady() != null) return false
+        return run(listOf("appops", "set", packageName, op, mode), STOP_TIMEOUT_MS)?.exit == 0
     }
 
     /** `cat` as Shizuku's user; the bytes as they are, refused past [ElevatedFiles.MAX_READ_BYTES]. */

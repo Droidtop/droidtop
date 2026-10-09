@@ -32,6 +32,8 @@ data class TaskPrivileges(
     val forceStop: Boolean,
     val shell: Boolean,
     val grantPermission: Boolean = false,
+    /** [PrivilegedShell.setAppOp] is served. */
+    val appOps: Boolean = false,
     /** [PrivilegedShell.readFile] and [PrivilegedShell.writeFile] are served. */
     val files: Boolean = false,
 ) {

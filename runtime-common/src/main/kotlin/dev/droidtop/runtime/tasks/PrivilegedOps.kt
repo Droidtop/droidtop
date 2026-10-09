@@ -31,8 +31,18 @@ interface PrivilegedShell {
 
     fun exec(argv: List<String>): ShellOutput?
 
-    /** Grant a runtime permission to an installed package when the provider supports it. */
+    /**
+     * Grant a runtime permission to an installed package when the provider supports it. A risky action: the gate
+     * ([RiskyClass.GRANT_ACCESS]) and the person's confirmation are the caller's and [ElevatedShell]'s to apply.
+     */
     fun grantPermission(packageName: String, permission: String): Boolean = false
+
+    /**
+     * Sets an appop of an installed package (`appops set <package> <op> <mode>`), e.g. All files access:
+     * `MANAGE_EXTERNAL_STORAGE` to `allow`. [op] is an upper-case AppOps name and [mode] one of [APPOP_MODES]. False
+     * when the provider cannot or the command failed. A risky action, gated like [grantPermission].
+     */
+    fun setAppOp(packageName: String, op: String, mode: String): Boolean = false
 
     /**
      * Starts [argv] as a long-lived process of the helper, its standard
@@ -55,6 +65,12 @@ interface PrivilegedShell {
      */
     fun writeFile(path: String, data: ByteArray): Boolean = false
 }
+
+/** The appop modes [PrivilegedShell.setAppOp] accepts (`appops set`'s own words). */
+val APPOP_MODES = setOf("allow", "ignore", "deny", "default")
+
+/** An AppOps name as `appops set` takes it, e.g. `MANAGE_EXTERNAL_STORAGE`. */
+val APPOP_NAME = Regex("^[A-Z][A-Z0-9_]*\$")
 
 /** No helper installed: every call is "nothing to ask". */
 object NoPrivilegedOps : PrivilegedShell {

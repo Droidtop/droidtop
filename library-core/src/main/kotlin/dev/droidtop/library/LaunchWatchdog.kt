@@ -224,7 +224,7 @@ object LaunchWatchdog {
         val closed = TaskManager.close(context.applicationContext, alert.packageName)
         if (closed is CloseOutcome.Closed) LaunchDisplay.clearRunning()
         dismiss()
-        return when (val outcome = RetroArchCores.ensure(context.applicationContext, need)) {
+        return when (val outcome = RetroArchCores.ensure(context.applicationContext, need, asked = true)) {
             RetroArchCores.Outcome.Ready -> "${need.core} is installed. Start the game again."
             is RetroArchCores.Outcome.Manual -> outcome.line
             is RetroArchCores.Outcome.Failed -> outcome.line

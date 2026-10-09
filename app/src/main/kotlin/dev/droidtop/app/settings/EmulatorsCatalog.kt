@@ -9,6 +9,7 @@ import dev.droidtop.library.consoles.ConfigText
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.CustomPlayerPrefs
+import dev.droidtop.library.consoles.EmulatorAccess
 import dev.droidtop.library.consoles.EmulatorDefaults
 import dev.droidtop.library.consoles.EmulatorResolution
 import dev.droidtop.library.consoles.EmulatorSetup
@@ -43,6 +44,10 @@ import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import java.io.File
 import java.nio.file.Files
+import dev.droidtop.runtime.tasks.RiskyActions
+import dev.droidtop.runtime.tasks.RiskyClass
+import dev.droidtop.runtime.tasks.RiskyPrompts
+import dev.droidtop.runtime.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -74,19 +79,61 @@ object EmulatorsCatalog {
         indexGroups = { context -> groups(context, forIndex = true) },
     )
 
-    // The one hint row for an emulator that can launch from a plain path but lacks All files access
-    // (Droidtop/tracker#270): it only opens Android's own screen for the package; droidtop grants nothing.
-    private fun fileAccessRow(id: String, name: String, packageName: String): ActionItem = ActionItem(
-        id = id,
-        title = "$name needs All files access",
-        subtitle = "Opens Android's All files access screen for it. droidtop never grants it for you.",
-        value = "Open settings",
-        run = { ctx -> openAllFilesAccessSettings(ctx, packageName) },
-    )
+    // The row for an emulator that can launch from a plain path but lacks All files access (Droidtop/tracker#270).
+    // With Risky actions > Give another app access on and a provider that can set an appop, droidtop gives it after an
+    // explicit yes naming the app; otherwise it only opens Android's own screen for the package, as it always did.
+    // Reads the helper's capabilities: build it off the main thread.
+    private fun fileAccessRow(id: String, name: String, packageName: String): CatalogItem {
+        if (EmulatorAccess.canGrantAllFiles()) {
+            return AsyncActionItem(
+                id = id,
+                title = RiskyPrompts.allFilesTitle(name),
+                subtitle = "$name cannot open your games by their path yet. droidtop can give it All files access for you; " +
+                    "you can take it back in Android's All files access screen",
+                value = "Give access",
+                confirmTitle = RiskyPrompts.allFilesConfirm(name, packageName),
+                run = { ctx, _ ->
+                    withContext(Dispatchers.IO) {
+                        EmulatorAccess.grantAllFiles(ctx, packageName, name) ?: "$name can now read your game folders"
+                    }
+                },
+            )
+        }
+        val canOffer = TaskManager.privileges().appOps && !RiskyActions.allows(RiskyClass.GRANT_ACCESS)
+        return ActionItem(
+            id = id,
+            title = "$name needs All files access",
+            subtitle = "Opens Android's All files access screen for it." +
+                if (canOffer) " " + RiskyPrompts.turnOnHint(RiskyClass.GRANT_ACCESS) else "",
+            value = "Open settings",
+            run = { ctx -> openAllFilesAccessSettings(ctx, packageName) },
+        )
+    }
+
+    // One row per runtime permission the emulator asks for and does not hold, when droidtop may grant it
+    // (Risky actions > Give another app access, and a provider that serves it). None otherwise: there is no
+    // Android screen to fall back to that lists just these, so nothing is drawn.
+    private fun permissionRows(context: Context, systemId: String, name: String, packageName: String): List<CatalogItem> {
+        if (!EmulatorAccess.canGrantPermission()) return emptyList()
+        return EmulatorAccess.missingRuntimePermissions(context, packageName).map { missing ->
+            AsyncActionItem(
+                id = "emulator_permission_${systemId}_${missing.permission}",
+                title = RiskyPrompts.permissionTitle(name, missing.label),
+                subtitle = "$name has asked for this and does not have it. droidtop can give it for you",
+                value = "Give permission",
+                confirmTitle = RiskyPrompts.permissionConfirm(name, packageName, missing.permission),
+                run = { ctx, _ ->
+                    withContext(Dispatchers.IO) {
+                        EmulatorAccess.grantPermission(ctx, packageName, missing.permission, name) ?: "$name can now use ${missing.label}"
+                    }
+                },
+            )
+        }
+    }
 
     // The RetroArch core a system launches with (Droidtop/tracker#271): installed, or installed
     // here without opening RetroArch when a root helper can place it.
-    private fun coreRow(id: String, need: RetroArchCores.Need): AsyncActionItem {
+    private fun coreRow(context: Context, id: String, need: RetroArchCores.Need): AsyncActionItem {
         val state = RetroArchCores.state(need)
         return AsyncActionItem(
             id = id,
@@ -94,7 +141,8 @@ object EmulatorsCatalog {
             // Without root droidtop cannot see RetroArch's cores, and RetroArch itself only shows
             // a black screen when one is missing (console, build 1386), so the row says what to check.
             subtitle = if (state == RetroArchCores.State.UNKNOWN) {
-                "${need.core}. If games stay black, it is not installed in RetroArch"
+                "${need.core}. If games stay black, it is not installed in RetroArch" +
+                    if (TaskManager.privileges().shell && !RiskyActions.allows(RiskyClass.ROOT_COMMANDS)) ". " + RiskyPrompts.turnOnHint(RiskyClass.ROOT_COMMANDS) else ""
             } else {
                 need.core
             },
@@ -103,7 +151,12 @@ object EmulatorsCatalog {
                 RetroArchCores.State.MISSING -> "Install core"
                 RetroArchCores.State.UNKNOWN -> "Open RetroArch"
             },
-            run = { ctx, onStatus -> outcomeLine(RetroArchCores.ensure(ctx, need, onStatus), need) },
+            // Placing the core is a root-level command in RetroArch's private folder: only with Risky actions >
+            // Root-level commands on (the state is UNKNOWN otherwise), and only after a yes naming the file.
+            confirmTitle = if (state == RetroArchCores.State.MISSING) RiskyPrompts.placeCoreConfirm(need.core, appLabel(context, need.packageName), need.corePath) else null,
+            run = { ctx, onStatus ->
+                outcomeLine(RetroArchCores.ensure(ctx, need, confirmed = state == RetroArchCores.State.MISSING, asked = true, onStatus = onStatus), need)
+            },
         )
     }
 
@@ -222,15 +275,23 @@ object EmulatorsCatalog {
                     ),
                 )
             } else {
+                val needs = resolvedById.values.mapNotNull { resolved ->
+                    resolved?.player?.let { RetroArchCores.needFor(it.packageName, it.argumentsTemplate) }
+                }.distinctBy { it.packageName to it.core }
+                // The cores a yes would place, named in the confirmation (a root-level command, Risky actions); none
+                // while the switch is off or no root provider is there, and then the row only opens RetroArch.
+                val toPlace = if (RetroArchCores.canPlace()) needs.filter { RetroArchCores.state(it) == RetroArchCores.State.MISSING } else emptyList()
                 val retroArchCores = AsyncActionItem(
                     id = "emulators_retroarch_cores",
                     title = "RetroArch cores",
                     subtitle = "Install the cores these systems use",
+                    confirmTitle = if (toPlace.isEmpty()) null else RiskyPrompts.placeCoresConfirm(
+                        toPlace.map { it.corePath },
+                        appLabel(context, toPlace.first().packageName),
+                    ),
                     run = { ctx, onStatus -> RetroArchCores.ensureForLibrary(ctx, withGames, onStatus) },
                 )
-                val usesRetroArch = resolvedById.values.any { resolved ->
-                    resolved?.player?.let { RetroArchCores.needFor(it.packageName, it.argumentsTemplate) } != null
-                }
+                val usesRetroArch = needs.isNotEmpty()
                 (if (usesRetroArch) listOf<CatalogItem>(retroArchCores) else emptyList()) + rows.map { it.third }
             },
         )
@@ -274,8 +335,11 @@ object EmulatorsCatalog {
                                 resolved?.player?.takeIf { playerNeedsAllFilesAccess(context, it) }?.let {
                                     fileAccessRow("emulator_access_${system.id}", it.name, it.packageName)
                                 },
+                            ).toTypedArray(),
+                            *(resolved?.player?.let { permissionRows(context, system.id, appLabel(context, it.packageName), it.packageName) }.orEmpty()).toTypedArray(),
+                            *listOfNotNull(
                                 resolved?.player?.let { RetroArchCores.needFor(it.packageName, it.argumentsTemplate) }?.let { need ->
-                                    coreRow("emulator_core_${system.id}", need)
+                                    coreRow(context, "emulator_core_${system.id}", need)
                                 },
                             ).toTypedArray(),
                             *listOfNotNull(
@@ -476,7 +540,8 @@ object EmulatorsCatalog {
             )
         val present = EmulatorSetup.listFolder(folder)
         val missing = present?.let { have -> needed.filter { want -> have.none { it.equals(want, ignoreCase = true) } } }
-        val writable = EmulatorSetup.writeReach("$folder/x") != EmulatorSetup.Reach.NONE
+        val reach = EmulatorSetup.writeReach("$folder/x")
+        val writable = reach == EmulatorSetup.Reach.DIRECT || reach == EmulatorSetup.Reach.HELPER
         val status = ActionItem(
             id = "emulator_bios_${system.id}",
             title = "BIOS files for ${system.displayName}",
@@ -484,7 +549,12 @@ object EmulatorsCatalog {
                 missing == null -> "Needs $shown in $folder. droidtop cannot look in that folder to check"
                 missing.isEmpty() -> "Every file droidtop knows of is in $folder"
                 else -> "Missing ${missing.take(4).joinToString(", ")} in $folder"
-            } + if (writable) "" else ". Copy them there with a file manager, or from $name's own settings",
+            } + when {
+                writable -> ""
+                reach == EmulatorSetup.Reach.LOCKED -> ". Copy them there with a file manager, or from $name's own settings. " +
+                    RiskyPrompts.turnOnHint(RiskyClass.OTHER_APP_FILES)
+                else -> ". Copy them there with a file manager, or from $name's own settings"
+            },
             value = when {
                 missing == null -> "Unknown"
                 missing.isEmpty() -> "All there"
@@ -500,6 +570,8 @@ object EmulatorsCatalog {
                 title = "Add a BIOS file",
                 subtitle = "Pick one of your own BIOS files; droidtop copies it into $name's BIOS folder under the name $name looks for",
                 mimeType = "*/*",
+                // Through the helper this writes into another app's folder (a risky action): say where, before the picker.
+                confirmTitle = if (reach == EmulatorSetup.Reach.HELPER) RiskyPrompts.addFileConfirm(name, folder) else null,
                 onPicked = { ctx, uri -> withContext(Dispatchers.IO) { placeBios(ctx, uri, bios, folder, name) } },
             ),
         )
@@ -534,12 +606,14 @@ object EmulatorsCatalog {
     }.getOrElse { "Not added: ${it.message ?: it.javaClass.simpleName}" }
 
     private fun settingItem(player: Player.AmStart, name: String, config: ConfigSpec, setting: ConfigSetting, configText: String?): CatalogItem {
-        val writable = configText != null && EmulatorSetup.writeReach(config.file) != EmulatorSetup.Reach.NONE
+        val reach = EmulatorSetup.writeReach(config.file)
+        val writable = configText != null && (reach == EmulatorSetup.Reach.DIRECT || reach == EmulatorSetup.Reach.HELPER)
         if (!writable) {
             return openEmulatorRow(
                 id = "emulator_setting_${setting.id}",
                 title = setting.label,
-                subtitle = "${setting.about}. To change it: ${setting.manual}",
+                subtitle = "${setting.about}. To change it: ${setting.manual}" +
+                    if (configText != null && reach == EmulatorSetup.Reach.LOCKED) ". " + RiskyPrompts.turnOnHint(RiskyClass.OTHER_APP_FILES) else "",
                 name = name,
                 packageName = player.packageName,
             )
@@ -551,6 +625,8 @@ object EmulatorsCatalog {
             title = setting.label,
             subtitle = setting.about + if (config.writesOnExit) ". Close $name first if it is open: it writes its own settings back when it closes" else "",
             value = currentLabel ?: "$name's default",
+            // Through the helper this rewrites a file in another app's folder (a risky action): name it first.
+            confirmTitle = if (reach == EmulatorSetup.Reach.HELPER) RiskyPrompts.writeFileConfirm(name, config.file) else null,
             run = { _, _ ->
                 withContext(Dispatchers.IO) {
                     val text = EmulatorSetup.read(config.file)

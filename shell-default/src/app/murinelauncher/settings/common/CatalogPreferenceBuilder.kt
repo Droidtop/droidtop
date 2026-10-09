@@ -636,8 +636,10 @@ class CatalogPreferenceNavigator(
             summary = item.subtitle
             isIconSpaceReserved = false
             setOnPreferenceClickListener {
-                pendingDocumentPick = item
-                documentPickLauncher.launch(item.pickerIntent())
+                confirmThen(context, item.confirmTitle) {
+                    pendingDocumentPick = item
+                    documentPickLauncher.launch(item.pickerIntent())
+                }
                 true
             }
         }

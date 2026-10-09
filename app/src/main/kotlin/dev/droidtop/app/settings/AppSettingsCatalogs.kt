@@ -176,6 +176,7 @@ object AppSettingsCatalogs {
         registered = true
         SettingsScreenRegistry.register(consoleSystemsScreen())
         SettingsScreenRegistry.register(EmulatorsCatalog.screen())
+        SettingsScreenRegistry.register(RiskyActionsCatalog.screen())
         SettingsScreenRegistry.register(romFoldersScreen())
         SettingsScreenRegistry.register(scraperScreen())
         SettingsScreenRegistry.register(platformsScreen())

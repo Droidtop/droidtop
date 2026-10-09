@@ -5,6 +5,7 @@ import dev.droidtop.runtime.tasks.BackendState
 import dev.droidtop.runtime.tasks.ElevatedChoice
 import dev.droidtop.runtime.tasks.ElevatedChoicePrefs
 import dev.droidtop.runtime.tasks.ElevatedShell
+import dev.droidtop.runtime.tasks.RiskyActions
 import dev.droidtop.runtime.tasks.TaskManager
 
 /**
@@ -25,6 +26,8 @@ object ElevatedAccessHost {
     fun install(context: Context) {
         val application = context.applicationContext
         ShizukuTransport.install(application)
+        // The risky-action switches load on their own thread; until they have, the gate answers no.
+        RiskyActions.preload(application)
         val built = ElevatedShell(app, PluginPrivilegedOps(application)) { ElevatedChoicePrefs.get(application) }
         installed = built
         TaskManager.install(built)

@@ -5,6 +5,9 @@ import android.content.Intent
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.PluginResult
 import dev.droidtop.runtime.tasks.PrivilegedShell
+import dev.droidtop.runtime.tasks.RiskyActions
+import dev.droidtop.runtime.tasks.RiskyClass
+import dev.droidtop.runtime.tasks.RiskyPrompts
 import dev.droidtop.runtime.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,6 +30,10 @@ import java.util.zip.ZipInputStream
  * by RetroArch with the folder's own SELinux label. Without root, droidtop cannot see or place cores,
  * so it opens RetroArch for the person (its Core Downloader is one menu away). An existing core
  * is never overwritten.
+ *
+ * Placing a core is a risky action (docs/SPEC.md "Risky actions"): root-level commands, in another app's private
+ * folder. It happens only with Settings > Risky actions > Root-level commands on, and only for a person who has just
+ * confirmed it for this core ([ensure]'s `confirmed`); a launch never places one by itself.
  */
 object RetroArchCores {
     const val DOWNLOAD_POST = "retroarch_core"
@@ -185,13 +192,20 @@ object RetroArchCores {
 
     // --- device parts ----------------------------------------------------------------------------
 
-    /** The helper when it runs as root (Sui); null otherwise. Blocks on the provider: background only. */
+    /**
+     * The helper when it runs as root (Sui) and Root-level commands is on in Settings > Risky actions; null otherwise,
+     * and then nothing is asked of it, not even to look. Blocks on the provider: background only.
+     */
     private fun rootShell(): PrivilegedShell? {
+        if (!RiskyActions.allows(RiskyClass.ROOT_COMMANDS)) return null
         val shell = TaskManager.shell
         if (!shell.capabilities().shell) return null
         val id = shell.exec(listOf("id", "-u")) ?: return null
         return shell.takeIf { id.exit == 0 && id.stdout.trim() == "0" }
     }
+
+    /** Whether the switch is on and the root helper is there: whether a confirmed press can place a core. Background only. */
+    fun canPlace(): Boolean = rootShell() != null
 
     /** Whether RetroArch has [need]'s core. Background only. */
     fun state(need: Need): State {
@@ -208,16 +222,34 @@ object RetroArchCores {
 
     /**
      * Makes sure RetroArch has [need]'s core: nothing when it has it, a download-and-place job in
-     * Downloads and installs when root can place it, and when it cannot, opens RetroArch and says
-     * where its own Core Downloader is. Returns the line the caller shows.
+     * Downloads and installs when root can place it and the person has [confirmed] it with Root-level
+     * commands switched on, and otherwise opens RetroArch and says where its own Core Downloader is (or
+     * which switch lets droidtop place it). RetroArch is opened only when the person asked ([asked], or [confirmed]
+     * which implies it): a launch passes neither and must never put RetroArch in front. Returns the line the caller shows.
      */
-    suspend fun ensure(context: Context, need: Need, onStatus: (String) -> Unit = {}): Outcome {
+    suspend fun ensure(
+        context: Context,
+        need: Need,
+        confirmed: Boolean = false,
+        asked: Boolean = confirmed,
+        onStatus: (String) -> Unit = {},
+    ): Outcome {
         when (withContext(Dispatchers.IO) { state(need) }) {
             State.INSTALLED -> return Outcome.Ready
-            State.MISSING -> Unit
+            State.MISSING -> {
+                if (!confirmed) {
+                    if (asked) openRetroArch(context, need.packageName)
+                    return Outcome.Manual(
+                        "Install the ${need.core} core in RetroArch: Online Updater > Core Downloader, or press Install core on the system's emulator screen in Settings.",
+                    )
+                }
+            }
             State.UNKNOWN -> {
                 openRetroArch(context, need.packageName)
-                return Outcome.Manual("Install the ${need.core} core in RetroArch: Online Updater > Core Downloader")
+                return Outcome.Manual(
+                    "Install the ${need.core} core in RetroArch: Online Updater > Core Downloader" +
+                        if (RiskyActions.allows(RiskyClass.ROOT_COMMANDS)) "" else ". " + RiskyPrompts.turnOnHint(RiskyClass.ROOT_COMMANDS),
+                )
             }
         }
         val abi = withContext(Dispatchers.IO) {
@@ -245,18 +277,20 @@ object RetroArchCores {
 
     /**
      * The cores of every system in [systems] whose chosen emulator is RetroArch: each missing one
-     * installed as its own job. Without root, opens RetroArch and names the cores. Returns the line shown.
+     * installed as its own job, the person having confirmed the batch. Without root, or with Root-level commands
+     * off, opens RetroArch and names the cores. Returns the line shown.
      */
     suspend fun ensureForLibrary(context: Context, systems: List<ConsoleSystemDef>, onStatus: (String) -> Unit = {}): String =
         withContext(Dispatchers.IO) {
             val needs = systems.mapNotNull { needForSystem(context, it) }.distinctBy { it.packageName to it.core }
             if (needs.isEmpty()) return@withContext "No system uses RetroArch"
-            if (rootShell() == null) {
+            if (!canPlace()) {
                 openRetroArch(context, needs.first().packageName)
-                return@withContext "Install in RetroArch's Core Downloader: " + needs.joinToString(", ") { it.core }
+                return@withContext "Install in RetroArch's Core Downloader: " + needs.joinToString(", ") { it.core } +
+                    if (RiskyActions.allows(RiskyClass.ROOT_COMMANDS)) "" else ". " + RiskyPrompts.turnOnHint(RiskyClass.ROOT_COMMANDS)
             }
             val missing = needs.filter { state(it) == State.MISSING }
-            val failed = missing.filter { ensure(context, it, onStatus) !is Outcome.Ready }
+            val failed = missing.filter { ensure(context, it, confirmed = true, onStatus = onStatus) !is Outcome.Ready }
             when {
                 missing.isEmpty() -> "All ${needs.size} cores installed"
                 failed.isEmpty() -> "Installed ${missing.size} of ${missing.size}"
@@ -279,6 +313,7 @@ object RetroArchCores {
                 val so = File(context.filesDir, "retroarch-cores/$core$SUFFIX")
                 try {
                     extractCore(file, core, abi, so)
+                    check(RiskyActions.allows(RiskyClass.ROOT_COMMANDS)) { "Root-level commands are off in Settings > Risky actions" }
                     val root = checkNotNull(rootShell()) { "root access is needed to place the core" }
                     val dir = coresDir(packageName)
                     val target = "$dir/$core$SUFFIX"

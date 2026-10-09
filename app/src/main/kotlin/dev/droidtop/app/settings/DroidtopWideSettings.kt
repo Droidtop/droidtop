@@ -130,6 +130,13 @@ object DroidtopWideSettings {
                         ),
                     ),
                 ),
+                // Whether droidtop may change other apps for you (docs/SPEC.md "Risky actions"); off by default.
+                CatalogGroup(
+                    id = "global_risky_actions",
+                    title = null,
+                    category = "System",
+                    items = listOf(RiskyActionsCatalog.linkRow("pref_global_risky_actions")),
+                ),
                 CatalogGroup(
                     id = "global_accessibility",
                     title = "Accessibility",

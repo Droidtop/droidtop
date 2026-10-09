@@ -77,12 +77,18 @@ object ElevatedAccess {
  * The one [PrivilegedShell] the rest of the app asks. It forwards to whichever backend [ElevatedAccess.resolve]
  * picks, and to nothing when none is picked, so a caller never learns which backend served it and a privileged
  * control hides itself exactly when [capabilities] is [TaskPrivileges.NONE].
+ *
+ * It is also the one gate for risky actions (docs/SPEC.md "Risky actions"): granting a permission or an appop, and
+ * writing a file, are refused here unless [risk] allows the class, whichever surface asks.
  */
 class ElevatedShell(
     private val app: ElevatedBackend,
     private val plugin: ElevatedBackend,
     private val choice: () -> ElevatedChoice,
 ) : PrivilegedShell {
+    /** Who says a class of risky action is allowed: the person's switches. Replaceable only so a test can decide. */
+    var risk: RiskyGate = RiskyActions
+
     fun active(): ElevatedBackendId? = ElevatedAccess.resolve(choice(), app.state(), plugin.state())
 
     /** The choices to show, from the live state of both backends. Not for the main thread: it pings binders. */
@@ -103,7 +109,11 @@ class ElevatedShell(
     override fun exec(argv: List<String>): ShellOutput? = target().exec(argv)
 
     override fun grantPermission(packageName: String, permission: String): Boolean =
-        target().grantPermission(packageName, permission)
+        risk.allows(RiskyClass.GRANT_ACCESS) && target().grantPermission(packageName, permission)
+
+    override fun setAppOp(packageName: String, op: String, mode: String): Boolean =
+        risk.allows(RiskyClass.GRANT_ACCESS) && op.matches(APPOP_NAME) && mode in APPOP_MODES &&
+            target().setAppOp(packageName, op, mode)
 
     /**
      * A long-lived process for the rooted desktop stack. A named backend is used alone, Off is none. Auto asks the
@@ -122,7 +132,8 @@ class ElevatedShell(
     override fun readFile(path: String): ByteArray? = if (ElevatedFiles.allowed(path)) target().readFile(path) else null
 
     override fun writeFile(path: String, data: ByteArray): Boolean =
-        ElevatedFiles.allowed(path) && data.size <= ElevatedFiles.MAX_WRITE_BYTES && target().writeFile(path, data)
+        risk.allows(RiskyClass.OTHER_APP_FILES) && ElevatedFiles.allowed(path) && data.size <= ElevatedFiles.MAX_WRITE_BYTES &&
+            target().writeFile(path, data)
 }
 
 /** The user's pick, kept in droidtop's own preferences and read once. */
