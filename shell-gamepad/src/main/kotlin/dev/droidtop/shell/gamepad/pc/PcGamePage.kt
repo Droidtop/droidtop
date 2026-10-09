@@ -183,6 +183,8 @@ internal fun PcGamePage(
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit,
     onOpenOptions: () -> Unit,
+    // "Choose a runner" on a game no runner offers: opens the Engine picker (Droidtop/tracker#287).
+    onChooseEngine: () -> Unit = onOpenOptions,
     onClose: () -> Unit,
     // The library, for the game's update source (the F95zone thread rows);
     // null draws the page without them.
@@ -343,7 +345,9 @@ internal fun PcGamePage(
     val buttons = 3
     fun pressButton(index: Int) {
         when (index) {
-            0 -> if (play.pressable) {
+            0 -> if (play.chooseEngine) {
+                onChooseEngine()
+            } else if (play.pressable) {
                 // The setup step runs over the page, which stays: closing it
                 // hid the page behind the offer (Droidtop/tracker#293).
                 if (play.ready) playAt?.takeIf { it.isAttached }?.let { FloodOrigin.markLaunch(screenRect(it, view)) }
@@ -995,7 +999,7 @@ private fun pageRows(
         add(
             PageFact(
                 "Runner",
-                runner?.label ?: if (play.pressable) "" else play.verb,
+                runner?.label ?: if (play.pressable && !play.chooseEngine) "" else play.verb,
                 subtitle = if (runner != null) runner.reason else play.detail,
             ),
         )

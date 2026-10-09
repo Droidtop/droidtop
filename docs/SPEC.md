@@ -11308,7 +11308,9 @@ structure, top to bottom, drawn only from theme tokens:
   buttons. While the cursor is in the rows the band has scrolled away.
   Store games have no installed or latest version until #222 gives them
   one; the strip simply has no Version fact for them.
-  The Details tab's Runner row states only the resolved runner and its reason. A store game that is not
+  "Choose a runner", the button of a game no runner offers, is pressable and opens the Engine picker (the menu's
+  Engine row; from the page it opens the menu on that picker): the engine is the one thing a person can say
+  about such a game (Droidtop/tracker#287). The Details tab's Runner row states only the resolved runner and its reason. A store game that is not
   installed has no runner worked out, and the action band's line ("Downloads 590 MB") is not a runner fact, so
   the row is left out rather than showing it (Droidtop/tracker#371).
 - **The tab strip** (`PageTabStrip`): Overview, Versions and updates, Extras,

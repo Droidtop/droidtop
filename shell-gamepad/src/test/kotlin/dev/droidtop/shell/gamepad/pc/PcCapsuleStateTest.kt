@@ -103,6 +103,15 @@ class PcCapsuleStateTest {
     }
 
     @Test
+    fun `a game no runner offers gets a Choose a runner button that opens the engine picker`() {
+        val none = playStateOf(null, folder())
+        assertEquals("Choose a runner", none.verb)
+        assertTrue(none.pressable)
+        assertTrue(none.chooseEngine)
+        assertFalse(playStateOf(null, store(installed = false)).chooseEngine)
+    }
+
+    @Test
     fun `the capsule badge reads the same stage as the button`() {
         assertEquals(CapsuleStatus.NOT_INSTALLED, capsuleStatusOf(store(installed = false), null))
         assertEquals(CapsuleStatus.UPDATE, capsuleStatusOf(store(update = StoreUpdate.AVAILABLE), null))

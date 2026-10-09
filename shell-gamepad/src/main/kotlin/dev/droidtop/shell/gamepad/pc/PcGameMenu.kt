@@ -134,6 +134,8 @@ internal fun PcGameMenu(
     // The Downloads place, where a store download droidtop runs is paused,
     // resumed or cancelled (docs/SPEC.md 7g, "Stores").
     onOpenDownloads: () -> Unit = {},
+    // Opens on the Engine picker (the page's "Choose a runner" for a game no runner offers).
+    openEnginePicker: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -153,7 +155,7 @@ internal fun PcGameMenu(
     var renaming by remember(entry) { mutableStateOf(false) }
     var progressToken by remember(entry) { mutableStateOf(0) }
     var editingThread by remember(entry) { mutableStateOf(false) }
-    var pickingEngine by remember(entry) { mutableStateOf(false) }
+    var pickingEngine by remember(entry) { mutableStateOf(openEnginePicker) }
     var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
     var importingLutris by remember(entry) { mutableStateOf(false) }
     var gettingGames by remember(entry) { mutableStateOf(false) }
@@ -746,7 +748,7 @@ internal fun PcGameMenu(
                         detail = playState.detail,
                         onSelect = if (loaded && playState.pressable) {
                             {
-                                val store = playState.store
+                                val store = if (playState.chooseEngine) null else playState.store
                                 when (store) {
                                     // Install and Update stop on the free-space
                                     // offer first: the size and the room the
@@ -764,7 +766,9 @@ internal fun PcGameMenu(
                                     }
                                 }
                                 if (store == null) {
-                                    if (isReady) {
+                                    if (playState.chooseEngine) {
+                                        if (engineChoice.folder != null) pickingEngine = true else status = "No game folder to pick an engine for"
+                                    } else if (isReady) {
                                         onClose()
                                         onLaunch()
                                     } else if (setupAction != null) {

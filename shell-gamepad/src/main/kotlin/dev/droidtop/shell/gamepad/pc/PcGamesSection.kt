@@ -131,6 +131,8 @@ internal class PcGamesState {
 
     var pageId by mutableStateOf<String?>(null)
     var menuId by mutableStateOf<String?>(null)
+    /** The open menu starts on the Engine picker (the page's "Choose a runner"). */
+    var menuEnginePicker by mutableStateOf(false)
     var setupOpen by mutableStateOf(false)
     var optionsOpen by mutableStateOf(false)
     var filterOpen by mutableStateOf(false)
@@ -840,6 +842,10 @@ internal fun PcGamesSection(
             onPlay = { launch(pageEntry) },
             onToggleFavorite = { onToggleFavorite(pageEntry) },
             onOpenOptions = { state.menuId = pageEntry.id },
+            onChooseEngine = {
+                state.menuEnginePicker = true
+                state.menuId = pageEntry.id
+            },
             onClose = { state.pageId = null },
             library = library,
         )
@@ -853,7 +859,8 @@ internal fun PcGamesSection(
                 launch(menuEntry)
             },
             onProgressChanged = { progressToken++ },
-            onClose = { state.menuId = null },
+            onClose = { state.menuId = null; state.menuEnginePicker = false },
+            openEnginePicker = state.menuEnginePicker,
             // Every PC/engine game the shell has, so the menu can offer the
             // other folders of the same game (docs/SPEC.md 7m).
             siblings = entries.filter { it.isPcOrEngineGame },

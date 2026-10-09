@@ -143,6 +143,7 @@ fun PcGameStandalone(
     }
     var pageOpen by remember(entryId) { mutableStateOf(true) }
     var menuOpen by remember(entryId) { mutableStateOf(false) }
+    var menuEnginePicker by remember(entryId) { mutableStateOf(false) }
     // The menu can move sideways to another folder of the same game (docs/SPEC.md 7m).
     var menuEntryId by remember(entryId) { mutableStateOf<String?>(null) }
     val fold = folded
@@ -170,6 +171,11 @@ fun PcGameStandalone(
                     menuEntryId = game.id
                     menuOpen = true
                 },
+                onChooseEngine = {
+                    menuEntryId = game.id
+                    menuEnginePicker = true
+                    menuOpen = true
+                },
                 onClose = { pageOpen = false },
                 library = library,
             )
@@ -180,7 +186,8 @@ fun PcGameStandalone(
                 entry = menuEntry,
                 library = library,
                 onLaunch = { launch.launch(menuEntry) },
-                onClose = { menuOpen = false },
+                onClose = { menuOpen = false; menuEnginePicker = false },
+                openEnginePicker = menuEnginePicker,
                 siblings = pcEntries,
                 onOpenOther = { menuEntryId = it.id },
                 onProgressChanged = { progressToken++ },

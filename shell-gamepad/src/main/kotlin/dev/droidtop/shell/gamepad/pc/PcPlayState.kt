@@ -52,6 +52,8 @@ internal data class PcPlayState(
     val store: StoreStage? = null,
     /** How far a running download is, 0 to 1; null when none is. */
     val progress: Float? = null,
+    /** Set when no runner offers the game: the button opens the Engine picker, the one place to say what it is. */
+    val chooseEngine: Boolean = false,
 )
 
 /** Where a store game is in its life on this device, when that is the thing to do next. */
@@ -157,7 +159,7 @@ internal fun playStateOf(
         option?.action != null ->
             PcPlayState(primaryActionLabel(option.action), option.reason ?: "One step, then this becomes Play", pressable = true, ready = false)
         else ->
-            PcPlayState("Choose a runner", option?.reason ?: noRunnerLine, pressable = false, ready = false)
+            PcPlayState("Choose a runner", option?.reason ?: noRunnerLine, pressable = true, ready = false, chooseEngine = true)
     }
 }
 
