@@ -21,7 +21,7 @@ object StoreCollections {
     const val IMPORT_PREFIX = "import:"
 
     /** Whether [collectionId] is a store's collection copied in (and so rewritten at the store's next sync). */
-    fun isImported(collectionId: String) = collectionId.startsWith(PREFIX)
+    fun isImported(collectionId: String) = collectionId.startsWith(IMPORT_PREFIX)
 
     /** The name a person's copy of the imported collection called [importedName] gets: the store's label dropped. Pure. */
     fun copyName(importedName: String) = importedName.substringAfter(": ", importedName).ifBlank { importedName }
