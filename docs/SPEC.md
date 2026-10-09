@@ -11009,9 +11009,11 @@ structure, top to bottom, drawn only from theme tokens:
   page): the hero, the action band, the tab strip and the tab's rows are ONE
   list. With the cursor down in the rows the hero and the band scroll away
   and the tab strip stays pinned at the top (a sticky header); once rows pass
-  under it, it gains a plate within 100 ms (`PAGE_PLATE_MS`; the scrim role
-  with a shadow, Steam's frosted header without the blur droidtop does not
-  draw). Up to the tabs keeps the scroll; Up to the buttons brings the hero
+  under it, it gains a plate within 100 ms (`PAGE_PLATE_MS`; the scrim role,
+  Steam's frosted header without the blur droidtop does not draw) and a drop
+  shadow under the strip, Steam's measured one (offset 4, blur 8, black at 50
+  percent), drawn as a short fade below it: a platform elevation shadow spread
+  over a dark ground and did not show (rig, build 1535). Up to the tabs keeps the scroll; Up to the buttons brings the hero
   back. The rows keep clear of the pinned strip (`keepInView(under = ...)`).
   This replaces the rule that the hero and band collapsed while the cursor
   was in the rows: one mechanism, the scroll.
@@ -13078,7 +13080,9 @@ theme's roles (section 7k2).
 - **Pages grow out of what opened them.** A game's page grows out of its capsule and draws back
   into it, and Play grows into the launch screen (DroidDeck's floods, `PageFlood.kt`; section 7i,
   "The game page"): edges on loose springs (`Motion.sp`), the far ones first, the window's ring
-  kept out of the way (`FocusGlide.hidden`) until it is done. With motion off they are cuts.
+  kept out of the way (`FocusGlide.hidden`) until it is done. With motion off they are cuts. The
+  launch screen covers the shell, so the shell's ring is hidden for as long as it shows (with motion
+  off it stayed on the capsule as a bare outline over the launch art, rig build 1535).
 - **Reduced motion is one switch.** Gaming's Settings > Shell > Animations (on by default) and
   Android's animator duration scale both feed `Motion.enabled` (`MotionSync`, observed live, read
   off the main thread): with the switch off or Android's "Remove animations" on, every role is a

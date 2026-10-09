@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -57,6 +58,14 @@ internal fun LaunchScreen(entry: LibraryEntry, via: String? = null) {
     val reveal = remember(entry.id) { Animatable(if (origin == null) 1f else 0f) }
     LaunchedEffect(covered) { if (covered) reveal.animateTo(1f, Motion.tw(LAUNCH_FLOOD_FADE_MS)) }
     val pulse = rememberLaunchPulse()
+    // The launch screen covers the shell, so the shell's focus ring (drawn over everything in its
+    // window) must not show through it: with motion off it stayed on the capsule the page was opened
+    // from, a bare outline over the launch art (rig, build 1535).
+    val glide = LocalFocusGlide.current
+    DisposableEffect(glide) {
+        glide?.hidden = true
+        onDispose { glide?.hidden = false }
+    }
 
     Box(Modifier.fillMaxSize()) {
         Box(

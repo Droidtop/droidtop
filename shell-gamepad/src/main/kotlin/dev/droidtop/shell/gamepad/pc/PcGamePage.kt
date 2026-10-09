@@ -49,6 +49,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -83,7 +85,6 @@ import dev.droidtop.shell.gamepad.LocalValueColumnWidth
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.Corners
-import dev.droidtop.shell.gamepad.Elevation
 import dev.droidtop.shell.gamepad.FloodOrigin
 import dev.droidtop.shell.gamepad.FocusGlideHost
 import dev.droidtop.shell.gamepad.PageFlood
@@ -519,8 +520,27 @@ internal fun PcGamePage(
                             Box(
                                 Modifier
                                     .fillMaxWidth()
-                                    .graphicsLayer { shadowElevation = plate.value * Elevation.Menu.toPx() }
-                                    .drawBehind { drawRect(MenuTokens.Scrim, alpha = plate.value) }
+                                    // Steam's sticky header: its plate, and a drop shadow under it (measured:
+                                    // offset 4, blur 8, black at 50 percent), drawn as a short fade below the
+                                    // strip. A platform elevation shadow spread 24dp over a dark ground and did
+                                    // not show at all (rig, build 1535).
+                                    .drawBehind {
+                                        val p = plate.value
+                                        if (p > 0.01f) {
+                                            drawRect(MenuTokens.Scrim, alpha = p)
+                                            val top = size.height + PAGE_PLATE_SHADOW_OFFSET_DP.dp.toPx() / 2f
+                                            val fade = PAGE_PLATE_SHADOW_BLUR_DP.dp.toPx()
+                                            drawRect(
+                                                Brush.verticalGradient(
+                                                    listOf(Color.Black.copy(alpha = PAGE_PLATE_SHADOW_ALPHA * p), Color.Transparent),
+                                                    startY = size.height,
+                                                    endY = top + fade,
+                                                ),
+                                                topLeft = Offset(0f, size.height),
+                                                size = Size(size.width, top + fade - size.height),
+                                            )
+                                        }
+                                    }
                                     .padding(horizontal = window.edgePadding),
                             ) {
                                 PageTabStrip(
@@ -623,6 +643,11 @@ internal const val PAGE_HERO_PORTRAIT = 0.30f
 
 /** How quickly the tab strip's plate appears once rows pass under it (Steam: 0.1 s). */
 internal const val PAGE_PLATE_MS = 100
+
+/** The pinned strip's drop shadow: Steam's offset 4, blur 8, black at 50 percent. */
+private const val PAGE_PLATE_SHADOW_OFFSET_DP = 4
+private const val PAGE_PLATE_SHADOW_BLUR_DP = 8
+private const val PAGE_PLATE_SHADOW_ALPHA = 0.5f
 
 /**
  * The hero band: the game's hero art edge to edge, darkened toward the
