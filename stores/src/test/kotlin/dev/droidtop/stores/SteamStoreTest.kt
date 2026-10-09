@@ -10,6 +10,8 @@ import dev.droidtop.stores.steam.OS
 import dev.droidtop.stores.steam.OSArch
 import dev.droidtop.stores.steam.SteamApp
 import dev.droidtop.stores.steam.SteamAppKind
+import dev.droidtop.stores.steam.SteamOwnedGames
+import dev.droidtop.library.stores.StoreHolding
 import dev.droidtop.stores.steam.SteamLicense
 import dev.droidtop.stores.steam.SteamOwnership
 import `in`.dragonbra.javasteam.enums.ELicenseFlags
@@ -265,8 +267,14 @@ class SteamStoreTest {
         assertEquals(setOf(7, 8), ownership.free)
         assertEquals(setOf(3), ownership.family)
         assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(1))
-        assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(7, played = true))
+        // A free game is the person's own once Steam's owned-games answer lists it, or once installed.
+        assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(7, listed = true))
+        assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(8, installed = true))
         assertEquals(SteamOwnership.Status.FREE, ownership.statusOf(8))
+        // Steam's answer settles a game no licence here grants (a played free-to-play game in the free sub).
+        assertEquals(SteamOwnership.Status.OWN, ownership.statusOf(100, listed = true))
+        // An installed lent game stays the family's.
+        assertEquals(SteamOwnership.Status.FAMILY, ownership.statusOf(3, installed = true))
         assertEquals(SteamOwnership.Status.FAMILY, ownership.statusOf(3))
         for (app in listOf(4, 5, 100, 101)) assertEquals("$app", SteamOwnership.Status.NONE, ownership.statusOf(app))
         // A free-to-start game is owned through its DLC.
@@ -276,7 +284,7 @@ class SteamStoreTest {
     }
 
     @Test
-    fun `a sync summary counts licences by billing type, apps by whose licence grants them, and played free games`() {
+    fun `a sync summary counts licences by billing type, apps by whose licence grants them, and Steam's own answer`() {
         val kinds = listOf(1, 2, 3, 4, 6, 7, 8, 9, 100).map { SteamAppKind(it, AppType.game.code, SteamIds.INVALID_APP_ID) } + listOf(
             SteamAppKind(5, AppType.dlc.code, 1),
             SteamAppKind(60, AppType.dlc.code, 6),
@@ -288,9 +296,11 @@ class SteamStoreTest {
             stored = licences,
             accountId = 7,
             kinds = kinds,
-            ownership = SteamOwnership.of(licences, accountId = 7),
-            played = setOf(7),
-            playtimeRead = true,
+            answer = SteamOwnedGames.Answer(listed = setOf(1, 7, 200), played = setOf(7)),
+            rows = listOf(
+                1 to StoreHolding.OWNED, 2 to StoreHolding.OWNED, 6 to StoreHolding.OWNED, 7 to StoreHolding.OWNED,
+                9 to StoreHolding.OWNED, 8 to StoreHolding.FREE, 3 to StoreHolding.FAMILY,
+            ),
         )
         assertEquals(
             "steam sync: 0 licences (payment: none; flags: CancelledByUser 1, Expired 1; another account's 1; " +
@@ -298,7 +308,9 @@ class SteamStoreTest {
                 "1: 1 packages, 0 games, 1 dlc, 10: 1 packages, 2 games, 0 dlc, 12: 1 packages, 3 games, 0 dlc; " +
                 "paid apps by type: game 3, dlc 1; free apps by type: game 2; family apps by type: game 1; " +
                 "only in the free sub or ended licences: game 2, demo 1, dlc 1, no product info 1; " +
-                "free games played or installed 1 of 2; library games: own 5, free not played 1, family 1",
+                "Steam's owned-games answer: 3 games (paid 1, free 1, family 0, other 1; 1 not a game here: no product info 1); " +
+                "free games it lists 1 of 2, played 1; paid games it does not list 2; " +
+                "library games: own 5, free not listed 1, family 1; dlc of own games 1 (paid 1)",
             line,
         )
     }

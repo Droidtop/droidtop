@@ -131,11 +131,9 @@ internal fun storeCounts(games: List<PcLibrary.Game>, source: PcLibrary.Source):
     )
 }
 
-/** The library row's value: what is known, in words ("12 games, 3 installed"). */
+/** The library row's value: what is known, in words ("12 games, 3 installed"); short, so it fits the value column. */
 internal fun countsLine(counts: StoreCounts, signedIn: Boolean): String = when {
-    counts.total > 0 -> "${counts.total} ${if (counts.total == 1) "game" else "games"}, ${counts.installed} installed" +
-        (if (counts.family > 0) ", ${counts.family} more from your family" else "") +
-        (if (counts.free > 0) ", ${counts.free} free games not played" else "")
+    counts.total > 0 -> "${counts.total} ${if (counts.total == 1) "game" else "games"}, ${counts.installed} installed"
     signedIn -> "No games read from this store yet"
     else -> "Sign in to read this store's library"
 }
@@ -237,16 +235,45 @@ internal object StoresCatalog {
             signInRows(context, store)
         }
 
+        val dlc = if (signedIn) runCatching { store.own?.dlcCount(context) }.getOrNull() else null
         val library = buildList {
             add(
                 ActionItem(
                     id = "store_${store.key}_library",
                     title = "Library",
-                    subtitle = syncedAgo(System.currentTimeMillis(), store.lastSyncRequested(context)),
+                    // PC Games shows a game owned twice (two editions, a copy in each group) as one card, so its tabs can count fewer.
+                    subtitle = syncedAgo(System.currentTimeMillis(), store.lastSyncRequested(context)) +
+                        ". PC Games shows editions and copies of one game as one card, so its tabs can count fewer",
                     value = countsLine(counts, signedIn),
                     run = {},
                 ),
             )
+            // Each count its own row, so every row fits its value column.
+            if (dlc != null && dlc > 0) {
+                add(ActionItem(id = "store_${store.key}_dlc", title = "DLC", subtitle = "DLC you hold for games in your library", value = "$dlc", run = {}))
+            }
+            if (counts.family > 0) {
+                add(
+                    ActionItem(
+                        id = "store_${store.key}_family",
+                        title = PcStoreNames.groupOf(store.label, StoreHolding.FAMILY),
+                        subtitle = "Games another account lends you, listed apart from yours",
+                        value = "${counts.family} ${if (counts.family == 1) "game" else "games"}",
+                        run = {},
+                    ),
+                )
+            }
+            if (counts.free > 0) {
+                add(
+                    ActionItem(
+                        id = "store_${store.key}_free",
+                        title = PcStoreNames.groupOf(store.label, StoreHolding.FREE),
+                        subtitle = "Free games on the account, not counted as yours until played, listed apart",
+                        value = "${counts.free} ${if (counts.free == 1) "game" else "games"}",
+                        run = {},
+                    ),
+                )
+            }
             if (counts.total > 0) {
                 add(
                     // The Gaming shell fulfils this by id (PcStoreNames.LIBRARY_ITEM_PREFIX): PC Games opened

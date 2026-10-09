@@ -9934,9 +9934,15 @@ follows:
   purchase, a key, a gift: any EBillingType but NoCost 0, FreeOnDemand 12 and
   FreeCommercialLicense 15, read from each package's product info into
   `steam_license.billing_type`); a free licence (those three types: a free
-  game the person added) makes it theirs only once it has playtime (read on
-  each sync through Steam's Player service, `SteamPlaytime`) or is installed,
-  and until then it is listed apart as "Steam Free"; a licence another
+  game the person added) makes it theirs only once Steam's own owned-games
+  answer lists it or it is installed, and until then it is listed apart as
+  "Steam Free". That answer (`SteamOwnedGames`: the Player service's
+  GetOwnedGames, read on each sync and kept in `steam/owned-games.txt`) is
+  asked as the profile counts, free games only once played
+  (`include_played_free_games`) and no free sub, and a game it lists is the
+  person's own whatever the licences say (a played free-to-play game only the
+  free sub names, say); on 1535, counting free games by playtime alone, own
+  was 1,193 against the profile's 1,245. A licence another
   account holds (Steam Families: the licence list carries the lender's
   account id) lends it, listed apart as "Steam Family"; an expired or
   cancelled licence grants nothing; and package 0, the free sub every account
@@ -9951,15 +9957,26 @@ follows:
   The PC tabs count games after the fold (`StoreIdentity`: rows whose titles
   are spelled the same once case, punctuation and an edition label are set
   aside are one card), the store page counts the store's rows, so the two can
-  differ by the rows that fold into another row's card (21 on 1523).
+  differ by the rows that fold into another row's card (21 on 1523); the
+  store page's Library row says so. Its value stays short ("N games, M
+  installed") and the DLC, Steam Family and Steam Free counts are rows of
+  their own, so every value fits its column. The store page and the sync line
+  count from the same rows (`SteamLibraryRows`). The DLC count is the DLC
+  any own live licence grants whose base game is one of the person's own
+  games (`SteamLibraryRows.dlcOfOwnGames`); whether Steam's profile counts
+  DLC the same way (782 for the owner, against 911 paid DLC of any base on
+  1535) is what the sync line's "dlc of own games" figures check.
   Each Steam sync writes one line to scan.log (`SteamLibrarySync.summary`):
   the licences by payment method and by flag, how many are another account's,
   whether the free sub is held and how many apps it names, the own live
   licences by billing type with the games and DLC each type grants, the apps
   by product-info type that paid licences, free licences and only a family
-  member's grant, and that only the free sub or an ended licence names, how
-  many free games were played or are installed, and the library games: own,
-  free not played, family, to set against Steam's own profile counts. Install is a job like every store's: fresh product info, then
+  member's grant, and that only the free sub or an ended licence names,
+  Steam's owned-games answer set against those (how many it lists, by
+  licence kind, how many are not a game here, which free games it lists and
+  played, which paid games it leaves out), and the library games as the
+  store page counts them (own, free not listed, family) with the DLC of own
+  games (held, and paid), to set against Steam's own profile counts. Install is a job like every store's: fresh product info, then
   the depots `SteamDepots.plan` picks (GameNative's rules: Windows, 64-bit over
   32-bit, the plain build over the Steam Deck one, the device's language else
   English, granted by the account's packages, not Steam China) with the DLC the

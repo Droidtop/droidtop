@@ -222,6 +222,9 @@ interface StoreLibrary {
     /** Every game of this store the device knows about, from droidtop's own copy. No network. */
     suspend fun games(context: Context): List<StoreGame>
 
+    /** How many DLC the account holds for its own games, for the store page; null when the store does not say. No network. */
+    suspend fun dlcCount(context: Context): Int? = null
+
     /**
      * Where [gameId] is installed, or null when it is not. Reads the whole
      * library unless the store has a cheaper answer, so a caller asking for

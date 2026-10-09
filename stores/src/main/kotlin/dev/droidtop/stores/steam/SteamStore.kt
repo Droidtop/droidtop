@@ -101,46 +101,26 @@ class SteamStore : StoreLibrary {
     }
 
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
-        val db = db(context)
-        val installs = db.installs().all().filter { it.isDownloaded && it.installPath.isNotBlank() }.associateBy { it.id }
-        // Whose licence grants each game (SteamOwnership): the account's own
-        // (paid, or free and played or installed), free and unplayed (listed
-        // apart), a family member's (listed apart), or only the free sub or an
-        // ended licence (not listed).
-        val accountId = SteamCredentials.load(context)?.steamId64?.takeIf { it != 0L }?.let { (it and 0xFFFFFFFFL).toInt() }
-        val ownership = SteamOwnership.of(db.licenses().all(), accountId)
-        val dlcByBase = db.apps().dlcKinds().groupBy({ it.base }, { it.id })
-        val played = SteamPlaytime.load(context)
-        val status = HashMap<Int, SteamOwnership.Status>()
-        val owned = db.apps().owned(SteamLibrarySync.PLAYABLE_TYPES).filter { app ->
-            val standing = ownership.statusOf(app.id, dlcByBase[app.id].orEmpty(), played = app.id in played || app.id in installs)
-            status[app.id] = standing
-            standing != SteamOwnership.Status.NONE
-        }
-        val ownedIds = owned.mapTo(HashSet()) { it.id }
-        // Installed and no longer owned (signed out, a licence gone) still shows, with its files.
-        val installedOnly = installs.keys.filter { it !in ownedIds }
-            .mapNotNull { db.apps().find(it) }
-            // A DLC's own install row is not a game of its own.
-            .filter { SteamLibrarySync.isLibraryGame(it, keepInstalledKinds = true) }
         val language = StoreLanguage.current()
-        (owned + installedOnly).filter { it.name.isNotBlank() }.map { app ->
-            val install = installs[app.id]
+        SteamLibraryRows.read(context, db(context)).map { row ->
             StoreGame(
                 store = id,
-                gameId = app.id.toString(),
-                title = app.name,
-                installed = install != null,
-                installPath = install?.installPath,
-                sizeBytes = baseSize(app, language),
-                artUrl = app.coverUrl,
-                holding = when (status[app.id]) {
-                    SteamOwnership.Status.FAMILY -> StoreHolding.FAMILY
-                    SteamOwnership.Status.FREE -> StoreHolding.FREE
-                    else -> StoreHolding.OWNED
-                },
+                gameId = row.app.id.toString(),
+                title = row.app.name,
+                installed = row.install != null,
+                installPath = row.install?.installPath,
+                sizeBytes = baseSize(row.app, language),
+                artUrl = row.app.coverUrl,
+                holding = row.holding,
             )
         }
+    }
+
+    /** The DLC the account holds for its own games ([SteamLibraryRows.dlcOfOwnGames]). */
+    override suspend fun dlcCount(context: Context): Int = withContext(Dispatchers.IO) {
+        val db = db(context)
+        val own = SteamLibraryRows.read(context, db).filter { it.holding == StoreHolding.OWNED }.mapTo(HashSet()) { it.app.id }
+        SteamLibraryRows.dlcOfOwnGames(db.apps().kinds(), SteamOwnership.of(db.licenses().all(), SteamLibraryRows.accountId(context)), own).held
     }
 
     override suspend fun installedPath(context: Context, gameId: String): String? = withContext(Dispatchers.IO) {
@@ -411,7 +391,7 @@ class SteamStore : StoreLibrary {
     }
 
     override fun changeStamp(context: Context): Long =
-        StoreFiles.stamp(SteamDatabase.files(context) + SteamCredentials.file(context) + SteamPlaytime.file(context))
+        StoreFiles.stamp(SteamDatabase.files(context) + SteamCredentials.file(context) + SteamOwnedGames.file(context))
 
     private suspend fun installOf(context: Context, gameId: String): Pair<AppInfo, File> {
         val appId = gameId.toIntOrNull() ?: error("$gameId is not a Steam app id")
