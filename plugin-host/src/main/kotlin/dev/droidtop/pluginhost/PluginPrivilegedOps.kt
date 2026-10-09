@@ -78,8 +78,17 @@ class PluginPrivilegedOps(private val context: Context) : ElevatedBackend {
         return true
     }
 
+    /**
+     * A long-lived root process through the provider's stream session ([ProviderProcess], `exec_stream`), for the
+     * rooted desktop stack (dev.droidtop.runtime.RootProcess, Droidtop/tracker#394). Only a provider that holds
+     * `priv.shell` at root level answers: a Shizuku plugin running over ADB gives null here, so the rooted stack never
+     * gets a shell-user process it would mistake for root.
+     */
+    override fun spawn(argv: List<String>): Process? = ProviderProcess.start(caller, argv, minLevel = ROOT_LEVEL)
+
     private companion object {
         /** Raw bytes per call: under a quarter of a binder transaction once base64-encoded. */
         const val FILE_CHUNK = 192 * 1024
+        const val ROOT_LEVEL = "root"
     }
 }

@@ -143,8 +143,7 @@ object ProcessRunner {
  *
  * Its only consumers are Desktop mode's rooted container stack: droidspaces
  * in :runtime-linux-root (namespace/cgroup/mount operations) and the
- * runtime selection in :app that asks whether that stack can run, plus the
- * plugin host's root-approval check. Nothing in Gaming or the launcher may
+ * runtime selection in :app that asks whether that stack can run. Nothing in Gaming or the launcher may
  * call it (docs/SPEC.md 7i, "Root never gates a Gaming game"). The command
  * is an argv, never a shell line: the helper starts it directly.
  */
@@ -183,20 +182,6 @@ object RootProcess {
             result = run(TaskManager.shell, listOf("id", "-u"), null)
         }
         accessOf(result)
-    }
-
-    /**
-     * [access] for a caller that cannot suspend (the plugin host's root
-     * approval, already on a background thread): one try, no waiting.
-     * Blocks on the helper: never on the main thread.
-     */
-    fun accessNow(): RootAccess {
-        val process = runCatching { TaskManager.shell.spawn(listOf("id", "-u")) }.getOrNull() ?: return RootAccess.ABSENT
-        return runCatching {
-            val out = process.inputStream.bufferedReader().readText()
-            process.errorStream.bufferedReader().readText()
-            accessOf(RootProcessResult(process.waitFor(), out, ""))
-        }.getOrDefault(RootAccess.ABSENT)
     }
 
     /** The mapping itself, separated so it is testable without a device: root is `id -u` answering 0. */

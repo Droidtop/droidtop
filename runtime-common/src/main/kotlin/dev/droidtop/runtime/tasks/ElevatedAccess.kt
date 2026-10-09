@@ -105,7 +105,19 @@ class ElevatedShell(
     override fun grantPermission(packageName: String, permission: String): Boolean =
         target().grantPermission(packageName, permission)
 
-    override fun spawn(argv: List<String>): Process? = target().spawn(argv)
+    /**
+     * A long-lived process for the rooted desktop stack. A named backend is used alone, Off is none. Auto asks the
+     * provider plugin first, because it answers only while a provider holds root ([ElevatedBackend.spawn] of the
+     * plugin backend asks for root level), and falls back to the Shizuku app, which runs whatever it is: root
+     * when Shizuku was started with root or is Sui, the shell user otherwise (RootProcess.access tells them apart).
+     * So a root provider plugin carries the desktop wherever there is one, and the app's binder everywhere else.
+     */
+    override fun spawn(argv: List<String>): Process? = when (choice()) {
+        ElevatedChoice.OFF -> null
+        ElevatedChoice.SHIZUKU_APP -> app.spawn(argv)
+        ElevatedChoice.SHIZUKU_PLUGIN -> plugin.spawn(argv)
+        ElevatedChoice.AUTO -> plugin.spawn(argv) ?: app.spawn(argv)
+    }
 
     override fun readFile(path: String): ByteArray? = if (ElevatedFiles.allowed(path)) target().readFile(path) else null
 

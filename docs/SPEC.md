@@ -1741,8 +1741,8 @@ with no host bridge attached, a second desktop nobody could see.
 
 **Root comes only from the elevated helper (owner rule, 2026-10-09).**
 droidtop never runs `su`. Every root command of the rooted desktop stack
-(droidspaces, `RootTarUnpacker`, `RootfsDelete`), the runtime selection's
-root check and the plugin host's root approval go through `RootProcess`,
+(droidspaces, `RootTarUnpacker`, `RootfsDelete`) and the runtime
+selection's root check go through `RootProcess`,
 which asks `TaskManager.shell` (the task manager's one `ElevatedShell`:
 the Shizuku app or Sui, or the Shizuku provider plugin, as the person
 chose) to `spawn` the argv as a long-lived process with its standard
@@ -1750,10 +1750,13 @@ streams; there is no shell line and no quoting. Root is `id -u` answering 0
 through it: a Shizuku started with root, or Sui, gives the rooted desktop;
 a Shizuku started over ADB answers 2000 and the desktop uses proot
 (`RootAccess.DENIED` says why); no helper, or "Elevated access" Off, is
-ABSENT. The provider plugin's `priv.shell` has no long-lived process op
-built yet (`exec_stream` is specified, not served), so only the Shizuku app
-or Sui can carry the rooted desktop today. It replaced `su -c` in
-`RootProcess` and in `PluginRuntimeService`'s device check.
+ABSENT. Where the process comes from: a named "Elevated access" backend is
+used alone; Auto asks the Shizuku provider plugin first, through its
+`priv.shell` stream session at root level (`ProviderProcess`,
+`exec_stream`/`stream_read`/`stream_write`/`stream_kill`), which answers
+only while a provider holds root, and falls back to the Shizuku app's binder
+(`Shizuku.newProcess`). It replaced `su -c` in `RootProcess`; the plugin
+host's own root check is the root-level provider's presence (below).
 
 **Every external process droidtop runs is bounded.** crane, proot,
 droidspaces and root commands run through one `ProcessRunner` that drains stdout

@@ -31,6 +31,40 @@ class ElevatedAccessTest {
 
     private val full = TaskPrivileges(forceStop = true, shell = true, grantPermission = true)
 
+    private class SpawnBackend(private val process: Process?) : ElevatedBackend {
+        var asked = 0
+
+        override fun state() = BackendState.READY
+
+        override fun forceStop(packageName: String): ForceStopResult = ForceStopResult.NoProvider
+
+        override fun exec(argv: List<String>): ShellOutput? = null
+
+        override fun spawn(argv: List<String>): Process? {
+            asked++
+            return process
+        }
+    }
+
+    @Test
+    fun `the rooted stack's process comes from a root provider plugin first, then the Shizuku app`() {
+        val fromPlugin = ProcessBuilder("true").start()
+        val fromApp = ProcessBuilder("true").start()
+
+        val pluginRoot = SpawnBackend(fromPlugin)
+        val app = SpawnBackend(fromApp)
+        assertTrue(ElevatedShell(app, pluginRoot) { ElevatedChoice.AUTO }.spawn(listOf("id")) === fromPlugin)
+        assertEquals(0, app.asked)
+
+        // No provider at root level: Auto falls back to the app's binder.
+        assertTrue(ElevatedShell(app, SpawnBackend(null)) { ElevatedChoice.AUTO }.spawn(listOf("id")) === fromApp)
+
+        // A named backend is used alone, and Off is none.
+        assertNull(ElevatedShell(app, SpawnBackend(null)) { ElevatedChoice.SHIZUKU_PLUGIN }.spawn(listOf("id")))
+        assertTrue(ElevatedShell(app, pluginRoot) { ElevatedChoice.SHIZUKU_APP }.spawn(listOf("id")) === fromApp)
+        assertNull(ElevatedShell(app, pluginRoot) { ElevatedChoice.OFF }.spawn(listOf("id")))
+    }
+
     @Test
     fun `auto takes the Shizuku app when both are ready`() {
         assertEquals(ElevatedBackendId.SHIZUKU_APP, ElevatedAccess.resolve(ElevatedChoice.AUTO, ready, ready))
