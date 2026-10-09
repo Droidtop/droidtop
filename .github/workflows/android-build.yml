@@ -224,11 +224,10 @@ jobs:
     # in an always() step. Pull requests and forks have no secret, so they upload
     # the payload unsigned and say so in the job summary.
     #
-    # No native code in this sample (manifest's "abis": [] -- see
-    # PluginManifest.kt), so there is only one dex output; a future
-    # native_bundle sample with real .so payloads would need this job to
-    # build/verify a lib/<abi> pair per PluginBundleInstaller's ABI rule
-    # rather than skip it.
+    # The sample also ships a small native library (native/greeting.c),
+    # built by build.sh for arm64-v8a and x86_64 with the NDK the setup
+    # action installs (ANDROID_NDK_HOME), so the contained tier's native
+    # loading has a real bundle to run (docs/plugin-api.md 5.3).
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -320,6 +319,7 @@ jobs:
           name: plugin-sample-statustile-unsigned
           path: |
             samples/plugin-sample-statustile/build/classes.jar
+            samples/plugin-sample-statustile/build/lib
             samples/plugin-sample-statustile/build/manifest.json
           if-no-files-found: error
 

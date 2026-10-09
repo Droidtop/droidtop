@@ -32,7 +32,7 @@ if [ -n "${PLUGIN_SIGNING_CERT:-}" ]; then
   CERT_FILE=origin.cert
 fi
 
-tar -C "$BUNDLE_DIR" --sort=name -cf - manifest.json manifest.sig $CERT_FILE classes.jar | xz -9e > droidtop.sample-statustile.droidplugin.tar.xz
+tar -C "$BUNDLE_DIR" --sort=name -cf - manifest.json manifest.sig $CERT_FILE classes.jar lib | xz -9e > droidtop.sample-statustile.droidplugin.tar.xz
 
 echo "Signed droidtop.sample-statustile.droidplugin.tar.xz"
 sha256sum droidtop.sample-statustile.droidplugin.tar.xz

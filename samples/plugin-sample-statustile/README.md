@@ -53,3 +53,8 @@ It runs contained (docs/plugin-api.md 5.3): an isolated process of its own, with
 network, no files and no permissions. Its toast, its library shelf and its vault value
 are all broker calls, each one gated by a permission its manifest declares. The plugin's
 page in Settings shows "Contained", and Advanced > Containment check shows the wall.
+
+It also ships a native library (`native/greeting.c`, built by `build.sh` for arm64-v8a and
+x86_64 with the NDK in `ANDROID_NDK_HOME`), loaded with an ordinary `System.loadLibrary`.
+Contained, droidtop hands the library over as a descriptor and its guarded hooks map it,
+so the JNI method binds as usual; the panel's "Native library" line shows what it said.

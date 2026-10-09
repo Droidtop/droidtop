@@ -162,9 +162,6 @@ class PluginManifestTest {
         assertTrue(manifest.structuralProblems().any { it.contains("flutter_assets") })
     }
 
-    /** A Flutter plugin cannot run contained, so it asks for full access (docs/plugin-api.md 5.3). */
-    private fun fullTrust() = JSONArray(listOf(JSONObject().put("id", PluginTiers.FULL_TRUST).put("required", true)))
-
     private fun withMainUi(kind: String, point: JSONObject): PluginManifest {
         val json = if (kind == "flutter_embed") {
             manifestJson(
@@ -177,7 +174,7 @@ class PluginManifestTest {
                     "lib/x86_64/libapp.so" to "b".repeat(64),
                     "flutter_assets/AssetManifest.bin" to "c".repeat(64),
                 ),
-            ).put("permissions", fullTrust())
+            )
         } else {
             manifestJson(kind = kind, capabilities = emptyList(), payload = listOf("plugin.py" to "a".repeat(64)), entryClass = null)
         }
@@ -258,12 +255,8 @@ class PluginManifestTest {
             entryClass = null,
             runtimeVersion = "af7e796e161ae0bb1ff0758c71a7105418bd9ded",
         )
-        val withoutFullTrust = PluginManifest.fromJson(json)!!
-        assertTrue(
-            "a Flutter plugin that does not ask for full access is refused",
-            withoutFullTrust.structuralProblems().any { it.contains(PluginTiers.FULL_TRUST) },
-        )
-        val manifest = PluginManifest.fromJson(json.put("permissions", fullTrust()))!!
+        // A Flutter plugin runs contained (docs/plugin-api.md 5.3): it needs no full access to install.
+        val manifest = PluginManifest.fromJson(json)!!
         assertEquals(PluginKind.FLUTTER_EMBED, manifest.kind)
         assertTrue(manifest.structuralProblems().isEmpty())
     }

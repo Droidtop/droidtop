@@ -35,7 +35,18 @@ cd "$(dirname "$0")"
 rm -rf build
 mkdir -p build/classes
 
-kotlinc -cp "$PLUGIN_HOST_CLASSPATH:$ANDROID_JAR" -d build/classes src/dev/droidtop/samples/statustile/StatusTilePlugin.kt
+kotlinc -cp "$PLUGIN_HOST_CLASSPATH:$ANDROID_JAR" -d build/classes $(find src -name '*.kt')
+
+# The sample's native library, for both ABIs droidtop requires of a bundle
+# that ships any (PluginBundleInstaller): ANDROID_NDK_HOME is the NDK CI
+# installs for :plugin-host. API 26 is droidtop's minSdk.
+: "${ANDROID_NDK_HOME:?set ANDROID_NDK_HOME to the Android NDK}"
+CLANG_DIR="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+for pair in arm64-v8a:aarch64-linux-android26 x86_64:x86_64-linux-android26; do
+  abi="${pair%%:*}"; target="${pair#*:}"
+  mkdir -p "build/lib/$abi"
+  "$CLANG_DIR/$target-clang" -shared -fPIC -O2 -Wl,-z,max-page-size=16384 -o "build/lib/$abi/libsamplegreeting.so" native/greeting.c
+done
 
 d8 --output build --lib "$ANDROID_JAR" \
   $(find build/classes -name '*.class')
@@ -47,10 +58,14 @@ d8 --output build --lib "$ANDROID_JAR" \
 CLASSES_SHA=$(sha256sum build/classes.jar | cut -d' ' -f1)
 
 python3 - "$CLASSES_SHA" <<'PY'
-import json, sys
+import hashlib, json, sys
 sha = sys.argv[1]
 manifest = json.load(open("manifest.template.json"))
-manifest["payload"] = [{"path": "classes.jar", "sha256": sha}]
+payload = [{"path": "classes.jar", "sha256": sha}]
+for abi in ("arm64-v8a", "x86_64"):
+    path = "lib/%s/libsamplegreeting.so" % abi
+    payload.append({"path": path, "sha256": hashlib.sha256(open("build/" + path, "rb").read()).hexdigest()})
+manifest["payload"] = payload
 json.dump(manifest, open("build/manifest.json", "w"), indent=2, sort_keys=True)
 PY
 

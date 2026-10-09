@@ -3,7 +3,11 @@ package dev.droidtop.pluginhost
 import android.content.Context
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
+import io.flutter.embedding.android.AndroidTouchProcessor
+import io.flutter.embedding.engine.renderer.FlutterRenderer
+import io.flutter.embedding.engine.systemchannels.KeyEventChannel
 import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.JSONMethodCodec
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -64,11 +68,13 @@ import org.json.JSONObject
  * approach (repackaging `flutter_assets` as a tiny per-plugin split APK
  * is the documented fallback, not built).
  */
-class FlutterDroidtopPlugin(
+class FlutterDroidtopPlugin internal constructor(
     private val pluginId: String,
     private val appContext: Context,
-    private val installDir: File,
-) : DroidtopPlugin {
+    private val source: FlutterSource,
+    /** The manifest's contract: 2 means the Dart code answers `handle` itself. */
+    private val contractVersion: Int,
+) : DroidtopPlugin, HostedScreen {
     private var engine: FlutterEngine? = null
     private var channel: MethodChannel? = null
     @Volatile private var pluginContext: PluginContext? = null
@@ -116,7 +122,7 @@ class FlutterDroidtopPlugin(
         // real, possibly slow work, so onLoad stays covered by
         // PluginRunner.CALL_TIMEOUT_MS like every DroidtopPlugin.onLoad.
         runOnMainThreadBlocking {
-            val built = FlutterEngineHost.build(appContext, pluginId, installDir)
+            val built = FlutterEngineHost.build(appContext, pluginId, source)
             val newEngine = built.engine
             val messenger: BinaryMessenger = newEngine.dartExecutor.binaryMessenger
             val newChannel = MethodChannel(messenger, "dev.droidtop.pluginhost/$pluginId")
@@ -303,10 +309,105 @@ class FlutterDroidtopPlugin(
     }
 
     /** Whether this plugin's own manifest is contract 2, read once from its installed payload. */
-    private val speaksContract2: Boolean by lazy {
-        runCatching {
-            PluginManifest.fromJson(JSONObject(File(installDir, "manifest.json").readText()))?.contractVersion ?: 1
-        }.getOrDefault(1) >= 2
+    private val speaksContract2: Boolean get() = contractVersion >= 2
+
+    // ---------------------------------------------------------------
+    // ui.main drawn into a surface droidtop owns (contained, docs/plugin-api.md 1.7)
+    // ---------------------------------------------------------------
+
+    private var screenEngine: FlutterEngine? = null
+    private var screenTouch: AndroidTouchProcessor? = null
+    private var screenKeys: KeyEventChannel? = null
+
+    /**
+     * Starts the plugin's main UI on an engine of its own, drawing into [surface], a surface of droidtop's
+     * ([PluginScreenActivity]) handed across the binder. A contained process has no window and may not open the GPU,
+     * so the engine draws in software into that surface; touch and keys come from droidtop. When the plugin's last route
+     * closes (`SystemNavigator.pop`), [onClose] tells droidtop to close the screen.
+     */
+    override fun attachScreen(entry: PluginMainUi.Entry, surface: android.view.Surface, width: Int, height: Int, density: Float, onClose: () -> Unit): String? =
+        try {
+            runOnMainThreadBlocking {
+                detachScreenOnMain()
+                val built = FlutterEngineHost.build(appContext, pluginId, source)
+                val engine = built.engine
+                // The only platform call a screen without a window needs: the last route closed.
+                MethodChannel(engine.dartExecutor.binaryMessenger, "flutter/platform", JSONMethodCodec.INSTANCE).setMethodCallHandler { call, result ->
+                    if (call.method == "SystemNavigator.pop") {
+                        onClose()
+                        result.success(null)
+                    } else {
+                        result.notImplemented()
+                    }
+                }
+                engine.renderer.startRenderingToSurface(surface, false)
+                engine.renderer.surfaceChanged(width, height)
+                engine.renderer.setViewportMetrics(viewport(width, height, density))
+                val entrypoint = if (entry.library == null) {
+                    DartExecutor.DartEntrypoint(built.appBundlePath, entry.entrypoint)
+                } else {
+                    DartExecutor.DartEntrypoint(built.appBundlePath, entry.library, entry.entrypoint)
+                }
+                engine.dartExecutor.executeDartEntrypoint(entrypoint)
+                engine.lifecycleChannel.appIsResumed()
+                screenEngine = engine
+                screenTouch = AndroidTouchProcessor(engine.renderer, false)
+                screenKeys = KeyEventChannel(engine.dartExecutor.binaryMessenger)
+            }
+            null
+        } catch (t: Throwable) {
+            t.message ?: t::class.java.simpleName
+        }
+
+    private var screenDensity = 1f
+
+    private fun viewport(width: Int, height: Int, density: Float): FlutterRenderer.ViewportMetrics {
+        screenDensity = density
+        return FlutterRenderer.ViewportMetrics().also {
+            it.width = width
+            it.height = height
+            it.devicePixelRatio = density
+        }
+    }
+
+    override fun resizeScreen(width: Int, height: Int) {
+        mainHandler.post {
+            val engine = screenEngine ?: return@post
+            engine.renderer.surfaceChanged(width, height)
+            engine.renderer.setViewportMetrics(viewport(width, height, screenDensity))
+        }
+    }
+
+    override fun screenTouch(event: android.view.MotionEvent) {
+        mainHandler.post {
+            screenTouch?.onTouchEvent(event)
+            event.recycle()
+        }
+    }
+
+    /** Keys, the pad's included, as Flutter's key events; Back pops the plugin's route (the last one closes the screen). */
+    override fun screenKey(event: android.view.KeyEvent) {
+        mainHandler.post {
+            val engine = screenEngine ?: return@post
+            if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                if (event.action == android.view.KeyEvent.ACTION_UP) engine.navigationChannel.popRoute()
+                return@post
+            }
+            screenKeys?.sendFlutterKeyEvent(KeyEventChannel.FlutterKeyEvent(event, null), event.action == android.view.KeyEvent.ACTION_UP) { }
+        }
+    }
+
+    override fun detachScreen() {
+        runCatching { runOnMainThreadBlocking { detachScreenOnMain() } }
+    }
+
+    private fun detachScreenOnMain() {
+        val engine = screenEngine ?: return
+        screenEngine = null
+        screenTouch = null
+        screenKeys = null
+        runCatching { engine.renderer.stopRenderingToSurface() }
+        runCatching { engine.destroy() }
     }
 
     /**
@@ -436,7 +537,10 @@ class FlutterDroidtopPlugin(
             if (FlutterRuntimeManager.libflutterSoPath(context) == null) {
                 return Result.failure(IllegalStateException("Flutter runtime not installed -- download it in Settings > Plugins first"))
             }
-            return Result.success(FlutterDroidtopPlugin(pluginId, context, installDir))
+            val contract = runCatching {
+                PluginManifest.fromJson(JSONObject(File(installDir, "manifest.json").readText()))?.contractVersion ?: 1
+            }.getOrDefault(1)
+            return runCatching { FlutterDroidtopPlugin(pluginId, context, FlutterSource.installed(context, pluginId, installDir), contract) }
         }
     }
 }

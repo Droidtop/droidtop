@@ -19,6 +19,8 @@ project(droidtoppy C)
 # time.
 add_library(droidtoppy SHARED
     src/droidtoppy_jni.c
+    # The guarded hooks of a contained plugin's isolated process (docs/plugin-api.md 5.3).
+    src/sandbox_hooks.c
 )
 
 target_link_libraries(droidtoppy dl log)

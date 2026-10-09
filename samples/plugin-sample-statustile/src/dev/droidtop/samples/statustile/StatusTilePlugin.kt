@@ -183,6 +183,8 @@ class StatusTilePlugin : DroidtopPlugin {
         item("info", "mode", "Drawn in") { put("value", hostCall("host", "info", JSONObject())?.optJSONObject("data")?.optString("mode") ?: "unknown") },
         item("info", "surface", "Place") { put("value", surface.ifBlank { "unknown" }) },
         item("info", "loads", "Loaded") { put("value", "$loadCount time(s)") },
+        // Its own native library, mapped by droidtop's guarded hooks while the plugin runs contained.
+        item("info", "native", "Native library") { put("value", NativeGreeting.line()) },
         item("info", "ticks", "Scheduled checks run") { put("value", scheduledRuns.get().toString()) },
         item("info", "word", "Remembered word") {
             put("value", hostCall("vault", "get", JSONObject().put("key", "word"))?.optJSONObject("data")?.optString("value")?.takeIf { it.isNotBlank() && it != "null" } ?: "none")

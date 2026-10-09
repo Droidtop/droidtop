@@ -60,6 +60,10 @@ class NativePluginRunner(
         override fun onJobComplete(pluginId: String, jobId: String, resultJson: String) {
             this@NativePluginRunner.onJobComplete(pluginId, jobId, decode(resultJson))
         }
+
+        override fun onScreenClosed(pluginId: String) {
+            PluginScreenActivity.closed(pluginId)
+        }
     }
 
     override suspend fun load(record: PluginRecord, installDir: String): Boolean {
@@ -128,6 +132,9 @@ class NativePluginRunner(
             opened.forEach { runCatching { it.close() } }
         }
     }
+
+    /** The process [pluginId] was loaded in by this runner, for the calls that are not plugin calls (its screen). */
+    fun runtimeOf(pluginId: String): IPluginRuntime? = runtimes[pluginId]
 
     /** What [pluginId]'s process reports it can reach (the containment check, docs/plugin-api.md 5.3); null when it is not loaded here. */
     suspend fun reachability(pluginId: String): JSONObject? {

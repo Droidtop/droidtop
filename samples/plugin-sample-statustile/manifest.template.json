@@ -2,8 +2,8 @@
   "id": "droidtop.sample-statustile",
   "origin": "droidtop",
   "label": "Sample status tile",
-  "description": "Harmless sample exercising the plugin API end to end (SPEC 12a): a status tile and a panel in every mode, rows on a game's page, a shelf on Home and in the Desktop Start menu, a scheduled task and a vault value; see build.sh in this folder.",
-  "version": "1.2.0",
+  "description": "Harmless sample exercising the plugin API end to end (SPEC 12a): a status tile and a panel in every mode, rows on a game's page, a shelf on Home and in the Desktop Start menu, a scheduled task, a vault value and a native library; see build.sh in this folder.",
+  "version": "1.3.0",
   "kind": "native_bundle",
   "contractVersion": 2,
   "provides": [
@@ -20,6 +20,6 @@
     {"id":"vault.own","reason":"Remembers the word you give it on its panel"}
   ],
   "requestsRoot": false,
-  "abis": [],
+  "abis": ["arm64-v8a", "x86_64"],
   "entryClass": "dev.droidtop.samples.statustile.StatusTilePlugin"
 }

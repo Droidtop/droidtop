@@ -27,7 +27,7 @@ class PluginMainActivity : FlutterActivity() {
         val pluginId = intent.getStringExtra(EXTRA_PLUGIN_ID) ?: throw IllegalStateException("no plugin id")
         val function = intent.getStringExtra(EXTRA_ENTRYPOINT) ?: throw IllegalStateException("no entrypoint")
         val library = intent.getStringExtra(EXTRA_LIBRARY)
-        val built = FlutterEngineHost.build(applicationContext, pluginId, PluginStore.payloadDirFor(applicationContext, pluginId))
+        val built = FlutterEngineHost.build(applicationContext, pluginId, FlutterSource.installed(applicationContext, pluginId, PluginStore.payloadDirFor(applicationContext, pluginId)))
         val entrypoint = if (library.isNullOrBlank()) {
             DartExecutor.DartEntrypoint(built.appBundlePath, function)
         } else {

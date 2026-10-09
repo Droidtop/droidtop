@@ -205,6 +205,29 @@ abstract class PluginProcessService : Service() {
         override fun cancelJob(pluginId: String, jobId: String) {
             runCatching { loaded[pluginId]?.cancelJob(jobId) }
         }
+
+        override fun attachScreen(pluginId: String, entrypoint: String, library: String?, surface: android.view.Surface, width: Int, height: Int, density: Float): String? {
+            val screen = loaded[pluginId] as? HostedScreen ?: return "this plugin has no screen of its own here"
+            return screen.attachScreen(PluginMainUi.Entry(entrypoint, library?.ifBlank { null }), surface, width, height, density) {
+                broadcastScreenClosed(pluginId)
+            }
+        }
+
+        override fun resizeScreen(pluginId: String, width: Int, height: Int) {
+            (loaded[pluginId] as? HostedScreen)?.resizeScreen(width, height)
+        }
+
+        override fun screenTouch(pluginId: String, event: android.view.MotionEvent) {
+            (loaded[pluginId] as? HostedScreen)?.screenTouch(event)
+        }
+
+        override fun screenKey(pluginId: String, event: android.view.KeyEvent) {
+            (loaded[pluginId] as? HostedScreen)?.screenKey(event)
+        }
+
+        override fun detachScreen(pluginId: String) {
+            (loaded[pluginId] as? HostedScreen)?.detachScreen()
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder = binder
@@ -296,6 +319,17 @@ abstract class PluginProcessService : Service() {
         }
     }
 
+    private fun broadcastScreenClosed(pluginId: String) = synchronized(broadcastLock) {
+        val n = callbacks.beginBroadcast()
+        try {
+            for (i in 0 until n) {
+                runCatching { callbacks.getBroadcastItem(i).onScreenClosed(pluginId) }
+            }
+        } finally {
+            callbacks.finishBroadcast()
+        }
+    }
+
     private fun broadcastPluginCrashed(pluginId: String, capability: String, reason: String) = synchronized(broadcastLock) {
         val n = callbacks.beginBroadcast()
         try {
@@ -310,6 +344,19 @@ abstract class PluginProcessService : Service() {
     private companion object {
         const val MAX_RESUME_PAYLOAD_CHARS = 4096
     }
+}
+
+/**
+ * A plugin that draws its own full-screen UI into a surface droidtop owns (contained `ui.main`, docs/plugin-api.md 1.7):
+ * an isolated process has no window of its own. [attachScreen] returns null once the entrypoint draws, else why not;
+ * [onClose] is called when the plugin closes its last route.
+ */
+interface HostedScreen {
+    fun attachScreen(entry: PluginMainUi.Entry, surface: android.view.Surface, width: Int, height: Int, density: Float, onClose: () -> Unit): String?
+    fun resizeScreen(width: Int, height: Int)
+    fun screenTouch(event: android.view.MotionEvent)
+    fun screenKey(event: android.view.KeyEvent)
+    fun detachScreen()
 }
 
 /**

@@ -72,6 +72,18 @@ class PluginCrashPolicy(
     }
 
     /**
+     * Loads [record] for its own screen (a contained `ui.main`, [PluginScreenActivity]) the way a call the person started
+     * would, and returns the process it runs in, or why it could not.
+     */
+    suspend fun screenRuntime(record: PluginRecord): Pair<IPluginRuntime?, String?> {
+        if (!record.runnable()) return null to "${record.manifest.label} is not approved and turned on"
+        gateOnVerification(record)?.let { return null to (it.error ?: "${record.manifest.label} failed its check") }
+        missingRuntime(record)?.let { return null to "${record.manifest.label} ${it.message}" }
+        loadFor(record, userInitiated = true)?.let { return null to it }
+        return runner.runtimeOf(record.manifest.id) to null
+    }
+
+    /**
      * The containment check (docs/plugin-api.md 5.3): loads [record] the way a call would and reports, in plain lines,
      * which tier and process it runs in and what that process reached when it tried the network, droidtop's files and
      * shared storage, plus how a contained python runtime loaded. For the rig and for anyone who wants to see the wall.

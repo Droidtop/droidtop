@@ -21,14 +21,12 @@ object PluginTiers {
     fun declaresFullTrust(manifest: PluginManifest): Boolean = manifest.v2.permissions.any { it.id == FULL_TRUST }
 
     /**
-     * Why [manifest] cannot run contained, or null when it can. Each reason is a fact of the isolated process
-     * (docs/plugin-api.md 5.3, "Spike results"): it opens no path, binds no other app and holds no privilege.
+     * Why [manifest] cannot run contained, or null when it can. Every kind runs contained (docs/plugin-api.md 5.3: code that
+     * loads by path, a native library or a Flutter engine, is answered by the guarded hooks); what is left needs
+     * privilege an isolated UID never has: binding another app's service, or giving other plugins system-level access.
      */
     fun containmentBlocker(manifest: PluginManifest): String? = when {
         manifest.contractVersion < 2 -> "it was written before permissions existed"
-        manifest.kind == PluginKind.FLUTTER_EMBED -> "a Flutter engine loads its code and assets by path"
-        manifest.kind == PluginKind.NATIVE_BUNDLE && manifest.payload.any { it.path.startsWith(ContainedFiles.NATIVE_PREFIX) && it.path.endsWith(".so") } ->
-            "its native libraries are loaded by path"
         manifest.v2.permissions.any { it.id == "apps.bind" } -> "it binds other apps' services"
         manifest.v2.exports.any { it.api.startsWith("priv.") || it.api.startsWith("root.") } -> "it gives other plugins system-level access"
         else -> null

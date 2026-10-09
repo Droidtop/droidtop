@@ -18,11 +18,15 @@ import org.json.JSONObject
  * The plugin's code arrives as file descriptors :app opened ([ContainedFiles]), and its [PluginContext] reaches
  * nothing but its broker: no folder, no root, no Shizuku. How each kind loads:
  * - `native_bundle`: the dex files of `classes.jar`, read from the descriptor into memory and loaded with
- *   [InMemoryDexClassLoader]. Native libraries are not loaded here (docs/plugin-api.md 5.3, "Spike results").
+ *   [InMemoryDexClassLoader]. Its native libraries get virtual paths ([SandboxFiles]) that the class loader's library
+ *   path names, so the plugin's own `System.loadLibrary` maps them through the guarded hooks and ART binds its JNI
+ *   methods as usual.
  * - `python`: the interpreter starts from descriptors ([PythonBridge.initContained]): libpython and its libraries
  *   through `android_dlopen_ext` with `ANDROID_DLEXT_USE_LIBRARY_FD`, the standard library as one zip on `sys.path`,
  *   and each `lib-dynload` module registered as a built-in. `plugin.py` is executed from its text.
- * - `flutter_embed`: refused; a Flutter plugin needs full access.
+ * - `flutter_embed`: a headless FlutterEngine from virtual paths (the downloaded engine, the plugin's `libapp.so`
+ *   and its assets zip) answered by the guarded hooks, drawing in software; its `ui.main` draws into a surface droidtop
+ *   owns ([PluginScreenActivity]).
  */
 open class PluginSandboxService : PluginProcessService() {
     @Volatile private var pythonReport: JSONObject? = null
@@ -36,18 +40,25 @@ open class PluginSandboxService : PluginProcessService() {
         return when (manifest.kind) {
             PluginKind.NATIVE_BUNDLE -> loadDex(pluginId, manifest, files, context)
             PluginKind.PYTHON -> loadPython(pluginId, manifest, files, context)
-            PluginKind.FLUTTER_EMBED -> failLoad(pluginId, "a Flutter plugin cannot run contained; it needs full access")
+            PluginKind.FLUTTER_EMBED -> loadFlutter(pluginId, manifest, files, context)
         }
     }
 
     private fun loadDex(pluginId: String, manifest: PluginManifest, files: Map<String, ParcelFileDescriptor>, context: PluginContext): Boolean {
         val jar = files[ContainedFiles.CLASSES] ?: return failLoad(pluginId, "its classes.jar was not handed over")
         val entryClass = manifest.entryClass ?: return failLoad(pluginId, "it names no entry class")
-        if (files.keys.any { it.startsWith(ContainedFiles.NATIVE_PREFIX) }) {
-            return failLoad(pluginId, "a plugin with native libraries cannot run contained; it needs full access")
+        val libraries = files.filterKeys { it.startsWith(ContainedFiles.NATIVE_PREFIX) && it.endsWith(".so") }
+        val libraryPath = if (libraries.isEmpty()) {
+            null
+        } else {
+            // docs/plugin-api.md 5.3, "Guarded hooks": each library at a virtual path the class loader's library path names.
+            val abi = libraries.keys.first().removePrefix(ContainedFiles.NATIVE_PREFIX).substringBefore('/')
+            libraries.forEach { (name, fd) -> SandboxFiles.register(SandboxFiles.PLUGIN + name, fd) }
+            hooks = SandboxFiles.ensureHooks()
+            SandboxFiles.PLUGIN + ContainedFiles.NATIVE_PREFIX + abi
         }
         return try {
-            val loader = ContainedDex.loader(ContainedDex.read(jar), javaClass.classLoader!!)
+            val loader = ContainedDex.loader(ContainedDex.read(jar), javaClass.classLoader!!, libraryPath)
             val plugin = loader.loadClass(entryClass).getDeclaredConstructor().newInstance() as? DroidtopPlugin
                 ?: return failLoad(pluginId, "its entry class does not implement the plugin interface")
             start(pluginId, plugin, context)
@@ -72,7 +83,31 @@ open class PluginSandboxService : PluginProcessService() {
         return start(pluginId, plugin, context)
     }
 
-    override fun loadNotes(): JSONObject = JSONObject().apply { pythonReport?.let { put("python", it) } }
+    private fun loadFlutter(pluginId: String, manifest: PluginManifest, files: Map<String, ParcelFileDescriptor>, context: PluginContext): Boolean {
+        val libflutter = files[ContainedFiles.FLUTTER_ENGINE] ?: return failLoad(pluginId, "the Flutter engine was not handed over")
+        val libapp = files[ContainedFiles.FLUTTER_APP] ?: return failLoad(pluginId, "its libapp.so was not handed over")
+        val assets = files[ContainedFiles.FLUTTER_ASSETS] ?: return failLoad(pluginId, "its flutter_assets were not handed over")
+        return try {
+            SandboxFiles.register(SandboxFiles.RUNTIME + "libflutter.so", libflutter)
+            SandboxFiles.register(SandboxFiles.PLUGIN + "libapp.so", libapp)
+            SandboxFiles.register(SandboxFiles.PLUGIN + "flutter_assets.zip", assets)
+            hooks = SandboxFiles.ensureHooks()
+            val registrant = files.filterKeys { it.startsWith(ContainedFiles.FLUTTER_DEX) }.toSortedMap().values.map { fd ->
+                java.nio.ByteBuffer.wrap(FileInputStream(fd.fileDescriptor).readBytes())
+            }
+            start(pluginId, FlutterDroidtopPlugin(pluginId, applicationContext, FlutterSource.contained(registrant), manifest.contractVersion), context)
+        } catch (t: Throwable) {
+            loadCrashed(pluginId, t)
+        }
+    }
+
+    /** What the guarded hooks rewrote, for the containment check. */
+    @Volatile private var hooks: String? = null
+
+    override fun loadNotes(): JSONObject = JSONObject().apply {
+        pythonReport?.let { put("python", it) }
+        hooks?.let { put("hooks", it) }
+    }
 }
 
 // Contained slots for API 26 to 28, where bindIsolatedService does not exist (docs/plugin-api.md 5.3): each is the same
@@ -105,10 +140,28 @@ internal object ContainedDex {
         return found.values.toList()
     }
 
-    /** One class loader over every dex, parented to droidtop's own so the plugin sees the plugin API. API 26 takes a single dex only. */
-    fun loader(dexes: List<ByteBuffer>, parent: ClassLoader): ClassLoader = when {
-        Build.VERSION.SDK_INT >= 27 -> InMemoryDexClassLoader(dexes.toTypedArray(), parent)
-        dexes.size == 1 -> InMemoryDexClassLoader(dexes[0], parent)
-        else -> throw IllegalStateException("a plugin with ${dexes.size} dex files needs Android 8.1 or later to run contained")
+    /**
+     * One class loader over every dex, parented to droidtop's own so the plugin sees the plugin API. [libraryPath] is the
+     * virtual folder of the plugin's native libraries, or null: API 29 takes it in the constructor, API 28 through the
+     * loader's own `addNativePath` (the call Android's ApplicationLoaders makes); before that a contained plugin cannot
+     * have native libraries. API 26 takes a single dex only.
+     */
+    fun loader(dexes: List<ByteBuffer>, parent: ClassLoader, libraryPath: String?): ClassLoader {
+        if (libraryPath != null) {
+            if (Build.VERSION.SDK_INT >= 29) return InMemoryDexClassLoader(dexes.toTypedArray(), libraryPath, parent)
+            if (Build.VERSION.SDK_INT >= 28) {
+                val loader = InMemoryDexClassLoader(dexes.toTypedArray(), parent)
+                dalvik.system.BaseDexClassLoader::class.java.getDeclaredMethod("addNativePath", Collection::class.java)
+                    .apply { isAccessible = true }
+                    .invoke(loader, listOf(libraryPath))
+                return loader
+            }
+            throw IllegalStateException("a plugin with native libraries needs Android 9 or later to run contained")
+        }
+        return when {
+            Build.VERSION.SDK_INT >= 27 -> InMemoryDexClassLoader(dexes.toTypedArray(), parent)
+            dexes.size == 1 -> InMemoryDexClassLoader(dexes[0], parent)
+            else -> throw IllegalStateException("a plugin with ${dexes.size} dex files needs Android 8.1 or later to run contained")
+        }
     }
 }

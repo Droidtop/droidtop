@@ -51,13 +51,14 @@ class PluginTiersTest {
     }
 
     @Test
-    fun `what cannot run contained says why`() {
+    fun `every kind runs contained, only privilege an isolated uid never has does not`() {
+        // A Flutter engine and native libraries load through the guarded hooks (docs/plugin-api.md 5.3).
         val flutter = manifest {
             it.put("kind", "flutter_embed")
             it.put("runtimeVersion", "abc")
             it.put("payload", JSONArray(listOf(JSONObject().put("path", "lib/x86_64/libapp.so").put("sha256", "a".repeat(64)))))
         }
-        assertNotNull(PluginTiers.containmentBlocker(flutter))
+        assertNull(PluginTiers.containmentBlocker(flutter))
         val withSo = manifest {
             it.put(
                 "payload",
@@ -69,7 +70,7 @@ class PluginTiersTest {
                 ),
             )
         }
-        assertNotNull(PluginTiers.containmentBlocker(withSo))
+        assertNull(PluginTiers.containmentBlocker(withSo))
         assertNotNull(PluginTiers.containmentBlocker(manifest { it.put("permissions", arr(obj("id" to "apps.bind"))) }))
         assertNotNull(PluginTiers.containmentBlocker(TestPlugins.provider("acme.shell").manifest))
     }

@@ -23,4 +23,7 @@ oneway interface IPluginRuntimeCallback {
 
     /** Fired exactly once per job, success or failure -- resultJson is the same shape {@link IPluginRuntime#invoke} returns. */
     void onJobComplete(String pluginId, String jobId, String resultJson);
+
+    /** The plugin's own screen (IPluginRuntime.attachScreen) closed its last route: droidtop closes the screen. */
+    void onScreenClosed(String pluginId);
 }

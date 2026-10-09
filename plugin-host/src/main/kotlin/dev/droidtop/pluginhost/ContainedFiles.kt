@@ -14,6 +14,11 @@ internal object ContainedFiles {
     /** Any file under this prefix is one of the bundle's native libraries; a contained plugin is refused when one is handed over. */
     const val NATIVE_PREFIX = "lib/"
 
+    const val FLUTTER_ENGINE = "flutter/libflutter.so"
+    const val FLUTTER_APP = "flutter/libapp.so"
+    const val FLUTTER_ASSETS = "flutter/flutter_assets.zip"
+    const val FLUTTER_DEX = "flutter/dex/"
+
     const val PYTHON_LIBPYTHON = "python/libpython/"
     const val PYTHON_STDLIB = "python/stdlib.zip"
     const val PYTHON_DEP = "python/dep/"
@@ -34,7 +39,9 @@ internal object ContainedFiles {
             PluginKind.NATIVE_BUNDLE -> {
                 val jar = File(dir, CLASSES)
                 if (!jar.isFile) return Result.Missing("its classes.jar is missing from the installed bundle")
-                val libs = record.manifest.payload.filter { it.path.startsWith(NATIVE_PREFIX) && it.path.endsWith(".so") }
+                // This device's ABI only: the libraries the plugin's System.loadLibrary will name.
+                val abi = FlutterRuntimeManager.currentAbi()
+                val libs = record.manifest.payload.filter { it.path.startsWith("$NATIVE_PREFIX$abi/") && it.path.endsWith(".so") }
                 Result.Files(listOf(CLASSES to jar) + libs.map { it.path to File(dir, it.path) })
             }
             PluginKind.PYTHON -> {
@@ -43,7 +50,23 @@ internal object ContainedFiles {
                 val runtime = PythonRuntimeManager.containedFiles(context) ?: return Result.Missing("the Python runtime is not installed")
                 Result.Files(listOf(PLUGIN_PY to script) + runtime)
             }
-            PluginKind.FLUTTER_EMBED -> Result.Missing("a Flutter plugin cannot run contained; it needs full access")
+            PluginKind.FLUTTER_EMBED -> {
+                val engine = FlutterRuntimeManager.libflutterSoPath(context) ?: return Result.Missing("the Flutter runtime is not installed")
+                val pinned = FlutterRuntimeManager.pinnedVersion(context)
+                if (record.manifest.runtimeVersion != pinned) {
+                    return Result.Missing("its runtimeVersion (${record.manifest.runtimeVersion}) does not match the installed Flutter runtime ($pinned)")
+                }
+                val libapp = File(dir, "lib/${FlutterRuntimeManager.currentAbi()}/libapp.so")
+                if (!libapp.isFile) return Result.Missing("its libapp.so for this device is missing from the installed bundle")
+                // The assets as the zip AssetManager reads, built once per installed bundle, outside the plugin's own data.
+                val zip = File(context.cacheDir, "plugin-assets/${record.manifest.id}-${record.archiveDigest.take(16)}.zip")
+                if (!zip.isFile) FlutterAssets.repack(dir, zip)
+                val dex = File(dir, "dex").listFiles { f -> f.isFile && f.extension == "dex" }.orEmpty().sortedBy { it.name }
+                Result.Files(
+                    listOf(FLUTTER_ENGINE to engine, FLUTTER_APP to libapp, FLUTTER_ASSETS to zip) +
+                        dex.map { FLUTTER_DEX + it.name to it },
+                )
+            }
         }
     }
 }

@@ -1,6 +1,9 @@
 package dev.droidtop.pluginhost;
 
 import android.os.ParcelFileDescriptor;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.Surface;
 import dev.droidtop.pluginhost.IPluginHostBroker;
 import dev.droidtop.pluginhost.IPluginRuntimeCallback;
 
@@ -84,6 +87,24 @@ interface IPluginRuntime {
      * list, and for a contained python plugin how its runtime loaded.
      */
     String reachability();
+
+    /**
+     * A contained plugin's own full-screen UI (ui.main, docs/plugin-api.md 1.7):
+     * an isolated process has no window, so droidtop's PluginScreenActivity owns
+     * the surface and hands it over, the plugin draws into it, and droidtop
+     * forwards touch and keys. Returns null once the plugin's entrypoint draws,
+     * else why not. The plugin closing its last route arrives as
+     * IPluginRuntimeCallback.onScreenClosed.
+     */
+    String attachScreen(String pluginId, String entrypoint, String library, in Surface surface, int width, int height, float density);
+
+    void resizeScreen(String pluginId, int width, int height);
+
+    oneway void screenTouch(String pluginId, in MotionEvent event);
+
+    oneway void screenKey(String pluginId, in KeyEvent event);
+
+    void detachScreen(String pluginId);
 
     /**
      * Why the last {@link #loadPlugin} of this plugin returned false, in a

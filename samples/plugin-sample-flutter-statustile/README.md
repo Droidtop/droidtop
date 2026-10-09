@@ -97,8 +97,8 @@ shape with error code `INVALID_ARGS`.
 
 ## Access
 
-A Flutter plugin cannot run contained (docs/plugin-api.md 5.3, "Spike results"): the
-engine loads `libapp.so` and `flutter_assets` from files and `ui.main` is an activity.
-So the manifest asks for `host.full_trust` (needed), and the plugin runs, in a process
-of its own under droidtop's UID, only once the person allows "Run with droidtop's full
-access". Its page shows "Full access".
+It runs contained (docs/plugin-api.md 5.3): the engine, `libapp.so` and the
+`flutter_assets` reach its isolated process as descriptors and droidtop's guarded hooks
+answer the engine's own file and library loads. An isolated process may not open the
+GPU, so the engine draws in software. Its `ui.main` screen draws into a surface droidtop
+owns, with touch and keys passed on; Back pops its route. Its page shows "Contained".

@@ -64,6 +64,18 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" />
 
         <!--
+          A contained plugin's own full-screen UI (ui.main): an isolated
+          process has no window, so this activity in droidtop's own process
+          owns the surface the plugin draws into, and passes touch and keys
+          on (docs/plugin-api.md 1.7, 5.3). Not exported.
+        -->
+        <activity
+            android:name="dev.droidtop.pluginhost.PluginScreenActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|density|uiMode" />
+
+        <!--
           What the broker asks Android for on a plugin's behalf, in droidtop's
           own process and under droidtop's own permissions (docs/plugin-api.md
           3 D4, 4.1): the system file picker for files.pick and Android's
