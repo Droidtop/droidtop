@@ -80,8 +80,10 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
         return true
     }
     override fun chainServedBy(pluginId: String) = chain
-    override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply {
+    val personStartedForwards = mutableListOf<Boolean>()
+    override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long, personStarted: Boolean): PluginReply {
         forwards += provider.manifest.id to call
+        personStartedForwards += personStarted
         lastTimeout = timeoutMs
         return forwardReply
     }

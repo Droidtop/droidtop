@@ -104,4 +104,14 @@ class HostApiCallerTest {
         }
         assertTrue(env.forwards.isEmpty())
     }
+
+    @Test
+    fun `ending a game is the person's own action, droidtop's other calls are not`() {
+        val env = FakeEnv(shizuku())
+        val caller = HostApiCaller(env)
+        assertEquals(ForceStop.Result.Stopped, ForceStop.request(caller, "org.example.emulator"))
+        caller.call("priv.packages", 1, "force_stop", obj("package" to "org.example.emulator"))
+        // Only the first may let the provider ask for full access on the first-use sheet.
+        assertEquals(listOf(true, false), env.personStartedForwards)
+    }
 }

@@ -2431,6 +2431,12 @@ arrays under the manifest's own keys (`V2Declarations`).
   answer of §12a (Android 13 gives droidtop no way to end another app's game)
   and now says the Shizuku plugin can. A provider that fails says why, and
   droidtop's running-game state clears only on `Ended` as before.
+  Ending a game this way (Quit to Library, the task manager's End) is the
+  person's own action, so a provider that has not yet been allowed full
+  access (§5.3) asks for it on the first-use sheet then, where a surface can
+  draw it (decided 2026-10-09, Droidtop/tracker#378). droidtop's other calls
+  to a provider (reading the task list, background checks) never show a
+  sheet; the Permissions screen allows it too.
 - The provider plugin itself is `Droidtop/droidtop-plugin-shizuku`
   (`droidtop-plugin/`): a contract 2 manifest exporting both interfaces,
   full-trust, with the existing status tile and app_status surfaces.

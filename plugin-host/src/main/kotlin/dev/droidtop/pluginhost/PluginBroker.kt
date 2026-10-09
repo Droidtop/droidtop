@@ -126,8 +126,12 @@ interface BrokerEnvironment {
     /** The chain of plugins the call [pluginId] is currently serving came through (empty when it serves none). */
     fun chainServedBy(pluginId: String): List<String>
 
-    /** Delivers [call] to [provider]'s `handle` and waits: a provider that misses [timeoutMs] is treated as crashed and the reply is TIMEOUT. */
-    fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply
+    /**
+     * Delivers [call] to [provider]'s `handle` and waits: a provider that misses [timeoutMs] is treated as crashed and the
+     * reply is TIMEOUT. [personStarted] is true when droidtop's own code calls for something the person just did (Quit to
+     * Library); then the provider's first-use sheets may show, its full-access one included.
+     */
+    fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long, personStarted: Boolean = false): PluginReply
 
     /** Starts a provider op that is a job, owned by [caller]; returns the job id or null when it could not start. */
     fun startBrokeredJob(caller: PluginRecord, provider: PluginRecord, call: PluginCall): String?
@@ -444,7 +448,12 @@ class HostApiCaller(private val env: BrokerEnvironment) {
     fun hasProvider(api: String, version: Int): Boolean =
         PluginApiResolver.providerFor(env.resolution(), "", RequiredApi(api, "$version.0", optional = true), env.providerChoice(api)) != null
 
-    fun call(api: String, version: Int, op: String, args: JSONObject): PluginReply {
+    /**
+     * [personStarted]: the call is for something the person just did in droidtop (Quit to Library, the task manager's
+     * End). Only then may a provider that has not been allowed full access ask for it on the first-use sheet; droidtop's
+     * own background use of a provider never shows one.
+     */
+    fun call(api: String, version: Int, op: String, args: JSONObject, personStarted: Boolean = false): PluginReply {
         val required = RequiredApi(api, "$version.0", optional = true)
         val provider = PluginApiResolver.providerFor(env.resolution(), "", required, env.providerChoice(api))
             ?: return PluginReply.error(PluginErrorCode.PROVIDER_UNAVAILABLE, "no plugin provides $api")
@@ -464,7 +473,7 @@ class HostApiCaller(private val env: BrokerEnvironment) {
             caller = JSONObject().put("kind", "host"),
             args = args,
         )
-        val reply = env.forward(record, call, timeout)
+        val reply = env.forward(record, call, timeout, personStarted)
         val permission = PluginPermissions.find(exportedOp.permission)
         if (permission == null || permission.tier != PermissionTier.NORMAL) {
             env.audit(
@@ -494,7 +503,8 @@ object ForceStop {
     fun request(caller: HostApiCaller, target: String): Result {
         if (!packageName.matches(target)) return Result.Failed("$target is not a package name")
         if (!caller.hasProvider("priv.packages", 1)) return Result.NoProvider
-        val reply = caller.call("priv.packages", 1, "force_stop", JSONObject().put("package", target))
+        // Ending a game is always the person's own action (Quit to Library, the task manager's End).
+        val reply = caller.call("priv.packages", 1, "force_stop", JSONObject().put("package", target), personStarted = true)
         return if (reply.ok && reply.data.optBoolean("stopped", true)) Result.Stopped else Result.Failed(reply.message.orEmpty().ifBlank { "it did not say why" })
     }
 }

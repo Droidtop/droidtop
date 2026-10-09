@@ -390,14 +390,14 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun chainServedBy(pluginId: String): List<String> = PluginBrokers.chainServedBy(pluginId)
 
-    override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long): PluginReply {
+    override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long, personStarted: Boolean): PluginReply {
         val callerId = call.caller.optString("id")
         val chain = call.caller.optJSONArray("via")?.let { a -> List(a.length()) { a.optString(it) } }.orEmpty()
         val policy = PluginCrashPolicy(appContext)
         return try {
             runBlocking {
                 PluginBrokers.serving(provider.manifest.id, chain) {
-                    val reply = policy.handle(provider, call, timeoutMs = timeoutMs, crashOnTimeout = true, userInitiated = PluginBrokers.userInitiated(callerId))
+                    val reply = policy.handle(provider, call, timeoutMs = timeoutMs, crashOnTimeout = true, userInitiated = personStarted || PluginBrokers.userInitiated(callerId))
                     // A provider that timed out or died is reported as crashed, not as the caller's own failure (docs/plugin-api.md 2.5).
                     if (!reply.ok && reply.code == PluginErrorCode.FAILED && record(provider.manifest.id)?.disabledReason != null) {
                         PluginReply.error(PluginErrorCode.PROVIDER_CRASHED, reply.message.orEmpty())
