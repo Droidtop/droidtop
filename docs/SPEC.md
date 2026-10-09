@@ -12174,6 +12174,40 @@ title also tries the title without a leading article ("The", "A", "An"),
 after the whole title: a game's program is named after it without the
 article more often than with it.
 
+**Game properties (Droidtop/tracker#228).** The standard fix for a Windows
+game that does not start is a command-line flag or an environment variable
+("-windowed", `DXVK_HUD=fps`), so a game has a **Game properties** screen
+(`GameProperties.screen`, `:library-core`; a row under the game's options
+beside "Program", which opens it in the same sheet). It has two text fields
+and a read-out. **Launch options** are cut into arguments by
+`GameLaunchOptions.tokenize` (spaces, "double" and 'single' quotes, a
+backslash) and added after the program's own arguments and after the ones a
+store names, for the program droidtop detects, the one the person chose and
+a store's own alike (`WindowsLaunchResolver.withUserOptions`, the one place
+they are added); they are handed to the program one by one, never through a
+shell. **Environment variables** are `NAME=value` pairs accepted by the same
+allowlist the Lutris import uses (`GameLaunchOptions.isAllowedEnvName` and
+`isAllowedEnvValue`, which `LutrisImport` now calls too: `DXVK_`, `VKD3D_`,
+`MESA_`, `__GL_` and four named tuning variables, plain values only, threat
+model decision 5 of §7e3); a pair outside it is not kept and the field says
+why. They ride the one launch's `Container.LAUNCH_ENV` beside the Steamworks
+shim's, are asked against the allowlist again at launch, and never change the
+prefix. The two live in `WineGameSettings` (`launchOptions`, `environment`),
+the person's own half beside the program half the Lutris import and "Program"
+write; those two use `WineGameSettingsPrefs.setProgram`, which replaces the
+program half and keeps the person's own, so choosing another program does not
+lose the flags. A **What will run** read-out (program, arguments, start
+folder, environment) comes from `WindowsLaunchResolver.forEntry`, the same
+function the launch uses (a store's own play task included), so it cannot say
+anything the launch would not do. **Not offered, on purpose:** pre-launch and
+post-exit commands (droidtop runs no script from text a person pastes, §7e3),
+and loader or path variables. **Not built, open for the owner:** a per-game
+language and a per-game controller template. Steam's language is the
+download's and every store's content language is chosen when the game is
+installed (`StoreLanguage`), and a game's controls belong to its prefix's
+controller tab (§5b) with no per-game store of their own; each is a design,
+not a field.
+
 ## 7j. Portrait and touch-first chrome (directed 2026-09-10)
 
 "Most people will be on phones without controllers." droidtop's own

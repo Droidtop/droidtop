@@ -14,8 +14,10 @@ import com.winlator.xenvironment.ImageFsInstaller
 import dev.droidtop.library.PcGameRuntime
 import dev.droidtop.library.PcLaunchResult
 import dev.droidtop.library.PcPrefixState
+import dev.droidtop.library.GameLaunchOptions
 import dev.droidtop.library.PcProvisionResult
 import dev.droidtop.library.WineDriveMapping
+import dev.droidtop.library.WineGameSettingsPrefs
 import dev.droidtop.library.lutris.DllOverrides
 import dev.droidtop.library.lutris.WinePrefixChanges
 import dev.droidtop.runtime.NativeLinuxGameSession
@@ -431,6 +433,13 @@ class DroidtopPcGameRuntime(
         // saved settings are not touched.
         val overrides = withContext(Dispatchers.IO) { WineOptions.launchOverrides(context, entryId, container) }
 
+        // The variables the person set for this game (docs/SPEC.md 7i, "Game
+        // properties"): laid over this one launch with the Steamworks shim's,
+        // never into the prefix.
+        val ownEnv = withContext(Dispatchers.IO) {
+            entryId?.let { WineGameSettingsPrefs.get(context, it) }?.environment?.let(GameLaunchOptions::launchEnvironment).orEmpty()
+        }
+
         // A Steam game that uses Steamworks starts through the shim in the
         // prefix (docs/SPEC.md 5b, "Steamworks in the prefix"), unless the
         // game turned it off; the game's own files are left as they are.
@@ -443,11 +452,13 @@ class DroidtopPcGameRuntime(
             }.getOrElse {
                 return PcLaunchResult(false, "couldn't set up Steamworks for this game: ${it.message ?: it}")
             }
-            val env = launch.env.entries.joinToString(" ") { (name, value) -> "$name=$value" }
+            val env = listOf(launch.env.entries.joinToString(" ") { (name, value) -> "$name=$value" }, ownEnv)
+                .filter { it.isNotEmpty() }
+                .joinToString(" ")
             container.setLaunchOverrides(overrides + (Container.LAUNCH_ENV to env))
             return launchInPrefix(wineEngine, container, launch.target.absolutePath, launch.workingDir, launch.arguments, entryId)
         }
-        container.setLaunchOverrides(overrides)
+        container.setLaunchOverrides(if (ownEnv.isEmpty()) overrides else overrides + (Container.LAUNCH_ENV to ownEnv))
         return launchInPrefix(wineEngine, container, executable.absolutePath, workingDir, arguments, entryId)
     }
 

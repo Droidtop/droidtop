@@ -690,6 +690,9 @@ internal fun PcGameMenu(
         onChooseProgram = engineChoice.folder?.let { folder ->
             { programScreen = dev.droidtop.library.WindowsPrograms.screen(entry.id, gameName, folder) }
         },
+        onOpenProperties = engineChoice.folder?.let { folder ->
+            { programScreen = dev.droidtop.library.GameProperties.screen(entry.id, gameName, folder) }
+        },
     )
 
     var pageAbout: List<PcMenuEntry> = emptyList()
@@ -1210,6 +1213,7 @@ private fun rememberPcActions(
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
     onChooseProgram: (() -> Unit)?,
+    onOpenProperties: (() -> Unit)?,
 ): PcMenuSections {
     val isEngineGame = entry.kind != LibraryEntryKind.WINE_PROFILE
     val runsOnEnginehost = runner?.option?.strategy == GameLaunchStrategy.ENGINEHOST
@@ -1300,6 +1304,7 @@ private fun rememberPcActions(
                 wineSettings = wineSettings,
                 onImportLutris = onImportLutris,
                 onChooseProgram = onChooseProgram,
+                onOpenProperties = onOpenProperties,
             ),
         ).flatten(),
     )
@@ -1417,6 +1422,7 @@ private fun runnerRows(
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
     onChooseProgram: (() -> Unit)?,
+    onOpenProperties: (() -> Unit)?,
 ): List<PcActionRow>? = when {
     runsOnEnginehost -> listOfNotNull(
         PcActionRow("Saves", "Opens Enginehost's save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
@@ -1445,6 +1451,12 @@ private fun runnerRows(
                 ).joinToString(" - ")
             } ?: "The one droidtop picks; choose another",
             onChooseProgram,
+        ),
+        // Launch options and environment variables for this game (docs/SPEC.md 7i, "Game properties").
+        PcActionRow(
+            "Game properties",
+            "Launch options, environment variables, and what will run",
+            onOpenProperties,
         ),
         PcActionRow(
             "Import a Lutris install script",

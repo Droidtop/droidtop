@@ -24,6 +24,7 @@ import dev.droidtop.library.PcGameRuntimeRegistry
 import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.WineGameSettings
 import dev.droidtop.library.WineGameSettingsPrefs
+import dev.droidtop.library.setProgram
 import dev.droidtop.library.lutris.ImportLine
 import dev.droidtop.library.lutris.LutrisImport
 import dev.droidtop.library.lutris.LutrisInstaller
@@ -134,7 +135,7 @@ internal fun LutrisImportScreen(
             val message = withContext(Dispatchers.IO) {
                 val said = mutableListOf<String>()
                 preview.game?.let {
-                    WineGameSettingsPrefs.set(context, entry.id, it)
+                    WineGameSettingsPrefs.setProgram(context, entry.id, it)
                     said += "This game now runs ${it.executable}."
                 }
                 val changes = preview.prefix?.changes

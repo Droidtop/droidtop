@@ -1,5 +1,6 @@
 package dev.droidtop.library.lutris
 
+import dev.droidtop.library.GameLaunchOptions
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -513,11 +514,11 @@ object LutrisImport {
                     "DLL overrides are imported only from the script's overrides list",
                 )
                 name == "WINEESYNC" -> esync = value.trim() != "0"
-                !ENV_NAMES.any { it(name) } -> notImported += ImportLine(
+                !GameLaunchOptions.isAllowedEnvName(name) -> notImported += ImportLine(
                     "Environment $name",
                     "Not one of the variables droidtop imports",
                 )
-                !ENV_VALUE.matches(value) -> notImported += ImportLine(
+                !GameLaunchOptions.isAllowedEnvValue(value) -> notImported += ImportLine(
                     "Environment $name=$value",
                     "Paths, variables and spaces in a value are never imported",
                 )
@@ -589,18 +590,4 @@ object LutrisImport {
         "disabled" to "",
         "" to "",
     )
-
-    /** Threat model, decision 5: tuning variables only, never loader or path variables. */
-    private val ENV_NAMES: List<(String) -> Boolean> = listOf(
-        { it.startsWith("DXVK_") },
-        { it.startsWith("VKD3D_") },
-        { it.startsWith("MESA_") },
-        { it.startsWith("mesa_") },
-        { it.startsWith("__GL_") },
-        { it == "WINE_LARGE_ADDRESS_AWARE" },
-        { it == "STAGING_SHARED_MEMORY" },
-        { it == "PULSE_LATENCY_MSEC" },
-    )
-
-    private val ENV_VALUE = Regex("[A-Za-z0-9_.,:=+-]{0,256}")
 }

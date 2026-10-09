@@ -10,9 +10,7 @@ import dev.droidtop.library.GameEngineDetector
 import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameExecutableResolver
-import dev.droidtop.library.WindowsLaunch
 import dev.droidtop.library.WindowsLaunchResolver
-import dev.droidtop.library.WineGameSettingsPrefs
 import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.library.PcGameRuntimeRegistry
 import dev.droidtop.library.PcRunnerOptions
@@ -464,18 +462,9 @@ class PcGameProvider(
                 // The program the person picked for this game wins; else the
                 // one the game's store itself starts (a GOG play task, docs/SPEC.md
                 // 7g "Stores"); else the one droidtop finds in the folder.
-                val picked = withContext(Dispatchers.IO) { WineGameSettingsPrefs.get(context, entry.id) }
-                val storeLaunch = if (picked?.executable == null) {
-                    StoreLibraries.forKey(entry.id)
-                        ?.let { store -> runCatching { store.launch(context, entry.id.substringAfter(':')) }.getOrNull() }
-                        ?.takeIf { withContext(Dispatchers.IO) { it.executable.isFile } }
-                } else {
-                    null
-                }
                 // Several equally likely programs and nothing to tell them apart:
                 // the person chooses, and the shell offers the choice on the spot.
-                val windows = storeLaunch?.let { WindowsLaunch(it.executable, it.workingDir, it.arguments) }
-                    ?: withContext(Dispatchers.IO) { WindowsLaunchResolver.resolve(picked, gameRoot) }
+                val windows = WindowsLaunchResolver.forEntry(context, entry.id, gameRoot)
                     ?: throw dev.droidtop.library.ProgramNotIdentified(entry.id, entry.title, gameRoot.absolutePath)
                 // A store's cloud saves are brought up to date first (Steam Cloud); it never holds the game back for long.
                 dev.droidtop.library.stores.StoreSaves.beforeLaunch(context, entry.id, GameNaming.displayName(entry.title))

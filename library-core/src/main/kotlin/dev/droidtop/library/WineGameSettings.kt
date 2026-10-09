@@ -18,9 +18,12 @@ import java.io.File
  * arguments are not another's. Paths are relative to the game's folder,
  * so a folder that moves with its game keeps them.
  *
- * Two writers: the Lutris importer (§7e3), whose [source] says so on the
- * game's own screen, and the person's program choice ([WindowsPrograms]).
- * Clearing it returns the game to detection.
+ * Three writers: the Lutris importer (§7e3), whose [source] says so on the
+ * game's own screen, the person's program choice ([WindowsPrograms]), and the
+ * person's own launch options and environment ([GameProperties]). The first
+ * two are the program half ([executable], [arguments], [workingDir],
+ * [source]); clearing it returns the game to detection and leaves the
+ * person's own half ([launchOptions], [environment]) as it was.
  */
 @Serializable
 data class WineGameSettings(
@@ -31,7 +34,19 @@ data class WineGameSettings(
     val workingDir: String? = null,
     /** Where these came from, in the person's words ("Lutris: GOG installer"). */
     val source: String? = null,
-)
+    /**
+     * What the person typed after the program, any program ([GameLaunchOptions.tokenize]),
+     * added after [arguments] and after the store's own. Null when none.
+     */
+    val launchOptions: String? = null,
+    /** Variables the person set for this game ([GameLaunchOptions.parseEnvironment]); applied to the one launch, never to the prefix. */
+    val environment: Map<String, String> = emptyMap(),
+) {
+    /** Nothing set: the game is on detection and has no options of its own. */
+    val isEmpty: Boolean
+        get() = executable == null && arguments.isEmpty() && workingDir == null && source == null &&
+            launchOptions.isNullOrBlank() && environment.isEmpty()
+}
 
 /** [WineGameSettings] by [LibraryEntry.id], the same keying as [LaunchStrategyOverridePrefs]. */
 object WineGameSettingsPrefs {
@@ -45,13 +60,33 @@ object WineGameSettingsPrefs {
 
     fun set(context: Context, entryId: String, settings: WineGameSettings?) {
         val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
-        if (settings == null) {
+        if (settings == null || settings.isEmpty) {
             prefs.remove(KEY_PREFIX + entryId)
         } else {
             prefs.putString(KEY_PREFIX + entryId, json.encodeToString(WineGameSettings.serializer(), settings))
         }
         prefs.apply()
     }
+}
+
+/**
+ * Replaces the program half of [entryId]'s settings with [program] (null:
+ * back to detection) and keeps the person's own launch options and
+ * environment, which belong to the game and not to the program. Both
+ * program writers use this.
+ */
+fun WineGameSettingsPrefs.setProgram(context: Context, entryId: String, program: WineGameSettings?) {
+    val old = get(context, entryId)
+    set(
+        context,
+        entryId,
+        (program ?: WineGameSettings()).copy(launchOptions = old?.launchOptions, environment = old?.environment.orEmpty()),
+    )
+}
+
+/** Changes the settings of [entryId] through [change], starting from none; an empty result removes them. */
+fun WineGameSettingsPrefs.edit(context: Context, entryId: String, change: (WineGameSettings) -> WineGameSettings) {
+    set(context, entryId, change(get(context, entryId) ?: WineGameSettings()))
 }
 
 /**
@@ -127,11 +162,44 @@ object WindowsLaunchResolver {
         // saved with; a detected program starts plain, as it always did.
         if (settings == null || chosen == null) {
             val detected = GameExecutableResolver.windowsExecutable(gameRoot) ?: return null
-            return WindowsLaunch(detected, gameRoot, emptyList())
+            return withUserOptions(WindowsLaunch(detected, gameRoot, emptyList()), settings)
         }
         val workingDir = settings.workingDir?.let { inside(root, it) }?.takeIf { it.isDirectory } ?: gameRoot
-        return WindowsLaunch(chosen, workingDir, settings.arguments)
+        return withUserOptions(WindowsLaunch(chosen, workingDir, settings.arguments), settings)
     }
+
+    /**
+     * [launch] with the person's own launch options added after its
+     * arguments, whatever program it is ([WineGameSettings.launchOptions]).
+     * The one place they are added, for the detected program, the chosen one
+     * and a store's own.
+     */
+    fun withUserOptions(launch: WindowsLaunch, settings: WineGameSettings?): WindowsLaunch {
+        val own = settings?.launchOptions?.let(GameLaunchOptions::tokenize).orEmpty()
+        return if (own.isEmpty()) launch else launch.copy(arguments = launch.arguments + own)
+    }
+
+    /**
+     * What a PC game of [entryId] in [gameRoot] runs: the program the person
+     * picked, else the one the game's store itself starts (a GOG play task,
+     * docs/SPEC.md 7g "Stores"), else the one droidtop finds in the folder,
+     * with the person's own launch options after the arguments. The one
+     * answer for the launch and for the Show command rows. Disk work, done
+     * here off the main thread.
+     */
+    suspend fun forEntry(context: Context, entryId: String, gameRoot: File): WindowsLaunch? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val picked = WineGameSettingsPrefs.get(context, entryId)
+            val storeLaunch = if (picked?.executable == null) {
+                dev.droidtop.library.stores.StoreLibraries.forKey(entryId)
+                    ?.let { store -> runCatching { store.launch(context, entryId.substringAfter(':')) }.getOrNull() }
+                    ?.takeIf { it.executable.isFile }
+            } else {
+                null
+            }
+            storeLaunch?.let { withUserOptions(WindowsLaunch(it.executable, it.workingDir, it.arguments), picked) }
+                ?: resolve(picked, gameRoot)
+        }
 
     fun resolve(context: Context, entryId: String, gameRoot: File): WindowsLaunch? =
         resolve(WineGameSettingsPrefs.get(context, entryId), gameRoot)

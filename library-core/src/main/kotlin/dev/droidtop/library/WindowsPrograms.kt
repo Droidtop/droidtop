@@ -79,7 +79,7 @@ object WindowsPrograms {
             old?.executable == path -> old
             else -> WineGameSettings(executable = path)
         }
-        WineGameSettingsPrefs.set(context, entryId, next)
+        WineGameSettingsPrefs.setProgram(context, entryId, next)
     }
 
     /**
