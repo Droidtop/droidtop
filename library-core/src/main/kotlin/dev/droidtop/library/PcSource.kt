@@ -39,6 +39,19 @@ sealed class PcSource {
         WineShortcut -> WINE_LABEL
     }
 
+    /**
+     * [label] cut to what a capsule's badge has room for (the badge is a few capitals in the card's corner, and
+     * "BSTSHAREDF..." was cut in the middle of a word, rig build 1715): a folder name of more than [BADGE_MAX] letters
+     * that is made of words reads as their initials ("BstSharedFolder" is "BSF"), one that is not as its first
+     * letters and an ellipsis. The focus line and the page keep the whole name ([detail]).
+     */
+    fun badgeLabel(): String {
+        val full = label()
+        if (this !is Folder || full.length <= BADGE_MAX) return full
+        val words = Regex("[^A-Za-z0-9]+|(?<=[a-z0-9])(?=[A-Z])").split(full).filter { it.isNotEmpty() }
+        return if (words.size >= 2) words.joinToString("") { it.first().uppercase() } else full.take(BADGE_MAX - 1) + "…"
+    }
+
     /** "GOG", "Folder: Games", "Wine shortcut": the words a focus line or a page row reads. */
     fun detail(): String = when (this) {
         is Store -> label()
@@ -52,6 +65,7 @@ sealed class PcSource {
         private const val WINE_ID = "wine"
         private const val FOLDER_LABEL = "Folder"
         private const val WINE_LABEL = "Wine shortcuts"
+        private const val BADGE_MAX = 10
 
         /**
          * The catalog item id prefix of a store page's "Open library" row; the

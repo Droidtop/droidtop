@@ -11,7 +11,7 @@ import org.junit.Test
  */
 class OriginLabelTest {
 
-    private val roots = listOf("/sd/Games")
+    private val roots = listOf("/sd/Games", "/sd/BstSharedFolder", "/sd/Retro-Games-Collection", "/sd/Longfoldername")
 
     // A store is named by its own label, whatever this test's process registered ([PcSource.label]).
     private val steam = PcSource.Store("steam").label()
@@ -43,6 +43,10 @@ class OriginLabelTest {
         Row(store("steam:12", StoreHolding.FREE), 1, "PC", "$steam · Free to play (not in your library)", null),
         // A folder game, and one that came through a launcher.
         Row(folder("/sd/Games/Portable"), 2, "PC · Games", "Folder: Games", null),
+        // A long folder name is cut for the badge (initials of its words, else its first letters); the focus line keeps it whole.
+        Row(folder("/sd/BstSharedFolder/Portable"), 2, "PC · BSF", "Folder: BstSharedFolder", null),
+        Row(folder("/sd/Retro-Games-Collection/x"), 2, "PC · RGC", "Folder: Retro-Games-Collection", null),
+        Row(folder("/sd/Longfoldername/x"), 2, "PC · Longfolde…", "Folder: Longfoldername", null),
         Row(store("gog:2"), 2, "PC · $gog", "$gog · via Heroic", null, via = "heroic"),
     )
 

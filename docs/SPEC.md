@@ -12642,7 +12642,11 @@ own games, in droidtop's own treatment:
   reads "ENGINE · <engine>" ("ENGINE · REN'PY", "ENGINE · RPG MAKER MZ",
   `LibraryEntryKind.engineFamily`, the one rule the Kind facet's Engine value
   reads too), a PC game "PC", plus " · <source>" only when the library has rows
-  from more than one source ("PC · GOG"). Ownership is never text on a capsule:
+  from more than one source ("PC · GOG"); a folder source is named by its
+  short label, `PcSource.badgeLabel`: the folder's last path segment, and when
+  that is longer than ten letters the initials of its words ("BstSharedFolder"
+  is "PC · BSF"), else its first letters and an ellipsis, so the badge is never
+  cut mid-word (the whole name stays on the focus line). Ownership is never text on a capsule:
   a game shared with you or gone from your library carries a small generic
   glyph in the bottom-right corner (no store logo). The focus line and the
   page's Source row carry the full text: "Steam · Shared with you", "GOG · via

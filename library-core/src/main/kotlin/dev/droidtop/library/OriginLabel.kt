@@ -80,7 +80,7 @@ fun originLabel(
     val detail = when {
         style != CapsuleBadgeStyle.FULL -> null
         family != null -> family
-        source != null && origins > 1 -> source.label()
+        source != null && origins > 1 -> source.badgeLabel()
         else -> null
     }
     val holding = entry.pcInfo?.takeIf { PcSource.storeIdOf(it.storeId) != null }?.holding
