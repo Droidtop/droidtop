@@ -21,6 +21,19 @@ class DualScreenOrchestrationTest {
     }
 
     @Test
+    fun `a companion surface left on the only display finishes`() {
+        assertTrue(DualScreenOrchestration.companionSurfaceRetires(1, 0, secondaryOnly = false))
+        assertTrue(DualScreenOrchestration.companionSurfaceRetires(1, 0, secondaryOnly = true))
+        assertFalse(DualScreenOrchestration.companionSurfaceRetires(2, 0, secondaryOnly = false))
+    }
+
+    @Test
+    fun `the idle cover finishes on the built-in display but stays on the add-on`() {
+        assertTrue(DualScreenOrchestration.companionSurfaceRetires(2, 0, secondaryOnly = true))
+        assertFalse(DualScreenOrchestration.companionSurfaceRetires(2, 9, secondaryOnly = true))
+    }
+
+    @Test
     fun `a companion is dismissed only when one is visible and not wanted`() {
         assertFalse(DualScreenOrchestration.shouldDismissCompanion(showCompanion = false, companionVisible = false))
         assertTrue(DualScreenOrchestration.shouldDismissCompanion(showCompanion = false, companionVisible = true))

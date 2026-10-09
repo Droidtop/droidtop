@@ -65,6 +65,15 @@ object DualScreenOrchestration {
     fun shouldShowSecondScreenCompanion(displayCount: Int): Boolean = displayCount > 1
 
     /**
+     * Whether a companion surface (the companion activity, the idle cover) must finish because it would
+     * stand in for the main UI (tracker#182): with one display left it is all that screen would show, and
+     * the idle cover ([secondaryOnly]) never belongs on the built-in display, where Android puts it when the
+     * add-on it was on goes away. Display 0 is Android's built-in (default) display.
+     */
+    fun companionSurfaceRetires(displayCount: Int, surfaceDisplayId: Int?, secondaryOnly: Boolean): Boolean =
+        !shouldShowSecondScreenCompanion(displayCount) || (secondaryOnly && surfaceDisplayId == 0)
+
+    /**
      * A dismiss is itself an Activity start on the built-in display, which
      * takes focus from the shell; the shell's onStop/onStart then re-runs the
      * orchestration pass, which would dismiss again. So a dismiss is sent

@@ -64,7 +64,14 @@ class SecondaryDisplayActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(SecondScreenWindowFlags.touchOnly())
+        CompanionSurfaceLifetime.bind(this, secondaryOnly = true)
         render()
+    }
+
+    override fun onDestroy() {
+        // A cover that finished covers nothing: the next one there starts from a clean state.
+        if (isFinishing && coveredDisplayId == displayIdCompat()) coveredDisplayId = null
+        super.onDestroy()
     }
 
     /**

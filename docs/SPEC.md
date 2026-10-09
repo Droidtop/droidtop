@@ -3508,6 +3508,21 @@ had not moved.
   events rerun the same pure orchestration decisions; if the shell's display
   disappears, it is relaunched on the remaining display immediately, and a
   later reconnect restores the selected arrangement.
+- The companion surfaces enforce the one-display rule themselves
+  (`CompanionSurfaceLifetime`, `DualScreenOrchestration.companionSurfaceRetires`,
+  tracker#182), because the shell's orchestration runs only while a shell
+  exists: when the add-on goes away Android moves its tasks, the idle cover
+  included, onto the built-in display, and a companion left there with no shell
+  alive was all the one screen showed. `CompanionActivity` and
+  `SecondaryDisplayActivity` check when started and on every display removal and
+  finish with one display left; the idle cover also finishes on the built-in
+  display. What was under them shows: the shell, or Android's home.
+- The companion activity finishes when the shell covers it on its own screen
+  (Main screen "Built-in screen" moves the shell over it): it has no role there,
+  and stopped under the shell it would be what that screen shows whenever the
+  shell leaves. An app covering it is not the shell, so that case keeps the
+  companion waiting (tracker#265). A finished companion or cover clears its
+  "covered" mark, so a stale one never blocks the next start.
 
 Verification: rig steps are in the commit message.
 

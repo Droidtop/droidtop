@@ -54,6 +54,8 @@ class CompanionActivity : AppCompatActivity() {
             return
         }
         window.addFlags(dev.droidtop.display.SecondScreenWindowFlags.touchOnly())
+        // Never the only thing a lone screen shows (tracker#182).
+        dev.droidtop.display.CompanionSurfaceLifetime.bind(this, secondaryOnly = false)
         widgetManager = AppWidgetManager.getInstance(this)
         widgetHost = CompanionWidgets.host(this)
         widgetIds = CompanionWidgetPrefs.widgetIds(this)
@@ -192,7 +194,29 @@ class CompanionActivity : AppCompatActivity() {
     override fun onStop() {
         visible = false
         widgetHost.stopListening()
+        // Covered by the shell on its own screen (Main screen set to the built-in one moves the shell
+        // over it): the companion has no role there, and left stopped under the shell it is what that
+        // screen shows whenever the shell goes (tracker#163, #182). An app covering it is different: the
+        // shell is then on the other screen, and the companion waits for that app (tracker#265).
+        val shellDisplay = ForegroundShell.current()?.takeIf { !it.isFinishing }?.let { shell ->
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                shell.display?.displayId
+            } else {
+                @Suppress("DEPRECATION")
+                shell.windowManager.defaultDisplay?.displayId
+            }
+        }
+        if (!isFinishing && shellDisplay != null && shellDisplay == displayIdCompat()) {
+            android.util.Log.i("droidtop.SecondScreen", "Companion covered by the shell on display $shellDisplay: finishing")
+            finish()
+        }
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        // A finished companion covers nothing; a stale cover would keep the next one from starting.
+        if (isFinishing) dev.droidtop.display.CompanionCover.retired(displayIdCompat())
+        super.onDestroy()
     }
 
     companion object {

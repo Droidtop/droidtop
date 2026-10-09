@@ -23,6 +23,11 @@ object CompanionCover {
         if (displayId == onDisplayId) displayId = null
     }
 
+    /** The companion on [onDisplayId] finished: nothing of it is covered there any more. */
+    fun retired(onDisplayId: Int?) {
+        if (displayId == onDisplayId) displayId = null
+    }
+
     /** The user asked for the screens back (Home, Main screen, reinitialize). */
     fun clear() {
         displayId = null
