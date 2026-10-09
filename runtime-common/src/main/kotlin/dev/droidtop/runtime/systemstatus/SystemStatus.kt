@@ -196,6 +196,11 @@ object SystemControls {
     fun bluetoothSettingsIntent(): Intent =
         Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+    /** Bluetooth's radio as the system holds it (the global setting, readable with no permission); never written. */
+    fun bluetoothOn(context: Context): Boolean = runCatching {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.BLUETOOTH_ON) == 1
+    }.getOrDefault(false)
+
     /** Airplane mode as the system holds it; an app can read it, never write it. */
     fun airplaneModeOn(context: Context): Boolean = runCatching {
         Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON) == 1

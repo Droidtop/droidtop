@@ -2559,7 +2559,9 @@ the `ContainerRuntime` interface that already exists (§3):
   shell's root, either panel's Start or R2, the game page's footer pills). **One switch and one
   slider:** the System, Audio and Display tiles show the same switch Settings' rows do
   (`ShellSwitch`, 52 by 30, the affirmative fill, the knob gliding in the layer phase) instead of an
-  "On"/"Off" word, and their sliders are Settings' slider (`ShellSlider`: a thin track filled in the
+  "On"/"Off" word, and their sliders are Settings' slider. A state the system owns and droidtop
+  can only open (Airplane mode, Bluetooth, VPN: `ActionItem.state`) is the same switch, on the
+  tile and in Settings' row, instead of a word or nothing (rig, build 1535) (`ShellSlider`: a thin track filled in the
   accent while selected, a round thumb), so the private drawing each had is gone (DroidDeck's
   switch and slider mechanics, `ui/SettingsWidgets.kt`). The open and close sounds are the sound
   roles' job (plan slice 10), not wired here.

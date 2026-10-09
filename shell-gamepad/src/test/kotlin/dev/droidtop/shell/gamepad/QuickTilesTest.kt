@@ -74,6 +74,14 @@ class QuickTilesTest {
         assertEquals("Bluetooth", plain.label)
         assertNull(plain.value)
 
+        // A system state the tile opens (Airplane mode) is an on/off switch, not a word.
+        val airplane = QuickTiles.tile(
+            ActionItem(id = GamingSettingsCatalog.ID_SYSTEM_AIRPLANE, title = "Airplane mode", state = false, run = {}),
+        )
+        assertEquals(false, airplane.on)
+        assertNull(airplane.value)
+        assertNull(plain.on)
+
         val colonInName = QuickTiles.tile(ActionItem(id = "x", title = "Wine: a compatibility layer", run = {}))
         assertEquals("Wine: a compatibility layer", colonInName.label)
         assertNull(colonInName.value)

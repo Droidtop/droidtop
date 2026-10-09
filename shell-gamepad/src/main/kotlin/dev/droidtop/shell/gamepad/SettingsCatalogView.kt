@@ -1150,7 +1150,8 @@ private fun CatalogRowView(
             ownScrollKeeping = true,
             uniformHeight = true,
             uniformSummaryLines = 0,
-            switchOn = if (status == null) toggle?.current else null,
+            // A system state an action opens (Airplane mode, Bluetooth, VPN) is the same switch.
+            switchOn = if (status == null) toggle?.current ?: (item as? ActionItem)?.state else null,
             sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
         )
     }

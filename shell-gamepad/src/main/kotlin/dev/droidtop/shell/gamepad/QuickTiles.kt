@@ -201,8 +201,11 @@ object QuickTiles {
             item = item,
             label = item.title,
             value = value,
+            // Every on/off state is a switch on the tile, the system's ones included (Airplane mode,
+            // Bluetooth, VPN: ActionItem.state), as in Settings' rows.
             on = when (item) {
                 is ToggleItem -> item.current
+                is ActionItem -> item.state
                 else -> null
             },
             glyph = glyphFor(item),

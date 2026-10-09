@@ -445,7 +445,7 @@ object GamingSettingsCatalog {
                         id = ID_SYSTEM_SWITCH_MODE,
                         title = "Switch mode",
                         subtitle = "Home screen",
-                        run = launchComponent("dev.droidtop.shell.standard.ModeSwitcherActivity"),
+                        run = launchComponent("dev.droidtop.app.ModeSwitcherActivity"),
                     ),
                 )
                 // The direct route into Gaming's own Settings section
@@ -640,7 +640,7 @@ object GamingSettingsCatalog {
                         id = ID_SYSTEM_VPN,
                         title = "VPN",
                         subtitle = "Opens the system VPN screen to connect, disconnect, or configure",
-                        value = if (status.vpnActive) "Active" else "Off",
+                        state = status.vpnActive,
                         run = { ctx ->
                             ctx.startActivity(
                                 android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS)
@@ -669,6 +669,7 @@ object GamingSettingsCatalog {
                         id = ID_SYSTEM_BLUETOOTH,
                         title = "Bluetooth",
                         subtitle = "Pair controllers and audio in the system Bluetooth screen",
+                        state = controls.bluetoothOn(context),
                         run = { ctx -> ctx.startActivity(controls.bluetoothSettingsIntent()) },
                     ),
                 )
@@ -680,7 +681,7 @@ object GamingSettingsCatalog {
                         id = ID_SYSTEM_AIRPLANE,
                         title = "Airplane mode",
                         subtitle = "Opens the system screen: Android does not let an app switch it",
-                        value = if (controls.airplaneModeOn(context)) "On" else "Off",
+                        state = controls.airplaneModeOn(context),
                         run = { ctx -> ctx.startActivity(controls.airplaneModeSettingsIntent()) },
                     ),
                 )

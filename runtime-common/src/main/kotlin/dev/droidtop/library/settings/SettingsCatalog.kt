@@ -156,6 +156,10 @@ class ActionItem(
     override val value: String? = null,
     val confirmTitle: String? = null,
     override val icon: CatalogIcon? = null,
+    // An on/off state the action cannot change itself but opens the place that does (Airplane mode,
+    // Bluetooth, VPN: the system owns the radios). Drawn as the one switch every on/off setting has,
+    // in a settings row and on a Quick Menu tile alike; null for an action with no such state.
+    val state: Boolean? = null,
     val run: (Context) -> Unit,
 ) : CatalogItem
 
