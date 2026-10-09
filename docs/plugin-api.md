@@ -2091,8 +2091,10 @@ Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
 permissions are declarative consent plus host-side gating of what droidtop
 does for it; they do not bound what it can do on its own, and the Activity
 screen says so (§4.6). That is why full trust is a critical grant, needed
-only by what cannot run contained (Flutter plugins, native libraries,
-`apps.bind`, the `priv.*` and `root.*` providers) and by contract 1 plugins.
+only by what needs privilege an isolated UID never has (`apps.bind`, the
+`priv.*` and `root.*` providers) and by contract 1 plugins. Every kind of
+plugin runs contained, Flutter and native libraries included (§5.3,
+"Guarded hooks").
 Whether the contained tier holds on a given device is what the Containment
 check (§5.3) shows.
 
@@ -2149,9 +2151,9 @@ commit that built this) and are written here when they arrive.
 | Kind | How it loads in the isolated process | Contained? |
 | --- | --- | --- |
 | `native_bundle`, dex only | `:app` opens `classes.jar` and hands the descriptor over; the sandbox reads its `classes*.dex` into memory and loads them with `InMemoryDexClassLoader`, parented to droidtop's own loader so the plugin sees the plugin API. API 27+ takes any number of dex files, API 26 one. | **Yes.** Needs no path at all. |
-| `native_bundle` with `.so` | Not loaded. | **No; needs full access.** JNI binds a plugin's `native` methods only to a library loaded with `System.loadLibrary`/`System.load` through the plugin's own class loader, and both take a path that loader can open. An isolated process can open none of droidtop's files, and `InMemoryDexClassLoader` has no library path to give. `android_dlopen_ext` from a descriptor maps the code but registers nothing with the class loader: the plugin's natives would stay unbound and its own `System.loadLibrary` call would still throw. Such a plugin declares `host.full_trust`. |
-| `python` | `:app` hands over libpython, the runtime's other libraries (OpenSSL, SQLite), the standard library as one zip (`python-stdlib.zip`, built once beside the runtime: pure Python, stored, no tests, IDLE or Tk) and every `lib-dynload` module. `libdroidtoppy.so` maps each library with `android_dlopen_ext` and `ANDROID_DLEXT_USE_LIBRARY_FD`, falling back to a private `memfd` copy when the file's own descriptor may not be mapped. Each extension module is registered as a built-in (`PyImport_AppendInittab`) before the interpreter starts, because the import system loads an extension only by path. The zip goes on `sys.path` as `/proc/self/fd/<n>`; `zipimport` stats that path and reads it through an open-code hook (`PyFile_SetOpenCodeHook`) that answers with the descriptor itself (later with `pread`, so threads importing at once never share a file offset), so nothing is opened by path. `plugin.py` is executed from its text. One interpreter per plugin process. | **Built; the rig decides.** Two Android facts are not knowable from code: whether SELinux lets an isolated process map executable code from a descriptor of a file in droidtop's private storage, and whether it may `stat` that file through `/proc/self/fd`. Both have the memfd fallback, and the report says which way each library went. If neither works on a device, python plugins need full access there and the report shows why. |
-| `flutter_embed` | Refused. | **No; needs full access.** The Dart VM loads `libapp.so` with `dlopen` by the name or path in `--aot-shared-library-name`; `flutter_assets` reach the engine through `AssetManager.addAssetPath(path)`; plugin packages (`path_provider`, `sqflite`) expect a files directory; and `ui.main` is an activity, which cannot run in an isolated process. On API 30+ the first two have a route (load `libapp.so` by descriptor first so the bare name resolves to it, and serve assets through `ResourcesLoader`), but API 28 (the BlueStacks rig) has neither, and the last two have none. A Flutter plugin declares `host.full_trust`. |
+| `native_bundle` with `.so` | Its libraries for the device's ABI reach the process as descriptors and get virtual paths (`/droidtop-sandbox/plugin/lib/<abi>/...`); the class loader's library path names that folder (the `InMemoryDexClassLoader` constructor from API 29, the loader's own `addNativePath` on API 28). The plugin's own `System.loadLibrary` then runs the ordinary way: libcore's `findLibrary` check and ART's `android_dlopen_ext` are answered by the guarded hooks, the library is mapped from a private memfd copy, and ART registers it with the plugin's class loader, so JNI binds by symbol name or `RegisterNatives` as usual. | **Built 2026-10-09 (plugin-enforce-3); the rig decides.** Needs Android 9 or later. A library whose `DT_NEEDED` names another of the plugin's own libraries loads only after that one (the linker resolves its dependencies by name, which the hooks do not see); load them in order. |
+| `python` | `:app` hands over libpython, the runtime's other libraries (OpenSSL, SQLite), the standard library as one zip (`python-stdlib.zip`, built once beside the runtime: pure Python, stored, no tests, IDLE or Tk) and every `lib-dynload` module. `libdroidtoppy.so` maps each library with `android_dlopen_ext` and `ANDROID_DLEXT_USE_LIBRARY_FD`, falling back to a private `memfd` copy when the file's own descriptor may not be mapped. Each extension module is registered as a built-in (`PyImport_AppendInittab`) before the interpreter starts, because the import system loads an extension only by path. The zip goes on `sys.path` as `/proc/self/fd/<n>`; `zipimport` stats that path and reads it through an open-code hook (`PyFile_SetOpenCodeHook`) that answers with the descriptor itself (later with `pread`, so threads importing at once never share a file offset), so nothing is opened by path. `plugin.py` is executed from its text. One interpreter per plugin process. | **Built; the rig decides.** AOSP's policy (below) answers the first question: an isolated process may never map code from droidtop's files, so the memfd copy is the path every library takes, and the report says so line by line ("memfd (fd refused: ...)"). It may `getattr` a file handed to it, so the zip is expected on `sys.path` through its own descriptor. Whether a device's kernel and policy match AOSP's is what the report shows; if contained Python fails on one, the report and logcat's `avc:` lines say exactly what was refused. |
+| `flutter_embed` | A headless `FlutterEngine` in the isolated service. `:app` hands over the downloaded engine, the plugin's `libapp.so`, its `flutter_assets` as one zip (built once per installed bundle in droidtop's cache) and its registrant dex. `System.load` of the engine and the asset manager opening the zip are answered by the guarded hooks; once the engine is in, its own imports are hooked too, so its `dlopen` of `libapp.so` maps the plugin's. The engine draws in software (`--enable-software-rendering`): an isolated process may not open the GPU. `ui.main`: an activity cannot run in an isolated process and the window manager is out of its reach, so droidtop's `PluginScreenActivity` owns a `SurfaceView` and hands its `Surface` across the binder; the plugin's main-UI engine renders into it, and droidtop forwards touch (`AndroidTouchProcessor`) and keys (`KeyEventChannel`); Back pops the plugin's route and its last route (`SystemNavigator.pop`) closes the screen. | **Built 2026-10-09 (plugin-enforce-3); the rig decides.** Plugin packages that need files (`path_provider`, `sqflite`) have none when contained: a Flutter plugin keeps its data through `hostCall` and the `data` API. Rendering a surface in software needs the isolated process to map the gralloc buffers the surface hands it, which only a device can confirm. |
 
 What every contained process is, by Android's rules: a random UID from the
 isolated range, no permissions, not in the `inet` group (no sockets), the
@@ -2159,6 +2161,52 @@ isolated range, no permissions, not in the `inet` group (no sockets), the
 may not open droidtop's files (`app_data_file`) or shared storage, and no
 content providers. droidtop's application object checks for an isolated
 process first and starts nothing in it.
+
+**What the platform allows an isolated process, from AOSP's own policy**
+(system/sepolicy, main branch, read 2026-10-09), and what the design does
+with it:
+
+- `private/isolated_app_all.te`: it may `read write getattr lock map` an
+  `app_data_file` handed to it, but `neverallow isolated_app_all
+  app_data_file_type:file open`: so files arrive as descriptors and are never
+  reopened by path (the hooks answer a virtual path with a duplicate of the
+  descriptor, and Python's open-code hook does the same for its zip).
+- `private/app.te`: `neverallow { ... isolated_app_all ... } { data_file_type
+  -apex_art_data_file -dalvikcache_data_file -system_data_file
+  -apk_data_file }:file no_x_file_perms`: an isolated process may never map
+  code from droidtop's files, whatever the descriptor. So every library a
+  plugin brings (and libpython, the Flutter engine, `libapp.so`) is copied
+  into a memfd the process makes itself before it is mapped: the
+  `app_domain()` macro (`public/te_macros`) labels an app's own tmpfs files
+  `appdomain_tmpfs` and allows it `execute getattr map read write` on them
+  (not `open`, which is why the memfd is mapped through its descriptor and
+  never reopened through `/proc/self/fd`). Chrome's and WebView's isolated
+  renderers live under the same rules: their code comes from an APK
+  (`apk_data_file`, executable) or anonymous memory, never from app data.
+- `isolated_app_all.te`: `neverallow { isolated_app_all
+  -isolated_compute_app } service_manager_type:service_manager find` except
+  `activity_service`, `display_service` and `webviewupdate_service`: no
+  window manager, so no window and no `SurfaceControlViewHost` of its own;
+  a surface has to come from droidtop. `neverallow { isolated_app_all
+  -isolated_compute_app } gpu_device:chr_file { rw_file_perms execute }`: no
+  GPU, so Flutter draws in software. Sockets other than `AF_UNIX` may not
+  be created at all.
+
+**Guarded hooks (decided 2026-10-09, owner: "If those plugins can't run
+locked down, we have to fix how WE handle them, maybe guarded hooks").**
+`SandboxFiles` and `native/src/sandbox_hooks.c`: every file a contained
+plugin's code loads by path gets a virtual path under `/droidtop-sandbox/`
+for a descriptor `:app` handed over. The import slots (PLT/GOT) of the
+system libraries that open such paths (`libnativeloader`, `libjavacore`,
+`libopenjdk`, `libandroidfw`, `libziparchive`, and the Flutter engine once
+loaded) are rewritten, the bytehook technique: `open`/`openat` and the
+`stat`/`access` family answer a virtual path from its descriptor (read
+only), `dlopen`/`android_dlopen_ext` map it from the memfd copy with
+`ANDROID_DLEXT_USE_LIBRARY_FD` added to the caller's own flags (so a
+library ART loads keeps its class-loader namespace and its JNI binding).
+A virtual path nobody registered is `ENOENT`; every other path reaches libc
+unchanged. The Containment check reports which libraries were hooked and how
+many import slots.
 - **Full trust, by grant.** droidtop's UID, but **one process per
   plugin** from eight declared slots (`:pluginhost`, `:pluginhost1` to
   `:pluginhost7`; beyond eight in use at once the least recently used slot
@@ -2169,8 +2217,6 @@ process first and starts nothing in it.
     for it through Shizuku's multi-process support);
   - plugins that bind other apps' services (`apps.bind`: an isolated
     process cannot bind);
-  - Flutter plugins and plugins with native libraries ("Spike results"
-    below);
   - contract 1 plugins, which keep running full-trust with the badge
     "Full access (older plugin)".
   - It needs `host.full_trust` (critical). A contract 2 plugin that cannot

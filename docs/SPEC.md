@@ -14911,9 +14911,10 @@ let droidtop actually regulate their usage".
   parameters it declared, the quota and the activity log apply. **For a
   contained plugin the permission model is a security boundary.**
 - **Full trust** is only the critical `host.full_trust` grant, which a
-  plugin that cannot run contained must declare (Flutter plugins, native
-  libraries, `apps.bind`, the `priv.*`/`root.*` providers), and every
-  contract 1 plugin. **For full-trust plugins the earlier decision stands:
+  plugin that needs privilege an isolated UID never has must declare
+  (`apps.bind`, the `priv.*`/`root.*` providers), and every contract 1
+  plugin. Flutter plugins and native libraries run contained through
+  droidtop's guarded hooks (`docs/plugin-api.md` §5.3, decided 2026-10-09). **For full-trust plugins the earlier decision stands:
   the process is for compatibility and stability, not security.** Such a
   plugin runs as droidtop's UID, in a process of its own (one of eight
   slots), and can do anything droidtop's UID can — no second permission
@@ -14937,8 +14938,8 @@ one runner per kind:
 - **`native_bundle`** — real Android/Kotlin code: a dex payload
   (`classes.jar`, a zip containing `classes.dex`) plus optional native
   `.so` libraries, loaded from memory (`InMemoryDexClassLoader`) in its
-  contained process, or by `DexClassLoader` in a full-trust one (a bundle
-  with native libraries needs full access), and driven
+  contained process (its native libraries mapped through the guarded
+  hooks), or by `DexClassLoader` in a full-trust one, and driven
   through `DroidtopPlugin` (`onLoad`/`invoke`/`startJob`/`onUnload`).
   Native code ships arm64-v8a AND x86_64 whenever it ships any `.so` at
   all — the standing bundle rule (§7d) — enforced by
