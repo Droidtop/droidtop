@@ -5127,14 +5127,16 @@ proposal) is not built; these helpers are in the one settings tree that already 
   does for the arrow keys. The hardware-key listener (`SecondScreenKeyboardListener`) presses and releases the
   arrows; Shift latched on that keyboard is held at the far side, so it selects there too. A hardware key types
   the moment it goes down, so with the helper on that listener sends the space bar down and up together when it
-  is let go (a held space no longer repeats on that surface); with the helper off nothing changes.
+  is let go; a space bar held for 250 ms is pressed at the far side then (`HoldTimer`), so it repeats there, and a
+  drag after that lets it go once; with the helper off nothing changes.
 - **Macro keys.** One macro per line of the `Macros` setting, `name = steps` (`MacroParser`, JVM tested): `C-b`
   style chords with Ctrl, Alt, Shift or Meta, key names, letters, and `"quoted text"` with `\n` as Enter. A
   line with a step that is not understood is skipped whole, so a typo never sends half a sequence. A macro is
   played as a hardware keyboard would (`MacroPlayer`): modifiers down, key down and up, modifiers up in reverse
   order, through the sink's key stream, so the input method, the companion's panel and a container all get the
   same sequence. Decision: macros are text lines in a setting, not JSON, because they are edited in a settings
-  field on a handheld; the study's JSON form can be added as an import later.
+  field on a handheld; JSON import and export are added when someone asks. A line that is not a macro is not
+  played; the Macros panel shows the first problem and its line number (`MacroParser.problems`).
 
 ### Emoji panel and search (Droidtop/tracker#342)
 
@@ -5165,6 +5167,9 @@ proposal) is not built; these helpers are in the one settings tree that already 
   width; the grid sits at its edge in the tool strip's key area, so with the strip off a right-hand grid is drawn
   at the left. A change rebuilds the input method's view (the setting's flags) or, for a panel droidtop draws,
   rebuilds its grid (`KeyboardPanel.rebuildKeys`).
+- **More layouts.** Every locale Android reports is already selectable; the layouts are the existing `xml-*`
+  folders and each locale's key text. Locales that have their own key text but were missing from the picker's
+  5-row label list now carry it. A reader for HeliBoard-style text layouts is a later item on Droidtop/tracker#342.
 - **Floating is not built, by decision.** An input method cannot reliably own an overlay window, least of all on
   a secondary display (the study's question 7).
 
@@ -5175,7 +5180,8 @@ On Android 11 and later droidtop's input method asks for inline suggestions (`me
 platform's autofill service can offer its entries in the keyboard instead of a dropdown over the app. The request
 (`InlineAutofill`, `androidx.autofill`) styles the chips in the keyboard's dark colours and allows six; the
 response is inflated and drawn in a row above the keys (`ToolsDeck.showInlineSuggestions`), cleared when the
-input view finishes. Its own preference ("Autofill suggestions", on); on Android 10 and earlier (`InlineRules`)
+input view finishes. The chips are surfaces of the autofill service's process, so they sit in `InlineClipView`,
+which clips each to the row every frame; a chip scrolled out of the row cannot cover the keys. Its own preference ("Autofill suggestions", on); on Android 10 and earlier (`InlineRules`)
 nothing is requested. Only the input method gets suggestions: the panels droidtop draws for the companion and
 over other apps type through other routes that autofill does not know.
 

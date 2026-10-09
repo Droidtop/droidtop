@@ -133,6 +133,44 @@ class EditingHelpersTest {
         assertEquals(listOf(right to true, right to false, right to true, right to false, left to true, left to false), sent)
     }
 
+    @Test fun aHeldSpaceRepeatsAtTheFarSideAndADragStillCancelsATap() {
+        val sent = ArrayList<Pair<Int, Boolean>>()
+        val timer = object : HoldTimer {
+            var action: (() -> Unit)? = null
+            override fun start(delayMs: Long, action: () -> Unit) { this.action = action }
+            override fun cancel() { action = null }
+        }
+        val resolver = CharKeyResolver { if (it == ' ') KeyStroke(KeyEvent.KEYCODE_SPACE) else null }
+        fun listener() = SecondScreenKeyboardListener({ code, down -> sent += code to down }, resolver, deferSpace = true, holdTimer = timer)
+        val space = KeyEvent.KEYCODE_SPACE
+
+        // Held past the delay: pressed at the far side, released when let go.
+        val held = listener()
+        held.onPress(32)
+        assertEquals(emptyList<Pair<Int, Boolean>>(), sent)
+        timer.action!!.invoke()
+        assertEquals(listOf(space to true), sent)
+        held.onRelease(32)
+        assertEquals(listOf(space to true, space to false), sent)
+
+        // A drag before the delay types no space at all.
+        sent.clear()
+        val tapDrag = listener()
+        tapDrag.onPress(32)
+        tapDrag.onCursorDrag(0)
+        assertEquals(null, timer.action)
+        tapDrag.onRelease(32)
+        assertEquals(emptyList<Pair<Int, Boolean>>(), sent)
+
+        // A drag after the space went down lets it go once.
+        val late = listener()
+        late.onPress(32)
+        timer.action!!.invoke()
+        late.onCursorDrag(0)
+        late.onRelease(32)
+        assertEquals(listOf(space to true, space to false), sent.drop(0))
+    }
+
     // --- incognito ---
 
     @Test fun learningIsOffInIncognitoPasswordsAndWhereTheEditorAsks() {
@@ -172,6 +210,15 @@ class EditingHelpersTest {
         val macros = MacroParser.parse("# a comment\n\nbad = C-b nonsense\ngood = C-b c\nno equals sign\nempty =\n")
         assertEquals(listOf("good"), macros.map { it.name })
         assertNull(MacroParser.parseSteps("\"unterminated"))
+    }
+
+    @Test fun aBadMacroLineSaysWhatIsWrongAndWhere() {
+        assertEquals(
+            listOf("Line 2: unknown key 'nonsense'", "Line 3: needs name = steps", "Line 4: a quote is not closed"),
+            MacroParser.problems("ok = C-b c\nbad = C-b nonsense\nno equals\nq = \"abc\n# comment\n\n"),
+        )
+        assertEquals(listOf("Line 1: unknown modifier in 'X-b' (use C-, A-, S- or M-)"), MacroParser.problems("m = X-b"))
+        assertEquals(emptyList<String>(), MacroParser.problems("m = C-b c\n"))
     }
 
     @Test fun aMacroIsDeliveredAsHardwareKeysInOrder() {

@@ -81,7 +81,9 @@ public class InputLanguageSelection extends PreferenceActivity {
         "en", "en_CX", "en_DV", "en_GB", "es", "es_LA", "fa", "fi", "fr",
         "fr_CA", "he", "hr", "hu", "hu_QY", "hy", "it", "iw", "lo", "lt",
         "nb", "pt_PT", "ro", "ru", "ru_PH", "si", "sk", "sk_QY", "sl",
-        "sr", "sv", "ta", "th", "tr", "uk"
+        "sr", "sv", "ta", "th", "tr", "uk",
+        // droidtop: locales with their own key text (values-xx/donottranslate-altchars.xml) that the list left out
+        "lv", "nl", "pl", "pt", "rm"
     };
 
     private static final String[] KBD_4_ROW = {

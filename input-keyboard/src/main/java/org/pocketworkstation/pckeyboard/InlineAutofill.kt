@@ -5,8 +5,14 @@ import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.util.Size
+import android.graphics.PixelFormat
+import android.graphics.Rect
+import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
+import android.widget.FrameLayout
+import android.widget.inline.InlineContentView
 import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.widget.inline.InlinePresentationSpec
@@ -71,6 +77,55 @@ object InlineAutofill {
                 views[index] = view
                 if (--pending == 0 && mine == generation) deck.showInlineSuggestions(views.filterNotNull())
             }
+        }
+    }
+}
+
+/**
+ * Holds the autofill chips so they are drawn only inside it. A chip is a surface owned by the autofill service's
+ * process and always draws on top of the app; without clipping, a chip scrolled out of the row would cover the keys
+ * (Droidtop/tracker#342). Each frame every [InlineContentView] below is clipped to this view's bounds. The same
+ * approach as the platform's inline suggestion sample (Apache-2.0): a transparent top-most surface lets the
+ * chips' surfaces stack under the keyboard's window content.
+ */
+@RequiresApi(Build.VERSION_CODES.R)
+class InlineClipView(context: Context) : FrameLayout(context) {
+    private val parentBounds = Rect()
+    private val contentBounds = Rect()
+    private val drawListener = ViewTreeObserver.OnDrawListener { clipChips() }
+
+    init {
+        val background = SurfaceView(context)
+        background.setZOrderOnTop(true)
+        background.holder.setFormat(PixelFormat.TRANSPARENT)
+        addView(background)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        viewTreeObserver.addOnDrawListener(drawListener)
+    }
+
+    override fun onDetachedFromWindow() {
+        viewTreeObserver.removeOnDrawListener(drawListener)
+        super.onDetachedFromWindow()
+    }
+
+    private fun clipChips() {
+        parentBounds.right = width
+        parentBounds.bottom = height
+        clipBelow(this)
+    }
+
+    private fun clipBelow(root: View) {
+        if (root is InlineContentView) {
+            contentBounds.set(parentBounds)
+            offsetRectIntoDescendantCoords(root, contentBounds)
+            root.clipBounds = contentBounds
+            return
+        }
+        if (root is ViewGroup) {
+            for (i in 0 until root.childCount) clipBelow(root.getChildAt(i))
         }
     }
 }

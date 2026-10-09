@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
+import android.os.Build
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
@@ -40,6 +41,9 @@ class ToolsDeck private constructor(
     private val inlineRow = LinearLayout(context)
     private val inlineScroll = HorizontalScrollView(context)
 
+    // Autofill chips are surfaces of another process; on Android 11 and later they are clipped to this host.
+    private val inlineHost: ViewGroup = if (Build.VERSION.SDK_INT >= 30) InlineClipView(context) else FrameLayout(context)
+
     init {
         orientation = VERTICAL
         setBackgroundColor(BACKGROUND)
@@ -48,10 +52,11 @@ class ToolsDeck private constructor(
         inlineScroll.apply {
             isHorizontalScrollBarEnabled = false
             isFocusable = false
-            visibility = GONE
             addView(inlineRow)
         }
-        addView(inlineScroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        inlineHost.addView(inlineScroll)
+        inlineHost.visibility = GONE
+        addView(inlineHost, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         notice.apply {
             textSize = 12f
             setTextColor(MUTED)
@@ -149,7 +154,7 @@ class ToolsDeck private constructor(
             (view.parent as? ViewGroup)?.removeView(view)
             inlineRow.addView(view)
         }
-        inlineScroll.visibility = if (views.isEmpty()) GONE else VISIBLE
+        inlineHost.visibility = if (views.isEmpty()) GONE else VISIBLE
     }
 
     fun clearInlineSuggestions() = showInlineSuggestions(emptyList())
@@ -328,8 +333,11 @@ class ToolsDeck private constructor(
         val root = panelFrame("Macros", status)
         val macros = ToolsPrefs.macros(context)
         val rows = LinearLayout(context).apply { orientation = VERTICAL }
-        if (macros.isEmpty()) {
-            status.text = "None yet. In the keyboard settings, Editing helpers, write one per line: name = C-b c"
+        val problems = MacroParser.problems(ToolsPrefs.macroSource(context))
+        status.text = when {
+            problems.isNotEmpty() -> problems.first() + if (problems.size > 1) " (and ${problems.size - 1} more)" else ""
+            macros.isEmpty() -> "None yet. In the keyboard settings, Editing helpers, write one per line: name = C-b c"
+            else -> ""
         }
         val player = MacroPlayer(sink::key, typeText)
         macros.forEach { macro ->

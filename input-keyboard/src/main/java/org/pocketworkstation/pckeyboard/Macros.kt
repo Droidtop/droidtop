@@ -32,6 +32,8 @@ object MacroParser {
     const val MAX_STEPS = 64
     const val MAX_TEXT = 2000
 
+    private class MacroError(message: String) : Exception(message)
+
     fun parse(source: String): List<Macro> = source.lineSequence().mapNotNull { parseLine(it) }.toList()
 
     fun parseLine(line: String): Macro? {
@@ -45,8 +47,32 @@ object MacroParser {
         return if (steps.isEmpty()) null else Macro(name, steps)
     }
 
+    /** Why [line] is not a macro, or null when it is one, or is blank or a comment. */
+    fun problem(line: String): String? {
+        val trimmed = line.trim()
+        if (trimmed.isEmpty() || trimmed.startsWith("#")) return null
+        val eq = trimmed.indexOf('=')
+        if (eq < 0) return "needs name = steps"
+        if (eq == 0 || trimmed.substring(0, eq).isBlank()) return "needs a name before ="
+        return try {
+            if (steps(trimmed.substring(eq + 1)).isEmpty()) "no steps after =" else null
+        } catch (e: MacroError) {
+            e.message
+        }
+    }
+
+    /** One message per line of [source] that is not a macro, each starting with its line number. */
+    fun problems(source: String): List<String> =
+        source.lineSequence().withIndex().mapNotNull { (index, line) -> problem(line)?.let { "Line ${index + 1}: $it" } }.toList()
+
     /** The steps in [text], or null when one is not understood or there are too many. */
-    fun parseSteps(text: String): List<MacroStep>? {
+    fun parseSteps(text: String): List<MacroStep>? = try {
+        steps(text)
+    } catch (e: MacroError) {
+        null
+    }
+
+    private fun steps(text: String): List<MacroStep> {
         val steps = ArrayList<MacroStep>()
         var i = 0
         while (i < text.length) {
@@ -78,20 +104,21 @@ object MacroParser {
                         i++
                     }
                 }
-                if (!closed || out.length > MAX_TEXT) return null
+                if (!closed) throw MacroError("a quote is not closed")
+                if (out.length > MAX_TEXT) throw MacroError("quoted text is longer than $MAX_TEXT")
                 if (out.isNotEmpty()) steps += MacroStep.Text(out.toString())
             } else {
                 var end = i
                 while (end < text.length && !text[end].isWhitespace()) end++
-                steps += chord(text.substring(i, end)) ?: return null
+                steps += chord(text.substring(i, end))
                 i = end
             }
-            if (steps.size > MAX_STEPS) return null
+            if (steps.size > MAX_STEPS) throw MacroError("more than $MAX_STEPS steps")
         }
         return steps
     }
 
-    private fun chord(token: String): MacroStep.Chord? {
+    private fun chord(token: String): MacroStep.Chord {
         var ctrl = false
         var alt = false
         var shift = false
@@ -103,14 +130,14 @@ object MacroParser {
                 'A', 'a' -> alt = true
                 'S', 's' -> shift = true
                 'M', 'm' -> meta = true
-                else -> return null
+                else -> throw MacroError("unknown modifier in '$token' (use C-, A-, S- or M-)")
             }
             rest = rest.substring(2)
         }
         NAMED[rest.lowercase()]?.let { return MacroStep.Chord(it, ctrl, alt, shift, meta) }
-        if (rest.length != 1) return null
+        if (rest.length != 1) throw MacroError("unknown key '$token'")
         val ch = rest[0]
-        val code = charKey(ch.lowercaseChar()) ?: return null
+        val code = charKey(ch.lowercaseChar()) ?: throw MacroError("unknown key '$token'")
         return MacroStep.Chord(code, ctrl, alt, shift || ch.isUpperCase(), meta)
     }
 

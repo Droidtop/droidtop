@@ -235,6 +235,13 @@ object SecondScreenKeyboard {
     const val DEFAULT_HEIGHT_PERCENT = 45f
 }
 
+/** A one-shot delay on the main thread, for [SecondScreenKeyboardListener]'s held space bar. */
+interface HoldTimer {
+    fun start(delayMs: Long, action: () -> Unit)
+
+    fun cancel()
+}
+
 /**
  * Turns Hacker's Keyboard key events into hardware-style key press and
  * release pairs.
@@ -268,11 +275,14 @@ class SecondScreenKeyboardListener(
      * with this on the space bar goes down and up together when it is let go, unless the touch became a drag.
      */
     private val deferSpace: Boolean = false,
+    /** With [deferSpace]: presses a held space bar after [SPACE_HOLD_MS], so it repeats at the far side. */
+    private val holdTimer: HoldTimer? = null,
 ) : LatinKeyboardBaseView.OnKeyboardActionListener {
 
     private val latchedModifiers = LinkedHashSet<Int>()
     private var spacePending = false
     private var spaceCancelled = false
+    private var spaceDown = false
     private val heldKeys = HashMap<Int, KeyStroke>()
     private var transientShift = false
 
@@ -287,6 +297,8 @@ class SecondScreenKeyboardListener(
         if (deferSpace && primaryCode == SPACE) {
             spacePending = true
             spaceCancelled = false
+            spaceDown = false
+            holdTimer?.start(SPACE_HOLD_MS) { pressHeldSpace() }
             return
         }
 
@@ -321,9 +333,15 @@ class SecondScreenKeyboardListener(
 
     override fun onRelease(primaryCode: Int) {
         if (spacePending && primaryCode == SPACE) {
+            holdTimer?.cancel()
             spacePending = false
-            if (!spaceCancelled) {
-                strokeFor(SPACE)?.let {
+            val stroke = strokeFor(SPACE)
+            if (spaceDown) {
+                spaceDown = false
+                stroke?.let { send(it.androidKeyCode, false) }
+                releaseLatched()
+            } else if (!spaceCancelled) {
+                stroke?.let {
                     send(it.androidKeyCode, true)
                     send(it.androidKeyCode, false)
                     releaseLatched()
@@ -373,6 +391,11 @@ class SecondScreenKeyboardListener(
      */
     override fun onCursorDrag(steps: Int) {
         spaceCancelled = true
+        holdTimer?.cancel()
+        if (spaceDown) {
+            spaceDown = false
+            strokeFor(SPACE)?.let { send(it.androidKeyCode, false) }
+        }
         val key = if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
         repeat(kotlin.math.abs(steps)) {
             send(key, true)
@@ -393,7 +416,21 @@ class SecondScreenKeyboardListener(
      * container behaving as though Ctrl were permanently down, which is
      * the failure `DesktopInputRouter.releaseHeldInput` also exists for.
      */
+    private fun pressHeldSpace() {
+        if (!spacePending || spaceCancelled || spaceDown) return
+        strokeFor(SPACE)?.let {
+            spaceDown = true
+            send(it.androidKeyCode, true)
+        }
+    }
+
     fun releaseEverything() {
+        holdTimer?.cancel()
+        if (spaceDown) {
+            spaceDown = false
+            strokeFor(SPACE)?.let { send(it.androidKeyCode, false) }
+        }
+        spacePending = false
         heldKeys.values.forEach { send(it.androidKeyCode, false) }
         heldKeys.clear()
         if (transientShift) {
@@ -424,6 +461,9 @@ class SecondScreenKeyboardListener(
         val LAYOUT_KEYS = setOf(-2, -119)
 
         const val SPACE = 32
+
+        /** A space bar held this long is a held key, not a tap that may still become a cursor drag. */
+        const val SPACE_HOLD_MS = 250L
 
         val MODIFIERS = setOf(
             KeyEvent.KEYCODE_SHIFT_LEFT,

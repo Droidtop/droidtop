@@ -53,7 +53,9 @@ object ToolsPrefs {
 
     fun spaceDrag(context: Context): Boolean = prefs(context).getBoolean(SPACE_DRAG, true)
 
-    fun macros(context: Context): List<Macro> = MacroParser.parse(prefs(context).getString(MACROS, "") ?: "")
+    fun macroSource(context: Context): String = prefs(context).getString(MACROS, "") ?: ""
+
+    fun macros(context: Context): List<Macro> = MacroParser.parse(macroSource(context))
 }
 
 /** When the keyboard asks for autofill suggestions (Droidtop/tracker#342): Android 11 or later, and not switched off. */

@@ -1,6 +1,8 @@
 package org.pocketworkstation.pckeyboard
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.KeyCharacterMap
@@ -43,12 +45,29 @@ class KeyboardPanel(
 ) : FrameLayout(context) {
 
     private var functionLayer = false
+    private val holdHandler = Handler(Looper.getMainLooper())
+    private val spaceTimer = object : HoldTimer {
+        private var pending: Runnable? = null
+
+        override fun start(delayMs: Long, action: () -> Unit) {
+            cancel()
+            val run = Runnable { action() }
+            pending = run
+            holdHandler.postDelayed(run, delayMs)
+        }
+
+        override fun cancel() {
+            pending?.let { holdHandler.removeCallbacks(it) }
+            pending = null
+        }
+    }
     private val listener = SecondScreenKeyboardListener(
         send = { code, down -> sink.key(code, down) },
         resolver = AndroidCharKeyResolver(),
         commit = if (sink.takesText) ({ chars: CharSequence -> sink.text(chars) }) else null,
         onLayoutToggle = { toggleLayout() },
         deferSpace = ToolsPrefs.spaceDrag(context),
+        holdTimer = spaceTimer,
     )
     private val keyboardView: LatinKeyboardView? = run {
         // The key grid reads the form (full, split, one-handed) from the shared settings, which only the input method loads.
