@@ -187,6 +187,9 @@ class DesktopSessionService : Service() {
         android.util.Log.i(TAG, "Primary container: ${primary.id}")
 
         booting = runtime to primary
+        // The panel's files are read by sway as it starts; written every time, so an update reaches them.
+        runCatching { dev.droidtop.runtime.DesktopPanel.writeConfigs(filesDir) }
+            .onFailure { android.util.Log.w(TAG, "Writing the desktop panel's config failed", it) }
         try {
             runtime.start(primary, provisioning) { line ->
                 _stateHolder.value = DesktopSessionState.Connecting(line)
@@ -276,6 +279,7 @@ class DesktopSessionService : Service() {
             desktopEnvironment,
             printing = DesktopSetupPrefs.printing(applicationContext),
             allLanguageFonts = DesktopSetupPrefs.allLanguageFonts(applicationContext),
+            panel = DesktopSetupPrefs.panel(applicationContext),
         )
             ?: error("No known compositor provisioning for ${repository.os}/$desktopEnvironment")
     }

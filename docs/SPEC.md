@@ -267,14 +267,27 @@ script (`ContainerLauncher`, `runtime-common`):
   Desktop shell showing there is nobody to answer and the request is
   dropped with a log line.
 
-Still open, and the owner's to choose: which stock panel/launcher the
-primary starts (waybar with a launcher, sfwbar, nwg-panel...), an ordinary
-distro package started from the compositor's own config. Until then the
-entries are reached from any launcher a person installs (`fuzzel`, `wofi
---show drun`), from `gtk-launch`, and from file managers that browse
-applications. When that panel lands, droidtop's own Compose taskbar shrinks
-to what only Android can do (the task manager across containers, the mode
-switch).
+**The desktop panel (decided 2026-10-09, Droidtop/tracker#353).** The sway
+desktop starts Waybar with wofi as its panel and launcher by default, the
+sway-native pair, both ordinary distro packages (`waybar wofi`, the same
+names in Alpine and Debian) added to the plan. Desktop settings has "Desktop
+panel": Waybar and wofi (default) or Sway's own bar; sfwbar and nwg-panel
+are alternatives for later. Waybar's plan starts `sway -c
+/run/droidtop-app-storage/desktop-launcher/panel/sway.config`, a file
+droidtop rewrites before every start (`DesktopPanel`): it includes
+`/etc/sway/config` (every distro binding and config.d stays), makes the
+stock bar (`bar-0`) run `true` instead of swaybar, starts Waybar with
+droidtop's Waybar config, and binds the stock launcher key to `wofi --show
+drun`. That Waybar config has an Apps button (a touch screen has no Super
+key), workspaces, the focused window, the tray and a clock from `date`, so
+it reads the container's POSIX `TZ`. Sway's own bar is plain `sway`, which
+also reads the person's own `~/.config/sway/config`; it is the choice for
+someone who keeps their own. labwc takes no panel here. Whichever panel
+runs, the library's games are in its launcher, since they are desktop
+entries on `XDG_DATA_DIRS`; the taskbar's minimize test reads the program
+name of the compositor command, not the whole command. droidtop's own
+Compose taskbar stays until it shrinks to what only Android can do (the task
+manager across containers, the mode switch).
 
 **Until it does (built 2026-09-24): droidtop's Start menu lists the primary
 container's own applications.** `ContainerApplications` (`runtime-common`)

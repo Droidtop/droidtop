@@ -261,6 +261,16 @@ object DroidtopWideSettings {
                             onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_TASKBAR_TOP, on).apply() },
                         ),
                         desktopScaleChoice(context),
+                        ChoiceItem(
+                            id = "pref_desktop_panel",
+                            title = "Desktop panel",
+                            subtitle = "The bar and app launcher inside the Linux desktop. A change installs what it needs when the desktop next starts",
+                            options = dev.droidtop.runtime.DesktopPanel.entries.map { ChoiceOption(it.id, it.label) },
+                            current = dev.droidtop.app.DesktopSetupPrefs.panel(context).id,
+                            onSelect = { ctx, value ->
+                                dev.droidtop.app.DesktopSetupPrefs.setPanel(ctx, dev.droidtop.runtime.DesktopPanel.fromId(value))
+                            },
+                        ),
                         ActionItem(
                             id = "pref_desktop_root_compositor_setup",
                             title = "Desktop setup",

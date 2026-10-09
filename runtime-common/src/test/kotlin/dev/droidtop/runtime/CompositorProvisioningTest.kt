@@ -40,6 +40,30 @@ class CompositorProvisioningTest {
     }
 
     @Test
+    fun `the Waybar panel installs waybar and wofi and starts sway with droidtop's config`() {
+        val plan = CompositorProvisioning.plan("alpine", "sway", panel = DesktopPanel.WAYBAR)!!
+        assertTrue(plan.installCommand.endsWith("&& apk add --no-cache waybar wofi"))
+        assertEquals("sway -c /run/droidtop-app-storage/desktop-launcher/panel/sway.config", plan.compositorCommand)
+        val debian = CompositorProvisioning.plan("debian", "sway", panel = DesktopPanel.WAYBAR)!!
+        assertTrue(debian.installCommand.endsWith("&& apt-get install -y --no-install-recommends waybar wofi"))
+        // Sway's own bar is the plain plan; labwc takes no panel.
+        assertEquals("sway", CompositorProvisioning.plan("alpine", "sway", panel = DesktopPanel.SWAYBAR)!!.compositorCommand)
+        assertEquals("labwc", CompositorProvisioning.plan("alpine", "labwc", panel = DesktopPanel.WAYBAR)!!.compositorCommand)
+    }
+
+    @Test
+    fun `droidtop's sway config keeps the distro's and swaps only the bar and the launcher`() {
+        val lines = DesktopPanel.swayConfig().lines()
+        assertTrue("include /etc/sway/config" in lines)
+        assertTrue("bar bar-0 swaybar_command true" in lines)
+        assertTrue("exec waybar -c /run/droidtop-app-storage/desktop-launcher/panel/waybar.json" in lines)
+        assertTrue("bindsym --no-warn \$mod+d exec wofi --show drun" in lines)
+        assertTrue(DesktopPanel.waybarConfig().contains("\"custom/apps\": { \"format\": \"Apps\", \"tooltip\": false, \"on-click\": \"wofi --show drun\" }"))
+        assertEquals(DesktopPanel.WAYBAR, DesktopPanel.fromId(null))
+        assertEquals(DesktopPanel.SWAYBAR, DesktopPanel.fromId("swaybar"))
+    }
+
+    @Test
     fun `alpine plus labwc starts the labwc it installed, not sway`() {
         val plan = CompositorProvisioning.plan("alpine", "labwc")!!
         assertTrue(plan.installCommand.contains("apk add") && plan.installCommand.contains(" labwc "))

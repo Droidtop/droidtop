@@ -708,7 +708,8 @@ private fun TaskbarWindowList(
     val scope = rememberCoroutineScope()
     // Sway's dead set_minimized (see the comment above) makes minimize a
     // compositor-dependent affordance, not a universal one.
-    val minimizeSupported = compositorCommand != "sway"
+    // The program, not the command: the Waybar panel starts sway with droidtop's config (sway -c ...).
+    val minimizeSupported = compositorCommand?.substringBefore(' ') != "sway"
 
     if (toplevels.isEmpty() && androidApps.isEmpty()) {
         Spacer(modifier = modifier)

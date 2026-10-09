@@ -127,9 +127,26 @@ object CompositorProvisioning {
         desktopEnvironment: String,
         printing: Boolean = false,
         allLanguageFonts: Boolean = false,
+        panel: DesktopPanel = DesktopPanel.SWAYBAR,
     ): PrimaryProvisioning? {
         val fonts = basePlan(os, desktopEnvironment)?.let { base -> withFonts(base, os, allLanguageFonts) } ?: return null
-        return withPrinting(fonts, os, printing)
+        return withPrinting(withPanel(fonts, os, desktopEnvironment, panel), os, printing)
+    }
+
+    /**
+     * [DesktopPanel.WAYBAR] adds Waybar and wofi to a sway plan and starts
+     * sway with droidtop's config ([DesktopPanel.swayConfig]); like
+     * Printing it changes the plan, so a desktop made before installs them
+     * on its next start. Sway's own bar, and labwc, are the plan as it is.
+     */
+    private fun withPanel(base: PrimaryProvisioning, os: String, desktopEnvironment: String, panel: DesktopPanel): PrimaryProvisioning {
+        if (panel != DesktopPanel.WAYBAR || desktopEnvironment != "sway") return base
+        val install = when (os) {
+            "debian" -> "${base.installCommand} && apt-get install -y --no-install-recommends ${DesktopPanel.WAYBAR_PACKAGES}"
+            "alpine" -> "${base.installCommand} && apk add --no-cache ${DesktopPanel.WAYBAR_PACKAGES}"
+            else -> return base
+        }
+        return base.copy(installCommand = install, compositorCommand = DesktopPanel.WAYBAR_COMPOSITOR)
     }
 
     private fun withFonts(base: PrimaryProvisioning, os: String, on: Boolean): PrimaryProvisioning {

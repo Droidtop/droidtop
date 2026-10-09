@@ -19,6 +19,15 @@ object DesktopSetupPrefs {
     private const val KEY_PRINTING = "droidtop_desktop_printing"
     private const val KEY_MICROPHONE = "droidtop_desktop_microphone"
     private const val KEY_ALL_LANGUAGE_FONTS = "droidtop_desktop_all_language_fonts"
+    private const val KEY_PANEL = "droidtop_desktop_panel"
+
+    /** The panel and launcher the sway desktop starts (dev.droidtop.runtime.DesktopPanel, Droidtop/tracker#353). */
+    fun panel(context: Context): dev.droidtop.runtime.DesktopPanel =
+        dev.droidtop.runtime.DesktopPanel.fromId(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PANEL, null))
+
+    fun setPanel(context: Context, panel: dev.droidtop.runtime.DesktopPanel) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_PANEL, panel.id).apply()
+    }
 
     /**
      * Whether the primary's plan installs fonts for every script
