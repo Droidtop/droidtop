@@ -5,11 +5,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import dev.droidtop.library.settings.Place
 import dev.droidtop.pluginhost.JobsSummary
 import dev.droidtop.pluginhost.PluginJobsCenter
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +21,7 @@ import kotlinx.coroutines.launch
 /**
  * The one droidtop notification that says how many background jobs are running ("3 jobs running",
  * docs/SPEC.md 12a "Downloads"): library scrapes, plugin work jobs and the like. Tapping it opens
- * Settings, where "Downloads and installs" lists them. Single-file downloads are not counted:
+ * "Downloads and installs" in the mode in use ([PlaceLinks]). Single-file downloads are not counted:
  * Android shows its own notification for each of those.
  *
  * It only posts when the person has already allowed notifications for droidtop (the permission is
@@ -58,15 +57,14 @@ object JobsSummaryNotification {
         val open = PendingIntent.getActivity(
             context,
             0,
-            Intent().setComponent(ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PlaceLinks.intent(context, Place.DOWNLOADS),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         manager.notify(
             NOTIFICATION_ID,
             Notification.Builder(context, CHANNEL_ID)
                 .setContentTitle(JobsSummary.text(count))
-                .setContentText("Open Settings, then Downloads and installs")
+                .setContentText("Tap to open Downloads and installs")
                 .setSmallIcon(R.drawable.ic_launcher_monochrome)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
