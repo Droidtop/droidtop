@@ -41,6 +41,10 @@ object NotificationsStore {
         val postTime: Long,
         val contentIntent: PendingIntent?,
         val clearable: Boolean,
+        /** The notification has a typed-reply action ([Controller.reply] answers it). */
+        val canReply: Boolean = false,
+        /** A message: the app posts it as `MessagingStyle` or in the message category. */
+        val message: Boolean = false,
     )
 
     private val mutableItems = MutableStateFlow<List<Item>>(emptyList())
@@ -53,6 +57,9 @@ object NotificationsStore {
     interface Controller {
         fun dismiss(key: String)
         fun clearAll()
+
+        /** Answers the notification [key] with [text] through its reply action; a failure says why in plain words. */
+        fun reply(key: String, text: String): Result<Unit>
     }
 
     /** Called only by the listener service. */

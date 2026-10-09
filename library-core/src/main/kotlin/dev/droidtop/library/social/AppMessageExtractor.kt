@@ -91,17 +91,8 @@ internal object AppMessageExtractor {
         val shortcutId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) n.shortcutId?.takeIf { it.isNotBlank() } else null
         val group = extras.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, conversationTitle != null && messagingStyle)
 
-        val actions = n.actions.orEmpty().filter { it.actionIntent != null }
-        val described = actions.mapIndexed { index, action ->
-            val inputs = action.remoteInputs.orEmpty()
-            NoteAction(
-                index = index,
-                title = action.title?.toString().orEmpty(),
-                semantic = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) action.semanticAction else 0,
-                hasRemoteInput = inputs.isNotEmpty(),
-                freeForm = inputs.any { it.allowFreeFormInput },
-            )
-        }
+        val actions = NotificationReply.actions(n)
+        val described = NotificationReply.describe(actions)
         val note = MessageNote(
             key = key,
             packageName = packageName,

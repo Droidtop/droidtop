@@ -3400,8 +3400,19 @@ row of recent apps, became Home's Recent apps section for every mode.
      four), and the number of games with an update waiting (the library's own `availableUpdate`).
   4. **Social**: unread conversations and friends in a game, from the same rows the Social tab draws; a tap
      opens that conversation on the Social tab. Not in Kiosk and Kid.
-  5. **Notifications**: the compact group (`CompanionNotifications`):
-     folded, its heading is the count and the newest line; open, up to twelve with Dismiss.
+  5. **Notifications** (`CompanionNotificationsSection`, slice C6, Droidtop/tracker#414): folded, its heading is
+     the count and the newest line; open, Clear all and up to twelve rows. One row model serves Home and the
+     Social tab (which lists the message notifications, `MessagingStyle` or the message category, above its
+     conversations): Reply where the app takes a typed reply, Open (a button, a long-press and a TalkBack
+     action; the app opens on the companion's screen) and Dismiss (a button, a swipe and a TalkBack action).
+     Reply opens droidtop's own keyboard and draft in the companion window (`CompanionComposer`, the Social
+     conversation's composer) and fills the notification's reply action directly (`NotificationReply`, the one
+     direct-reply path the Social place uses too), so Android's input method and focus never move and the game
+     keeps its focus. "Show message text" (Companion group): When unlocked, the default, which while locked
+     follows Android's own lock-screen "show sensitive content"; Always; or Never. A hidden text reads "Tap to
+     show". **Now playing** (`CompanionNowPlayingCard`) sits under the pins: the newest media session's title,
+     artist and app with Previous, Play or Pause and Next, read through notification access and its change
+     callbacks while shown. Kid and Kiosk show neither.
   6. **System**: storage free and total, and All controls (the System tab).
   7. **Widgets**: the user's Android widgets, then Add widget and Remove widget, the same on every host:
      Add opens `CompanionWidgetPickActivity` (Android's picker needs an Activity result, which the

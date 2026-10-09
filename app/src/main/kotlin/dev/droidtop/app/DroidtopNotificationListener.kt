@@ -26,6 +26,14 @@ class DroidtopNotificationListener : NotificationListenerService() {
         override fun clearAll() {
             runCatching { cancelAllNotifications() }
         }
+
+        override fun reply(key: String, text: String): Result<Unit> {
+            val sbn = runCatching { activeNotifications?.firstOrNull { it.key == key } }.getOrNull()
+                ?: return Result.failure(dev.droidtop.library.UserFacingException("That notification is gone"))
+            val action = dev.droidtop.library.social.NotificationReply.replyAction(sbn.notification)
+                ?: return Result.failure(dev.droidtop.library.UserFacingException("This one can only be answered in its app"))
+            return dev.droidtop.library.social.NotificationReply.send(this@DroidtopNotificationListener, action, text)
+        }
     }
 
     override fun onListenerConnected() {
@@ -71,6 +79,10 @@ class DroidtopNotificationListener : NotificationListenerService() {
                     postTime = sbn.postTime,
                     contentIntent = sbn.notification.contentIntent,
                     clearable = sbn.isClearable,
+                    canReply = dev.droidtop.library.social.NotificationReply.replyAction(sbn.notification) != null,
+                    message = sbn.notification.category == android.app.Notification.CATEGORY_MESSAGE ||
+                        extras.getString(android.app.Notification.EXTRA_TEMPLATE) ==
+                        android.app.Notification.MessagingStyle::class.java.name,
                 )
             }
         NotificationsStore.publish(list)

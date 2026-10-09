@@ -264,14 +264,7 @@ object AppMessages : SocialProvider {
         if (!SocialOrder.sendable(text)) return Result.failure(UserFacingException("That message cannot be sent"))
         val action = synchronized(lock) { replyTarget(friendId)?.second }
             ?: return Result.failure(UserFacingException("This conversation can only be answered in its app"))
-        return runCatching {
-            val input = action.remoteInputs.orEmpty().first { it.allowFreeFormInput }
-            val fill = Intent()
-            val results = Bundle().apply { putCharSequence(input.resultKey, text) }
-            RemoteInput.addResultsToIntent(action.remoteInputs, fill, results)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) RemoteInput.setResultsSource(fill, RemoteInput.SOURCE_FREE_FORM_INPUT)
-            action.actionIntent.send(context, 0, fill)
-        }.fold(
+        return NotificationReply.send(context, action, text).fold(
             onSuccess = {
                 synchronized(lock) {
                     val now = System.currentTimeMillis()
@@ -281,10 +274,7 @@ object AppMessages : SocialProvider {
                 }
                 Result.success(Unit)
             },
-            onFailure = { e ->
-                Timber.tag(TAG).w(e, "Reply failed")
-                Result.failure(if (e is PendingIntent.CanceledException) UserFacingException("The app no longer takes replies to this") else e)
-            },
+            onFailure = { e -> Result.failure(e) },
         )
     }
 

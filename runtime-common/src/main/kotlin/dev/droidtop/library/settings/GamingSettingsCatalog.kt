@@ -1129,6 +1129,14 @@ object GamingSettingsCatalog {
                     current = settings.onGameStart,
                     onSelect = { c, value -> CompanionPrefs.setOnGameStart(c, value) },
                 ),
+                ChoiceItem(
+                    id = "companion_message_text",
+                    title = "Show message text",
+                    subtitle = "Whether notifications on the companion show what a message says, or only who sent it",
+                    options = dev.droidtop.runtime.systemstatus.NotificationRows.MessageText.entries.map { ChoiceOption(it.key, it.label) },
+                    current = settings.messageText,
+                    onSelect = { c, value -> CompanionPrefs.setMessageText(c, value) },
+                ),
                 ActionItem(
                     id = "companion_reset",
                     title = "Reset the companion to defaults",

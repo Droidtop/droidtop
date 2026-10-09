@@ -24,6 +24,8 @@ data class CompanionSettings(
     val onGameStart: String = CompanionPrefs.GAME_START_RUNNER,
     /** The bar's first-run tip was dismissed. */
     val barTipSeen: Boolean = false,
+    /** "Show message text" ([dev.droidtop.runtime.systemstatus.NotificationRows.MessageText] key). */
+    val messageText: String = "unlocked",
 ) {
     fun chosen(mode: String): List<String> = chosen[mode] ?: CompanionPrefs.defaultChosen(mode)
     fun opening(mode: String): String = opening[mode] ?: CompanionPrefs.OPEN_DEFAULT
@@ -37,6 +39,7 @@ object CompanionPrefs {
     private const val KEY_GAME_START = "game_start"
     private const val KEY_BAR_TIP = "bar_tip_seen"
     private const val KEY_MIGRATED = "migrated_roles"
+    private const val KEY_MESSAGE_TEXT = "message_text"
 
     const val MAX_CHOSEN = 4
     const val OPEN_DEFAULT = "default"
@@ -98,6 +101,7 @@ object CompanionPrefs {
         last = MODES.mapNotNull { mode -> (all[KEY_LAST + mode] as? String)?.let { mode to currentId(it) } }.toMap(),
         onGameStart = (all[KEY_GAME_START] as? String)?.let(::currentId) ?: GAME_START_RUNNER,
         barTipSeen = all[KEY_BAR_TIP] as? Boolean ?: false,
+        messageText = all[KEY_MESSAGE_TEXT] as? String ?: "unlocked",
     )
 
     /** A stored bar list: comma separated, old ids made current, unknown ids and repeats dropped, at most four. */
@@ -153,6 +157,11 @@ object CompanionPrefs {
     fun setOnGameStart(context: Context, value: String) {
         update { it.copy(onGameStart = value) }
         prefs(context).edit().putString(KEY_GAME_START, value).apply()
+    }
+
+    fun setMessageText(context: Context, key: String) {
+        update { it.copy(messageText = key) }
+        prefs(context).edit().putString(KEY_MESSAGE_TEXT, key).apply()
     }
 
     fun setBarTipSeen(context: Context) {

@@ -127,6 +127,13 @@ private fun CompanionSocialList(onOpen: (OpenConversation) -> Unit) {
         modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // Message notifications, with the same rows (Reply, Open, Dismiss) as Home's notifications.
+        val notes by NotificationsStore.items.collectAsState()
+        val messages = remember(notes) { dev.droidtop.runtime.systemstatus.NotificationRows.messages(notes) }
+        if (messages.isNotEmpty()) {
+            Text("Messages", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            CompanionNotificationList(messages)
+        }
         if (current?.needsAccess == true) {
             ContactRow("Allow notification access", "") { NotificationsStore.openGrantScreen(context) }
             if (current?.restricted == true) {
@@ -219,25 +226,6 @@ private fun CompanionConversation(chat: OpenConversation, onBack: () -> Unit) {
             provider.close(chat.friendId)
         }
     }
-    var draft by remember(chat) { mutableStateOf(CompanionDraft()) }
-    var keyboard by remember(chat) { mutableStateOf(false) }
-    var sending by remember(chat) { mutableStateOf(false) }
-    var failure by remember(chat) { mutableStateOf<String?>(null) }
-
-    fun send() {
-        val text = draft.text.trim()
-        if (sending || !SocialOrder.sendable(text)) return
-        sending = true
-        scope.launch {
-            val result = withContext(Dispatchers.IO) { provider.send(chat.friendId, text) }
-            sending = false
-            result.onSuccess {
-                draft = CompanionDraft()
-                failure = null
-            }.onFailure { failure = userFacingErrorMessage(it) }
-        }
-    }
-
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CompanionPill("Back", onClick = onBack)
@@ -261,10 +249,44 @@ private fun CompanionConversation(chat: OpenConversation, onBack: () -> Unit) {
             }
             items(messages.asReversed(), key = { it.key }) { message -> MessageBubble(context, message, chat.name) }
         }
-        failure?.let { Text("Not sent: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         // Re-read when the conversation changes: its notification may have gone, and with it the reply.
         val canSend = remember(messages) { provider.canSend(chat.friendId) }
-        if (canSend) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (canSend) CompanionComposer(key = chat) { text -> provider.send(chat.friendId, text) }
+    }
+}
+
+/**
+ * A message composer: the draft as a field, Send, and droidtop's one keyboard (KeyboardPanel) drawn in the companion
+ * window, its keys editing the draft directly, so no input method and no window focus are involved (docs/SPEC.md
+ * 4c) and a game on the other screen keeps its focus. A Social conversation and a notification's Reply both use it;
+ * [onSend] is the one reply path each has. [key] starts a fresh draft when it changes.
+ */
+@Composable
+internal fun CompanionComposer(key: Any?, startWithKeyboard: Boolean = false, onSent: () -> Unit = {}, onSend: suspend (String) -> Result<Unit>) {
+    val scope = rememberCoroutineScope()
+    var draft by remember(key) { mutableStateOf(CompanionDraft()) }
+    var keyboard by remember(key) { mutableStateOf(startWithKeyboard) }
+    var sending by remember(key) { mutableStateOf(false) }
+    var failure by remember(key) { mutableStateOf<String?>(null) }
+
+    fun send() {
+        val text = draft.text.trim()
+        if (sending || !SocialOrder.sendable(text)) return
+        sending = true
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { onSend(text) }
+            sending = false
+            result.onSuccess {
+                draft = CompanionDraft()
+                failure = null
+                onSent()
+            }.onFailure { failure = userFacingErrorMessage(it) }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        failure?.let { Text("Not sent: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DraftField(
                 draft = draft,
                 modifier = Modifier.weight(1f),
@@ -276,9 +298,7 @@ private fun CompanionConversation(chat: OpenConversation, onBack: () -> Unit) {
             CompanionPill(if (sending) "Sending" else "Send", selected = SocialOrder.sendable(draft.text.trim())) { send() }
             CompanionPill(if (keyboard) "Hide" else "Keys") { keyboard = !keyboard }
         }
-        if (canSend && keyboard) {
-            // droidtop's one keyboard (KeyboardPanel); here its keys edit the draft directly, so no input method
-            // and no window focus are involved (docs/SPEC.md 4c).
+        if (keyboard) {
             DroidtopKeyboard(
                 sink = object : KeyboardSink {
                     override fun key(androidKeyCode: Int, down: Boolean) {

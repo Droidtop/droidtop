@@ -77,6 +77,7 @@ fun CompanionSurface(
             CompanionSystemBar()
             LaunchErrorLine()
             if (shows(dev.droidtop.library.settings.ControlRow.PINS)) CompanionPinsSection()
+            if (shows(dev.droidtop.library.settings.ControlRow.NOW_PLAYING)) CompanionNowPlayingCard()
             val library = shows(dev.droidtop.library.settings.ControlRow.LIBRARY)
             if (library && layout.shows(CompanionHomeSection.NOW)) CompanionNowSection(entry, layout)
             if (library && layout.shows(CompanionHomeSection.CONTINUE)) CompanionRecents(layout)
@@ -90,7 +91,7 @@ fun CompanionSurface(
             }
             if (shows(dev.droidtop.library.settings.ControlRow.NOTIFICATIONS) && layout.shows(CompanionHomeSection.NOTIFICATIONS)) {
                 val open = layout.isOpen(CompanionHomeSection.NOTIFICATIONS)
-                CompanionNotifications(open = open) {
+                CompanionNotificationsSection(open = open) {
                     CompanionHomePrefs.setOpen(context, CompanionHomeSection.NOTIFICATIONS, !open)
                 }
             }
