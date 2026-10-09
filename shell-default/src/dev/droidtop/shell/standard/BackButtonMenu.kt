@@ -1,15 +1,9 @@
 package dev.droidtop.shell.standard
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Bundle
-import android.view.Gravity
-import android.view.View
-import android.widget.LinearLayout
-import android.widget.TextView
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.ModeGate
 import dev.droidtop.library.settings.Modes
@@ -27,10 +21,11 @@ import dev.droidtop.library.settings.Modes
  * - the Desktop taskbar ("Modes");
  * - droidtop's games screen, when it is the only droidtop surface on.
  *
- * All but the first open it through [ModeSwitcher.open], which hosts it in
- * [ModeSwitcherActivity] so a surface with no Activity of its own to hand
- * (a settings catalog row, a Compose screen in another module) opens the
- * same dialog.
+ * Every route opens it through [ModeSwitcher.open]: one translucent
+ * activity in `:app` (`ModeSwitcherActivity`) draws the shell's own modal
+ * sheet over whatever is on screen, so the switcher looks and answers the
+ * pad the same in every mode (it was a platform AlertDialog in the system
+ * face until 2026-10-08, rig build 1535).
  *
  * The long press stays because it is the one route from anywhere, but on
  * its own it failed the rig: BlueStacks never delivers a long-pressed Back,
@@ -90,145 +85,30 @@ object BackButtonMenu {
      * recovering Gaming took a data clear).
      */
     @JvmStatic
-    @JvmOverloads
-    fun show(activity: Activity, onDismiss: (() -> Unit)? = null) {
-        val homeImplementation = HomeRolePrefs.activeHomeImplementation(activity)
-        val density = activity.resources.displayMetrics.density
-        fun dp(value: Int): Int = (value * density).toInt()
+    fun show(activity: Activity) = ModeSwitcher.open(activity)
 
-        // Real, individually focusable Views chained in one vertical
-        // LinearLayout, not a stock AlertDialog list: the ListView the
-        // dialog used to build its rows from left D-pad focus stuck on the
-        // first row no matter how many times Down was pressed, and a tap on
-        // "Gaming" restarted MainActivity without ever landing on the
-        // Gaming shell (rig, dq-modefix-01, BlueStacks/Android 9). A plain
-        // LinearLayout's own focus search -- the same mechanism every other
-        // droidtop screen already relies on for pad navigation -- moves
-        // between real sibling Views far more reliably across Android
-        // versions than a ListView's internal selection tracking, and each
-        // row's own click closure captures its mode directly instead of
-        // looking an index back up in a parallel list.
-        val root = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(20), dp(24), dp(12))
-        }
-        root.addView(
-            TextView(activity).apply {
-                text = "Switch mode"
-                textSize = 20f
-                setTextColor(TITLE_COLOR)
-                setPadding(dp(8), 0, dp(8), dp(16))
-                DialogAccessibility.heading(this)
-            },
-        )
-        DialogAccessibility.paneTitle(root, "Switch mode")
-
-        var dialog: AlertDialog? = null
-        var confirmDown = false
-        val rows = mutableListOf<TextView>()
-        fun addRow(label: String, onSelect: () -> Unit) {
-            rows += TextView(activity).apply {
-                text = label
-                textSize = 17f
-                setTextColor(ROW_COLOR)
-                isFocusable = true
-                isClickable = true
-                DialogAccessibility.button(this)
-                background = activity.getDrawable(com.android.launcher3.R.drawable.droidtop_list_selector)
-                setPadding(dp(16), dp(14), dp(16), dp(14))
-                setOnClickListener {
-                    onSelect()
-                    dialog?.dismiss()
-                }
-                root.addView(this)
-            }
-        }
-
-        // Same rows, same order [ModeGate.switcherModes] already gives the
-        // rest of droidtop -- "Android" always, Desktop/Gaming only while
-        // enabled -- plus this switcher's own two fixed actions.
-        for (mode in ModeGate.switcherModes(Modes.enabled)) {
-            when (mode) {
-                Mode.LAUNCHER -> addRow(Mode.LAUNCHER.label) { openHome(activity, homeImplementation) }
-                Mode.DESKTOP -> addRow(Mode.DESKTOP.label) { launchAppMode(activity, Mode.DESKTOP) }
-                Mode.GAMING -> addRow(Mode.GAMING.label) { launchAppMode(activity, Mode.GAMING) }
-            }
-        }
-        addRow(SETTINGS_ITEM) { openGlobalSettings(activity) }
-        addRow(REINIT_DISPLAYS_ITEM) { reinitializeDisplays(activity) }
-        addRow(CLEAR_ALL_APPS_ITEM) { ClearAllApps.open(activity) }
-
-        root.addView(
-            View(activity).apply {
-                setBackgroundColor(DIVIDER_COLOR)
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)).apply {
-                    topMargin = dp(12)
-                    bottomMargin = dp(10)
-                }
-            },
-        )
-        // This dialog's own hint row (p2-ux-droidtop-dialog-hint-row): the
-        // Quick Menu's hint row underneath it named controls that don't
-        // apply here ("Lower/Raise/Act/Close"), and a hint naming a button
-        // nothing here handles is worse than none. This one names what the
-        // dialog itself does.
-        root.addView(
-            TextView(activity).apply {
-                text = "Up/Down Navigate  ·  A Select  ·  B Cancel"
-                textSize = 13f
-                setTextColor(HINT_COLOR)
-                gravity = Gravity.START
-                setPadding(dp(8), 0, dp(8), 0)
-                DialogAccessibility.hide(this)
-            },
-        )
-
-        // DroidtopDialog: the same dark chrome palette as DroidtopTheme
-        // (docs/SPEC.md section 2a chrome theming). This menu used to
-        // render in the stock AlertDialog look, visually unrelated to
-        // every other droidtop surface.
-        dialog = AlertDialog.Builder(activity, com.android.launcher3.R.style.DroidtopDialog)
-            .setView(root)
-            .setOnDismissListener { onDismiss?.invoke() }
-            // A press that arrives with no row focused (the window came up in touch mode) is
-            // the first row's: A selects at once instead of only bringing the focus back. Only a
-            // press that went down here counts, never the release of the press that opened it.
-            .setOnKeyListener { _, keyCode, event ->
-                val confirm = keyCode == android.view.KeyEvent.KEYCODE_BUTTON_A ||
-                    keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
-                    keyCode == android.view.KeyEvent.KEYCODE_ENTER
-                when {
-                    !confirm || rows.any { it.isFocused } -> false
-                    event.action == android.view.KeyEvent.ACTION_DOWN -> {
-                        if (event.repeatCount == 0) confirmDown = true
-                        true
-                    }
-                    event.action == android.view.KeyEvent.ACTION_UP && confirmDown -> {
-                        confirmDown = false
-                        rows.firstOrNull()?.performClick()
-                        true
-                    }
-                    else -> false
+    /**
+     * The switcher's rows, in order, each with what choosing it does: "Android" always, Desktop and
+     * Gaming while they are on ([ModeGate.switcherModes]), then "Modes and settings", "Reinitialize
+     * displays" and "Close all apps". The rows are drawn by the shell's own modal sheet
+     * (`ModeSwitcherSheet` in `:shell-gamepad`, hosted by `dev.droidtop.app.ModeSwitcherActivity`),
+     * the same in every mode; this module cannot depend on that one, so it hands over the list.
+     */
+    fun choices(context: Context): List<Pair<String, () -> Unit>> {
+        val homeImplementation = HomeRolePrefs.activeHomeImplementation(context)
+        return buildList {
+            for (mode in ModeGate.switcherModes(Modes.enabled)) {
+                when (mode) {
+                    Mode.LAUNCHER -> add(Mode.LAUNCHER.label to { openHome(context, homeImplementation) })
+                    Mode.DESKTOP -> add(Mode.DESKTOP.label to { launchAppMode(context, Mode.DESKTOP) })
+                    Mode.GAMING -> add(Mode.GAMING.label to { launchAppMode(context, Mode.GAMING) })
                 }
             }
-            .show()
-        // The dialog opens with real pad focus already on the first row,
-        // rather than leaving the very first Down press "acquire" focus
-        // (the visible symptom of the stuck-on-"Android" bug above). Opened
-        // from a screen in touch mode (the Quick Menu's tile, a tap), a plain
-        // requestFocus is refused and the dialog showed no selection until a
-        // key was pressed, and the first A only brought it back (console,
-        // build 1519); the touch-mode request takes it there too. Asked once
-        // the window is attached, since the dialog's window takes focus after
-        // show() returns.
-        val first = rows.firstOrNull()
-        first?.post { if (!first.requestFocus()) first.requestFocusFromTouch() }
+            add(SETTINGS_ITEM to { openGlobalSettings(context) })
+            add(REINIT_DISPLAYS_ITEM to { reinitializeDisplays(context) })
+            add(CLEAR_ALL_APPS_ITEM to { ClearAllApps.open(context) })
+        }
     }
-
-    private const val TITLE_COLOR = 0xFFEDEDED.toInt()
-    private const val ROW_COLOR = 0xFFEDEDED.toInt()
-    private const val HINT_COLOR = 0xFFA0A0A0.toInt()
-    private const val DIVIDER_COLOR = 0x33FFFFFF
 
     /** Names the screen it opens: Global settings is where the modes live. */
     private const val SETTINGS_ITEM = "Modes and settings"
@@ -315,14 +195,14 @@ object BackButtonMenu {
     @JvmStatic
     fun isExplicitHome(intent: Intent?): Boolean = intent?.getStringExtra(EXTRA_MODE) == Mode.LAUNCHER.id
 
-    private fun launchAppMode(activity: Activity, mode: Mode) {
-        Modes.setLastMode(activity, mode)
+    private fun launchAppMode(context: Context, mode: Mode) {
+        Modes.setLastMode(context, mode)
         val intent = Intent(Intent.ACTION_MAIN).apply {
-            setClassName(activity.packageName, APP_MAIN_ACTIVITY)
+            setClassName(context.packageName, APP_MAIN_ACTIVITY)
             putExtra(EXTRA_MODE, mode.id)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        activity.startActivity(intent)
+        context.startActivity(intent)
     }
 
     /** Global settings, on the settings surface every mode shares. */
@@ -342,7 +222,7 @@ object BackButtonMenu {
 
 /** Opens the mode switcher from anywhere; see [BackButtonMenu]. */
 object ModeSwitcher {
-    const val ACTIVITY = "dev.droidtop.shell.standard.ModeSwitcherActivity"
+    const val ACTIVITY = "dev.droidtop.app.ModeSwitcherActivity"
 
     @JvmStatic
     fun open(context: Context) {
@@ -352,17 +232,5 @@ object ModeSwitcher {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             },
         )
-    }
-}
-
-/**
- * Hosts [BackButtonMenu] for a caller with no Activity of its own to show
- * a dialog from. Translucent: the dialog appears over whatever was on
- * screen, and the activity goes when the dialog does.
- */
-class ModeSwitcherActivity : Activity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        BackButtonMenu.show(this) { finish() }
     }
 }

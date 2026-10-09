@@ -750,7 +750,7 @@ private const val CONTAINERS_SCREEN_ID = "containers"
 
 private fun openModes(context: Context) {
     val intent = Intent(Intent.ACTION_MAIN).apply {
-        component = ComponentName(context.packageName, "dev.droidtop.shell.standard.ModeSwitcherActivity")
+        component = ComponentName(context.packageName, "dev.droidtop.app.ModeSwitcherActivity")
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     context.startActivity(intent)

@@ -659,35 +659,22 @@ list and of Desktop's settings as well as Gaming's; turning a mode off is
 always reversible from the UI (it once took a data clear, dq-coordinator-23
 F5).
 
-**The switcher's rows are real Views, not a stock dialog list (fixed
-2026-09-26).** A UX pass on BlueStacks (Android 9, droidtop 0.1.0-dev-903)
-found the switcher unusable both ways: D-pad Down moved focus onto
-"Android" and no further Down press ever reached "Gaming" or past it, and
-tapping "Gaming" directly restarted `MainActivity` (confirmed in logcat)
-but the screen stayed on whatever was showing before -- the stock
-`AlertDialog.setItems` list's own internal selection tracking, not
-droidtop's own focus/click handling. `BackButtonMenu.show` now builds the
-dialog's rows itself: one real, individually focusable `TextView` per row
-in a plain vertical `LinearLayout`, each with its own click closure
-capturing its mode directly rather than looking an index back up in a
-parallel array. A `LinearLayout`'s own focus search is the same mechanism
-every other droidtop screen already relies on for pad navigation, and is
-far more reliably tested across Android versions than a `ListView`'s
-internal one; the first row receives focus explicitly on open rather than
-waiting for the first Down press to "acquire" it. Opened from a window in
-touch mode (the Quick Menu's tile on the console, build 1519) a plain focus
-request is refused, so the dialog showed no selection and the first A only
-brought it back: the request is made once the window is attached and falls
-back to the touch-mode one (`requestFocusFromTouch`), and an A that went
-down in the dialog with nothing focused presses the first row (2026-10-08,
-Droidtop/tracker#363). The row order is
-`ModeGate.switcherModes` (`runtime-common`, unit-tested in `ModesTest`):
-Android always, Desktop and Gaming only while enabled -- exactly what
-`BackButtonMenu` computed inline before, now a pure function the dialog
-and its test share. The dialog also draws its own hint row ("Up/Down
-Navigate · A Select · B Cancel") instead of leaving the Quick Menu's
-underneath it visible through the dialog, which named controls
-("Lower/Raise/Act/Close") that don't apply here.
+**The switcher is the shell's own modal sheet, in every mode (2026-10-08,
+Droidtop/tracker#363).** It was a platform `AlertDialog` (since 2026-09-26 built
+from real Views, because the stock list's own selection lost D-pad focus) in the
+system face, unlike every other droidtop surface (rig, build 1535). Every route
+now opens one translucent activity in `:app`, `ModeSwitcherActivity`
+(`ModeSwitcher.open`; the long press of Back, the home screen's menu, Gaming's
+Quick Menu tile and the Desktop taskbar alike), which draws `ModeSwitcherSheet`
+(`:shell-gamepad`): `MenuPanel`'s panel, dim, glide and title, the shell's rows,
+in the Gaming theme when Gaming was the last mode and droidtop's own look
+otherwise. The rows and what each does stay in `:shell-default`
+(`BackButtonMenu.choices`), in `ModeGate.switcherModes` order (unit-tested in
+`ModesTest`): Android always, Desktop and Gaming only while enabled, then Modes
+and settings, Reinitialize displays and Close all apps. The first row holds the
+cursor from the start, so one A chooses it; B closes; the sheet draws its own
+hint row (A Select, B Cancel), the touch route to those presses, because the
+window has no shell footer.
 
 **That fix was the dialog; a second, separate bug looked like "Gaming
 never appears" (found and fixed 2026-09-26).** The rig re-tested the

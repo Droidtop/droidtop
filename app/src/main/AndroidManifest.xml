@@ -315,6 +315,20 @@
           droidtop-internal surface.
         -->
         <!--
+          The mode switcher (BackButtonMenu.choices) as the shell's own modal sheet
+          (ModeSwitcherSheet), for every route: the long press of Back, the home
+          screen's menu, Gaming's Quick Menu, the Desktop taskbar. Its own task, so
+          opening it never brings another droidtop task forward behind it;
+          translucent, so the sheet sits over whatever was on screen.
+        -->
+        <activity
+            android:name="dev.droidtop.app.ModeSwitcherActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!--
           Standard mode's search: the launcher's drawer search field opens it
           by the action below (the launcher module cannot name this class).
           Translucent, so the drawer shows behind it. Not exported.
