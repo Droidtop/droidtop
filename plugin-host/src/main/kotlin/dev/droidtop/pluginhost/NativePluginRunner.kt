@@ -62,7 +62,10 @@ class NativePluginRunner(
         }
     }
 
-    override suspend fun load(record: PluginRecord, installDir: String): Boolean = load(record, installDir, PluginTier.FULL_TRUST)
+    override suspend fun load(record: PluginRecord, installDir: String): Boolean {
+        val grants = withContext(Dispatchers.IO) { PluginGrants.forContext(appContext).read(record.manifest.id) }
+        return load(record, installDir, PluginTiers.of(record, grants))
+    }
 
     /**
      * Loads [record] in its own process for [tier]: from its install folder with full trust, or, contained, from the

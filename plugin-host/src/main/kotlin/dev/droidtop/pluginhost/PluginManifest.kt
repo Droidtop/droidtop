@@ -251,6 +251,11 @@ data class PluginManifest(
                 add("ui.main must name the Dart entrypoint it starts (\"entrypoint\")")
             }
         }
+        // docs/plugin-api.md 5.3: a contract 2 plugin runs contained unless the person allows it full access, so one that
+        // cannot run contained must ask for full access where the person sees it, on the approval list.
+        if (contractVersion >= 2 && !PluginTiers.declaresFullTrust(this@PluginManifest)) {
+            PluginTiers.containmentBlocker(this@PluginManifest)?.let { add("this plugin cannot run contained ($it), so it must declare ${PluginTiers.FULL_TRUST}") }
+        }
         if (!PluginOriginKeys.isOfficial(origin)) {
             v2.permissions.filter { PluginPermissions.find(it.id)?.officialOnly == true }.forEach {
                 add("permission \"${it.id}\" is restricted to the official origin")

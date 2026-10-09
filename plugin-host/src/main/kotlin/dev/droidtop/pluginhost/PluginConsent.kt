@@ -38,6 +38,8 @@ data class ConsentView(
     val unsupported: List<String>,
     /** A contract 1 plugin holds `host.full_trust`: shown as "Full access (older plugin)". */
     val olderPluginFullAccess: Boolean,
+    /** A contract 2 plugin that asks for `host.full_trust` (docs/plugin-api.md 5.3); without it, it runs contained. */
+    val asksFullAccess: Boolean = false,
 ) {
     /** Every tick box on the list, in the order shown. */
     val items: List<ConsentLine> get() = (adds.flatMap { it.second } + can + asks.map { it.line } + offers).filter { it.id != null }
@@ -140,6 +142,7 @@ object PluginConsent {
             uses = uses,
             unsupported = manifest.unsupportedDeclarations(),
             olderPluginFullAccess = manifest.contractVersion < 2,
+            asksFullAccess = newContract && PluginTiers.declaresFullTrust(manifest),
         )
     }
 

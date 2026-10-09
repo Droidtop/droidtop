@@ -32,14 +32,47 @@ class PluginCrashPolicy(
         PluginStore.disableWithReason(context, pluginId, PluginLoadErrorMessage.userMessage(reason), detail = reason)
     }
 
-    /** Loads [record]; the reason it could not, or null. */
-    private suspend fun loadFor(record: PluginRecord, userInitiated: Boolean, tier: PluginTier = PluginTier.FULL_TRUST): String? {
+    /**
+     * The tier [record] runs in for this call (docs/plugin-api.md 5.3), or why it cannot run: a plugin that can only run
+     * with full access and has not been allowed it. During a call the person started, an unanswered `host.full_trust`
+     * is asked about on the first-use sheet, like any other critical permission; from the background it is not.
+     */
+    private suspend fun tierFor(record: PluginRecord, userInitiated: Boolean): Pair<PluginTier?, String?> = withContext(Dispatchers.IO) {
+        val store = PluginGrants.forContext(context)
+        var grants = store.read(record.manifest.id)
+        val refusal = PluginTiers.refusal(record, grants) ?: return@withContext PluginTiers.of(record, grants) to null
+        val state = PluginGrants.stateOf(record, grants, PluginTiers.FULL_TRUST)
+        if (state == GrantState.ASK && userInitiated) {
+            val declared = record.manifest.v2.permissions.first { it.id == PluginTiers.FULL_TRUST }
+            val answer = PluginGrantPrompts.ask(
+                GrantPromptRequest(
+                    record.manifest.id, record.manifest.label, PluginTiers.FULL_TRUST,
+                    PluginPermissions.labelFor(PluginTiers.FULL_TRUST) ?: PluginTiers.FULL_TRUST, declared.reason, PermissionTier.CRITICAL,
+                ),
+            )
+            when (answer) {
+                GrantAnswer.ALLOW -> store.set(record.manifest.id, PluginTiers.FULL_TRUST, GrantState.GRANTED)
+                GrantAnswer.NEVER -> store.set(record.manifest.id, PluginTiers.FULL_TRUST, GrantState.DENIED)
+                GrantAnswer.NOT_NOW -> Unit
+            }
+            grants = store.read(record.manifest.id)
+            PluginTiers.refusal(record, grants)?.let { return@withContext null to it }
+            return@withContext PluginTiers.of(record, grants) to null
+        }
+        if (state == GrantState.ASK) store.noteWanted(record.manifest.id, PluginTiers.FULL_TRUST)
+        null to refusal
+    }
+
+    /** Loads [record] in the tier it may run in; false with the reason in [loadFailure] when it cannot. */
+    private suspend fun loadFor(record: PluginRecord, userInitiated: Boolean): String? {
+        val (tier, refusal) = tierFor(record, userInitiated)
+        if (tier == null) return refusal ?: "plugin failed to load"
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
         return if (runner.load(record, dir.absolutePath, tier)) null else loadFailure(record)
     }
 
     /**
-     * The containment check (docs/plugin-api.md 5.3): loads [record] contained, in an isolated process, and reports, in plain lines,
+     * The containment check (docs/plugin-api.md 5.3): loads [record] the way a call would and reports, in plain lines,
      * which tier and process it runs in and what that process reached when it tried the network, droidtop's files and
      * shared storage, plus how a contained python runtime loaded. For the rig and for anyone who wants to see the wall.
      */
@@ -47,7 +80,7 @@ class PluginCrashPolicy(
         if (!record.runnable()) return "${record.manifest.label} is not approved and turned on"
         gateOnVerification(record)?.let { return it.error ?: "failed its check" }
         missingRuntime(record)?.let { return it.message }
-        loadFor(record, userInitiated = true, tier = PluginTier.CONTAINED)?.let { return "Did not load contained: $it" }
+        loadFor(record, userInitiated = true)?.let { return "Did not load: $it" }
         val report = runner.reachability(record.manifest.id) ?: return "Loaded, but its process did not answer"
         return buildString {
             append(if (report.optBoolean("isolated")) "Contained: an isolated process" else "Full access: droidtop's own UID")

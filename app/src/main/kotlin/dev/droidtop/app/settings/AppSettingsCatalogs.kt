@@ -60,6 +60,8 @@ import dev.droidtop.pluginhost.PluginConsent
 import dev.droidtop.pluginhost.PermissionTier
 import dev.droidtop.pluginhost.ExtensionPoints
 import dev.droidtop.pluginhost.PluginCrashPolicy
+import dev.droidtop.pluginhost.PluginTier
+import dev.droidtop.pluginhost.PluginTiers
 import dev.droidtop.pluginhost.PluginOriginKeys
 import dev.droidtop.pluginhost.PluginSourceKeys
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
@@ -1681,7 +1683,7 @@ object AppSettingsCatalogs {
         return NestedScreenItem(
             id = "plugin_${m.id}",
             title = m.label,
-            subtitle = pluginSummary(m, enabledPoints) + " - " + trustBadge,
+            subtitle = pluginSummary(m, enabledPoints) + " - " + trustBadge + " - " + PluginTiers.badge(record, grants),
             inline = pluginDetailScreen(m.id, m.label),
             valueLabel = { state },
         )
@@ -1761,6 +1763,8 @@ object AppSettingsCatalogs {
             // are the action; keep the trust/status row for plugins that already have a decision.
             if (record.trust != PluginTrustState.PENDING) {
                 add(ActionItem(id = "plugin_${m.id}_status", title = statusLine, subtitle = trustLine, run = {}))
+                // docs/plugin-api.md 5.3: where its code runs decides what it can reach without asking droidtop.
+                add(ActionItem(id = "plugin_${m.id}_access", title = PluginTiers.badge(record, grantSnapshot), subtitle = accessLine(record, grantSnapshot), run = {}))
             }
             // The headline above is a plain sentence; what the plugin actually reported is one press away,
             // for its developer or a bug report (docs/SPEC.md 12a, Droidtop/tracker#167).
@@ -2130,6 +2134,16 @@ object AppSettingsCatalogs {
         }
     }
 
+    /** What the access badge means for [record], in one sentence (docs/plugin-api.md 4.6, 5.3). */
+    private fun accessLine(record: dev.droidtop.pluginhost.PluginRecord, grants: PluginGrants.Snapshot): String {
+        PluginTiers.refusal(record, grants)?.let { return it }
+        return if (PluginTiers.of(record, grants) == PluginTier.FULL_TRUST) {
+            "Runs with droidtop's own access: it can do anything droidtop can, and only what it asks droidtop to do is listed under Activity"
+        } else {
+            "Runs sealed in a process of its own: no network, files or permissions except what droidtop does for it, as allowed under Permissions"
+        }
+    }
+
     /** One line of the Permissions screen: a permission, a high-risk point it may provide, or an export, with its current state. */
     private data class PermissionRow(val id: String, val label: String, val reason: String?, val tier: PermissionTier, val state: GrantState)
 
@@ -2250,22 +2264,22 @@ object AppSettingsCatalogs {
             }
         val rest = rows
         return listOfNotNull(
-            if (record.manifest.contractVersion < 2) {
-                CatalogGroup(
-                    id = "plugin_permissions_older",
-                    title = "Older plugin",
-                    items = listOf(
-                        ActionItem(
-                            id = "plugin_permissions_older_row",
-                            title = "Full access (older plugin)",
-                            subtitle = "Written before permissions existed; turn any of it off below",
-                            run = {},
-                        ),
+            CatalogGroup(
+                id = "plugin_permissions_access",
+                title = "Access",
+                items = listOf(
+                    ActionItem(
+                        id = "plugin_permissions_access_row",
+                        title = PluginTiers.badge(record, snap),
+                        subtitle = if (record.manifest.contractVersion < 2) {
+                            "Written before permissions existed: it runs with droidtop's own access, and only what it asks droidtop to do is listed under Activity"
+                        } else {
+                            accessLine(record, snap)
+                        },
+                        run = {},
                     ),
-                )
-            } else {
-                null
-            },
+                ),
+            ),
             modeItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_modes", "Where it appears", it) },
             backgroundItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_background", "Background tasks", it) },
             rest.filter { it.tier == PermissionTier.CRITICAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_critical", "Critical", it.map(::item)) },
@@ -2355,10 +2369,14 @@ object AppSettingsCatalogs {
         fun group(key: String, title: String, items: List<CatalogItem>) =
             if (items.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_consent_$scope$key", title = title, items = items)
         return listOfNotNull(
-            if (view.olderPluginFullAccess && only == null) {
-                group("older", "Older plugin", listOf(info("older", "Full access (older plugin)", "Written before permissions existed: it can do everything it could before, and droidtop does not contain it")))
-            } else {
+            if (only != null) {
                 null
+            } else if (view.olderPluginFullAccess) {
+                group("older", "Older plugin", listOf(info("older", "Full access (older plugin)", "Written before permissions existed: it can do everything it could before, and droidtop does not contain it")))
+            } else if (view.asksFullAccess) {
+                group("access", "Access", listOf(info("access", "Asks for full access", "Allowed, it runs with droidtop's own access and can do anything droidtop can; only what it asks droidtop to do is listed under Activity")))
+            } else {
+                group("access", "Access", listOf(info("access", "Contained", "Runs sealed in a process of its own: it can reach only what is listed here, and only through droidtop")))
             },
             group(
                 "adds", "Adds",
