@@ -42,6 +42,7 @@ class GOGStore : StoreLibrary {
         home = "https://www.gog.com/",
         hosts = listOf("gog.com"),
         searchPage = "https://www.gog.com/en/games?query=",
+        accountLibrary = "https://www.gog.com/en/account",
     )
     override val signInKind = StoreSignInKind.WEB_PAGE
 
@@ -159,9 +160,20 @@ class GOGStore : StoreLibrary {
     override suspend fun checkUpdate(context: Context, gameId: String): StoreUpdateCheck? = withContext(Dispatchers.IO) {
         val game = dao(context).getById(gameId) ?: return@withContext null
         if (!game.isInstalled || game.installedBuildId.isBlank()) return@withContext null
+        againstLive(context, gameId, game.installedBuildId)
+    }
+
+    // An offline installer's build, from its goggame-<id>.info, against the newest: the same comparison.
+    override suspend fun checkMarkerUpdate(context: Context, gameId: String, buildId: String): StoreUpdateCheck? =
+        withContext(Dispatchers.IO) {
+            if (buildId.isBlank() || !signedIn(context)) return@withContext null
+            againstLive(context, gameId, buildId)
+        }
+
+    private suspend fun againstLive(context: Context, gameId: String, buildId: String): StoreUpdateCheck? {
         val client = GOGApiClient(context.applicationContext, GOGManifestParser())
-        val live = client.latestWindowsBuild(gameId).getOrNull() ?: return@withContext null
-        StoreUpdateCheck(updateState(game.installedBuildId, live.buildId), live.versionName.takeIf { it.isNotBlank() })
+        val live = client.latestWindowsBuild(gameId).getOrNull() ?: return null
+        return StoreUpdateCheck(updateState(buildId, live.buildId), live.versionName.takeIf { it.isNotBlank() })
     }
 
     override suspend fun launch(context: Context, gameId: String): StoreLaunch? =

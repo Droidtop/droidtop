@@ -31,6 +31,12 @@ class StoreWebPages(
     val hosts: List<String>,
     /** The store's search page for what the person typed. */
     private val searchPage: String,
+    /**
+     * The account's own library on the store's site, where the installers of
+     * what it owns are (GOG's): where "Get the new installer" goes for a copy
+     * installed outside droidtop. Null when the store has no such page.
+     */
+    val accountLibrary: String? = null,
 ) {
     /** The store's search page for [query]. */
     fun search(query: String): String = searchPage + URLEncoder.encode(query.trim(), "UTF-8")

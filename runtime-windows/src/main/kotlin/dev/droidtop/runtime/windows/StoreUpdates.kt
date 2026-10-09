@@ -42,6 +42,23 @@ internal object StoreUpdates {
     @Volatile
     private var known: Map<String, Result> = emptyMap()
 
+    /**
+     * The folder games whose store marker names a build (docs/SPEC.md 7g,
+     * "Store markers"), by the folder game's id, from the folder walks: their
+     * answer is kept under that id, which is what the folder game's row reads.
+     */
+    @Volatile
+    private var markers: Map<String, dev.droidtop.library.StoreMarker> = emptyMap()
+
+    /** Adds what a folder walk found ([markers]); a marker with no build has nothing to compare and is left out. */
+    fun rememberMarkers(found: Map<String, dev.droidtop.library.StoreMarker>) {
+        val withBuild = found.filterValues { !it.buildId.isNullOrBlank() }
+        if (withBuild.isNotEmpty()) markers = markers + withBuild
+    }
+
+    /** The folder games asked about through their marker, for the store part's refresh. */
+    fun markerIds(): List<String> = markers.keys.toList()
+
     @Volatile
     private var checkedAt = 0L
 
@@ -118,6 +135,11 @@ internal object StoreUpdates {
 
     /** The store's answer, or null when it cannot be asked right now or has no check at all. */
     private suspend fun ask(context: Context, id: String): Result? {
+        markers[id]?.let { marker ->
+            val build = marker.buildId ?: return null
+            val store = StoreLibraries.byId(marker.storeId) ?: return null
+            return store.checkMarkerUpdate(context, marker.gameId, build)?.let { Result(it.update, it.latest) }
+        }
         val store = StoreLibraries.forKey(id) ?: return null
         return store.checkUpdate(context, id.substringAfter(':'))?.let { Result(it.update, it.latest) }
     }

@@ -11221,6 +11221,28 @@ is that store's game for every reader of `PcSource` (the Source facet, the
 focus line), signed in or not, and carries no Ownership: holding is a store
 row's fact.
 
+**One card with the account (slice F).** A marker folder and the account's
+row of that game on that store (the same store id, `StoreMarker.key`) are one
+card (`LibraryGrouping.withMarkedCopies`): a GOG offline install with the GOG
+account's row, a Heroic install with the Epic account's. The folder's
+versions come first, so the card stands on what is here and Play starts it,
+and the store's copy follows under the store's name; every folder with that
+marker joins the same card. Signed out there is no account row, so the folder
+stays its own card, still Source GOG, with no Ownership row. A folder without
+a marker never joins a store row, whatever its title. **Its updates** are the
+store's: a marker that names a build is asked about like the store's own
+installs (`StoreUpdates.rememberMarkers`, answered under the folder game's id,
+which its row reads), through `StoreLibrary.checkMarkerUpdate` (GOG: the
+marker's `buildId` against the newest Windows build, only while signed in;
+nothing is asked of a store that is not). With no build in the marker there
+is no Update row. A newer build's Update row says to get the new installer
+and A opens the account's own library on the store's site in the store's view
+(`StoreWebPages.accountLibrary`, GOG's account page, where the installers
+are), never the public store page; droidtop does not download over a folder it
+did not install. The DLC row of a marker copy counts the DLC `.info` files in
+its folder. An answer reaches the folder game's row when its folder is walked
+again (a Rescan or a change to the folder).
+
 **A folder game keeps its identity across a version bump.** A folder game's id
 is `GameFolderIds`' (droidtop's own file, never one in the folder). Besides a
 rename (same device and inode) and a move (same content shape), a folder that

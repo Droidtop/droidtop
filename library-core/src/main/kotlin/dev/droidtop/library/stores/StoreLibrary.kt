@@ -299,6 +299,14 @@ interface StoreLibrary {
     /** The store's answer about a newer build, or null when it cannot be asked right now or has no check. */
     suspend fun checkUpdate(context: Context, gameId: String): StoreUpdateCheck? = null
 
+    /**
+     * Whether a newer build of [gameId] exists than [buildId], the build a
+     * copy installed outside droidtop names in its store marker (docs/SPEC.md
+     * 7g, "Store markers"); null when the store cannot say. Only while signed
+     * in: a store not signed in is not asked anything.
+     */
+    suspend fun checkMarkerUpdate(context: Context, gameId: String, buildId: String): StoreUpdateCheck? = null
+
     /** How the store itself starts [gameId], or null to let droidtop find the executable in the folder. */
     suspend fun launch(context: Context, gameId: String): StoreLaunch? = null
 

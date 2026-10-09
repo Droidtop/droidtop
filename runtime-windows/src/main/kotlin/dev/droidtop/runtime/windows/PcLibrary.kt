@@ -178,7 +178,7 @@ object PcLibrary {
             .also { games ->
                 storeSourceInstalls = games.mapNotNull { it.toStoreInstall() }
                 // Asked in the background, for the next walk to read.
-                StoreUpdates.refreshInBackground(context, games.filter { it.installed }.map { it.id })
+                StoreUpdates.refreshInBackground(context, games.filter { it.installed }.map { it.id } + StoreUpdates.markerIds())
             }
             .let { StoreRead(it, failed) }
     }
@@ -280,6 +280,8 @@ object PcLibrary {
                 groups.flatMap { it.games }.mapNotNull { it.toStoreInstall() }
             // When each root was last walked, for Game sources > Folders: a walk that failed,
             // or a root that cannot be read (a card that is out), does not count.
+            // A copy a store installed outside droidtop is asked about its build like the store's own installs.
+            StoreUpdates.rememberMarkers(groups.flatMap { it.games }.mapNotNull { game -> game.marker?.let { game.id to it } }.toMap())
             if (walkedOk) {
                 dev.droidtop.library.GamesRoots.markPcScanned(
                     context,

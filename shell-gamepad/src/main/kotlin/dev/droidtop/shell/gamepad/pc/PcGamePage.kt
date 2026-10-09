@@ -249,6 +249,11 @@ internal fun PcGamePage(
             } else {
                 emptyList()
             },
+            onGetInstaller = { marker ->
+                val store = dev.droidtop.library.stores.StoreLibraries.byId(marker.storeId)
+                val page = store?.webPages?.accountLibrary
+                if (store != null && page != null) dev.droidtop.library.stores.StoreWeb.open(context, store, page)
+            },
             onScrape = {
                 scope.launch {
                     scrapeStatus = "Looking it up..."
@@ -974,6 +979,8 @@ private fun pageRows(
     sourceRows: List<PageFact> = emptyList(),
     latest: String? = null,
     onOpenLink: (String) -> Unit = {},
+    // "Get the new installer" for a copy a store installed outside droidtop: its account library (docs/SPEC.md 7g).
+    onGetInstaller: (dev.droidtop.library.StoreMarker) -> Unit = {},
     onScrape: () -> Unit,
 ): List<PageFact> = buildList {
     // Each fact is on ONE tab, and none repeats the facts strip under the
@@ -1004,14 +1011,33 @@ private fun pageRows(
         add(PageFact("Version", availableVersions.first(), subtitle = if (availableVersions.size > 1) "Also here: ${availableVersions.drop(1).joinToString(", ")}" else null))
     }
     latest?.let { add(PageFact("Latest", it)) }
-    entry.availableUpdate?.let { add(PageFact("Update", it, subtitle = GameUpdates.line(it))) }
+    // A copy a store installed outside droidtop (its marker, docs/SPEC.md 7g): the store's newer build is had
+    // from the account's own library, where the installers are, never by droidtop downloading over the folder.
+    val marker = entry.pcInfo?.marker
+    val markerStore = marker?.let { dev.droidtop.library.PcSource.Store(it.storeId).label() }
+    entry.availableUpdate?.let { update ->
+        add(
+            PageFact(
+                "Update",
+                update,
+                subtitle = if (marker != null) "${GameUpdates.line(update)}. Get the new installer from your $markerStore library" else GameUpdates.line(update),
+                onActivate = marker?.let { m -> { onGetInstaller(m) } },
+            ),
+        )
+    }
     addAll(sourceRows)
-    entry.pcInfo?.takeIf { entry.isStoreRow() && it.installed }?.let { pc ->
+    // The DLC installed beside the game, from the store's marker files in its folder.
+    marker?.dlcIds?.takeIf { it.isNotEmpty() }?.let { dlc ->
+        add(PageFact("DLC", "${dlc.size} installed", subtitle = "$markerStore DLC in the game's folder"))
+    }
+    entry.pcInfo?.takeIf { (entry.isStoreRow() || it.marker?.buildId != null) && it.installed }?.let { pc ->
         pc.installedVersion?.takeIf { availableVersions.isEmpty() }?.let { add(PageFact("Version", it)) }
         // A store with no way to tell droidtop says so; it is never shown as up to date.
         when {
             // Already said above, under the same row.
             entry.availableUpdate != null -> Unit
+            // A marker copy whose store was not asked (signed out, offline) has no Update row at all.
+            pc.update == dev.droidtop.library.StoreUpdate.UNKNOWN && pc.marker != null -> Unit
             pc.update == dev.droidtop.library.StoreUpdate.UNKNOWN ->
                 add(PageFact("Update", "Not known", subtitle = "${dev.droidtop.library.PcSource.of(entry)?.label() ?: "The store"} has not said whether a newer build exists yet; it is asked in the background, and an install made before its build was recorded is checked after its next update"))
             pc.update == dev.droidtop.library.StoreUpdate.CURRENT ->

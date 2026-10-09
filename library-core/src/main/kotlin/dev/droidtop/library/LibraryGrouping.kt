@@ -158,6 +158,7 @@ object LibraryGrouping {
                 merged.entries.associateBy { it.id },
             )
         }
+        val (folderGames, storeOnly) = withMarkedCopies(grouped, storeGames)
         val ungrouped = ungroupedRows.map { entry ->
             LibraryGameGroup(
                 // The person's own title wins over the one the source gave (docs/SPEC.md 7n).
@@ -165,6 +166,48 @@ object LibraryGrouping {
                 mapOf(entry.id to entry),
             )
         }
-        return (grouped + storeGames + ungrouped).sortedBy { it.game.name.lowercase() }
+        return (folderGames + storeOnly + ungrouped).sortedBy { it.game.name.lowercase() }
+    }
+
+    /**
+     * A folder game holding a store's marker ([PcInfo.marker], docs/SPEC.md
+     * 7g "Store markers") and the account's row of that game on that store
+     * (the same store id, [StoreMarker.key]) are ONE card: a GOG offline
+     * install with the GOG account's row, a Heroic install with the Epic
+     * account's. The card keeps the folder's versions first (what is here is
+     * what Play starts) and the store's copy after them, under the store's
+     * name; every folder carrying that marker joins the same card. A marker
+     * with no account row (signed out) leaves the folder its own card. One
+     * map lookup per folder game.
+     */
+    private fun withMarkedCopies(
+        folders: List<LibraryGameGroup>,
+        stores: List<LibraryGameGroup>,
+    ): Pair<List<LibraryGameGroup>, List<LibraryGameGroup>> {
+        val storeByKey = HashMap<String, Int>()
+        stores.forEachIndexed { index, group ->
+            group.entriesByPath.values.forEach { entry -> entry.ownership()?.let { storeByKey["${it.store}:${it.id}"] = index } }
+        }
+        if (storeByKey.isEmpty()) return folders to stores
+        val byStore = LinkedHashMap<Int, MutableList<LibraryGameGroup>>()
+        val plain = ArrayList<LibraryGameGroup>(folders.size)
+        for (folder in folders) {
+            val index = folder.entriesByPath.values.firstNotNullOfOrNull { it.pcInfo?.marker?.key }?.let(storeByKey::get)
+            if (index == null) plain += folder else byStore.getOrPut(index) { mutableListOf() } += folder
+        }
+        val joined = byStore.map { (index, members) ->
+            val store = stores[index]
+            LibraryGameGroup(
+                GroupedGame(
+                    name = store.game.name,
+                    versions = members.flatMap { it.game.versions }.sortedWith(GameVersion.NEWEST_FIRST) + store.game.versions,
+                    segments = members.flatMap { it.game.segments },
+                    latestKnown = members.firstNotNullOfOrNull { it.game.latestKnown },
+                ),
+                members.fold(emptyMap<String, LibraryEntry>()) { all, member -> all + member.entriesByPath } + store.entriesByPath,
+                members.flatMapTo(HashSet()) { it.finished },
+            )
+        }
+        return (plain + joined) to stores.filterIndexed { index, _ -> index !in byStore }
     }
 }
