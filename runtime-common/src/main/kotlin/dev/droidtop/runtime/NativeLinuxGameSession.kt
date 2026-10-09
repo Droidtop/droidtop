@@ -21,9 +21,10 @@ class NativeLinuxGameSession(
     // No WAYLAND_DISPLAY here: every runtime's exec already hands a process
     // the compositor's own socket name (ContainerLayout.clientEnvironment),
     // and the `wayland-0` this used to force is a name sway never uses.
-    suspend fun launch(executablePath: String, args: List<String> = emptyList()): ContainerExecResult =
+    suspend fun launch(executablePath: String, args: List<String> = emptyList(), env: Map<String, String> = emptyMap()): ContainerExecResult =
         runtime.exec(
             container = container,
             command = listOf(executablePath) + args,
+            env = env,
         )
 }

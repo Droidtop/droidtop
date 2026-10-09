@@ -466,7 +466,7 @@ class PcGameProvider(
                         "Can't launch ${entry.title}: couldn't identify which Linux launcher to run in " +
                             "${gameRoot.absolutePath}. Pick one explicitly for this game.",
                     )
-                runtime.launchLinux(linux, gameRoot)
+                runtime.launchLinux(linux, gameRoot, entry.id)
             }
             GameLaunchStrategy.WINE_PREFIX -> {
                 // The program the person picked for this game wins; else the

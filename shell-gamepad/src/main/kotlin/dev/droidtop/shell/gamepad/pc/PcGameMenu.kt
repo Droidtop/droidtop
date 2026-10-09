@@ -489,6 +489,9 @@ internal fun PcGameMenu(
     val hasWindowsRoute = runners.options.any {
         it.strategy == GameLaunchStrategy.WINE_PREFIX && it.state != RunnerState.NOT_FOR_THIS_GAME
     }
+    val hasLinuxRoute = runners.options.any {
+        it.strategy == GameLaunchStrategy.LINUX_CONTAINER && it.state != RunnerState.NOT_FOR_THIS_GAME
+    }
     // Which part of a multi-part game this entry is, and whether it is finished
     // (docs/SPEC.md 7n). Names only: the segments came from the folder names.
     val partOf = grouping?.game?.takeIf { it.segments.size > 1 }?.segments
@@ -703,6 +706,17 @@ internal fun PcGameMenu(
             }.getOrElse { "Enginehost didn't take that: ${it.message}" }
         },
         hasWindowsRoute = hasWindowsRoute,
+        hasLinuxRoute = hasLinuxRoute,
+        // The registered Linux tools screen :app builds (LinuxGameToolsCatalog), in the same sheet.
+        onOpenLinuxTools = engineChoice.folder?.let { folder ->
+            {
+                val screen = dev.droidtop.library.settings.SettingsScreenRegistry.get(
+                    dev.droidtop.library.LinuxToolsScreen.ID,
+                    dev.droidtop.library.LinuxToolsScreen.argument(entry.id, gameName, folder),
+                )
+                if (screen != null) wineScreen = screen else status = "Linux tools aren't available in this build"
+            }
+        },
         // The registered settings screen :app builds (WineOptionsCatalog),
         // by id and deep-linked to this game, in a sheet over the menu.
         onOpenWineSettings = {
@@ -1179,6 +1193,8 @@ private fun rememberPcActions(
     engineRow: PcActionRow?,
     onEnginehost: (android.content.Intent) -> Unit,
     hasWindowsRoute: Boolean,
+    hasLinuxRoute: Boolean,
+    onOpenLinuxTools: (() -> Unit)?,
     onOpenWineSettings: () -> Unit,
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
@@ -1268,6 +1284,8 @@ private fun rememberPcActions(
             runnerRows(
                 runsOnEnginehost = runsOnEnginehost,
                 hasWindowsRoute = hasWindowsRoute,
+                hasLinuxRoute = hasLinuxRoute,
+                onOpenLinuxTools = onOpenLinuxTools,
                 isEngineGame = isEngineGame,
                 onEnginehost = onEnginehost,
                 onOpenPrefix = onOpenWineSettings,
@@ -1386,6 +1404,8 @@ internal fun wineRowDetail(x86_64Host: Boolean): String =
 private fun runnerRows(
     runsOnEnginehost: Boolean,
     hasWindowsRoute: Boolean,
+    hasLinuxRoute: Boolean,
+    onOpenLinuxTools: (() -> Unit)?,
     isEngineGame: Boolean,
     onEnginehost: (android.content.Intent) -> Unit,
     onOpenPrefix: () -> Unit,
@@ -1435,6 +1455,14 @@ private fun runnerRows(
         ),
         PcActionRow("Saves", "Inside its Windows prefix", null),
         PcActionRow("Controls", "In its prefix's controller tab", null),
+    )
+    // A native Linux build (docs/SPEC.md 7c, "Prefix tools for Linux games").
+    hasLinuxRoute -> listOf(
+        PcActionRow(
+            "Linux tools",
+            "Run a program from its folder, stop its processes, keep or reset its own saves and settings",
+            onOpenLinuxTools,
+        ),
     )
     else -> null
 }

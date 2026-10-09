@@ -1819,7 +1819,7 @@ class EngineGameProvider(
         val result = if (windows) {
             runtime.launchWindows(executable, gameRoot, windowsLaunch?.workingDir ?: gameRoot, windowsLaunch?.arguments.orEmpty(), entryId)
         } else {
-            runtime.launchLinux(executable, gameRoot)
+            runtime.launchLinux(executable, gameRoot, entryId)
         }
         check(result.succeeded) { "Launching ${executable.name} failed: ${result.detail}" }
     }

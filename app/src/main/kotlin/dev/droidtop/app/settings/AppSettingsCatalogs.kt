@@ -191,6 +191,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(WineOptionsCatalog.gameScreen())
         SettingsScreenRegistry.register(WindowsInstallCatalog.screen())
+        SettingsScreenRegistry.register(LinuxGameToolsCatalog.screen())
         SettingsScreenRegistry.register(pcStoresScreen())
         SettingsScreenRegistry.register(StoresCatalog.screen())
         SettingsScreenRegistry.register(SocialCatalog.screen())

@@ -48,7 +48,7 @@ class PcRunnerOptionsConsentTest {
             entryId: String?,
         ): PcLaunchResult = PcLaunchResult(false, "not launched")
 
-        override suspend fun launchLinux(executable: File, gameRoot: File): PcLaunchResult =
+        override suspend fun launchLinux(executable: File, gameRoot: File, entryId: String?): PcLaunchResult =
             PcLaunchResult(false, "not launched")
 
         override fun prefixState(entryId: String?): PcPrefixState? = null

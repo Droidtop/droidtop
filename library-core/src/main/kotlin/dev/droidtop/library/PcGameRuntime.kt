@@ -106,8 +106,27 @@ interface PcGameRuntime {
         entryId: String? = null,
     ): PcLaunchResult
 
-    /** Runs a native Linux executable directly inside the container. */
-    suspend fun launchLinux(executable: File, gameRoot: File): PcLaunchResult
+    /**
+     * Runs a native Linux executable directly inside the container. [entryId] is the game's library id: a
+     * game that keeps its saves in a home of its own ([LinuxGameOptionsPrefs]) starts with that home.
+     */
+    suspend fun launchLinux(executable: File, gameRoot: File, entryId: String? = null): PcLaunchResult
+
+    /**
+     * Runs [program], a file inside [gameRoot], in the container in the environment [entryId]'s game
+     * starts in, and returns when it ends (docs/SPEC.md 7c, "Prefix tools for Linux games").
+     */
+    suspend fun runLinuxProgram(program: File, gameRoot: File, entryId: String): PcLaunchResult =
+        PcLaunchResult(false, "this build cannot run Linux programs")
+
+    /** Ends the processes in the container that were started from [gameRoot]; returns the line to show. */
+    suspend fun stopLinuxProcesses(gameRoot: File): String = "this build cannot run Linux programs"
+
+    /**
+     * Empties the home [entryId]'s game keeps its saves and settings in (only a game with a home of its
+     * own has one); the shared container is never touched. Returns the line to show.
+     */
+    suspend fun resetLinuxHome(entryId: String): String = "this build cannot run Linux programs"
 
     /**
      * What the Wine prefix [entryId] runs in is set to -- the same

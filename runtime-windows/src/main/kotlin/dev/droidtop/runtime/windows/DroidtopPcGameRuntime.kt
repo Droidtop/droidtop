@@ -525,19 +525,78 @@ class DroidtopPcGameRuntime(
             }.getOrElse { PcProvisionResult(false, "The prefix could not be saved: ${it.message ?: it}") }
         }
 
-    override suspend fun launchLinux(executable: File, gameRoot: File): PcLaunchResult {
+    override suspend fun launchLinux(executable: File, gameRoot: File, entryId: String?): PcLaunchResult {
         val session = primarySession()
             ?: return PcLaunchResult(false, "a native Linux build runs inside Desktop mode's container, and it isn't running")
+        return linuxExec(session, executable, entryId)
+    }
 
+    override suspend fun runLinuxProgram(program: File, gameRoot: File, entryId: String): PcLaunchResult {
+        val session = primarySession()
+            ?: return PcLaunchResult(false, "Linux programs run inside Desktop mode's container, and it isn't running")
+        val inside = withContext(Dispatchers.IO) { program.isFile && PrefixFolderView.isInside(gameRoot, program) }
+        if (!inside) return PcLaunchResult(false, "${program.name} is not a file inside the game's folder")
+        return linuxExec(session, program, entryId)
+    }
+
+    /** [program] in the container, in the environment the game starts in: its own home when it has one. */
+    private suspend fun linuxExec(session: PrimaryContainerSession, program: File, entryId: String?): PcLaunchResult {
+        val env = withContext(Dispatchers.IO) { linuxEnvironment(session, entryId) }
         val result = runCatching {
             NativeLinuxGameSession(session.container, session.runtime)
-                .launch(session.runtime.hostStorageToContainerPath(executable))
+                .launch(session.runtime.hostStorageToContainerPath(program), env = env)
         }.getOrElse { return PcLaunchResult(false, it.message ?: it.toString()) }
 
         return PcLaunchResult(
             succeeded = result.succeeded,
             detail = if (result.succeeded) "ok" else "exit ${result.exitCode}: ${result.stderr.ifBlank { result.stdout }}",
         )
+    }
+
+    /** Empty for a game on the container's home; the game's own home otherwise, made when it is not there yet. */
+    private fun linuxEnvironment(session: PrimaryContainerSession, entryId: String?): Map<String, String> {
+        if (entryId == null || !dev.droidtop.library.LinuxGameOptionsPrefs.ownHome(context, entryId)) return emptyMap()
+        val home = LinuxGameHome.dir(context, entryId).also { it.mkdirs() }
+        return LinuxGameHome.environment(session.runtime.hostStorageToContainerPath(home))
+    }
+
+    override suspend fun stopLinuxProcesses(gameRoot: File): String {
+        val session = primarySession() ?: return "Desktop mode's container is not running, so nothing of this game is"
+        return runCatching {
+            val pattern = session.runtime.hostStorageToContainerPath(gameRoot)
+            val result = session.runtime.exec(
+                session.container,
+                listOf("sh", "-c", LinuxGameHome.STOP_SCRIPT),
+                mapOf("DT_STOP_PATTERN" to pattern),
+            )
+            val stopped = result.stdout.trim().toIntOrNull()
+            when {
+                !result.succeeded -> "Couldn't look for the game's processes: ${result.stderr.ifBlank { result.stdout }.trim()}"
+                stopped == null || stopped == 0 -> "No process of this game was running"
+                stopped == 1 -> "Stopped the 1 process of this game"
+                else -> "Stopped the $stopped processes of this game"
+            }
+        }.getOrElse { "Couldn't stop the game's processes: ${it.message ?: it}" }
+    }
+
+    override suspend fun resetLinuxHome(entryId: String): String = withContext(Dispatchers.IO) {
+        val home = LinuxGameHome.dir(context, entryId)
+        if (!home.isDirectory) return@withContext "This game's own home is empty already"
+        val session = primarySession()
+        // Inside the container when it is up: a rooted container made those files, and the app may not delete them.
+        // Otherwise from the app, which made them under proot.
+        val emptied = if (session != null) {
+            runCatching {
+                session.runtime.exec(
+                    session.container,
+                    listOf("sh", "-c", LinuxGameHome.RESET_SCRIPT),
+                    mapOf("DT_HOME" to session.runtime.hostStorageToContainerPath(home)),
+                ).succeeded
+            }.getOrDefault(false)
+        } else {
+            SafeDelete.deleteWithin(home.parentFile ?: return@withContext "Couldn't find the game's home", home) && home.mkdirs()
+        }
+        if (emptied) "Reset. This game starts with an empty home" else "Couldn't empty the game's home. Start Desktop mode and try again"
     }
 
     internal companion object {

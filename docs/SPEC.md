@@ -6985,6 +6985,29 @@ Two concrete references to build from rather than design blind:
     so it is started through `/system/bin/linker64` as Wine is, never with root. "Check the unpacker"
     asks it for its version, which shows the fetch and the start work on a device.
 
+  **Prefix tools for Linux games (2026-10-09, Droidtop/tracker#10).** A native Linux build has no
+  prefix: `launchLinux` runs its launcher with `ContainerRuntime.exec` in Desktop mode's primary
+  container (through FEX or box64 when its code is x86, §3c) and always has, with the container's
+  home. The Linux counterpart of Prefix tools is therefore a "Linux tools" row on the game's page
+  (shown for a game with a Linux route and no Windows one; screen `linux_game_tools`,
+  `LinuxGameToolsCatalog`), acting on that game's launch environment and never on the shared
+  container:
+  - **Run a program in place.** A file inside the game's folder, picked or typed, run in the
+    container in the environment the game starts in; it is refused if it is not inside the folder
+    (real path) and nothing is copied. It blocks until the program ends and says so.
+  - **Stop its processes.** A script run in the container (`LinuxGameHome.STOP_SCRIPT`) ends every
+    process whose command line mentions the game's folder. The folder travels in the environment, not
+    the command line, so the script and the exec wrapper never match themselves.
+  - **A home of its own, off by default.** "Keep this game's saves and settings in a home of its own"
+    (`LinuxGameOptionsPrefs`): when on, the game starts with `HOME` and the XDG folders pointing into
+    a folder in app storage named for the game (`LinuxGameHome`), made when needed. When off, which is
+    every existing game, nothing changes: a game's saves are where it has always put them (a save
+    location is not changed, §5a), and turning the option on moves nothing.
+  - **Reset.** Empties that home only (`find . -mindepth 1 -delete` in the container when it is up,
+    because a rooted container made the files and the app may not delete them; from the app
+    otherwise), behind the usual question. A game on the container's home has nothing of its own to
+    reset, and the row says so: the container's home is never reset from a game.
+
 - **Linux container management**: distrobox itself is CLI-only (no
   official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
   real, actively-maintained GTK4 GUI for it — confirmed feature set:
