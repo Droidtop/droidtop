@@ -5094,6 +5094,48 @@ open Android's own pickers.
 and the settings catalog shows the active keyboard, says what it is, and
 offers the switch. It never nags and never changes the setting itself.
 
+### Editing helpers (Droidtop/tracker#340, Droidtop/tracker#336)
+
+Owner, 2026-10-08: "It's extra important that we keep Hacker Keyboard's flexibility", with modern
+improvements on top. Every helper below is an ordinary preference in the keyboard's one default store
+(Settings, "Editing helpers"; `ToolsPrefs`), so the settings screen, the input method and every panel droidtop
+draws read the same value; nothing of Hacker's was removed or moved to make room. Pro mode (the study's
+proposal) is not built; these helpers are in the one settings tree that already shows everything.
+
+- **One wrapper for both surfaces.** `ToolsDeck` is a strip of buttons above the key grid plus panels that take
+  the grid's place while open. The input method wraps its input view in it (`KeyboardSwitcher` calls
+  `LatinIME.wrapInputView`) and `KeyboardPanel` wraps its grid, so the companion's Input tab, the overlays and
+  droidtop's own fields get the same helpers. What a tool types goes to the sink the surface already types into
+  (the editor's connection, the routed sink, the container's key stream). "Tool strip" turns the strip off and
+  leaves the bare grid; the strip is plain views, no layout resources.
+- **Clipboard history.** `ClipboardHistory` is the model (JVM tested): at most 50 unpinned entries, 5000
+  characters each (longer is dropped, not truncated, as in the bridge, 6d), newest first, pinned entries first
+  and never trimmed, a repeat moves to the top. `ClipboardHistoryStore` records `primaryClip` text when the
+  clipboard changes (no polling; allowed because droidtop's keyboard is the current input method, 6d; a read
+  Android refuses is skipped), never a clip flagged `android.content.extra.IS_SENSITIVE`, never while incognito,
+  and keeps the file (`clipboard_history.txt`, app-private) on one background thread; the main thread only
+  touches memory. The panel lists entries with Pin, Delete and Clear (pinned stay). A tap on an entry types it at
+  the cursor where the sink takes text; into a container, which has no text channel, it sets the Android
+  clipboard, which the clipboard bridge hands to the container, and the panel says to paste there.
+- **Incognito.** One preference, toggled from the strip. While on: no clipboard recording, turning it on forgets
+  the unpinned history, and the panel hides what was there; `LatinIME.checkAddToDictionary` learns no words or
+  bigrams. The same learning gate (`IncognitoRules.learningAllowed`) also applies to a password field and to an
+  editor that set `IME_FLAG_NO_PERSONALIZED_LEARNING`, with incognito off.
+- **Space-bar drag moves the cursor.** `SpaceDrag` (JVM tested) starts after 24 dp sideways and then steps
+  every 14 dp; `PointerTracker` lets go of the space key without typing it and calls the new listener method
+  `onCursorDrag`. The input method sends the arrow keys through its own `onKey` path, so Shift selects as it
+  does for the arrow keys. The hardware-key listener (`SecondScreenKeyboardListener`) presses and releases the
+  arrows; Shift latched on that keyboard is held at the far side, so it selects there too. A hardware key types
+  the moment it goes down, so with the helper on that listener sends the space bar down and up together when it
+  is let go (a held space no longer repeats on that surface); with the helper off nothing changes.
+- **Macro keys.** One macro per line of the `Macros` setting, `name = steps` (`MacroParser`, JVM tested): `C-b`
+  style chords with Ctrl, Alt, Shift or Meta, key names, letters, and `"quoted text"` with `\n` as Enter. A
+  line with a step that is not understood is skipped whole, so a typo never sends half a sequence. A macro is
+  played as a hardware keyboard would (`MacroPlayer`): modifiers down, key down and up, modifiers up in reverse
+  order, through the sink's key stream, so the input method, the companion's panel and a container all get the
+  same sequence. Decision: macros are text lines in a setting, not JSON, because they are edited in a settings
+  field on a handheld; the study's JSON form can be added as an import later.
+
 ## 6b. Desktop surface input (built 2026-09-01)
 
 The seat in §6 was a primitive with no caller. `:shell-desktop`'s

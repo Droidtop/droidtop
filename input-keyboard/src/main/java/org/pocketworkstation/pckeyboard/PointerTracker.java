@@ -72,6 +72,12 @@ public class PointerTracker {
     // true if this pointer is in sliding key input
     private boolean mIsInSlidingKeyInput;
 
+    // droidtop patch (Droidtop/tracker#340): non-null while a touch that began on the space key may become a cursor
+    // drag; thresholds are 24dp to start and 14dp per step.
+    private SpaceDrag mSpaceDrag;
+    private final int mSpaceDragActivatePx;
+    private final int mSpaceDragStepPx;
+
     // For multi-tap
     private int mLastSentIndex;
     private int mTapCount;
@@ -183,6 +189,9 @@ public class PointerTracker {
         mHasDistinctMultitouch = proxy.hasDistinctMultitouch();
         mDelayBeforeKeyRepeatStart = res.getInteger(R.integer.config_delay_before_key_repeat_start);
         mMultiTapKeyTimeout = res.getInteger(R.integer.config_multi_tap_key_timeout);
+        final float density = res.getDisplayMetrics().density;
+        mSpaceDragActivatePx = Math.max(1, (int) (24 * density));
+        mSpaceDragStepPx = Math.max(1, (int) (14 * density));
         sSlideKeyHack = slideKeyHack;
         resetMultiTap();
     }
@@ -306,6 +315,11 @@ public class PointerTracker {
                 }
             }
         }
+        mSpaceDrag = null;
+        if (LatinIME.sKeyboardSettings.spaceDrag && mListener != null && isSpaceKey(keyIndex)) {
+            mSpaceDrag = new SpaceDrag(mSpaceDragActivatePx, mSpaceDragStepPx);
+            mSpaceDrag.down(x);
+        }
         if (isValidKeyIndex(keyIndex)) {
             if (mKeys[keyIndex].repeatable) {
                 repeatKey(keyIndex);
@@ -354,9 +368,42 @@ public class PointerTracker {
         clearSlideKeys();
     }
     
+    /**
+     * droidtop patch (Droidtop/tracker#340): a sideways drag that started on the space key moves the cursor instead
+     * of typing a space. Returns true while the touch is a cursor drag.
+     */
+    private boolean handleSpaceDrag(int x, int y) {
+        final SpaceDrag drag = mSpaceDrag;
+        final boolean wasActive = drag.getActive();
+        if (!wasActive && (mKeyAlreadyProcessed || !isSpaceKey(mKeyDetector.getKeyIndexAndNearbyCodes(x, y, null)))) {
+            // A long press took the key, or the finger slid off the space bar onto another key: an ordinary touch.
+            mSpaceDrag = null;
+            return false;
+        }
+        final int steps = drag.move(x);
+        if (!drag.getActive())
+            return false;
+        if (!wasActive) {
+            // The touch has become a drag: let go of the space key without typing it.
+            mHandler.cancelKeyTimers();
+            mHandler.cancelPopupPreview();
+            showKeyPreviewAndUpdateKey(NOT_A_KEY);
+            mKeyAlreadyProcessed = true;
+            if (mListener != null) {
+                mListener.onCursorDrag(0);
+                mListener.onRelease(LatinIME.ASCII_SPACE);
+            }
+        } else if (steps != 0 && mListener != null) {
+            mListener.onCursorDrag(steps);
+        }
+        return true;
+    }
+
     public void onMoveEvent(int x, int y, long eventTime) {
         if (DEBUG_MOVE)
             debugLog("onMoveEvent:", x, y);
+        if (mSpaceDrag != null && handleSpaceDrag(x, y))
+            return;
         if (mKeyAlreadyProcessed)
             return;
         final KeyState keyState = mKeyState;
@@ -422,6 +469,7 @@ public class PointerTracker {
     public void onUpEvent(int x, int y, long eventTime) {
         if (DEBUG)
             debugLog("onUpEvent  :", x, y);
+        mSpaceDrag = null;
         mHandler.cancelKeyTimers();
         mHandler.cancelPopupPreview();
         showKeyPreviewAndUpdateKey(NOT_A_KEY);

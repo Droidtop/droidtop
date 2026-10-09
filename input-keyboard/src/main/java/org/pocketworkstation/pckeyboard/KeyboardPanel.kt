@@ -48,11 +48,19 @@ class KeyboardPanel(
         resolver = AndroidCharKeyResolver(),
         commit = if (sink.takesText) ({ chars: CharSequence -> sink.text(chars) }) else null,
         onLayoutToggle = { toggleLayout() },
+        deferSpace = ToolsPrefs.spaceDrag(context),
     )
     private val keyboardView: LatinKeyboardView? =
         runCatching { SecondScreenKeyboard.createView(context, listener, heightPercent) }.getOrNull()
 
+    // The tool strip (clipboard history, macros, incognito) above the grid, or the grid alone when it is switched off.
+    private val deck: View? = keyboardView?.let { grid ->
+        ToolsDeck.wrap(context, grid, sink, if (sink.takesText) null else ({ chars: CharSequence -> listener.onText(chars) }))
+    }
+
     init {
+        // Space-bar drag is read by the key tracker from the shared settings, which only the input method loads.
+        LatinIME.sKeyboardSettings.spaceDrag = ToolsPrefs.spaceDrag(context)
         // Never a focus target: a tap on a key must leave focus on the field being typed into (and on the screen
         // the user is typing on, for the companion).
         isFocusable = false
@@ -60,8 +68,8 @@ class KeyboardPanel(
         keyboardView?.let {
             it.isFocusable = false
             it.isFocusableInTouchMode = false
-            addView(it, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         }
+        deck?.let { addView(it, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)) }
     }
 
     /** Whether the key grid could be built at all (a broken keyboard resource leaves an empty panel). */

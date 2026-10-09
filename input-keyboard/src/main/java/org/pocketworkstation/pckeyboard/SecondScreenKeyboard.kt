@@ -263,15 +263,28 @@ class SecondScreenKeyboardListener(
     private val commit: ((CharSequence) -> Unit)? = null,
     /** Fn / layout-switch, which change what THIS keyboard shows and go nowhere else. */
     private val onLayoutToggle: () -> Unit = {},
+    /**
+     * Space-bar drag moves the cursor (Droidtop/tracker#340). A hardware key is typed the moment it goes down, so
+     * with this on the space bar goes down and up together when it is let go, unless the touch became a drag.
+     */
+    private val deferSpace: Boolean = false,
 ) : LatinKeyboardBaseView.OnKeyboardActionListener {
 
     private val latchedModifiers = LinkedHashSet<Int>()
+    private var spacePending = false
+    private var spaceCancelled = false
     private val heldKeys = HashMap<Int, KeyStroke>()
     private var transientShift = false
 
     override fun onPress(primaryCode: Int) {
         if (primaryCode in LAYOUT_KEYS) {
             onLayoutToggle()
+            return
+        }
+
+        if (deferSpace && primaryCode == SPACE) {
+            spacePending = true
+            spaceCancelled = false
             return
         }
 
@@ -305,6 +318,17 @@ class SecondScreenKeyboardListener(
     }
 
     override fun onRelease(primaryCode: Int) {
+        if (spacePending && primaryCode == SPACE) {
+            spacePending = false
+            if (!spaceCancelled) {
+                strokeFor(SPACE)?.let {
+                    send(it.androidKeyCode, true)
+                    send(it.androidKeyCode, false)
+                    releaseLatched()
+                }
+            }
+            return
+        }
         val stroke = heldKeys.remove(primaryCode) ?: return
         send(stroke.androidKeyCode, false)
         if (transientShift) {
@@ -337,6 +361,19 @@ class SecondScreenKeyboardListener(
             send(stroke.androidKeyCode, true)
             send(stroke.androidKeyCode, false)
             if (stroke.shift) send(KeyEvent.KEYCODE_SHIFT_LEFT, false)
+        }
+    }
+
+    /**
+     * A space-bar drag: each step is an arrow key, pressed and released. A Shift latched on the keyboard is held at
+     * the far side, so the arrow selects, as it does on a hardware keyboard.
+     */
+    override fun onCursorDrag(steps: Int) {
+        spaceCancelled = true
+        val key = if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
+        repeat(kotlin.math.abs(steps)) {
+            send(key, true)
+            send(key, false)
         }
     }
 
@@ -382,6 +419,8 @@ class SecondScreenKeyboardListener(
          * by value because both are package-private Java constants.
          */
         val LAYOUT_KEYS = setOf(-2, -119)
+
+        const val SPACE = 32
 
         val MODIFIERS = setOf(
             KeyEvent.KEYCODE_SHIFT_LEFT,

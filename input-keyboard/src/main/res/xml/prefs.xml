@@ -316,6 +316,54 @@
     </PreferenceCategory>
 
     <PreferenceCategory
+            android:title="@string/title_editing_helpers"
+            android:key="editing_helpers">
+
+    <CheckBoxPreference
+            android:key="pref_tools_strip"
+            android:title="@string/title_tools_strip"
+            android:persistent="true"
+            android:defaultValue="true"
+            android:summary="@string/summary_tools_strip"
+            />
+
+    <CheckBoxPreference
+            android:key="pref_incognito"
+            android:title="@string/title_incognito"
+            android:persistent="true"
+            android:defaultValue="false"
+            android:summary="@string/summary_incognito"
+            />
+
+    <CheckBoxPreference
+            android:key="pref_clipboard_history"
+            android:title="@string/title_clipboard_history"
+            android:persistent="true"
+            android:defaultValue="true"
+            android:summary="@string/summary_clipboard_history"
+            />
+
+    <CheckBoxPreference
+            android:key="pref_space_drag"
+            android:title="@string/title_space_drag"
+            android:persistent="true"
+            android:defaultValue="true"
+            android:summary="@string/summary_space_drag"
+            />
+
+    <EditTextPreference
+            android:key="pref_macros"
+            android:title="@string/title_macros"
+            android:dialogTitle="@string/title_macros"
+            android:dialogMessage="@string/message_macros"
+            android:persistent="true"
+            android:defaultValue=""
+            android:inputType="textMultiLine|textNoSuggestions"
+            />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
             android:title="@string/title_debugging"
             android:key="debugging">
 

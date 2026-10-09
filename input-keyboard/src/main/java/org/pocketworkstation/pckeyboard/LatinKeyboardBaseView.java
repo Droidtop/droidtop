@@ -165,6 +165,14 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
          * Called when the user quickly moves the finger from down to up.
          */
         boolean swipeUp();
+
+        /**
+         * droidtop patch (Droidtop/tracker#340): a touch that began on the space key became a cursor drag. Called
+         * once when it does (steps 0, the space key is then not typed) and again for each run of steps; positive
+         * steps move the cursor right, negative left.
+         */
+        default void onCursorDrag(int steps) {
+        }
     }
 
     // Timing constants

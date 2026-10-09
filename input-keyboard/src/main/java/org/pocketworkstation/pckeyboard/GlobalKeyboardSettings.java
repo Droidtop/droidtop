@@ -62,6 +62,9 @@ public final class GlobalKeyboardSettings {
     //
     // Read by PointerTracker
     public int sendSlideKeys = 0;
+    //
+    // Read by PointerTracker (droidtop, Droidtop/tracker#340)
+    public boolean spaceDrag = true;
     
     /* Updated by LatinIME */
     //
@@ -85,6 +88,7 @@ public final class GlobalKeyboardSettings {
     public String editorFieldName; 
     public int editorFieldId; 
     public int editorInputType;
+    public int editorImeOptions;
 
     /* Updated by KeyboardSwitcher */
     //
@@ -137,6 +141,19 @@ public final class GlobalKeyboardSettings {
             public void set(String val) { sendSlideKeys = Integer.valueOf(val); }
             public String getDefault() { return "0"; }
             public int getFlags() { return FLAG_PREF_NONE; }
+        });
+
+        addBooleanPref("pref_space_drag", new BooleanPref() {
+            public void set(boolean val) { spaceDrag = val; }
+            public boolean getDefault() { return true; }
+            public int getFlags() { return FLAG_PREF_NONE; }
+        });
+
+        // The tool strip is wrapped around the input view, so a change rebuilds it.
+        addBooleanPref("pref_tools_strip", new BooleanPref() {
+            public void set(boolean val) { }
+            public boolean getDefault() { return true; }
+            public int getFlags() { return FLAG_PREF_RECREATE_INPUT_VIEW; }
         });
 
         addBooleanPref("pref_touch_pos", new BooleanPref() {

@@ -675,6 +675,17 @@
     <string name="seek_pref_0">0%</string>
     <string name="seek_pref_val">x%</string>
     <string name="seek_pref_max">100%</string>
+    <string name="title_editing_helpers">Editing helpers</string>
+    <string name="title_tools_strip">Tool strip</string>
+    <string name="summary_tools_strip">A row of buttons above the keys: clipboard history, macros and incognito mode.</string>
+    <string name="title_incognito">Incognito mode</string>
+    <string name="summary_incognito">Learn no words and record no clipboard history while on. Password fields and editors that ask for no personalised learning are always treated this way.</string>
+    <string name="title_clipboard_history">Clipboard history</string>
+    <string name="summary_clipboard_history">Keep the text you copy so it can be pinned and pasted again. Clips marked sensitive are never kept.</string>
+    <string name="title_space_drag">Space bar moves the cursor</string>
+    <string name="summary_space_drag">Drag a finger along the space bar to move the cursor; with Shift held on the keyboard it selects.</string>
+    <string name="title_macros">Macros</string>
+    <string name="message_macros">One per line, name = steps. Steps: C-b (Ctrl+B), A-x, S-Tab, M-x, key names (Esc, Enter, Tab, Up, F5, ...), letters, and \"quoted text\" with \\n for Enter. Example: tmux new window = C-b c</string>
     <string name="notification_channel_name">Hacker\'s Keyboard</string>
     <string name="notification_channel_description">Hacker\'s Keyboard</string>
     <string name="notification_action_settings">Settings</string>

@@ -778,6 +778,7 @@ public class LatinIME extends InputMethodService implements
         sKeyboardSettings.editorFieldName = attribute.fieldName;
         sKeyboardSettings.editorFieldId = attribute.fieldId;
         sKeyboardSettings.editorInputType = attribute.inputType;
+        sKeyboardSettings.editorImeOptions = attribute.imeOptions;
 
         //Log.i("PCKeyboard", "onStartInputView " + attribute + ", inputType= " + Integer.toHexString(attribute.inputType) + ", restarting=" + restarting);
         LatinKeyboardView inputView = mKeyboardSwitcher.getInputView();
@@ -975,6 +976,31 @@ public class LatinIME extends InputMethodService implements
             mAutoDictionary.flushPendingWrites();
         if (mUserBigramDictionary != null)
             mUserBigramDictionary.flushPendingWrites();
+    }
+
+    /**
+     * droidtop patch (Droidtop/tracker#340): the input view with the tool strip above the keys (clipboard history,
+     * macros, incognito), or the keys alone when the strip is switched off.
+     */
+    View wrapInputView(LatinKeyboardView keyboard) {
+        return ToolsDeck.wrap(this, keyboard, new ImeConnectionSink(), null, new Runnable() {
+            public void run() {
+                // A tool types at the cursor: finish the word being composed first, as an arrow key does.
+                final InputConnection ic = getCurrentInputConnection();
+                if (ic != null && mPredicting) {
+                    commitTyped(ic, true);
+                }
+            }
+        });
+    }
+
+    /** droidtop patch (Droidtop/tracker#340): a space-bar drag moves the cursor like the arrow keys do. */
+    @Override
+    public void onCursorDrag(int steps) {
+        final int key = steps < 0 ? LatinKeyboardView.KEYCODE_DPAD_LEFT : LatinKeyboardView.KEYCODE_DPAD_RIGHT;
+        for (int i = Math.abs(steps); i > 0; i--) {
+            onKey(key, null, LatinKeyboardBaseView.NOT_A_TOUCH_COORDINATE, LatinKeyboardBaseView.NOT_A_TOUCH_COORDINATE);
+        }
     }
 
     @Override
@@ -2849,6 +2875,12 @@ public class LatinIME extends InputMethodService implements
             int frequencyDelta, boolean addToBigramDictionary) {
         if (suggestion == null || suggestion.length() < 1)
             return;
+        // droidtop patch (Droidtop/tracker#340): incognito mode, a password field and an editor that asked for no
+        // personalised learning learn nothing.
+        if (!IncognitoRules.learningAllowed(ToolsPrefs.INSTANCE.incognito(this),
+                sKeyboardSettings.editorImeOptions, mPasswordText)) {
+            return;
+        }
         // Only auto-add to dictionary if auto-correct is ON. Otherwise we'll be
         // adding words in situations where the user or application really
         // didn't
