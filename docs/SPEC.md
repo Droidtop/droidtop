@@ -8991,6 +8991,21 @@ and the shell's idle timer OBSERVES: the row lives inside the shell, so a
 value read once at start left a newly chosen timer on Off until the app
 restarted (rig, build 814).
 
+**Sleep and return to game (decided 2026-10-09, Droidtop/tracker#86).** The model is the Steam
+Deck's: while a game runs the console never sleeps on its own, the person sleeps it with the power
+button (or the Quick Menu's System section, Sleep), and waking returns to the game. The shell is what
+sleeps on idle, by the system's own timer; the screensaver keeps its own timer above.
+- **Keep-awake.** `GameWakeLock` (`:library-core`) holds a screen-on platform wake lock (a window flag
+  cannot cover another app's window) while the setting is Never sleep, `LaunchDisplay.running` names a
+  game, and the shell is not the window in front on the display the game runs on. The shell reports its
+  own front state (`MainActivity.onTopResumedActivityChanged`), so the lock is released the moment the
+  shell comes in front and nothing polls the task list. A game on the other screen of a dual-screen
+  handheld keeps the lock while the shell shows on the first. A game that ended unseen is found by
+  Android's force-stopped flag, checked every 30 seconds while the lock is held. Droidtop's own Windows
+  game screen no longer sets `FLAG_KEEP_SCREEN_ON`: it ignored the setting, and this is the one mechanism.
+- **Setting.** Settings > Shell > "While a game runs": Never sleep (default) or Use the system timer
+  (`GameAwakePrefs`, observed, so a change applies to the game already running).
+
 **Media viewer.** One pager per game over every media type droidtop has
 for it: images (built), the preview video (ExoPlayer, unmuted, with
 pause and seek on the hint row) and the manual (the platform's own

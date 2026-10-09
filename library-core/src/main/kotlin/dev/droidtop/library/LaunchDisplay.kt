@@ -127,8 +127,16 @@ object LaunchDisplay {
      * the addon isn't covered by the shell or the widgets panel. Cleared
      * by an explicit shell entry (BackButtonMenu's Gaming item).
      */
-    @Volatile
-    var parkedDisplayId: Int? = null
+    var parkedDisplayId: Int?
+        get() = parkedFlow.value
+        set(value) {
+            parkedFlow.value = value
+        }
+
+    private val parkedFlow = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
+
+    /** [parkedDisplayId], observable: [GameWakeLock] follows which display the game is on. */
+    val parked: kotlinx.coroutines.flow.StateFlow<Int?> = parkedFlow
 
     /** Invoked after every [start] — the shell hooks this to re-run its display-role orchestration (e.g. dismissing the widgets Presentation off a display a game just went to). */
     @Volatile

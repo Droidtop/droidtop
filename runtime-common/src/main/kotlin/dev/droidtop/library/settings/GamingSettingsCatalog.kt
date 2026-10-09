@@ -63,6 +63,7 @@ object GamingSettingsCatalog {
     const val ID_SCRAPER = "pref_gaming_scraper"
     const val ID_ACCOUNTS_AND_SOURCES = "pref_gaming_accounts_and_sources"
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
+    const val ID_GAME_AWAKE = "pref_gaming_game_awake"
     const val ID_LAUNCH_SOUND_EXPERIMENT = "pref_gaming_launch_sound_experiment"
     const val ID_UI_MODE = "pref_gaming_ui_mode"
     const val ID_CONSOLE_SYSTEMS = "pref_gaming_console_systems"
@@ -192,6 +193,23 @@ object GamingSettingsCatalog {
                             ScreensaverPrefs.setMode(
                                 ctx,
                                 runCatching { ScreensaverMode.valueOf(value) }.getOrDefault(ScreensaverMode.OFF),
+                            )
+                        },
+                    ),
+                )
+                // The Steam Deck's model (docs/SPEC.md 7f, "Sleep and return to game"): the console does not sleep
+                // on its own while a game runs, unless the person asks for Android's timer.
+                add(
+                    ChoiceItem(
+                        id = ID_GAME_AWAKE,
+                        title = "While a game runs",
+                        subtitle = null,
+                        options = GameAwakeMode.entries.map { ChoiceOption(it.name, it.label) },
+                        current = GameAwakePrefs.mode(context).name,
+                        onSelect = { ctx, value ->
+                            GameAwakePrefs.setMode(
+                                ctx,
+                                runCatching { GameAwakeMode.valueOf(value) }.getOrDefault(GameAwakeMode.NEVER_SLEEP),
                             )
                         },
                     ),

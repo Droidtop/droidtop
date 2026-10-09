@@ -10,7 +10,6 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -120,7 +119,8 @@ class WineGameActivity : Activity() {
         // had in fact begun to boot.
         ControllerManager.getInstance().init(applicationContext)
 
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // The screen stays on by GameWakeLock (the setting "While a game runs"), not by a window flag
+        // that ignored it.
         goFullscreen()
 
         val target = intent.getStringExtra(EXTRA_TARGET)

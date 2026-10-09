@@ -257,6 +257,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // here: launch resolution must work with Gaming and Desktop both
         // off, and this Activity does not run then (LibraryCore).
         library = LibraryCore.library(applicationContext)
+        dev.droidtop.library.GameWakeLock.install(applicationContext)
 
         refreshModeIfUndecided()
 
@@ -559,6 +560,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
         topResumed = isTopResumedActivity
+        // The wake lock a running game holds is released while the shell covers it (GameWakeLock).
+        dev.droidtop.library.GameWakeLock.shellInFront(if (isTopResumedActivity) currentDisplayId() else null)
         if (!isTopResumedActivity) {
             padGate.cancel()
             padGate.overlays?.forgetHeld()
@@ -842,6 +845,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         }
         clipboardBridge?.stop()
         clipboardBridge = null
+        // A shell moved to the other screen has already reported from its new instance.
+        if (live?.get().let { it === this || it == null }) dev.droidtop.library.GameWakeLock.shellInFront(null)
         super.onDestroy()
     }
 
