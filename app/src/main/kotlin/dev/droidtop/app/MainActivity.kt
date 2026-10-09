@@ -242,10 +242,16 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // so there is nothing for this instance to be until then, and a
         // Gaming shell composed underneath started its library scan and
         // recorded itself as the last mode before any of that was chosen.
-        // The hardware row names the screens in the launch chooser (addonScreenOnTop), which reads
-        // only an already loaded table: load it now, off the main thread.
+        // The hardware row names the screens by position (docs/SPEC.md 4c, "Screen names"), and the person's own
+        // names live in a preferences file: both are read here, off the main thread, and handed to ScreenNaming,
+        // which the orchestration pass reads without touching a file.
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            runCatching { dev.droidtop.library.controller.HardwareDatabase.defs(applicationContext) }
+            runCatching {
+                dev.droidtop.runtime.ScreenNaming.customNames(applicationContext)
+                dev.droidtop.runtime.ScreenNaming.setProfile(
+                    dev.droidtop.library.controller.HardwareDatabase.forThisDevice(applicationContext)?.panels.orEmpty(),
+                )
+            }
         }
 
         if (OnboardingGate.resumeIfUnfinished(this)) {
@@ -765,11 +771,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         dev.droidtop.library.LaunchDisplay.clearRunning()
     }
 
-    // From the hardware row (docs/SPEC.md 4c), only when the table is already loaded: the
-    // orchestration pass must not read a file. The table is loaded at start, off the main thread.
-    override fun addonScreenOnTop(): Boolean? =
-        dev.droidtop.library.controller.HardwareDatabase.loadedForThisDevice()?.addonOnTop
-
     override fun publishLaunchTargeting(
         secondDisplayId: Int?,
         targetDisplayId: Int?,
@@ -782,7 +783,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // the default-highlighted choice is the better screen -- candidate
         // ordering itself is pure and unit-tested (DualScreenOrchestration).
         dev.droidtop.library.LaunchDisplay.askOptions = askOptions?.map {
-            dev.droidtop.library.LaunchDisplayOption(it.displayId, it.label)
+            dev.droidtop.library.LaunchDisplayOption(it.displayId, it.label, it.rememberable)
         }
     }
 

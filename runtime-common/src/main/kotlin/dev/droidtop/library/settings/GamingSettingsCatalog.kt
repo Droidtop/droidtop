@@ -339,6 +339,7 @@ object GamingSettingsCatalog {
                 add(secondScreenRoleItem(context, MODE_GAMING))
                 add(secondScreenRoleItem(context, MODE_DESKTOP))
                 addAll(secondScreenKeyboardItems(context))
+                addAll(screenNameItems(context))
             },
         ),
         CatalogGroup(
@@ -896,6 +897,30 @@ object GamingSettingsCatalog {
      * row (Android's accessibility settings, where the user turns droidtop's service on), and while Android 13+
      * keeps that switch locked for a sideloaded droidtop, the one row that opens App info.
      */
+    /**
+     * One row per connected screen to give it a name of the person's own (docs/SPEC.md 4c, "Screen names",
+     * Droidtop/tracker#162): the launch chooser, the running apps list and every row that names a screen use it.
+     * Stored per Android's unique id for the display, so the name stays with the screen. Reads the display list and a
+     * preferences file: built off the main thread like the rest of this catalog.
+     */
+    private fun screenNameItems(context: Context): List<CatalogItem> {
+        val outputs = dev.droidtop.runtime.DisplayOutputRepository(context).currentOutputsSnapshot().sortedBy { it.androidDisplayId }
+        val names = dev.droidtop.runtime.ScreenNaming.names(context, outputs)
+        val custom = dev.droidtop.runtime.ScreenNaming.customNames(context)
+        return outputs.map { output ->
+            val facts = dev.droidtop.runtime.ScreenNaming.facts(output)
+            val kind = if (facts.screenClass == dev.droidtop.runtime.ScreenClass.BUILT_IN) "Built-in" else "External"
+            TextInputItem(
+                id = "screen_name_${output.uniqueId}",
+                title = "Name: ${names[output.androidDisplayId] ?: output.name}",
+                subtitle = "$kind, Android calls it \"${output.name.ifBlank { "display ${output.androidDisplayId}" }}\". " +
+                    "Leave empty for droidtop's own name",
+                value = custom[output.uniqueId].orEmpty(),
+                onChange = { ctx, value -> dev.droidtop.runtime.ScreenNaming.rename(ctx, output.uniqueId, value) },
+            )
+        }
+    }
+
     private fun secondScreenKeyboardItems(context: Context): List<CatalogItem> = buildList {
         val elevated = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
         if (elevated) {

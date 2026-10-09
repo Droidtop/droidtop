@@ -101,8 +101,8 @@ object TaskPolicy {
             add(CloseStep.KILL_BACKGROUND)
         }
 
-    /** What a screen calls a display: the built-in one is 0, everything else is an attached screen. */
-    fun displayLabel(displayId: Int): String = if (displayId == 0) "Built-in screen" else "Second screen"
+    /** What a screen calls a display: its name as the display orchestration last computed it (docs/SPEC.md 4c, "Screen names"). */
+    fun displayLabel(displayId: Int): String = dev.droidtop.runtime.ScreenNaming.label(displayId)
 
     /** The display "move to the other screen" targets: the built-in screen for an app elsewhere, otherwise the first other display; null with one screen. */
     fun otherDisplay(current: Int, all: List<Int>): Int? =

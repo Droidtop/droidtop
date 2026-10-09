@@ -45,7 +45,7 @@ internal fun LaunchDisplayChooserDialog(
     val rows = remember(options, canRemember) {
         options.map { ChooserRow(it, remember = false, label = it.label) } +
             if (canRemember) {
-                options.map { ChooserRow(it, remember = true, label = "Always: " + it.label) }
+                options.filter { it.rememberable }.map { ChooserRow(it, remember = true, label = "Always: " + it.label) }
             } else {
                 emptyList()
             }

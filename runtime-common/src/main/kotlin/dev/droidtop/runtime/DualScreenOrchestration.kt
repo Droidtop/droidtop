@@ -170,40 +170,44 @@ object DualScreenOrchestration {
      * Chooser candidates in priority order: the addon/second screen FIRST,
      * so the default-highlighted row is the better surface (per direction:
      * when the add-on is attached it is the preferred screen, not an
-     * afterthought). Each label names the screen first and says which one
-     * the person is looking at second: "This screen (add-on)" read as a
-     * riddle to a newcomer (console, build 1386). droidtop knows which panel
-     * is built in and which is attached; where each sits comes only from the
-     * device's hardware row ([addonOnTop]: true when the add-on display is
-     * above the built-in one, false below, null when the row does not say),
-     * and only then do the names say "Top screen" / "Bottom screen"
-     * (section 4c, Droidtop/tracker#258).
+     * afterthought), then the default display, every connected screen
+     * once, so a device with three or more screens offers each of them.
+     * Each label is the screen's name ([ScreenNames]: the person's own, a
+     * position from the device profile, "Built-in screen" or the display's
+     * own name) and says which one the person is looking at: "(this one)"
+     * for the shell's screen and, with exactly two, "(the other one)" for
+     * the other ("This screen (add-on)" read as a riddle to a newcomer,
+     * console build 1386; section 4c, Droidtop/tracker#162). The default
+     * display's candidate has a null id, the launch's "default display".
+     * Only the default display and [secondDisplayId] can be remembered:
+     * the remembered choice is a role (built-in or second), not a display.
      */
-    data class ChooserCandidate(val displayId: Int?, val label: String)
+    data class ChooserCandidate(val displayId: Int?, val label: String, val rememberable: Boolean = true)
 
-    fun chooserCandidates(secondDisplayId: Int, shellOnSecond: Boolean, addonOnTop: Boolean? = null): List<ChooserCandidate> {
-        val addon = when (addonOnTop) {
-            true -> "Top screen"
-            false -> "Bottom screen"
-            null -> "Add-on screen"
-        }
-        val builtIn = when (addonOnTop) {
-            true -> "Bottom screen"
-            false -> "Top screen"
-            null -> "Built-in screen"
-        }
-        return if (shellOnSecond) {
-            listOf(
-                ChooserCandidate(secondDisplayId, "$addon (this one)"),
-                ChooserCandidate(null, "$builtIn (the other one)"),
-            )
-        } else {
-            listOf(
-                ChooserCandidate(secondDisplayId, "$addon (the other one)"),
-                ChooserCandidate(null, "$builtIn (this one)"),
+    fun chooserCandidates(
+        displayIds: List<Int>,
+        names: Map<Int, String>,
+        shellDisplayId: Int,
+        secondDisplayId: Int?,
+    ): List<ChooserCandidate> {
+        val ordered = displayIds.distinct().filter { it != DEFAULT_DISPLAY_ID }.sorted() +
+            listOfNotNull(DEFAULT_DISPLAY_ID.takeIf { it in displayIds })
+        return ordered.map { id ->
+            val name = names[id] ?: if (id == DEFAULT_DISPLAY_ID) ScreenNames.BUILT_IN else ScreenNames.EXTERNAL
+            val relation = when {
+                id == shellDisplayId -> " (this one)"
+                ordered.size == 2 -> " (the other one)"
+                else -> ""
+            }
+            ChooserCandidate(
+                displayId = id.takeIf { it != DEFAULT_DISPLAY_ID },
+                label = name + relation,
+                rememberable = id == DEFAULT_DISPLAY_ID || id == secondDisplayId,
             )
         }
     }
+
+    private const val DEFAULT_DISPLAY_ID = 0
 
     /**
      * Whether the add-on display looks like it needs a hard reinit right

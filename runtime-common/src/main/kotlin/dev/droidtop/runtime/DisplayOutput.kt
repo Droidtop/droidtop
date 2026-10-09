@@ -33,6 +33,14 @@ data class DisplayOutput(
      */
     val nativeWidthPx: Int = widthPx,
     val nativeHeightPx: Int = heightPx,
+    /**
+     * Android's own stable id for the display (`Display.getUniqueId`, "local:<port>" for a panel), which survives
+     * reconnects and reboots where the display id does not; a key built from its type, name and native mode when
+     * Android does not give it. The person's screen names are kept under it ([ScreenNaming]).
+     */
+    val uniqueId: String = id,
+    /** Android's display type (`Display.getType`: 1 internal, 2 external, 3 Wi-Fi, 4 overlay, 5 virtual); null when unreadable. */
+    val androidType: Int? = null,
 ) {
     /** See [DisplayModes.isFallback]. */
     val isInFallbackMode: Boolean

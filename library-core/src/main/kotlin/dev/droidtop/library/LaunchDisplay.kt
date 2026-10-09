@@ -37,7 +37,8 @@ import kotlinx.coroutines.withContext
  * each library-core call site re-reading preferences it shouldn't know
  * the shape of.
  */
-data class LaunchDisplayOption(val displayId: Int?, val label: String)
+/** One screen the launch chooser offers; [rememberable] false leaves it out of the "Always" rows (a third screen has no role to remember). */
+data class LaunchDisplayOption(val displayId: Int?, val label: String, val rememberable: Boolean = true)
 
 /**
  * Which game a launch is for, so [LaunchDisplay] can look up and record

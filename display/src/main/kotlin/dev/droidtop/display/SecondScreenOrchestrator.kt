@@ -44,13 +44,6 @@ interface SecondScreenHost {
     fun parkedDisplayId(): Int?
     fun clearParkedDisplayId()
 
-    /**
-     * Where the add-on display physically sits, from this device's hardware row: true above the
-     * built-in one, false below, null when the row does not say (or is not loaded yet). Cheap and
-     * non-blocking: called from the orchestration pass.
-     */
-    fun addonScreenOnTop(): Boolean? = null
-
     /** Mirrors the resolved state into dev.droidtop.library.LaunchDisplay. */
     fun publishLaunchTargeting(
         secondDisplayId: Int?,
@@ -254,7 +247,8 @@ class SecondScreenOrchestrator(
             displayOutputs.observe(),
             roleRefresh,
             DisplayArrangement.refresh,
-        ) { outputs, _, arrangement -> outputs to arrangement }
+            dev.droidtop.runtime.ScreenNaming.changes,
+        ) { outputs, _, arrangement, _ -> outputs to arrangement }
             .collectLatest { (outputs, arrangementSeq) ->
                 if (arrangementSeq != lastArrangementSeq) {
                     lastArrangementSeq = arrangementSeq
@@ -343,8 +337,18 @@ class SecondScreenOrchestrator(
                         if (shellOnSecondNow) second!!.androidDisplayId else null
                     DisplayRolePrefs.GameLaunchTarget.SECOND -> second!!.androidDisplayId
                 }
+                // Every screen's name (docs/SPEC.md 4c, "Screen names"), kept for the rows that name a screen.
+                val screenNames = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    dev.droidtop.runtime.ScreenNaming.names(context, outputs)
+                }
+                dev.droidtop.runtime.ScreenNaming.current = screenNames
                 val askOptions = if (launchTarget == DisplayRolePrefs.GameLaunchTarget.ASK) {
-                    DualScreenOrchestration.chooserCandidates(second!!.androidDisplayId, shellOnSecondNow, host.addonScreenOnTop())
+                    DualScreenOrchestration.chooserCandidates(
+                        outputs.map { it.androidDisplayId },
+                        screenNames,
+                        currentDisplay,
+                        second?.androidDisplayId,
+                    )
                 } else {
                     null
                 }

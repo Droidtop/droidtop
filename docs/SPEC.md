@@ -3571,16 +3571,48 @@ fallback:
   that remembers for this game. Asking is still the first-launch
   default; a remembered answer is the steady state, so the question is
   asked once per game, not every time.
-- Each row names the screen first and the relation second: "Add-on screen (this one)",
-  "Built-in screen (the other one)" (console, build 1386: "This screen (add-on)" read as a
-  riddle to a newcomer). droidtop knows which panel is built in and which is attached; where
-  each sits comes only from the device's hardware row (droidtop-platforms `hardware/<device>.json`,
-  `displays[].position`, top or bottom; `ConsoleDef.addonOnTop`). When the row says, the rows
-  read "Top screen (this one)" / "Bottom screen (the other one)"; otherwise they keep "Add-on" and
-  "Built-in". The Retroid Pocket 5's add-on display sits above the built-in one (owner,
-  2026-10-02, Droidtop/tracker#258). The orchestration pass reads only an already loaded table
-  (`HardwareDatabase.loadedForThisDevice`; `MainActivity` loads it at start, off the main thread),
-  so a pass before that keeps the generic names.
+- The chooser offers every connected screen once (the non-default displays first, in display-id
+  order, then the default display), so a device with three or more screens offers each. Each row
+  is the screen's name ("Screen names", below) and its relation: "(this one)" for the shell's
+  screen and, with exactly two screens, "(the other one)" for the other ("This screen (add-on)"
+  read as a riddle to a newcomer, console build 1386). The "Always" rows are offered only for the
+  default display and the second display, because the remembered answer is a role (built-in or
+  second), not a display.
+- **Screen names** (decided 2026-10-09, owner, Droidtop/tracker#162: "That dichotomy only makes
+  sense on the current device configuration. It doesn't make sense on multi-display devices. We
+  need better than just going all or nothing"; and "Some devices have multiple internal displays
+  ... The ayn thor, for instance"). One rule set (`ScreenNames`, pure and unit-tested) names every
+  screen wherever droidtop names one: the launch chooser, the running apps list
+  (`TaskPolicy.displayLabel`) and Settings.
+  1. A name the person gave the screen in Settings > Displays ("Name: <screen>", blank gives the
+     screen its own name back), stored per Android's unique id for the display
+     (`Display.getUniqueId`, read by reflection; a key from type, name and native mode when it
+     cannot be read), so the name stays with the screen across reconnects.
+  2. Built-in or external comes from Android's own facts, never from "the default display is the
+     built-in one": the display type (`Display.getType`: internal is built in; external, Wi-Fi,
+     overlay and virtual are not). Only when the type cannot be read: the default display is built
+     in and a presentation display is external.
+  3. A device profile that knows the physical arrangement names its panels by position, "Top
+     screen" / "Bottom screen" (droidtop-platforms `hardware/<device>.json` `displays[]`: role
+     internal or addon, native width and height, position; `ConsoleDef.panels`, with
+     `addonOnTop` kept). A built-in panel matches a built-in screen of its native size in either
+     orientation; the device's add-on, an external display that belongs to it, matches only its
+     exact size, so a landscape monitor on the same port is not taken for a portrait add-on. A panel
+     without a size matches only when it and one screen of its kind are all that is left. Rows: the
+     AYN Thor (two built-in panels, top 1920x1080 and bottom 1240x1080; from its published
+     specifications and LineageOS's device tree, to be replaced with what a Thor reports) and the
+     Retroid Pocket 5 (built-in panel below, add-on display above, both 1080x1920; owner
+     2026-10-02, Droidtop/tracker#258).
+  4. Otherwise one built-in screen is "Built-in screen", several are "Built-in screen 1", "Built-in
+     screen 2", ... in display-id order, and an external screen is its own Android name (a
+     monitor's product name, "DP Screen", "HDMI Screen"; "External screen" when it has none).
+  5. Names that still collide are numbered in display-id order ("HDMI Screen 1", "HDMI Screen 2").
+  The profile and the person's names are read off the main thread at start (`MainActivity`) into
+  `ScreenNaming`; the orchestration pass computes the names on every display change, rename or
+  profile load, and keeps the result for the rows that name a screen. Superseded: the 2026-10-02
+  chooser that offered only the built-in and the second screen, as "Top screen" / "Bottom screen"
+  whenever the hardware row had positions and "Add-on" / "Built-in" otherwise, whatever was
+  actually connected.
 - Clearing is first-class ("Delete preferred Screen"): the game's
   metadata editor has a Launch screen row (Ask / Built-in / Add-on,
   writes immediately — a display choice is a launcher preference, not

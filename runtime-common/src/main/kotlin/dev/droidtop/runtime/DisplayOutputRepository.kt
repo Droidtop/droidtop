@@ -61,6 +61,15 @@ class DisplayOutputRepository(private val context: Context) {
     /** One-shot read, for callers that act rather than observe. */
     fun currentOutputsSnapshot(): List<DisplayOutput> = currentOutputs()
 
+    // Display.getType and Display.getUniqueId are hidden but readable by apps (hidden-API unsupported list): the type
+    // is the only fact that tells a second built-in panel (a dual-screen handheld) from an external display, and the
+    // unique id the only key that stays with a screen. Any failure reads as unknown.
+    private fun hiddenInt(display: Display, method: String): Int? =
+        runCatching { Display::class.java.getMethod(method).invoke(display) as? Int }.getOrNull()
+
+    private fun hiddenString(display: Display, method: String): String? =
+        runCatching { Display::class.java.getMethod(method).invoke(display) as? String }.getOrNull()
+
     private fun currentOutputs(): List<DisplayOutput> {
         val primary = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
         val presentationDisplays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
@@ -84,7 +93,11 @@ class DisplayOutputRepository(private val context: Context) {
             val presentation = (display.flags and Display.FLAG_PRESENTATION) != 0
             val native = display.supportedModes
                 .maxByOrNull { it.physicalWidth.toLong() * it.physicalHeight }
+            val type = hiddenInt(display, "getType")
             DisplayOutput(
+                uniqueId = hiddenString(display, "getUniqueId")?.takeIf { it.isNotBlank() }
+                    ?: "display:${type ?: "?"}:${display.name.orEmpty()}:${native?.physicalWidth ?: point.x}x${native?.physicalHeight ?: point.y}",
+                androidType = type,
                 id = display.displayId.toString(),
                 androidDisplayId = display.displayId,
                 kind = if (display.displayId == Display.DEFAULT_DISPLAY) {

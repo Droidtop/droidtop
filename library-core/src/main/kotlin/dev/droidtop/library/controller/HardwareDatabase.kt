@@ -28,6 +28,8 @@ data class ConsoleDef(
     val toggle: LayoutToggle?,
     /** Where the add-on display sits: true above the built-in panel, false below, null when the row does not say. */
     val addonOnTop: Boolean? = null,
+    /** The row's `displays[]` with a position: what names this device's screens by position (docs/SPEC.md 4c, "Screen names"). */
+    val panels: List<dev.droidtop.runtime.ScreenPanel> = emptyList(),
 ) {
     fun matches(deviceManufacturer: String?, deviceModel: String?): Boolean =
         deviceModel != null && model.equals(deviceModel.trim(), ignoreCase = true) &&
@@ -67,13 +69,6 @@ object HardwareDatabase {
     /** The row for this device, or null. Not for the main thread. */
     fun forThisDevice(context: Context): ConsoleDef? =
         defs(context).firstOrNull { it.matches(android.os.Build.MANUFACTURER, android.os.Build.MODEL) }
-
-    /**
-     * This device's row when the table is already loaded, reading nothing: for a caller on the main thread,
-     * which gets null until something has loaded the table ([defs] off the main thread).
-     */
-    fun loadedForThisDevice(): ConsoleDef? =
-        cached?.firstOrNull { it.matches(android.os.Build.MANUFACTURER, android.os.Build.MODEL) }
 
     /** Validate-then-replace, like the other databases. Returns the row count. */
     fun install(context: Context, text: String): Int {
@@ -137,7 +132,26 @@ object HardwareDatabase {
             glyphFamily = GlyphFamily.fromId(pad?.optString("glyphFamily", "")),
             toggle = toggle,
             addonOnTop = addonOnTop(json.optJSONArray("displays")),
+            panels = panels(json.optJSONArray("displays")),
         )
+    }
+
+    /** Every `displays[]` entry with a role and a position; an add-on is an external display that belongs to the device. */
+    private fun panels(displays: org.json.JSONArray?): List<dev.droidtop.runtime.ScreenPanel> {
+        if (displays == null) return emptyList()
+        return (0 until displays.length()).mapNotNull { displays.optJSONObject(it) }.mapNotNull { panel ->
+            val builtIn = when (panel.optString("role")) {
+                "internal" -> true
+                "addon" -> false
+                else -> return@mapNotNull null
+            }
+            dev.droidtop.runtime.ScreenPanel(
+                builtIn = builtIn,
+                position = panel.optString("position", "").ifEmpty { null },
+                widthPx = panel.optInt("width", 0).takeIf { it > 0 },
+                heightPx = panel.optInt("height", 0).takeIf { it > 0 },
+            )
+        }
     }
 
     /**
