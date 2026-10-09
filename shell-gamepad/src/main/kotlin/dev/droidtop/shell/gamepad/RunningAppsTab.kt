@@ -91,7 +91,8 @@ internal fun AppsTab(onDismiss: () -> Unit) {
                         message = null
                     }
                     GamepadAction.B -> onDismiss()
-                    GamepadAction.A -> if (index == 0) {
+                    // With nothing running there is no Clear all row (SharedRunningAppsList), so nothing at row 0.
+                    GamepadAction.A -> if (apps.isEmpty()) Unit else if (index == 0) {
                         scope.launch {
                             val targets = TaskManager.clearAllTargets(context)
                             if (TaskPolicy.needsClearAllConfirm(targets.size) && !clearAllArmed) {
@@ -127,7 +128,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
                 true
             },
     ) {
-        if (snapshot?.note != null) {
+        if (snapshot?.note != null && apps.isNotEmpty()) {
             Text("Limited list", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
         }
         // Scrolls, and MenuRow brings the selected row into view itself.
@@ -140,7 +141,11 @@ internal fun AppsTab(onDismiss: () -> Unit) {
             if (snapshot == null) {
                 Text("Reading…", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             } else if (apps.isEmpty()) {
-                Text("Nothing running", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
+                // A list the system only partly gave us cannot promise nothing is running (Droidtop/tracker#367).
+                Text(
+                    if (snapshot?.note != null) "Nothing seen (limited list)" else "Nothing running",
+                    color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium,
+                )
             }
             SharedRunningAppsList(
                 apps = apps,
@@ -156,7 +161,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
         }
         HintRow(
             bindings = listOf(
-                HintBinding(GamepadAction.A, "Clear all") { index == 0 },
+                HintBinding(GamepadAction.A, "Clear all") { index == 0 && apps.isNotEmpty() },
                 HintBinding(GamepadAction.A, "Switch to") { index > 0 },
                 HintBinding(GamepadAction.X, "Close") { index > 0 },
                 HintBinding(GamepadAction.Y, "Other screen") { index > 0 && TaskManager.displayIds(context).size > 1 },
@@ -183,7 +188,8 @@ fun SharedRunningAppsList(
     onMove: (Int, RunningApp) -> Unit,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing)) {
-        SharedTaskAction(clearLabel, selectedIndex == 0, onClear)
+        // Nothing running: no button to close nothing.
+        if (apps.isNotEmpty()) SharedTaskAction(clearLabel, selectedIndex == 0, onClear)
         apps.forEachIndexed { i, app ->
             val selected = selectedIndex == i + 1
             // The pad's cursor is virtual (the Quick Menu's index), so the scrolling column is asked to show

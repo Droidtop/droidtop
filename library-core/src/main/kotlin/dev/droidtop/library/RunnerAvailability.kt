@@ -226,7 +226,9 @@ object RunnerAvailability {
             return RunnerOption(
                 strategy,
                 RunnerState.NEEDS_SETUP,
-                "Set up Windows games",
+                // Not the action's own name: the button and the menu row already say "Set up Windows games",
+                // and a reason repeating it told the person nothing (Droidtop/tracker#367).
+                "The Windows environment is not set up yet",
                 RunnerAction.SET_UP_WINDOWS_GAMES,
             )
         }

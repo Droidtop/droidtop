@@ -186,7 +186,9 @@ internal object StoresCatalog {
                     NestedScreenItem(
                         id = "store_${store.key}",
                         title = store.label,
-                        subtitle = store.signInNote,
+                        // How to sign in is only worth saying while the person is not signed in; the value column
+                        // already says "Signed in" (Droidtop/tracker#367).
+                        subtitle = if (signedIn) null else store.signInNote,
                         inline = storePage(store),
                         valueLabel = { if (signedIn) "Signed in" else "Not signed in" },
                         icon = CatalogIcon.GLOBAL,
