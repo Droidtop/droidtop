@@ -91,3 +91,11 @@ com.android.wm.shell.shared.CounterRotator
 com.android.wm.shell.shared.GroupedTaskInfo
 com.android.wm.shell.shared.TransactionPool
 com.android.wm.shell.shared.TransitionUtil
+
+# --- Framework callbacks only the platform calls, and only on the API that has them ---
+
+# LatinIME overrides InputMethodService.onCreateInlineSuggestionsRequest (API 30), whose return type is
+# InlineSuggestionsRequest. Android calls it only on Android 11 and later, where the type exists; the
+# override is @RequiresApi(30) and the class is a service the platform instantiates, not code that calls it.
+org.pocketworkstation.pckeyboard.InlineAutofill
+org.pocketworkstation.pckeyboard.LatinIME
