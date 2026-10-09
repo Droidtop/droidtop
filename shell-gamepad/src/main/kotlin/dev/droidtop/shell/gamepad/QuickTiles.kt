@@ -5,10 +5,14 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.ChoiceItem
+import dev.droidtop.library.settings.ControlAccess
+import dev.droidtop.library.settings.ControlPanel
+import dev.droidtop.library.settings.ControlSurface
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.library.settings.UiMode
 
 /**
  * The Quick Menu's System tab as tiles: the pure model behind it, with
@@ -38,16 +42,16 @@ enum class QuickGlyph {
  * for quick management only; destinations and the places things live are
  * the left menu's, and Get games is a contextual action that is not here.
  */
-enum class QuickSection(val label: String, val glyph: QuickGlyph) {
-    GAME("Game", QuickGlyph.GAMEPAD),
-    APPS("Running apps", QuickGlyph.APPS),
-    NOTIFICATIONS("Notifications", QuickGlyph.BELL),
-    SYSTEM("System", QuickGlyph.SETTINGS),
-    PERFORMANCE("Performance", QuickGlyph.GAUGE),
-    AUDIO("Audio", QuickGlyph.VOLUME),
-    DISPLAY("Display", QuickGlyph.DISPLAY),
-    DOWNLOADS("Downloads and jobs", QuickGlyph.DOWNLOAD),
-    PLUGINS("Plugins", QuickGlyph.GENERIC),
+enum class QuickSection(val label: String, val glyph: QuickGlyph, val panel: ControlPanel) {
+    GAME("Game", QuickGlyph.GAMEPAD, ControlPanel.GAME),
+    APPS("Running apps", QuickGlyph.APPS, ControlPanel.APPS),
+    NOTIFICATIONS("Notifications", QuickGlyph.BELL, ControlPanel.NOTIFICATIONS),
+    SYSTEM("System", QuickGlyph.SETTINGS, ControlPanel.SYSTEM),
+    PERFORMANCE("Performance", QuickGlyph.GAUGE, ControlPanel.PERFORMANCE),
+    AUDIO("Audio", QuickGlyph.VOLUME, ControlPanel.AUDIO),
+    DISPLAY("Display", QuickGlyph.DISPLAY, ControlPanel.DISPLAY),
+    DOWNLOADS("Downloads and jobs", QuickGlyph.DOWNLOAD, ControlPanel.DOWNLOADS),
+    PLUGINS("Plugins", QuickGlyph.GENERIC, ControlPanel.PLUGINS),
 }
 
 /**
@@ -102,11 +106,16 @@ object QuickTiles {
         GamingSettingsCatalog.ID_DISPLAY_REINIT,
     )
 
-    /** The sections the rail shows now: Game only while a game runs, Plugins only when a plugin has a panel or tiles here. */
-    fun visibleSections(gameRunning: Boolean, hasPlugins: Boolean): List<QuickSection> =
-        QuickSection.entries.filter {
-            (it != QuickSection.GAME || gameRunning) && (it != QuickSection.PLUGINS || hasPlugins)
+    /**
+     * The sections the rail shows now: those [mode] allows on the Quick Menu ([ControlAccess], the one
+     * restriction model), Game only while a game runs, Plugins only when a plugin has a panel or tiles here.
+     */
+    fun visibleSections(gameRunning: Boolean, hasPlugins: Boolean, mode: UiMode = UiMode.FULL): List<QuickSection> {
+        val allowed = ControlAccess.panels(mode, ControlSurface.QUICK_MENU)
+        return QuickSection.entries.filter {
+            it.panel in allowed && (it != QuickSection.GAME || gameRunning) && (it != QuickSection.PLUGINS || hasPlugins)
         }
+    }
 
     /**
      * Where the menu opens: the running game, else Notifications once
@@ -130,9 +139,11 @@ object QuickTiles {
     /**
      * The catalog items one tile-grid section shows (System, Audio or
      * Display), as the single group [panel] takes. Pulled from the live
-     * Gaming catalog by id, never copied.
+     * Gaming catalog by id, never copied, after [ControlAccess] has taken
+     * out what [mode] hides.
      */
-    fun sectionGroups(all: List<CatalogGroup>, section: QuickSection): List<CatalogGroup> {
+    fun sectionGroups(catalog: List<CatalogGroup>, section: QuickSection, mode: UiMode = UiMode.FULL): List<CatalogGroup> {
+        val all = ControlAccess.filter(mode, catalog)
         val system = all.firstOrNull { it.id == GamingSettingsCatalog.GROUP_SYSTEM }?.items.orEmpty()
         val claimed = AUDIO_IDS + DISPLAY_IDS
         val byId = (system + all.filter { it.id != GamingSettingsCatalog.GROUP_SYSTEM }.flatMap { it.items })

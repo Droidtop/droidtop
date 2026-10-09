@@ -2775,7 +2775,10 @@ the `ContainerRuntime` interface that already exists (§3):
   lot more", more granular instead of one flat list. So the tab row above is replaced by an
   **icon rail** of sections beside the section's own content (a column down the sheet's left
   edge in landscape, a row across the top of the bottom sheet in portrait). One menu, the existing
-  tabs migrated into it, not a second one. Sections, in rail order, and what each is:
+  tabs migrated into it, not a second one. Which sections a UI mode shows, and which catalog
+  items inside them, is `ControlAccess`'s answer (see "UI modes and ControlAccess" in 7f); Kid and
+  Kiosk keep every section Full has, without the items that control the restriction itself.
+  Sections, in rail order, and what each is:
   - **Game** (only while a game is parked, first when present): the Game section below.
   - **Running apps**: the task manager's list with Close and Clear all (`AppsTab`, #245, #252).
   - **Notifications**: unchanged (`NotificationsTab`, grant row when access is missing, #180).
@@ -9320,6 +9323,30 @@ which is what the `Y Info` hint had been promising).
 lists kid-game entries only and hides Settings; kiosk hides Settings and
 the metadata editor; leaving either is a held press on the Quick Menu's
 System tab.
+
+**UI modes and ControlAccess (decided 2026-10-09, Droidtop/tracker#414).**
+`ControlAccess` (`:runtime-common`) is the one restriction model. It takes
+the UI mode as a value (Full, Kid, Kiosk; Guest is reserved and gets its
+rules when it is defined, Droidtop/tracker#420) and answers, for the
+companion and the Quick Menu alike: which panels show (`ControlPanel`, the
+companion's tabs and the Quick Menu's sections named once), which panels
+are read-only, which non-catalog rows show inside them (`ControlRow`),
+which catalog items and groups are hidden, which items may be pinned on
+the companion's Home, and whether long-press, Open on the companion
+screen and the provider line exist. `UiMode.hidesSettings` and
+`UiMode.kidGamesOnly` read from it; nothing else gates Kid or Kiosk. Each
+mode's rules are written out in full, and the test names every mode's
+sets, so an added mode fails until its sets are written.
+- **Full**: everything.
+- **Kid and Kiosk**: the companion shows Home (the volume and brightness
+  pins only), Game (Resume and Quit, both always asking) and Performance
+  read-only (stats, no controls); no notifications, Now playing, recent
+  apps, Social, plugin pins, long-press, Open on the companion screen or
+  provider line. The Quick Menu keeps every section Full shows. On every
+  surface the items that control the restriction itself are hidden: the
+  companion's own preferences (the Companion catalog group), Kid's volume
+  cap, the passkey and the UI mode choice. The way out (Leave Kid, Leave
+  Kiosk on the Quick Menu's System section) stays.
 
 **Screensaver.** ES-DE's four kinds — dim, black, slideshow and video —
 after Off/2/5/10/15/30 minutes (today: the slideshow only), with the

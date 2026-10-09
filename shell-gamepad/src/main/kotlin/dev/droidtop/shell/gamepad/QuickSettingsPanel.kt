@@ -110,7 +110,11 @@ internal fun QuickSettingsPanel(
     // battery broadcast and a connectivity query.
     val groups by produceState(initialValue = emptyList<CatalogGroup>(), version) {
         value = withContext(Dispatchers.IO) {
-            val base = QuickTiles.sectionGroups(GamingSettingsCatalog.groups(context), section)
+            val base = QuickTiles.sectionGroups(
+                GamingSettingsCatalog.groups(context),
+                section,
+                dev.droidtop.library.settings.UiModePrefs.get(context),
+            )
             // The System tab also carries the two controller tiles (SPEC 7b), which live in this
             // module because they act on the shell's own controller resolver.
             if (section != QuickSection.SYSTEM) base

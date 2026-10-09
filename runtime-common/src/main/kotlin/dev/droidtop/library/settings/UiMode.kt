@@ -18,6 +18,9 @@ import android.content.Context
  * it. That is a real escape hatch a parent can find and a child is
  * unlikely to stumble into, without pretending a passcode droidtop does
  * not have.
+ *
+ * What each mode shows and hides, on every surface, is [ControlAccess]'s
+ * to say; this enum only names the modes.
  */
 enum class UiMode(val label: String) {
     FULL("Full"),
@@ -25,8 +28,9 @@ enum class UiMode(val label: String) {
     KID("Kid (kid-friendly games only)"),
     ;
 
-    val hidesSettings: Boolean get() = this != FULL
-    val kidGamesOnly: Boolean get() = this == KID
+    // Both answers come from ControlAccess, the one restriction model (docs/SPEC.md "UI modes and ControlAccess").
+    val hidesSettings: Boolean get() = !ControlAccess.rules(this).settings
+    val kidGamesOnly: Boolean get() = ControlAccess.rules(this).kidGamesOnly
 }
 
 object UiModePrefs {

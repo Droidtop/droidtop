@@ -171,8 +171,10 @@ internal fun QuickMenu(
         }
         val granted = remember { NotificationsStore.isGranted(context) }
         val gameRunning = runningEntry != null
-        val sections = remember(gameRunning, hasPlugins) {
-            QuickTiles.visibleSections(gameRunning, hasPlugins)
+        // The sections Kid and Kiosk allow come from ControlAccess, like the companion's tabs.
+        val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
+        val sections = remember(gameRunning, hasPlugins, uiMode) {
+            QuickTiles.visibleSections(gameRunning, hasPlugins, uiMode)
         }
         var section by remember { mutableStateOf(QuickTiles.initialSection(gameRunning, granted)) }
         LaunchedEffect(sections, section) {

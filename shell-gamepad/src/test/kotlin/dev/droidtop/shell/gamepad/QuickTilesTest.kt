@@ -250,6 +250,29 @@ class QuickTilesTest {
     }
 
     @Test
+    fun `Kid and Kiosk sections come from ControlAccess and match Full's, without the restriction's own items`() {
+        for (mode in listOf(dev.droidtop.library.settings.UiMode.KID, dev.droidtop.library.settings.UiMode.KIOSK)) {
+            assertEquals(
+                QuickTiles.visibleSections(gameRunning = true, hasPlugins = true),
+                QuickTiles.visibleSections(gameRunning = true, hasPlugins = true, mode = mode),
+            )
+        }
+        val groups = listOf(
+            CatalogGroup(
+                GamingSettingsCatalog.GROUP_SYSTEM, "System",
+                listOf(
+                    ActionItem(id = GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE, title = "Leave Kid", run = {}),
+                    ActionItem(id = dev.droidtop.library.settings.ControlAccess.ID_UI_MODE_PASSKEY, title = "Passkey", run = {}),
+                ),
+            ),
+        )
+        fun ids(mode: dev.droidtop.library.settings.UiMode) =
+            QuickTiles.sectionGroups(groups, QuickSection.SYSTEM, mode).single().items.map { it.id }
+        assertEquals(listOf(GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE), ids(dev.droidtop.library.settings.UiMode.KID))
+        assertEquals(2, ids(dev.droidtop.library.settings.UiMode.FULL).size)
+    }
+
+    @Test
     fun `the menu opens on the game, else notifications when granted, else system`() {
         assertEquals(QuickSection.GAME, QuickTiles.initialSection(gameRunning = true, notificationsGranted = false))
         assertEquals(QuickSection.NOTIFICATIONS, QuickTiles.initialSection(gameRunning = false, notificationsGranted = true))
