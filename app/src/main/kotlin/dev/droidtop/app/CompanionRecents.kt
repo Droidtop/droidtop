@@ -88,7 +88,7 @@ private fun List<LibraryEntry>.distinctGames(): List<LibraryEntry> =
 /**
  * One rail: the section heading over a row of capsules that scrolls sideways inside the page's one vertical
  * scroll. Capsules are small (80dp, 2:3) so a rail and the heading of the next section share the first
- * screen. Every capsule is reachable by a sideways swipe or the D-pad (a focused capsule scrolls into view).
+ * screen. Every capsule is reachable by a sideways swipe.
  */
 @Composable
 private fun CompanionRail(section: CompanionHomeSection, layout: CompanionHomeLayout, games: List<LibraryEntry>) {

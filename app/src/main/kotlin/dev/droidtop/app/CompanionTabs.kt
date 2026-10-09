@@ -48,9 +48,7 @@ import dev.droidtop.library.social.SocialHub
  * [CompanionSocialTab], Droidtop/tracker#327; not in Kiosk and Kid), Tasks, Performance, System and,
  * in Desktop mode or when the user chose it as this mode's second-screen role, the keyboard and
  * trackpad Input surface (section 6c).
- * Touch first: a key reaches the companion only while no shell is in front to take it (TouchOnlySurfaceFocus,
- * #186, #265), and then the D-pad moves between the companion's controls ([CompanionTile]). The
- * second-screen host still denies focus to its whole tree.
+ * Touch only: the companion takes no pad keys, so none of its controls draws a focus ring ([CompanionTile]).
  */
 internal enum class CompanionTab(val label: String) {
     HOME("Home"),

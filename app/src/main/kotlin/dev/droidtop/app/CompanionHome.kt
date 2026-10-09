@@ -1,12 +1,8 @@
 package dev.droidtop.app
 
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -74,9 +70,8 @@ internal class CompanionNav(val openTab: (CompanionTab) -> Unit, val openConvers
 internal val LocalCompanionNav = staticCompositionLocalOf<CompanionNav?> { null }
 
 /**
- * The companion's one touch-and-pad target: clipped to [shape], a ripple on touch, and a ring in the theme's
- * accent while the pad's focus is on it (touch never shows a ring). Pills, cards, rows and section headings
- * are all this, so the D-pad lands on every control the finger can.
+ * The companion's one touch target: clipped to [shape] with a ripple. The companion is touch only and never
+ * receives pad keys, so there is no focus ring. Pills, cards, rows and section headings are all this.
  */
 @Composable
 internal fun CompanionTile(
@@ -86,13 +81,10 @@ internal fun CompanionTile(
     enabled: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
     Box(
         modifier = modifier
             .clip(shape)
-            .then(if (focused) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
-            .clickable(interactionSource = interaction, indication = LocalIndication.current, enabled = enabled, onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         content = content,
     )
 }
