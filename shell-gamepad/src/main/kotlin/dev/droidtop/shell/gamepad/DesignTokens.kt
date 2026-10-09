@@ -213,6 +213,15 @@ object SettingsLayout {
 }
 
 /**
+ * Progress, where a job is drawn with it (a download's row, a capsule being
+ * installed; `ShellProgressBar`): a [Height] track in the scrim role, filled
+ * in the accent (Steam's black track and blue fill, in the theme's roles).
+ */
+object ProgressLook {
+    val Height: Dp = 4.dp
+}
+
+/**
  * The type scale, and the job of each role. droidtop's chrome supplies
  * this to [MaterialTheme] rather than inheriting the platform default, so
  * two screens in the same flow cannot use different roles for the same

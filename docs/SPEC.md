@@ -12932,6 +12932,23 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   (`PcStoreNames`), for the code that makes them and the code that filters
   by them. Per-store settings do not exist yet: nothing in the backend is
   configurable per store, and no row is shown for it.
+  **Shape (Droidtop/tracker#363 slice 9, 2026-10-08, DroidDeck's `StorePage`):**
+  the pages open with **header chips**, a page's facts at a glance and never
+  a control (`CatalogGroup.chips`, drawn by every catalog renderer: a row of
+  chips in the Gaming renderer, one line of facts in the Preference one).
+  The Stores list's chips say how many stores are signed in and how many
+  installs are under way, and a store's row carries the progress bar of its
+  install under way (DroidDeck's busy bar). A store page's chips say who is
+  signed in ("Signed in as ..." where the store keeps the name in the open),
+  when droidtop last asked for a sync, and how many of its installs are
+  downloading or paused; the inert "Signed in" row they replace is gone, and
+  the library's counts stay the Library row's value so nothing is said
+  twice. Its Downloads section lists that store's installs under way with
+  the Downloads place's own rows, then **All downloads**. Both pages are
+  live on the store installs alone (`CatalogScreen.live`), so an install
+  moves on them without anything polling. DroidDeck's segmented strip and
+  capsule grid are not taken: a store is a filter on the one library
+  (**Open library**), not a second place to browse it.
 - **Social** (`social`, `SocialCatalog`; Droidtop/tracker#313, #327): the friends
   and conversations of every social provider, Steam and plugins alike, see
   "Social" below. It sits after Stores in the left menu.
@@ -12940,6 +12957,23 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   downloads, plugin updates) with progress, Pause, Resume and Cancel where
   the job supports them (12a "Jobs"); every store installs as a
   job here (7g "Stores"), Steam included.
+  It is laid out as Steam's downloads page (Droidtop/tracker#363 slice 9):
+  the jobs fall into **Current**, **Paused** and **Completed** (recently
+  finished), each headed with its count and absent when empty; a job is one
+  row, its name over the shell's one progress bar (`ShellProgressBar`: the
+  scrim role's track filled in the accent, the same bar a capsule being
+  installed carries; an empty track while the size is unknown), and in the
+  value column how far it has got with roughly how long is left, then its
+  status line (a download's "120 MB of 300 MB"). Time left (`JobEta`) is
+  measured from how fast the job has moved since droidtop first saw it, says
+  nothing until it has moved 1% over 5 s, and starts again after a pause:
+  "Under a minute left", "About 8 min left", "About 2 h left". A on a running
+  or paused job opens its page: its progress, Pause or Resume where the job
+  supports them, and Cancel (two presses). The screen is live on the jobs
+  list (`CatalogScreen.live`), so nothing polls; the earlier progress row,
+  whose A started a second follower of the same job, is gone. There is no
+  "Up next" queue and no "move to top": droidtop's jobs run side by side, so
+  a queue order would be a control with nothing behind it.
   The name stays the one the rest of the app already uses. Theme downloads
   and update installs are not yet jobs in that list; folding them in is open.
 - **Updates** (`updates`): the "Available" group lists what has a newer

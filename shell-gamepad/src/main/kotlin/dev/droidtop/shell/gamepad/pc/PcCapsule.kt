@@ -50,7 +50,9 @@ import dev.droidtop.shell.gamepad.FloodOrigin
 import dev.droidtop.shell.gamepad.FocusLook
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.ShellProgressBar
 import dev.droidtop.shell.gamepad.Space
+import dev.droidtop.shell.gamepad.StatusChip
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.focusLift
 import dev.droidtop.shell.gamepad.input.PadModality
@@ -406,16 +408,8 @@ private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownload
         CapsuleChip(source.toString(), MenuTokens.OnSurface, MenuTokens.Scrim, Modifier.align(Alignment.BottomStart))
     }
     if (parts > 1) CapsuleChip("×$parts", MenuTokens.OnSurface, MenuTokens.Scrim, Modifier.align(Alignment.BottomEnd))
-    if (download != null) {
-        Box(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(MenuTokens.Scrim)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(download.fraction.coerceIn(0f, 1f))
-                    .height(4.dp)
-                    .background(MenuTokens.Selected),
-            )
-        }
-    }
+    // The shell's one progress bar, the same a download's row in the Downloads place draws.
+    if (download != null) ShellProgressBar(download.fraction.coerceIn(0f, 1f), Modifier.align(Alignment.BottomStart).fillMaxWidth())
 }
 
 /**
@@ -444,25 +438,10 @@ private fun KindMark(badge: KindBadge, modifier: Modifier) {
     )
 }
 
-/**
- * The one chip a capsule carries in a corner (DroidDeck's status Chip,
- * ui/FrontEndWidgets.kt at 9310d19): a pill on [fill] with a hairline of
- * its own [ink], so it reads over any art, the label in small capitals.
- */
+/** A chip in a capsule's corner: the shell's one [StatusChip], kept clear of the corner. */
 @Composable
 private fun CapsuleChip(text: String, ink: Color, fill: Color, modifier: Modifier) {
-    Text(
-        text.uppercase(),
-        color = ink,
-        style = TypeRole.eyebrow,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-            .padding(Space.Sm)
-            .background(fill, Corners.Pill)
-            .border(1.dp, ink.copy(alpha = 0.3f), Corners.Pill)
-            .padding(horizontal = Space.Sm, vertical = Space.Hair),
-    )
+    StatusChip(text, ink, fill, modifier.padding(Space.Sm))
 }
 
 /**

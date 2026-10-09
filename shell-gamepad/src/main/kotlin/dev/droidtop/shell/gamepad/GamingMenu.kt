@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -411,6 +412,9 @@ internal fun MenuRow(
     // own (Quick Menu, PcGameMenu, GamelistOptionsMenu and friends),
     // which still need MenuRow to scroll itself into view.
     ownScrollKeeping: Boolean = false,
+    // A job's progress (CatalogItem.progress): a thin bar under the title, the title then one line so
+    // the row keeps its height. Null: not a job.
+    progress: Float? = null,
     // A leading picture the caller draws (an app's own icon in the task manager's list); [accent] and
     // [icon] win when given, since a row carries one leading mark at most.
     leading: (@Composable () -> Unit)? = null,
@@ -492,9 +496,12 @@ internal fun MenuRow(
                 color = if (danger) MenuTokens.Danger else MenuTokens.OnSurface,
                 fontWeight = FontWeight.Medium,
                 style = MaterialTheme.typography.bodyLarge,
-                maxLines = 2,
+                maxLines = if (progress != null) 1 else 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (progress != null) {
+                ShellProgressBar(progress, Modifier.fillMaxWidth().padding(top = Space.Sm))
+            }
             // Wraps in full: rows grow with their text, so nothing is cut
             // (owner, tracker#154). The Info sheet still shows the row whole.
             subtitle?.takeIf { !uniformHeight || uniformSummaryLines > 0 }?.let {
@@ -627,6 +634,42 @@ internal fun ShellSlider(fraction: Float, selected: Boolean, modifier: Modifier 
         if (fraction > 0f) drawLine(fill, start, at, line, androidx.compose.ui.graphics.StrokeCap.Round)
         drawCircle(fill, thumb, at)
     }
+}
+
+/**
+ * The shell's one progress bar ([ProgressLook]): a thin track in the scrim role filled to
+ * [fraction] in the accent, Steam's black track and blue fill in the theme's roles. A negative
+ * [fraction] (a job under way whose size is not known yet) is the track alone. Drawn in one pass;
+ * [modifier] gives it its width. A download's row and a capsule being installed both draw it.
+ */
+@Composable
+internal fun ShellProgressBar(fraction: Float, modifier: Modifier = Modifier) {
+    val track = MenuTokens.Scrim
+    val fill = MenuTokens.Accent
+    androidx.compose.foundation.Canvas(modifier.height(ProgressLook.Height)) {
+        drawRect(track)
+        if (fraction > 0f) drawRect(fill, size = size.copy(width = size.width * fraction.coerceAtMost(1f)))
+    }
+}
+
+/**
+ * The shell's one status chip (DroidDeck's Chip, ui/FrontEndWidgets.kt at 9310d19): a fact in
+ * small capitals on a pill of [fill] with a hairline of its own [ink], so it reads over art and
+ * over a page alike. A capsule's corner marks and a place's header facts are both this chip.
+ */
+@Composable
+internal fun StatusChip(text: String, ink: Color, fill: Color, modifier: Modifier = Modifier) {
+    Text(
+        text.uppercase(),
+        color = ink,
+        style = TypeRole.eyebrow,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+            .background(fill, Corners.Pill)
+            .border(1.dp, ink.copy(alpha = 0.3f), Corners.Pill)
+            .padding(horizontal = Space.Sm, vertical = Space.Hair),
+    )
 }
 
 private val SliderHeight = 20.dp

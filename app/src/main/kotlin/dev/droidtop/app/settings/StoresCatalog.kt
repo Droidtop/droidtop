@@ -9,6 +9,7 @@ import dev.droidtop.library.PcStoreNames
 import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
+import dev.droidtop.library.settings.CatalogChip
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.CatalogItem
@@ -17,15 +18,20 @@ import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.stores.StoreHolding
 import dev.droidtop.library.stores.StoreChanges
+import dev.droidtop.library.stores.StoreInstallJob
 import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.runtime.windows.PcLibrary
+import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.runtime.windows.displayName
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /**
@@ -174,15 +180,42 @@ internal object StoresCatalog {
         title = "Stores",
         subtitle = "Each store: who is signed in, its library, and syncing it",
         groups = { context -> rootGroups(context) },
+        live = storeJobChanges,
     )
 
+    /**
+     * What the Stores pages follow live: which store installs are under way and how far they have
+     * got, so a store's row and page show an install moving (DroidDeck's busy bar) without
+     * re-reading the pages for every other job.
+     */
+    private val storeJobChanges: Flow<Any?> = PluginJobsCenter.entries()
+        .map { all -> all.filter { it.nativeKind == StoreInstallJob.KIND && !it.done }.map { Triple(it.jobId, it.percent, it.paused) } }
+        .distinctUntilChanged()
+
+    /** [store]'s installs that are running or paused, from the one jobs list. */
+    private fun storeJobs(store: PcStore): List<PluginJobsCenter.Entry> {
+        val label = store.own?.label ?: return emptyList()
+        return PluginJobsCenter.entries().value.filter { it.nativeKind == StoreInstallJob.KIND && !it.done && it.pluginLabel == label }
+    }
+
+    /** A row's progress bar for [jobs]: the first running install's, an empty track while its size is unknown. */
+    private fun busyProgress(jobs: List<PluginJobsCenter.Entry>): Float? =
+        jobs.firstOrNull { !it.paused }?.let { if (it.percent >= 0) it.percent / 100f else -1f }
+
     private suspend fun rootGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val signedInByStore = PcStore.entries.associateWith { it.signedIn(context) }
+        val installing = PcStore.entries.sumOf { store -> storeJobs(store).count { !it.paused } }
         listOf(
             CatalogGroup(
                 id = "stores_list",
                 title = null,
+                // The page's facts at a glance (DroidDeck's store header chips).
+                chips = listOfNotNull(
+                    signedInByStore.values.count { it }.let { n -> CatalogChip("$n of ${PcStore.entries.size} signed in", ok = n > 0) },
+                    CatalogChip("$installing downloading").takeIf { installing > 0 },
+                ),
                 items = PcStore.entries.map { store ->
-                    val signedIn = store.signedIn(context)
+                    val signedIn = signedInByStore[store] == true
                     NestedScreenItem(
                         id = "store_${store.key}",
                         title = store.label,
@@ -192,6 +225,7 @@ internal object StoresCatalog {
                         inline = storePage(store),
                         valueLabel = { if (signedIn) "Signed in" else "Not signed in" },
                         icon = CatalogIcon.GLOBAL,
+                        progress = busyProgress(storeJobs(store)),
                     )
                 },
             ),
@@ -205,21 +239,37 @@ internal object StoresCatalog {
         groups = { context -> pageGroups(context, store) },
         // The search index must not read every store's tables to list a few static rows.
         indexGroups = { emptyList() },
+        live = storeJobChanges,
     )
+
+    /**
+     * A store page's header chips: who is signed in, when droidtop last asked for a sync, and how
+     * many installs are under way. Facts, never controls; the library's own counts stay its row's
+     * value, so nothing is said twice.
+     */
+    private fun pageChips(context: Context, store: PcStore, signedIn: Boolean, jobs: List<PluginJobsCenter.Entry>): List<CatalogChip> = buildList {
+        add(
+            if (signedIn) {
+                CatalogChip(store.accountName(context)?.let { "Signed in as $it" } ?: "Signed in", ok = true)
+            } else {
+                CatalogChip("Not signed in")
+            },
+        )
+        if (signedIn) add(CatalogChip(syncedAgo(System.currentTimeMillis(), store.lastSyncRequested(context))))
+        val running = jobs.count { !it.paused }
+        if (running > 0) add(CatalogChip("$running downloading"))
+        val paused = jobs.size - running
+        if (paused > 0) add(CatalogChip("$paused paused"))
+    }
 
     private suspend fun pageGroups(context: Context, store: PcStore): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val signedIn = store.signedIn(context)
         val counts = storeCounts(runCatching { PcLibrary.storeGames(context) }.getOrDefault(emptyList()), store.source)
+        val jobs = storeJobs(store)
 
+        // Who is signed in is the page's first chip; the account's rows are what can be done about it.
         val account = if (signedIn) {
             listOf(
-                ActionItem(
-                    id = "store_${store.key}_account",
-                    title = "Signed in",
-                    subtitle = "This device holds a sign-in for ${store.label}",
-                    value = store.accountName(context),
-                    run = {},
-                ),
                 AsyncActionItem(
                     id = "store_${store.key}_signout",
                     title = "Sign out",
@@ -244,8 +294,8 @@ internal object StoresCatalog {
                     id = "store_${store.key}_library",
                     title = "Library",
                     // PC Games shows a game owned twice (two editions, a copy in each group) as one card, so its tabs can count fewer.
-                    subtitle = syncedAgo(System.currentTimeMillis(), store.lastSyncRequested(context)) +
-                        ". PC Games shows editions and copies of one game as one card, so its tabs can count fewer",
+                    // When droidtop last asked for a sync is the page's chip.
+                    subtitle = "PC Games shows editions and copies of one game as one card, so its tabs can count fewer",
                     value = countsLine(counts, signedIn),
                     run = {},
                 ),
@@ -309,20 +359,24 @@ internal object StoresCatalog {
         // The store's own settings (Steam's status, cloud saves and message notifications), once signed in.
         val own = if (signedIn) runCatching { store.own?.settingsItems(context) }.getOrNull().orEmpty() else emptyList()
         listOfNotNull(
-            CatalogGroup(id = "store_${store.key}_account_group", title = "Account", items = account),
+            CatalogGroup(
+                id = "store_${store.key}_account_group",
+                title = "Account",
+                items = account,
+                chips = pageChips(context, store, signedIn, jobs),
+            ),
             CatalogGroup(id = "store_${store.key}_settings_group", title = "Settings", items = own).takeIf { own.isNotEmpty() },
             CatalogGroup(id = "store_${store.key}_library_group", title = "Library", items = library),
             CatalogGroup(
                 id = "store_${store.key}_downloads_group",
                 title = "Downloads",
-                items = listOf(
-                    // Every store installs through the one jobs list: the Downloads place.
-                    NestedScreenItem(
-                        id = "store_${store.key}_downloads",
-                        title = "Downloads",
-                        subtitle = "What is downloading or waiting, with Pause, Resume and Cancel",
-                        registryId = PluginJobsScreen.ID,
-                    ),
+                // This store's installs under way, as the Downloads place draws them (DroidDeck's busy bar),
+                // then the way to the whole list. Every store installs through the one jobs list.
+                items = jobs.map { PluginJobsScreen.jobRow(it) } + NestedScreenItem(
+                    id = "store_${store.key}_downloads",
+                    title = "All downloads",
+                    subtitle = "Everything downloading or waiting, with Pause, Resume and Cancel",
+                    registryId = PluginJobsScreen.ID,
                 ),
             ),
         )

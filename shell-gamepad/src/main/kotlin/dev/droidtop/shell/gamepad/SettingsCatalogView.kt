@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,6 +82,7 @@ import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
+import dev.droidtop.library.settings.CatalogChip
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.CatalogItem
@@ -272,7 +275,11 @@ fun CatalogNavigator(
     val rows = remember(groups, showSearch, depth, categoryMode) {
         val built = groups.flatMap { group ->
             group.items.mapIndexed { index, item ->
-                CatalogRow(item, headerAbove = if (index == 0) group.title else null)
+                CatalogRow(
+                    item,
+                    headerAbove = if (index == 0) group.title else null,
+                    chipsAbove = if (index == 0) group.chips else emptyList(),
+                )
             }
         }
             // One key per row in the list below: a merged screen must not
@@ -806,6 +813,7 @@ private fun CatalogPane(
             itemsIndexed(rows, key = { _, row -> row.item.id }) { index, row ->
                 val isSelected = active && index == selected
                 Column {
+                    if (row.chipsAbove.isNotEmpty()) CatalogChipRow(row.chipsAbove)
                     row.headerAbove?.let { header -> MenuSectionLabel(header) }
                     CatalogRowView(
                         row = row,
@@ -1128,7 +1136,31 @@ internal fun adjustCatalogItem(context: Context, item: CatalogItem, direction: I
     else -> false
 }
 
-private data class CatalogRow(val item: CatalogItem, val headerAbove: String?)
+private data class CatalogRow(val item: CatalogItem, val headerAbove: String?, val chipsAbove: List<CatalogChip> = emptyList())
+
+/**
+ * A group's status chips ([CatalogGroup.chips]): a page's facts at a glance (DroidDeck's
+ * StorePage header chips, ui/StorePage.kt at 9310d19), never a focus stop. A good state ("Signed
+ * in") stands out on the selected-row plate; the rest are quiet on the row plate.
+ */
+@Composable
+private fun CatalogChipRow(chips: List<CatalogChip>) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Space.Sm),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(top = Space.Sm, bottom = Space.Xs),
+    ) {
+        chips.forEach { chip ->
+            StatusChip(
+                text = chip.label,
+                ink = if (chip.ok) MenuTokens.OnSurface else MenuTokens.Value,
+                fill = if (chip.ok) MenuTokens.SurfaceSelected else MenuTokens.Surface,
+            )
+        }
+    }
+}
 
 /** The synthetic root-level row that opens search -- never a real catalog id. */
 private const val SEARCH_ROW_ID = "__settings_search__"
@@ -1187,6 +1219,7 @@ private fun CatalogRowView(
             // A system state an action opens (Airplane mode, Bluetooth, VPN) is the same switch.
             switchOn = if (status == null) toggle?.current ?: (item as? ActionItem)?.state else null,
             sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
+            progress = item.progress,
         )
     }
 }

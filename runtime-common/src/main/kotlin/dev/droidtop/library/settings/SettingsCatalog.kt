@@ -76,6 +76,13 @@ sealed interface CatalogItem {
      * column beside it.
      */
     val value: String? get() = null
+
+    /**
+     * How far a job this row stands for has got, 0 to 1, drawn as a thin bar under its title (a
+     * download in the Downloads place, a store's install on its page); a negative value is a job
+     * under way whose size is not known yet (an empty track). Null for every row that is not a job.
+     */
+    val progress: Float? get() = null
 }
 
 data class ChoiceOption(val value: String, val label: String)
@@ -160,6 +167,7 @@ class ActionItem(
     // Bluetooth, VPN: the system owns the radios). Drawn as the one switch every on/off setting has,
     // in a settings row and on a Quick Menu tile alike; null for an action with no such state.
     val state: Boolean? = null,
+    override val progress: Float? = null,
     val run: (Context) -> Unit,
 ) : CatalogItem
 
@@ -303,6 +311,7 @@ class NestedScreenItem(
     // list keeps its real per-system color cue from SystemThemeColors.
     val accent: Int? = null,
     override val icon: CatalogIcon? = null,
+    override val progress: Float? = null,
 ) : CatalogItem {
     init {
         require((inline != null) != (registryId != null)) { "Exactly one of inline/registryId must be set" }
@@ -355,7 +364,17 @@ data class CatalogGroup(
      * is its own category (or a hub, when it holds only links to other screens).
      */
     val category: String? = null,
+    /**
+     * Short facts about what the group is about, drawn as a row of status chips above its rows
+     * (docs/SPEC.md 7j "Places": a store page's "Signed in", "128 games", "Synced 5 min ago"): the
+     * page's header when it is the first group. A chip is a fact, never a control; anything that can
+     * be pressed is a row. Drawn only above a group that has rows.
+     */
+    val chips: List<CatalogChip> = emptyList(),
 )
+
+/** One status chip ([CatalogGroup.chips]): a short fact, and whether it is a good state (signed in, up to date). */
+data class CatalogChip(val label: String, val ok: Boolean = false)
 
 /**
  * Cross-module screen lookup: the module that owns a management screen's

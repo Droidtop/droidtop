@@ -294,6 +294,18 @@ class CatalogPreferenceNavigator(
                 } else {
                     prefScreen
                 }
+                // A group's status chips (a store page's "Signed in", "128 games") are its facts: one
+                // line here, where the Gaming renderer draws a row of chips. Not selectable, never a control.
+                if (group.chips.isNotEmpty() && group.items.isNotEmpty()) {
+                    container.addPreference(
+                        Preference(context).apply {
+                            key = "${group.id}_chips"
+                            title = group.chips.joinToString(" · ") { it.label }
+                            isSelectable = false
+                            isIconSpaceReserved = false
+                        },
+                    )
+                }
                 for (item in group.items) {
                     container.addPreference(toPreference(context, item))
                 }
