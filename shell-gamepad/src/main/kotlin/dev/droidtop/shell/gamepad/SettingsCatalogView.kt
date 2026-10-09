@@ -58,8 +58,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -1502,15 +1506,35 @@ internal fun TextEditDialog(
             OwnFieldKeyboard()
             val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = {
-                    clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let { value = it }
-                }) { Text("Paste", color = MenuTokens.Accent) }
+                TextButton(
+                    onClick = { clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let { value = it } },
+                    modifier = Modifier.keepsFieldFocusOnTouch(),
+                ) { Text("Paste", color = MenuTokens.Accent) }
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDismiss) { Text("Cancel", color = MenuTokens.OnSurfaceMuted) }
-                TextButton(onClick = { onCommit(value) }) { Text("Save", color = MenuTokens.Accent) }
+                TextButton(onClick = onDismiss, modifier = Modifier.keepsFieldFocusOnTouch()) {
+                    Text("Cancel", color = MenuTokens.OnSurfaceMuted)
+                }
+                TextButton(onClick = { onCommit(value) }, modifier = Modifier.keepsFieldFocusOnTouch()) {
+                    Text("Save", color = MenuTokens.Accent)
+                }
             }
         }
     }
+}
+
+/**
+ * A button of [TextEditDialog] that a finger presses without taking focus from the field above it.
+ * A button is focusable, and a touch moved the focus onto it on the press: the field lost focus, Android
+ * took its keyboard down, the dialog resized, and the button was no longer under the finger when it lifted,
+ * so the first tap on Save only dismissed the keyboard and a second one saved (Droidtop/tracker#307). With
+ * the focus left in the field the press is a plain tap. Only on a touch: with a pad or a keyboard the
+ * buttons stay on the focus path, which is how they are reached.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun Modifier.keepsFieldFocusOnTouch(): Modifier {
+    val input = LocalInputModeManager.current
+    return focusProperties { canFocus = input.inputMode != InputMode.Touch }
 }
 
 /**

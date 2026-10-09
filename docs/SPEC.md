@@ -6095,6 +6095,19 @@ app-drawer icon or a floating switcher button:
   is still stock launcher3 preferences, deliberately, is only Standard mode's OWN launcher pages
   (icons, drawer, home screen, rotation) — the fork's settings for the fork's own surface, not a
   droidtop-wide setting, so migrating them onto the catalog model is not the goal.
+
+  **A text row is edited in the shell's one text-entry dialog
+  (`TextEditDialog`), and its buttons do not take focus on a touch
+  (2026-10-09, Droidtop/tracker#307).** A tap on Save with the keyboard up
+  needed two taps: a button is focusable, the press moved focus onto it, the
+  field lost focus, Android took the keyboard down and the dialog resized,
+  and the button was no longer under the finger when it lifted. Paste,
+  Cancel and Save leave focus in the field when the input mode is touch
+  (`focusProperties { canFocus = false }`, the way the hint pills and the
+  header buttons already do) and stay on the focus path for a pad or a
+  keyboard. The dialog the report was filed against, GameNative's prefix
+  dialog with its own Save icon, no longer exists (prefix settings are
+  droidtop's own rows, 7c); the fork's fix for that dialog is not carried.
   - **Settings polish pass (settingsui, 2026-09-25), what was already real versus what this
     found stale.** Owner direction was "significant improvements to polish, layout, and all of
     that" across every settings surface. Auditing against the catalog architecture above and
