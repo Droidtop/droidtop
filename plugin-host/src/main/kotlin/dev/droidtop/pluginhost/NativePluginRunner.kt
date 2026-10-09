@@ -64,6 +64,10 @@ class NativePluginRunner(
         override fun onScreenClosed(pluginId: String) {
             PluginScreenActivity.closed(pluginId)
         }
+
+        override fun onScreenFrame(pluginId: String, index: Int, width: Int, height: Int) {
+            PluginScreenActivity.frame(pluginId, index, width, height)
+        }
     }
 
     override suspend fun load(record: PluginRecord, installDir: String): Boolean {

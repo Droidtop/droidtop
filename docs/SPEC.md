@@ -16856,7 +16856,11 @@ Advanced.
   datagrams), the same one a `gpu.render` process takes, so the wall holds
   on a device that does not enforce Android's own rules (the BlueStacks
   rig runs with SELinux disabled; plugin-enforce-7, `docs/plugin-api.md`
-  §5.3 "The rigs").
+  §5.3 "The rigs"). A contained plugin's own screen (`ui.main`) is drawn
+  through droidtop: an isolated process can neither get vsync nor use a
+  Surface's buffers, so its engine draws into shared frames droidtop
+  allocates and droidtop paints them (plugin-enforce-8, §5.3 "ui.main in
+  the sandbox").
 - **The graphics tier** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
   a plugin that needs the GPU and nothing else declares `gpu.render` and the
   person ticks it. Granting it runs the plugin in a droidtop-owned process

@@ -244,6 +244,36 @@ typedef struct {
     void *replacement;
 } Hook;
 
+/* Symbols a hooked library may not find through dlsym ([nativeHideSymbols]). The one use: in an isolated process the
+ * Flutter engine must not take AChoreographer, whose display-event connection needs SurfaceFlinger, a service an
+ * isolated process may not look up ("avc: denied { find } ... SurfaceFlingerAIDL", emulator-5560); without
+ * AChoreographer_getInstance it waits for vsync through FlutterJNI, which droidtop drives. */
+#define MAX_HIDDEN 8
+static char *g_hidden[MAX_HIDDEN];
+static int g_hidden_count = 0;
+
+/* screen_bridge.c: the stand-in window's replacement for an ANativeWindow function, or NULL. */
+void *screen_bridge_replacement(const char *symbol);
+static int g_bridge_on = 0;
+
+static void *h_dlsym(void *handle, const char *symbol) {
+    if (symbol != NULL) {
+        for (int i = 0; i < g_hidden_count; i++) {
+            if (strcmp(symbol, g_hidden[i]) == 0) return NULL;
+        }
+        /* The engine resolves some window functions by name too (Impeller's proc table); those get the bridge's. */
+        if (g_bridge_on) {
+            void *bridged = screen_bridge_replacement(symbol);
+            if (bridged != NULL) return bridged;
+        }
+    }
+    return dlsym(handle, symbol);
+}
+
+static const Hook SYMBOL_HOOKS[] = {
+    {"dlsym", (void *) h_dlsym},
+};
+
 static const Hook HOOKS[] = {
     {"open", (void *) h_open},
     {"open64", (void *) h_open},
@@ -281,6 +311,8 @@ typedef struct {
     const char *suffix; /* "/libjavacore.so" */
     int libraries;
     int slots;
+    const Hook *hooks;
+    size_t hook_count;
 } Pass;
 
 static uintptr_t abs_addr(uintptr_t bias, uintptr_t value) {
@@ -298,7 +330,7 @@ static int patch_slot(uintptr_t slot, void *replacement) {
     return 1;
 }
 
-static int patch_relocations(uintptr_t bias, const ElfW(Rela) *rel, size_t count, const ElfW(Sym) *symtab, const char *strtab) {
+static int patch_relocations(uintptr_t bias, const ElfW(Rela) *rel, size_t count, const ElfW(Sym) *symtab, const char *strtab, const Hook *hooks, size_t hook_count) {
     int patched = 0;
     for (size_t r = 0; r < count; r++) {
         unsigned long type = ELF64_R_TYPE(rel[r].r_info);
@@ -306,9 +338,9 @@ static int patch_relocations(uintptr_t bias, const ElfW(Rela) *rel, size_t count
         unsigned long sym = ELF64_R_SYM(rel[r].r_info);
         if (sym == 0) continue;
         const char *name = strtab + symtab[sym].st_name;
-        for (size_t h = 0; h < sizeof(HOOKS) / sizeof(HOOKS[0]); h++) {
-            if (strcmp(name, HOOKS[h].symbol) == 0) {
-                patched += patch_slot(bias + rel[r].r_offset, HOOKS[h].replacement);
+        for (size_t h = 0; h < hook_count; h++) {
+            if (strcmp(name, hooks[h].symbol) == 0) {
+                patched += patch_slot(bias + rel[r].r_offset, hooks[h].replacement);
                 break;
             }
         }
@@ -365,8 +397,8 @@ static int patch_library(struct dl_phdr_info *info, size_t size, void *data) {
     }
     if (symtab == NULL || strtab == NULL) return 0;
     int patched = 0;
-    if (jmprel != NULL) patched += patch_relocations(bias, jmprel, jmprel_size / sizeof(ElfW(Rela)), symtab, strtab);
-    if (rela != NULL) patched += patch_relocations(bias, rela, rela_size / sizeof(ElfW(Rela)), symtab, strtab);
+    if (jmprel != NULL) patched += patch_relocations(bias, jmprel, jmprel_size / sizeof(ElfW(Rela)), symtab, strtab, pass->hooks, pass->hook_count);
+    if (rela != NULL) patched += patch_relocations(bias, rela, rela_size / sizeof(ElfW(Rela)), symtab, strtab, pass->hooks, pass->hook_count);
     pass->libraries++;
     pass->slots += patched;
     return 0;
@@ -414,12 +446,66 @@ Java_dev_droidtop_pluginhost_SandboxFiles_nativeHook(JNIEnv *env, jclass clazz, 
     for (jsize k = 0; k < n; k++) {
         jstring js = (jstring) (*env)->GetObjectArrayElement(env, jSuffixes, k);
         const char *suffix = (*env)->GetStringUTFChars(env, js, NULL);
-        Pass pass = {suffix, 0, 0};
+        Pass pass = {suffix, 0, 0, HOOKS, sizeof(HOOKS) / sizeof(HOOKS[0])};
         dl_iterate_phdr(patch_library, &pass);
         int w = snprintf(report + used, sizeof report - used, "%s%s=%d/%d", used ? " " : "", suffix, pass.libraries, pass.slots);
         if (w > 0 && (size_t) w < sizeof report - used) used += (size_t) w;
         (*env)->ReleaseStringUTFChars(env, js, suffix);
         (*env)->DeleteLocalRef(env, js);
     }
+    return (*env)->NewStringUTF(env, report);
+}
+
+/* Hides [jNames] from dlsym calls made by the libraries whose path ends in [jSuffix] (see [g_hidden]); returns
+ * "<suffix>=<libraries>/<slots>" like nativeHook. Only the dlsym import is rewritten, and only in those libraries, so
+ * no other library's symbol lookup changes. */
+JNIEXPORT jstring JNICALL
+Java_dev_droidtop_pluginhost_SandboxFiles_nativeHideSymbols(JNIEnv *env, jclass clazz, jstring jSuffix, jobjectArray jNames) {
+    jsize n = (*env)->GetArrayLength(env, jNames);
+    pthread_mutex_lock(&g_lock);
+    for (jsize k = 0; k < n && g_hidden_count < MAX_HIDDEN; k++) {
+        jstring js = (jstring) (*env)->GetObjectArrayElement(env, jNames, k);
+        const char *name = (*env)->GetStringUTFChars(env, js, NULL);
+        int known = 0;
+        for (int i = 0; i < g_hidden_count; i++) known |= strcmp(g_hidden[i], name) == 0;
+        if (!known) g_hidden[g_hidden_count++] = strdup(name);
+        (*env)->ReleaseStringUTFChars(env, js, name);
+        (*env)->DeleteLocalRef(env, js);
+    }
+    pthread_mutex_unlock(&g_lock);
+    const char *suffix = (*env)->GetStringUTFChars(env, jSuffix, NULL);
+    Pass pass = {suffix, 0, 0, SYMBOL_HOOKS, sizeof(SYMBOL_HOOKS) / sizeof(SYMBOL_HOOKS[0])};
+    dl_iterate_phdr(patch_library, &pass);
+    char report[256];
+    snprintf(report, sizeof report, "%s=%d/%d (dlsym)", suffix, pass.libraries, pass.slots);
+    (*env)->ReleaseStringUTFChars(env, jSuffix, suffix);
+    return (*env)->NewStringUTF(env, report);
+}
+
+/* Gives the libraries whose path ends in [jSuffix] the screen bridge's stand-in window (screen_bridge.c): their own
+ * ANativeWindow imports, and dlsym, which then also answers those names. Returns "<suffix>=<libraries>/<slots>". */
+JNIEXPORT jstring JNICALL
+Java_dev_droidtop_pluginhost_SandboxFiles_nativeBridgeScreen(JNIEnv *env, jclass clazz, jstring jSuffix) {
+    static const char *NAMES[] = {
+        "ANativeWindow_fromSurface", "ANativeWindow_acquire", "ANativeWindow_release", "ANativeWindow_getWidth",
+        "ANativeWindow_getHeight", "ANativeWindow_getFormat", "ANativeWindow_lock", "ANativeWindow_unlockAndPost",
+    };
+    Hook hooks[sizeof(NAMES) / sizeof(NAMES[0]) + 1];
+    size_t count = 0;
+    for (size_t i = 0; i < sizeof(NAMES) / sizeof(NAMES[0]); i++) {
+        hooks[count].symbol = NAMES[i];
+        hooks[count].replacement = screen_bridge_replacement(NAMES[i]);
+        count++;
+    }
+    hooks[count].symbol = "dlsym";
+    hooks[count].replacement = (void *) h_dlsym;
+    count++;
+    g_bridge_on = 1;
+    const char *suffix = (*env)->GetStringUTFChars(env, jSuffix, NULL);
+    Pass pass = {suffix, 0, 0, hooks, count};
+    dl_iterate_phdr(patch_library, &pass);
+    char report[256];
+    snprintf(report, sizeof report, "%s=%d/%d (window)", suffix, pass.libraries, pass.slots);
+    (*env)->ReleaseStringUTFChars(env, jSuffix, suffix);
     return (*env)->NewStringUTF(env, report);
 }

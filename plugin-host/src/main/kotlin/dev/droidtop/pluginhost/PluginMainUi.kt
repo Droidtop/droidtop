@@ -63,8 +63,13 @@ object PluginMainUi {
         }
         // A plugin without its own activity draws into a surface droidtop owns (contained in software, gpu.render with
         // hardware); only a full-access plugin runs its own activity in its own process (docs/plugin-api.md 5.3).
-        val ownActivity = PluginTiers.of(record, PluginGrants.forContext(context).read(m.id)) == PluginTier.FULL_TRUST
-        val intent = if (ownActivity) PluginMainActivity.intentFor(context, m.id, entry) else PluginScreenActivity.intentFor(context, m.id, entry)
+        val tier = PluginTiers.of(record, PluginGrants.forContext(context).read(m.id))
+        val intent = if (tier == PluginTier.FULL_TRUST) {
+            PluginMainActivity.intentFor(context, m.id, entry)
+        } else {
+            // A contained plugin is isolated and cannot present into the surface itself: its frames come through droidtop.
+            PluginScreenActivity.intentFor(context, m.id, entry, bridged = tier == PluginTier.CONTAINED)
+        }
         if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching { context.startActivity(intent) }.fold(onSuccess = { null }, onFailure = { "Could not open ${m.label}: ${it.message}" })
     }

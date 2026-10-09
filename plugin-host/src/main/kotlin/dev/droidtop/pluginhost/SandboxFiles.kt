@@ -35,6 +35,10 @@ internal object SandboxFiles {
 
     @JvmStatic private external fun nativeHook(suffixes: Array<String>): String
 
+    @JvmStatic private external fun nativeHideSymbols(suffix: String, names: Array<String>): String
+
+    @JvmStatic private external fun nativeBridgeScreen(suffix: String): String
+
     /** Gives [fd] the virtual [path] (under [ROOT]); the descriptor becomes the hooks' own. */
     fun register(path: String, fd: ParcelFileDescriptor): Boolean = nativeRegister(path, fd.detachFd())
 
@@ -44,6 +48,13 @@ internal object SandboxFiles {
 
     /** Hooks a library loaded later (the Flutter engine, which opens its app snapshot itself). */
     fun hook(vararg suffixes: String): String = nativeHook(arrayOf(*suffixes))
+
+    /** Makes dlsym in the library [suffix] names answer null for [names]; only that library's dlsym import changes. */
+    fun hideSymbols(suffix: String, vararg names: String): String = nativeHideSymbols(suffix, arrayOf(*names))
+
+    /** Gives the library [suffix] names the screen bridge's stand-in window ([ScreenBridge], `screen_bridge.c`). */
+    @Synchronized
+    fun bridgeScreen(suffix: String): String = nativeBridgeScreen(suffix)
 
     /** What [ensureHooks] reported, or null before it ran. */
     fun report(): String? = systemReport

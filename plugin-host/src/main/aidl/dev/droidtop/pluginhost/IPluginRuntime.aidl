@@ -96,7 +96,7 @@ interface IPluginRuntime {
      * else why not. The plugin closing its last route arrives as
      * IPluginRuntimeCallback.onScreenClosed.
      */
-    String attachScreen(String pluginId, String entrypoint, String library, in Surface surface, int width, int height, float density);
+    String attachScreen(String pluginId, String entrypoint, String library, in Surface surface, in ParcelFileDescriptor frames, long framesCapacity, int width, int height, float density);
 
     void resizeScreen(String pluginId, int width, int height);
 

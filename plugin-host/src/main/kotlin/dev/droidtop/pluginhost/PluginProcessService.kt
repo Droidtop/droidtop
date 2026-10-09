@@ -214,9 +214,20 @@ abstract class PluginProcessService : Service() {
             runCatching { loaded[pluginId]?.cancelJob(jobId) }
         }
 
-        override fun attachScreen(pluginId: String, entrypoint: String, library: String?, surface: android.view.Surface, width: Int, height: Int, density: Float): String? {
+        override fun attachScreen(
+            pluginId: String,
+            entrypoint: String,
+            library: String?,
+            surface: android.view.Surface,
+            frames: ParcelFileDescriptor?,
+            framesCapacity: Long,
+            width: Int,
+            height: Int,
+            density: Float,
+        ): String? {
             val screen = loaded[pluginId] as? HostedScreen ?: return "this plugin has no screen of its own here"
-            return screen.attachScreen(PluginMainUi.Entry(entrypoint, library?.ifBlank { null }), surface, width, height, density) {
+            val target = ScreenTarget(surface, frames, framesCapacity) { index, w, h -> broadcastScreenFrame(pluginId, index, w, h) }
+            return screen.attachScreen(PluginMainUi.Entry(entrypoint, library?.ifBlank { null }), target, width, height, density) {
                 broadcastScreenClosed(pluginId)
             }
         }
@@ -333,6 +344,17 @@ abstract class PluginProcessService : Service() {
         }
     }
 
+    private fun broadcastScreenFrame(pluginId: String, index: Int, width: Int, height: Int) = synchronized(broadcastLock) {
+        val n = callbacks.beginBroadcast()
+        try {
+            for (i in 0 until n) {
+                runCatching { callbacks.getBroadcastItem(i).onScreenFrame(pluginId, index, width, height) }
+            }
+        } finally {
+            callbacks.finishBroadcast()
+        }
+    }
+
     private fun broadcastScreenClosed(pluginId: String) = synchronized(broadcastLock) {
         val n = callbacks.beginBroadcast()
         try {
@@ -361,12 +383,24 @@ abstract class PluginProcessService : Service() {
 }
 
 /**
+ * Where a hosted screen draws: droidtop's [surface], and, for a plugin in an isolated process (which cannot present
+ * into a Surface itself), the shared [frames] droidtop copies into it ([ScreenBridge]); [onFrame] reports each finished
+ * frame. [frames] is null when droidtop did not bridge the screen (a `gpu.render` process draws into [surface] directly).
+ */
+class ScreenTarget(
+    val surface: android.view.Surface,
+    val frames: ParcelFileDescriptor?,
+    val framesCapacity: Long,
+    val onFrame: (index: Int, width: Int, height: Int) -> Unit,
+)
+
+/**
  * A plugin that draws its own full-screen UI into a surface droidtop owns (contained `ui.main`, docs/plugin-api.md 1.7):
  * an isolated process has no window of its own. [attachScreen] returns null once the entrypoint draws, else why not;
  * [onClose] is called when the plugin closes its last route.
  */
 interface HostedScreen {
-    fun attachScreen(entry: PluginMainUi.Entry, surface: android.view.Surface, width: Int, height: Int, density: Float, onClose: () -> Unit): String?
+    fun attachScreen(entry: PluginMainUi.Entry, target: ScreenTarget, width: Int, height: Int, density: Float, onClose: () -> Unit): String?
     fun resizeScreen(width: Int, height: Int)
     fun screenTouch(event: android.view.MotionEvent)
     fun screenKey(event: android.view.KeyEvent)

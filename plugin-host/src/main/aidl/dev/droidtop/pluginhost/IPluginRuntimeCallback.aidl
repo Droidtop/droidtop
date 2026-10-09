@@ -26,4 +26,10 @@ oneway interface IPluginRuntimeCallback {
 
     /** The plugin's own screen (IPluginRuntime.attachScreen) closed its last route: droidtop closes the screen. */
     void onScreenClosed(String pluginId);
+
+    /**
+     * A contained plugin's screen finished a frame in the shared frames droidtop handed over (frames, framesCapacity on
+     * attachScreen): frame [index] (0 or 1) of [width] x [height] RGBA pixels. droidtop copies it into its Surface.
+     */
+    void onScreenFrame(String pluginId, int index, int width, int height);
 }

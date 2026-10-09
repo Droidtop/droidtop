@@ -96,6 +96,10 @@ internal object FlutterEngineHost {
         val dartVmArgs = if (source.contained) emptyArray() else arrayOf("--aot-shared-library-name=${source.libapp}")
         // false, not true: automatic registration only looks on this process's own classloader, which never has the plugin's generated registrant (see registerGeneratedPlugins).
         val engine = FlutterEngine(appContext, flutterLoader, flutterJNI, dartVmArgs, false)
+        // An isolated process cannot have a display-event connection (Choreographer and AChoreographer both need
+        // SurfaceFlinger, which it may not look up), so no vsync ever arrived and a ui.main screen stayed black
+        // (emulator-5560). There the engine waits for vsync through FlutterJNI, and droidtop answers it on a timer.
+        if (IsolatedVsync.needed()) flutterJNI.setAsyncWaitForVsyncDelegate(IsolatedVsync(flutterJNI))
         registerGeneratedPlugins(source, engine)
         return Built(engine, flutterLoader.findAppBundlePath())
     }
@@ -174,6 +178,10 @@ internal object FlutterEngineHost {
         override fun loadLibrary(context: Context) {
             System.load(libflutterSo)
             if (contained) SandboxFiles.hook("/libflutter.so")
+            // Without AChoreographer the engine takes its FlutterJNI vsync path, which IsolatedVsync drives.
+            if (IsolatedVsync.needed()) {
+                android.util.Log.i("droidtop.plugin", "flutter engine vsync through droidtop: " + SandboxFiles.hideSymbols("/libflutter.so", "AChoreographer_getInstance"))
+            }
         }
 
         override fun init(
@@ -212,5 +220,32 @@ internal object FlutterAssets {
             throw IllegalStateException("could not write ${out.name}")
         }
         return out
+    }
+}
+
+/**
+ * Vsync for a Flutter engine in an isolated process (docs/plugin-api.md 5.3, "ui.main in the sandbox"). Android's frame
+ * timing comes from a display-event connection to SurfaceFlinger, a service an isolated process may not look up
+ * ("avc: denied { find } ... SurfaceFlingerAIDL"; "AChoreographer: Failed to initialize", emulator-5560), so neither
+ * Choreographer nor AChoreographer ever calls back and the engine never draws a frame. With AChoreographer hidden from the
+ * engine ([SandboxFiles.hideSymbols]) it asks FlutterJNI for each vsync, and this answers on the next tick of a
+ * [REFRESH_HZ] clock on the main thread. The frames are drawn in software into droidtop's surface, which sets their pace
+ * on screen; the clock only lets the engine produce them.
+ */
+internal class IsolatedVsync(private val jni: FlutterJNI) : FlutterJNI.AsyncWaitForVsyncDelegate {
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    override fun asyncWaitForVsync(cookie: Long) {
+        val now = System.nanoTime()
+        val next = (now / PERIOD_NANOS + 1) * PERIOD_NANOS
+        handler.postDelayed({ jni.onVsync(System.nanoTime() - next, PERIOD_NANOS, cookie) }, (next - now) / 1_000_000L)
+    }
+
+    companion object {
+        private const val REFRESH_HZ = 60L
+        private const val PERIOD_NANOS = 1_000_000_000L / REFRESH_HZ
+
+        /** Only an isolated process lacks a display-event connection; a gpu.render or full-access process has one. */
+        fun needed(): Boolean = dev.droidtop.runtime.util.IsolatedProcess.isIsolated()
     }
 }

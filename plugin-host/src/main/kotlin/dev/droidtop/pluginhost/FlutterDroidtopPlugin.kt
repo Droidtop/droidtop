@@ -316,6 +316,8 @@ class FlutterDroidtopPlugin internal constructor(
     // ---------------------------------------------------------------
 
     private var screenEngine: FlutterEngine? = null
+    private var bridged = false
+    private var bridgeReport: String? = null
     private var screenTouch: AndroidTouchProcessor? = null
     private var screenKeys: KeyEventChannel? = null
 
@@ -325,7 +327,7 @@ class FlutterDroidtopPlugin internal constructor(
      * so the engine draws in software into that surface; touch and keys come from droidtop. When the plugin's last route
      * closes (`SystemNavigator.pop`), [onClose] tells droidtop to close the screen.
      */
-    override fun attachScreen(entry: PluginMainUi.Entry, surface: android.view.Surface, width: Int, height: Int, density: Float, onClose: () -> Unit): String? =
+    override fun attachScreen(entry: PluginMainUi.Entry, target: ScreenTarget, width: Int, height: Int, density: Float, onClose: () -> Unit): String? =
         try {
             runOnMainThreadBlocking {
                 detachScreenOnMain()
@@ -340,7 +342,18 @@ class FlutterDroidtopPlugin internal constructor(
                         result.notImplemented()
                     }
                 }
-                engine.renderer.startRenderingToSurface(surface, false)
+                // In an isolated process the engine draws into droidtop's shared frames through a stand-in window
+                // (ScreenBridge, docs/plugin-api.md 5.3 "ui.main in the sandbox"); elsewhere into the surface itself.
+                val frames = target.frames
+                if (frames != null && dev.droidtop.runtime.util.IsolatedProcess.isIsolated()) {
+                    if (!ScreenBridge.attach(frames, target.framesCapacity, width, height, target.onFrame)) {
+                        throw IllegalStateException("the screen's frames could not be mapped")
+                    }
+                    bridged = true
+                    bridgeReport = bridgeReport ?: SandboxFiles.bridgeScreen("/libflutter.so")
+                    android.util.Log.i("droidtop.plugin", "$pluginId: screen ${width}x$height through droidtop's frames: $bridgeReport")
+                }
+                engine.renderer.startRenderingToSurface(target.surface, false)
                 engine.renderer.surfaceChanged(width, height)
                 engine.renderer.setViewportMetrics(viewport(width, height, density))
                 val entrypoint = if (entry.library == null) {
@@ -395,6 +408,7 @@ class FlutterDroidtopPlugin internal constructor(
     override fun resizeScreen(width: Int, height: Int) {
         mainHandler.post {
             val engine = screenEngine ?: return@post
+            if (bridged) ScreenBridge.resize(width, height)
             engine.renderer.surfaceChanged(width, height)
             engine.renderer.setViewportMetrics(viewport(width, height, screenDensity))
         }
@@ -430,6 +444,10 @@ class FlutterDroidtopPlugin internal constructor(
         screenKeys = null
         runCatching { engine.renderer.stopRenderingToSurface() }
         runCatching { engine.destroy() }
+        if (bridged) {
+            bridged = false
+            ScreenBridge.detach()
+        }
     }
 
     /**

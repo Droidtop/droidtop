@@ -23,6 +23,8 @@ add_library(droidtoppy SHARED
     src/sandbox_hooks.c
     # The system-call filter of a gpu.render plugin's process (docs/plugin-api.md 5.3, "The graphics tier").
     src/gpu_filter.c
+    # The stand-in window a contained plugin's own screen draws into (docs/plugin-api.md 5.3, "ui.main in the sandbox").
+    src/screen_bridge.c
 )
 
-target_link_libraries(droidtoppy dl log)
+target_link_libraries(droidtoppy dl log android)
