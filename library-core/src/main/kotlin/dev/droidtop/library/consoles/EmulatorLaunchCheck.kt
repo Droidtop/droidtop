@@ -70,6 +70,18 @@ fun emulatorReadsStoragePaths(context: Context, packageName: String): Boolean = 
 fun emulatorNeedsAllFilesAccess(hasPathTemplate: Boolean, emulatorReadsPaths: Boolean): Boolean =
     hasPathTemplate && !emulatorReadsPaths
 
+/**
+ * The sentence a launch alert adds when [player] was handed a content link because it has no All files access
+ * (Droidtop/tracker#270), naming the emulator setup row that gives it: "Let <Emulator> read your game folders" where
+ * droidtop can give the access ([EmulatorAccess.canGrantAllFiles]), "<Emulator> needs All files access" where it opens
+ * Android's screen. Pure.
+ */
+fun fileAccessAdvice(emulator: String, systemName: String, canGrant: Boolean): String {
+    val row = if (canGrant) dev.droidtop.runtime.tasks.RiskyPrompts.allFilesTitle(emulator) else "$emulator needs All files access"
+    return "$emulator has no All files access, so droidtop gave it a link to the game instead of its path, and $emulator " +
+        "may not be able to open games that way. Give it access in Settings > Library > Emulators > $systemName: \"$row\"."
+}
+
 /** [emulatorNeedsAllFilesAccess] for [player]. Reads AppOps and PackageManager, so not for the main thread. */
 fun playerNeedsAllFilesAccess(context: Context, player: Player.AmStart): Boolean =
     player.storagePathTemplate != null &&

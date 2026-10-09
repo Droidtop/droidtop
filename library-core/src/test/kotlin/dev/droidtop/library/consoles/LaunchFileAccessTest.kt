@@ -17,6 +17,15 @@ class LaunchFileAccessTest {
     )
 
     @Test
+    fun aLaunchAlertForALinkLaunchNamesTheEmulatorSetupRow() {
+        val canGrant = fileAccessAdvice("NetherSX2 Turnip", "Sony PlayStation 2", canGrant = true)
+        assertTrue(canGrant.startsWith("NetherSX2 Turnip has no All files access"))
+        assertTrue(canGrant.endsWith("Settings > Library > Emulators > Sony PlayStation 2: \"Let NetherSX2 Turnip read your game folders\"."))
+        val opensSettings = fileAccessAdvice("NetherSX2 Turnip", "Sony PlayStation 2", canGrant = false)
+        assertTrue(opensSettings.endsWith("\"NetherSX2 Turnip needs All files access\"."))
+    }
+
+    @Test
     fun aPresetWithoutAPathVariantAlwaysUsesItsOwnTemplate() {
         assertEquals("-n a.b/.Main -e bootPath {file.uri}", launchTemplateFor(player(null), emulatorReadsPaths = true))
     }

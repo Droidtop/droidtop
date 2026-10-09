@@ -4,6 +4,7 @@ import android.content.Context
 import dev.droidtop.library.PathIndexing
 import dev.droidtop.library.disambiguateTitles
 import dev.droidtop.library.LaunchDisplay
+import dev.droidtop.library.LaunchWatchdog
 import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.GameMediaLocator
 import dev.droidtop.library.GamesRoots
@@ -906,6 +907,12 @@ class ConsoleRomProvider(
         val intent = when (val prepared = prepareLaunch(context, system, player, romFile)) {
             is PreparedLaunch.Ready -> prepared.intent
             is PreparedLaunch.Blocked -> error(prepared.reason)
+        }
+        // The launch goes ahead as the preset says (SPEC 7e2, "File access is help in emulator setup, never a launch
+        // step"); when it went out with the content link because the emulator lacks All files access, a launch alert
+        // says so and names the setup row (Droidtop/tracker#270: NetherSX2 black, then not responding, on the link).
+        if (playerNeedsAllFilesAccess(context, player)) {
+            LaunchWatchdog.adviseNext(player.packageName, fileAccessAdvice(player.name, system.displayName, EmulatorAccess.canGrantAllFiles()))
         }
         if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
         try {

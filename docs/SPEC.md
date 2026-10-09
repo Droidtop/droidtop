@@ -7400,6 +7400,19 @@ given. droidtop never grants anything. When a launch has issues, the failure dia
 plain path is used when the emulator holds access, the row's own template otherwise. The file provider and
 the sibling grants above are unchanged too.
 
+**A launch that went out with the link says so when it goes wrong** (Droidtop/tracker#270, console build
+1649: NetherSX2 Turnip without All files access was handed `content://dev.droidtop.app.fileprovider/...`,
+stayed black and then showed Android's not-responding dialog, with no word from droidtop). Nothing changes
+before the launch. When a preset with a `storagePathTemplate` goes out on its link template because the
+emulator lacks All files access (the read-only check `launchTemplateFor` already made), the ROM provider
+leaves the launch watchdog one sentence for that package (`LaunchWatchdog.adviseNext`, `fileAccessAdvice`),
+and any alert that launch gets ends with it: the emulator has no All files access, it was given a link
+instead of the path, and the access is given in Settings > Library > Emulators > <system> on the row
+"Let <Emulator> read your game folders" (where droidtop can give it, Risky actions) or "<Emulator> needs All
+files access" (where it opens Android's screen). The earlier fix, the PS2 rows' plain-path launch, applies
+only once the emulator holds that access; the console's NetherSX2 did not, so the link went out as designed
+and NetherSX2 could not boot from it.
+
 Why the NetherSX2 rows need the plain path (console, build 1386): ES-DE's own NetherSX2 commands pass
 `bootPath=%ROMSAF%`, a Storage Access Framework document URI from the folder the person granted ES-DE, which
 NetherSX2's file helper understands; droidtop holds All files access instead of a SAF folder grant, so it

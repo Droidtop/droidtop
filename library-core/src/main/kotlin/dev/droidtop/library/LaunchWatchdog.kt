@@ -186,6 +186,20 @@ object LaunchWatchdog {
         alertFlow.value = null
     }
 
+    /** A sentence for the next launch of one package, set by the provider that built it: see [adviseNext]. */
+    @Volatile
+    private var advice: Pair<String, String>? = null
+
+    /**
+     * Notes what the provider that built the next launch of [packageName] knows that would explain trouble with it,
+     * added to any alert that launch gets. The one user is a launch handed a content link because its emulator has no
+     * All files access (Droidtop/tracker#270): the alert says so and names the emulator setup row that gives it.
+     * Taken by the next [start] for that package, and dropped by a start for any other.
+     */
+    fun adviseNext(packageName: String, sentence: String) {
+        advice = packageName to sentence
+    }
+
     /** Stops watching: the launch ended on purpose (a quit), so its silence is not a problem. */
     @Synchronized
     fun cancel() {
@@ -203,6 +217,8 @@ object LaunchWatchdog {
         val appContext = context.applicationContext
         job?.cancel()
         alertFlow.value = null
+        val note = advice?.takeIf { it.first == packageName }?.second
+        advice = null
         job = scope.launch {
             val appName = TaskManager.appLabel(appContext, packageName) ?: packageName
             val started = System.currentTimeMillis()
@@ -242,7 +258,7 @@ object LaunchWatchdog {
                             packageName,
                             appName,
                             verdict.trouble,
-                            listOfNotNull(LaunchWatchPolicy.message(appName, verdict.trouble), core?.let(RetroArchCores::troubleHint))
+                            listOfNotNull(LaunchWatchPolicy.message(appName, verdict.trouble), core?.let(RetroArchCores::troubleHint), note)
                                 .joinToString(" "),
                             ScanLog.logPath(appContext),
                             core,
