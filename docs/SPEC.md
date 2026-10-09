@@ -8973,7 +8973,7 @@ own Appearance step:
    `ThemeAssets.defaultThemeFor`'s own doc comment already states this rule for the portrait
    default ("the theme moving under the user is the one thing this rule must not do"); the same
    rule applies here. A cancelled/failed/offline download leaves `ThemePrefs` unset, so
-   `ThemeAssets.resolveActiveTheme`'s existing fallback (DEcaffe, or Slate on a portrait screen)
+   `ThemeAssets.resolveActiveTheme`'s existing fallback (DEcaffe, or Slate on a device upright in its natural orientation)
    applies exactly as it did before this section — no second fallback mechanism was added.
 5. "Browse themes" (Settings, and onboarding's own "Download more themes") offers Art Book Next exactly
    as it offers every other theme in the index, whether or not onboarding's own download reached
@@ -9133,14 +9133,21 @@ loaded).
 
 That is a property of the theme, not a bug in the engine: no renderer can
 invent the portrait artwork and element positions an author never wrote.
-So the **default** theme on a portrait display is one that ships them.
+So the **default** theme on a device that is upright in its natural
+orientation (a phone; `ThemeAssets.isPortraitDevice`, the screen's shape
+undone by the display's rotation) is one that ships them.
 Slate (ES-DE's own default, `16:9_vertical` and `4:3_vertical`, bundled
 alongside DEcaffe, CC-BY-NC-SA, see NOTICE.md) is that theme;
 DEcaffe remains the landscape default. The rule applies only when the
 user has chosen nothing, an explicit choice always wins (including
 choosing DEcaffe on a phone), and onboarding says what happened and
-writes the result down as a real choice so a later rotation cannot move
-the theme under the user (`ThemeAssets.defaultThemeFor`).
+writes the result down as a real choice (`ThemeAssets.defaultThemeFor`).
+Because the default follows the device's natural shape, not the screen's
+shape at the moment, turning a device never changes it, and resolving it
+writes nothing (2026-10-09): resolution used to write the portrait default
+as the person's choice, and a landscape handheld turned upright once (the
+BlueStacks rig) kept Slate for good and lost DEcaffe. Each theme scan logs
+what it found and why a folder was skipped (`droidtop.ThemeAssets`).
 
 **View transitions (2026-09-11)**: moving between the system view and a
 gamelist is animated by the theme, not by droidtop. The animation for
@@ -13240,7 +13247,8 @@ Droidtop/tracker#363 slice 7, 2026-10-08; values in `SideMenu`, DesignTokens.kt)
 a 240 dp panel flush with the left edge (72% of a window held upright) that
 starts 40 dp below the top and ends at the menu's own hint row, which is drawn
 across the bottom of the window where the footer is, as Steam draws its main
-menu's legend. The page behind is dimmed by the scrim role's own strength (80%;
+menu's legend, on an opaque strip of the panel's surface so the page's own
+hint row underneath never shows through. The page behind is dimmed by the scrim role's own strength (80%;
 the Quick Menu keeps its lighter 55%, because the page behind it is still what
 the person is looking at). Each row is an icon and a label, 48 dp tall (one touch
 target in a touch window), 24 dp in from the left and 16 dp from the right, and no
@@ -14308,7 +14316,10 @@ Settings tab, the left menu's places, Console systems and Containers.
   row keeps Steam's room round it as the list scrolls, about 31% of the list's
   height clear above and 7.5% below (Steam's 250 and 60 of 800; shrunk together
   where a list is too short), so the cursor is never against an edge
-  (`keepInView(keepRoom)`). Narrower than 600dp (portrait) the two take turns: the category
+  (`keepInView(keepRoom)`). With Animations off nothing grows; the gradient and
+  edge alone mark the cursor (rig, build 1649). On a window held upright, or
+  narrower than 600dp, the two take turns, however wide the window (a
+  1080x1920 window at 720dp once drew them side by side): the category
   list, then the pane, B or Left back to the list. Anything else (a sheet,
   a dialog, a root with one or two categories, like Plugins' list and its
   "Add" group) is the one list it always was.
@@ -14359,7 +14370,9 @@ Settings tab, the left menu's places, Console systems and Containers.
 - **Rows.** A row is its name and, right-aligned in the screen's one value
   column, what it is set to: a switch for a toggle, an inline track and the
   number for a slider, `‹ value ›` for a short choice, a chevron for a row
-  that opens something. No explanation is drawn on a row: it is the row's
+  that opens something. A or a tap on a choice opens its list
+  (`CatalogChoicePicker`) and never changes the value by itself (rig, build
+  1649: a tap cycled it); Left/Right and a touch screen's arrows step it in place. No explanation is drawn on a row: it is the row's
   HintTip, shown while the pad rests on the row, and the Y Info sheet (a
   long press on touch). A live status (working, a failure) takes the value
   column while it lasts. Rows are `uniformRowHeight(0)` tall. The bubble sits under the row it explains
@@ -14375,7 +14388,7 @@ Settings tab, the left menu's places, Console systems and Containers.
   nothing (the D-pad never reaches a header). In the column, A or Right
   enter the pane, A on Search opens search, B leaves Settings. In the pane,
   Left/Right step a slider or a short choice in place; on any other row
-  Left moves to the column; A acts; Y is Info; B pops a pushed screen,
+  Left moves to the column; A acts (on a choice, opens its list); Y is Info; B pops a pushed screen,
   else returns to the column. Moving the column's cursor changes the pane
   (a linked screen is built once the cursor rests on it for 120ms) and
   leaves any screen a row had opened. Start (left menu) and R2 (Quick Menu)

@@ -253,7 +253,9 @@ fun CatalogNavigator(
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val fillsPage = hostWidth >= screenWidth * PAGE_WIDTH_FRACTION
     val categoryMode = fillsPage && categories.size >= MIN_SETTINGS_CATEGORIES
-    val twoPane = categoryMode && hostWidth >= TWO_PANE_MIN_WIDTH
+    // Side by side only on a landscape window: held upright the two take turns, however wide the
+    // window is (a 1080x1920 tablet is 720dp wide, which once put the column beside the pane).
+    val twoPane = categoryMode && hostWidth >= TWO_PANE_MIN_WIDTH && !LocalShellWindow.current.portrait
     val categoryIndex = categories.indexOfFirst { it.key == categoryKey }.coerceAtLeast(0)
     val category = if (categoryMode) categories.getOrNull(categoryIndex) else null
     // A linked category's screen, resolved once per category: an inline
@@ -443,9 +445,11 @@ fun CatalogNavigator(
         }
         when (item) {
             is ToggleItem -> adjust(item, +1)
-            // Small sets cycle in place; big ones (a 100-system picker)
-            // get a real selection list.
-            is ChoiceItem -> if (item.options.size <= 6) adjust(item, +1) else pickingChoice = item
+            // A and a tap open the choices, never change the value by
+            // themselves (rig, build 1649: a tap on a selector cycled it, so
+            // looking at a setting changed it). Left/Right, and the arrows a
+            // touch screen draws on a short choice, still step it in place.
+            is ChoiceItem -> if (item.options.isNotEmpty()) pickingChoice = item
             is SliderItem -> {}
             is TextInputItem -> editingText = item
             is FolderPickItem -> {
@@ -707,7 +711,7 @@ fun CatalogNavigator(
             GamepadAction.RIGHT -> if (row != null && (!categoryMode || row.item.stepsInPlace())) adjust(row.item, +1)
             GamepadAction.A -> row?.let {
                 // A toggle and a stepped choice make their own cue (adjust); everything else confirms.
-                if (it.item !is ToggleItem && !(it.item is ChoiceItem && (it.item as ChoiceItem).options.size <= 6)) EsDeNavigationSounds.play(UiSound.CONFIRM)
+                if (it.item !is ToggleItem) EsDeNavigationSounds.play(UiSound.CONFIRM)
                 activate(it.item)
             }
             else -> return false
@@ -960,7 +964,8 @@ private fun CategoryEntry(label: String, icon: CatalogIcon?, current: Boolean, c
     }
     val accent = MenuTokens.Accent
     val grow by androidx.compose.animation.core.animateFloatAsState(
-        if (shown) SideMenu.FocusScale else 1f,
+        // Growth is motion: none with Animations off, the gradient and edge alone mark the cursor.
+        if (shown && Motion.enabled) SideMenu.FocusScale else 1f,
         Motion.focus(),
         label = "category grow",
     )

@@ -266,7 +266,8 @@ private fun Modifier.sideMenuFocus(selected: Boolean, onClick: () -> Unit): Modi
 
 /** The content of a focused row grows rightwards from near its left edge; the plate stays put. */
 private fun Modifier.sideMenuGrow(selected: Boolean): Modifier = composed {
-    val grow by animateFloatAsState(if (selected && PadModality.showsFocus) SideMenu.FocusScale else 1f, Motion.focus(), label = "side menu grow")
+    // Growth is motion: with Animations off (or Android's animator scale at 0) the row does not grow at all.
+    val grow by animateFloatAsState(if (selected && PadModality.showsFocus && Motion.enabled) SideMenu.FocusScale else 1f, Motion.focus(), label = "side menu grow")
     Modifier.graphicsLayer {
         scaleX = grow
         scaleY = grow

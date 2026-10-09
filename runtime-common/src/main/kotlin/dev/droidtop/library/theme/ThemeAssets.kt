@@ -99,8 +99,10 @@ object ThemeAssets {
         } catch (t: Exception) {
             emptyArray()
         }
+        val bundledWithCapabilities = mutableSetOf<String>()
         for (folder in bundledFolders) {
             if (assetHasCapabilities(context, folder)) {
+                bundledWithCapabilities += folder
                 byName[folder] = ThemeDescriptor(name = folder, bundledAssetFolder = folder, userDir = null)
             }
         }
@@ -110,6 +112,13 @@ object ThemeAssets {
                 byName[dir.name] = ThemeDescriptor(name = dir.name, bundledAssetFolder = null, userDir = dir)
             }
         }
+        // What was found and why, once per scan (the scan runs once until a theme is downloaded or
+        // updated): a theme missing from Settings is then a log line away from its reason.
+        Log.i(
+            "droidtop.ThemeAssets",
+            "themes: bundled ${bundledFolders.joinToString { "$it${if (it in bundledWithCapabilities) "" else " (no capabilities.xml)"}" }}; " +
+                "user ${userDirs.joinToString { "${it.name}${if (File(it, "capabilities.xml").isFile) "" else " (no capabilities.xml)"}" }}",
+        )
         return byName.values.sortedBy { it.name.uppercase() }
     }
 
@@ -158,15 +167,15 @@ object ThemeAssets {
         val selected = ThemePrefs.get(context)
         discovered.firstOrNull { it.name == selected }?.let { return it }
         val default = defaultThemeFor(context, discovered) ?: return null
-        // A default chosen BECAUSE of the screen's shape is written down
-        // the first time it is resolved, exactly as onboarding's own
-        // portrait step writes it. Without this the choice is re-made on
-        // every read: turning a phone sideways makes isPortraitScreen
-        // false, which puts DEcaffe back mid-session and takes it away
-        // again on the way back -- the theme moving under the user,
-        // which is the one thing this rule must not do. Onboarding only
-        // covers an install that saw that step; this covers the rest.
-        if (default.name != DEFAULT_THEME_NAME) ThemePrefs.set(context, default.name)
+        // Not written down: the default no longer follows the screen's
+        // current shape ([defaultThemeFor] reads the device's natural
+        // one), so it does not move when the device is turned, and an
+        // unwritten default leaves the choice to the person (onboarding's
+        // recommended download activates only while nothing is chosen).
+        // Writing the PORTRAIT default here, as this once did, made a
+        // landscape handheld turned upright once (the BlueStacks rig,
+        // 2026-10-09) keep Slate as its theme and lose DEcaffe, the
+        // owner's default, for good.
         return default
     }
 
@@ -196,13 +205,28 @@ object ThemeAssets {
         if (discovered.isEmpty()) return null
         val landscapeDefault = discovered.firstOrNull { it.name == DEFAULT_THEME_NAME }
             ?: discovered.first()
-        if (!isPortraitScreen(context)) return landscapeDefault
+        if (!isPortraitDevice(context)) return landscapeDefault
         if (hasVerticalVariant(context, landscapeDefault)) return landscapeDefault
         return discovered.firstOrNull {
             it.name == PORTRAIT_DEFAULT_THEME_NAME && hasVerticalVariant(context, it)
         }
             ?: discovered.firstOrNull { hasVerticalVariant(context, it) }
             ?: landscapeDefault
+    }
+
+    /**
+     * Whether the device is upright in its NATURAL orientation (a phone, not a landscape handheld
+     * turned on its side): the screen's shape now, undone by the display's rotation. The default
+     * theme is chosen by this, so turning the device never changes which theme an unchosen default
+     * is; a handheld whose natural shape is wide keeps DEcaffe however it is held.
+     */
+    fun isPortraitDevice(context: Context): Boolean {
+        val rotation = runCatching {
+            context.getSystemService(android.hardware.display.DisplayManager::class.java)
+                ?.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.rotation
+        }.getOrNull() ?: android.view.Surface.ROTATION_0
+        val turned = rotation == android.view.Surface.ROTATION_90 || rotation == android.view.Surface.ROTATION_270
+        return isPortraitScreen(context) != turned
     }
 
     /** Width < height on the live display, the same test ES-DE makes (Renderer.cpp:188-191). */

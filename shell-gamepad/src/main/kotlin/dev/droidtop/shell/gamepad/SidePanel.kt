@@ -176,7 +176,11 @@ internal fun SidePanelFrame(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = topInset)
-                            .graphicsLayer { alpha = shown.value },
+                            .graphicsLayer { alpha = shown.value }
+                            // Opaque, on the panel's own surface: the page's hint row sits in this same strip,
+                            // and through a see-through footer its pills showed under the menu's (rig, build
+                            // 1649: "ENU", "ILTER" fragments between A Open and B Close).
+                            .background(MenuTokens.OverlaySurface),
                         contentAlignment = Alignment.Center,
                     ) { footer(close) }
                 }
