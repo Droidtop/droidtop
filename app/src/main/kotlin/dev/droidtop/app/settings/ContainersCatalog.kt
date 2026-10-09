@@ -262,6 +262,7 @@ object ContainersCatalog {
 
         val groups = mutableListOf(CatalogGroup(id = "container", title = imageLine(info), items = main))
         if (primary) groups += CatalogGroup(id = "printing", title = "Printing", items = printingItems(context, runtime, desktopUp))
+        if (primary) groups += CatalogGroup(id = "fonts", title = "Languages", items = fontItems(context))
         groups += CatalogGroup(id = "vpn", title = "VPN", items = vpnItems(context, runtime, info))
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
@@ -604,6 +605,25 @@ object ContainersCatalog {
                 )
             }
         }
+    }
+
+    // ---- fonts (Droidtop/tracker#390) ----
+
+    private suspend fun fontItems(context: Context): List<CatalogItem> {
+        val on = withContext(Dispatchers.IO) { DesktopSetupPrefs.allLanguageFonts(context) }
+        return listOf(
+            ToggleItem(
+                id = "container_all_language_fonts",
+                title = "Fonts for all languages",
+                subtitle = if (on) {
+                    "Chinese, Japanese and Korean text and emoji draw in the desktop. About 100 MB."
+                } else {
+                    "Off: Chinese, Japanese and Korean text and emoji show as boxes. On installs them when the desktop next starts."
+                },
+                current = on,
+                onToggle = { ctx, value -> DesktopSetupPrefs.setAllLanguageFonts(ctx, value) },
+            ),
+        )
     }
 
     // ---- VPN (docs/SPEC.md 4a) ----

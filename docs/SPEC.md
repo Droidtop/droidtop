@@ -2087,6 +2087,13 @@ the `ContainerRuntime` interface that already exists (§3):
   also installs an icon theme (`CompositorProvisioning.ICON_THEME_PACKAGE`, Adwaita): a stock
   image ships none, and without one GTK draws only its built-in fallbacks, so every file,
   folder and Places entry in PCManFM was a blank page (Droidtop/tracker#146).
+  **Fonts for all languages (Droidtop/tracker#390).** The plan's one font, DejaVu, has no
+  Chinese, Japanese or Korean glyphs and no colour emoji, so a library of Japanese folder names
+  was boxes in PCManFM. The primary's entry in the container manager has a "Fonts for all
+  languages" switch, on by default, that adds the distro's Noto packages to the plan (Alpine
+  `font-noto-cjk font-noto-emoji`, Debian `fonts-noto-cjk fonts-noto-color-emoji`, about 100 MB);
+  like Printing it changes the plan, so a desktop made before installs them on its next start,
+  and turning it off later does not remove them.
 - **A real terminal into any container** — a computer the user can't
   open a shell on isn't a computer. **Decided and built 2026-09-02, the
   other way round from this section's original sketch**: droidtop does

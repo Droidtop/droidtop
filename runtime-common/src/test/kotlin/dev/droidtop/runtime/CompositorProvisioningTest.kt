@@ -22,6 +22,24 @@ class CompositorProvisioningTest {
     }
 
     @Test
+    fun `fonts for all languages add each distro's Noto packages, and only when asked`() {
+        val alpine = CompositorProvisioning.plan("alpine", "sway", allLanguageFonts = true)!!.installCommand
+        assertTrue(alpine.endsWith("&& apk add --no-cache font-noto-cjk font-noto-emoji"))
+        val debian = CompositorProvisioning.plan("debian", "sway", allLanguageFonts = true)!!.installCommand
+        assertTrue(debian.endsWith("&& apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-color-emoji"))
+        assertFalse(CompositorProvisioning.plan("alpine", "sway")!!.installCommand.contains("noto"))
+        // A different plan, so a desktop made before the switch installs them on its next start.
+        assertFalse(
+            ContainerLayout.planId(CompositorProvisioning.plan("alpine", "sway")!!) ==
+                ContainerLayout.planId(CompositorProvisioning.plan("alpine", "sway", allLanguageFonts = true)!!),
+        )
+        // Printing still lands after the fonts and still adds its daemon.
+        val both = CompositorProvisioning.plan("alpine", "sway", printing = true, allLanguageFonts = true)!!
+        assertTrue(both.installCommand.contains("font-noto-cjk") && both.installCommand.contains(" cups"))
+        assertEquals(listOf(CompositorProvisioning.PRINTING_DAEMON), both.daemons)
+    }
+
+    @Test
     fun `alpine plus labwc starts the labwc it installed, not sway`() {
         val plan = CompositorProvisioning.plan("alpine", "labwc")!!
         assertTrue(plan.installCommand.contains("apk add") && plan.installCommand.contains(" labwc "))

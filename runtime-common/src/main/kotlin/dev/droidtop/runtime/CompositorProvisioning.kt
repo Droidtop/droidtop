@@ -82,6 +82,18 @@ object CompositorProvisioning {
      */
     const val ICON_THEME_PACKAGE = "adwaita-icon-theme"
 
+    /**
+     * Fonts for every script, the "Fonts for all languages" switch on the
+     * primary's entry in the container manager (Droidtop/tracker#390): the
+     * plan's one font, DejaVu, has no Chinese, Japanese or Korean glyphs and
+     * no colour emoji, so file names and pages in those scripts were empty
+     * boxes. The distro's own Noto packages, by name per distro.
+     */
+    private val ALL_LANGUAGE_FONTS = mapOf(
+        "alpine" to "font-noto-cjk font-noto-emoji",
+        "debian" to "fonts-noto-cjk fonts-noto-color-emoji",
+    )
+
     /** CUPS's own package name, the same in both distros droidtop provisions. */
     const val PRINTING_PACKAGE = "cups"
 
@@ -108,9 +120,28 @@ object CompositorProvisioning {
      * switch on the primary's entry in the container manager): its package,
      * its configuration, and `cupsd` among the daemons. Turning it on or
      * off changes the plan, which the boot script notices and re-runs.
+     * [allLanguageFonts] adds [ALL_LANGUAGE_FONTS] the same way.
      */
-    fun plan(os: String, desktopEnvironment: String, printing: Boolean = false): PrimaryProvisioning? {
-        val base = basePlan(os, desktopEnvironment) ?: return null
+    fun plan(
+        os: String,
+        desktopEnvironment: String,
+        printing: Boolean = false,
+        allLanguageFonts: Boolean = false,
+    ): PrimaryProvisioning? {
+        val fonts = basePlan(os, desktopEnvironment)?.let { base -> withFonts(base, os, allLanguageFonts) } ?: return null
+        return withPrinting(fonts, os, printing)
+    }
+
+    private fun withFonts(base: PrimaryProvisioning, os: String, on: Boolean): PrimaryProvisioning {
+        val packages = ALL_LANGUAGE_FONTS[os]?.takeIf { on } ?: return base
+        val install = when (os) {
+            "debian" -> "${base.installCommand} && apt-get install -y --no-install-recommends $packages"
+            else -> "${base.installCommand} && apk add --no-cache $packages"
+        }
+        return base.copy(installCommand = install)
+    }
+
+    private fun withPrinting(base: PrimaryProvisioning, os: String, printing: Boolean): PrimaryProvisioning {
         if (!printing) return base
         val install = when (os) {
             "debian" -> "${base.installCommand} && apt-get install -y --no-install-recommends $PRINTING_PACKAGE"

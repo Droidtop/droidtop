@@ -18,6 +18,19 @@ object DesktopSetupPrefs {
     private const val KEY_PRIMARY_CREATED_FROM = "droidtop_desktop_primary_created_from"
     private const val KEY_PRINTING = "droidtop_desktop_printing"
     private const val KEY_MICROPHONE = "droidtop_desktop_microphone"
+    private const val KEY_ALL_LANGUAGE_FONTS = "droidtop_desktop_all_language_fonts"
+
+    /**
+     * Whether the primary's plan installs fonts for every script
+     * (CompositorProvisioning, Droidtop/tracker#390). On by default: a
+     * library full of Japanese file names is unreadable without them.
+     */
+    fun allLanguageFonts(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_ALL_LANGUAGE_FONTS, true)
+
+    fun setAllLanguageFonts(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_ALL_LANGUAGE_FONTS, on).apply()
+    }
 
     /** Whether the primary's provisioning plan includes CUPS (docs/SPEC.md 4b). */
     fun printing(context: Context): Boolean =
