@@ -15,19 +15,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.settings.CatalogPrefs
+import dev.droidtop.library.settings.CompanionOrientation
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
 
-/** Rotate fixed-orientation content inside a display that cannot rotate with its host Activity. */
+/**
+ * Every companion surface's content, turned a quarter inside a window whose shape is not the one asked for
+ * ([CompanionOrientation.rotateContent]): the companion's "Lock to landscape", else the active mode's Screen
+ * orientation. A Presentation, and an activity on a display that cannot rotate, cannot change the window's shape.
+ */
 @Composable
-internal fun DisplayOrientationContent(content: @Composable () -> Unit) {
+fun DisplayOrientationContent(content: @Composable () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val context = LocalContext.current
         val prefs = remember(context) { CatalogPrefs.prefs(context) }
         var modeId by remember(context) { mutableStateOf(Modes.lastMode(context)) }
+        var lockLandscape by remember(prefs) { mutableStateOf(CompanionOrientation.lockLandscape(context)) }
         DisposableEffect(prefs) {
             val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                 if (key == "droidtop_last_mode") modeId = Modes.lastMode(context)
+                if (key == CompanionOrientation.KEY_LOCK_LANDSCAPE) lockLandscape = CompanionOrientation.lockLandscape(context)
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -44,10 +51,7 @@ internal fun DisplayOrientationContent(content: @Composable () -> Unit) {
             prefs.registerOnSharedPreferenceChangeListener(listener)
             onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
-        val wantsLandscape = setting == "landscape" || setting == "landscape_flipped"
-        val fixed = setting != null && setting != "follow"
-        val rotate = fixed && wantsLandscape != (maxWidth > maxHeight)
-        if (rotate) {
+        if (CompanionOrientation.rotateContent(setting, lockLandscape, windowLandscape = maxWidth > maxHeight)) {
             Box(
                 Modifier.align(Alignment.Center)
                     .requiredSize(width = maxHeight, height = maxWidth)

@@ -869,6 +869,19 @@ object GamingSettingsCatalog {
                         CompanionHomePrefs.load(ctx)
                         val home = CompanionHomePrefs.layout.value
                         listOf(
+                            // The companion screen's own orientation lock, apart from each mode's (tracker#213).
+                            CatalogGroup(
+                                id = "${ID_DISPLAY_COMPANION}_screen",
+                                title = "Screen",
+                                items = listOf(
+                                    ToggleItem(
+                                        id = CompanionOrientation.KEY_LOCK_LANDSCAPE,
+                                        title = "Lock to landscape",
+                                        current = CompanionOrientation.lockLandscape(ctx),
+                                        onToggle = { c, on -> CompanionOrientation.setLockLandscape(c, on) },
+                                    ),
+                                ),
+                            ),
                             // Which sections the companion's Home shows; folding one is done on Home itself.
                             CatalogGroup(
                                 id = "${ID_DISPLAY_COMPANION}_home",

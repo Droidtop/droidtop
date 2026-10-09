@@ -41,6 +41,12 @@ object ScreenOrientationPrefs {
         .getString(KEY_PREFIX + mode.id, FOLLOW) ?: FOLLOW
 
     fun apply(activity: Activity) {
+        // The companion screen's own lock wins over the mode's choice there (tracker#213); landscape either way
+        // round, as the device allows.
+        if (activity is CompanionActivity && dev.droidtop.library.settings.CompanionOrientation.lockLandscape(activity)) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
+            return
+        }
         val mode = Mode.byId(Modes.lastMode(activity)) ?: Mode.LAUNCHER
         activity.requestedOrientation = requestedOrientation(mode, choice(activity, mode))
     }
@@ -60,7 +66,9 @@ object ScreenOrientationPrefs {
             override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
         })
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "droidtop_last_mode" || Mode.entries.any { key == KEY_PREFIX + it.id }) {
+            if (key == "droidtop_last_mode" || key == dev.droidtop.library.settings.CompanionOrientation.KEY_LOCK_LANDSCAPE ||
+                Mode.entries.any { key == KEY_PREFIX + it.id }
+            ) {
                 activities.toList().forEach(::apply)
             }
         }

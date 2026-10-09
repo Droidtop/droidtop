@@ -2982,6 +2982,16 @@ A fixed orientation maps to Android's matching `SCREEN_ORIENTATION_*` value. A
 `Presentation` cannot request display orientation, so its content rotates inside the
 display when the display aspect conflicts with the selected orientation.
 
+The companion screen has its own **Lock to landscape** (Displays > Companion > Screen, off by
+default; owner, 2026-10-01: the Retroid add-on does not rotate, but other dual-screen systems
+may, "so we should include a 'lock to landscape' option in droidtop too"). On, it wins over the
+mode's choice for the companion only: `CompanionActivity` requests user landscape
+(`ScreenOrientationPrefs.apply`), and every companion host (`CompanionActivity`,
+`SecondScreenPresentation`, `SecondaryDisplayActivity`) draws through `DisplayOrientationContent`,
+which turns the content a quarter when the window is still portrait, the case of a Presentation
+and of a display that cannot rotate (`CompanionOrientation.rotateContent`, one rule for the lock
+and the mode's choice). The shell's own orientation is untouched.
+
 Read directly off the installed `com.iisulauncher` 0.1.6.1 APK
 (`/root/re/iisu` in the dev container). The code is obfuscated; the
 manifest and resources are not, and they were enough — class names,

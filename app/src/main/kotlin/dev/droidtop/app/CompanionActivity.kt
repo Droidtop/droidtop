@@ -61,27 +61,30 @@ class CompanionActivity : AppCompatActivity() {
         widgetIds = CompanionWidgetPrefs.widgetIds(this)
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-                // Touch only: the D-pad never reaches these controls (dispatchKeyEvent below).
-                Box(Modifier.fillMaxSize()) {
-                    // The same tab host every other second-screen host draws: with the
-                    // shell relocated to the addon, THIS activity is what the remaining panel
-                    // shows, and in Desktop mode its default tab is the input surface
-                    // (trackpad + keyboard), with Home, Tasks, Performance and System beside it.
-                    val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(this@CompanionActivity)
-                    CompanionTabs(mode) {
-                        val entry = settledFocusedEntry()
-                        CompanionSurface(
-                            entry = entry,
-                            widgetIds = widgetIds,
-                            widgetManager = widgetManager,
-                            widgetHost = widgetHost,
-                        ) {
-                            androidx.compose.foundation.layout.Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.padding(vertical = 8.dp),
+                // Touch only: the D-pad never reaches these controls (dispatchKeyEvent below). Turned inside
+                // the window when the display cannot take the orientation asked for (Lock to landscape, #213).
+                dev.droidtop.display.DisplayOrientationContent {
+                    Box(Modifier.fillMaxSize()) {
+                        // The same tab host every other second-screen host draws: with the
+                        // shell relocated to the addon, THIS activity is what the remaining panel
+                        // shows, and in Desktop mode its default tab is the input surface
+                        // (trackpad + keyboard), with Home, Tasks, Performance and System beside it.
+                        val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(this@CompanionActivity)
+                        CompanionTabs(mode) {
+                            val entry = settledFocusedEntry()
+                            CompanionSurface(
+                                entry = entry,
+                                widgetIds = widgetIds,
+                                widgetManager = widgetManager,
+                                widgetHost = widgetHost,
                             ) {
-                                CompanionPill("Add widget") { pickWidget() }
-                                if (widgetIds.isNotEmpty()) CompanionPill("Remove widget") { removeLastWidget() }
+                                androidx.compose.foundation.layout.Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                ) {
+                                    CompanionPill("Add widget") { pickWidget() }
+                                    if (widgetIds.isNotEmpty()) CompanionPill("Remove widget") { removeLastWidget() }
+                                }
                             }
                         }
                     }
