@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad.input
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.Choreographer
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -311,8 +312,31 @@ class PadGate(
         },
     )
 
+    /**
+     * Keys that follow a handled press closely wait until the change that press made (a menu joining the overlay
+     * stack) has had its frames, so the layer beneath never sees them ([KeySettle]). Only where there is a stack.
+     */
+    private val settle: KeySettle<KeyEvent>? = if (overlays == null) null else {
+        KeySettle(
+            deliver = ::dispatchKeyNow,
+            opens = { it.action == KeyEvent.ACTION_DOWN && it.repeatCount == 0 },
+            // Two frames: the composition the press caused is queued behind this call, so one frame can run first.
+            nextFrame = { task ->
+                val choreographer = Choreographer.getInstance()
+                choreographer.postFrameCallback { choreographer.postFrameCallback { task() } }
+            },
+        )
+    }
+
     /** A key event for this window; returns whether it was handled (or dropped). */
     fun dispatchKey(event: KeyEvent): Boolean {
+        val held = settle
+        if (held == null || (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP)) return dispatchKeyNow(event)
+        // The platform may reuse the event it hands over: what is held is a copy.
+        return held.dispatch(KeyEvent(event))
+    }
+
+    private fun dispatchKeyNow(event: KeyEvent): Boolean {
         // The pad that just pressed something is the one whose layout applies, before the key is read.
         ControllerLayouts.noteInput(event)
         if (!enabled()) return deliver(event)
@@ -402,7 +426,10 @@ class PadGate(
     private val triggerKeysByDevice = HashMap<Int, BooleanArray>()
 
     /** Lets go of everything held and stops every timer. */
-    fun cancel() = core.cancel()
+    fun cancel() {
+        settle?.clear()
+        core.cancel()
+    }
 
     private fun PadSyntheticKey.toKeyEvent(): KeyEvent = KeyEvent(
         downTime,

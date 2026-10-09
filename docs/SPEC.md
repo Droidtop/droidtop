@@ -6147,6 +6147,17 @@ dialog window joins the stack by the same one line. The window is the
 stack token, so a `MenuPanel` inside an already-gated dialog is the same
 layer, not a second one.
 
+The stack is pushed when the dialog composes, a frame after the press that
+asked for it, so two keys dispatched back to back (Start then Down in one adb
+call) were both in before it. `KeySettle` closes that gap for every overlay
+at once, without each open site announcing itself: after a handled fresh
+press, a gate that has an overlay stack holds the keys that follow and
+delivers them, in order, two frames later (`PadGate.dispatchKey`), when the
+overlay the press opened is on the stack and the routing above swallows what
+belongs to the layer beneath. Held keys are delivered, never dropped by the
+settle itself; a release or repeat does not start a wait, and an unhandled
+press holds nothing.
+
 **3. The edge rule and the cadence (`Modifier.onPad`).** A screen takes
 the pad with `onPad { press -> ... }` and gets a `PadPress`: an action,
 and whether it is a held direction coming round again. It never sees a
