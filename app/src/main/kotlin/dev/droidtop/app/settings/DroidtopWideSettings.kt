@@ -1,5 +1,6 @@
 package dev.droidtop.app.settings
 
+import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -93,7 +94,7 @@ object DroidtopWideSettings {
                                     if (on) HomeRolePrefs.HomeImplementation.STANDARD else HomeRolePrefs.HomeImplementation.NONE,
                                 )
                                 if (on && !HomeRolePrefs.isDroidtopHome(ctx)) {
-                                    ctx.startActivity(HomeRolePrefs.homeSettingsIntent())
+                                    SettingsLaunch.start(ctx, HomeRolePrefs.homeSettingsIntent())
                                 }
                             },
                         ),

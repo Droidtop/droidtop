@@ -1,5 +1,6 @@
 package dev.droidtop.runtime.keyboard
 
+import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -36,6 +37,6 @@ object AccessibilityKeyboard {
     /** Android's accessibility settings, where the user turns the service on (no app can do that for them). */
     fun openSettings(context: Context) {
         RestrictedSettings.noteAttempt(context, RestrictedGrant.ACCESSIBILITY)
-        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        SettingsLaunch.start(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }

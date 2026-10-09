@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import android.content.Intent
@@ -445,9 +446,9 @@ private fun SystemControlsRow() {
         SystemSliders()
         androidx.compose.foundation.layout.Row {
             DndPill()
-            TextButton(onClick = { context.startActivity(controls.internetPanelIntent()) }) { Text("Network") }
-            TextButton(onClick = { context.startActivity(controls.bluetoothSettingsIntent()) }) { Text("Bluetooth") }
-            TextButton(onClick = { context.startActivity(controls.allSettingsIntent()) }) { Text("All settings") }
+            TextButton(onClick = { SettingsLaunch.start(context, controls.internetPanelIntent()) }) { Text("Network") }
+            TextButton(onClick = { SettingsLaunch.start(context, controls.bluetoothSettingsIntent()) }) { Text("Bluetooth") }
+            TextButton(onClick = { SettingsLaunch.start(context, controls.allSettingsIntent()) }) { Text("All settings") }
         }
     }
 }

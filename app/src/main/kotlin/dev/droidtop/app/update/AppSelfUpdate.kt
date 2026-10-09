@@ -359,7 +359,8 @@ object AppSelfUpdate {
         // dq-shell2-01). Ask first, and open the one screen that fixes it.
         if (!context.packageManager.canRequestPackageInstalls()) {
             runCatching {
-                context.startActivity(
+                dev.droidtop.runtime.systemstatus.SettingsLaunch.start(
+                    context,
                     Intent(
                         android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                         android.net.Uri.parse("package:" + context.packageName),

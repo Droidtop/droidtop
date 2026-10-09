@@ -1,5 +1,6 @@
 package dev.droidtop.app.settings
 
+import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -650,7 +651,7 @@ object ContainersCatalog {
                 id = "container_vpn_always_on",
                 title = "Always-on in Android",
                 subtitle = "Android's own VPN settings",
-                run = { ctx -> ctx.startActivity(Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+                run = { ctx -> SettingsLaunch.start(ctx, Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
             ),
         )
     }

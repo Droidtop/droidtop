@@ -1,5 +1,6 @@
 package dev.droidtop.app.settings
 
+import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -1084,7 +1085,7 @@ object AppSettingsCatalogs {
                             id = "grant_app_details",
                             title = "droidtop's app info",
                             subtitle = "Permissions, storage, notifications for droidtop itself",
-                            run = { ctx -> ctx.startActivity(controls.appDetailsIntent(ctx)) },
+                            run = { ctx -> SettingsLaunch.start(ctx, controls.appDetailsIntent(ctx)) },
                         ),
                         ActionItem(
                             id = "grant_write_settings",
@@ -1093,14 +1094,14 @@ object AppSettingsCatalogs {
                             // the subtitle (UI pass 2026-09-24, M14).
                             subtitle = "Lets droidtop change brightness, screen timeout and auto-rotate",
                             value = if (controls.canWriteBrightness(context)) "Granted" else "Not granted",
-                            run = { ctx -> ctx.startActivity(controls.brightnessGrantIntent(ctx)) },
+                            run = { ctx -> SettingsLaunch.start(ctx, controls.brightnessGrantIntent(ctx)) },
                         ),
                         ActionItem(
                             id = "grant_dnd",
                             title = "Do Not Disturb access",
                             subtitle = "Lets droidtop turn Do Not Disturb on and off",
                             value = if (controls.hasDndAccess(context)) "Granted" else "Not granted",
-                            run = { ctx -> ctx.startActivity(controls.dndGrantIntent()) },
+                            run = { ctx -> SettingsLaunch.start(ctx, controls.dndGrantIntent()) },
                         ),
                     ),
                 ),
@@ -1111,7 +1112,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "link_${link.id}",
                             title = link.label,
-                            run = { ctx -> ctx.startActivity(link.intent) },
+                            run = { ctx -> SettingsLaunch.start(ctx, link.intent) },
                         )
                     },
                 ),

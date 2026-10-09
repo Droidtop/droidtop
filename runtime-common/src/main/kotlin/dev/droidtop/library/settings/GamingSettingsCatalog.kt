@@ -1,5 +1,6 @@
 package dev.droidtop.library.settings
 
+import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -498,7 +499,7 @@ object GamingSettingsCatalog {
                             "Opens Wi-Fi and data controls"
                         },
                         run = { ctx ->
-                            ctx.startActivity(controls.internetPanelIntent())
+                            SettingsLaunch.start(ctx, controls.internetPanelIntent())
                         },
                     ),
                 )
@@ -566,7 +567,7 @@ object GamingSettingsCatalog {
                             title = "Brightness",
                             subtitle = "Opens the system screen where droidtop can be granted Modify system settings",
                             value = "Needs permission",
-                            run = { ctx -> ctx.startActivity(controls.brightnessGrantIntent(ctx)) },
+                            run = { ctx -> SettingsLaunch.start(ctx, controls.brightnessGrantIntent(ctx)) },
                         ),
                     )
                 }
@@ -588,7 +589,7 @@ object GamingSettingsCatalog {
                             id = ID_SYSTEM_DND_GRANT,
                             title = "Do Not Disturb",
                             value = "Needs permission",
-                            run = { ctx -> ctx.startActivity(controls.dndGrantIntent()) },
+                            run = { ctx -> SettingsLaunch.start(ctx, controls.dndGrantIntent()) },
                         ),
                     )
                 }
@@ -661,7 +662,7 @@ object GamingSettingsCatalog {
                         title = "Battery",
                         subtitle = "Opens the system Battery Saver screen",
                         value = controls.batteryValue(status.batteryPercent, status.charging, controls.powerSaveOn(context)),
-                        run = { ctx -> ctx.startActivity(controls.batterySaverSettingsIntent()) },
+                        run = { ctx -> SettingsLaunch.start(ctx, controls.batterySaverSettingsIntent()) },
                     ),
                 )
                 add(
@@ -670,7 +671,7 @@ object GamingSettingsCatalog {
                         title = "Bluetooth",
                         subtitle = "Pair controllers and audio in the system Bluetooth screen",
                         state = controls.bluetoothOn(context),
-                        run = { ctx -> ctx.startActivity(controls.bluetoothSettingsIntent()) },
+                        run = { ctx -> SettingsLaunch.start(ctx, controls.bluetoothSettingsIntent()) },
                     ),
                 )
                 // Airplane mode: Android gives an app no write to it (the
@@ -682,7 +683,7 @@ object GamingSettingsCatalog {
                         title = "Airplane mode",
                         subtitle = "Opens the system screen: Android does not let an app switch it",
                         state = controls.airplaneModeOn(context),
-                        run = { ctx -> ctx.startActivity(controls.airplaneModeSettingsIntent()) },
+                        run = { ctx -> SettingsLaunch.start(ctx, controls.airplaneModeSettingsIntent()) },
                     ),
                 )
                 // The power menu (shut down, restart) belongs to the system; a plain app has no call that
@@ -709,7 +710,7 @@ object GamingSettingsCatalog {
                         id = ID_AUDIO_OUTPUT,
                         title = "Audio output",
                         subtitle = "Opens Android's output switcher",
-                        run = { ctx -> ctx.startActivity(controls.audioOutputIntent()) },
+                        run = { ctx -> SettingsLaunch.start(ctx, controls.audioOutputIntent()) },
                     ),
                 )
                 // The Social place's way in from the Quick Menu: the unread count over every provider is the

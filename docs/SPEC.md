@@ -6351,6 +6351,12 @@ each is asked:
 | Post notifications (API 33+) | the desktop session's foreground notification, download progress | starting the desktop session; the first download |
 | Draw over other apps | nothing; droidtop draws no overlay over another app | never asked |
 
+Every one of these screens, and App info and Android's Home choice, is started through `SettingsLaunch.start`
+(`:runtime-common`), which logs one debug line, tag `droidtop.settings`, with the screen asked for and the
+code that asked, then starts it exactly as before; a settings screen that opens by itself is traced from that
+line (Droidtop/tracker#368). Screens started for a result (the onboarding storage and Home requests) are not
+logged.
+
 A grant that Android revokes behind droidtop's back (a system-bound
 service disabled with its mode, §2c; an unused-app reset) is detected the
 next time the feature is opened, and the same row asks again. Grants are

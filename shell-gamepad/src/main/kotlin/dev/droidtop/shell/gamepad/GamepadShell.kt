@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.util.Log
 import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.shell.gamepad.input.PadCadence
@@ -3552,7 +3553,7 @@ private fun AppsSection(
         val usageAction = SheetAction(
             title = "Include apps opened outside droidtop",
             subtitle = "Needs usage access",
-            onClick = { runCatching { context.startActivity(AppUsageAccess.settingsIntent()) } },
+            onClick = { runCatching { SettingsLaunch.start(context, AppUsageAccess.settingsIntent()) } },
         )
         LibraryFilterSheet(
             scope = scope,

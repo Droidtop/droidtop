@@ -87,9 +87,9 @@ object NotificationsStore {
             val detail = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
                 .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, ComponentName(context.packageName, LISTENER_CLASS).flattenToString())
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (runCatching { context.startActivity(detail) }.isSuccess) return
+            if (runCatching { SettingsLaunch.start(context, detail) }.isSuccess) return
         }
-        context.startActivity(grantIntent())
+        SettingsLaunch.start(context, grantIntent())
     }
 
     /**

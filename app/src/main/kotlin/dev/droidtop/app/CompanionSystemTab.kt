@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.os.Environment
 import android.os.StatFs
 import androidx.compose.foundation.background
@@ -113,7 +114,7 @@ internal fun SystemSliders() {
                     valueRange = 0f..255f,
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                 )
-                CompanionPill("Allow") { context.startActivity(SystemControls.brightnessGrantIntent(context)) }
+                CompanionPill("Allow") { SettingsLaunch.start(context, SystemControls.brightnessGrantIntent(context)) }
             }
         }
     }
@@ -149,7 +150,7 @@ internal fun DndPill() {
             dnd = !dnd
             controls.setDnd(context, dnd)
         } else {
-            context.startActivity(controls.dndGrantIntent())
+            SettingsLaunch.start(context, controls.dndGrantIntent())
         }
     }
 }
