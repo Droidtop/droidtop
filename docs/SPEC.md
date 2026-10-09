@@ -13243,12 +13243,22 @@ Settings tab, the left menu's places, Console systems and Containers.
 
 - **Two panes.** A navigator that fills the page (at least 80% of the
   screen's width; never one inside a sheet or a dialog) whose root has three
-  or more categories draws a **category column** (30% of the width) and a
-  **pane**. The column starts with a Search entry, then one entry per
-  category: a glyph and a name, the current one marked with a fill and an
-  accent rail, the pad's cursor with the shell's one selection ring. The
-  pane holds the current category's rows, grouped under small section
-  labels. Narrower than 600dp (portrait) the two take turns: the category
+  or more categories draws a **category column** and a **pane**. The column
+  is Steam's settings list (Droidtop/tracker#363 slice 8, 2026-10-08; values
+  in `SettingsLayout`): 20% of the page and never under 240dp (240dp on the
+  console's 768dp window), on a plate of its own (the card role) that runs the
+  page's height from its left edge. It starts with a Search entry, then one
+  entry per category: a glyph and a name. The entry under the pad's cursor is
+  an accent gradient from its left edge, 40% fading to clear, with a 2dp accent
+  edge, its glyph and name grown 10% from the left (the entry stays put), and
+  the shell's one sliding ring; the category being shown wears the same
+  gradient and edge at 22%, whether or not the pad is in the column. The fill
+  and the 3dp rail the current entry had are gone. The pane holds the current
+  category's rows, grouped under small section labels; on a page the selected
+  row keeps Steam's room round it as the list scrolls, about 31% of the list's
+  height clear above and 7.5% below (Steam's 250 and 60 of 800; shrunk together
+  where a list is too short), so the cursor is never against an edge
+  (`keepInView(keepRoom)`). Narrower than 600dp (portrait) the two take turns: the category
   list, then the pane, B or Left back to the list. Anything else (a sheet,
   a dialog, a root with one or two categories, like Plugins' list and its
   "Add" group) is the one list it always was.

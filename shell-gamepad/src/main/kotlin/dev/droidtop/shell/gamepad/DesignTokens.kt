@@ -176,6 +176,43 @@ object SideMenu {
 }
 
 /**
+ * Settings' two panes (docs/SPEC.md "Settings layout"), as Steam's settings
+ * measure: the category column takes [ColumnFraction] of the page and never
+ * less than [ColumnMinWidth], on a plate of its own ([MenuTokens.Card]). The
+ * entry under the cursor is an accent gradient from its left edge
+ * ([FocusedGradient] fading to clear) with a [Border] of the accent along that
+ * edge, its content grown by [SideMenu.FocusScale]; the category being shown
+ * wears the same at [CurrentGradient]. Scrolling keeps the selected row
+ * [ScrollRoomAbove] of the list's height clear above it and [ScrollRoomBelow]
+ * below (Steam's 250 and 60 of 800), so the cursor is never against an edge.
+ */
+object SettingsLayout {
+    const val ColumnFraction = 0.2f
+    val ColumnMinWidth: Dp = 240.dp
+    val CategoryIcon: Dp = 22.dp
+    const val FocusedGradient = 0.40f
+    const val CurrentGradient = 0.22f
+    val Border: Dp = 2.dp
+    const val ScrollRoomAbove = 0.3125f
+    const val ScrollRoomBelow = 0.075f
+
+    /** The category column's width in a page [hostWidth] wide: Steam's share, with its floor. Pure. */
+    fun columnWidth(hostWidth: Dp): Dp = (hostWidth * ColumnFraction).coerceAtLeast(ColumnMinWidth).coerceAtMost(hostWidth)
+
+    /**
+     * The room kept above and below a selected row [itemPx] tall in a list [viewportPx] tall,
+     * in pixels: Steam's shares, shrunk together when the row and the room would not fit. Pure.
+     */
+    fun scrollRoom(viewportPx: Int, itemPx: Int): Pair<Int, Int> {
+        val above = viewportPx * ScrollRoomAbove
+        val below = viewportPx * ScrollRoomBelow
+        val spare = (viewportPx - itemPx).coerceAtLeast(0)
+        val scale = if (above + below > spare) spare / (above + below) else 1f
+        return (above * scale).toInt() to (below * scale).toInt()
+    }
+}
+
+/**
  * The type scale, and the job of each role. droidtop's chrome supplies
  * this to [MaterialTheme] rather than inheriting the platform default, so
  * two screens in the same flow cannot use different roles for the same

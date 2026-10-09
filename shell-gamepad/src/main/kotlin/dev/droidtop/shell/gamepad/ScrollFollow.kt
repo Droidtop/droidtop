@@ -29,8 +29,14 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
  * sticky header the item must stay clear of (the game page's tab strip): its
  * lower edge is the top of the room the item has. It is only for items
  * after that header.
+ *
+ * [keepRoom] keeps Steam's room round the item as well (the Settings pane,
+ * [SettingsLayout.scrollRoom]): a share of the list's height clear above it
+ * and a smaller one below, so the selected row is never against an edge and a
+ * person moving up sees what is coming. Where the list cannot scroll further
+ * the row simply sits nearer that end.
  */
-internal suspend fun LazyListState.keepInView(index: Int, animate: Boolean = true, under: Int? = null) {
+internal suspend fun LazyListState.keepInView(index: Int, animate: Boolean = true, under: Int? = null, keepRoom: Boolean = false) {
     // Two passes: an item that is not laid out yet is reached by an
     // estimate, and the second pass makes the estimate exact.
     repeat(2) {
@@ -43,20 +49,22 @@ internal suspend fun LazyListState.keepInView(index: Int, animate: Boolean = tru
         val top = maxOf(info.viewportStartOffset, header?.let { it.offset + it.size } ?: Int.MIN_VALUE)
         val bottom = info.viewportEndOffset - info.afterContentPadding
         val row = visible.firstOrNull { it.index == index }
+        val first = visible.first()
+        val last = visible.last()
+        val perItem = (last.offset + last.size - first.offset).coerceAtLeast(1).toFloat() / visible.size
+        val (above, below) = if (keepRoom) SettingsLayout.scrollRoom(bottom - top, row?.size ?: perItem.toInt()) else 0 to 0
+        val roomTop = top + above
+        val roomBottom = bottom - below
         val delta = when {
             row == null -> {
-                val first = visible.first()
-                val last = visible.last()
-                val span = (last.offset + last.size - first.offset).coerceAtLeast(1)
-                val perItem = span.toFloat() / visible.size
                 if (index > last.index) {
-                    (last.offset + last.size - bottom) + (index - last.index) * perItem
+                    (last.offset + last.size - roomBottom) + (index - last.index) * perItem
                 } else {
-                    (first.offset - top) - (first.index - index) * perItem
+                    (first.offset - roomTop) - (first.index - index) * perItem
                 }
             }
-            row.offset < top -> (row.offset - top).toFloat()
-            row.offset + row.size > bottom -> (row.offset + row.size - bottom).toFloat()
+            row.offset < roomTop -> (row.offset - roomTop).toFloat()
+            row.offset + row.size > roomBottom -> (row.offset + row.size - roomBottom).toFloat()
             else -> return
         }
         if (animate) animateScrollBy(delta, Motion.scroll(chained = isScrollInProgress)) else scrollBy(delta)

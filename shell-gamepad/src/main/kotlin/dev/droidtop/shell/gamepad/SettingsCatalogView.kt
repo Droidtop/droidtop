@@ -53,6 +53,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -235,7 +236,8 @@ fun CatalogNavigator(
         rootGroups?.let { settingsCategories(it, root.title, nativeActions.keys, root.categoryOrder) }.orEmpty()
     }
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-    val categoryMode = hostWidth >= screenWidth * PAGE_WIDTH_FRACTION && categories.size >= MIN_SETTINGS_CATEGORIES
+    val fillsPage = hostWidth >= screenWidth * PAGE_WIDTH_FRACTION
+    val categoryMode = fillsPage && categories.size >= MIN_SETTINGS_CATEGORIES
     val twoPane = categoryMode && hostWidth >= TWO_PANE_MIN_WIDTH
     val categoryIndex = categories.indexOfFirst { it.key == categoryKey }.coerceAtLeast(0)
     val category = if (categoryMode) categories.getOrNull(categoryIndex) else null
@@ -580,7 +582,8 @@ fun CatalogNavigator(
         if (rows.isEmpty()) return@LaunchedEffect
         // Back at a depth left for a sub-screen: exactly where it was.
         scrollByDepth.remove(depth)?.let { (index, offset) -> listState.scrollToItem(index, offset) }
-        listState.keepInView(selected.coerceIn(0, rows.lastIndex), animate = !heldStep)
+        // Steam's room round the cursor on a page (a sheet's short list keeps the plain rule).
+        listState.keepInView(selected.coerceIn(0, rows.lastIndex), animate = !heldStep, keepRoom = fillsPage)
     }
     // The column's cursor, as an index into its own list (search first).
     val searchEntries = if (showSearch) 1 else 0
@@ -739,7 +742,7 @@ fun CatalogNavigator(
             when {
                 !categoryMode -> pane(Modifier.fillMaxSize(), edge)
                 twoPane -> Row(Modifier.fillMaxSize()) {
-                    column(Modifier.fillMaxHeight().fillMaxWidth(CATEGORY_COLUMN_FRACTION))
+                    column(Modifier.fillMaxHeight().width(SettingsLayout.columnWidth(hostWidth)))
                     pane(Modifier.weight(1f).fillMaxHeight(), 16.dp)
                 }
                 inColumn -> column(Modifier.fillMaxSize())
@@ -822,10 +825,12 @@ private fun CatalogPane(
 
 /**
  * The category column: search at its top, then one entry per category,
- * a hub's links under its title. [current] is marked (a fill and an accent
- * rail) wherever the pad is; [cursor] is the entry the pad is on while it
- * is in the column (null while the pane has it), drawn with the shell's
- * one selection ring.
+ * a hub's links under its title, on a plate of its own that runs the
+ * page's height from its left edge (Steam's settings list, [SettingsLayout]).
+ * [current] is marked (Steam's quieter accent gradient and edge) wherever
+ * the pad is; [cursor] is the entry the pad is on while it is in the column
+ * (null while the pane has it), drawn with the stronger gradient and the
+ * shell's one selection ring.
  */
 @Composable
 private fun SettingsCategoryColumn(
@@ -841,9 +846,12 @@ private fun SettingsCategoryColumn(
     val offset = if (showSearch) 1 else 0
     LazyColumn(
         state = state,
-        modifier = modifier.fadingEdges(state),
-        contentPadding = PaddingValues(start = LocalShellWindow.current.edgePadding, end = 8.dp, top = 12.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier
+            .background(MenuTokens.Card)
+            .fadingEdges(state),
+        // The entries reach the plate's left edge, where their accent edge is drawn.
+        contentPadding = PaddingValues(top = Space.Md, bottom = Space.Md),
+        verticalArrangement = Arrangement.spacedBy(Space.Xs),
     ) {
         if (showSearch) {
             item(key = SEARCH_ROW_ID) {
@@ -852,7 +860,7 @@ private fun SettingsCategoryColumn(
         }
         itemsIndexed(categories, key = { _, category -> category.key }) { index, category ->
             Column {
-                category.sectionAbove?.let { MenuSectionLabel(it) }
+                category.sectionAbove?.let { MenuSectionLabel(it, Modifier.padding(start = LocalShellWindow.current.edgePadding)) }
                 CategoryEntry(
                     label = category.label,
                     icon = category.icon,
@@ -865,45 +873,74 @@ private fun SettingsCategoryColumn(
     }
 }
 
+/**
+ * One entry of the category column, Steam's settings list item (docs/SPEC.md
+ * "Settings layout", [SettingsLayout]): under the cursor, an accent gradient
+ * from the left edge at [SettingsLayout.FocusedGradient] fading to clear, a
+ * [SettingsLayout.Border] of the accent on that edge, and the glyph and name
+ * grown by [SideMenu.FocusScale] from the left (the entry itself stays put);
+ * the category being shown wears the same gradient and edge at
+ * [SettingsLayout.CurrentGradient], whether or not the pad is in the column.
+ * The colour answers at once; the growth glides ([Motion.focus]) in the layer
+ * phase. The window's one sliding ring marks the cursor as everywhere else.
+ */
 @Composable
 private fun CategoryEntry(label: String, icon: CatalogIcon?, current: Boolean, cursor: Boolean, onClick: () -> Unit) {
+    val shown = cursor && PadModality.showsFocus
+    val strength = when {
+        shown -> SettingsLayout.FocusedGradient
+        current -> SettingsLayout.CurrentGradient
+        else -> 0f
+    }
+    val accent = MenuTokens.Accent
+    val grow by androidx.compose.animation.core.animateFloatAsState(
+        if (shown) SideMenu.FocusScale else 1f,
+        Motion.focus(),
+        label = "category grow",
+    )
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = MenuTokens.CategoryRowMinHeight)
-            .clip(MenuTokens.RowShape)
-            .selectionFrame(cursor, MenuTokens.RowShape, rest = if (current) MenuTokens.SurfaceSelected else Color.Transparent)
+            .drawBehind {
+                if (strength > 0f) {
+                    drawRect(Brush.horizontalGradient(listOf(accent.copy(alpha = accent.alpha * strength), Color.Transparent)))
+                    drawRect(accent, size = Size(SettingsLayout.Border.toPx(), size.height))
+                }
+            }
+            .focusRing(shown, androidx.compose.ui.graphics.RectangleShape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(start = LocalShellWindow.current.edgePadding, end = Space.Md, top = Space.Sm, bottom = Space.Sm),
     ) {
-        Box(
-            Modifier
-                .width(3.dp)
-                .height(20.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(if (current) MenuTokens.Accent else Color.Transparent),
-        )
-        Spacer(Modifier.width(10.dp))
-        if (icon != null) {
-            Icon(
-                icon.glyph(),
-                contentDescription = null,
-                tint = if (current || cursor) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
-                modifier = Modifier.size(22.dp),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.graphicsLayer {
+                scaleX = grow
+                scaleY = grow
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+            },
+        ) {
+            if (icon != null) {
+                Icon(
+                    icon.glyph(),
+                    contentDescription = null,
+                    tint = if (current || cursor) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
+                    modifier = Modifier.size(SettingsLayout.CategoryIcon),
+                )
+            } else {
+                Spacer(Modifier.size(SettingsLayout.CategoryIcon))
+            }
+            Spacer(Modifier.width(Space.Md))
+            Text(
+                label,
+                color = if (current || cursor) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
+                style = TypeRole.rowTitle,
+                fontWeight = if (current) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-        } else {
-            Spacer(Modifier.size(22.dp))
         }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            label,
-            color = if (current || cursor) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (current) FontWeight.SemiBold else FontWeight.Medium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
@@ -939,9 +976,6 @@ private const val PAGE_WIDTH_FRACTION = 0.8f
 
 /** Narrower than this, the column and the pane take turns instead of sitting side by side. */
 private val TWO_PANE_MIN_WIDTH = 600.dp
-
-/** The category column's share of a two-pane navigator's width. */
-private const val CATEGORY_COLUMN_FRACTION = 0.3f
 
 /** How long the column's cursor rests on a linked category before its screen is built. */
 private const val PANE_LOAD_SETTLE_MS = 120L
