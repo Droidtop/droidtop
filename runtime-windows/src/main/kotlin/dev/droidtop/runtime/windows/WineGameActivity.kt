@@ -272,18 +272,35 @@ class WineGameActivity : Activity() {
         }
         session?.stop()
         session = null
+        // Nothing is running any more: the Quick Menu must not offer Resume or Quit for this launch
+        // (Droidtop/tracker#171, rig 2026-10-01 r18).
+        if (dev.droidtop.library.LaunchDisplay.runningPackageName == packageName) dev.droidtop.library.LaunchDisplay.clearRunning()
         setContentView(
             TextView(this).apply {
+                // A tap dismisses it too, for a person holding the console without a pad in reach.
+                setOnClickListener { leaveFailure() }
                 text = title + "\n" + "\n" +
                     message + "\n" + "\n" +
                     "Check that Windows games is set up in Settings, then try again." + "\n" + "\n" +
-                    "Press Back to return."
+                    "Press B to return to droidtop."
                 gravity = Gravity.CENTER
                 setBackgroundColor(Color.BLACK)
                 setTextColor(Color.WHITE)
                 setPadding(FAILURE_PADDING_PX, FAILURE_PADDING_PX, FAILURE_PADDING_PX, FAILURE_PADDING_PX)
             },
         )
+    }
+
+    /**
+     * Leaves the failure screen for droidtop's shell. This screen is its own task (taskAffinity
+     * `:wine`), so finishing it alone shows whatever task Android has beneath it, which on the rig was
+     * a browser left open earlier (Droidtop/tracker#171, r09-after-back.png); the shell is brought to
+     * the front explicitly, the same way the launch watchdog's "Return to droidtop" does.
+     */
+    private fun leaveFailure() {
+        if (isFinishing) return
+        dev.droidtop.library.LaunchWatchdog.returnToShell(this)
+        finish()
     }
 
     // ---- input -------------------------------------------------------
@@ -293,7 +310,7 @@ class WineGameActivity : Activity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (failed) {
-            if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) finish()
+            if (event.action == KeyEvent.ACTION_UP && WinePresentation.dismissesFailure(event.keyCode)) leaveFailure()
             return true
         }
         // Back with the soft keyboard up closes the keyboard, not the game.
@@ -413,6 +430,16 @@ class WineGameActivity : Activity() {
  * the target, so they are tested without a surface.
  */
 object WinePresentation {
+
+    /**
+     * The keys that leave the failure screen: Back, and the pad's B, because most pads report B as
+     * KEYCODE_BUTTON_B rather than KEYCODE_BACK, and on the rig six B presses did nothing while the
+     * screen said "Press Back" (Droidtop/tracker#171, r03..r08). Escape for a keyboard. Not A: the
+     * release of the A press that started the launch can arrive here when the screen fails at once.
+     */
+    fun dismissesFailure(keyCode: Int): Boolean = keyCode == KeyEvent.KEYCODE_BACK ||
+        keyCode == KeyEvent.KEYCODE_BUTTON_B ||
+        keyCode == KeyEvent.KEYCODE_ESCAPE
 
     /**
      * The Vulkan present mode for a prefix's named one. The numbers are

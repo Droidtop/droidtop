@@ -7159,6 +7159,17 @@ installed emulator for the system, and the pad's B, a row tap or a tap
 outside dismisses it; the shell stays visible behind it, never a black
 full-screen state.
 
+A Windows game's own screen (`WineGameActivity`) reports a failure
+itself, because it has already taken the screen when Wine fails. That
+report leaves on Back, the pad's B (most pads send `KEYCODE_BUTTON_B`,
+not Back) or a tap, never on A, whose release from the launching press
+can land on a screen that fails at once
+(`WinePresentation.dismissesFailure`). Leaving brings droidtop's shell
+to the front explicitly: the game screen is its own task, and finishing
+it alone showed whatever task Android had beneath it (a browser, on the
+rig). Showing the report also clears the running-game state, so the
+Quick Menu never offers Resume or Quit for a launch that is not running.
+
 ## 7f. Gaming mode: real, generic ES-DE theme engine
 
 **Status as of 2026-08-29 — this is Gaming's actual, current, singular

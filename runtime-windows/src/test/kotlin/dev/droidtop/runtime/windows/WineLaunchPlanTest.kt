@@ -186,4 +186,16 @@ class WineLaunchPlanTest {
         val silent = WinePresentation.exitReport(1, 1_000, showedWindow = false, output = "  \n")!!
         assertEquals("Wine exited with code 1 after 1 s. It printed nothing.", silent.detail)
     }
+
+    @Test
+    fun `the pad's B leaves a failure screen, not only Back`() {
+        listOf(
+            android.view.KeyEvent.KEYCODE_BACK,
+            android.view.KeyEvent.KEYCODE_BUTTON_B,
+            android.view.KeyEvent.KEYCODE_ESCAPE,
+        ).forEach { assertTrue(WinePresentation.dismissesFailure(it)) }
+        // A is not: the release of the press that started the launch could dismiss a screen that failed at once.
+        listOf(android.view.KeyEvent.KEYCODE_BUTTON_A, android.view.KeyEvent.KEYCODE_DPAD_DOWN)
+            .forEach { assertTrue(!WinePresentation.dismissesFailure(it)) }
+    }
 }
