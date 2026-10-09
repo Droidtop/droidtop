@@ -417,6 +417,8 @@ private fun GamepadShellBody(
     // The other fixable kind: a Windows game whose program droidtop could
     // not tell (Droidtop/tracker#308), and the program choice once opened.
     var unknownProgram by remember { mutableStateOf<dev.droidtop.library.ProgramNotIdentified?>(null) }
+    // A RetroArch core droidtop saw missing or incomplete before the launch (Droidtop/tracker#271).
+    var missingCore by remember { mutableStateOf<dev.droidtop.library.consoles.RetroArchCores.Missing?>(null) }
     var programScreen by remember { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     // The game being started, if any: drives the launch screen (real
     // ES-DE has one; without it the shell simply freezes mid-frame for
@@ -669,6 +671,7 @@ private fun GamepadShellBody(
                     launching = null
                     missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled
                     unknownProgram = it as? dev.droidtop.library.ProgramNotIdentified
+                    missingCore = it as? dev.droidtop.library.consoles.RetroArchCores.Missing
                     launchError = LaunchFailureMessage.userMessage(entry.title, it)
                 }
             // Held briefly after the launch call returns: the call
@@ -1109,10 +1112,25 @@ private fun GamepadShellBody(
                         unknownProgram = null
                         launchError = null
                     }
+                }, missingCore?.let { problem ->
+                    // The launch watchdog's Get the core, here before anything started: RetroArch's Core
+                    // Downloader, or droidtop placing it once the person confirms on the emulator screen.
+                    LaunchFailureAction("Get the core") {
+                        missingCore = null
+                        launchError = null
+                        scope.launch {
+                            when (val outcome = dev.droidtop.library.consoles.RetroArchCores.ensure(context, problem.need, asked = true)) {
+                                dev.droidtop.library.consoles.RetroArchCores.Outcome.Ready -> Unit
+                                is dev.droidtop.library.consoles.RetroArchCores.Outcome.Manual -> launchError = outcome.line
+                                is dev.droidtop.library.consoles.RetroArchCores.Outcome.Failed -> launchError = outcome.line
+                            }
+                        }
+                    }
                 }),
                 onDismiss = {
                     missingEmulator = null
                     unknownProgram = null
+                    missingCore = null
                     launchError = null
                 },
             )

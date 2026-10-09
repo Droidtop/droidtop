@@ -892,15 +892,15 @@ class ConsoleRomProvider(
                 suggestions = usableEmulatorNames(KnownPlayers.forSystem(context, system.id).map { it.label }),
                 message = noEmulatorInstalledMessage(context, system),
             )
-        // RetroArch sits black, with no error, when the core it is handed is missing
-        // (Droidtop/tracker#271): when droidtop can see that, it installs the core first.
+        // RetroArch sits black, with no error, when the core it is handed is missing or incomplete
+        // (Droidtop/tracker#271): when droidtop can see that (a root helper), the launch stops here with the
+        // reason and the shell offers Get the core. It used to call ensure() without asking, which only
+        // returned a line nobody showed, and the launch went on into the black screen. Without root the
+        // state is unknown and the launch watchdog notices the stall instead.
         RetroArchCores.needFor(player.packageName, player.argumentsTemplate)?.let { need ->
-            val missing = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                RetroArchCores.state(need) == RetroArchCores.State.MISSING
-            }
-            if (missing) {
-                val outcome = RetroArchCores.ensure(context, need)
-                if (outcome is RetroArchCores.Outcome.Failed) error(outcome.line)
+            val state = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { RetroArchCores.state(need) }
+            if (state == RetroArchCores.State.MISSING || state == RetroArchCores.State.PARTIAL) {
+                throw RetroArchCores.Missing(need, RetroArchCores.missingMessage(need, state))
             }
         }
         val intent = when (val prepared = prepareLaunch(context, system, player, romFile)) {

@@ -45,8 +45,12 @@ object RetroArchCores {
     private const val ARG_CORE = "core"
     private const val ARG_ABI = "abi"
 
-    /** What droidtop knows about one core. [UNKNOWN]: no root helper, so RetroArch's private folder cannot be looked at. */
-    enum class State { INSTALLED, MISSING, UNKNOWN }
+    /**
+     * What droidtop knows about one core. [PARTIAL]: the file is there but is not a whole ELF library (an interrupted
+     * download), which RetroArch cannot load either. [UNKNOWN]: no root helper, so RetroArch's private folder cannot
+     * be looked at.
+     */
+    enum class State { INSTALLED, MISSING, PARTIAL, UNKNOWN }
 
     /** A RetroArch launch's package and the core file it loads. */
     data class Need(val packageName: String, val core: String, val corePath: String)
@@ -93,8 +97,36 @@ object RetroArchCores {
      * launch). [suspect] decides whether it applies. Pure.
      */
     fun troubleHint(need: Need): String =
-        "RetroArch shows a black screen when the core it is given is not installed: " +
+        "RetroArch shows a black screen when the core it is given is not installed or is incomplete: " +
             "install ${need.core} in RetroArch (Online Updater > Core Downloader), or choose Get the core."
+
+    /** The launch-failure sentence for a core droidtop saw is [State.MISSING] or [State.PARTIAL]. Pure. */
+    fun missingMessage(need: Need, state: State): String =
+        if (state == State.PARTIAL) {
+            "The ${need.core} core in RetroArch is incomplete, so RetroArch would show a black screen. " +
+                "Install it again in RetroArch (Online Updater > Core Downloader), or choose Get the core."
+        } else {
+            "RetroArch does not have the ${need.core} core this game needs, so it would show a black screen. " +
+                "Choose Get the core, or install it in RetroArch (Online Updater > Core Downloader)."
+        }
+
+    /**
+     * Whether [header] (at least the first 64 bytes) and [size] make a whole ELF file: the magic, and a section header
+     * table that ends inside the file (ELF64 e_shoff at 0x28, e_shentsize 0x3A, e_shnum 0x3C; ELF32 at 0x20, 0x2E,
+     * 0x30). An interrupted copy keeps the header and loses the table at the end. Pure.
+     */
+    fun elfWhole(header: ByteArray, size: Long): Boolean {
+        if (header.size < 52 || header[0] != 0x7F.toByte() || header[1] != 'E'.code.toByte() ||
+            header[2] != 'L'.code.toByte() || header[3] != 'F'.code.toByte()
+        ) return false
+        fun le(offset: Int, bytes: Int): Long = (0 until bytes).fold(0L) { acc, i -> acc or ((header[offset + i].toLong() and 0xFF) shl (8 * i)) }
+        val (shoff, entsize, count) = when (header[4].toInt()) {
+            2 -> if (header.size < 64) return false else Triple(le(0x28, 8), le(0x3A, 2), le(0x3C, 2))
+            1 -> Triple(le(0x20, 4), le(0x2E, 2), le(0x30, 2))
+            else -> return false
+        }
+        return shoff == 0L || size >= shoff + entsize * count
+    }
 
     /**
      * The core a stuck RetroArch launch may be missing: [corePath]'s core unless the root helper
@@ -207,11 +239,17 @@ object RetroArchCores {
     /** Whether the switch is on and the root helper is there: whether a confirmed press can place a core. Background only. */
     fun canPlace(): Boolean = rootShell() != null
 
-    /** Whether RetroArch has [need]'s core. Background only. */
+    /** Whether RetroArch has [need]'s core, and whole ([elfWhole]). Background only. */
     fun state(need: Need): State {
         val root = rootShell() ?: return State.UNKNOWN
         val out = root.exec(listOf("test", "-e", need.corePath)) ?: return State.UNKNOWN
-        return if (out.exit == 0) State.INSTALLED else State.MISSING
+        if (out.exit != 0) return State.MISSING
+        val size = root.exec(listOf("stat", "-c", "%s", need.corePath))?.takeIf { it.exit == 0 }?.stdout?.trim()?.toLongOrNull()
+        val hex = root.exec(listOf("od", "-An", "-tx1", "-N64", need.corePath))?.takeIf { it.exit == 0 }?.stdout
+        val header = hex?.split(' ', '\n')?.filter { it.isNotBlank() }?.mapNotNull { it.toIntOrNull(16)?.toByte() }?.toByteArray()
+        // A read the helper could not answer says nothing against the file.
+        if (size == null || header == null) return State.INSTALLED
+        return if (elfWhole(header, size)) State.INSTALLED else State.PARTIAL
     }
 
     /** The core [system]'s chosen RetroArch launch needs, if RetroArch is the chosen emulator. Background only. */
@@ -236,6 +274,11 @@ object RetroArchCores {
     ): Outcome {
         when (withContext(Dispatchers.IO) { state(need) }) {
             State.INSTALLED -> return Outcome.Ready
+            State.PARTIAL -> {
+                // droidtop never replaces a core file RetroArch has; RetroArch's own downloader does.
+                if (asked) openRetroArch(context, need.packageName)
+                return Outcome.Manual("Install the ${need.core} core again in RetroArch: Online Updater > Core Downloader.")
+            }
             State.MISSING -> {
                 if (!confirmed) {
                     if (asked) openRetroArch(context, need.packageName)
@@ -268,6 +311,12 @@ object RetroArchCores {
         )
         return if (result.ok) Outcome.Ready else Outcome.Failed(result.error ?: "The core was not installed")
     }
+
+    /**
+     * A launch refused before it started because droidtop saw RetroArch lacks [need]'s core, or has it incomplete
+     * ([State.MISSING], [State.PARTIAL]): the shell offers Get the core at the point of failure.
+     */
+    class Missing(val need: Need, message: String) : IllegalStateException(message)
 
     sealed interface Outcome {
         data object Ready : Outcome

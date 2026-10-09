@@ -7439,11 +7439,21 @@ change reaches it (console, build 1397: RetroArch's system dialog came 44 s afte
 - when a `priv.shell` provider runs, whether the app's task is in the system's task list
   (`TaskManager`, exact fidelity only); without one this is unknown and claims nothing.
 
-It reports three things, each in plain words naming the app: it is not responding; it closed straight
+- for a RetroArch launch, when a `priv.shell` provider runs, the processor time its processes have used,
+  read once 15 s after the launch (`pidof`, then `/proc/<pid>/stat` utime plus stime, which the shell user
+  reads for every app as `ps` does; `LaunchWatchPolicy.cpuMsFromStat`).
+
+It reports four things, each in plain words naming the app: it is not responding; it closed straight
 after it started (the shell came back within 10 s and the app is not open); it is no longer running
-but its screen never handed back (task list says gone after 9 s). A black window of a live, responsive
+but its screen never handed back (task list says gone after 9 s); a RetroArch launch has stalled (under
+1 s of processor time 15 s after the launch, `STALLED`). A black window of a live, responsive
 app is indistinguishable from a game that is running and is never claimed, and a person returning to
-the shell on purpose while the app is open or after 10 s is not a problem.
+the shell on purpose while the app is open or after 10 s is not a problem. The stall is the one black
+screen that is claimed, for RetroArch only, because its evidence is not a guess: a running game or
+RetroArch's own menu (which it shows when content fails to load) draws every frame and has used seconds
+by then, while the console's hung GBC and N64 launches (build 1649, Droidtop/tracker#271) showed 0.14 s
+of processor time after 90 s and answered nothing until Back raised Android's not-responding dialog.
+Before this, a hang that nobody touched was reported only once a key reached it, or never.
 
 It watches other apps only. A game screen of droidtop's own, a Windows game's `WineGameActivity`, knows
 how its game ended and says so itself (Droidtop/tracker#302): the watchdog could only see droidtop's own
@@ -7703,10 +7713,15 @@ Owner: "do this over the API. We want retroarch to TRY to be touchless" and, on 
   a zip holding exactly that `.so`, an ELF for that ABI, and places it as root: copy beside it, owner
   RetroArch's uid, the folder's own SELinux label, no-clobber rename. An existing core is never
   replaced; droidtop ships no cores.
-- **When it runs:** before every launch through RetroArch (a missing core is installed first, because
-  RetroArch shows no error for a missing core: it sits black); from a system's emulator screen
-  ("RetroArch core"); and from Emulators > Systems with games > "RetroArch cores" for every system with
-  games that RetroArch runs.
+- **When it runs:** from a system's emulator screen ("RetroArch core"); from Emulators > Systems with
+  games > "RetroArch cores" for every system with games that RetroArch runs; and from a launch's
+  **Get the core**. Before every launch through RetroArch the root helper checks the core, and a core
+  that is missing, or there but not a whole ELF file (`RetroArchCores.elfWhole`: the section header
+  table must end inside the file, which an interrupted copy loses; state `PARTIAL`), stops the launch
+  with that sentence and **Get the core** in the launch failure dialog (`RetroArchCores.Missing`). The
+  launch used to call `ensure` without asking, which for a missing core only returned a line nobody
+  showed, and went on into the black screen. droidtop never replaces a core file RetroArch already has,
+  incomplete or not: Get the core for an incomplete one opens RetroArch's Core Downloader, which does.
 - **Without root** droidtop cannot see RetroArch's cores, so a launch goes ahead as it is, and the two
   actions open RetroArch and name the cores to get from its Core Downloader, in one line.
 - **A stuck RetroArch names its core** (console, build 1386). A Game Boy Color game launched with
@@ -7714,8 +7729,8 @@ Owner: "do this over the API. We want retroarch to TRY to be touchless" and, on 
   es_systems.xml rows) sat black at 0% CPU after RetroArch's "Auto-start game" line and stopped answering
   on Back, while mGBA ran through the same launch; the console's audit log shows RetroArch executing
   `mgba_libretro_android.so` on every GBA launch and never `gambatte_libretro_android.so`, so the core was
-  not installed. Nothing without root tells that apart from a running game, so the launch watchdog's
-  report for a RetroArch launch (not responding, closed at once, gone) adds one sentence naming the core
+  not installed. Without root droidtop cannot look in the cores folder, so the launch watchdog's
+  report for a RetroArch launch (not responding, closed at once, gone, stalled) adds one sentence naming the core
   and RetroArch's Core Downloader unless the root helper confirmed the core is there
   (`RetroArchCores.suspect` and `troubleHint`, from the launch intent's LIBRETRO extra), and the system's
   "RetroArch core" row says that games staying black means the core is missing. That report also offers

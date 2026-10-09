@@ -84,6 +84,20 @@ class RetroArchCoresTest {
     }
 
     @Test
+    fun `a core whose section table ends past the end of the file is incomplete`() {
+        // ELF64: e_shoff 0x1000, e_shentsize 64, e_shnum 10, so the table ends at 0x1000 + 640.
+        val header = elf(true, 183).also {
+            it[0x29] = 0x10
+            it[0x3A] = 64
+            it[0x3C] = 10
+        }
+        assertTrue(RetroArchCores.elfWhole(header, 0x1000L + 640))
+        assertFalse(RetroArchCores.elfWhole(header, 0x1000L))
+        assertFalse(RetroArchCores.elfWhole("PK".toByteArray() + ByteArray(62), 1_000_000))
+        assertTrue(RetroArchCores.missingMessage(RetroArchCores.Need("com.retroarch.aarch64", "gambatte", "/x"), RetroArchCores.State.PARTIAL).contains("incomplete"))
+    }
+
+    @Test
     fun `the archive must hold exactly the named core`() {
         val dest = File.createTempFile("core", ".so").also { it.deleteOnExit() }
         RetroArchCores.extractCore(zipOf("mgba_libretro_android.so" to elf(true, 183)), "mgba", "arm64-v8a", dest)

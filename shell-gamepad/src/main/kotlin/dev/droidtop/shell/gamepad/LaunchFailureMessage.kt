@@ -16,6 +16,8 @@ object LaunchFailureMessage {
     fun userMessage(game: String?, cause: Throwable?): String = when {
         cause is NoEmulatorInstalled ->
             "No ${cause.systemName} emulator is installed yet."
+        // Droidtop/tracker#271: what droidtop saw in RetroArch's cores folder, with Get the core beside it.
+        cause is dev.droidtop.library.consoles.RetroArchCores.Missing -> cause.message ?: "RetroArch does not have this game's core."
         // Droidtop/tracker#308: what is wrong, never emulator advice.
         cause is ProgramNotIdentified ->
             "droidtop can't tell which program starts \"${game?.takeIf { it.isNotBlank() } ?: cause.title}\"."

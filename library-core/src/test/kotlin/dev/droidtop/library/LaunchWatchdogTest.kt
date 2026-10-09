@@ -75,6 +75,28 @@ class LaunchWatchdogTest {
     }
 
     @Test
+    fun aRetroArchThatHasUsedNoProcessorTimeIsStalled() {
+        fun read(elapsedMs: Long, cpuMs: Long?, shellCameBack: Boolean = false) =
+            LaunchWatchPolicy.judge(WatchObservation(elapsedMs, shellCameBack, notResponding = false, taskListed = null, cpuMs = cpuMs))
+        // Console, build 1649: GBC and N64 launches at 0:00.14 of processor time, black, until Back raised an ANR.
+        assertEquals(WatchVerdict.Trouble(LaunchTrouble.STALLED), read(LaunchWatchPolicy.STALL_CHECK_MS, cpuMs = 140))
+        // A game that runs, or RetroArch's own menu, has used seconds by then.
+        assertEquals(WatchVerdict.Keep, read(LaunchWatchPolicy.STALL_CHECK_MS, cpuMs = 3_900))
+        // No reading (no helper, or not a RetroArch launch) claims nothing; nor does a person already back in droidtop.
+        assertEquals(WatchVerdict.Keep, read(LaunchWatchPolicy.STALL_CHECK_MS, cpuMs = null))
+        assertEquals(WatchVerdict.Stop, read(LaunchWatchPolicy.STALL_CHECK_MS, cpuMs = 140, shellCameBack = true))
+    }
+
+    @Test
+    fun processorTimeIsReadFromProcStatPastTheProcessName() {
+        // utime 9, stime 5 ticks; the name holds a space and a parenthesis, as app names may.
+        val stat = "17618 (RetroArch (A) x) S 811 811 0 0 -1 1077952832 9001 0 12 0 9 5 0 0 10 -10 30 0 123 0"
+        assertEquals(140L, LaunchWatchPolicy.cpuMsFromStat(stat))
+        assertEquals(280L, LaunchWatchPolicy.cpuMsFromStat("$stat\n$stat"))
+        assertEquals(null, LaunchWatchPolicy.cpuMsFromStat("cat: /proc/1/stat: No such file or directory"))
+    }
+
+    @Test
     fun withoutAHelperTheWatchEndsAtTheLimitAndClaimsNothingAboutABlackScreen() {
         assertEquals(WatchVerdict.Stop, look(LaunchWatchPolicy.WATCH_MS, taskListed = null))
     }

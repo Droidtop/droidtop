@@ -29,6 +29,9 @@ enum class LaunchTrouble {
 
     /** The app is no longer open, yet the screen it was sent to did not hand back. */
     GONE_WHILE_AWAY,
+
+    /** A RetroArch launch whose process has done almost nothing since it started: a core it could not load. */
+    STALLED,
 }
 
 /** A launch that went wrong, in the words the person is shown. */
@@ -52,6 +55,11 @@ internal data class WatchObservation(
     val notResponding: Boolean,
     /** Whether the system's task list holds the app; null when droidtop cannot read that list (no privileged helper). */
     val taskListed: Boolean?,
+    /**
+     * Processor time the app's processes have used, read once at [LaunchWatchPolicy.STALL_CHECK_MS] for a RetroArch
+     * launch through the privileged helper; null at every other look, and without a helper.
+     */
+    val cpuMs: Long? = null,
 )
 
 internal sealed interface WatchVerdict {
@@ -92,8 +100,21 @@ internal object LaunchWatchPolicy {
     /** The most the watchdog ever watches; after this a stuck app is the person's to notice. */
     const val WATCH_MS = 90_000L
 
+    /** When a RetroArch launch's processor time is read once. */
+    const val STALL_CHECK_MS = 15_000L
+
+    /**
+     * Less processor time than this by [STALL_CHECK_MS] is a RetroArch that never got going. A running game or
+     * RetroArch's own menu (which it shows when content fails to load) draws every frame and uses seconds; the hung
+     * GBC and N64 launches had used 0.14 s after 90 s (console, build 1649, `ps` TIME 0:00.14) while a GBA game ran at
+     * 26% of a core.
+     */
+    const val STALL_CPU_MS = 1_000L
+
     fun judge(o: WatchObservation): WatchVerdict = when {
         o.notResponding -> WatchVerdict.Trouble(LaunchTrouble.NOT_RESPONDING)
+        o.cpuMs != null && o.cpuMs < STALL_CPU_MS && o.elapsedMs >= STALL_CHECK_MS && !o.shellCameBack ->
+            WatchVerdict.Trouble(LaunchTrouble.STALLED)
         o.shellCameBack ->
             if (o.taskListed != true && o.elapsedMs <= EXIT_WINDOW_MS) WatchVerdict.Trouble(LaunchTrouble.EXITED_AT_ONCE)
             else WatchVerdict.Stop
@@ -110,6 +131,25 @@ internal object LaunchWatchPolicy {
      */
     fun dumpShowsNotResponding(dump: String): Boolean = "mNotResponding=true" in dump
 
+    /**
+     * The processor time in [stats], one `/proc/<pid>/stat` line per process: utime plus stime (fields 14 and 15,
+     * counted after the parenthesised name, which may hold spaces), in clock ticks of [ticksPerSecond] (USER_HZ, 100
+     * on Android). Null when no line parses. Pure, for tests.
+     */
+    fun cpuMsFromStat(stats: String, ticksPerSecond: Long = 100): Long? {
+        var ticks = 0L
+        var any = false
+        for (line in stats.lineSequence()) {
+            val fields = line.substringAfterLast(')', "").trim().split(' ').filter { it.isNotEmpty() }
+            // After the name: state is field 3, so utime (14) and stime (15) are at 11 and 12.
+            val utime = fields.getOrNull(11)?.toLongOrNull() ?: continue
+            val stime = fields.getOrNull(12)?.toLongOrNull() ?: continue
+            ticks += utime + stime
+            any = true
+        }
+        return if (any) ticks * 1000 / ticksPerSecond else null
+    }
+
     /** The plain sentence for [trouble], naming the app and what to do. */
     fun message(appName: String, trouble: LaunchTrouble): String = when (trouble) {
         LaunchTrouble.EXITED_AT_ONCE ->
@@ -118,6 +158,8 @@ internal object LaunchWatchPolicy {
             "$appName has stopped responding. You can close it and try again, or go back to droidtop."
         LaunchTrouble.GONE_WHILE_AWAY ->
             "$appName is no longer running, but its screen did not return to droidtop. Go back to droidtop and try again."
+        LaunchTrouble.STALLED ->
+            "$appName started but has done nothing since, so its screen stays black. Close it and try again once the cause below is fixed."
     }
 }
 
@@ -165,10 +207,19 @@ object LaunchWatchdog {
             val appName = TaskManager.appLabel(appContext, packageName) ?: packageName
             val started = System.currentTimeMillis()
             var settled = false
+            // A RetroArch launch's processor time is read once (LaunchWatchPolicy.STALL_CHECK_MS): a missing or
+            // broken core leaves RetroArch black and idle, and RetroArch reports nothing (Droidtop/tracker#271).
+            var stallChecked = retroArchCorePath == null
             while (isActive) {
                 delay(LaunchWatchPolicy.POLL_MS)
                 val elapsed = System.currentTimeMillis() - started
                 val shellCameBack = LaunchDisplay.shellStartedMs >= launchedAtMs
+                val cpuMs = if (!stallChecked && elapsed >= LaunchWatchPolicy.STALL_CHECK_MS) {
+                    stallChecked = true
+                    cpuMs(packageName)
+                } else {
+                    null
+                }
                 val observation = WatchObservation(
                     elapsedMs = elapsed,
                     shellCameBack = shellCameBack,
@@ -178,6 +229,7 @@ object LaunchWatchdog {
                     } else {
                         null
                     },
+                    cpuMs = cpuMs,
                 )
                 when (val verdict = LaunchWatchPolicy.judge(observation)) {
                     WatchVerdict.Keep -> Unit
@@ -253,6 +305,20 @@ object LaunchWatchdog {
         if (!shell.capabilities().shell) return false
         val out = runCatching { shell.exec(listOf("dumpsys", "activity", "processes", packageName)) }.getOrNull()
         return out != null && out.exit == 0 && LaunchWatchPolicy.dumpShowsNotResponding(out.stdout)
+    }
+
+    /**
+     * The processor time [packageName]'s processes have used, read as the privileged helper's user (the shell user can
+     * read every app's `/proc/<pid>/stat`, as `ps` does); null without a helper or a running process.
+     */
+    private fun cpuMs(packageName: String): Long? {
+        val shell = TaskManager.shell
+        if (!shell.capabilities().shell) return null
+        val pids = runCatching { shell.exec(listOf("pidof", packageName)) }.getOrNull()
+            ?.takeIf { it.exit == 0 }?.stdout?.split(' ', '\n')?.filter { it.isNotBlank() && it.all(Char::isDigit) }
+            ?.takeIf { it.isNotEmpty() } ?: return null
+        val stats = runCatching { shell.exec(listOf("cat") + pids.map { "/proc/$it/stat" }) }.getOrNull() ?: return null
+        return LaunchWatchPolicy.cpuMsFromStat(stats.stdout)
     }
 
     /** Whether the task list holds the package; null when it cannot be read exactly (no privileged helper running). */

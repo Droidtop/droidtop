@@ -149,6 +149,7 @@ object EmulatorsCatalog {
             value = when (state) {
                 RetroArchCores.State.INSTALLED -> "Installed"
                 RetroArchCores.State.MISSING -> "Install core"
+                RetroArchCores.State.PARTIAL -> "Incomplete: reinstall in RetroArch"
                 RetroArchCores.State.UNKNOWN -> "Open RetroArch"
             },
             // Placing the core is a root-level command in RetroArch's private folder: only with Risky actions >
