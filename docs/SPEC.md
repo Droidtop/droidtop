@@ -6839,6 +6839,32 @@ Two concrete references to build from rather than design blind:
     same `WinePrefixTools.runIn` starts a file opened with droidtop (§4b).
   - **Stop every Wine process.** `ProcessHelper.killAllWineProcesses`, the list a launch clears
     before it starts, behind a question because it ends every Windows program, in any prefix.
+  - **Windows components (the winetricks verbs this runtime has).** A real `winetricks` is a
+    shell script that downloads from Microsoft's servers and runs unsigned installers in the prefix;
+    droidtop does not run one (the same refusal as §7e3). What it has is the components of
+    droidtop's component catalog (`wincomponents/*` of Droidtop/droidtop-components: Direct3D,
+    DirectSound, DirectMusic, DirectPlay, DirectShow, Visual C++ 2010, Windows Media decoder,
+    OpenGL, ...), each already a row of the prefix settings (Wine's own or Windows' own). The tool
+    is the same choice made at once: pressing a component writes it through `PrefixSettings` and
+    prepares the prefix straight away (`WinePrefixPreparation.prepare`), which fetches the files
+    from the catalog, checked against their SHA-256, and unpacks them, with progress on the row,
+    where the settings row only takes effect at the next start. Pressing an installed one goes back
+    to Wine's own. The person chooses which; none is installed on its own. A verb outside the
+    catalog (`dotnet48`, `corefonts`, a `d3dx9_43` of its own) is not offered: it needs an installer
+    or a catalog entry that does not exist yet.
+  - **Look inside the prefix.** `PrefixFolderCatalog` over `PrefixFolderView`: the prefix's folders
+    and files, sizes, read only. It offers nothing to do with a file. A symbolic link (the drive
+    letters, which point at the person's game folders and the system files) is named with its
+    target and is not opened, and no folder outside the prefix can be opened (checked by real path).
+  - **Reset the prefix.** The prefix's `.wine` folder is deleted (`SafeDelete.deleteWithin`, which
+    never follows a link) and unpacked again from the Wine build's own prefix pack
+    (`ContainerManager.extractContainerPatternFile`, what creating a prefix does); the start-up
+    markers the last start recorded are cleared (`appVersion`, `imgVersion`, `wincomponents`, ...)
+    so the next start runs the whole first-boot pass, and the prefix's settings stay. Two presses:
+    the row, then the question, which says that installed programs, the registry and the saves a
+    game keeps inside the prefix are deleted; for the shared prefix the row says it is every game's.
+    Game folders are never touched. Reset and Windows components are refused while any Wine process
+    runs, since that process owns the prefix.
 - **Linux container management**: distrobox itself is CLI-only (no
   official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
   real, actively-maintained GTK4 GUI for it — confirmed feature set:

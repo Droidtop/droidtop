@@ -2,8 +2,13 @@ package dev.droidtop.runtime.windows
 
 import android.content.Context
 import com.winlator.container.Container
+import com.winlator.container.ContainerManager
+import com.winlator.contents.ContentsManager
+import com.winlator.core.KeyValueSet
 import com.winlator.core.ProcessHelper
+import com.winlator.xserver.ScreenInfo
 import dev.droidtop.library.PcLaunchResult
+import dev.droidtop.runtime.SafeDelete
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -34,7 +39,7 @@ object WinePrefixTools {
         COMMAND_PROMPT("Command prompt", "wineconsole", listOf("cmd")),
     }
 
-    internal const val NO_ENVIRONMENT = "There is no Windows environment yet. Run Set up Windows games first."
+    const val NO_ENVIRONMENT = "There is no Windows environment yet. Run Set up Windows games first."
 
     /** What a program is started as: the file Wine is handed, and what follows it. */
     internal data class ProgramLaunch(val target: String, val arguments: List<String>)
@@ -107,6 +112,92 @@ object WinePrefixTools {
             if (running == 1) "Stopped the 1 Wine process" else "Stopped the $running Wine processes"
         }
     }
+
+    // ---- Windows components (the winetricks verbs this runtime has) ----
+
+    /** A Windows component the prefix can have: [native] is "Windows' own files", false is Wine's own. */
+    data class Component(val id: String, val name: String, val native: Boolean)
+
+    /**
+     * Every component [entryId]'s prefix lists, with whether it carries Windows' own files. These are
+     * the components of droidtop's component catalog (the `wincomponents` files of
+     * Droidtop/droidtop-components): this runtime's counterpart of a winetricks verb.
+     */
+    suspend fun components(context: Context, entryId: String?): List<Component>? = withContext(Dispatchers.IO) {
+        val container = PcContainers.forGame(context, entryId) ?: return@withContext null
+        KeyValueSet(container.winComponents).map { (id, on) -> Component(id, PrefixSettings.componentName(id), on == "1") }
+    }
+
+    /**
+     * Installs component [id] into [entryId]'s prefix ([native]), or switches it back to Wine's own,
+     * now: the choice is written the way the prefix settings write it and the prefix is prepared
+     * straight away, which fetches the component's files from the catalog (checked against their
+     * SHA-256) and puts them in, instead of leaving it for the next start. Refused while any Wine
+     * process runs, because that process owns the prefix.
+     */
+    suspend fun setComponent(context: Context, entryId: String?, id: String, native: Boolean, onStatus: (String) -> Unit): String =
+        withContext(Dispatchers.IO) {
+            runningMessage()?.let { return@withContext it }
+            val container = PcContainers.forGame(context, entryId) ?: return@withContext NO_ENVIRONMENT
+            if (KeyValueSet(container.winComponents).none { it[0] == id }) return@withContext "This prefix has no component $id"
+            val name = PrefixSettings.componentName(id)
+            onStatus(if (native) "Installing $name…" else "Switching $name back to Wine's own…")
+            PrefixSettings.set(context, entryId, PrefixSettings.COMPONENT + id, if (native) "1" else "0").join()
+            val fresh = PcContainers.forGame(context, entryId) ?: return@withContext NO_ENVIRONMENT
+            val missing = BionicWineEngine(context).readiness(fresh) as? WineEngineReadiness.Missing
+            if (missing != null) return@withContext "Saved, and applied at the next start: ${missing.reason}"
+            runCatching {
+                WindowsBackbone.awaitReady(context)
+                WinePrefixPreparation.prepare(context, fresh, ScreenInfo(fresh.screenSize))
+            }.fold(
+                { if (native) "Installed $name" else "$name is Wine's own again" },
+                { "Saved, but couldn't apply it now (${it.message ?: it}); it is tried again at the next start" },
+            )
+        }
+
+    // ---- the prefix folder, read only ----
+
+    /** The prefix's own files (its `.wine` folder, whose `drive_c` is C:), or null with no environment. Disk work. */
+    suspend fun folderOf(context: Context, entryId: String?): File? = withContext(Dispatchers.IO) {
+        PcContainers.forGame(context, entryId)?.let { File(it.rootDir, ".wine") }?.takeIf { it.isDirectory }
+    }
+
+    // ---- reset ----
+
+    /**
+     * Makes [entryId]'s prefix new: its `.wine` folder is removed (every Windows program installed in
+     * it, its registry and the saves of every game that keeps them inside it) and unpacked again from
+     * the Wine build's own prefix, and the prefix's settings are kept. The next start sets it up the
+     * way the first one did. Refused while any Wine process runs.
+     */
+    suspend fun reset(context: Context, entryId: String?, onStatus: (String) -> Unit): String = withContext(Dispatchers.IO) {
+        runningMessage()?.let { return@withContext it }
+        val container = PcContainers.forGame(context, entryId) ?: return@withContext NO_ENVIRONMENT
+        val root = container.rootDir
+        val prefix = File(root, ".wine")
+        onStatus("Removing the old prefix…")
+        if (!SafeDelete.deleteWithin(root, prefix)) return@withContext "Couldn't remove all of the prefix; some of it may be gone. Reset it again to finish"
+        onStatus("Unpacking a fresh prefix…")
+        val contents = ContentsManager(context).apply { syncContents() }
+        if (!ContainerManager(context).extractContainerPatternFile(container.wineVersion, contents, root, null)) {
+            return@withContext "Couldn't unpack a fresh prefix for ${container.wineVersion}. Reset it again once that Wine build is installed"
+        }
+        // What the last start recorded about the prefix is no longer true: the next start sets it up whole.
+        RESET_EXTRAS.forEach { container.putExtra(it, null) }
+        container.saveData()
+        "Reset. Its next start sets the prefix up again"
+    }
+
+    /** A line to refuse with while any Wine process runs, else null. */
+    private fun runningMessage(): String? =
+        if (ProcessHelper.listRunningWineProcesses().isEmpty()) null
+        else "A Windows program is still running. Stop every Wine process first (Prefix tools), then try again"
+
+    /** The extras a start records about a prefix ([WinePrefixPreparation]); cleared, the next start runs the whole pass. */
+    private val RESET_EXTRAS = listOf(
+        "appVersion", "imgVersion", "appliedContainerVariant", "appliedWineVersion", "dxwrapper", "graphicsDriver",
+        "desktopTheme", "xaudioDllsExtracted", "wincomponents", "audioDriver", "startupSelection",
+    )
 
     /** The prefix's C: drive, where a tool starts. */
     internal fun driveC(container: Container): File = File(container.rootDir, ".wine/drive_c")

@@ -4,6 +4,7 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.DocumentPickItem
+import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.runtime.windows.WinePrefixTools
 import java.io.File
@@ -12,9 +13,10 @@ import kotlinx.coroutines.withContext
 
 /**
  * Lutris-style tools for a Wine prefix as settings rows (docs/SPEC.md 7c, "Prefix tools"): Wine's own
- * programs, running any program in it, and stopping every Wine process. Reached from "Prefix tools" in
- * Wine and graphics ([WineOptionsCatalog]), for the prefix [entryId] starts in (null: the shared one,
- * [shared]). [WinePrefixTools] starts each one.
+ * programs, installing Windows components into it, running any program in it, looking inside it, stopping
+ * every Wine process and resetting it. Reached from "Prefix tools" in Wine and graphics
+ * ([WineOptionsCatalog]), for the prefix [entryId] starts in (null: the shared one, [shared]).
+ * [WinePrefixTools] does each one.
  */
 object PrefixToolsCatalog {
 
@@ -25,7 +27,8 @@ object PrefixToolsCatalog {
         id = "wine_prefix_tools",
         title = "Prefix tools",
         subtitle = title,
-        groups = { _ ->
+        groups = { context ->
+            val components = WinePrefixTools.components(context, entryId).orEmpty()
             val where = if (shared) "the shared prefix, which every game without a prefix of its own runs in" else "this prefix"
             listOf(
                 CatalogGroup(
@@ -42,6 +45,25 @@ object PrefixToolsCatalog {
                             },
                             run = { ctx, _ -> WinePrefixTools.open(ctx, entryId, program) },
                         )
+                    },
+                ),
+                CatalogGroup(
+                    id = "wine_prefix_tools_components",
+                    title = "Windows components",
+                    items = components.map { component ->
+                        AsyncActionItem(
+                            id = "wine_prefix_component_" + component.id,
+                            title = component.name,
+                            subtitle = if (component.native) {
+                                "Windows' own files are in $where. Press to go back to Wine's own"
+                            } else {
+                                "Wine's own is in use. Press to install Windows' own files into $where, from droidtop's component catalog (each download checked against its SHA-256)"
+                            },
+                            value = if (component.native) "Installed" else "Wine's own",
+                            run = { ctx, onStatus -> WinePrefixTools.setComponent(ctx, entryId, component.id, !component.native, onStatus) },
+                        )
+                    }.ifEmpty {
+                        listOf(AsyncActionItem(id = "wine_prefix_components_none", title = "No Windows environment yet", run = { _, _ -> WinePrefixTools.NO_ENVIRONMENT }))
                     },
                 ),
                 CatalogGroup(
@@ -80,6 +102,18 @@ object PrefixToolsCatalog {
                     ),
                 ),
                 CatalogGroup(
+                    id = "wine_prefix_tools_files",
+                    title = null,
+                    items = listOf(
+                        NestedScreenItem(
+                            id = "wine_prefix_files",
+                            title = "Look inside the prefix",
+                            subtitle = "Its folders and files, read only: nothing here can be changed or deleted",
+                            inline = PrefixFolderCatalog.screen(entryId, title),
+                        ),
+                    ),
+                ),
+                CatalogGroup(
                     id = "wine_prefix_tools_stop",
                     title = null,
                     items = listOf(
@@ -89,6 +123,14 @@ object PrefixToolsCatalog {
                             subtitle = "For a program that hung, or a game left running in the background. Ends every Windows program that is running, in any prefix",
                             confirmTitle = "Stop every Wine process?",
                             run = { _, _ -> WinePrefixTools.killAll() },
+                        ),
+                        AsyncActionItem(
+                            id = "wine_prefix_reset",
+                            title = "Reset the prefix",
+                            subtitle = "Makes $where new. Every program installed in it, its registry and the saves a game keeps inside it are deleted; " +
+                                "its settings stay, and the next start sets it up again. Game folders are not touched",
+                            confirmTitle = "Reset the prefix? What is installed in it and the saves inside it are deleted",
+                            run = { ctx, onStatus -> WinePrefixTools.reset(ctx, entryId, onStatus) },
                         ),
                     ),
                 ),

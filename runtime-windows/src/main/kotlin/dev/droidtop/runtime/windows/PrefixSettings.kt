@@ -191,7 +191,7 @@ object PrefixSettings {
                 "components", "Windows components",
                 KeyValueSet(d.wincomponents).map { (id, on) ->
                     choice(
-                        COMPONENT + id, COMPONENT_NAMES[id] ?: id, on,
+                        COMPONENT + id, componentName(id), on,
                         listOf(WineOptionChoice("0", "Wine's own"), WineOptionChoice("1", "Windows' own")),
                     )
                 },
@@ -276,6 +276,9 @@ object PrefixSettings {
         val all = if (choices.isEmpty() || choices.any { it.value == current }) choices else listOf(WineOptionChoice(current, current)) + choices
         return PrefixSetting.Choice(id, title, current, all)
     }
+
+    /** The name a Windows component goes by in the rows, or its id. */
+    internal fun componentName(id: String): String = COMPONENT_NAMES[id] ?: id
 
     private val COMPONENT_NAMES = mapOf(
         "direct3d" to "Direct3D", "directsound" to "DirectSound", "directinput8" to "DirectInput 8",
