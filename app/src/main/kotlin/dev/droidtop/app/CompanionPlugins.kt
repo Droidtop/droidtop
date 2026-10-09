@@ -223,13 +223,24 @@ internal fun CompanionGamePluginRows(entry: LibraryEntry) {
     }
 }
 
+/** How many shown panels declare `keep_on`: while above 0 the companion's idle timer does not run (slice C14). */
+internal val CompanionKeepOn = kotlinx.coroutines.flow.MutableStateFlow(0)
+
 /** Keeps the companion's window on while [on] (a panel declaring `keep_on`); released when it leaves. */
 @Composable
 private fun KeepScreenOn(on: Boolean) {
     val view = LocalView.current
     DisposableEffect(view, on) {
-        if (on) view.keepScreenOn = true
-        onDispose { if (on) view.keepScreenOn = false }
+        if (on) {
+            view.keepScreenOn = true
+            CompanionKeepOn.value++
+        }
+        onDispose {
+            if (on) {
+                view.keepScreenOn = false
+                CompanionKeepOn.value--
+            }
+        }
     }
 }
 

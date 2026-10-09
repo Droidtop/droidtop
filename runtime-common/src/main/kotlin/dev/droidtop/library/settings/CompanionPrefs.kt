@@ -42,6 +42,12 @@ data class CompanionSettings(
     val inputPin: String? = null,
     /** The one-screen sheet's first-run tip was dismissed (slice C13). */
     val sheetTipSeen: Boolean = false,
+    /** Dim and turn the companion screen off when untouched (slice C14); on by default. */
+    val idleTimeout: Boolean = true,
+    /** How an off companion wakes: `dev.droidtop.runtime.CompanionIdle.Wake` key, double tap by default. */
+    val wake: String = "double",
+    /** The off screen's "how to wake" line was seen through to a wake. */
+    val offHintSeen: Boolean = false,
 ) {
     /** The two ask-first rules as [GameControls] takes them. */
     val ask: AskFirst get() = AskFirst(askBeforeStopping, askBeforeLoad)
@@ -84,6 +90,16 @@ object CompanionPrefs {
     private const val KEY_HANDLE = "input_handle_edge"
     private const val KEY_INPUT_PIN = "input_pin"
     private const val KEY_SHEET_TIP = "sheet_tip_seen"
+    private const val KEY_IDLE = "idle_timeout"
+    private const val KEY_WAKE = "wake"
+    private const val KEY_OFF_HINT = "off_hint_seen"
+
+    /** The Quick Menu's "Companion screen" row asks an off companion to wake; each request bumps this. */
+    val wakeRequests = MutableStateFlow(0)
+
+    fun requestWake() {
+        wakeRequests.value++
+    }
     private const val TP = "trackpad_"
 
     const val HANDLE_BOTTOM = "bottom"
@@ -171,7 +187,25 @@ object CompanionPrefs {
         handleEdge = (all[KEY_HANDLE] as? String)?.takeIf { it == HANDLE_TOP } ?: HANDLE_BOTTOM,
         inputPin = (all[KEY_INPUT_PIN] as? String)?.takeIf { it.isNotBlank() },
         sheetTipSeen = all[KEY_SHEET_TIP] as? Boolean ?: false,
+        idleTimeout = all[KEY_IDLE] as? Boolean ?: true,
+        wake = all[KEY_WAKE] as? String ?: "double",
+        offHintSeen = all[KEY_OFF_HINT] as? Boolean ?: false,
     )
+
+    fun setIdleTimeout(context: Context, on: Boolean) {
+        update { it.copy(idleTimeout = on) }
+        prefs(context).edit().putBoolean(KEY_IDLE, on).apply()
+    }
+
+    fun setWake(context: Context, key: String) {
+        update { it.copy(wake = key) }
+        prefs(context).edit().putString(KEY_WAKE, key).apply()
+    }
+
+    fun setOffHintSeen(context: Context) {
+        update { it.copy(offHintSeen = true) }
+        prefs(context).edit().putBoolean(KEY_OFF_HINT, true).apply()
+    }
 
     fun setSheetTipSeen(context: Context) {
         update { it.copy(sheetTipSeen = true) }

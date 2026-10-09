@@ -3557,6 +3557,33 @@ row of recent apps, became Home's Recent apps section for every mode.
   Android's notifications), and a tray panel at the bottom right over Desktop's taskbar ("Companion" on the taskbar,
   on one screen only). A tap outside, Back, or a pull up on the sheet's handle closes it. A first-run tip says how to
   open it again, until dismissed.
+- **Companion screen and displays (slice C14).** `DisplayControls` (`:runtime-common`) is the one write path for each
+  screen's brightness, power and refresh rate; the catalog's Brightness row moved onto it and `SystemControls`' own
+  brightness write is gone. The main screen's brightness is Android's setting; the companion's is its own window's
+  (`screenBrightness`, where the host is an Activity), never below 10%, so it never changes the main screen. **Off**:
+  Android 13 gives the shell no command to power one panel of several off (`cmd display` has brightness, modes and
+  dock, not power), so Off is the companion window black at the lowest window brightness, still taking touch to
+  wake. **Idle** (`CompanionIdle`, Companion group "Dim and turn off the companion", on by default): untouched, the
+  companion dims after 2 minutes and goes off after 5, both stretched to what `AccessibilityManager
+  .getRecommendedTimeoutMillis` asks; TalkBack hears "Companion screen will turn off soon. Touch to keep it on." ten
+  seconds before. It does not run while Social shows, a plugin panel that declares keep-on shows, the companion
+  keyboard is open, or a stream runs. Every touch is seen before the tab (never consumed), so a tap on a dimmed screen
+  brightens it and does what was tapped. A new message notification brings an off or dimmed screen back to dimmed,
+  except in Kid and Kiosk. **Wake** (Companion group): a double tap (default), a single tap, or only the Quick Menu's
+  "Companion screen" row (System, while a second screen holds the companion); the off screen is one TalkBack element,
+  "Companion screen off, activate to turn on", and the first time it says how to wake it. On Input it is a dark
+  trackpad: touches still move the pointer, and the Show tabs handle or the Tabs button wakes it. **Which screen**:
+  "Show the companion on" (Companion group) lists every screen but the main one in plain words; the choice is
+  remembered per set of screens (`CompanionScreens`, keyed by each screen's name, native size and built-in or
+  external, never display ids, so two identical monitors share a key and a choice); the default is the screen that
+  is not the main one, built-in before external (an AYN Thor's second built-in screen before a monitor), and the
+  orchestrator puts the companion there after every hotplug, TalkBack hearing where it is. **System > Display** has
+  one card per screen: name, built-in or external, size, orientation and role; the main screen's brightness, the
+  companion's own brightness and "Turn this screen off"; the refresh rate where the screen lists more than one
+  (`cmd display set-user-preferred-display-mode` through the helper app, behind the new Risky actions class "Change
+  display settings"); and "This screen controls its own brightness" where droidtop has no brightness for it.
+  Identify screens shows a large number and name on each screen for five seconds (a Presentation; a message on
+  Android's default screen) and TalkBack reads the list.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 
@@ -8186,6 +8213,8 @@ or the system through the privileged helper:
 - **Write another app's files** (`OTHER_APP_FILES`): `PrivilegedShell.writeFile`, the emulator setup helper's
   BIOS files and config options in an emulator's `Android/data`. A write droidtop can make itself, in a folder
   of its own or one the person gave it, is not this class.
+- **Change display settings** (`DISPLAY_SETTINGS`): the helper app setting a screen's refresh rate for every app
+  (`cmd display set-user-preferred-display-mode`, the companion's System > Display cards, Droidtop/tracker#414).
 - **Root-level commands** (`ROOT_COMMANDS`): commands run as root through a provider that holds it. Today that is
   placing a RetroArch core in RetroArch's private folder (`RetroArchCores`); with the class off droidtop does not
   even look at the cores folder through the root helper, and the core row opens RetroArch's Core Downloader as it

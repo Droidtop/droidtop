@@ -299,6 +299,34 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
     // on however the request ended (Droidtop/tracker#369). A tab pressed meanwhile ends the request first.
     val requested by KeyboardTargets.companion.collectAsState()
 
+    // Screens plugged in or out: the companion goes back to the screen chosen for the new set by itself (the
+    // orchestrator), and TalkBack hears where it is now when the set changes (slice C14).
+    val outputs by remember { dev.droidtop.runtime.DisplayOutputRepository(context.applicationContext).observe() }
+        .collectAsState(initial = null)
+    var lastScreens by remember { mutableStateOf<Set<Int>?>(null) }
+    LaunchedEffect(outputs) {
+        val now = outputs?.map { it.androidDisplayId }?.toSet() ?: return@LaunchedEffect
+        val before = lastScreens
+        lastScreens = now
+        if (before != null && before != now) {
+            val where = withContext(Dispatchers.IO) {
+                val list = outputs.orEmpty()
+                val names = dev.droidtop.runtime.ScreenNaming.names(context.applicationContext, list)
+                view.display?.displayId?.let { names[it] }
+            }
+            view.announceForAccessibility(if (now.size > before.size) "Screen connected. Companion on ${where ?: "this screen"}" else "Screen disconnected. Companion on ${where ?: "this screen"}")
+        }
+    }
+    // Dims and turns the companion off when untouched (slice C14); Social, the keyboard, a keep-on panel and a stream
+    // that asks hold it on.
+    val showTabsNow by CompanionInputHandle.showTabs.collectAsState()
+    val shownForIdle = selectedId ?: when (val opening = settings.opening(modeName)) {
+        CompanionPrefs.OPEN_DEFAULT -> CompanionPrefs.defaultOpening(modeName)
+        CompanionPrefs.OPEN_LAST -> settings.last[modeName] ?: CompanionPrefs.defaultOpening(modeName)
+        else -> opening
+    }
+    val idleExempt = shownForIdle == CompanionTab.SOCIAL.id || requested != null || runningKind == LibraryEntryKind.REMOTE_STREAM
+    CompanionIdleLayer(exempt = idleExempt, input = shownForIdle == CompanionTab.INPUT.id && requested == null, wakeRequest = showTabsNow) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val portrait = maxHeight >= maxWidth
         val density = LocalDensity.current
@@ -469,6 +497,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                 Column(Modifier.weight(1f).fillMaxHeight(), content = content)
             }
         }
+    }
     }
 }
 

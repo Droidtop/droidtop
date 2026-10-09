@@ -22,6 +22,13 @@ enum class RiskyClass(val id: String, val title: String, val summary: String) {
         "Let droidtop change an emulator's settings file or put a BIOS file in its folder, where Android keeps droidtop out",
     ),
 
+    /** The helper app changing a screen's setting for the whole system: its refresh rate (`cmd display`). */
+    DISPLAY_SETTINGS(
+        "display_settings",
+        "Change display settings",
+        "Let droidtop set a screen's refresh rate for every app, through the helper app",
+    ),
+
     /** Root-level commands through a provider that holds root (Sui, or a root provider plugin). */
     ROOT_COMMANDS(
         "root_commands",

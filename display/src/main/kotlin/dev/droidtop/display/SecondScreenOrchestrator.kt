@@ -8,6 +8,7 @@ import android.view.Display
 import android.util.Log
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.runtime.CompanionScreenGuard
+import dev.droidtop.runtime.CompanionScreens
 import dev.droidtop.runtime.DisplayArrangement
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
@@ -98,6 +99,9 @@ class SecondScreenOrchestrator(
     private var lastDisplayIds: Set<Int> = emptySet()
     private var lastArrangementSeq: Int = -1
     private var lastMainScreen: MainScreenChoice? = null
+
+    /** The companion's screen as the last pass chose it (CompanionScreens), for placing the idle cover first there. */
+    @Volatile private var companionDisplayId: Int? = null
     private var secondScreenPresentation: SecondScreenPresentation? = null
     private var healthCheckJob: Job? = null
 
@@ -219,6 +223,8 @@ class SecondScreenOrchestrator(
         val secondaryIds = outputs
             .filter { it.kind == DisplayOutputKind.SECOND_SCREEN }
             .map { it.androidDisplayId }
+            // The companion's chosen screen first (Show the companion on, CompanionScreens).
+            .sortedBy { if (it == companionDisplayId) 0 else 1 }
         DualScreenOrchestration
             .displaysNeedingIdleCover(
                 secondaryDisplayIds = secondaryIds,
@@ -273,7 +279,12 @@ class SecondScreenOrchestrator(
                     return@collectLatest
                 }
 
-                val second = outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
+                // The companion's screen: the one chosen for this set of displays under "Show the companion on",
+                // else the screen that is not the main one (CompanionScreens.pick; slice C14).
+                val chosenId = withContext(Dispatchers.IO) { CompanionScreens.companionDisplay(context, outputs) }
+                companionDisplayId = chosenId
+                val second = outputs.firstOrNull { it.androidDisplayId == chosenId && it.kind == DisplayOutputKind.SECOND_SCREEN }
+                    ?: outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
                 val showCompanion = DualScreenOrchestration.shouldShowSecondScreenCompanion(outputs.size)
                 if (DualScreenOrchestration.shouldDismissCompanion(showCompanion, host.companionVisible())) {
                     host.stopCompanion()

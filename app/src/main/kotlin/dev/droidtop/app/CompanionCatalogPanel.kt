@@ -78,7 +78,7 @@ internal fun companionSystemCards(
     SystemCard("power", "Power", listOfNotNull(performanceMode), folded = true),
     SystemCard("storage", "Storage", emptyList(), folded = true, storage = true),
     SystemCard("privacy", "Privacy", listOfNotNull(privacy), folded = true),
-).filter { it.storage || it.items.isNotEmpty() }
+).filter { it.storage || it.id == "display" || it.items.isNotEmpty() }
 
 /**
  * Catalog items drawn for touch: the companion's half of "the Quick Menu and the companion draw the same control

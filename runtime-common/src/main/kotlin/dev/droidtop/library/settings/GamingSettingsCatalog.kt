@@ -74,6 +74,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_NETWORK = "pref_gaming_system_network"
     const val ID_SYSTEM_VOLUME = "pref_gaming_system_volume"
     const val ID_SYSTEM_BRIGHTNESS = "pref_gaming_system_brightness"
+    const val ID_COMPANION_WAKE = "pref_companion_screen_wake"
     const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_gaming_system_brightness_grant"
     const val ID_SYSTEM_BLUETOOTH = "pref_gaming_system_bluetooth"
     const val ID_SYSTEM_VPN = "pref_gaming_system_vpn"
@@ -570,6 +571,17 @@ object GamingSettingsCatalog {
                         run = { _ -> dev.droidtop.runtime.DisplayArrangement.reinitialize() },
                     ),
                 )
+                // Wakes an off companion screen (slice C14); only while a second screen holds the companion.
+                if (!dev.droidtop.runtime.CompanionSheet.offered(context)) {
+                    add(
+                        ActionItem(
+                            id = ID_COMPANION_WAKE,
+                            title = "Companion screen",
+                            subtitle = "Turns the companion screen back on",
+                            run = { _ -> CompanionPrefs.requestWake() },
+                        ),
+                    )
+                }
                 add(
                     SliderItem(
                         id = ID_SYSTEM_VOLUME,
@@ -587,8 +599,8 @@ object GamingSettingsCatalog {
                             title = "Brightness",
                             min = 0,
                             max = 255,
-                            current = controls.brightness(context) ?: 128,
-                            onChange = { ctx, value -> controls.setBrightness(ctx, value) },
+                            current = dev.droidtop.runtime.DisplayControls.brightness(context) ?: 128,
+                            onChange = { ctx, value -> dev.droidtop.runtime.DisplayControls.setBrightness(ctx, value) },
                         ),
                     )
                 } else {
@@ -1164,6 +1176,22 @@ object GamingSettingsCatalog {
                     subtitle = "How the companion's Input trackpad moves, clicks and scrolls",
                     inline = trackpadScreen(),
                 ),
+                ToggleItem(
+                    id = "companion_idle",
+                    title = "Dim and turn off the companion",
+                    subtitle = "Untouched, the companion screen dims after 2 minutes and turns off after 5. Social, a chat and the keyboard keep it on",
+                    current = settings.idleTimeout,
+                    onToggle = { c, on -> CompanionPrefs.setIdleTimeout(c, on) },
+                ),
+                ChoiceItem(
+                    id = "companion_wake",
+                    title = "Wake the companion screen",
+                    subtitle = "What turns the companion screen back on once it is off",
+                    options = dev.droidtop.runtime.CompanionIdle.Wake.entries.map { ChoiceOption(it.key, it.label) },
+                    current = settings.wake,
+                    onSelect = { c, value -> CompanionPrefs.setWake(c, value) },
+                ),
+                companionScreenItem(context),
                 ChoiceItem(
                     id = "companion_handle_edge",
                     title = "Show tabs handle",
@@ -1200,6 +1228,34 @@ object GamingSettingsCatalog {
                     run = { c -> CompanionPrefs.reset(c); PinnedControls.reset(c) },
                 ),
             ),
+        )
+    }
+
+    /**
+     * "Show the companion on" (docs/SPEC.md "The companion's tabs", Which screen; slice C14): every screen but the main
+     * one in plain words (droidtop's name, built-in or external, size), remembered for this set of displays
+     * ([dev.droidtop.runtime.CompanionScreens]); the default names the screen it resolves to now. Reads the display list
+     * and preferences: built off the main thread like the rest of this catalog.
+     */
+    private fun companionScreenItem(context: Context): CatalogItem {
+        val outputs = dev.droidtop.runtime.DisplayOutputRepository(context).currentOutputsSnapshot()
+        val facts = outputs.map(dev.droidtop.runtime.ScreenNaming::facts)
+        val names = dev.droidtop.runtime.ScreenNaming.names(context, outputs)
+        val set = dev.droidtop.runtime.CompanionScreens.setKey(facts)
+        val others = facts.filter { it.displayId != android.view.Display.DEFAULT_DISPLAY }
+        val auto = dev.droidtop.runtime.CompanionScreens.pick(facts, android.view.Display.DEFAULT_DISPLAY, null)
+        fun describe(f: dev.droidtop.runtime.ScreenFacts): String {
+            val kind = if (f.screenClass == dev.droidtop.runtime.ScreenClass.BUILT_IN) "built-in" else "external"
+            return "${names[f.displayId] ?: f.androidName}, $kind, ${f.nativeWidthPx}x${f.nativeHeightPx}"
+        }
+        val autoLabel = facts.firstOrNull { it.displayId == auto }?.let { "Automatic: ${describe(it)}" } ?: "Automatic (the screen that is not the main one)"
+        return ChoiceItem(
+            id = "companion_screen",
+            title = "Show the companion on",
+            subtitle = "Remembered for this set of screens. Identify screens under System > Display shows which is which",
+            options = listOf(ChoiceOption("", autoLabel)) + others.map { ChoiceOption(dev.droidtop.runtime.CompanionScreens.screenKey(it), describe(it)) },
+            current = dev.droidtop.runtime.CompanionScreens.chosen(context, set).orEmpty(),
+            onSelect = { c, value -> dev.droidtop.runtime.CompanionScreens.choose(c, set, value.ifEmpty { null }) },
         )
     }
 

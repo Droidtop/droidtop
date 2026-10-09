@@ -80,6 +80,8 @@ internal fun CompanionSystemTab() {
                         if (card.storage) {
                             StorageLine()
                         } else {
+                            // One card per screen above the Quick Menu's Display items (slice C14).
+                            if (card.id == "display") CompanionDisplayCards()
                             CompanionCatalogItems(
                                 card.items,
                                 onChanged = { version++ },

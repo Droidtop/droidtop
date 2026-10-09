@@ -159,31 +159,8 @@ object SystemControls {
         )
     }
 
-    fun canWriteBrightness(context: Context): Boolean = Settings.System.canWrite(context)
-
-    /** 0..255, or null when unreadable. */
-    fun brightness(context: Context): Int? = runCatching {
-        Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
-    }.getOrNull()
-
-    /** Returns false when the WRITE_SETTINGS grant is missing — callers surface the grant action instead. */
-    fun setBrightness(context: Context, value: Int): Boolean {
-        if (!Settings.System.canWrite(context)) return false
-        return runCatching {
-            // Manual brightness only makes sense with adaptive off; the
-            // system's own slider does the same.
-            Settings.System.putInt(
-                context.contentResolver,
-                Settings.System.SCREEN_BRIGHTNESS_MODE,
-                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
-            )
-            Settings.System.putInt(
-                context.contentResolver,
-                Settings.System.SCREEN_BRIGHTNESS,
-                value.coerceIn(0, 255),
-            )
-        }.isSuccess
-    }
+    /** Brightness is [dev.droidtop.runtime.DisplayControls]'s, the one write path per display (slice C14). */
+    fun canWriteBrightness(context: Context): Boolean = dev.droidtop.runtime.DisplayControls.canWriteBrightness(context)
 
     fun brightnessGrantIntent(context: Context): Intent =
         Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS)
