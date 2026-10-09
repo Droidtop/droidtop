@@ -14587,6 +14587,9 @@ The design's order (droidtop-agent docs/DESIGN.md section 10) holds:
      learn their public endpoint at the same moment, which waits on the
      owner's decision about a discovery service (droidtop-agent DESIGN
      decision 4).
+     Syncthing's global discovery and public STUN servers were read for it
+     (2026-10-09): neither publishes terms that let another program use
+     them, so nothing is built on them (droidtop-agent DESIGN section 10).
 3. Store and forward through a folder of the person's own that their own
    sync tool carries to both sides (Drive, OneDrive, Dropbox, Nextcloud,
    Syncthing-Fork, FolderSync): Settings > Computers > "Cloud folder", picked
