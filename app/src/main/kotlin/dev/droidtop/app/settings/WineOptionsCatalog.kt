@@ -1,8 +1,6 @@
 package dev.droidtop.app.settings
 
 import android.content.Context
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import dev.droidtop.library.WindowsPrograms
 import dev.droidtop.library.WindowsSetup
 import dev.droidtop.library.WineSettingsScreen
