@@ -14347,6 +14347,8 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   Update all), and games whose source names a version the library lacks
   (a linked source, 7g "Where an update comes from"). It reads only what is
   cached or published and never starts a network call or a walk. The
+  whole screen is built off the main thread (its preference and package
+  reads held a frame of the page as it opened). The
   group below it is droidtop's own update settings and Check now, as
   before. Android apps are not listed: nothing yet knows an installed app's
   latest version, and the install and update manager (Droidtop/tracker#261)

@@ -886,101 +886,106 @@ object AppSettingsCatalogs {
         title = "Updates",
         subtitle = "What has a newer version, and how droidtop checks for its own",
         groups = { context ->
-            val update = dev.droidtop.app.update.AppSelfUpdate
-            availableUpdatesGroups(context) + listOf(
-                CatalogGroup(
-                    id = "updates_droidtop",
-                    title = "droidtop's own updates",
-                    items = listOf(
-                        ChoiceItem(
-                            id = "updates_frequency",
-                            title = "Check for updates",
-                            subtitle = "Fetches one small file describing the latest build; nothing about this " +
-                                "device or your library is sent. Picking Never stops the automatic checks; Check now still works",
-                            options = dev.droidtop.app.update.AppSelfUpdate.Frequency.entries
-                                .map { ChoiceOption(it.name, it.label) },
-                            current = update.frequency(context).name,
-                            onSelect = { ctx, value ->
-                                update.setFrequency(ctx, dev.droidtop.app.update.AppSelfUpdate.Frequency.valueOf(value))
-                            },
-                        ),
-                        ToggleItem(
-                            id = "updates_unmetered_only",
-                            title = "Only on Wi-Fi and other unmetered networks",
-                            subtitle = "Skips the scheduled check while on mobile data or a metered connection",
-                            current = update.unmeteredOnly(context),
-                            onToggle = { ctx, value -> update.setUnmeteredOnly(ctx, value) },
-                        ),
-                        ChoiceItem(
-                            id = "updates_channel",
-                            title = "Build channel",
-                            subtitle = "Which builds this device follows. Unstable gets every new build; the " +
-                                "others get a build once it has been promoted to them",
-                            options = dev.droidtop.app.update.AppSelfUpdate.Channel.entries
-                                .map { ChoiceOption(it.name, it.label) },
-                            current = update.channel(context).name,
-                            onSelect = { ctx, value ->
-                                update.setChannel(ctx, dev.droidtop.app.update.AppSelfUpdate.Channel.valueOf(value))
-                            },
-                        ),
-                        ToggleItem(
-                            id = "updates_debug_builds",
-                            title = "Install debug builds",
-                            // Real question this answers (rig,
-                            // p1-dt-updater-debug-build-mismatch): a
-                            // device can be ON a debug build (a fresh
-                            // sideload, or CI's own artifact) while this
-                            // stays Off, which is the normal starting
-                            // state, not a stuck one. Both variants are
-                            // built from the same commit and signed with
-                            // the same persistent CI key (app/build.gradle.kts),
-                            // so Check now here correctly detects a newer
-                            // build either way and installs cleanly over
-                            // a debug build even with this Off -- turning
-                            // it off and checking again is exactly how a
-                            // debug install gets back to the faster
-                            // release one.
-                            subtitle = when {
-                                update.debugBuilds(context) ->
-                                    "Debug builds run several times slower. Turn this off and check again to go back"
-                                ctxIsDebuggable(context) ->
-                                    "Currently running a debug build. Check now still finds and installs the faster " +
-                                        "release build with this off"
-                                else -> "Much slower builds for debugging droidtop itself. Leave this off to play"
-                            },
-                            current = update.debugBuilds(context),
-                            onToggle = { ctx, value -> update.setDebugBuilds(ctx, value) },
-                        ),
-                        // ONE check: it checks now, whatever the schedule
-                        // says, and installs a newer build (verified against
-                        // the release's digest, then Android's installer,
-                        // which checks the signing key and asks). There used
-                        // to be a check-only row beside it that pointed at a
-                        // "Download and install" row which did not exist (UI
-                        // pass 2026-09-24, L4). The same pass is reachable
-                        // over adb: am broadcast -a dev.droidtop.UPDATE_NOW
-                        // -n dev.droidtop.app/.UpdateNowReceiver.
-                        AsyncActionItem(
-                            id = "updates_install",
-                            title = "Check now",
-                            subtitle = (update.lastAttempt(context)?.let { last ->
-                                "Last checked " + android.text.format.DateUtils.getRelativeDateTimeString(
-                                    context, last, android.text.format.DateUtils.MINUTE_IN_MILLIS,
-                                    android.text.format.DateUtils.WEEK_IN_MILLIS, 0,
-                                )
-                            } ?: "Not checked yet") + ". Installs a newer build if there is one; Android asks you to confirm",
-                            value = update.installedVersionName(context),
-                            run = { ctx, onStatus ->
-                                withContext(Dispatchers.IO) {
-                                    dev.droidtop.app.update.UpdateNow.runNow(ctx, waitForOutcome = true) { status ->
-                                        onStatus(status)
+            // Off the main thread as a whole: the rows below read preferences and the installed package's version,
+            // and this builder runs on the caller's (the pane's) thread, where those reads held a frame of the
+            // page that was opening (docs/SPEC.md 7j "Updates").
+            withContext(Dispatchers.IO) {
+                val update = dev.droidtop.app.update.AppSelfUpdate
+                availableUpdatesGroups(context) + listOf(
+                    CatalogGroup(
+                        id = "updates_droidtop",
+                        title = "droidtop's own updates",
+                        items = listOf(
+                            ChoiceItem(
+                                id = "updates_frequency",
+                                title = "Check for updates",
+                                subtitle = "Fetches one small file describing the latest build; nothing about this " +
+                                    "device or your library is sent. Picking Never stops the automatic checks; Check now still works",
+                                options = dev.droidtop.app.update.AppSelfUpdate.Frequency.entries
+                                    .map { ChoiceOption(it.name, it.label) },
+                                current = update.frequency(context).name,
+                                onSelect = { ctx, value ->
+                                    update.setFrequency(ctx, dev.droidtop.app.update.AppSelfUpdate.Frequency.valueOf(value))
+                                },
+                            ),
+                            ToggleItem(
+                                id = "updates_unmetered_only",
+                                title = "Only on Wi-Fi and other unmetered networks",
+                                subtitle = "Skips the scheduled check while on mobile data or a metered connection",
+                                current = update.unmeteredOnly(context),
+                                onToggle = { ctx, value -> update.setUnmeteredOnly(ctx, value) },
+                            ),
+                            ChoiceItem(
+                                id = "updates_channel",
+                                title = "Build channel",
+                                subtitle = "Which builds this device follows. Unstable gets every new build; the " +
+                                    "others get a build once it has been promoted to them",
+                                options = dev.droidtop.app.update.AppSelfUpdate.Channel.entries
+                                    .map { ChoiceOption(it.name, it.label) },
+                                current = update.channel(context).name,
+                                onSelect = { ctx, value ->
+                                    update.setChannel(ctx, dev.droidtop.app.update.AppSelfUpdate.Channel.valueOf(value))
+                                },
+                            ),
+                            ToggleItem(
+                                id = "updates_debug_builds",
+                                title = "Install debug builds",
+                                // Real question this answers (rig,
+                                // p1-dt-updater-debug-build-mismatch): a
+                                // device can be ON a debug build (a fresh
+                                // sideload, or CI's own artifact) while this
+                                // stays Off, which is the normal starting
+                                // state, not a stuck one. Both variants are
+                                // built from the same commit and signed with
+                                // the same persistent CI key (app/build.gradle.kts),
+                                // so Check now here correctly detects a newer
+                                // build either way and installs cleanly over
+                                // a debug build even with this Off -- turning
+                                // it off and checking again is exactly how a
+                                // debug install gets back to the faster
+                                // release one.
+                                subtitle = when {
+                                    update.debugBuilds(context) ->
+                                        "Debug builds run several times slower. Turn this off and check again to go back"
+                                    ctxIsDebuggable(context) ->
+                                        "Currently running a debug build. Check now still finds and installs the faster " +
+                                            "release build with this off"
+                                    else -> "Much slower builds for debugging droidtop itself. Leave this off to play"
+                                },
+                                current = update.debugBuilds(context),
+                                onToggle = { ctx, value -> update.setDebugBuilds(ctx, value) },
+                            ),
+                            // ONE check: it checks now, whatever the schedule
+                            // says, and installs a newer build (verified against
+                            // the release's digest, then Android's installer,
+                            // which checks the signing key and asks). There used
+                            // to be a check-only row beside it that pointed at a
+                            // "Download and install" row which did not exist (UI
+                            // pass 2026-09-24, L4). The same pass is reachable
+                            // over adb: am broadcast -a dev.droidtop.UPDATE_NOW
+                            // -n dev.droidtop.app/.UpdateNowReceiver.
+                            AsyncActionItem(
+                                id = "updates_install",
+                                title = "Check now",
+                                subtitle = (update.lastAttempt(context)?.let { last ->
+                                    "Last checked " + android.text.format.DateUtils.getRelativeDateTimeString(
+                                        context, last, android.text.format.DateUtils.MINUTE_IN_MILLIS,
+                                        android.text.format.DateUtils.WEEK_IN_MILLIS, 0,
+                                    )
+                                } ?: "Not checked yet") + ". Installs a newer build if there is one; Android asks you to confirm",
+                                value = update.installedVersionName(context),
+                                run = { ctx, onStatus ->
+                                    withContext(Dispatchers.IO) {
+                                        dev.droidtop.app.update.UpdateNow.runNow(ctx, waitForOutcome = true) { status ->
+                                            onStatus(status)
+                                        }
                                     }
-                                }
-                            },
+                                },
+                            ),
                         ),
                     ),
-                ),
-            )
+                )
+            }
         },
     )
 
