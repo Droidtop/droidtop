@@ -173,10 +173,13 @@ fun HostedListSheet(
         ) + extraBindings + HintBinding(GamepadAction.B, "Close")
     }
     CompositionLocalProvider(LocalShellWindow provides window) {
-        Dialog(onDismissRequest = onClose) {
+        // The platform's default dialog width (440dp on the emulator rig) would cap the sheet below its own width.
+        Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
             GatePadInThisDialog()
             MenuPanel(
-                modifier = modifier.width(window.panelWidth(440.dp)).onPreviewKeyEvent { event ->
+                // Wide enough for A, X, Y and B on one line (rig emulator-5560, 2026-10-09: at 440dp "B Close"
+                // ran off the edge); a narrower window wraps them (TouchHintBar).
+                modifier = modifier.width(window.panelWidth(HOSTED_SHEET_WIDTH)).onPreviewKeyEvent { event ->
                     val typed = onTyped
                     val text = if (typed == null) null else typedText(event.nativeKeyEvent)
                     if (typed != null && text != null) {
@@ -319,3 +322,6 @@ fun QuickMenuStandalone(
         )
     }
 }
+
+/** A hosted list sheet's width where the window allows: four hint pills fit on one line. */
+private val HOSTED_SHEET_WIDTH = 520.dp

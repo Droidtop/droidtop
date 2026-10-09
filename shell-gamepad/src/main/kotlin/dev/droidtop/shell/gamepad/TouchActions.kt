@@ -8,6 +8,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -78,11 +80,13 @@ fun rememberGamepadTouch(): (GamepadAction) -> Unit {
  * screen the same list is the CONTROLS, since there are no face buttons
  * to press. One list, one meaning, two ways in.
  *
- * Horizontally scrollable because a narrow screen cannot fit five hints,
- * and dropping hints to make them fit would drop actions a touch user
- * has no other route to.
+ * A sheet's bar (narrower than [TIGHT_HINT_BAR_WIDTH], or any bar on a
+ * compact window) wraps its hints onto a second line; a full-width bar
+ * scrolls sideways. Neither drops a hint to make the rest fit: that would
+ * drop actions a touch user has no other route to.
  */
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 internal fun TouchHintBar(
     hints: List<Pair<GamepadAction, String>>,
     modifier: Modifier = Modifier,
@@ -98,21 +102,39 @@ internal fun TouchHintBar(
         // window does: at the full window's spacing the sheet's four hints ran off its right edge,
         // "B Close" cut in half (console, build 1386). It still scrolls if even that does not fit.
         val tight = window.compact || maxWidth < TIGHT_HINT_BAR_WIDTH
-        Row(
-            modifier = Modifier
-                .then(if (fill) Modifier.fillMaxWidth() else Modifier)
-                .background(background)
-                // A plate gets the frame's hairline on its top edge; over a
-                // theme's own canvas (transparent) there is no plate and none.
-                .then(if (background.alpha > 0f) Modifier.frameEdge(atTop = true) else Modifier)
-                .horizontalScroll(rememberScrollState())
-                .heightIn(min = window.frameBarHeight)
-                .padding(horizontal = if (tight) minOf(window.barPadding, 12.dp) else window.barPadding),
-            horizontalArrangement = Arrangement.spacedBy(if (tight) 10.dp else 24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            hints.forEach { (action, label) ->
-                TouchHint(action = action, label = label, onPress = { press(action) })
+        val plate = Modifier
+            .then(if (fill) Modifier.fillMaxWidth() else Modifier)
+            .background(background)
+            // A plate gets the frame's hairline on its top edge; over a
+            // theme's own canvas (transparent) there is no plate and none.
+            .then(if (background.alpha > 0f) Modifier.frameEdge(atTop = true) else Modifier)
+        if (tight) {
+            // A sheet's bar wraps its pills onto a second line instead of scrolling them: a scrolled
+            // row showed "B Close" cut at the sheet's edge whenever X and Y joined A and B (Desktop's
+            // Start sheet, rig emulator-5560, 2026-10-09), and nothing said there was more to scroll to.
+            FlowRow(
+                modifier = plate
+                    .heightIn(min = window.frameBarHeight)
+                    .padding(horizontal = minOf(window.barPadding, 12.dp), vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                hints.forEach { (action, label) ->
+                    TouchHint(action = action, label = label, onPress = { press(action) })
+                }
+            }
+        } else {
+            Row(
+                modifier = plate
+                    .horizontalScroll(rememberScrollState())
+                    .heightIn(min = window.frameBarHeight)
+                    .padding(horizontal = window.barPadding),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                hints.forEach { (action, label) ->
+                    TouchHint(action = action, label = label, onPress = { press(action) })
+                }
             }
         }
     }
