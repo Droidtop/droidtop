@@ -2779,7 +2779,9 @@ the `ContainerRuntime` interface that already exists (§3):
   items inside them, is `ControlAccess`'s answer (see "UI modes and ControlAccess" in 7f); Kid and
   Kiosk keep every section Full has, without the items that control the restriction itself.
   Sections, in rail order, and what each is:
-  - **Game** (only while a game is parked, first when present): the Game section below.
+  - **Game** (only while a game is parked, first when present): the Game section below. Whether its Restart and
+    its Kill pill need the second A is `GameControls.needsSecondPress` (Droidtop/tracker#414, slice C8): the same
+    decision the companion's Game tab asks by, so turning Ask before stopping off makes both act at once.
   - **Running apps**: the task manager's list with Close and Clear all (`AppsTab`, #245, #252).
   - **Notifications**: unchanged (`NotificationsTab`, grant row when access is missing, #180).
   - **System**: the quick-settings tile grid over the catalog's quick System group with its
@@ -3480,7 +3482,17 @@ row of recent apps, became Home's Recent apps section for every mode.
   sampling, and drops to 0 when the Performance tab or section is switched away.
   **Performance mode** is one catalog item (`GamingSettingsCatalog.performanceModeItem`, Android's GameManager
   profile through the `priv.shell` provider, only while a game droidtop launched is in front): the Quick Menu's
-  Performance section and System > Power draw that item.
+  Performance section, System > Power and the Game tab draw that item.
+- **Game (slice C8).** `CompanionGameTab`: a header (art, name, this session's play time), then the rows
+  `GameControls` (`:runtime-common`, pure) gives for the UI mode and the runner: Resume, Quit, Restart, Kill, the
+  overlay level and performance mode. Kid and Kiosk get Resume and Quit. A stream (`REMOTE_STREAM`, windowcast)
+  hides Restart and Kill unless its runner says they apply and uses its own Quit label and question
+  ("Disconnect"). `GameControls.asks` is the one decision whether a row asks first: the runner's or a plugin's
+  `confirm` flag; **Ask before stopping** (Companion group, on by default) for Quit, Restart, Kill, an Apps row's
+  Stop and Clear all; **Ask before load and overwrite** (on by default) for plugin rows flagged `confirm`; and Kid
+  and Kiosk always ask. The Quick Menu's Game section reads the same decision. The question starts on Keep playing,
+  the two answers large and well apart; a pad press that reaches the companion while it is open closes it as
+  Cancel and says "Cancelled. Tap Quit on this screen to quit." Restart is the one quit, then the one launch.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 
@@ -8076,6 +8088,10 @@ menu_displaylist.c and msg_hash_us.h). The rows and the manual steps read the sa
   opens Android's own All files access screen (7e2) and the second is not drawn.
 
 ### Risky actions (owner, 2026-10-09, Droidtop/tracker#248)
+
+Risky actions stays the gate for provider writes only; whether a companion or Quick Menu row asks before it
+stops a game or overwrites a save is `GameControls` with the Companion group's Ask before stopping and Ask before
+load and overwrite (Droidtop/tracker#414), not a Risky actions class.
 
 Owner, on giving an emulator permissions through the helper: "It's a yes, but gate it behind explicit checks,
 like most things. there should be a 'risky actions' settings section." So Settings > Risky actions

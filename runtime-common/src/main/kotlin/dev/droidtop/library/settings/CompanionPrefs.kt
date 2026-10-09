@@ -28,7 +28,14 @@ data class CompanionSettings(
     val messageText: String = "unlocked",
     /** Home's low-battery line shows at or under this percent; 0 is off (the default). */
     val lowBattery: Int = 0,
+    /** Ask before stopping (Quit, Restart, Kill, Stop, Clear all); on by default. */
+    val askBeforeStopping: Boolean = true,
+    /** Ask before load and overwrite (plugin rows flagged confirm); on by default. */
+    val askBeforeLoad: Boolean = true,
 ) {
+    /** The two ask-first rules as [GameControls] takes them. */
+    val ask: AskFirst get() = AskFirst(askBeforeStopping, askBeforeLoad)
+
     fun chosen(mode: String): List<String> = chosen[mode] ?: CompanionPrefs.defaultChosen(mode)
     fun opening(mode: String): String = opening[mode] ?: CompanionPrefs.OPEN_DEFAULT
 }
@@ -43,6 +50,8 @@ object CompanionPrefs {
     private const val KEY_MIGRATED = "migrated_roles"
     private const val KEY_MESSAGE_TEXT = "message_text"
     private const val KEY_LOW_BATTERY = "low_battery"
+    private const val KEY_ASK_STOP = "ask_before_stopping"
+    private const val KEY_ASK_LOAD = "ask_before_load"
 
     const val MAX_CHOSEN = 4
     const val OPEN_DEFAULT = "default"
@@ -106,7 +115,19 @@ object CompanionPrefs {
         barTipSeen = all[KEY_BAR_TIP] as? Boolean ?: false,
         messageText = all[KEY_MESSAGE_TEXT] as? String ?: "unlocked",
         lowBattery = all[KEY_LOW_BATTERY] as? Int ?: 0,
+        askBeforeStopping = all[KEY_ASK_STOP] as? Boolean ?: true,
+        askBeforeLoad = all[KEY_ASK_LOAD] as? Boolean ?: true,
     )
+
+    fun setAskBeforeStopping(context: Context, on: Boolean) {
+        update { it.copy(askBeforeStopping = on) }
+        prefs(context).edit().putBoolean(KEY_ASK_STOP, on).apply()
+    }
+
+    fun setAskBeforeLoad(context: Context, on: Boolean) {
+        update { it.copy(askBeforeLoad = on) }
+        prefs(context).edit().putBoolean(KEY_ASK_LOAD, on).apply()
+    }
 
     /** A stored bar list: comma separated, old ids made current, unknown ids and repeats dropped, at most four. */
     fun decodeList(stored: String): List<String> =

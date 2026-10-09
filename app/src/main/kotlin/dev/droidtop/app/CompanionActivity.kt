@@ -110,7 +110,8 @@ class CompanionActivity : AppCompatActivity() {
     // Touch only (Droidtop/tracker#186): a pad key that still reaches this window goes to the shell
     // or nowhere, never to the companion's own controls.
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
-        dev.droidtop.display.TouchOnlySurfaceFocus.consumesKey(event) || super.dispatchKeyEvent(event)
+        CompanionConfirm.cancelByKey(event) ||
+            dev.droidtop.display.TouchOnlySurfaceFocus.consumesKey(event) || super.dispatchKeyEvent(event)
 
     override fun onPause() {
         // Paused with something in front of it (an app launched onto this screen,

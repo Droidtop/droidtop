@@ -89,6 +89,10 @@ object CompanionState {
     @Volatile
     var onQuitEntry: ((LibraryEntry) -> Unit)? = null
 
+    /** Restart for the running game (the Game tab): the same quit, then the one launch path once it has ended. */
+    @Volatile
+    var onRestartEntry: ((LibraryEntry) -> Unit)? = null
+
     /**
      * Why the last rail launch failed, shown under the rail. The shell's
      * own error line is on the other screen, and a log line alone left a

@@ -1129,6 +1129,20 @@ object GamingSettingsCatalog {
                     current = settings.onGameStart,
                     onSelect = { c, value -> CompanionPrefs.setOnGameStart(c, value) },
                 ),
+                ToggleItem(
+                    id = "companion_ask_stopping",
+                    title = "Ask before stopping",
+                    subtitle = "Quit, Restart, Kill, Stop and Clear all ask first, on the companion and in the Quick Menu",
+                    current = settings.askBeforeStopping,
+                    onToggle = { c, on -> CompanionPrefs.setAskBeforeStopping(c, on) },
+                ),
+                ToggleItem(
+                    id = "companion_ask_load",
+                    title = "Ask before load and overwrite",
+                    subtitle = "Loading a save state or saving over a filled slot asks first",
+                    current = settings.askBeforeLoad,
+                    onToggle = { c, on -> CompanionPrefs.setAskBeforeLoad(c, on) },
+                ),
                 ChoiceItem(
                     id = "companion_low_battery",
                     title = "Low battery line",

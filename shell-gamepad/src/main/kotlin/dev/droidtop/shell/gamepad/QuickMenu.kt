@@ -720,9 +720,6 @@ private data class GameQuickTile(
     val action: () -> Unit,
 )
 
-/** Returns whether a destructive quit needs a second activation. */
-internal fun quitNeedsConfirmation(armed: Boolean): Boolean = !armed
-
 /**
  * The Plugins section (docs/plugin-api.md C17, Droidtop/tracker#316): Decky Loader's list and panels as one catalog
  * navigator. A on a plugin pushes its panel, B pops back to the list and from the list closes the sheet. The last
@@ -805,6 +802,17 @@ private fun GameTab(
     var focusIndex by remember(entry.id) { mutableStateOf(0) }
     val focusRequester = remember { FocusRequester() }
     val press = rememberGamepadTouch()
+    // Whether a row asks first is GameControls' one decision, which the companion's Game tab reads too.
+    val gameContext = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            dev.droidtop.library.settings.CompanionPrefs.load(gameContext.applicationContext)
+        }
+    }
+    val companionSettings by dev.droidtop.library.settings.CompanionPrefs.settings.collectAsState()
+    val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
+    fun secondPress(row: dev.droidtop.library.settings.GameRow, isArmed: Boolean) =
+        dev.droidtop.library.settings.GameControls.needsSecondPress(row, isArmed, uiMode, companionSettings.ask)
     // The row waiting for its second press (Restart or Quit), and the one whose outcome the subtitle reports.
     var armed by remember(entry.id) { mutableStateOf<GameEnding?>(null) }
     var lastEnding by remember(entry.id) { mutableStateOf<GameEnding?>(null) }
@@ -815,7 +823,7 @@ private fun GameTab(
     var emulatorChoice by remember(entry.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(entry.id) { emulatorChoice = library.getMetadataForEditing(entry)?.altEmulator }
 
-    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice) {
+    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode) {
         fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = GameQuickTile(
             title = title,
             subtitle = when {
@@ -825,7 +833,7 @@ private fun GameTab(
             },
             dangerAction = true,
             action = {
-                if (quitNeedsConfirmation(armed == kind)) {
+                if (secondPress(if (restart) dev.droidtop.library.settings.GameRow.RESTART else dev.droidtop.library.settings.GameRow.QUIT, armed == kind)) {
                     armed = kind
                 } else {
                     armed = null
@@ -869,7 +877,7 @@ private fun GameTab(
     // The Stop pill in the header (DroidDeck's red Stop, Steam's destructive red): ending the game
     // without restarting it, with the same second press as the rows.
     val stop = GameQuickTile(title = "Kill", subtitle = null, dangerAction = true) {
-        if (quitNeedsConfirmation(armed == GameEnding.KILL)) {
+        if (secondPress(dev.droidtop.library.settings.GameRow.QUIT, armed == GameEnding.KILL)) {
             armed = GameEnding.KILL
         } else {
             armed = null

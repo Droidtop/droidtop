@@ -325,6 +325,15 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             }
         }
         CompanionState.onQuitEntry = companionQuitSeam
+        CompanionState.onRestartEntry = { entry ->
+            lifecycleScope.launch {
+                when (val outcome = library.quitRunning(applicationContext, entry)) {
+                    dev.droidtop.library.QuitResult.Ended -> CompanionState.onLaunchEntry?.invoke(entry)
+                    is dev.droidtop.library.QuitResult.NotEnded -> CompanionState.launchError.value = outcome.message
+                    is dev.droidtop.library.QuitResult.Unresolvable -> CompanionState.launchError.value = outcome.message
+                }
+            }
+        }
 
         displayOrchestrator = SecondScreenOrchestrator(applicationContext, this)
         observeSecondScreen()

@@ -82,7 +82,15 @@ internal fun CompanionTasks() {
                     val own = setOfNotNull(view.display?.displayId)
                     scope.launch {
                         val targets = TaskManager.clearAllTargets(context, keepDisplays = own)
-                        if (targets.isEmpty()) detail = "Nothing to close" else pending = targets
+                        val asks = dev.droidtop.library.settings.GameControls.asksStop(
+                            dev.droidtop.library.settings.UiModeRefresh.mode.value,
+                            dev.droidtop.library.settings.CompanionPrefs.settings.value.ask,
+                        )
+                        when {
+                            targets.isEmpty() -> detail = "Nothing to close"
+                            asks -> pending = targets
+                            else -> clearAll(targets)
+                        }
                     }
                 },
                 onSwitch = { _, app -> detail = TaskActions.bringTo(context, app.packageName, app.displayId) },
