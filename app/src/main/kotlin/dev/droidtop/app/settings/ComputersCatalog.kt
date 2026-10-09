@@ -132,7 +132,7 @@ object ComputersCatalog {
                             onStatus("Reading this device's games…")
                             val entries = libraryGames(ctx) ?: return@AsyncActionItem "The library is still being scanned; try again in a moment"
                             onStatus("Talking to ${computer.name}…")
-                            withContext(Dispatchers.IO) { ComputerLibrary.sync(ctx, computer, entries) }
+                            withContext(Dispatchers.IO) { ComputerLibrary.sync(ctx, computer, LibraryCore.library(ctx), entries) }
                         },
                     ),
                     ActionItem(

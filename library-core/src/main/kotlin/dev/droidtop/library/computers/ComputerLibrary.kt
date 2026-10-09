@@ -1,8 +1,11 @@
 package dev.droidtop.library.computers
 
 import android.content.Context
+import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
+import dev.droidtop.library.consoles.GameMetadataEntity
+import dev.droidtop.library.consoles.RomDatabase
 import dev.droidtop.net.peer.AgentNative
 import dev.droidtop.net.peer.Computer
 import dev.droidtop.net.peer.Computers
@@ -39,8 +42,73 @@ object ComputerLibrary {
         return titleKey(entry.title)
     }
 
-    /** One exchange with [computer]: this device's games out, the computer's changes in. Network work: never on the main thread. */
-    fun sync(context: Context, computer: Computer, games: List<LibraryEntry>): String {
+    /** The marks droidtop keeps on a game that the agent carries, by the agent's field names. */
+    private const val FAVOURITE = "favourite"
+    private const val HIDDEN = "hidden"
+    private const val COMPLETED = "completed"
+
+    /**
+     * Every mark this device keeps on its games, unset ones included, by key.
+     * The core turns only a mark that differs from the shared one into a
+     * change, so a mark that arrived from a computer and was written here is
+     * not sent back (droidtop-agent docs/DESIGN.md section 7).
+     */
+    private fun marksOf(games: List<LibraryEntry>): JSONObject {
+        val out = JSONObject()
+        games.groupBy(::keyOf).forEach { (key, entries) ->
+            out.put(
+                key,
+                JSONObject()
+                    .put(FAVOURITE, entries.any { it.favorite })
+                    .put(HIDDEN, entries.any { it.hidden })
+                    .put(COMPLETED, entries.any { it.completed }),
+            )
+        }
+        return out
+    }
+
+    /**
+     * Writes the marks the core says arrived from elsewhere ([marks]: key,
+     * then field and value) into this device's library: a favourite through
+     * the library's own favourite (the one the Gaming UI's toggle uses), hidden
+     * and completed into the game's `game_metadata` row, which every provider
+     * merges into its entries. Returns how many games changed.
+     */
+    private suspend fun writeMarks(context: Context, library: Library, games: List<LibraryEntry>, marks: JSONObject?): Int {
+        if (marks == null || marks.length() == 0) return 0
+        val dao = RomDatabase.get(context).romDao()
+        val byKey = games.groupBy(::keyOf)
+        var written = 0
+        marks.keys().forEach { key ->
+            val fields = marks.optJSONObject(key) ?: return@forEach
+            byKey[key].orEmpty().forEach { entry ->
+                var changed = false
+                if (fields.has(FAVOURITE) && entry.favorite != fields.optBoolean(FAVOURITE)) {
+                    changed = library.toggleFavorite(entry) != null
+                }
+                if (fields.has(HIDDEN) || fields.has(COMPLETED)) {
+                    val current = dao.getGameMetadataSingle(entry.id) ?: GameMetadataEntity(id = entry.id)
+                    val next = current.copy(
+                        hidden = if (fields.has(HIDDEN)) fields.optBoolean(HIDDEN) else current.hidden,
+                        completed = if (fields.has(COMPLETED)) fields.optBoolean(COMPLETED) else current.completed,
+                    )
+                    if (next != current) {
+                        dao.upsertGameMetadata(next)
+                        changed = true
+                    }
+                }
+                if (changed) written++
+            }
+        }
+        return written
+    }
+
+    /**
+     * One exchange with [computer]: this device's games and marks out, the
+     * computer's changes in, and the marks that arrived written into
+     * [library]. Network and disk work: never on the main thread.
+     */
+    suspend fun sync(context: Context, computer: Computer, library: Library, games: List<LibraryEntry>): String {
         val scan = JSONArray()
         games.forEach { entry ->
             val install = JSONObject()
@@ -57,9 +125,13 @@ object ComputerLibrary {
                     .put("install", install),
             )
         }
-        val reply = Computers.call(context, computer, "sync_library", JSONObject().put("state", stateFile(context).absolutePath).put("scan", scan))
+        val marks = marksOf(games)
+        fun args() = JSONObject().put("state", stateFile(context).absolutePath).put("scan", scan).put("marks", marks)
+        val reply = Computers.call(context, computer, "sync_library", args())
+        val written = if (AgentNative.failure(reply) == null) writeMarks(context, library, games, reply.optJSONObject("marks")) else 0
+        val marked = if (written > 0) "; marks changed on $written games" else ""
         val line = AgentNative.failure(reply)?.let { "Library with ${computer.name}: $it" }
-            ?: "Library: ${reply.optInt("pushed")} changes sent to ${computer.name}, ${reply.optInt("pulled")} received"
+            ?: "Library: ${reply.optInt("pushed")} changes sent to ${computer.name}, ${reply.optInt("pulled")} received$marked"
         Computers.noteSync(context, computer.id, line)
         return line
     }

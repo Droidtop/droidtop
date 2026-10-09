@@ -14506,10 +14506,19 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
 - The state, with every device's games, is the core's
   `files/agent/library.json`. The computer's games are listed under its row
   ("Games on <computer>").
-- Not yet carried: the person's marks (favourite, hidden, completed). The
-  core has them, last writer wins per field, but droidtop does not yet write
-  marks it receives into its own metadata, so sending its own would undo the
-  other side's.
+- **The person's marks travel both ways:** favourite, hidden and completed,
+  last writer wins per field (the core's hybrid logical clock).
+  - Each exchange reports every mark droidtop keeps on its games, unset ones
+    included (`ComputerLibrary`). The core turns only a mark that differs
+    from the shared one into a change, so a mark that came from a computer
+    and was written here is never sent back with a newer stamp, and a mark
+    nobody set is not sent at all.
+  - The reply names the shared marks that differ from droidtop's, and
+    droidtop writes them: a favourite through the library's own favourite
+    (the Gaming UI's toggle), hidden and completed into the game's
+    `game_metadata` row, which every provider merges into its entries.
+  - Two entries with the same key (a game in two places) share their marks:
+    either one marked counts, and a mark that arrives is written to both.
 
 ### Transports
 
