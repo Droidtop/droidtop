@@ -210,6 +210,18 @@ object GamingSettingsCatalog {
                         onChange = { ctx, value -> UiModePasskey.set(ctx, value.trim()) },
                     ),
                 )
+                // Kid's maximum volume, applied in the one volume write path (VolumeControl); off by default.
+                dev.droidtop.runtime.systemstatus.VolumeControl.load(context)
+                add(
+                    ChoiceItem(
+                        id = ControlAccess.ID_KID_VOLUME_CAP,
+                        title = "Kid mode's highest volume",
+                        subtitle = "In Kid mode no slider or volume key goes past this",
+                        options = listOf(ChoiceOption("0", "No limit (default)")) + listOf(30, 50, 70).map { ChoiceOption(it.toString(), "$it%") },
+                        current = dev.droidtop.runtime.systemstatus.VolumeControl.kidCapPercent.toString(),
+                        onSelect = { ctx, value -> dev.droidtop.runtime.systemstatus.VolumeControl.setKidCap(ctx, value.toIntOrNull() ?: 0) },
+                    ),
+                )
                 add(
                     ChoiceItem(
                         id = ID_SCREENSAVER,

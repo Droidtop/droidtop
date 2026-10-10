@@ -112,6 +112,10 @@
          first; without it the filter reads only droidtop's own launch log, and nothing needs it. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
 
+    <!-- The companion's Connections card lists paired Bluetooth devices (asked when it first opens). -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <application
         android:name=".DroidtopApplication"
         android:label="@string/droidtop_app_name"

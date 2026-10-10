@@ -86,6 +86,9 @@ internal fun CompanionSystemTab() {
                             if (card.id == "power") CompanionPowerCard()
                             // Recent camera, mic and location use, and droidtop's own grants (slice C17).
                             if (card.id == "privacy") CompanionPrivacyCard()
+                            // A slider per stream through the one volume path, and the network and Bluetooth (C19).
+                            if (card.id == "sound") CompanionStreamVolumes()
+                            if (card.id == "connections") CompanionConnections()
                             CompanionCatalogItems(
                                 card.items,
                                 onChanged = { version++ },

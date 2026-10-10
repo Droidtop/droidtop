@@ -75,10 +75,15 @@ internal fun companionSystemCards(
     SystemCard("system", "System", section(QuickSection.SYSTEM), folded = false),
     SystemCard("display", "Display", section(QuickSection.DISPLAY), folded = true),
     SystemCard("sound", "Sound", section(QuickSection.AUDIO), folded = true),
+    // Network detail and Bluetooth devices, drawn by the card itself (slice C19).
+    SystemCard("connections", "Connections", emptyList(), folded = true),
     SystemCard("power", "Power", listOfNotNull(performanceMode), folded = true),
     SystemCard("storage", "Storage", emptyList(), folded = true, storage = true),
     SystemCard("privacy", "Privacy", listOfNotNull(privacy), folded = true),
-).filter { it.storage || it.id == "display" || it.id == "power" || it.items.isNotEmpty() }
+).filter { it.storage || it.id in DRAWN_CARDS || it.items.isNotEmpty() }
+
+/** Cards that draw rows of their own beside any catalog items, so they show even with none. */
+private val DRAWN_CARDS = setOf("display", "sound", "connections", "power", "privacy")
 
 /**
  * Catalog items drawn for touch: the companion's half of "the Quick Menu and the companion draw the same control

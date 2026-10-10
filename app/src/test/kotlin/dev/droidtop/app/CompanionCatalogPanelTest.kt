@@ -34,7 +34,7 @@ class CompanionCatalogPanelTest {
 
     @Test fun cardsCarryTheQuickMenusItemsInTheSameOrder() {
         val cards = companionSystemCards(::quick, performance, privacy)
-        assertEquals(listOf("system", "display", "sound", "power", "storage", "privacy"), cards.map { it.id })
+        assertEquals(listOf("system", "display", "sound", "connections", "power", "storage", "privacy"), cards.map { it.id })
         assertEquals(quick(QuickSection.SYSTEM).map { it.id }, cards.first { it.id == "system" }.items.map { it.id })
         assertEquals(quick(QuickSection.DISPLAY).map { it.id }, cards.first { it.id == "display" }.items.map { it.id })
         assertEquals(quick(QuickSection.AUDIO).map { it.id }, cards.first { it.id == "sound" }.items.map { it.id })

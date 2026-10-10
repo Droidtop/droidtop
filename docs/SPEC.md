@@ -3612,6 +3612,15 @@ row of recent apps, became Home's Recent apps section for every mode.
   an app (tap a line's tag or pid), and Running game only (`pidof` of the running package). Pause. Save (the system
   file picker, through the transparent `LogSaveActivity`) and Share (text, the filtered view), both under one line
   saying logs can hold personal data. `LogReader` (`:runtime-common`).
+- **Sound and connections (slice C19).** `VolumeControl` (`:runtime-common`) is the one volume write path: the
+  Quick Menu's slider (through `SystemControls.setVolume`), the companion's pins and System > Sound's slider per
+  stream (media, ring, notifications, alarms, calls) all set volume there, and Kid's highest volume (Settings > UI
+  mode's "Kid mode's highest volume", no limit by default, hidden in Kid and Kiosk) holds there for every stream; a
+  settings observer turns a volume key that goes past it back down while Kid is on. Sound also opens Android's
+  output and volume panel (Outputs). System > Connections shows the network in detail: address, signal, band, link
+  speed and VPN, and with the helper app the network's name (`cmd wifi status`; Android keeps it behind location
+  otherwise) and whether ADB over Wi-Fi is on; then the paired Bluetooth devices, asking for Bluetooth access
+  (`BLUETOOTH_CONNECT`) when the card first opens (owner question 1's default), and Android's Bluetooth settings.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 

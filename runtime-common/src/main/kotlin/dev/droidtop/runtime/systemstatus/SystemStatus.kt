@@ -150,14 +150,8 @@ object SystemControls {
         (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager)
             .getStreamVolume(AudioManager.STREAM_MUSIC)
 
-    fun setVolume(context: Context, value: Int) {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        am.setStreamVolume(
-            AudioManager.STREAM_MUSIC,
-            value.coerceIn(0, am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)),
-            0,
-        )
-    }
+    /** Media volume, through the one volume write path (Kid's cap applies there). */
+    fun setVolume(context: Context, value: Int) = VolumeControl.set(context, VolumeControl.Stream.MEDIA, value)
 
     /** Brightness is [dev.droidtop.runtime.DisplayControls]'s, the one write path per display (slice C14). */
     fun canWriteBrightness(context: Context): Boolean = dev.droidtop.runtime.DisplayControls.canWriteBrightness(context)
