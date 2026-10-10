@@ -15826,6 +15826,26 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   - Two entries with the same key (a game in two places) share their marks:
     either one marked counts, and a mark that arrives is written to both.
 
+### Versions (Droidtop/tracker#469 part 2)
+
+- Each device states the version it has of each game. droidtop's is the
+  version the person set, else the build a store's marker names, else the
+  folder name's (`SetVersions.shown`). A computer states its store's build
+  or version, or its folder name's.
+- The agent core keeps each game's version history: device, version, and
+  when first heard of. It learns it from the install changes it applies, so
+  devices that never meet still learn each other's versions.
+- A version a computer has that is newer than every copy here
+  (`Versions.compareLoose`) becomes that computer's answer, from the source
+  `computer:<id>`, in the same `source_links` and `source_answers` tables
+  the update plugins use (`Library.noteVersionElsewhere`). So the card, the
+  shelf, the Update filter and Versions say "v1.3 is available" the one way
+  they say it for any source. `GameLinks.latestKnown` takes the newest of
+  all sources' answers. No update round asks a computer source: no plugin
+  provides it, and the next library sync renews or removes the answer.
+- The game page's Versions and updates tab has a row per other device ("On
+  DESKTOP-PC", its version now, and the ones it had before).
+
 ### Transports
 
 The design's order (droidtop-agent docs/DESIGN.md section 10) holds:

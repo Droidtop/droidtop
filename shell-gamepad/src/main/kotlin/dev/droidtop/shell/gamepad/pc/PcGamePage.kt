@@ -278,11 +278,23 @@ internal fun PcGamePage(
             )
         }
     }
+    // The game's versions on the person's other devices (docs/SPEC.md 7o, "Versions").
+    val elsewhere by produceState(emptyList<dev.droidtop.library.computers.ComputerLibrary.VersionElsewhere>(), entry.id) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                dev.droidtop.library.computers.ComputerLibrary.versionsElsewhere(
+                    context,
+                    dev.droidtop.library.computers.ComputerLibrary.keyOf(entry),
+                    dev.droidtop.net.peer.DeviceIdentity.id(context),
+                )
+            }.getOrDefault(emptyList())
+        }
+    }
     val originText by produceState<String?>(null, entry.id) {
         value = withContext(Dispatchers.IO) { dev.droidtop.library.originLabel(entry, 1, roots = pcRootsOf(context)).full }
     }
     val sizeLine = (folderSize ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) }
-    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText) {
+    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere) {
         pageRows(
             entry, play, runner, siblings,
             origin = originText,
@@ -324,7 +336,7 @@ internal fun PcGamePage(
                 )
             } else {
                 emptyList()
-            },
+            } + elsewhereRows(elsewhere),
             onGetInstaller = { marker ->
                 val store = dev.droidtop.library.stores.StoreLibraries.byId(marker.storeId)
                 val page = store?.webPages?.accountLibrary
@@ -1561,3 +1573,23 @@ internal fun heroCaption(entry: LibraryEntry, now: Long): String {
     val time = playtimeShort(entry.playtimeSeconds).takeIf { entry.playtimeSeconds > 0 }
     return listOfNotNull(last, time).joinToString(" · ").ifEmpty { "Not played yet" }
 }
+
+/**
+ * The game's versions on the person's other devices, on Versions and updates
+ * (docs/SPEC.md 7o, "Versions"): one row per device, its version now or last,
+ * and the ones it had before.
+ */
+internal fun elsewhereRows(seen: List<dev.droidtop.library.computers.ComputerLibrary.VersionElsewhere>): List<PageFact> =
+    seen.groupBy { it.device }.map { (device, versions) ->
+        val now = versions.firstOrNull { it.current }
+        val before = versions.filter { it != now }.map { it.version }.distinct()
+        PageFact(
+            title = "On $device",
+            value = (now ?: versions.first()).version.let { if (it.firstOrNull()?.isDigit() == true) "v$it" else it },
+            subtitle = listOfNotNull(
+                if (now == null) "No longer installed there" else null,
+                before.takeIf { it.isNotEmpty() }?.let { "Before: " + it.joinToString(", ") },
+            ).joinToString(". ").ifBlank { null },
+            tab = PageTab.VERSIONS,
+        )
+    }

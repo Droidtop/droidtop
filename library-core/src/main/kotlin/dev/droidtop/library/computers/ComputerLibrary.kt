@@ -171,6 +171,8 @@ object ComputerLibrary {
                 .put("play_seconds", entry.playtimeSeconds)
                 .put("last_played_ms", entry.lastPlayedEpochMs ?: 0L)
             entry.pcInfo?.installPath?.takeIf { it.isNotBlank() }?.let { install.put("path", it) }
+            // The version this device has (docs/SPEC.md 7o, "Versions"): set, a store build, or the folder's.
+            dev.droidtop.library.SetVersions.shown(entry, dev.droidtop.library.SetVersions.get(context, entry.id))?.first?.let { install.put("version", it) }
             scan.put(
                 JSONObject()
                     .put("key", keyOf(entry))
@@ -185,6 +187,7 @@ object ComputerLibrary {
         val shared = if (live.has("unreachable")) ComputerShare.library(context, computer, args()) else null
         val reply = shared ?: live
         val written = if (AgentNative.failure(reply) == null) writeMarks(context, library, games, reply.optJSONObject("marks")) else 0
+        if (AgentNative.failure(reply) == null) noteNewerVersions(context, computer, library, games)
         val marked = if (written > 0) "; marks changed on $written games" else ""
         val line = AgentNative.failure(reply)?.let { "Library with ${computer.name}: $it" }
             ?: if (shared != null) {
@@ -197,6 +200,61 @@ object ComputerLibrary {
             }
         Computers.noteSync(context, computer.id, line)
         return line
+    }
+
+    /** The source a computer's versions are answers of (docs/SPEC.md 7o, "Versions"). */
+    fun versionSource(computer: Computer): String = "computer:${computer.id}"
+
+    /**
+     * After an exchange: each of this device's games that [computer] has in a
+     * newer version gets that version as the computer's answer, so the card,
+     * the shelf, the Update filter and the Versions tab say "v1.3 is
+     * available" (the newer version is named on the page as on that computer);
+     * a game it no longer has newer loses the link.
+     */
+    private suspend fun noteNewerVersions(context: Context, computer: Computer, library: Library, games: List<LibraryEntry>) {
+        val state = runCatching { JSONObject(stateFile(context).readText()).optJSONObject("games") }.getOrNull() ?: return
+        val source = versionSource(computer)
+        games.groupBy(::keyOf).forEach { (key, entries) ->
+            val theirs = state.optJSONObject(key)?.optJSONObject("installs")?.optJSONObject(computer.id)?.optJSONObject("install")
+                ?.takeIf { it.optBoolean("installed") }?.optString("version")?.takeIf { it.isNotBlank() }
+            val mine = entries.mapNotNull { dev.droidtop.library.SetVersions.shown(it, dev.droidtop.library.SetVersions.get(context, it.id))?.first }
+            val newer = theirs?.takeIf { v -> mine.isNotEmpty() && mine.all { newerThan(v, it) } }
+            val ids = entries.map { it.id }
+            val linked = library.gameLinks(ids)?.link(source)?.answer?.version
+            if (newer != linked) library.noteVersionElsewhere(ids, source, key, newer)
+        }
+    }
+
+    /** Whether version [a] is newer than [b], as droidtop compares versions (a leading `v` aside). */
+    internal fun newerThan(a: String, b: String): Boolean =
+        dev.droidtop.runtime.util.Versions.compareLoose(a.trim().removePrefix("v").removePrefix("V"), b.trim().removePrefix("v").removePrefix("V")) > 0
+
+    /** A version of a game another device had, and when this device first heard of it. */
+    data class VersionElsewhere(val device: String, val version: String, val atMs: Long, val current: Boolean)
+
+    /**
+     * The game [key]'s versions on the person's other devices, newest heard of
+     * first, from the agent core's history (docs/SPEC.md 7o, "Versions").
+     * [me] is this device's id. Reads a file: never on the main thread.
+     */
+    fun versionsElsewhere(context: Context, key: String, me: String?): List<VersionElsewhere> {
+        val game = runCatching { JSONObject(stateFile(context).readText()).optJSONObject("games")?.optJSONObject(key) }.getOrNull() ?: return emptyList()
+        val installs = game.optJSONObject("installs")
+        val history = game.optJSONArray("versions") ?: return emptyList()
+        return (0 until history.length()).mapNotNull { history.optJSONObject(it) }
+            .filter { it.optString("device") != me }
+            .map { seen ->
+                val device = seen.optString("device")
+                val now = installs?.optJSONObject(device)?.optJSONObject("install")
+                VersionElsewhere(
+                    device = seen.optString("device_name").ifBlank { "Another device" },
+                    version = seen.optString("version"),
+                    atMs = seen.optLong("ms"),
+                    current = now?.optBoolean("installed") == true && now.optString("version") == seen.optString("version"),
+                )
+            }
+            .sortedByDescending { it.atMs }
     }
 
     /** A game installed on a computer, as the last exchange left it. */

@@ -1403,6 +1403,25 @@ class Library(
     }
 
     /**
+     * Records that another of the person's devices has [version] of the game
+     * whose folders are [ids] (docs/SPEC.md 7o, "Versions"), as the answer of
+     * the source [source] (`computer:<id>`) about [externalId], so "an update
+     * is available" and the Update filter say it the one way they say any
+     * source's. Null [version] removes the link: that device no longer has a
+     * newer one. No round asks such a source: no plugin provides it.
+     */
+    suspend fun noteVersionElsewhere(ids: Collection<String>, source: String, externalId: String, version: String?) = withContext(Dispatchers.IO) {
+        if (version == null) {
+            links.setSourceLink(ids, source, null)
+        } else {
+            links.setSourceLink(ids, source, externalId)
+            links.saveAnswer(SourceKey(source, externalId), SourceAnswer(version, System.currentTimeMillis()))
+        }
+        changedFactIds += ids
+        republish()
+    }
+
+    /**
      * Asks about [key] now, a person's "Check now": the same round,
      * limited to one record and to once a minute ([SourceUpdateCheck]).
      * Returns why the ask failed, or null.

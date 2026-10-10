@@ -86,9 +86,16 @@ data class GameLinks(
     /** The link to [source], when there is one. */
     fun link(source: String): SourceLink? = sources.firstOrNull { it.source == source }
 
-    /** The newest version a linked source gives, when one has one to give (sources in key order, so it is stable). */
+    /**
+     * The newest version a linked source gives, when one has one to give: a
+     * plugin's answer and a computer's (`computer:<id>`, docs/SPEC.md 7o) are
+     * compared, and the newer wins; equal ones in source key order, so it is
+     * stable.
+     */
     val latestKnown: String?
-        get() = sources.sortedBy { it.source }.firstNotNullOfOrNull { it.answer?.takeUnless { a -> a.gone }?.version }
+        get() = sources.sortedBy { it.source }
+            .mapNotNull { it.answer?.takeUnless { a -> a.gone }?.version?.takeIf { v -> v.isNotBlank() } }
+            .reduceOrNull { best, next -> if (dev.droidtop.runtime.util.Versions.compareLoose(GameUpdates.normalize(next), GameUpdates.normalize(best)) > 0) next else best }
 }
 
 /**
