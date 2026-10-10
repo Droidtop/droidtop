@@ -56,6 +56,11 @@ object PinnedControls {
 
     fun tileId(key: String): String = TILE_PREFIX + key
 
+    /** An app pinned on Home by its package (slice C20): opened on the main screen, or on the companion's. */
+    const val APP_PREFIX = "app:"
+
+    fun appId(packageName: String): String = APP_PREFIX + packageName
+
     /** Whether Home must run the performance sampler for its pins. */
     fun needsSampler(pins: List<String>): Boolean = STAT_CLOCK in pins
 

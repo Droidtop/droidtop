@@ -3621,6 +3621,16 @@ row of recent apps, became Home's Recent apps section for every mode.
   speed and VPN, and with the helper app the network's name (`cmd wifi status`; Android keeps it behind location
   otherwise) and whether ADB over Wi-Fi is on; then the paired Bluetooth devices, asking for Bluetooth access
   (`BLUETOOTH_CONNECT`) when the card first opens (owner question 1's default), and Android's Bluetooth settings.
+- **Apps (slice C20).** Stop on each row is the one stop route (`TaskManager.close`: force-stop through the helper
+  app, else Android's background kill, which Android may ignore, and then "Force stop in App info"), and asks first
+  while Ask before stopping is on (always in Kid and Kiosk); the Quick Menu's System section has "Stop the app in
+  front" on the same route, pinnable, with the helper app only. Sort by Recent, Processor or Memory (with the helper
+  app: `dumpsys cpuinfo`, `dumpsys meminfo -c`) or Data (Usage access: `NetworkStatsManager` over the last three hours,
+  in Android's buckets of several hours, so it is a marker, never a rate); each row's line says its figure, "Used
+  data lately" and the sensitive permissions it holds (`AppsInsights`), and Data saver opens Android's screen when
+  something used data. Home's Edit pins lists apps, and, while droidtop is the home app (Android's launcher API
+  answers only then), the shortcuts of a pinned app: a tap opens it on the main screen, Here (also a TalkBack action)
+  on the companion's.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 

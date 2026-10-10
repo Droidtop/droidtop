@@ -76,6 +76,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_BRIGHTNESS = "pref_gaming_system_brightness"
     const val ID_COMPANION_WAKE = "pref_companion_screen_wake"
     const val ID_SCREENSHOT = "pref_screenshot"
+    const val ID_STOP_FOREGROUND = "pref_stop_foreground_app"
     const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_gaming_system_brightness_grant"
     const val ID_SYSTEM_BLUETOOTH = "pref_gaming_system_bluetooth"
     const val ID_SYSTEM_VPN = "pref_gaming_system_vpn"
@@ -593,6 +594,25 @@ object GamingSettingsCatalog {
                         run = { ctx, _ -> dev.droidtop.runtime.Capture.take(ctx.applicationContext, android.view.Display.DEFAULT_DISPLAY).message },
                     ),
                 )
+                // Stops the app in front on the main screen (slice C20), only with the helper app: one stop route,
+                // TaskManager.close, asking first while Ask before stopping is on.
+                if (runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)) {
+                    add(
+                        AsyncActionItem(
+                            id = ID_STOP_FOREGROUND,
+                            title = "Stop the app in front",
+                            subtitle = "Ends the app on the main screen, as Stop in Apps does",
+                            confirmTitle = if (CompanionPrefs.settings.value.askBeforeStopping) "Stop the app in front? Anything not saved in it is lost." else null,
+                            run = { ctx, _ ->
+                                val pkg = dev.droidtop.runtime.tasks.AppsInsights.foreground(ctx) ?: return@AsyncActionItem "Nothing in front"
+                                when (val outcome = dev.droidtop.runtime.tasks.TaskManager.close(ctx, pkg)) {
+                                    dev.droidtop.runtime.tasks.CloseOutcome.Closed -> "Stopped"
+                                    else -> outcome.text
+                                }
+                            },
+                        ),
+                    )
+                }
                 // Wakes an off companion screen (slice C14); only while a second screen holds the companion.
                 if (!dev.droidtop.runtime.CompanionSheet.offered(context)) {
                     add(

@@ -94,10 +94,23 @@ internal fun CompanionPinsSection() {
             emptyList()
         }
     }
+    // Apps and their shortcuts (slice C20): read only while an app is pinned or the pins are being edited.
+    var editing by remember { mutableStateOf(false) }
+    val wantsApps = editing || state.pins.any { it.startsWith(PinnedControls.APP_PREFIX) || it.startsWith(AppPins.SHORTCUT_PREFIX) }
+    val appLabels by produceState<Map<String, String>>(emptyMap(), wantsApps, state.pins) {
+        if (wantsApps) {
+            value = withContext(Dispatchers.IO) {
+                val apps = AppPins.launchable(context.applicationContext).associate { (pkg, label) -> PinnedControls.appId(pkg) to label }
+                val pinnedApps = state.pins.filter { it.startsWith(PinnedControls.APP_PREFIX) }.map { it.removePrefix(PinnedControls.APP_PREFIX) }
+                val shortcuts = pinnedApps.flatMap { pkg -> AppPins.shortcuts(context.applicationContext, pkg).map { (id, label) -> id to "$label (${apps[PinnedControls.appId(pkg)] ?: pkg})" } }
+                apps + shortcuts
+            }
+        }
+    }
     val items = pinnable ?: return
     val byId = items.associateBy { it.id }
     val tileById = tiles.associateBy { PinnedControls.tileId(it.key) }
-    val shown = PinnedControls.visible(state.pins, uiMode, byId.keys + tileById.keys)
+    val shown = PinnedControls.visible(state.pins, uiMode, byId.keys + tileById.keys + appLabels.keys)
     // A pinned tile's state is asked for once while Home shows it, and again after each press; never polled.
     var tileVersion by remember { mutableIntStateOf(0) }
     val pinnedTiles = shown.mapNotNull { tileById[it] }
@@ -110,7 +123,6 @@ internal fun CompanionPinsSection() {
     if (PinnedControls.needsSampler(shown)) {
         LaunchedEffect(Unit) { dev.droidtop.runtime.systemstatus.PerformanceMonitor.watch(context) }
     }
-    var editing by remember { mutableStateOf(false) }
     val canEdit = ControlAccess.shows(uiMode, "", ControlAccess.GROUP_COMPANION)
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -128,6 +140,7 @@ internal fun CompanionPinsSection() {
                             when {
                                 item != null -> PinTile(item, Modifier.weight(1f)) { version++ }
                                 tile != null -> PluginTilePin(tile, tileStates[tile.key] ?: PluginTiles.cached(tile), Modifier.weight(1f)) { tileVersion++ }
+                                appLabels[id] != null -> AppPinTile(id, appLabels.getValue(id), Modifier.weight(1f))
                                 else -> StatTile(id, Modifier.weight(1f))
                             }
                         }
@@ -143,7 +156,8 @@ internal fun CompanionPinsSection() {
             if (editing) {
                 val choices = items.filter { ControlAccess.pinnable(uiMode, it.id) && it.id !in PinnedControls.STAND_INS.values }
                     .map { it.id to it.title } + PinnedControls.STATS +
-                    tiles.map { PinnedControls.tileId(it.key) to "${PluginTiles.cached(it)?.label ?: it.fallbackLabel} (${it.pluginLabel})" }
+                    tiles.map { PinnedControls.tileId(it.key) to "${PluginTiles.cached(it)?.label ?: it.fallbackLabel} (${it.pluginLabel})" } +
+                    appLabels.toList()
                 choices.forEach { (id, title) ->
                     val pinned = id in state.pins
                     Row(
