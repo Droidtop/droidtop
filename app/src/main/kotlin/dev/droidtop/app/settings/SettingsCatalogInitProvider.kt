@@ -58,6 +58,17 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.library.integrations.PluginCatalog.registerDownloadPost()
         dev.droidtop.library.consoles.RetroArchCores.registerDownloadPost()
         dev.droidtop.library.integrations.PluginBios.registerDownloadPost()
+        // The one APK install path's post step: a catalog's app is checked, then installed (docs/SPEC.md 10b).
+        dev.droidtop.app.apps.ApkInstaller.registerDownloadPost()
+        // Links (docs/SPEC.md 12a "Links", "Action links"): droidtop's own action links are the router's built-in
+        // handler, an app catalog's link opens its source review, and the scheme aliases follow what the installed
+        // plugins register.
+        dev.droidtop.library.integrations.LinkRouter.registerBuiltIn(dev.droidtop.library.integrations.ActionLinks.routerHandler)
+        dev.droidtop.library.integrations.LinkRouter.registerPoint(
+            dev.droidtop.library.integrations.AppCatalogs.POINT,
+            dev.droidtop.library.integrations.AppCatalogScreen.linkHandler,
+        )
+        dev.droidtop.app.LinkSchemes.start(appContext)
         // The installed build's own APK and older partial updates are dead weight, and a restored job
         // must not fetch an old build again (tracker#445); runs once the jobs are restored.
         dev.droidtop.pluginhost.PluginJobsCenter.onRestored = {

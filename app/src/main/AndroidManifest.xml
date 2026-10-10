@@ -428,13 +428,16 @@
         </activity>
 
         <!--
-          The catalog links (docs/SPEC.md 12a "Known catalogs", "Install links"): droidtop://add-catalog?address=...
-          and droidtop://install-plugin?catalog=...&id=..., each also in the https form on droidtop.github.io,
-          which a catalog's README and its web page carry. They only fetch a catalog and open a review; adding a
-          catalog or installing a plugin is the person's Accept or Install there.
+          Every link droidtop answers goes to one router (docs/SPEC.md 12a "Links", Droidtop/tracker#459):
+          droidtop's own action links (droidtop://do?v=1&a=..., and the older add-catalog and
+          install-plugin forms), every https link as a general web-link handler that names no site
+          (plugins register the sites they handle; a link nothing claims goes on to the browser), and
+          links shared to droidtop. Third-party schemes are the disabled aliases below. Plugins never get
+          an exported component: the router hands a link to a plugin through the broker, and a link only
+          opens a review; nothing is added, trusted or installed without the person's press.
         -->
         <activity
-            android:name="dev.droidtop.app.CatalogLinkActivity"
+            android:name="dev.droidtop.app.LinkActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:taskAffinity=""
@@ -443,22 +446,91 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="droidtop" android:host="do" />
                 <data android:scheme="droidtop" android:host="add-catalog" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="droidtop" android:host="install-plugin" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="droidtop.github.io" android:pathPrefix="/add-catalog" />
-                <data android:scheme="https" android:host="droidtop.github.io" android:pathPrefix="/install-plugin" />
+                <data android:scheme="https" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!--
+          Link schemes droidtop declares for plugins (PluginLinks.MANIFEST_SCHEMES, docs/SPEC.md 12a "Links"):
+          each alias stays disabled until an installed plugin registers that scheme and is disabled again
+          when none does (LinkSchemes), so droidtop never offers to open links nobody handles. Every one
+          goes to LinkActivity and its router.
+        -->
+        <activity-alias
+            android:name="dev.droidtop.app.links.FdroidreposLink"
+            android:targetActivity="dev.droidtop.app.LinkActivity"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="fdroidrepos" />
+                <data android:scheme="FDROIDREPOS" tools:ignore="AppLinkUrlError" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="dev.droidtop.app.links.FdroidrepoLink"
+            android:targetActivity="dev.droidtop.app.LinkActivity"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="fdroidrepo" />
+                <data android:scheme="FDROIDREPO" tools:ignore="AppLinkUrlError" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="dev.droidtop.app.links.MagnetLink"
+            android:targetActivity="dev.droidtop.app.LinkActivity"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="magnet" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="dev.droidtop.app.links.SteamLink"
+            android:targetActivity="dev.droidtop.app.LinkActivity"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="steam" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="dev.droidtop.app.links.MarketLink"
+            android:targetActivity="dev.droidtop.app.LinkActivity"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="market" />
+            </intent-filter>
+        </activity-alias>
 
         <!--
           "Open with droidtop" for downloaded Windows programs, Linux packages
@@ -689,9 +761,9 @@
                 <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
             </intent-filter>
         </receiver>
-        <!-- PackageInstaller reports the self-update verdict here. -->
+        <!-- PackageInstaller reports the verdict on every APK droidtop installs here (ApkInstaller). -->
         <receiver
-            android:name="dev.droidtop.app.update.AppUpdateStatusReceiver"
+            android:name="dev.droidtop.app.apps.ApkInstallStatusReceiver"
             android:exported="false" />
 
         <!--

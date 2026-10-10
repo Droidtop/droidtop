@@ -28,7 +28,7 @@ import kotlinx.coroutines.withContext
  * every catalog but droidtop's, the row's own action (Install / Update to
  * <version> / no action, saying why when there is none) and, above the rows,
  * Install all and Update all. Adding a catalog is one flow however it starts
- * (a known catalog's press, a typed address, a QR code, an add-catalog link):
+ * (a known catalog's press, a typed address, a QR code; an action link's `catalog.add` step reviews the same way):
  * fetch, review (its name, its disclaimer, whether it is signed, each origin's
  * key fingerprint) and an explicit Accept; nothing is listed or trusted before
  * that. These are [CatalogScreen]s carried inline by the Plugins screen, which
@@ -42,16 +42,10 @@ import kotlinx.coroutines.withContext
 object PluginCatalogScreen {
     const val ID = "plugins_catalogs"
 
-    /** The install review an install-plugin link opens. */
-    const val INSTALL_ID = "plugins_catalog_install_link"
-
     // Buffers between the address field and its action, and the fetched catalog awaiting the person's
     // decision: the same pending-buffer shape "Keys you trust" uses.
     @Volatile private var pendingAddress = ""
     @Volatile private var pendingProposal: PluginCatalog.Proposal? = null
-
-    // The plugin an install-plugin link named: (catalog id, plugin id). The review reads it each time it is drawn.
-    @Volatile private var pendingInstall: Pair<String, String>? = null
 
     // Counts fetches, so a catalog fetched again must be read again: the read-gate of its notice is new each time.
     @Volatile private var proposalSerial = 0
@@ -71,47 +65,6 @@ object PluginCatalogScreen {
     fun summary(context: Context): String {
         val added = PluginCatalogSources.added(PluginCatalogSources.storeFile(context)).size
         return if (added == 0) "None added" else "$added added"
-    }
-
-    /**
-     * An add-catalog link was opened ([PluginCatalogSources.addressFromLink]): fetches the catalog it names so the
-     * screen opens on its review, the notice above Accept. Returns the line to tell the person when there is no
-     * review to show (it could not be fetched, it is already added); null when the review is ready. Off the main thread.
-     */
-    suspend fun prepareLink(context: Context, address: String): LinkOpening {
-        // droidtop's own catalog is always there, so its link has no review to show: it opens that catalog.
-        if (PluginCatalogSources.indexUrlFor(address).equals(PluginCatalog.indexUrl(context), ignoreCase = true)) {
-            return LinkOpening(officialScreen().id, null)
-        }
-        pendingAddress = address
-        val message = fetch(context, address) {}
-        return LinkOpening(ID, if (pendingProposal != null) null else message)
-    }
-
-    /** Which screen a link opens, and the line to tell the person first when there is something to say. */
-    data class LinkOpening(val screenId: String, val problem: String?)
-
-    /**
-     * An install-plugin link was opened ([PluginCatalogSources.installFromLink]). A plugin of a catalog the person
-     * has (droidtop's own, or one added) opens that plugin's install review ([installLinkScreen]); a plugin of a catalog
-     * not added yet opens the catalog's own review instead, because the catalog's notice comes before anything it lists.
-     * Nothing is installed here: the review's Install is the person's press. Off the main thread.
-     */
-    suspend fun prepareInstallLink(context: Context, link: PluginCatalogSources.InstallLink): LinkOpening = withContext(Dispatchers.IO) {
-        val address = link.catalog
-        val url = address?.let(PluginCatalogSources::indexUrlFor)
-        val source = when {
-            url == null || url.equals(PluginCatalog.indexUrl(context), ignoreCase = true) -> PluginCatalogSources.OFFICIAL
-            else -> PluginCatalogSources.all(context).firstOrNull { it.indexUrl.equals(url, ignoreCase = true) }
-        }
-        if (source == null) {
-            val opening = prepareLink(context, address!!)
-            return@withContext opening.copy(
-                problem = opening.problem ?: "Add this catalog first, then open the link again to install ${link.pluginId}",
-            )
-        }
-        pendingInstall = source.id to link.pluginId
-        LinkOpening(INSTALL_ID, null)
     }
 
     private fun slug(id: String): String = Sha256.hex(id.toByteArray()).take(12)
@@ -188,8 +141,9 @@ object PluginCatalogScreen {
                             if (text == null) {
                                 "No QR code found in that image"
                             } else {
-                                // A catalog's QR code carries its add-catalog link (the README's) or just its address.
-                                pendingAddress = PluginCatalogSources.addressFromLink(text) ?: text.trim()
+                                // A catalog's QR code carries its action link (the README's, docs/SPEC.md 12a "Action links"), an older
+                                // add-catalog link, or just its address; here only the catalog it adds is read.
+                                pendingAddress = ActionLinks.catalogAddress(text) ?: text.trim()
                                 fetch(ctx, pendingAddress) {}
                             }
                         },
@@ -320,64 +274,6 @@ object PluginCatalogScreen {
             subtitle = "Third-party, not official, and droidtop has not checked it",
             value = fingerprint,
             run = {},
-        )
-    }
-
-    // ------------------------------------------------------------------
-    // The install review an install-plugin link opens.
-    // ------------------------------------------------------------------
-
-    fun installLinkScreen(): CatalogScreen = CatalogScreen(
-        id = INSTALL_ID,
-        title = "Install a plugin",
-        subtitle = "A link asked for this plugin. Nothing is installed until you press Install, and it runs only after you approve it",
-        groups = { context -> installLinkGroups(context) },
-    )
-
-    private suspend fun installLinkGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
-        fun only(title: String, subtitle: String? = null) = listOf(
-            CatalogGroup(
-                id = "plugins_catalog_install_link_note",
-                title = null,
-                items = listOf(ActionItem(id = "plugins_catalog_install_link_note_row", title = title, subtitle = subtitle, run = {})),
-            ),
-        )
-        val (sourceId, pluginId) = pendingInstall ?: return@withContext only("No plugin was asked for", "Open an install link again")
-        val source = PluginCatalogSources.byId(context, sourceId) ?: return@withContext only("This catalog was removed")
-        val load = PluginCatalog.currentIndex(context, source)
-        val current = PluginCatalogSources.byId(context, sourceId) ?: source
-        val index = load.index ?: return@withContext only(
-            if (load.published) "Couldn't read ${current.name}'s catalog" else "No catalog is published at ${current.name} yet",
-            load.note,
-        )
-        if (!PluginCatalog.listable(current, index)) {
-            return@withContext only("${current.name} has a new notice", "Read and accept it under Plugins > Add > More catalogs; nothing is listed until then")
-        }
-        val origin = index.origins.firstOrNull { o -> o.plugins.any { it.id == pluginId } }
-        val plugin = origin?.plugins?.firstOrNull { it.id == pluginId }
-        if (origin == null || plugin == null) return@withContext only("${current.name} doesn't list $pluginId", "It may have been removed, or the link is wrong")
-        val installed = PluginStore.installed(context).firstOrNull { it.manifest.id == pluginId }
-        val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
-        val state = PluginCatalog.originState(current, origin, userKeys)
-        listOf(
-            CatalogGroup(
-                id = "plugins_catalog_install_link_plugin",
-                title = plugin.label,
-                chips = listOfNotNull(chipFor(current)?.let { CatalogChip(it) }),
-                items = listOf(
-                    TextBlockItem(
-                        id = "plugins_catalog_install_link_about",
-                        text = (plugin.description ?: "No description") + "\n" +
-                            (if (current.official) "From droidtop's own catalog." else "From \"${current.name}\", which is not part of droidtop and has not been vetted by it."),
-                    ),
-                    TextBlockItem(
-                        id = "plugins_catalog_install_link_checks",
-                        text = "droidtop downloads it and checks its signature and every file. It does not run until you approve it on the Plugins screen, " +
-                            "where you see every permission it asks for and can refuse any of them.",
-                    ),
-                    rowFor(current, origin, state, plugin, installed, reviewed = true),
-                ),
-            ),
         )
     }
 
@@ -577,17 +473,12 @@ object PluginCatalogScreen {
 
     private fun chipFor(source: PluginCatalogSource): String? = if (source.official) null else UNOFFICIAL
 
-    /**
-     * One plugin's row. [reviewed] is the install review of a link ([installLinkGroups]): the Install or Update
-     * asks for an explicit yes first, because the person did not pick this plugin from a list on this device.
-     */
     private fun rowFor(
         source: PluginCatalogSource,
         origin: PluginCatalogOrigin,
         state: PluginCatalog.OriginState,
         plugin: PluginCatalogPlugin,
         installed: PluginRecord?,
-        reviewed: Boolean = false,
     ): CatalogItem {
         val subtitle = buildString {
             append(plugin.description ?: "No description")
@@ -608,7 +499,6 @@ object PluginCatalogScreen {
                 subtitle = subtitle,
                 chip = chipFor(source),
                 value = "Update to ${latest!!.version}",
-                confirmTitle = if (reviewed) "Update ${plugin.label} to ${latest.version} from \"${source.name}\"?" else null,
                 run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, latest!!, onStatus) },
             )
             installed != null -> ActionItem(id = id, title = plugin.label, subtitle = subtitle, value = "Installed ${installed.manifest.version}", chip = chipFor(source), run = {})
@@ -618,7 +508,6 @@ object PluginCatalogScreen {
                 subtitle = subtitle,
                 chip = chipFor(source),
                 value = "Install ${latest.version}",
-                confirmTitle = if (reviewed) "Install ${plugin.label} ${latest.version} from \"${source.name}\"?" else null,
                 run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, latest, onStatus) },
             )
             !offered -> ActionItem(

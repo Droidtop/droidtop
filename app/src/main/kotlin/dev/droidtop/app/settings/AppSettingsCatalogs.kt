@@ -186,10 +186,16 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(AcquireContentSources.chooseSystemScreen())
         SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(pluginKeysScreen())
-        // Opened on their own by the catalog links (CatalogLinkActivity); More catalogs is also inside Plugins > Add.
+        // Opened on their own by droidtop:// action links (LinkActivity, LinkRouter); More catalogs is also inside Plugins > Add.
         SettingsScreenRegistry.register(PluginCatalogScreen.screen())
-        SettingsScreenRegistry.register(PluginCatalogScreen.installLinkScreen())
+        SettingsScreenRegistry.register(dev.droidtop.library.integrations.ActionLinks.screen())
         SettingsScreenRegistry.register(PluginCatalogScreen.officialScreen())
+        // The link router's own screens and an app catalog's source review (docs/SPEC.md 12a "Links"), and Get apps (10b).
+        SettingsScreenRegistry.register(dev.droidtop.library.integrations.LinkRouter.choiceScreen())
+        SettingsScreenRegistry.register(dev.droidtop.library.integrations.LinkRouter.resultScreen())
+        SettingsScreenRegistry.register(dev.droidtop.library.integrations.LinkRouter.handlersScreen())
+        SettingsScreenRegistry.register(dev.droidtop.library.integrations.AppCatalogScreen.screen())
+        SettingsScreenRegistry.register(dev.droidtop.library.integrations.AppCatalogScreen.reviewScreen())
         SettingsScreenRegistry.register(PluginJobsScreen.screen())
         SettingsScreenRegistry.register(DownloadRulesCatalog.screen())
         SettingsScreenRegistry.register(windowsGamesScreen())
@@ -994,10 +1000,10 @@ object AppSettingsCatalogs {
     /**
      * What has a newer version, from the data that exists today (docs/SPEC.md 7j "Places",
      * Droidtop/tracker#222): droidtop's own newer build as the last check saw it, installed
-     * plugins against the cached catalog, and games whose source names a version the library does
-     * not have. Android apps are not here: nothing yet knows an installed app's latest version
-     * (the install and update manager, Droidtop/tracker#261, is what will). Reads only what is
-     * already cached or published; it never starts a network call or a walk.
+     * plugins against the cached catalog, games whose source names a version the library does
+     * not have, and Android apps against the app catalogs' cached offers (docs/SPEC.md 10b
+     * "Installing apps", Droidtop/tracker#261: one package-manager query, compared in memory).
+     * Reads only what is already cached or published; it never starts a network call or a walk.
      */
     private suspend fun availableUpdatesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val selfUpdate = dev.droidtop.app.update.AppSelfUpdate
@@ -1009,6 +1015,14 @@ object AppSettingsCatalogs {
         val gameUpdates = published?.let { entries ->
             LibraryGrouping.group(entries).mapNotNull { group -> group.game.availableUpdate?.let { group.game.name to it } }
         }.orEmpty().sortedBy { it.first.lowercase() }
+
+        val appCatalogs = dev.droidtop.library.integrations.AppCatalogs
+        val cachedOffers = appCatalogs.cachedOffers(context)
+        val appUpdates = if (cachedOffers.isEmpty()) {
+            emptyList()
+        } else {
+            appCatalogs.updates(cachedOffers, dev.droidtop.library.integrations.AppPackages.allInstalledFacts(context), context.packageName)
+        }
 
         val shown = buildList<dev.droidtop.library.settings.CatalogItem> {
             add(
@@ -1056,6 +1070,42 @@ object AppSettingsCatalogs {
                     ),
                 )
             }
+            appUpdates.take(MAX_APP_UPDATE_ROWS).forEach { state ->
+                when (state) {
+                    is dev.droidtop.library.integrations.AppCatalogs.UpdateState.Available -> add(
+                        AsyncActionItem(
+                            id = "updates_app_${state.offer.id}",
+                            title = state.offer.name,
+                            subtitle = "App, installed ${state.installed.versionName ?: state.installed.versionCode} - from " +
+                                (state.offer.source ?: state.pluginLabel),
+                            value = "Update to ${state.offer.version}",
+                            run = { ctx, onStatus -> updateApp(ctx, state, onStatus) },
+                        ),
+                    )
+                    is dev.droidtop.library.integrations.AppCatalogs.UpdateState.KeyDiffers -> add(
+                        ActionItem(
+                            id = "updates_app_${state.offer.id}",
+                            title = state.offer.name,
+                            subtitle = "${state.offer.version} from ${state.offer.source ?: state.pluginLabel} is signed by a different key " +
+                                "than the installed app, so Android would refuse it. Not offered",
+                            value = "Different key",
+                            run = {},
+                        ),
+                    )
+                }
+            }
+            val availableApps = appUpdates.filterIsInstance<dev.droidtop.library.integrations.AppCatalogs.UpdateState.Available>()
+            if (availableApps.size > 1) {
+                add(
+                    AsyncActionItem(
+                        id = "updates_apps_update_all",
+                        title = "Update all apps",
+                        subtitle = "Downloads each update, checks its package and signing key, then hands it to Android one after another",
+                        value = availableApps.size.toString(),
+                        run = { ctx, onStatus -> availableApps.map { state -> updateApp(ctx, state, onStatus) }.joinToString(". ") },
+                    ),
+                )
+            }
             gameUpdates.take(MAX_GAME_UPDATE_ROWS).forEach { (name, version) ->
                 add(
                     ActionItem(
@@ -1078,8 +1128,73 @@ object AppSettingsCatalogs {
                 )
             }
         }
-        listOf(CatalogGroup(id = "updates_available", title = "Available", items = shown))
+        listOf(CatalogGroup(id = "updates_available", title = "Available", items = shown), androidAppsGroup(context, cachedOffers))
     }
+
+    /** One app's update from its catalog, through the one install path; the line to show. */
+    private suspend fun updateApp(
+        context: Context,
+        state: dev.droidtop.library.integrations.AppCatalogs.UpdateState.Available,
+        onStatus: (String) -> Unit,
+    ): String {
+        val record = dev.droidtop.library.integrations.AppCatalogs.providers(context).firstOrNull { it.manifest.id == state.pluginId }
+            ?: return "${state.offer.name}: ${state.pluginLabel} is no longer installed or allowed"
+        val result = dev.droidtop.library.integrations.AppCatalogs.install(context, record, state.offer.id, state.offer.versionCode, state.offer.name, onStatus)
+        return if (result.ok) result.values["summary"] ?: "${state.offer.name} updated" else "${state.offer.name}: ${result.error ?: "it failed"}"
+    }
+
+    /**
+     * Android apps (docs/SPEC.md 10b "Installing apps"): Get apps, checking the app catalogs now, and whether updates
+     * install without asking where Android allows it (the owner's setting, 2026-10-01: it changes something only
+     * where Android or a privilege allows a silent install; otherwise Android asks every time regardless).
+     */
+    private fun androidAppsGroup(
+        context: Context,
+        cached: List<dev.droidtop.library.integrations.AppCatalogs.CachedOffers>,
+    ): CatalogGroup {
+        val checked = cached.maxOfOrNull { it.checked }?.takeIf { it > 0 }
+        val checkedLine = checked?.let {
+            "Last checked " + android.text.format.DateUtils.getRelativeTimeSpanString(
+                it, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS,
+            )
+        } ?: "Not checked yet"
+        return CatalogGroup(
+            id = "updates_android_apps",
+            title = "Android apps",
+            items = listOf(
+                NestedScreenItem(
+                    id = "updates_get_apps",
+                    title = "Get apps",
+                    subtitle = "Browse and install apps from the catalogs your plugins add, such as F-Droid repositories",
+                    registryId = dev.droidtop.library.integrations.AppCatalogScreen.ID,
+                ),
+                AsyncActionItem(
+                    id = "updates_apps_check",
+                    title = "Check app catalogs now",
+                    subtitle = "$checkedLine. Refreshes every source of every app catalog, then lists the updates above",
+                    run = { ctx, onStatus ->
+                        val providers = dev.droidtop.library.integrations.AppCatalogs.providers(ctx)
+                        if (providers.isEmpty()) {
+                            "No app catalog is added. Get apps says how"
+                        } else {
+                            providers.map { record ->
+                                record.manifest.label + ": " + dev.droidtop.library.integrations.AppCatalogs.refresh(ctx, record, null, onStatus)
+                            }.joinToString(". ")
+                        }
+                    },
+                ),
+                ToggleItem(
+                    id = "updates_apps_silent",
+                    title = "Update apps without asking",
+                    subtitle = "Where Android allows it (Android 12 and later, for apps droidtop installed). Elsewhere Android asks each time",
+                    current = dev.droidtop.app.apps.ApkInstaller.silentUpdates(context),
+                    onToggle = { ctx, value -> dev.droidtop.app.apps.ApkInstaller.setSilentUpdates(ctx, value) },
+                ),
+            ),
+        )
+    }
+
+    private const val MAX_APP_UPDATE_ROWS = 50
 
     private const val MAX_GAME_UPDATE_ROWS = 30
 
@@ -1595,6 +1710,13 @@ object AppSettingsCatalogs {
                         // A downloaded bundle is in Downloads; the picker otherwise opened on an empty Documents (rig, build 1535).
                         startIn = "Download",
                         onPicked = { ctx, uri -> PluginStore.importFromPicker(ctx, uri) },
+                    ),
+                    // Which plugin or app opens which kind of link (docs/SPEC.md 12a "Links").
+                    NestedScreenItem(
+                        id = "plugins_link_handlers",
+                        title = "Link handlers",
+                        subtitle = "Which plugin or app opens which kind of link, and sending a kind of link to an app",
+                        registryId = dev.droidtop.library.integrations.LinkRouter.HANDLERS_ID,
                     ),
                 ),
             ),

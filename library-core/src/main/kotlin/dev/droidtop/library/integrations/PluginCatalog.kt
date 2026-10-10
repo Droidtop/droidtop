@@ -632,10 +632,12 @@ object PluginCatalog {
     /**
      * The confirm half: the person accepted [proposal]'s disclaimer. Stores
      * the catalog (its master when signed, the disclaimer version accepted),
-     * keeps the index it was shown, and trusts each origin's key exactly as
-     * "Keys you trust" does ([trustOrigin]). Returns the line to show.
+     * keeps the index it was shown, and, when [trustOrigins], trusts each origin's key exactly as
+     * "Keys you trust" does ([trustOrigin]). An action link adds the catalog without trusting any key
+     * (`catalog.add`), because trusting a key is its own step there (`key.trust`, docs/SPEC.md 12a
+     * "Action links"). Returns the line to show.
      */
-    suspend fun accept(context: Context, proposal: Proposal): String = withContext(Dispatchers.IO) {
+    suspend fun accept(context: Context, proposal: Proposal, trustOrigins: Boolean = true): String = withContext(Dispatchers.IO) {
         val store = PluginCatalogSources.storeFile(context)
         if (PluginCatalogSources.byId(context, proposal.info.id) != null) return@withContext "\"${proposal.info.name}\" is already one of your catalogs"
         val source = PluginCatalogSource(
@@ -653,7 +655,7 @@ object PluginCatalog {
         } catch (failure: Exception) {
             return@withContext "Couldn't save the catalog: ${failure.message}"
         }
-        val lines = proposal.origins.map { trustOrigin(context, source, it.origin, it.keyBase64) }
+        val lines = if (trustOrigins) proposal.origins.map { trustOrigin(context, source, it.origin, it.keyBase64) } else emptyList()
         runCatching { refreshAddedRevocations(context, source) }
         "Added \"${source.name}\". " + lines.joinToString(" ")
     }

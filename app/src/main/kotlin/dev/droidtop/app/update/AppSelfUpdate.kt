@@ -1,17 +1,14 @@
 package dev.droidtop.app.update
 
-import android.app.PendingIntent
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
-import android.os.Build
 import androidx.core.content.pm.PackageInfoCompat
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.app.apps.ApkInstaller
 
 /**
  * droidtop's own update check and self-update (docs/SPEC.md "Releases and
@@ -399,87 +396,16 @@ object AppSelfUpdate {
             "then press Check now again."
 
     /**
-     * The installer's answer for each session this process committed, so
-     * the Check now row can report what really happened -- installed,
-     * cancelled, refused -- instead of "handed to the installer" after the
-     * person had already cancelled (rig, dq-shell2-01).
+     * The installer's answer on [sessionId] (installed, cancelled, refused), so the Check now row reports what
+     * really happened instead of "handed to the installer" after the person had already cancelled (rig,
+     * dq-shell2-01). The session itself is [ApkInstaller]'s, the one install path for every APK.
      */
-    private val outcomes = java.util.concurrent.ConcurrentHashMap<Int, java.util.concurrent.CompletableFuture<String>>()
+    fun awaitOutcome(sessionId: Int, timeoutMs: Long): String? = ApkInstaller.awaitOutcome(sessionId, timeoutMs)
 
-    internal fun reportOutcome(sessionId: Int, message: String) {
-        android.util.Log.i(UpdateNow.TAG, "installer: " + message)
-        outcomes.remove(sessionId)?.complete(message)
-    }
-
-    /** Waits up to [timeoutMs] for the installer's answer on [sessionId]; null when none came. */
-    fun awaitOutcome(sessionId: Int, timeoutMs: Long): String? =
-        runCatching { outcomes[sessionId]?.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) }.getOrNull()
-
-    private fun commitSession(context: Context, apk: File, label: String): Int {
-        val installer = context.packageManager.packageInstaller
-        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
-            setAppPackageName(context.packageName)
-            if (Build.VERSION.SDK_INT >= 31) {
-                // Silent only when the system itself decides droidtop is
-                // eligible (its own installer of record, and so on);
-                // otherwise the normal confirmation dialog appears.
-                setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-            }
-        }
-        val sessionId = installer.createSession(params)
-        outcomes[sessionId] = java.util.concurrent.CompletableFuture()
-        pendingNames[sessionId] = label
-        installer.openSession(sessionId).use { session ->
-            apk.inputStream().use { input ->
-                session.openWrite("droidtop.apk", 0, apk.length()).use { output ->
-                    input.copyTo(output)
-                    session.fsync(output)
-                }
-            }
-            val intent = Intent(context, AppUpdateStatusReceiver::class.java).setPackage(context.packageName)
-            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-                if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
-            session.commit(PendingIntent.getBroadcast(context, sessionId, intent, flags).intentSender)
-        }
-        return sessionId
-    }
-
-    /** What each committed session installs, for the outcome sentence. */
-    internal val pendingNames = java.util.concurrent.ConcurrentHashMap<Int, String>()
+    private fun commitSession(context: Context, apk: File, label: String): Int =
+        // Silent only when the system itself decides droidtop is eligible (its own installer of record, and so on)
+        // and "Update apps without asking" is on; otherwise the normal confirmation dialog appears.
+        ApkInstaller.commit(context, apk, context.packageName, "droidtop $label", silent = ApkInstaller.silentUpdates(context), requestOwnership = false)
 
     private fun sha256(file: File): String = Sha256.hex(file).uppercase()
-}
-
-/**
- * Receives PackageInstaller's verdict on a self-update. The one status that
- * needs code is PENDING_USER_ACTION: the system hands over its confirmation
- * UI to launch. Success needs none -- the process is replaced mid-update.
- */
-class AppUpdateStatusReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
-        val name = AppSelfUpdate.pendingNames[sessionId] ?: "the update"
-        when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
-            PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                @Suppress("DEPRECATION")
-                val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
-                confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                runCatching { context.startActivity(confirm) }.onFailure {
-                    AppSelfUpdate.reportOutcome(sessionId, "Android's installer could not show its confirmation; $name was not installed.")
-                }
-            }
-            // The process is replaced as this lands; the sentence is for the log.
-            PackageInstaller.STATUS_SUCCESS -> AppSelfUpdate.reportOutcome(sessionId, "Installed $name.")
-            else -> {
-                val message = if (status == PackageInstaller.STATUS_FAILURE_ABORTED) {
-                    "The install was cancelled: $name was not installed. Press Check now to try again."
-                } else {
-                    "Android's installer refused $name: " +
-                        (intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "it gave no reason") + "."
-                }
-                AppSelfUpdate.reportOutcome(sessionId, message)
-                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
-            }
-        }
-    }
 }

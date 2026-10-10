@@ -52,7 +52,7 @@ class PluginRegistryTest {
     fun `the points that need consent are exactly the ones section 4_2 lists`() {
         val consent = ExtensionPoints.all.filter { it.risk.needsConsent }.map { it.id }.toSet()
         assertEquals(
-            setOf("library.sources", "saves.sync", "launch.provider", "files.handler", "onboarding.step", "intents.in", "containers.packages", "jobs.service"),
+            setOf("library.sources", "apps.catalog", "saves.sync", "launch.provider", "files.handler", "onboarding.step", "intents.in", "containers.packages", "jobs.service"),
             consent,
         )
     }

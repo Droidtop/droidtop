@@ -139,11 +139,19 @@ object PluginApiResolver {
 /** A counter every write of a plugin record or grant bumps, so cached views know when to recompute. */
 object PluginEpoch {
     @Volatile private var value = 0
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
 
     fun current(): Int = value
 
     @Synchronized fun bump() {
         value++
+        // Listeners only schedule their work (the link aliases, docs/SPEC.md 12a "Links"); none reads the store here.
+        listeners.forEach { runCatching { it() } }
+    }
+
+    /** Runs [listener] after every bump, on the bumping thread: it must only schedule work. */
+    fun listen(listener: () -> Unit) {
+        listeners += listener
     }
 }
 

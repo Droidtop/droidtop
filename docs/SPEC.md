@@ -14507,9 +14507,15 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   whole screen is built off the main thread (its preference and package
   reads held a frame of the page as it opened). The
   group below it is droidtop's own update settings and Check now, as
-  before. Android apps are not listed: nothing yet knows an installed app's
-  latest version, and the install and update manager (Droidtop/tracker#261)
-  is what will feed this group.
+  before. **Android apps** (Droidtop/tracker#261, 10b "Installing apps"):
+  installed apps against the app catalogs' cached offers, one row per update
+  ("Update to <version>", the one install path) and Update all apps; an offer
+  signed by another key than the installed app is listed as "Different key"
+  and not offered. Below them an "Android apps" group: Get apps (the app
+  catalogs' screen), Check app catalogs now (refreshes every source of every
+  catalog plugin, then the offers) and **Update apps without asking** (on by
+  default; the owner's setting of 2026-10-01: it only matters where Android or
+  a privilege allows a silent install, Android asks every time otherwise).
   **One Updates screen, one list of ways in** (2026-10-03, Droidtop/tracker#273):
   the plugin updates status and "Update all" that the Plugins screen also
   carried are gone (the Plugins screen lists plugins, approvals, repositories
@@ -16796,6 +16802,49 @@ promotion never publishes a bundle missing one of the two ABIs. The
 promotion command refuses `stable` for a 0.x plugin version, so a
 mis-click cannot publish one.
 
+### Installing apps (Droidtop/tracker#261, owner 2026-10-01 and 2026-10-10)
+
+Core owns installing and update tracking; plugins supply catalogs ("We can
+probably make it a plugin? Obtainium too").
+
+- **One install path** (`ApkInstaller`, `:app`): every APK droidtop installs,
+  its own update included, is one PackageInstaller session, and Android's
+  verdict comes back to `ApkInstallStatusReceiver` (it launches Android's
+  confirmation when asked; the self-update's old receiver is gone). Non-root
+  first: on Android 12+ a session asks for no confirmation
+  (`USER_ACTION_NOT_REQUIRED`) where Android allows it (an update of an app
+  droidtop installed that targets a recent SDK) while **Update apps without
+  asking** is on (default on; the owner's setting); on Android 14+ a catalog's
+  first install asks for update ownership; on 13+ the package source is
+  "store". Shizuku and root are not used here yet.
+- **App catalogs are plugins** (`apps.catalog@1`, docs/plugin-api.md 3 A12): an
+  F-Droid repository client (Droidtop/droidtop-plugin-fdroid), a release-page
+  tracker in the spirit of Obtainium (a separate plugin on the same API). The
+  plugin keeps its sources and indexes and answers searches and an app's page;
+  droidtop draws everything ("Get apps", `AppCatalogScreen`): per catalog a
+  search, its sources (address, key fingerprint, apps, last refresh, on/off,
+  Refresh, Remove), the sources it lists to add with a press, and Add by
+  address or QR code; adding a source is the plugin's review, then the
+  person's Accept, however it starts (a link through the router, a QR code,
+  the address field, a listed source, an action link's `apps.source.add`). An
+  app's page shows its description, anti-features with the catalog's reasons,
+  who signs it, and Install / Update to / Installed per version.
+- **Installing from a catalog** (`AppCatalogs.install`): the plugin's `acquire`
+  job returns the download and what the APK must be (package, version code,
+  signing-certificate SHA-256s); droidtop requires the package asked for and a
+  file digest or a signing key, runs the download as a Downloads job, and its
+  post step (`install_apk`) refuses the file unless it is that package and
+  version, signed by one of those keys and, when the app is installed, by a key
+  the installed app has (`AppPackages.refusal`): a changed signing key is said
+  plainly and not left to Android's error.
+- **Updates are droidtop's decision** (`AppCatalogs.updates`): the plugins'
+  newest compatible versions are read page by page (`latest`, 500 a page) after
+  a refresh into one cache file; the Updates place compares them with the
+  installed apps from ONE package-manager query. A plugin never learns which
+  apps are installed and never says "update available". No source is
+  configured by default; there is no background refresh yet (Check app
+  catalogs now, or a plugin's own refresh).
+
 ## 10c. Diagnostics, crash recovery and privacy
 
 Preference access uses `runtime-common`'s `PrefsFile` typed delegates and
@@ -18324,45 +18373,18 @@ what the index says is display data, never a trust decision.
       The list holds gamegrab-sources/catalog (the first one, which "droidtop
       ships no address for" used to say). A known catalog disappears from the
       list once it is added.
-    - **An add-catalog link**, which a catalog's own README and web page can
-      carry: `droidtop://add-catalog?address=<catalog address>` and, for places
-      that render only web links, `https://droidtop.github.io/add-catalog?address=
-      <catalog address>` (`PluginCatalogSources.addressFromLink`; `address` or
-      `url`, URL-encoded, https only). `CatalogLinkActivity` has no screen of
-      its own: it fetches the catalog (`PluginCatalogScreen.prepareLink`) and
-      opens More catalogs on its review. **A link can neither add nor trust
-      anything**: it only fetches an https address and shows a review, and
-      adding is the Accept on that review (the same screen, the same read-gate).
-      Where Settings is hidden (Kiosk, Kid) it does nothing. An address that is
-      already added or cannot be fetched is told to the person in a line, and
-      More catalogs opens with the address filled in; droidtop's own catalog is
-      always there, so its link opens that catalog's screen instead of a review.
-      The https form is declared as an unverified web link on a host the Droidtop
-      organisation owns, and the page there (`droidtop.github.io/add-catalog`,
-      "The web catalog" below) validates the address and offers "Open in
-      droidtop" and "Copy address" for a device without the app.
-    - **An install-plugin link** (Droidtop/tracker#458), which a catalog's web
-      page carries on every plugin: `droidtop://install-plugin?catalog=<catalog
-      address>&id=<plugin id>` and `https://droidtop.github.io/install-plugin?...`
-      (`PluginCatalogSources.installFromLink`; `catalog` is optional and means
-      droidtop's own catalog; the id is `[A-Za-z0-9][A-Za-z0-9._-]*`, so a link
-      cannot name a path). `CatalogLinkActivity` opens the plugin's **install
-      review** (`PluginCatalogScreen.installLinkScreen`): its label, description,
-      the catalog it comes from with the same Unofficial chip, a line saying what
-      droidtop checks and that nothing runs before approval, and the ordinary
-      Install or Update row of that catalog, which here asks "Install <plugin>
-      <version> from <catalog>?" before it does anything (`rowFor(reviewed =
-      true)`). Same rules as add-catalog: a link names, the person confirms.
-      The install is the one install path (`PluginCatalog.install`), so the
-      plugin still waits for approval on the Plugins screen, where every
-      permission is shown. A plugin of a catalog the person has not added opens
-      that catalog's review instead (its notice comes before anything it lists)
-      with a line to open the link again afterwards. A plugin the catalog does
-      not list, or a catalog whose notice changed, says so on the review screen.
-    - The QR code and the address field. A catalog's QR code carries its
-      add-catalog link (a phone camera opens the web page, which opens droidtop);
-      "Read a QR code" accepts that link as well as a bare address
-      (`addressFromLink(text) ?: text`).
+    - **A link.** A catalog's README, its web page and its QR code carry a
+      droidtop action link (below, "Action links"): `catalog.add` for the
+      catalog, `key.trust` for each publisher key it vouches for, and
+      `plugin.install` for a plugin, each its own step the person approves or
+      denies. The older `droidtop://add-catalog?address=` and
+      `droidtop://install-plugin?catalog=&id=` links, and their https forms on
+      droidtop.github.io, are read by the same parser as one step each
+      (`PluginCatalogSources.addressFromLink`, `installFromLink`), so codes
+      already printed keep working; the separate CatalogLinkActivity and its
+      install review are gone. "Read a QR code" takes an action link, an older
+      link or a bare address (`ActionLinks.catalogAddress`).
+    - The address field, unchanged.
   - **Format.** An added catalog's index is the same schema 1 index with
     two more top-level blocks, both required for an added catalog and
     absent from droidtop's own: `catalog` {`id` ("owner/name" of the
@@ -18539,11 +18561,97 @@ what the index says is display data, never a trust decision.
   - **READMEs.** Each catalog's README carries its add-catalog link and a QR
     code of the same link (`add-catalog-qr.svg` beside it, made with segno from
     the link in the README).
+- **Links (owner, 2026-10-10, Droidtop/tracker#459: "Plugins should be able to
+  register URLs to droidtop, right? We don't want them being called
+  directly").** droidtop owns every Android entry point and routes every link
+  through one router (`LinkRouter`, `:library-core`); a plugin never gets an
+  exported component.
+  - **Entry points** (`LinkActivity`, a plain ComponentActivity with the
+    platform translucent theme: an AppCompatActivity refuses that theme at
+    launch, which crashed build 1750): droidtop's own `droidtop://` links
+    (hosts `do`, and the older `add-catalog`, `install-plugin`); **every https
+    link**, as a general web-link handler that names no site (owner: "computer
+    in a box. Maybe the user wants to use a browser in linux"), so a page in
+    any browser can hand droidtop a link; text shared to droidtop (the first
+    https or droidtop link in it); and **disabled-until-needed scheme aliases**
+    for common link types and every scheme an official plugin uses or
+    plausibly will (`PluginLinks.MANIFEST_SCHEMES`: fdroidrepos, fdroidrepo,
+    magnet, steam, market; one `activity-alias` each, `android:enabled=
+    "false"`). `LinkSchemes` enables an alias while an installed, runnable
+    plugin registers that scheme and disables it when none does (at process
+    start and after every plugin record or grant change, `PluginEpoch.listen`,
+    on one background thread), so droidtop never offers to open links nobody
+    handles. An unofficial plugin's scheme outside that list will reach droidtop
+    through a generated links-helper APK (owner's decision; a separate slice,
+    not built). Where Settings is hidden (Kiosk, Kid) droidtop opens no link
+    itself; a web link still goes to the browser.
+  - **Handlers** come from sources (`LinkRouter.registerSource`) and are run by
+    kinds (`LinkRouter.registerKind`): **plugin** (a `provides` entry's `links:
+    [{scheme, host?, pathPrefix?, pathSuffix?, query?}]`, honoured only while the
+    plugin holds `intents.in` and may provide that point; the link reaches it as
+    an ordinary broker call, op `open_link {link}`, on that point, which decides
+    what the reply shows: an app catalog's reply is the review of the source it
+    would add, any other point's a page in the view schema), and **android**
+    (an app the person chose under Plugins > Link handlers for a scheme or a
+    site; the link is forwarded to that app's activity). The **container**
+    (an app's `.desktop` `x-scheme-handler`), **wine** and **peer** kinds are
+    seams for those runtimes: they register a kind and a source and the router
+    does the rest. A plugin may claim a named site (`*.example.org` for its
+    subdomains), a path ending on any host (`/fdroid/repo`) or any other
+    scheme, never every web link, never droidtop's own scheme or site
+    (`PluginLinks.supported`).
+  - **Routing.** droidtop's own action links first; then the handlers whose
+    pattern matches. One is handed the link at once; several open "Open this
+    link with" (each handler and its kind, and "Remember my choice" for that
+    kind of link, kept per scheme and host until Link handlers > Forget
+    choices). An https link nothing claims goes on to the person's default
+    browser (or Android's chooser without droidtop); any other unclaimed link is
+    told in a line.
+- **Action links (owner, 2026-10-10, Droidtop/tracker#459: "The droidtop URL
+  scheme can do a complete mix of arbitrary API calls, so the parser will read
+  the url and announce to the user what it's doing").** One grammar, one parser
+  (`ActionLinks`):
+  ```
+  droidtop://do?v=1&a=<action>[&<param>=<value>]...[&a=<action>...]...
+  https://droidtop.github.io/do?v=1&a=...      (the same query)
+  ```
+  - `v=1` first; each `a=` starts a step and the parameters up to the next
+    `a=` are its own; at most 10 steps and 4096 characters. An action is
+    built in or a plugin's (`<plugin id>:<action>`). An unknown action, an
+    unknown, repeated, missing or malformed parameter, or a wrong version
+    refuses the WHOLE link with a plain reason, and nothing changes.
+  - **Built-in actions:** `catalog.add {address}` (a plugin catalog: its notice
+    is shown in full and must be read; it trusts no key),
+    `key.trust {catalog, origin, sha256}` (a publisher's key in an added
+    catalog, trusted only when the catalog names exactly that key),
+    `plugin.install {id, catalog?}` (the one install path; the plugin still
+    waits for approval) and `apps.source.add {plugin, address, fingerprint?}`
+    (an app catalog plugin reviews and adds a source, 10b). Adding a catalog and
+    trusting its key are separate steps, as by hand (owner), and any
+    publisher's link may carry all three.
+  - **Plugin actions:** a `provides` entry's `actions: [{id, label, params:
+    [{name, kind, required}]}]`, kinds text, url (https), id, sha256, number,
+    bool; offered while the plugin holds `intents.in` and may provide the
+    point; run as a broker call, op `run_action {action, params}`.
+  - **Dependencies:** a step depends on an earlier step that provides what it
+    uses (a `catalog.add` for the catalog a `key.trust` or `plugin.install`
+    names, a `key.trust` for the catalog a `plugin.install` names) and on the
+    steps in its `needs` (earlier step numbers).
+  - **Review** ("Open a droidtop link"): every step in plain words with its
+    risk and its own "Do this step" switch (owner: "Users can line-item approve
+    and deny parts"); a step that cannot run (its catalog is not added and the
+    link does not add it) says why and is off; a step already true (the
+    catalog is already added) says so. Denying a step marks its dependants
+    "Refused" before anything runs. "Run the approved steps" (opens once every
+    notice was read, then a confirm) runs them in order; a step whose
+    precondition fails at run time (the catalog cannot be read, the key differs
+    from the one named) stops its dependants with the reason, independent
+    steps still run, and "What happened" lists every step.
 - **Not built:** the deferred droidtop root key that would certify new origins
-  without an app change; offering testing/unstable streams; F-Droid style
-  repositories as catalogs (Droidtop/tracker#261): their indexes are already
-  browsable on the web and carry tap-to-add links, so they would get the same
-  two link kinds, unbuilt until that support exists.
+  without an app change; offering testing/unstable streams; the links-helper
+  APK for unofficial plugins' schemes; the container, Wine and peer link
+  handler kinds (seams in `LinkRouter`); outbound links (Droidtop/tracker#418)
+  through the same router.
 
 **The trust-boundary checklist** (unchanged in substance from the
 2026-09-02 text, now checked against `PluginBundleInstaller` and
