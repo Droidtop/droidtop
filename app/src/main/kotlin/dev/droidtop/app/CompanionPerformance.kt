@@ -128,6 +128,7 @@ internal fun CompanionPerformanceTab() {
                     CompanionNote("Thermal state: ${PerformanceMonitor.thermalLabel(latest.thermalStatus)}")
                 }
             },
+            { CompanionLogsCard() },
             {
                 // Per-app figures exist only with a shell provider (Shizuku): without one the card is not drawn.
                 val apps = topApps

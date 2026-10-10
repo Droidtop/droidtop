@@ -3606,6 +3606,12 @@ row of recent apps, became Home's Recent apps section for every mode.
   (Android has no public page for one permission of one app). Then "What droidtop can access": notification access,
   Usage access, the accessibility service (its two jobs, typing and screenshots), Bluetooth and the helper app, each
   with whether droidtop holds it and why it asks, opening droidtop's own App info.
+- **Logs (slice C18).** Performance has a Logs card (not in Kid or Kiosk): Android's log through the helper app
+  (`logcat -d -v threadtime`, the last lines, then every two seconds only what is newer, only while the card shows and
+  is not paused), else droidtop's own (`logcat --pid`, no permission needed), saying which. Filters: a level, a tag or
+  an app (tap a line's tag or pid), and Running game only (`pidof` of the running package). Pause. Save (the system
+  file picker, through the transparent `LogSaveActivity`) and Share (text, the filtered view), both under one line
+  saying logs can hold personal data. `LogReader` (`:runtime-common`).
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 

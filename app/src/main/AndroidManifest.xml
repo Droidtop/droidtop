@@ -364,6 +364,17 @@
             </intent-filter>
         </activity>
 
+        <!--
+          Save on the companion's Logs card: the system file picker needs an Activity
+          result, so this transparent one asks where and writes the text. Not exported.
+        -->
+        <activity
+            android:name="dev.droidtop.app.LogSaveActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name="dev.droidtop.app.UiModePasskeyActivity"
             android:exported="false"
