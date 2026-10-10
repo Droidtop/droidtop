@@ -4,6 +4,8 @@ import android.content.Context
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
+import dev.droidtop.library.consoles.CollectionEntity
+import dev.droidtop.library.consoles.CollectionMemberEntity
 import dev.droidtop.library.consoles.GameMetadataEntity
 import dev.droidtop.library.consoles.RomDatabase
 import dev.droidtop.net.peer.AgentNative
@@ -40,18 +42,29 @@ object ComputerLibrary {
         return titleKey(entry.title)
     }
 
-    /** The marks droidtop keeps on a game that the agent carries, by the agent's field names. */
+    /**
+     * The person's own organization of a game that travels with it, by the
+     * agent's field names (docs/SPEC.md 7o, "Library"; Droidtop/tracker#469
+     * part 1). Newest change wins per field on every device. Per-device
+     * choices (emulator, launch screen, "broken", media paths) stay here.
+     */
     private const val FAVOURITE = "favourite"
     private const val HIDDEN = "hidden"
     private const val COMPLETED = "completed"
+    private const val RATING = "rating"
+    private const val TITLE = "title"
+    private const val SORT_NAME = "sort_name"
+    private const val KID_GAME = "kid_game"
+    private const val COLLECTIONS = "collections"
 
     /**
      * Every mark this device keeps on its games, unset ones included, by key.
      * The core turns only a mark that differs from the shared one into a
      * change, so a mark that arrived from a computer and was written here is
-     * not sent back (droidtop-agent docs/DESIGN.md section 7).
+     * not sent back (droidtop-agent docs/DESIGN.md section 7). [collections]
+     * is each entry id's collection names.
      */
-    private fun marksOf(games: List<LibraryEntry>): JSONObject {
+    internal fun marksOf(games: List<LibraryEntry>, collections: Map<String, List<String>>): JSONObject {
         val out = JSONObject()
         games.groupBy(::keyOf).forEach { (key, entries) ->
             out.put(
@@ -59,10 +72,22 @@ object ComputerLibrary {
                 JSONObject()
                     .put(FAVOURITE, entries.any { it.favorite })
                     .put(HIDDEN, entries.any { it.hidden })
-                    .put(COMPLETED, entries.any { it.completed }),
+                    .put(COMPLETED, entries.any { it.completed })
+                    .put(RATING, entries.firstNotNullOfOrNull { it.rating }?.toDouble() ?: 0.0)
+                    .put(TITLE, entries.firstNotNullOfOrNull { it.gameName }.orEmpty())
+                    .put(SORT_NAME, entries.firstNotNullOfOrNull { it.sortName }.orEmpty())
+                    .put(KID_GAME, entries.any { it.kidGame })
+                    .put(COLLECTIONS, JSONArray(entries.flatMap { collections[it.id].orEmpty() }.distinct().sorted())),
             )
         }
         return out
+    }
+
+    /** Each entry id's collection names. Reads the database: never on the main thread. */
+    private suspend fun collectionNames(context: Context): Map<String, List<String>> {
+        val dao = RomDatabase.get(context).romDao()
+        val names = dao.getCollections().associate { it.id to it.name }
+        return dao.getAllCollectionMembers().groupBy({ it.gameId }, { names[it.collectionId] }).mapValues { (_, n) -> n.filterNotNull() }
     }
 
     /**
@@ -84,21 +109,50 @@ object ComputerLibrary {
                 if (fields.has(FAVOURITE) && entry.favorite != fields.optBoolean(FAVOURITE)) {
                     changed = library.toggleFavorite(entry) != null
                 }
-                if (fields.has(HIDDEN) || fields.has(COMPLETED)) {
+                if (listOf(HIDDEN, COMPLETED, RATING, SORT_NAME, KID_GAME).any { fields.has(it) }) {
                     val current = dao.getGameMetadataSingle(entry.id) ?: GameMetadataEntity(id = entry.id)
                     val next = current.copy(
                         hidden = if (fields.has(HIDDEN)) fields.optBoolean(HIDDEN) else current.hidden,
                         completed = if (fields.has(COMPLETED)) fields.optBoolean(COMPLETED) else current.completed,
+                        rating = if (fields.has(RATING)) fields.optDouble(RATING).takeIf { it > 0.0 }?.toFloat() else current.rating,
+                        sortName = if (fields.has(SORT_NAME)) fields.optString(SORT_NAME).ifBlank { null } else current.sortName,
+                        kidGame = if (fields.has(KID_GAME)) fields.optBoolean(KID_GAME) else current.kidGame,
                     )
                     if (next != current) {
                         dao.upsertGameMetadata(next)
                         changed = true
                     }
                 }
+                if (fields.has(TITLE)) {
+                    val title = fields.optString(TITLE).ifBlank { null }
+                    if (title != entry.gameName) {
+                        library.renameGame(listOf(entry.id), title)
+                        changed = true
+                    }
+                }
+                fields.optJSONArray(COLLECTIONS)?.let { list ->
+                    if (setCollections(dao, entry.id, (0 until list.length()).map { list.optString(it) }.filter { it.isNotBlank() }.toSet())) changed = true
+                }
                 if (changed) written++
             }
         }
         return written
+    }
+
+    /**
+     * Puts [gameId] in exactly the collections named [names], making a
+     * collection that does not exist here yet. Returns whether anything changed.
+     */
+    private suspend fun setCollections(dao: dev.droidtop.library.consoles.RomDao, gameId: String, names: Set<String>): Boolean {
+        val all = dao.getCollections()
+        val byName = all.associateBy { it.name }
+        val current = dao.getCollectionsOf(gameId).toSet()
+        val wanted = names.map { name ->
+            byName[name]?.id ?: java.util.UUID.randomUUID().toString().also { dao.upsertCollection(CollectionEntity(id = it, name = name)) }
+        }.toSet()
+        (wanted - current).forEach { dao.addCollectionMember(CollectionMemberEntity(collectionId = it, gameId = gameId)) }
+        (current - wanted).forEach { dao.removeCollectionMember(it, gameId) }
+        return wanted != current
     }
 
     /**
@@ -125,7 +179,7 @@ object ComputerLibrary {
                     .put("install", install),
             )
         }
-        val marks = marksOf(games)
+        val marks = marksOf(games, collectionNames(context))
         fun args() = JSONObject().put("state", stateFile(context).absolutePath).put("scan", scan).put("marks", marks)
         val live = Computers.call(context, computer, "sync_library", args())
         val shared = if (live.has("unreachable")) ComputerShare.library(context, computer, args()) else null

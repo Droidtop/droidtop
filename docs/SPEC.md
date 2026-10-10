@@ -15803,17 +15803,26 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   Opening such an entry says which computer has it; streaming it is
   windowcast's (7a). The entries are read from the core's library file after
   each sync and switch change (not indexed).
-- **The person's marks travel both ways:** favourite, hidden and completed,
-  last writer wins per field (the core's hybrid logical clock).
+- **The person's marks travel both ways** (Droidtop/tracker#469 part 1):
+  favourite, hidden, completed, kid game, rating, the person's own title
+  (`game_links.game_name`), sort title and collections (by name; a
+  collection missing here is made). Last writer wins per field (the core's
+  hybrid logical clock), relayed through computers to every paired device.
+  The emulator, launch screen, "broken" and media paths are this device's
+  own and do not travel.
   - Each exchange reports every mark droidtop keeps on its games, unset ones
     included (`ComputerLibrary`). The core turns only a mark that differs
     from the shared one into a change, so a mark that came from a computer
     and was written here is never sent back with a newer stamp, and a mark
     nobody set is not sent at all.
   - The reply names the shared marks that differ from droidtop's, and
-    droidtop writes them: a favourite through the library's own favourite
-    (the Gaming UI's toggle), hidden and completed into the game's
-    `game_metadata` row, which every provider merges into its entries.
+    droidtop writes them:
+    - a favourite through the library's own favourite (the Gaming UI's
+      toggle);
+    - hidden, completed, kid game, rating and sort title into the game's
+      `game_metadata` row, which every provider merges into its entries;
+    - the title through `Library.renameGame`;
+    - collections as the game's exact membership.
   - Two entries with the same key (a game in two places) share their marks:
     either one marked counts, and a mark that arrives is written to both.
 
