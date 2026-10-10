@@ -12341,6 +12341,57 @@ the first scan after an install read the EMPTY set. That is why build 537
 (upgraded, with a previous run's value in the preference) listed 171 games
 and a freshly installed 539 listed 151 with every folder game missing.
 
+### Detection gaps found by auditing a real library (2026-10-10, Droidtop/tracker#472-#476, refs Droidtop/tracker#373)
+
+A read-only inventory of a 189-game library compared what the on-device walks
+find with what is installed: 174 found, 15 missed, 6 games listed once per
+part. The desktop agent runs these same rules (droidtop-agent, `scan/folders.rs`)
+over the same `engines-database.json`, so a rule changed here changes there.
+
+1. **A ROM system folder is a folder named for a system that holds that
+   system's files** (#472). ES-DE system ids are ordinary words, so
+   `Manual/ags` (Adventure Game Studio games) and `adult/flash` (an Adobe AIR
+   game) were skipped by both walks and read as systems by the ROM walk, which
+   listed the four `library.swf` files inside the AIR runtime as Flash ROMs.
+   `consoles.holdsSystemFiles` is the one test: a file of one of the system's
+   extensions in the folder or directly inside one of its folders, an unfilled
+   system folder (nothing but `systeminfo.txt` or hidden files) counting too.
+   `resolveSystemFolder` is name plus files and is what the engine walk
+   (`isConsoleSystemFolder`, `holdsSeveralGames`), the PC walk and the ROM walk
+   (`SystemFolders`, through `SystemOverridePrefs.resolveForFolder`) ask; a
+   folder the person assigned a system to is still that system wherever it is.
+   ROMs filed two folders below their system folder (`snes/A/Game/rom.sfc`)
+   are not seen by this test, the same bound the agent uses.
+2. **A Steam library found inside a scanned folder lists its manifests'
+   games** (#473). `steamapps/common/<game>` is already four folders down, so
+   a game whose program is in `bin/` or `Binaries/` was past the depth bound.
+   `SteamManifests` reads the `appmanifest_*.acf` files (one reader, shared
+   with the Steamworks shim's app id): each fully installed app (`StateFlags`
+   bit 4) that is no tool (Proton, the runtimes, the redistributables) and
+   whose `installdir` exists is a game, and what the depth-bound walk found
+   inside it is that folder. A game folder without a manifest is still found by
+   the walk.
+3. **LOVE and AGS are compiled engines** (#474): `LOVE2D` and `AGS` map the
+   `love2d` and `ags` rows of `engines-database.json`, which were skipped
+   because no engine id mapped them. A game with no program (a `.love` file, a
+   `main.lua` with `love.conf`, an AGS `.ags` data file) is now found; the
+   rules themselves stay in the database. AGS runs with Wine only, so a game
+   with no program is listed and has no runner.
+4. **A single-file game is an entry** (#475, amends 7m "A version is a
+   FOLDER"). A program carrying Godot's pack (the `GDPC` trailer the folder
+   probe already reads) left loose in a folder that holds several Godot games
+   is a game of its own; the entry is the file, run from the folder it sits in
+   and grouped with its siblings by name like any version. A program without
+   the trailer is not. **Flashpoint** (a `version.txt` naming Flashpoint beside
+   `FPSoftware/`): each `Data/Games/<id>-<timestamp>.zip` it has downloaded is an
+   entry (`FlashpointInstall`, `flashpoint:<id>`), titled from the launcher's
+   `Data/flashpoint.sqlite` opened read-only (the id when it cannot be read).
+   Flashpoint runs its games, so such an entry's install path is the
+   launcher's folder and starting one starts the launcher.
+5. **Parts are already one game** (#476). The scan yields one entry per part
+   folder by design; `GameGrouping` (7m) joins them into one game with segments.
+   No scan change.
+
 ### PC folder scan cost, progress and cancel (Droidtop/tracker#275)
 
 A rescan of 79 PC games on an SD card took 300 s (`pc folders ... 79 games,
@@ -15087,7 +15138,13 @@ this section is tested against:
   with no version in its name, is one game with **two VERSIONS**, and
   `v0.8.1` is what Play starts.
 
-### A version is a FOLDER (decided 2026-09-17)
+### A version is a FOLDER (decided 2026-09-17; a Godot single-file build amended 2026-10-10)
+
+Amended 2026-10-10 (Droidtop/tracker#475, 7h "Detection gaps found by auditing
+a real library"): a program that carries Godot's pack, left loose beside Godot
+games, is an entry of its own, as this section's last paragraph allows ("the
+change is in what a SCAN yields"). Every other loose file stays as described
+below.
 
 `adult/godot/Anomalous_Coffee_Machine_2-1.0.00_deluxe_linux.x86_64` is a
 2 GB Linux ELF **file** sitting beside the folder

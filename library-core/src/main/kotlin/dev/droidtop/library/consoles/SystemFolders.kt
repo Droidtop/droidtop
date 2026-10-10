@@ -50,7 +50,7 @@ object SystemFolders {
                     storeOwner != null ->
                         skipped.add(child, "$storeOwner owns this tree — its games are the PC library's, not a ROM system")
                     else -> {
-                        val system = SystemOverridePrefs.resolveForFolder(context, child.absolutePath, child.name, systemsById)
+                        val system = SystemOverridePrefs.resolveForFolder(context, child, systemsById)
                         when {
                             // A system folder's contents are ROMs, so the
                             // search stops here and the scan takes over.
@@ -99,7 +99,7 @@ object SystemFolders {
             // The path itself is a file when it is the last name: only folders can be system folders.
             if (index == names.size - 1 && !path.isDirectory) break
             if (ScanPrune.skipReason(folder) != null || ScanPrune.storeRootOwner(folder) != null) return null
-            val system = SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)
+            val system = SystemOverridePrefs.resolveForFolder(context, folder, systemsById)
             if (system != null) return Triple(root, folder, system)
         }
         for ((assigned, systemId) in SystemOverridePrefs.assigned(context)) {

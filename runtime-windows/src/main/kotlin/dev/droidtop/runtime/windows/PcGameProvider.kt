@@ -400,7 +400,7 @@ class PcGameProvider(
         // shortcut path, so it launches through the PC runtime seam
         // against its own install directory instead. Any registered store's
         // row does, built in or plugged in.
-        if (StoreLibraries.forKey(entry.id) != null || entry.id.startsWith("folder:")) {
+        if (StoreLibraries.forKey(entry.id) != null || entry.id.startsWith("folder:") || entry.id.startsWith(PcLibrary.FLASHPOINT_PREFIX)) {
             launchStoreGame(entry)
             return
         }

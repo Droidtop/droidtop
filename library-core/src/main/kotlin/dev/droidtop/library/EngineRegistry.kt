@@ -106,6 +106,8 @@ object EngineRegistryParser {
         "renpy-fallback" to GameEngine.RENPY,
         "unreal" to GameEngine.UNREAL,
         "unity" to GameEngine.UNITY,
+        "love2d" to GameEngine.LOVE2D,
+        "ags" to GameEngine.AGS,
     )
 
     /**

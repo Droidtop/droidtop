@@ -95,19 +95,7 @@ object SteamworksShim {
      * The app id of [gameRoot] when it is `steamapps/common/<dir>` of a
      * Steam library: the `appmanifest_*.acf` whose `installdir` names it.
      */
-    internal fun appIdFromManifest(gameRoot: File): Int? {
-        val common = gameRoot.parentFile ?: return null
-        val steamapps = common.parentFile ?: return null
-        if (!common.name.equals("common", ignoreCase = true) || !steamapps.name.equals("steamapps", ignoreCase = true)) return null
-        val manifests = steamapps.listFiles { f -> f.isFile && f.name.startsWith("appmanifest_") && f.name.endsWith(".acf") } ?: return null
-        for (manifest in manifests) {
-            val text = runCatching { manifest.readText() }.getOrNull() ?: continue
-            val installDir = Regex("\"installdir\"\\s+\"([^\"]*)\"", RegexOption.IGNORE_CASE).find(text)?.groupValues?.get(1) ?: continue
-            if (!installDir.equals(gameRoot.name, ignoreCase = true)) continue
-            return Regex("\"appid\"\\s+\"(\\d+)\"", RegexOption.IGNORE_CASE).find(text)?.groupValues?.get(1)?.toIntOrNull()
-        }
-        return null
-    }
+    internal fun appIdFromManifest(gameRoot: File): Int? = dev.droidtop.library.SteamManifests.appIdOf(gameRoot)
 
     /** The DLC app ids a Steam library's manifest lists as installed (`InstalledDepots` entries with a `dlcappid`). */
     internal fun installedDlcFromManifest(gameRoot: File, appId: Int): Set<String> {

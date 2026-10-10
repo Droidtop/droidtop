@@ -3,7 +3,7 @@ package dev.droidtop.library
 import android.content.Context
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
-import dev.droidtop.library.consoles.resolveSystem
+import dev.droidtop.library.consoles.resolveSystemFolder
 import java.io.File
 import java.io.RandomAccessFile
 import java.util.concurrent.CancellationException
@@ -16,6 +16,9 @@ enum class GameEngine {
     RENPY, RPG_MAKER_MV, RPG_MAKER_MZ, RPG_MAKER_VX_ACE, RPG_MAKER_VX, RPG_MAKER_XP,
     RPG_MAKER_2000_2003, KIRIKIRI,
     AUGUST, BURIKO, CATSYSTEM2, CMVS, FLASH_AIR, GODOT, HTML, UNREAL, UNITY,
+    // Rows engines-database.json already carries that the library did not name: a game with no program (a LOVE folder or
+    // .love file, an AGS .ags data file) was not detected at all (docs/SPEC.md 7e2b).
+    LOVE2D, AGS,
 }
 
 /**
@@ -138,6 +141,24 @@ object GameEngineDetector {
             .any { hasEmbeddedPckTrailer(File(facts.folder, it)) }
     }
 
+    /**
+     * The single-file Godot exports left loose in [folder]: programs that
+     * carry the engine's pack inside themselves (the trailer
+     * [hasEmbeddedPckTrailer] reads), not in a folder of their own. Same
+     * bounded look as [isGodot]: at most [GODOT_MAX_TRAILER_READS] programs
+     * are opened, in name order.
+     */
+    internal fun looseGodotBuilds(folder: File): List<File> {
+        val facts = FolderListing(folder)
+        return facts.entryNames().asSequence()
+            .filter { it.substringAfterLast('.', "").lowercase() in GODOT_EXECUTABLE_SUFFIXES && facts.isFile(it) }
+            .sorted()
+            .take(GODOT_MAX_TRAILER_READS)
+            .map { File(folder, it) }
+            .filter { hasEmbeddedPckTrailer(it) }
+            .toList()
+    }
+
     private fun hasEmbeddedPckTrailer(file: File): Boolean {
         val size = file.length()
         if (size < 12) return false
@@ -220,10 +241,10 @@ object GameEngineDetector {
      *   none of them is a second game.
      * - [MAX_SCAN_DEPTH] folders below the root, so a mistakenly-added
      *   storage root cannot walk the whole device.
-     * - Any subdirectory whose name resolves to a known console system is
-     *   skipped at every level (see
-     *   [dev.droidtop.library.consoles.resolveSystem]), since those are
-     *   provably ROM folders. Real, not theoretical: a real ROMs folder's
+     * - Any subdirectory that is a known console system's folder (its name
+     *   resolves to the system AND it holds that system's files, see
+     *   [dev.droidtop.library.consoles.resolveSystemFolder]) is
+     *   skipped at every level, since those are provably ROM folders. Real, not theoretical: a real ROMs folder's
      *   "j2me" system directory had 18,126 entries, and
      *   [isKirikiri]/[isRpgMakerVxAce] each do a full `listFiles()` scan
      *   looking for signature files -- wastefully slow on a folder that
@@ -596,7 +617,7 @@ object GameEngineDetector {
         hooks: ProbeHooks = ProbeHooks(),
     ): Boolean {
         val children = (subfolders ?: folder.listFiles().orEmpty().filter { it.isDirectory })
-            .filter { ScanPrune.isScannableFolder(it) && resolveSystem(it.name, systemsById) == null }
+            .filter { ScanPrune.isScannableFolder(it) && resolveSystemFolder(it, systemsById) == null }
         // Two are needed, so fewer than two cannot answer yes.
         if (children.size < 2) return false
         hooks.planned(children.size)
@@ -737,7 +758,7 @@ object GameEngineDetector {
     ): Boolean {
         if (childDepth > dev.droidtop.library.consoles.MAX_SYSTEM_SEARCH_DEPTH) return false
         if (ScanPrune.storeTreeRoot(dir) != null) return false
-        return resolveSystem(dir.name, systemsById) != null
+        return resolveSystemFolder(dir, systemsById) != null
     }
 
     /**
@@ -859,7 +880,14 @@ object GameEngineDetector {
         if (subtreeHere != null && !isStoreRoot && below.size <= 1 && below.none { it.precise }) {
             return listOf(Walked(DetectedGame(folder, folder, subtreeHere), precise = false))
         }
-        // A folder holding games is a wrapper, not a game of its own.
+        // A folder holding games is a wrapper, not a game of its own. A
+        // single-file Godot export left loose beside them is a game of its
+        // own (docs/SPEC.md 7m, "A single-file game is an entry"): the file
+        // is the entry, so it is a version of its siblings only through the
+        // name grouping, never by being a folder.
+        if (preciseHere == GameEngine.GODOT && holdsGames) {
+            return below + looseGodotBuilds(folder).map { Walked(DetectedGame(it, it, GameEngine.GODOT), precise = true) }
+        }
         return below
     }
 
@@ -1210,8 +1238,10 @@ object GameLaunchStrategyResolver {
         preferredOrder = preferredOrder.orEmpty(),
     )
 
+    // A single-file game ([GameEngineDetector.looseGodotBuilds]) is its own program.
     private fun hasWindowsExecutable(folder: File): Boolean =
-        folder.listFiles()?.any { it.isFile && it.extension.lowercase() == "exe" } == true
+        if (folder.isFile) folder.extension.lowercase() == "exe"
+        else folder.listFiles()?.any { it.isFile && it.extension.lowercase() == "exe" } == true
 
     /**
      * Real, checkable evidence that this folder contains a native Linux
@@ -1230,6 +1260,7 @@ object GameLaunchStrategyResolver {
      *   the failure later.
      */
     private fun hasLinuxBuild(folder: File): Boolean {
+        if (folder.isFile) return folder.extension.lowercase() in LINUX_LAUNCHER_EXTENSIONS
         val entries = folder.listFiles() ?: return false
         if (entries.any { it.isFile && it.extension.lowercase() in LINUX_LAUNCHER_EXTENSIONS }) return true
         return File(folder, "lib").listFiles()?.any { it.isDirectory && it.name.contains("linux") } == true
@@ -1257,6 +1288,8 @@ internal fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
     GameEngine.HTML -> LibraryEntryKind.HTML
     GameEngine.UNREAL -> LibraryEntryKind.UNREAL
     GameEngine.UNITY -> LibraryEntryKind.UNITY
+    GameEngine.LOVE2D -> LibraryEntryKind.LOVE2D
+    GameEngine.AGS -> LibraryEntryKind.AGS
 }
 
 /**
@@ -1798,14 +1831,20 @@ class EngineGameProvider(
             }
         }
 
+        // A single-file game ([GameEngineDetector.looseGodotBuilds]) is its
+        // own program, run from the folder it sits in.
+        val singleFile = gameRoot.isFile
+        val folder = if (singleFile) gameRoot.parentFile ?: gameRoot else gameRoot
         // The game's own Wine settings (docs/SPEC.md 7i) name its program
         // when it has them; detection otherwise, as before.
-        val windowsLaunch = if (windows) {
+        val windowsLaunch = if (windows && !singleFile) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { WindowsLaunchResolver.resolve(context, entryId, gameRoot) }
         } else {
             null
         }
-        val executable = if (windows) {
+        val executable = if (singleFile) {
+            gameRoot
+        } else if (windows) {
             // Several equally likely programs: the person chooses (the shell
             // offers the choice with the failure), the same as a PC game.
             windowsLaunch?.executable ?: throw ProgramNotIdentified(entryId, gameRoot.name, gameRoot.absolutePath)
@@ -1817,9 +1856,9 @@ class EngineGameProvider(
         )
 
         val result = if (windows) {
-            runtime.launchWindows(executable, gameRoot, windowsLaunch?.workingDir ?: gameRoot, windowsLaunch?.arguments.orEmpty(), entryId)
+            runtime.launchWindows(executable, folder, windowsLaunch?.workingDir ?: folder, windowsLaunch?.arguments.orEmpty(), entryId)
         } else {
-            runtime.launchLinux(executable, gameRoot, entryId)
+            runtime.launchLinux(executable, folder, entryId)
         }
         check(result.succeeded) { "Launching ${executable.name} failed: ${result.detail}" }
     }

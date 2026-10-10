@@ -347,6 +347,8 @@ fun GameEngine.displayName(): String = when (this) {
     GameEngine.HTML -> "HTML"
     GameEngine.UNREAL -> "Unreal"
     GameEngine.UNITY -> "Unity"
+    GameEngine.LOVE2D -> "LOVE"
+    GameEngine.AGS -> "AGS"
 }
 
 /**

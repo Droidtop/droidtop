@@ -351,6 +351,8 @@ class GameEngineDetectorTest {
         File(tmp.root, "Roms/n3ds/renpy").mkdirs()
         File(tmp.root, "Roms/n3ds/game").mkdirs()
         File(tmp.root, "Roms/n3ds/game/.keep").createNewFile()
+        // A folder is a system folder when it holds the system's files.
+        File(tmp.root, "Roms/n3ds/Some Game.3ds").createNewFile()
         File(tmp.root, "Roms/VN1/renpy").mkdirs()
         File(tmp.root, "Roms/VN1/game").mkdirs()
         File(tmp.root, "Roms/VN1/game/.keep").createNewFile()

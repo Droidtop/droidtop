@@ -298,6 +298,58 @@ internal fun resolveSystem(folderName: String, systemsById: Map<String, ConsoleS
 }
 
 /**
+ * The system a FOLDER is, not merely one its name matches
+ * (Droidtop/tracker#472, docs/SPEC.md 7h "Detection gaps found by auditing a real library").
+ * ES-DE system ids are ordinary words (`ags`, `flash`, `pc`, `android`), so a
+ * collection folder `Manual/ags` holding Adventure Game Studio games, or
+ * `adult/flash` holding an Adobe AIR game, resolved to a system and both
+ * walks skipped it: the games were lost and the AIR runtime's own
+ * `library.swf` files were listed as Flash ROMs. A folder is a system folder
+ * only when it holds that system's files ([holdsSystemFiles]); the same rule
+ * the desktop agent's scanner applies, so the two agree.
+ */
+internal fun resolveSystemFolder(dir: File, systemsById: Map<String, ConsoleSystemDef>): ConsoleSystemDef? =
+    resolveSystem(dir.name, systemsById)?.takeIf { holdsSystemFiles(dir, it) }
+
+/** How many of a folder's subfolders [holdsSystemFiles] lists, and how many entries it stats to find them. */
+private const val MAX_PROBED_SUBFOLDERS = 100
+private const val MAX_PROBED_ENTRIES = 500
+
+/**
+ * Whether [dir] holds a file of [system]'s extensions, directly or in one of
+ * its own subfolders (`gba/Game.gba`, `ps2/Kingdom Hearts (USA)/Kingdom
+ * Hearts (USA).iso`). A folder with nothing in it but ES-DE's `systeminfo.txt`
+ * or hidden files is an unfilled system folder and counts too: nothing is
+ * lost by walking it as a system, and the Console systems page keeps
+ * listing it. Names are compared first and only a name that matches is
+ * `stat`ed, so a folder of thousands of ROMs answers on its first entries.
+ * Disk work; never on the main thread.
+ */
+internal fun holdsSystemFiles(dir: File, system: ConsoleSystemDef): Boolean {
+    val entries = dir.listFiles() ?: return false
+    val extensions = system.extensions
+    var anything = false
+    for (entry in entries) {
+        val name = entry.name
+        if (name.startsWith(".") || name.equals("systeminfo.txt", ignoreCase = true)) continue
+        anything = true
+        if (name.substringAfterLast('.', "").lowercase() in extensions && entry.isFile) return true
+    }
+    if (!anything) return true
+    var statted = 0
+    var listed = 0
+    for (entry in entries) {
+        if (entry.name.startsWith(".")) continue
+        if (++statted > MAX_PROBED_ENTRIES) break
+        if (!entry.isDirectory) continue
+        if (++listed > MAX_PROBED_SUBFOLDERS) break
+        val inside = entry.listFiles() ?: continue
+        if (inside.any { it.name.substringAfterLast('.', "").lowercase() in extensions && it.isFile }) return true
+    }
+    return false
+}
+
+/**
  * [LibraryProvider] for real console ROMs, scanning `<root>/<systemId>/
  * <romFile>` -- the same layout ES-DE itself uses (confirmed against a
  * real device's existing ROMs folder this session), so an existing

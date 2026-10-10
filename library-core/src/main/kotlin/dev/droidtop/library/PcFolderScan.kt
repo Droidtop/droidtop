@@ -66,6 +66,16 @@ import java.util.concurrent.ConcurrentHashMap
  *     tells that shape from an install's payload folders: `bin` and
  *     `bin_plus` hold an executable and no engine at all.
  *
+ *  7. **A Steam library folder lists what its manifests say is installed**
+ *     ([SteamManifests]): `steamapps/common/<installdir>` of each fully
+ *     installed app, however deep its program sits. A library met in a
+ *     games root is already four folders down at `steamapps/common/<game>`,
+ *     so Baldur's Gate 3 (`bin/bg3.exe`), Kingdom Come: Deliverance and the
+ *     like were past the depth bound. The depth-bound walk still runs and
+ *     what it finds outside the manifests' folders is kept (a game folder
+ *     with no manifest), and a result inside a manifest's folder is that
+ *     folder. The desktop agent reads the same manifests.
+ *
  * Engine games are NOT this scan's business: [GameEngineDetector] finds
  * them, and `PcGameProvider` already drops a PC entry for any folder
  * engine detection owns (docs/SPEC.md 7g).
@@ -101,6 +111,9 @@ object PcFolderScan {
 
     /** Same bound as [GameEngineDetector.MAX_SCAN_DEPTH], for the same reason. */
     const val MAX_SCAN_DEPTH = 4
+
+    /** [ScanPrune.storeRootOwner]'s name for a Steam library folder. */
+    private const val STEAM = "Steam"
 
     /** ES-DE's own PC systems: a console-style name whose folders ARE where PC games live. */
     private val PC_SYSTEM_IDS = setOf("pc", "windows")
@@ -532,6 +545,16 @@ object PcFolderScan {
 
         fun walk(folder: File, depth: Int): List<File> {
             if (!walkable(folder, depth)) return emptyList()
+            val found = walkFolder(folder, depth)
+            if (ScanPrune.storeRootOwner(folder) != STEAM) return found
+            // Rule 7: a Steam library says what it has installed.
+            val installed = SteamManifests.installedGameFolders(folder)
+            if (installed.isEmpty()) return found
+            val inInstalled = { game: File -> installed.any { game.path == it.path || game.path.startsWith(it.path + "/") } }
+            return (found.filterNot(inInstalled) + installed).sortedBy { it.path.lowercase() }
+        }
+
+        private fun walkFolder(folder: File, depth: Int): List<File> {
             val listing = listingOf(folder)
             // A store's own install root is the store's business, never a
             // game, however many executables its client drops in it.

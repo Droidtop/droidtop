@@ -46,4 +46,15 @@ object SystemOverridePrefs {
         if (overrideId != null) return systemsById[overrideId]?.takeIf { it.canResolveFromFolder() }
         return resolveSystem(folderName, systemsById)
     }
+
+    /**
+     * The system [folder] is: an explicit override first, else
+     * [resolveSystemFolder] -- the folder's name AND the system's files in it,
+     * so a collection folder that only shares a system's name is not one.
+     */
+    fun resolveForFolder(context: Context, folder: java.io.File, systemsById: Map<String, ConsoleSystemDef>): ConsoleSystemDef? {
+        val overrideId = get(context, folder.absolutePath)
+        if (overrideId != null) return systemsById[overrideId]?.takeIf { it.canResolveFromFolder() }
+        return resolveSystemFolder(folder, systemsById)
+    }
 }

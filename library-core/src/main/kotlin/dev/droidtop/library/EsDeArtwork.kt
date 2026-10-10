@@ -427,4 +427,6 @@ fun GameEngine.esDeSystemName(): String = when (this) {
     GameEngine.HTML -> "html"
     GameEngine.UNREAL -> "unreal"
     GameEngine.UNITY -> "unity"
+    GameEngine.LOVE2D -> "love2d"
+    GameEngine.AGS -> "ags"
 }

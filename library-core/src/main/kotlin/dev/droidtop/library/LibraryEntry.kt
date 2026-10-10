@@ -549,6 +549,8 @@ enum class LibraryEntryKind {
     HTML,
     UNREAL,
     UNITY,
+    LOVE2D,
+    AGS,
 
     /**
      * A real console ROM (NES, GBA, PS1, ...), launched via
@@ -636,7 +638,7 @@ fun LibraryEntryKind.itemName(): String = when (this) {
     LibraryEntryKind.RPG_MAKER_2000_2003,
     -> "RPG Maker game"
     LibraryEntryKind.GODOT, LibraryEntryKind.UNREAL, LibraryEntryKind.UNITY,
-    LibraryEntryKind.HTML,
+    LibraryEntryKind.HTML, LibraryEntryKind.LOVE2D, LibraryEntryKind.AGS,
     -> "PC game"
 }
 
@@ -664,6 +666,8 @@ fun LibraryEntryKind.displayName(): String = when (this) {
     LibraryEntryKind.UNREAL -> "Unreal Engine"
     LibraryEntryKind.UNITY -> "Unity"
     LibraryEntryKind.HTML -> "HTML"
+    LibraryEntryKind.LOVE2D -> "LOVE"
+    LibraryEntryKind.AGS -> "Adventure Game Studio"
 }
 
 /**

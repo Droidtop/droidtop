@@ -5,6 +5,7 @@ import dev.droidtop.runtime.windows.utils.CustomGameScanner
 import dev.droidtop.runtime.windows.utils.ScannedGame
 import dev.droidtop.library.EngineVerdictStore
 import dev.droidtop.library.GameTitleParser
+import dev.droidtop.library.FlashpointInstall
 import dev.droidtop.library.PcFolderScan
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.PcSource
@@ -253,10 +254,13 @@ object PcLibrary {
                 // scanned before, the previous run's value hid the race
                 // completely -- which is exactly why build 537 showed 171
                 // games and a freshly installed 539 showed 151.
-                val games = group.gameFolders
-                    .mapNotNull { folder -> runCatching { CustomGameScanner.createLibraryItemFromFolder(folder) }.getOrNull() }
-                    .distinctBy { it.appId }
-                    .map { it.toGame(context, group.root) }
+                val games = (
+                    group.gameFolders
+                        .mapNotNull { folder -> runCatching { CustomGameScanner.createLibraryItemFromFolder(folder) }.getOrNull() }
+                        .distinctBy { it.appId }
+                        .map { it.toGame(context, group.root) } +
+                        group.gameFolders.flatMap { flashpointGames(it, group.root) }
+                    )
                     .sortedBy { it.title.lowercase() }
                 val folderGroup = FolderGroup(
                     root = group.root,
@@ -337,13 +341,40 @@ object PcLibrary {
             val current = dev.droidtop.runtime.windows.PrefManager.customGameManualFolders
             if (!current.containsAll(gameFolders)) dev.droidtop.runtime.windows.PrefManager.customGameManualFolders = current + gameFolders
         }.onFailure { android.util.Log.w(TAG, "Could not tell the folder scanner which folders are games", it) }
-        val games = gameFolders
-            .mapNotNull { gameFolder -> runCatching { CustomGameScanner.createLibraryItemFromFolder(gameFolder) }.getOrNull() }
-            .distinctBy { it.appId }
-            .map { it.toGame(context, root.absolutePath) }
+        val games = (
+            gameFolders
+                .mapNotNull { gameFolder -> runCatching { CustomGameScanner.createLibraryItemFromFolder(gameFolder) }.getOrNull() }
+                .distinctBy { it.appId }
+                .map { it.toGame(context, root.absolutePath) } +
+                gameFolders.flatMap { flashpointGames(it, root.absolutePath) }
+            )
             .sortedBy { it.title.lowercase() }
         FolderAt(root.absolutePath, top.absolutePath, folder.absolutePath, games)
     }
+
+    /** The prefix of the id of a game a Flashpoint install has downloaded ([flashpointGames]). */
+    const val FLASHPOINT_PREFIX = "flashpoint:"
+
+    /**
+     * The games a Flashpoint install in [folderPath] has downloaded
+     * ([FlashpointInstall], docs/SPEC.md 7g), each its own entry named from the
+     * launcher's database. Flashpoint runs them, so an entry's install path is
+     * the launcher's folder and starting one starts the launcher. Nothing for a
+     * folder that is no Flashpoint install; reads the folder, so off the main thread.
+     */
+    private fun flashpointGames(folderPath: String, root: String): List<Game> =
+        runCatching { FlashpointInstall.downloads(File(folderPath)) }.getOrDefault(emptyList()).map { download ->
+            Game(
+                id = FLASHPOINT_PREFIX + download.id,
+                source = PcSource.Folder(root),
+                nativeId = download.id,
+                title = download.title,
+                installed = true,
+                installPath = folderPath,
+                sizeBytes = download.sizeBytes,
+                artUrl = null,
+            )
+        }
 
     /** Whether the vendored scanner was told, by hand, that [path] is a game folder. */
     fun isManualFolder(path: String): Boolean =
@@ -732,7 +763,7 @@ object PcLibrary {
  * that directory and the `pc` entry is suppressed (see
  * `GameEngineDetector.engineOwnsInstall`).
  */
-fun PcLibrary.Game.toStoreInstall(): StoreInstall? = installDir?.let { dir ->
+fun PcLibrary.Game.toStoreInstall(): StoreInstall? = installDir?.takeUnless { id.startsWith(PcLibrary.FLASHPOINT_PREFIX) }?.let { dir ->
     StoreInstall(installDir = dir, pcInfo = toPcInfo(), artworkUri = artUrl)
 }
 
