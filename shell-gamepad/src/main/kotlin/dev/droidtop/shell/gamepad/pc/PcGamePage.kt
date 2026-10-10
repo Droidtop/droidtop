@@ -290,11 +290,14 @@ internal fun PcGamePage(
             }.getOrDefault(emptyList())
         }
     }
+    val pairedComputers by produceState(emptyList<dev.droidtop.net.peer.Computer>(), entry.id) {
+        value = withContext(Dispatchers.IO) { runCatching { dev.droidtop.net.peer.Computers.list(context) }.getOrDefault(emptyList()) }
+    }
     val originText by produceState<String?>(null, entry.id) {
         value = withContext(Dispatchers.IO) { dev.droidtop.library.originLabel(entry, 1, roots = pcRootsOf(context)).full }
     }
     val sizeLine = (folderSize ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) }
-    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere) {
+    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers) {
         pageRows(
             entry, play, runner, siblings,
             origin = originText,
@@ -336,7 +339,21 @@ internal fun PcGamePage(
                 )
             } else {
                 emptyList()
-            } + elsewhereRows(elsewhere),
+            } + elsewhereRows(
+                elsewhere,
+                here = dev.droidtop.library.SetVersions.shown(entry, setVersion)?.first,
+                computers = pairedComputers,
+                onGet = if (entry.groupingPath() != null) {
+                    { computer, version -> dev.droidtop.library.computers.ComputerGames.get(context, computer, entry, version) }
+                } else {
+                    null
+                },
+                onSend = if (entry.groupingPath() != null) {
+                    { computer -> dev.droidtop.library.computers.ComputerGames.send(context, computer, entry) }
+                } else {
+                    null
+                },
+            ),
             onGetInstaller = { marker ->
                 val store = dev.droidtop.library.stores.StoreLibraries.byId(marker.storeId)
                 val page = store?.webPages?.accountLibrary
@@ -1576,20 +1593,39 @@ internal fun heroCaption(entry: LibraryEntry, now: Long): String {
 
 /**
  * The game's versions on the person's other devices, on Versions and updates
- * (docs/SPEC.md 7o, "Versions"): one row per device, its version now or last,
- * and the ones it had before.
+ * (docs/SPEC.md 7o, "Versions" and "Game updates"): one row per device, its
+ * version now or last, and the ones it had before. A paired computer's newer
+ * version is copied here as a new version folder when its row is chosen
+ * ([onGet]), and "Send this version" copies this one to a computer ([onSend]).
  */
-internal fun elsewhereRows(seen: List<dev.droidtop.library.computers.ComputerLibrary.VersionElsewhere>): List<PageFact> =
-    seen.groupBy { it.device }.map { (device, versions) ->
-        val now = versions.firstOrNull { it.current }
-        val before = versions.filter { it != now }.map { it.version }.distinct()
-        PageFact(
-            title = "On $device",
-            value = (now ?: versions.first()).version.let { if (it.firstOrNull()?.isDigit() == true) "v$it" else it },
-            subtitle = listOfNotNull(
-                if (now == null) "No longer installed there" else null,
-                before.takeIf { it.isNotEmpty() }?.let { "Before: " + it.joinToString(", ") },
-            ).joinToString(". ").ifBlank { null },
-            tab = PageTab.VERSIONS,
-        )
-    }
+internal fun elsewhereRows(
+    seen: List<dev.droidtop.library.computers.ComputerLibrary.VersionElsewhere>,
+    here: String? = null,
+    computers: List<dev.droidtop.net.peer.Computer> = emptyList(),
+    onGet: ((dev.droidtop.net.peer.Computer, String) -> Unit)? = null,
+    onSend: ((dev.droidtop.net.peer.Computer) -> Unit)? = null,
+): List<PageFact> = seen.groupBy { it.device }.map { (device, versions) ->
+    val now = versions.firstOrNull { it.current }
+    val before = versions.filter { it != now }.map { it.version }.distinct()
+    val computer = now?.let { n -> computers.firstOrNull { it.id == n.deviceId } }
+    val newer = now != null && (here == null || dev.droidtop.library.computers.ComputerLibrary.newerThan(now.version, here))
+    val get = if (computer != null && newer && onGet != null) ({ onGet(computer, now.version) }) else null
+    PageFact(
+        title = "On $device",
+        value = (now ?: versions.first()).version.let { if (it.firstOrNull()?.isDigit() == true) "v$it" else it },
+        subtitle = listOfNotNull(
+            if (now == null) "No longer installed there" else null,
+            before.takeIf { it.isNotEmpty() }?.let { "Before: " + it.joinToString(", ") },
+            if (get != null) "Select to copy it here as a new version; the one you have stays" else null,
+        ).joinToString(". ").ifBlank { null },
+        onActivate = get,
+        tab = PageTab.VERSIONS,
+    )
+} + if (onSend == null) emptyList() else computers.map { computer ->
+    PageFact(
+        title = "Send this version to ${computer.name}",
+        subtitle = "Copied to its game folder as a new folder; nothing there is replaced",
+        onActivate = { onSend(computer) },
+        tab = PageTab.VERSIONS,
+    )
+}

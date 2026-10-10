@@ -15846,6 +15846,32 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
 - The game page's Versions and updates tab has a row per other device ("On
   DESKTOP-PC", its version now, and the ones it had before).
 
+### Game updates (Droidtop/tracker#469 part 3)
+
+Owner, 2026-10-10: "If I install an update to a game on my desktop, I should
+be able to sync it to the handheld and version-manage it automatically".
+Library management is droidtop's own job; the rule about game files binds
+agents, not droidtop's features.
+
+- **A copy is a new version folder** (7m, "A version is a FOLDER"). It lands
+  beside the game's folder here, named `<name> v<version>` so `GameNaming`
+  reads it as the same game at that version, and the library indexes it at
+  once (`Library.indexPaths`). The version that was here stays. Rolling back
+  is choosing it in Versions; nothing is changed in place.
+- **From the game's Versions and updates tab** (`ComputerGames`):
+  - a paired computer's row with a newer version: choosing it copies that
+    version here;
+  - "Send this version to <computer>" copies this folder to the computer's
+    first game folder, never into a store's install folders.
+- **It runs as a job in Downloads**, with its progress. The agent core
+  builds the folder in `<name>.dtpart/`, checks every file's SHA-256, and
+  renames it into place only when whole. A copy that stopped resumes where
+  it stopped. It goes over the session channel (LAN or WireGuard), never the
+  cloud folder.
+- **Not built yet:** a per-game "Keep updated from <computer>" that copies
+  new versions by itself, and asking to remove older version folders when
+  space runs short.
+
 ### Transports
 
 The design's order (droidtop-agent docs/DESIGN.md section 10) holds:

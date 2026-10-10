@@ -47,6 +47,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.app.DesktopFontsJob.register(appContext)
         // A store game's cloud saves, uploaded when the game ends, a job each (7g, "Stores").
         dev.droidtop.library.stores.StoreSaves.register(appContext)
+        // Copying a game's version between this device and a computer (docs/SPEC.md 7o, "Game updates").
+        dev.droidtop.library.computers.ComputerGames.register(appContext) { dev.droidtop.app.LibraryCore.library(it) }
         // Every social provider's message notifications and the Quick Menu's unread count
         // (SPEC "Social"), then Steam, which stays connected while signed in for friends and
         // chat: its service, then the connection itself (7g, "Stores").

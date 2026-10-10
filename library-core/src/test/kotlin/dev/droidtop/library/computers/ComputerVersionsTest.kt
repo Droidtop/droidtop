@@ -28,4 +28,14 @@ class ComputerVersionsTest {
         )
         assertEquals("0.9.6", links.latestKnown)
     }
+
+    @Test
+    fun `a version copied here is named so it reads as the same game at that version`() {
+        val entry = dev.droidtop.library.LibraryEntry(id = "/games/Eternum-0.9.5-pc", title = "Eternum", kind = dev.droidtop.library.LibraryEntryKind.RENPY)
+        val name = ComputerGames.folderName(entry, "v0.9.6")
+        assertEquals("Eternum v0.9.6", name)
+        val derived = dev.droidtop.library.GameNaming.derive("/games/$name")
+        assertEquals("0.9.6", derived.version)
+        assertEquals(dev.droidtop.library.GameNaming.derive(entry.id).name, derived.name)
+    }
 }
