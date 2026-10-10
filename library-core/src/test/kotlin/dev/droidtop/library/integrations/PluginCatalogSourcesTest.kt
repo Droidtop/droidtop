@@ -55,6 +55,32 @@ class PluginCatalogSourcesTest {
     }
 
     @Test
+    fun `catalog links name an address or a plugin and nothing else`() {
+        val repo = "https%3A%2F%2Fgithub.com%2Fgamegrab-sources%2Fcatalog"
+        assertEquals("https://github.com/gamegrab-sources/catalog", PluginCatalogSources.addressFromLink("droidtop://add-catalog?address=$repo"))
+        assertEquals(
+            "https://github.com/gamegrab-sources/catalog",
+            PluginCatalogSources.addressFromLink("https://droidtop.github.io/add-catalog/?address=$repo"),
+        )
+        assertNull(PluginCatalogSources.addressFromLink("droidtop://add-catalog?address=http%3A%2F%2Fx"))
+        assertNull(PluginCatalogSources.addressFromLink("https://example.com/add-catalog?address=$repo"))
+        assertNull(PluginCatalogSources.addressFromLink("droidtop://install-plugin?catalog=$repo&id=a.b"))
+        assertNull(PluginCatalogSources.addressFromLink("droidtop://add-catalog?address=%zz"))
+
+        val install = PluginCatalogSources.installFromLink("droidtop://install-plugin?catalog=$repo&id=bi0shacker001.romgi-3ds-decrypt")
+        assertEquals(PluginCatalogSources.InstallLink("https://github.com/gamegrab-sources/catalog", "bi0shacker001.romgi-3ds-decrypt"), install)
+        // droidtop's own catalog needs no address.
+        assertEquals(
+            PluginCatalogSources.InstallLink(null, "droidtop.retroarch"),
+            PluginCatalogSources.installFromLink("https://droidtop.github.io/install-plugin?id=droidtop.retroarch"),
+        )
+        assertNull(PluginCatalogSources.installFromLink("droidtop://install-plugin?catalog=$repo"))
+        assertNull(PluginCatalogSources.installFromLink("droidtop://install-plugin?catalog=http%3A%2F%2Fx&id=a.b"))
+        assertNull(PluginCatalogSources.installFromLink("droidtop://install-plugin?id=..%2F..%2Fx"))
+        assertNull(PluginCatalogSources.installFromLink("droidtop://add-catalog?address=$repo&id=a.b"))
+    }
+
+    @Test
     fun `the store keeps added catalogs and never the official one`() {
         val file = tmp.newFile("plugin-catalogs.json")
         PluginCatalogSources.put(file, added)

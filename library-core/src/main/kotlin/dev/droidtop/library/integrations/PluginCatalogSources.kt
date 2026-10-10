@@ -166,7 +166,7 @@ object PluginCatalogSources {
     /** The known catalogs the person has not added yet. */
     fun knownNotAdded(added: List<PluginCatalogSource>): List<KnownCatalog> = KNOWN.filter { known -> added.none { it.id == known.id } }
 
-    /** `droidtop://add-catalog?address=<catalog address>`: a link a catalog's own page can carry. */
+    /** `droidtop://add-catalog?address=<catalog address>`: a link a catalog's own page can carry. [LINK_SCHEME] is shared by every droidtop:// link. */
     const val LINK_SCHEME = "droidtop"
     const val LINK_HOST = "add-catalog"
 
@@ -180,17 +180,49 @@ object PluginCatalogSources {
      * person's Accept, so a link can never add or trust anything by itself.
      */
     fun addressFromLink(link: String): String? {
+        val query = linkQuery(link, LINK_HOST, WEB_LINK_PATH) ?: return null
+        val address = query["address"] ?: query["url"] ?: return null
+        return address.takeIf { indexUrlFor(it) != null }
+    }
+
+    /** `droidtop://install-plugin?catalog=<catalog address>&id=<plugin id>`, and its https form, for a plugin's page in a catalog. */
+    const val INSTALL_LINK_HOST = "install-plugin"
+    const val WEB_INSTALL_PATH = "/install-plugin"
+
+    /** A plugin id as a catalog lists it: "<origin>.<name>". Anything else is no plugin a link can name. */
+    private val PLUGIN_ID = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+
+    /** What an install-plugin link names: [catalog] is the catalog's address (null: droidtop's own), [pluginId] the plugin in it. */
+    data class InstallLink(val catalog: String?, val pluginId: String)
+
+    /**
+     * The plugin an install-plugin link names, or null when [link] is not one. Like [addressFromLink] it only names:
+     * opening it shows that plugin's install review from a catalog the person already has (or the catalog's own review
+     * when it is not added yet), and installing is the person's press there; the plugin still runs only after the person
+     * approves it on the Plugins screen.
+     */
+    fun installFromLink(link: String): InstallLink? {
+        val query = linkQuery(link, INSTALL_LINK_HOST, WEB_INSTALL_PATH) ?: return null
+        val id = query["id"]?.takeIf { PLUGIN_ID.matches(it) } ?: return null
+        val catalog = query["catalog"]
+        if (catalog != null && indexUrlFor(catalog) == null) return null
+        return InstallLink(catalog, id)
+    }
+
+    /** The decoded query of [link] when it is the droidtop:// link on [host] or the https one on [path] at droidtop.github.io; the first of a repeated name wins. */
+    private fun linkQuery(link: String, host: String, path: String): Map<String, String>? {
         val uri = runCatching { URI(link.trim()) }.getOrNull() ?: return null
         val scheme = uri.scheme?.lowercase()
-        val host = uri.host?.lowercase()
-        val isLink = (scheme == LINK_SCHEME && host == LINK_HOST) ||
-            (scheme == "https" && host == WEB_LINK_HOST && uri.path.orEmpty().trimEnd('/') == WEB_LINK_PATH)
+        val isLink = (scheme == LINK_SCHEME && uri.host?.lowercase() == host) ||
+            (scheme == "https" && uri.host?.lowercase() == WEB_LINK_HOST && uri.path.orEmpty().trimEnd('/') == path)
         if (!isLink) return null
-        val address = uri.rawQuery.orEmpty().split('&').firstNotNullOfOrNull { pair ->
-            val name = pair.substringBefore('=')
-            if (name == "address" || name == "url") java.net.URLDecoder.decode(pair.substringAfter('=', ""), "UTF-8") else null
-        } ?: return null
-        return address.takeIf { indexUrlFor(it) != null }
+        return runCatching {
+            val query = LinkedHashMap<String, String>()
+            uri.rawQuery.orEmpty().split('&').filter { it.contains('=') }.forEach { pair ->
+                query.putIfAbsent(pair.substringBefore('='), java.net.URLDecoder.decode(pair.substringAfter('='), "UTF-8"))
+            }
+            query
+        }.getOrNull()
     }
 
     /** A file published beside the index: the same folder, another name. */

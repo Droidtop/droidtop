@@ -186,8 +186,10 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(AcquireContentSources.chooseSystemScreen())
         SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(pluginKeysScreen())
-        // Opened on its own by an add-catalog link (AddCatalogLinkActivity), as well as inside Plugins > Add.
+        // Opened on their own by the catalog links (CatalogLinkActivity); More catalogs is also inside Plugins > Add.
         SettingsScreenRegistry.register(PluginCatalogScreen.screen())
+        SettingsScreenRegistry.register(PluginCatalogScreen.installLinkScreen())
+        SettingsScreenRegistry.register(PluginCatalogScreen.officialScreen())
         SettingsScreenRegistry.register(PluginJobsScreen.screen())
         SettingsScreenRegistry.register(DownloadRulesCatalog.screen())
         SettingsScreenRegistry.register(windowsGamesScreen())

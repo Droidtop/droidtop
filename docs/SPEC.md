@@ -18324,24 +18324,45 @@ what the index says is display data, never a trust decision.
       The list holds gamegrab-sources/catalog (the first one, which "droidtop
       ships no address for" used to say). A known catalog disappears from the
       list once it is added.
-    - **An add-catalog link**, which a catalog's own README can carry:
-      `droidtop://add-catalog?address=<catalog address>` and, for places that
-      render only web links, `https://droidtop.github.io/add-catalog?address=
+    - **An add-catalog link**, which a catalog's own README and web page can
+      carry: `droidtop://add-catalog?address=<catalog address>` and, for places
+      that render only web links, `https://droidtop.github.io/add-catalog?address=
       <catalog address>` (`PluginCatalogSources.addressFromLink`; `address` or
-      `url`, URL-encoded, https only). `AddCatalogLinkActivity` has no screen of
+      `url`, URL-encoded, https only). `CatalogLinkActivity` has no screen of
       its own: it fetches the catalog (`PluginCatalogScreen.prepareLink`) and
       opens More catalogs on its review. **A link can neither add nor trust
       anything**: it only fetches an https address and shows a review, and
       adding is the Accept on that review (the same screen, the same read-gate).
       Where Settings is hidden (Kiosk, Kid) it does nothing. An address that is
-      already added, is droidtop's own, or cannot be fetched is told to the
-      person in a line, and More catalogs opens with the address filled in.
+      already added or cannot be fetched is told to the person in a line, and
+      More catalogs opens with the address filled in; droidtop's own catalog is
+      always there, so its link opens that catalog's screen instead of a review.
       The https form is declared as an unverified web link on a host the Droidtop
-      organisation owns; a page there that sends a browser on to the
-      `droidtop://` form is not published yet, so until it is a README's
-      working routes are the QR code (Read a QR code), the plain address, and
-      the `droidtop://` link in places that open it.
-    - The QR code and the address field, unchanged.
+      organisation owns, and the page there (`droidtop.github.io/add-catalog`,
+      "The web catalog" below) validates the address and offers "Open in
+      droidtop" and "Copy address" for a device without the app.
+    - **An install-plugin link** (Droidtop/tracker#458), which a catalog's web
+      page carries on every plugin: `droidtop://install-plugin?catalog=<catalog
+      address>&id=<plugin id>` and `https://droidtop.github.io/install-plugin?...`
+      (`PluginCatalogSources.installFromLink`; `catalog` is optional and means
+      droidtop's own catalog; the id is `[A-Za-z0-9][A-Za-z0-9._-]*`, so a link
+      cannot name a path). `CatalogLinkActivity` opens the plugin's **install
+      review** (`PluginCatalogScreen.installLinkScreen`): its label, description,
+      the catalog it comes from with the same Unofficial chip, a line saying what
+      droidtop checks and that nothing runs before approval, and the ordinary
+      Install or Update row of that catalog, which here asks "Install <plugin>
+      <version> from <catalog>?" before it does anything (`rowFor(reviewed =
+      true)`). Same rules as add-catalog: a link names, the person confirms.
+      The install is the one install path (`PluginCatalog.install`), so the
+      plugin still waits for approval on the Plugins screen, where every
+      permission is shown. A plugin of a catalog the person has not added opens
+      that catalog's review instead (its notice comes before anything it lists)
+      with a line to open the link again afterwards. A plugin the catalog does
+      not list, or a catalog whose notice changed, says so on the review screen.
+    - The QR code and the address field. A catalog's QR code carries its
+      add-catalog link (a phone camera opens the web page, which opens droidtop);
+      "Read a QR code" accepts that link as well as a bare address
+      (`addressFromLink(text) ?: text`).
   - **Format.** An added catalog's index is the same schema 1 index with
     two more top-level blocks, both required for an added catalog and
     absent from droidtop's own: `catalog` {`id` ("owner/name" of the
@@ -18472,10 +18493,57 @@ what the index says is display data, never a trust decision.
   HTTP status, and that state remains for a device that cannot reach it.
   The gamegrab-sources catalog builds its index with the same script adapted to
   its organisation (a separate repository, so a copy with the same rules).
+- **The web catalog (owner, 2026-10-10, Droidtop/tracker#458: "the catalog can
+  also be browsable over the web, making tap-to-add repos simpler").** A catalog
+  is also a web page, generated from its own `index.json`; one generator,
+  `generator/build_site.py` (python standard library), makes both.
+  - **droidtop.github.io** (repository Droidtop/droidtop.github.io, GitHub Pages
+    from a workflow, rebuilt every three hours and on a push) publishes the
+    official catalog and the two link pages. **The gamegrab-sources catalog's
+    page is published by the gamegrab-sources organisation** (its catalog
+    repository's own Pages, with its unofficial notice above everything else),
+    never under the Droidtop organisation: that separation is deliberate. The
+    generator is copied into that repository (`tools/site/`), the way
+    `build_index.py` is a copy of droidtop-platforms' script; its buttons point at
+    the link pages on droidtop.github.io, because that is the host the app
+    declares.
+  - **A plugin's card** shows what the index and the bundle say and nothing
+    invented: label, description, publisher, the newest stable version, every
+    release with its channel (stable is what droidtop offers; testing is not),
+    date and size, the source repository (the repository the bundle's release
+    URL names), the signature facts (publisher key fingerprint; certified by the
+    master, or signed by the publisher's own key that the catalog accepted; the
+    bundle's SHA-256 checked against the index) and **permissions in plain
+    language**. The permissions are read from the newest stable bundle's
+    `manifest.json` (the generator downloads the bundle, refuses it unless its
+    SHA-256 and its manifest's SHA-256 match the index, and reads only that one
+    file); each is named by the label droidtop's own grant screen uses, taken at
+    build time from `PluginPermissions.kt` on droidtop's `main` (so the page
+    cannot drift from the app), with its tier, the plugin's reason, and whether
+    it is optional. A bundle that cannot be read is said so on the card, never
+    guessed.
+  - **Buttons** are links to the pages above: "Install in droidtop"
+    (`/install-plugin?catalog=...&id=...`) on a plugin, "Add this catalog to
+    droidtop" (`/add-catalog?address=...`) at the top of an unofficial catalog and
+    "Open this catalog in droidtop" on droidtop's own.
+  - **The link pages** (`/add-catalog`, `/install-plugin`) are static pages with
+    one script (`link.js`, no libraries). It accepts an address only if it parses
+    as an `https:` URL with a host and no embedded credentials, and a plugin id
+    only if it matches the id pattern above; anything else shows "This is not a
+    catalog link" and no button. It builds the `droidtop://` link from the
+    validated parts (URL-encoded) and shows the address in full next to a plain
+    "Open in droidtop" button (a tap, never an automatic redirect) and a "Copy
+    address" fallback, with the line that droidtop is an Android app and that the
+    address can be pasted under Plugins > Add > More catalogs. The page only
+    forwards; the review and its Accept are in the app.
+  - **READMEs.** Each catalog's README carries its add-catalog link and a QR
+    code of the same link (`docs/add-catalog-qr.svg`, made with segno from the
+    link in the README).
 - **Not built:** the deferred droidtop root key that would certify new origins
-  without an app change; offering testing/unstable streams; the web page that
-  forwards `https://droidtop.github.io/add-catalog` to the `droidtop://` link
-  (needs a site the owner publishes).
+  without an app change; offering testing/unstable streams; F-Droid style
+  repositories as catalogs (Droidtop/tracker#261): their indexes are already
+  browsable on the web and carry tap-to-add links, so they would get the same
+  two link kinds, unbuilt until that support exists.
 
 **The trust-boundary checklist** (unchanged in substance from the
 2026-09-02 text, now checked against `PluginBundleInstaller` and
