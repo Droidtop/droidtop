@@ -20,15 +20,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Plugins > Catalogs (docs/SPEC.md 12a "The catalog", "Added catalogs"):
- * droidtop's own catalog first, then every catalog the person added, each
- * opening its own screen of plugins -- label, description, an "Unofficial"
- * badge for every catalog but droidtop's, and the row's own action (Install /
- * Update to <version> / no action, saying why when there is none). Adding a
- * catalog is fetch, review (its name, its disclaimer, whether it is signed,
- * each origin's key fingerprint) and an explicit Accept; nothing is listed
- * or trusted before that. These are [CatalogScreen]s carried inline by the
- * Plugins screen, which both settings renderers already render.
+ * Plugins > Add (docs/SPEC.md 12a "The catalog", "Added catalogs", "Known
+ * catalogs"): droidtop's own catalog opens straight from Add ([officialScreen]),
+ * and [screen] is the other catalogs -- the ones the person added, the known
+ * ones to switch on with a press, and the address form. A catalog opens its
+ * own screen of plugins -- label, description, an "Unofficial" badge for
+ * every catalog but droidtop's, the row's own action (Install / Update to
+ * <version> / no action, saying why when there is none) and, above the rows,
+ * Install all and Update all. Adding a catalog is one flow however it starts
+ * (a known catalog's press, a typed address, a QR code, an add-catalog link):
+ * fetch, review (its name, its disclaimer, whether it is signed, each origin's
+ * key fingerprint) and an explicit Accept; nothing is listed or trusted before
+ * that. These are [CatalogScreen]s carried inline by the Plugins screen, which
+ * both settings renderers already render, and registered for the link.
  *
  * A catalog's own screen may touch the network (the index fetch,
  * [PluginCatalog.currentIndex], off the main thread via [Dispatchers.IO]),
@@ -48,46 +52,82 @@ object PluginCatalogScreen {
 
     fun screen(): CatalogScreen = CatalogScreen(
         id = ID,
-        title = "Catalogs",
-        subtitle = "Where plugins are listed. droidtop's own catalog is built in; any other is one you added: " +
-            "unofficial, not part of droidtop, and not vetted by it",
+        title = "More catalogs",
+        subtitle = "Other places plugins are listed. They are not part of droidtop and droidtop has not vetted them: " +
+            "you read each one's notice before it is added",
         groups = { context -> catalogsGroups(context) },
     )
+
+    /** droidtop's own catalog: what Plugins > Add opens first. */
+    fun officialScreen(): CatalogScreen = catalogScreen(PluginCatalogSources.OFFICIAL_ID, "droidtop plugins")
 
     /** The Plugins screen row's value. Disk; call off the main thread. */
     fun summary(context: Context): String {
         val added = PluginCatalogSources.added(PluginCatalogSources.storeFile(context)).size
-        return if (added == 0) "Official only" else "Official + $added added"
+        return if (added == 0) "None added" else "$added added"
+    }
+
+    /**
+     * An add-catalog link was opened ([PluginCatalogSources.addressFromLink]): fetches the catalog it names so the
+     * screen opens on its review, the notice above Accept. Returns the line to tell the person when there is no
+     * review to show (it could not be fetched, it is already added); null when the review is ready. Off the main thread.
+     */
+    suspend fun prepareLink(context: Context, address: String): String? {
+        pendingAddress = address
+        val message = fetch(context, address) {}
+        return if (pendingProposal != null) null else message
     }
 
     private fun slug(id: String): String = Sha256.hex(id.toByteArray()).take(12)
 
     private suspend fun catalogsGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
-        val sources = PluginCatalogSources.all(context)
+        val added = PluginCatalogSources.added(PluginCatalogSources.storeFile(context))
+        val known = PluginCatalogSources.knownNotAdded(added)
         val proposal = pendingProposal
         // The review is the whole screen while there is one: the notice and its Accept are never below a form.
         if (proposal != null) return@withContext listOf(proposalGroup(proposal))
         listOfNotNull(
-            CatalogGroup(
-                id = "plugins_catalogs_list",
-                title = "Your catalogs",
-                items = sources.map { source ->
-                    NestedScreenItem(
-                        id = "plugins_catalog_${slug(source.id)}",
-                        title = source.name,
-                        subtitle = if (source.official) {
-                            "droidtop's own catalog, from droidtop-platforms"
-                        } else {
-                            "Not part of droidtop. ${source.indexUrl}"
-                        },
-                        inline = catalogScreen(source.id, source.name),
-                        chip = chipFor(source),
-                    )
-                },
-            ),
+            if (added.isEmpty()) {
+                null
+            } else {
+                CatalogGroup(
+                    id = "plugins_catalogs_list",
+                    title = "Your catalogs",
+                    items = added.map { source ->
+                        NestedScreenItem(
+                            id = "plugins_catalog_${slug(source.id)}",
+                            title = source.name,
+                            subtitle = "Not part of droidtop. ${source.indexUrl}",
+                            inline = catalogScreen(source.id, source.name),
+                            chip = chipFor(source),
+                        )
+                    },
+                )
+            },
+            if (known.isEmpty()) {
+                null
+            } else {
+                CatalogGroup(
+                    id = "plugins_catalogs_known",
+                    title = "Catalogs you can switch on",
+                    items = known.map { catalog ->
+                        AsyncActionItem(
+                            id = "plugins_catalogs_known_${slug(catalog.id)}",
+                            title = catalog.name,
+                            subtitle = "${catalog.about}. Not part of droidtop: you read its notice before it is added",
+                            chip = UNOFFICIAL,
+                            value = "Switch on",
+                            run = { ctx, onStatus ->
+                                pendingAddress = catalog.address
+                                fetch(ctx, catalog.address, onStatus)
+                            },
+                        )
+                    },
+                )
+            },
             CatalogGroup(
                 id = "plugins_catalogs_add",
-                title = "Add a catalog",
+                title = "Add by address",
                 items = listOf(
                     TextInputItem(
                         id = "plugins_catalogs_add_address",
@@ -277,6 +317,33 @@ object PluginCatalogScreen {
         val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
         val index = load.index
         val top = buildList<CatalogItem> {
+            if (index != null && PluginCatalog.listable(current, index)) {
+                val installedList = installed.values.toList()
+                val toInstall = PluginCatalog.installable(current, index, installedList, userKeys).size
+                val toUpdate = PluginCatalog.offersFor(installedList, listOf(PluginCatalog.Listing(current, index)), userKeys).size
+                if (toInstall > 0) {
+                    add(
+                        AsyncActionItem(
+                            id = "plugins_catalog_install_all",
+                            title = "Install all",
+                            subtitle = "$toInstall plugin${if (toInstall == 1) "" else "s"} from ${current.name}. Each one waits for your approval before it runs",
+                            value = toInstall.toString(),
+                            run = { ctx, onStatus -> PluginCatalog.installAll(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current, onStatus) },
+                        ),
+                    )
+                }
+                if (toUpdate > 0) {
+                    add(
+                        AsyncActionItem(
+                            id = "plugins_catalog_update_all",
+                            title = "Update all",
+                            subtitle = "$toUpdate plugin${if (toUpdate == 1) "" else "s"} installed from ${current.name} ${if (toUpdate == 1) "has" else "have"} a newer version",
+                            value = toUpdate.toString(),
+                            run = { ctx, onStatus -> PluginCatalog.updateAll(ctx, onStatus, only = PluginCatalogSources.byId(ctx, sourceId) ?: current) },
+                        ),
+                    )
+                }
+            }
             add(
                 AsyncActionItem(
                     id = "plugins_catalog_refresh",

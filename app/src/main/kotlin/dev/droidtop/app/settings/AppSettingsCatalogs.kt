@@ -186,6 +186,8 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(AcquireContentSources.chooseSystemScreen())
         SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(pluginKeysScreen())
+        // Opened on its own by an add-catalog link (AddCatalogLinkActivity), as well as inside Plugins > Add.
+        SettingsScreenRegistry.register(PluginCatalogScreen.screen())
         SettingsScreenRegistry.register(PluginJobsScreen.screen())
         SettingsScreenRegistry.register(DownloadRulesCatalog.screen())
         SettingsScreenRegistry.register(windowsGamesScreen())
@@ -1571,9 +1573,15 @@ object AppSettingsCatalogs {
                 title = "Add",
                 items = listOf(
                     NestedScreenItem(
+                        id = "plugins_add_official",
+                        title = "droidtop plugins",
+                        subtitle = "Made by droidtop. Install one with a press, or all of them",
+                        inline = PluginCatalogScreen.officialScreen(),
+                    ),
+                    NestedScreenItem(
                         id = "plugins_add_catalog",
-                        title = "Catalogs",
-                        subtitle = "droidtop's own catalog, and catalogs you add by address or QR code",
+                        title = "More catalogs",
+                        subtitle = "From other people: switch one on, or add one by address, QR code or link",
                         inline = PluginCatalogScreen.screen(),
                         valueLabel = { catalogsSummary },
                     ),

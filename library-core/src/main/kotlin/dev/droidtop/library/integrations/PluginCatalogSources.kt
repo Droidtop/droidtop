@@ -38,6 +38,9 @@ data class PluginCatalogSource(
     val acceptedDisclaimer: Int = 0,
 )
 
+/** A catalog droidtop lists by name ([PluginCatalogSources.KNOWN]); [id] is the id its index declares, [address] where it is fetched from. */
+data class KnownCatalog(val id: String, val name: String, val address: String, val about: String)
+
 /**
  * The catalogs the person added, in droidtop's own private storage (`filesDir/plugin-catalogs.json`),
  * written through a temp file and a rename like the key store beside it. The official catalog is not
@@ -143,6 +146,51 @@ object PluginCatalogSources {
         }
         if (uri.query != null || uri.fragment != null) return null
         return if (trimmed.endsWith(".json", ignoreCase = true)) trimmed else "$trimmed/$INDEX_FILE"
+    }
+
+    /**
+     * The catalogs droidtop lists by name so a person can switch one on with a press instead of typing an
+     * address (docs/SPEC.md 12a "Known catalogs"). The press fetches the catalog and shows the same review
+     * and notice as any added catalog; nothing is added or trusted before Accept. droidtop's own catalog
+     * is not here: it is always on.
+     */
+    val KNOWN: List<KnownCatalog> = listOf(
+        KnownCatalog(
+            id = "gamegrab-sources/catalog",
+            name = "gamegrab-sources",
+            address = "https://github.com/gamegrab-sources/catalog",
+            about = "Plugins that reach content on sites that are not part of droidtop",
+        ),
+    )
+
+    /** The known catalogs the person has not added yet. */
+    fun knownNotAdded(added: List<PluginCatalogSource>): List<KnownCatalog> = KNOWN.filter { known -> added.none { it.id == known.id } }
+
+    /** `droidtop://add-catalog?address=<catalog address>`: a link a catalog's own page can carry. */
+    const val LINK_SCHEME = "droidtop"
+    const val LINK_HOST = "add-catalog"
+
+    /** The https form of the same link, for places that only render web links (a README): `https://droidtop.github.io/add-catalog?address=...`. */
+    const val WEB_LINK_HOST = "droidtop.github.io"
+    const val WEB_LINK_PATH = "/add-catalog"
+
+    /**
+     * The catalog address an add-catalog link carries, or null when [link] is not one. Only the address is
+     * read: opening the link fetches that catalog and shows its review, and adding it still takes the
+     * person's Accept, so a link can never add or trust anything by itself.
+     */
+    fun addressFromLink(link: String): String? {
+        val uri = runCatching { URI(link.trim()) }.getOrNull() ?: return null
+        val scheme = uri.scheme?.lowercase()
+        val host = uri.host?.lowercase()
+        val isLink = (scheme == LINK_SCHEME && host == LINK_HOST) ||
+            (scheme == "https" && host == WEB_LINK_HOST && uri.path.orEmpty().trimEnd('/') == WEB_LINK_PATH)
+        if (!isLink) return null
+        val address = uri.rawQuery.orEmpty().split('&').firstNotNullOfOrNull { pair ->
+            val name = pair.substringBefore('=')
+            if (name == "address" || name == "url") java.net.URLDecoder.decode(pair.substringAfter('=', ""), "UTF-8") else null
+        } ?: return null
+        return address.takeIf { indexUrlFor(it) != null }
     }
 
     /** A file published beside the index: the same folder, another name. */

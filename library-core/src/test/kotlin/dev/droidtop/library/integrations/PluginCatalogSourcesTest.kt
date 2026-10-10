@@ -251,4 +251,41 @@ class PluginCatalogSourcesTest {
         // The official catalog never offers a third-party origin, whatever the person trusts.
         assertFalse(PluginCatalog.originOffered(PluginCatalogSources.OFFICIAL, origin, mapOf("acme" to UserOriginKey("acme", spki, null))))
     }
+
+    @Test
+    fun `install all covers what the catalog offers under a key the person trusts, and nothing before`() {
+        val parsed = PluginCatalogIndexParser.parse(index(catalogBlock, disclaimerBlock))!!
+        val accepted = added.copy(acceptedDisclaimer = 2)
+        val trusted = mapOf("acme" to UserOriginKey("acme", spki, null, catalog = added.id))
+        assertEquals(listOf("acme.tool"), PluginCatalog.installable(accepted, parsed, emptyList(), trusted).map { it.first.id })
+        // Not trusted yet, a different key, or a notice not yet accepted: nothing is installed in bulk.
+        assertTrue(PluginCatalog.installable(accepted, parsed, emptyList(), emptyMap()).isEmpty())
+        assertTrue(PluginCatalog.installable(accepted, parsed, emptyList(), mapOf("acme" to UserOriginKey("acme", otherSpki, null))).isEmpty())
+        assertTrue(PluginCatalog.installable(added, parsed, emptyList(), trusted).isEmpty())
+    }
+
+    @Test
+    fun `an add-catalog link carries only an https catalog address`() {
+        val address = "https://github.com/gamegrab-sources/catalog"
+        val encoded = java.net.URLEncoder.encode(address, "UTF-8")
+        assertEquals(address, PluginCatalogSources.addressFromLink("droidtop://add-catalog?address=$encoded"))
+        assertEquals(address, PluginCatalogSources.addressFromLink("droidtop://add-catalog?url=$encoded"))
+        assertEquals(address, PluginCatalogSources.addressFromLink("https://droidtop.github.io/add-catalog?address=$encoded"))
+        assertEquals(address, PluginCatalogSources.addressFromLink("DROIDTOP://ADD-CATALOG?address=$address"))
+        // Not a catalog link, no address, an address that is not https, or a link on another host.
+        assertNull(PluginCatalogSources.addressFromLink("droidtop://open?address=$encoded"))
+        assertNull(PluginCatalogSources.addressFromLink("droidtop://add-catalog"))
+        assertNull(PluginCatalogSources.addressFromLink("droidtop://add-catalog?address=http%3A%2F%2Fexample.com%2Fx"))
+        assertNull(PluginCatalogSources.addressFromLink("https://example.com/add-catalog?address=$encoded"))
+        assertNull(PluginCatalogSources.addressFromLink("not a link"))
+    }
+
+    @Test
+    fun `a known catalog is offered until it is added`() {
+        assertEquals(listOf("gamegrab-sources/catalog"), PluginCatalogSources.knownNotAdded(emptyList()).map { it.id })
+        val gamegrab = added.copy(id = "gamegrab-sources/catalog")
+        assertTrue(PluginCatalogSources.knownNotAdded(listOf(gamegrab)).isEmpty())
+        // Every known catalog is reachable by the same address rule a typed one is.
+        PluginCatalogSources.KNOWN.forEach { assertNotNull(PluginCatalogSources.indexUrlFor(it.address)) }
+    }
 }

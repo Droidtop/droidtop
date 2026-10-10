@@ -428,6 +428,31 @@
         </activity>
 
         <!--
+          The "Add catalog" link (docs/SPEC.md 12a "Known catalogs"): droidtop://add-catalog?address=...
+          and the https form on droidtop.github.io, which a catalog's README can carry. It only fetches
+          the catalog and opens its review; adding it is the person's Accept.
+        -->
+        <activity
+            android:name="dev.droidtop.app.AddCatalogLinkActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity=""
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="droidtop" android:host="add-catalog" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="droidtop.github.io" android:pathPrefix="/add-catalog" />
+            </intent-filter>
+        </activity>
+
+        <!--
           "Open with droidtop" for downloaded Windows programs, Linux packages
           and AppImages (docs/SPEC.md 4b). Disabled here and enabled by
           ModeStartup only while Desktop mode is on (ModePiece.DESKTOP_OPEN_WITH).

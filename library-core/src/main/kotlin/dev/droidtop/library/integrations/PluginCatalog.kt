@@ -62,6 +62,9 @@ object PluginCatalog {
     private const val ARG_LABEL = "label"
     private const val ARG_VERSION = "version"
 
+    /** The start of the line a refused bundle gives; [installOutcome] reads "not installed" from it. */
+    private const val NOT_INSTALLED = "Not installed:"
+
 
     /** One catalog and the index last fetched from it. */
     data class Listing(val source: PluginCatalogSource, val index: PluginCatalogIndex)
@@ -291,13 +294,23 @@ object PluginCatalog {
         plugin: PluginCatalogPlugin,
         release: PluginCatalogRelease,
         onStatus: (String) -> Unit = {},
-    ): String = withContext(Dispatchers.IO) {
+    ): String = installOutcome(context, plugin, release, onStatus).line
+
+    /** What [install] did: whether the plugin is now installed, and the line to show for it. */
+    data class InstallOutcome(val installed: Boolean, val line: String)
+
+    suspend fun installOutcome(
+        context: Context,
+        plugin: PluginCatalogPlugin,
+        release: PluginCatalogRelease,
+        onStatus: (String) -> Unit = {},
+    ): InstallOutcome = withContext(Dispatchers.IO) {
         // A token host is resolved to its signed address here (see GitHubAuth.downloadRequestFor);
         // the transfer itself is one resumable download job in "Downloads and installs".
         val (url, headers) = try {
             GitHubAuth.downloadRequestFor(release.bundle.url, token(context))
         } catch (failure: Exception) {
-            return@withContext "Couldn't download ${plugin.label}: the connection failed (${failure.message ?: "no network"})"
+            return@withContext InstallOutcome(false, "Couldn't download ${plugin.label}: the connection failed (${failure.message ?: "no network"})")
         }
         val result = DownloadJobs.run(
             context = context,
@@ -312,10 +325,11 @@ object PluginCatalog {
             onStatus = onStatus,
         )
         when {
-            result.ok -> result.values["summary"].orEmpty()
+            result.ok -> result.values["summary"].orEmpty().let { InstallOutcome(!it.startsWith(NOT_INSTALLED), it) }
             // A catalog bundle gets no shortcut past its hash: a mismatch is never installed.
-            result.error == DownloadJobs.DIGEST_MISMATCH -> "The downloaded bundle doesn't match the catalog's own hash for it -- not installed"
-            else -> "Couldn't download ${plugin.label}: ${result.error}"
+            result.error == DownloadJobs.DIGEST_MISMATCH ->
+                InstallOutcome(false, "The downloaded bundle doesn't match the catalog's own hash for it -- not installed")
+            else -> InstallOutcome(false, "Couldn't download ${plugin.label}: ${result.error}")
         }
     }
 
@@ -336,7 +350,7 @@ object PluginCatalog {
                     } else {
                         "$label $version installed. Approve it on the Plugins screen before it runs"
                     }
-                is PluginInstallResult.Refused -> "Not installed: ${result.error.reason}"
+                is PluginInstallResult.Refused -> "$NOT_INSTALLED ${result.error.reason}"
             }
         }
     }
@@ -346,14 +360,42 @@ object PluginCatalog {
      * -- this is the action that acts on the index, and it acts on the
      * newest one; a catalog whose refresh fails is left out of the
      * comparison and named in the summary), then the same [install] path
-     * for every installed plugin that has an update in one of them. The
-     * return is the summary line.
+     * for every installed plugin that has an update in one of them. With
+     * [only] it is that one catalog's "Update all": only it is fetched and
+     * compared. The return is the summary line.
      */
-    suspend fun updateAll(context: Context, onStatus: (String) -> Unit): String = withContext(Dispatchers.IO) {
+    suspend fun updateAll(context: Context, onStatus: (String) -> Unit, only: PluginCatalogSource? = null): String = withContext(Dispatchers.IO) {
         onStatus("Loading the catalogs...")
+        val (fresh, skipped) = freshListings(context, only)
+        val notes = if (skipped.isEmpty()) "" else " Not compared: ${skipped.joinToString("; ")}."
+        if (fresh.isEmpty()) {
+            return@withContext if (skipped.isEmpty()) "No plugin catalog is published yet, so there is nothing to update from." else "Nothing was compared or updated.$notes"
+        }
+        val updates = offersFor(PluginStore.installed(context), fresh, userKeys(context))
+        if (updates.isEmpty()) return@withContext "Everything installed is up to date.$notes"
+        val failures = mutableListOf<String>()
+        updates.forEachIndexed { i, (record, offer) ->
+            onStatus("Updating ${record.manifest.label} (${i + 1}/${updates.size})...")
+            val outcome = installOutcome(context, offer.plugin, offer.release) { status -> onStatus("${record.manifest.label}: $status") }
+            if (!outcome.installed) {
+                failures.add("${record.manifest.label}: ${outcome.line}")
+            }
+        }
+        if (failures.isEmpty()) {
+            "Updated ${updates.size} plugin${if (updates.size == 1) "" else "s"}: ${updates.joinToString(", ") { it.first.manifest.label }}.$notes"
+        } else {
+            "Updated ${updates.size - failures.size} of ${updates.size}: ${failures.joinToString("; ")}.$notes"
+        }
+    }
+
+    /**
+     * Every catalog's index fetched fresh ([only] limits it to one), the listable ones, and a line for each
+     * that could not be compared. The official catalog being unpublished is not worth a line.
+     */
+    private fun freshListings(context: Context, only: PluginCatalogSource?): Pair<List<Listing>, List<String>> {
         val fresh = mutableListOf<Listing>()
         val skipped = mutableListOf<String>()
-        for (source in PluginCatalogSources.all(context)) {
+        for (source in if (only != null) listOf(only) else PluginCatalogSources.all(context)) {
             try {
                 val index = fetchAndCache(context, source)
                 // A source whose stored state changed during the fetch (a newly recorded signing key) is read again.
@@ -365,24 +407,56 @@ object PluginCatalog {
                 skipped.add("${source.name}: couldn't refresh (${describe(failure)})")
             }
         }
-        val notes = if (skipped.isEmpty()) "" else " Not compared: ${skipped.joinToString("; ")}."
-        if (fresh.isEmpty()) {
-            return@withContext if (skipped.isEmpty()) "No plugin catalog is published yet, so there is nothing to update from." else "Nothing was compared or updated.$notes"
-        }
-        val updates = offersFor(PluginStore.installed(context), fresh, userKeys(context))
-        if (updates.isEmpty()) return@withContext "Everything installed is up to date.$notes"
-        val failures = mutableListOf<String>()
-        updates.forEachIndexed { i, (record, offer) ->
-            onStatus("Updating ${record.manifest.label} (${i + 1}/${updates.size})...")
-            val outcome = install(context, offer.plugin, offer.release) { status -> onStatus("${record.manifest.label}: $status") }
-            if (!outcome.startsWith("Updated")) {
-                failures.add("${record.manifest.label}: $outcome")
+        return fresh to skipped
+    }
+
+    /**
+     * The plugins of [index] that "Install all" would install: not installed yet, under an origin [source] offers,
+     * with a newest stable release the catalog is consistent about. In the catalog's own order.
+     */
+    fun installable(
+        source: PluginCatalogSource,
+        index: PluginCatalogIndex,
+        installed: List<PluginRecord>,
+        userKeys: Map<String, UserOriginKey>,
+    ): List<Pair<PluginCatalogPlugin, PluginCatalogRelease>> {
+        if (!listable(source, index)) return emptyList()
+        val have = installed.map { it.manifest.id }.toSet()
+        return index.origins.filter { originOffered(source, it, userKeys) }.flatMap { origin ->
+            origin.plugins.mapNotNull { plugin ->
+                if (plugin.id in have) null else latestStable(plugin)?.let { plugin to it }
             }
         }
-        if (failures.isEmpty()) {
-            "Updated ${updates.size} plugin${if (updates.size == 1) "" else "s"}: ${updates.joinToString(", ") { it.first.manifest.label }}.$notes"
-        } else {
-            "Updated ${updates.size - failures.size} of ${updates.size}: ${failures.joinToString("; ")}.$notes"
+    }
+
+    /**
+     * "Install all" for one catalog: a fresh fetch of it, then the same [install] path for each plugin it offers
+     * that is not installed. A plugin still lands waiting for the person's approval, as a single install does.
+     * The return is the summary line.
+     */
+    suspend fun installAll(context: Context, source: PluginCatalogSource, onStatus: (String) -> Unit): String = withContext(Dispatchers.IO) {
+        onStatus("Loading ${source.name}...")
+        val (fresh, skipped) = freshListings(context, source)
+        val listing = fresh.firstOrNull()
+            ?: return@withContext if (skipped.isEmpty()) "Nothing is published in ${source.name} yet." else "Couldn't load ${source.name}: ${skipped.joinToString("; ")}."
+        val todo = installable(listing.source, listing.index, PluginStore.installed(context), userKeys(context))
+        if (todo.isEmpty()) return@withContext "Everything ${source.name} offers is already installed."
+        val failures = mutableListOf<String>()
+        todo.forEachIndexed { i, (plugin, release) ->
+            onStatus("Installing ${plugin.label} (${i + 1}/${todo.size})...")
+            val outcome = installOutcome(context, plugin, release) { status -> onStatus("${plugin.label}: $status") }
+            if (!outcome.installed) failures.add("${plugin.label}: ${outcome.line}")
+        }
+        val done = todo.size - failures.size
+        val names = todo.map { it.first.label }.filter { label -> failures.none { it.startsWith("$label:") } }
+        buildString {
+            if (done > 0) {
+                append("Installed $done plugin${if (done == 1) "" else "s"}: ${names.joinToString(", ")}. Approve them on the Plugins screen before they run.")
+            }
+            if (failures.isNotEmpty()) {
+                if (done > 0) append(' ')
+                append("Not installed: ${failures.joinToString("; ")}.")
+            }
         }
     }
 

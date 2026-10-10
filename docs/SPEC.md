@@ -18240,11 +18240,13 @@ what the index says is display data, never a trust decision.
     available", "Up to date", never "Up to date" on a catalog that was
     never read) and "Update all" (`PluginCatalog.updateAll`) are the
     Updates screen's "Available" group, see "Places".
-  - **Add** — "Catalogs" (the catalog screens below and "Added
-    catalogs"; it was "Browse catalog" while there was one) and "Install
-    plugin file" (the file picker), both install sources in one place
-    instead of the file picker being the very last row of the old flat
-    list.
+  - **Add** — "droidtop plugins" (droidtop's own catalog, the screen
+    below, opened straight from here so installing an official plugin is
+    Add, the plugin, Install), "More catalogs" ("Added catalogs", "Known
+    catalogs") and "Install plugin file" (the file picker), the install
+    sources in one place instead of the file picker being the very last row
+    of the old flat list. Owner, 2026-10-10: "we need to simplify the
+    process of adding the plugins, if it's complicated" (Droidtop/tracker#458).
   - **Advanced** — "Keys you trust" (unchanged). A single-item group
     today; anything else that is genuinely advanced (rather than
     per-plugin) configuration lands here rather than back at the top
@@ -18256,7 +18258,18 @@ what the index says is display data, never a trust decision.
   <version> (an update is available), or no action at all with
   "Installed <version>" in the value column (current); unpinned-origin
   plugins and plugins with no stable release yet are listed without an
-  action and say why. Install and update are the SAME download-verify-
+  action and say why. Above the rows, when there is something to do,
+  **Install all** (every plugin the catalog offers that is not installed:
+  an origin it offers, a newest stable release it is consistent about;
+  `PluginCatalog.installable`) and **Update all** (every installed plugin
+  that has an update in THIS catalog; `PluginCatalog.updateAll(only = ...)`)
+  show how many they cover. They fetch the catalog fresh and run the single
+  install path once per plugin, so nothing is trusted that one press would
+  not have; a new plugin still waits for the person's approval ("Approve them
+  on the Plugins screen before they run"), and the summary names each one that
+  failed. They need no confirmation: the plugins listed are the ones the
+  person already chose by choosing the catalog. The same two actions are on
+  every catalog's screen, official or added. Install and update are the SAME download-verify-
   install path (`PluginCatalog.install`): fetch to cache, whole-file
   SHA-256 against the index's `sha256` first, then the existing
   `PluginBundleInstaller` validation in full, so a catalog bundle gets no
@@ -18285,16 +18298,50 @@ what the index says is display data, never a trust decision.
   There is no second code path: listing, the offer rule, updates, "Update
   all" and install are the same functions for every catalog, and install
   is still `PluginCatalog.install` into `PluginBundleInstaller`.
-  - **Where.** Plugins > Add > "Catalogs": "Your catalogs" (each opens
-    that catalog's own screen: refresh, its plugins, and for an added one
-    an "About this catalog" group with its address, signature, disclaimer
-    and "Remove this catalog") and "Add a catalog": an address field (the
+  - **Where.** Plugins > Add > "More catalogs": "Your catalogs" (the added
+    ones; each opens that catalog's own screen: Install all, Update all,
+    refresh, its plugins, and an "About this catalog" group with its address,
+    signature, disclaimer and "Remove this catalog"), "Catalogs you can switch
+    on" ("Known catalogs" below) and "Add by address": an address field (the
     catalog's GitHub repository, which droidtop turns into
     `raw.githubusercontent.com/<owner>/<repo>/HEAD/index.json`, or the
     https address of its index.json; plain http is refused), "Fetch this
     catalog", and "Read a QR code" (a photo or screenshot of the catalog's
     QR code, decoded on the device with zxing, the library droidtop
     already draws QR codes with; there is no live camera scanner).
+  - **Known catalogs (owner, 2026-10-10, Droidtop/tracker#458: "we need to
+    simplify the process of adding the plugins").** Adding a catalog is one
+    flow, `PluginCatalog.propose` then `accept`, however it starts, and there
+    are three ways to start it besides the address field:
+    - **A short list of known catalogs**
+      (`PluginCatalogSources.KNOWN`: id, name, address, one line). droidtop's
+      own catalog is always on and is not in the list; every other entry is OFF
+      until the person presses "Switch on". The press fetches the catalog and
+      opens the same review as a typed address: the notice IN FULL above
+      Accept, "Unofficial", its keys. Nothing is added or trusted before that
+      Accept, so switching a known catalog on is exactly as safe as typing its
+      address, and a known catalog is listed for convenience, never trusted.
+      The list holds gamegrab-sources/catalog (the first one, which "droidtop
+      ships no address for" used to say). A known catalog disappears from the
+      list once it is added.
+    - **An add-catalog link**, which a catalog's own README can carry:
+      `droidtop://add-catalog?address=<catalog address>` and, for places that
+      render only web links, `https://droidtop.github.io/add-catalog?address=
+      <catalog address>` (`PluginCatalogSources.addressFromLink`; `address` or
+      `url`, URL-encoded, https only). `AddCatalogLinkActivity` has no screen of
+      its own: it fetches the catalog (`PluginCatalogScreen.prepareLink`) and
+      opens More catalogs on its review. **A link can neither add nor trust
+      anything**: it only fetches an https address and shows a review, and
+      adding is the Accept on that review (the same screen, the same read-gate).
+      Where Settings is hidden (Kiosk, Kid) it does nothing. An address that is
+      already added, is droidtop's own, or cannot be fetched is told to the
+      person in a line, and More catalogs opens with the address filled in.
+      The https form is declared as an unverified web link on a host the Droidtop
+      organisation owns; a page there that sends a browser on to the
+      `droidtop://` form is not published yet, so until it is a README's
+      working routes are the QR code (Read a QR code), the plain address, and
+      the `droidtop://` link in places that open it.
+    - The QR code and the address field, unchanged.
   - **Format.** An added catalog's index is the same schema 1 index with
     two more top-level blocks, both required for an added catalog and
     absent from droidtop's own: `catalog` {`id` ("owner/name" of the
@@ -18396,21 +18443,39 @@ what the index says is display data, never a trust decision.
     disclaimer. Its master and index signature arrive when the owner
     provisions them (`catalog-master-key.json`, `CATALOG_SIGNING_KEY`,
     `CATALOG_SIGNING_CERT`); until then the index names no master and is
-    unsigned. droidtop ships no address for it: the person adds it.
+    unsigned. It is the first of the known catalogs ("Known catalogs"), off until
+    the person switches it on.
 
   Unit-tested in `library-core` (`PluginCatalogSourcesTest`: addresses,
   the store, the blocks, the disclaimer gate, the offer rule, the
   master's origin) and `plugin-host` (`UserOriginKeysTest`: the catalog
   field; `PluginCertificatesTest`: an organisation master's chain, its
   own revocation list, and droidtop's master giving no standing there).
-- **Not built:** the droidtop-platforms side that populates
-  `droidtop-plugins/index.json` (its own generator and workflow,
-  mirroring `generator/plugins_index.py`, in that repository — until it
-  exists the app's catalog is empty and the file-picker path is the only
-  install source, which is a working state, not a broken one: the catalog
-  screen says "No catalog is published yet", never a raw HTTP status); the
-  deferred droidtop root key that would certify new origins without an
-  app change; and offering testing/unstable streams.
+- **The official index is generated (built 2026-10-10,
+  Droidtop/tracker#458).** `generator/droidtop_plugins_index.py` in
+  droidtop-platforms writes `droidtop-plugins/index.json`; the existing
+  `Plugins index` workflow runs it beside the Enginehost index (every six
+  hours, on `workflow_dispatch` and a `plugin-published` dispatch; `--check`
+  on a push), so there is one workflow and one commit step for both. It lists
+  every `*.droidplugin.tar.xz` release asset of the public
+  `Droidtop/droidtop-plugin-*` repositories that carries an `origin.cert` from
+  droidtop's plugin master (`droidtop-plugins/master-key.json`, the key
+  `MasterKey` pins), whose `manifest.sig` verifies against the key it
+  certifies, under origin `droidtop`: it refuses what the app would refuse. The
+  index's `key` block for origin `droidtop` is the master, one of the two
+  anchors `originOffered` accepts. A prerelease is the `testing` stream (not
+  offered); each plugin keeps its newest five stable and three testing
+  releases, so a run of pre-releases cannot push its newest stable one off the
+  list. A bundle signed by the legacy origin key, with no certificate, is not
+  listed (the app still accepts such a file picked by hand). Before the file
+  existed the catalog screen said "No catalog is published yet", never a raw
+  HTTP status, and that state remains for a device that cannot reach it.
+  The gamegrab-sources catalog builds its index with the same script adapted to
+  its organisation (a separate repository, so a copy with the same rules).
+- **Not built:** the deferred droidtop root key that would certify new origins
+  without an app change; offering testing/unstable streams; the web page that
+  forwards `https://droidtop.github.io/add-catalog` to the `droidtop://` link
+  (needs a site the owner publishes).
 
 **The trust-boundary checklist** (unchanged in substance from the
 2026-09-02 text, now checked against `PluginBundleInstaller` and
