@@ -2,7 +2,11 @@ package dev.droidtop.library.integrations
 
 import android.content.Context
 import android.os.Build
+import dev.droidtop.net.GitHubAuth
+import dev.droidtop.net.GitHubTokenStore
+import dev.droidtop.pluginhost.AcquireDownloadDescriptor
 import dev.droidtop.pluginhost.AcquireDownloads
+import dev.droidtop.pluginhost.GrantState
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.PluginGrants
 import dev.droidtop.pluginhost.PluginRecord
@@ -103,7 +107,41 @@ object AppCatalogs {
         val apps: Int?,
         val fingerprint: String?,
         val note: String?,
+        /** The source's own settings the plugin offers (a tracked page's pre-releases, file pattern); droidtop draws them. */
+        val options: List<SourceOption> = emptyList(),
     )
+
+    /**
+     * One setting of a source (`list_sources` `options: [{name, label, kind, value, description?, choices?}]`): `bool`,
+     * `text` or `choice` (with `choices: [{value, label}]`). droidtop draws it on the source's page and sends a change
+     * as `set_source_options {source, options: {name: value}}`; what it means is the plugin's.
+     */
+    data class SourceOption(
+        val name: String,
+        val label: String,
+        val kind: String,
+        val value: String,
+        val description: String?,
+        val choices: List<Pair<String, String>>,
+    )
+
+    private fun parseOptions(array: JSONArray?): List<SourceOption> = array.objects().take(16).mapNotNull { o ->
+        val name = o.optString("name").trim().takeIf { it.matches(Regex("[a-z][a-zA-Z0-9_]{0,63}")) } ?: return@mapNotNull null
+        val kind = o.optString("kind").trim().takeIf { it in setOf("bool", "text", "choice") } ?: return@mapNotNull null
+        val choices = o.optJSONArray("choices").objects().take(20).mapNotNull { c ->
+            val v = c.optString("value").takeIf { it.isNotEmpty() && it.length <= 100 } ?: return@mapNotNull null
+            v to c.optString("label").trim().ifEmpty { v }.take(60)
+        }
+        if (kind == "choice" && choices.isEmpty()) return@mapNotNull null
+        SourceOption(
+            name = name,
+            label = o.optString("label").trim().ifEmpty { name }.take(80),
+            kind = kind,
+            value = o.opt("value")?.toString()?.take(500) ?: "",
+            description = o.optString("description").trim().takeIf { it.isNotEmpty() }?.take(300),
+            choices = choices,
+        )
+    }
 
     data class KnownSource(val name: String, val address: String, val about: String?)
 
@@ -121,6 +159,7 @@ object AppCatalogs {
                 apps = if (o.has("apps")) o.optInt("apps") else null,
                 fingerprint = o.optString("fingerprint").trim().takeIf { it.isNotEmpty() }?.take(100),
                 note = o.optString("note").trim().takeIf { it.isNotEmpty() }?.take(300),
+                options = parseOptions(o.optJSONArray("options")),
             )
         }
         val known = data.optJSONArray("known").objects().mapNotNull { o ->
@@ -354,7 +393,8 @@ object AppCatalogs {
 
     /** Asks [record] for its review of the source [link] names. A line to show when there is none. */
     suspend fun review(context: Context, record: PluginRecord, link: String): Result<Review> {
-        val reply = PluginViews.call(context, record, POINT, dev.droidtop.pluginhost.PluginLinks.OP_OPEN, args().put("link", link.trim()), timeoutMs = 60_000L)
+        // Long enough for the person to pick a file when the plugin asks for one (an Obtainium export, files.pick).
+        val reply = PluginViews.call(context, record, POINT, dev.droidtop.pluginhost.PluginLinks.OP_OPEN, args().put("link", link.trim()), timeoutMs = 180_000L)
         if (!reply.ok) return Result.failure(IllegalStateException(reply.message ?: "it could not read that source"))
         return parseReview(reply.data)?.let { Result.success(it) }
             ?: Result.failure(IllegalStateException(reply.data.optString("message").ifBlank { "it returned no source to review" }))
@@ -373,6 +413,13 @@ object AppCatalogs {
         extra.keys().forEach { call.put(it, extra.get(it)) }
         val reply = PluginViews.call(context, record, POINT, op, call)
         return if (reply.ok) reply.data.optString("message").ifBlank { done } else "${record.manifest.label}: ${reply.message ?: "it failed"}"
+    }
+
+    /** Changes one of [source]'s own settings ([SourceOption]); the plugin's line about it. */
+    suspend fun setSourceOption(context: Context, record: PluginRecord, source: String, option: SourceOption, value: Any): String {
+        val line = quick(context, record, "set_source_options", JSONObject().put("source", source).put("options", JSONObject().put(option.name, value)), "Saved")
+        refreshOffers(context, record)
+        return line
     }
 
     /** Re-reads the indexes of [source] (null: every source), then the offers. A job. */
@@ -432,6 +479,18 @@ object AppCatalogs {
             ),
         ) ?: return PluginResult.failure("${record.manifest.label} did not say which app the download is")
         if (expected.packageName != id) return PluginResult.failure("${record.manifest.label} offered ${expected.packageName}, not $id")
+        // A private repository's asset: droidtop adds the person's GitHub token itself, only for a plugin allowed to use it.
+        var url = descriptor.url
+        var headers = descriptor.headers
+        if (descriptor.auth == AcquireDownloadDescriptor.AUTH_GITHUB) {
+            val allowed = PluginGrants.stateOf(record, PluginGrants.forContext(context).read(record.manifest.id), "github.api") == GrantState.GRANTED
+            if (!allowed) return PluginResult.failure("${record.manifest.label} may not use your GitHub token")
+            val (finalUrl, auth) = withContext(Dispatchers.IO) {
+                runCatching { GitHubAuth.downloadRequestFor(descriptor.url, GitHubTokenStore.get(context)) }.getOrNull()
+            } ?: return PluginResult.failure("GitHub did not answer for ${descriptor.url}")
+            url = finalUrl
+            headers = headers + auth
+        }
         if (descriptor.sha256 == null && expected.signers.isEmpty()) {
             return PluginResult.failure("${record.manifest.label} gave neither a digest nor a signing key to check the app with")
         }
@@ -439,11 +498,11 @@ object AppCatalogs {
             context = context,
             title = "Install $label",
             post = POST_INSTALL,
-            url = descriptor.url,
+            url = url,
             name = "app_${id.replace('.', '_')}_${expected.versionCode}.apk",
             sha256 = descriptor.sha256,
             maxBytes = descriptor.size ?: 0L,
-            headers = descriptor.headers,
+            headers = headers,
             sizeBytes = descriptor.size ?: 0L,
             extra = expected.toArgs() + (ARG_LABEL to label),
             onStatus = onStatus,

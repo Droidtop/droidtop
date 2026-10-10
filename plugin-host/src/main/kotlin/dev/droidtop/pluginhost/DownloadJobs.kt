@@ -655,8 +655,16 @@ data class AcquireDownloadDescriptor(
     val unpack: Boolean = false,
     /** A download a page started in the plugin's web session, named by the one-use token `web.session open_in_session` gave (docs/plugin-api.md 3 G3). */
     val session: String? = null,
+    /**
+     * `"github"`: droidtop adds the person's GitHub token to the request where GitHubAuth allows it (a private
+     * repository's release asset), held by Downloads in memory only, never shown to the plugin. Honoured only for a
+     * plugin granted `github.api` (docs/plugin-api.md 3 G4).
+     */
+    val auth: String? = null,
 ) {
     companion object {
+        const val AUTH_GITHUB = "github"
+
         fun parse(json: String?): AcquireDownloadDescriptor? = runCatching {
             val value = JSONObject(requireNotNull(json))
             val url = value.getString("url")
@@ -683,7 +691,9 @@ data class AcquireDownloadDescriptor(
             }
             val session = value.optString("session").takeIf { it.isNotEmpty() }
             require(session == null || session.matches(Regex("w-[0-9a-f-]{36}")))
-            AcquireDownloadDescriptor(url, headers, fileName, digest, size, sha1, md5, unpackWord == DownloadJobs.UNPACK_ARCHIVE, session)
+            val auth = value.optString("auth").takeIf { it.isNotEmpty() }
+            require(auth == null || auth == AUTH_GITHUB)
+            AcquireDownloadDescriptor(url, headers, fileName, digest, size, sha1, md5, unpackWord == DownloadJobs.UNPACK_ARCHIVE, session, auth)
         }.getOrNull()
     }
 }

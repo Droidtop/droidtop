@@ -91,4 +91,22 @@ class AppCatalogsTest {
         assertEquals(listOf("org.a"), offers.map { it.id })
         assertEquals("org.a", next)
     }
+
+    @Test
+    fun `a source's own settings are read with their kinds, and a choice without choices is dropped`() {
+        val source = JSONObject().put("id", "s1").put("name", "App").put(
+            "options",
+            JSONArray()
+                .put(JSONObject().put("name", "prereleases").put("label", "Pre-releases").put("kind", "bool").put("value", true))
+                .put(JSONObject().put("name", "pattern").put("kind", "text").put("value", "arm64"))
+                .put(JSONObject().put("name", "order").put("kind", "choice").put("value", "date")
+                    .put("choices", JSONArray().put(JSONObject().put("value", "date").put("label", "Newest date"))))
+                .put(JSONObject().put("name", "broken").put("kind", "choice"))
+                .put(JSONObject().put("name", "Bad Name").put("kind", "bool")),
+        )
+        val options = AppCatalogs.parseSources(JSONObject().put("sources", JSONArray().put(source))).sources.single().options
+        assertEquals(listOf("prereleases", "pattern", "order"), options.map { it.name })
+        assertEquals("true", options[0].value)
+        assertEquals(listOf("date" to "Newest date"), options[2].choices)
+    }
 }

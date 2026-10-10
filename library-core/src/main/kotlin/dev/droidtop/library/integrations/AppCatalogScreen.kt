@@ -17,6 +17,7 @@ import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.ProvidedPoint
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -318,23 +319,29 @@ object AppCatalogScreen {
         id = "apps_source_screen_${record.manifest.id}_${source.id.hashCode()}",
         title = source.name,
         subtitle = "From ${record.manifest.label}",
-        groups = { _ ->
+        groups = { context ->
+            // Read again, so a setting changed on this page shows its new value.
+            val fresh = withContext(Dispatchers.IO) {
+                AppCatalogs.sources(context, record).getOrNull()?.sources?.firstOrNull { it.id == source.id }
+            } ?: source
             listOf(
                 CatalogGroup(
-                    "apps_source_${source.id.hashCode()}",
+                    "apps_source_${fresh.id.hashCode()}",
                     null,
                     buildList<CatalogItem> {
-                        add(ActionItem("apps_source_address", source.address, subtitle = "Address", run = {}))
-                        source.fingerprint?.let { add(ActionItem("apps_source_key", "Signing key", value = grouped(it), run = {})) }
-                        source.note?.let { add(ActionItem("apps_source_note", "Note", subtitle = it, run = {})) }
+                        add(ActionItem("apps_source_address", fresh.address, subtitle = "Address", run = {}))
+                        fresh.fingerprint?.let { add(ActionItem("apps_source_key", "Signing key", value = grouped(it), run = {})) }
+                        fresh.note?.let { add(ActionItem("apps_source_note", "Note", subtitle = it, run = {})) }
+                        // The source's own settings, as the plugin describes them (AppCatalogs.SourceOption).
+                        fresh.options.forEach { option -> add(optionItem(record, fresh, option)) }
                         add(
                             ToggleItem(
                                 id = "apps_source_enabled",
                                 title = "Use this source",
                                 subtitle = "Off: its apps are not listed or offered as updates, and it is kept",
-                                current = source.enabled,
+                                current = fresh.enabled,
                                 onToggle = { ctx, value ->
-                                    AppCatalogs.quick(ctx, record, "set_source_enabled", JSONObject().put("source", source.id).put("enabled", value), "Done")
+                                    AppCatalogs.quick(ctx, record, "set_source_enabled", JSONObject().put("source", fresh.id).put("enabled", value), "Done")
                                     AppCatalogs.refreshOffers(ctx, record)
                                 },
                             ),
@@ -344,7 +351,7 @@ object AppCatalogScreen {
                                 id = "apps_source_refresh",
                                 title = "Refresh",
                                 subtitle = "Fetches its index again and checks its signature",
-                                run = { ctx, onStatus -> AppCatalogs.refresh(ctx, record, source.id, onStatus) },
+                                run = { ctx, onStatus -> AppCatalogs.refresh(ctx, record, fresh.id, onStatus) },
                             ),
                         )
                         add(
@@ -352,9 +359,9 @@ object AppCatalogScreen {
                                 id = "apps_source_remove",
                                 title = "Remove this source",
                                 subtitle = "Its apps are no longer listed or updated from it. Apps you installed stay",
-                                confirmTitle = "Remove \"${source.name}\"?",
+                                confirmTitle = "Remove \"${fresh.name}\"?",
                                 run = { ctx, _ ->
-                                    val message = AppCatalogs.quick(ctx, record, "remove_source", JSONObject().put("source", source.id), "Removed ${source.name}")
+                                    val message = AppCatalogs.quick(ctx, record, "remove_source", JSONObject().put("source", fresh.id), "Removed ${fresh.name}")
                                     AppCatalogs.refreshOffers(ctx, record)
                                     message
                                 },
@@ -366,6 +373,37 @@ object AppCatalogScreen {
         },
         indexGroups = { emptyList() },
     )
+
+    private fun optionItem(record: PluginRecord, source: AppCatalogs.Source, option: AppCatalogs.SourceOption): CatalogItem {
+        val id = "apps_source_option_${option.name}"
+        return when (option.kind) {
+            "bool" -> ToggleItem(
+                id = id,
+                title = option.label,
+                subtitle = option.description,
+                current = option.value.equals("true", ignoreCase = true),
+                onToggle = { ctx, value -> AppCatalogs.setSourceOption(ctx, record, source.id, option, value) },
+            )
+            "choice" -> dev.droidtop.library.settings.ChoiceItem(
+                id = id,
+                title = option.label,
+                subtitle = option.description,
+                options = option.choices.map { (value, label) -> dev.droidtop.library.settings.ChoiceOption(value, label) },
+                current = option.value,
+                // ChoiceItem's callback is not suspend: the change is sent off the main thread.
+                onSelect = { ctx, value ->
+                    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { AppCatalogs.setSourceOption(ctx, record, source.id, option, value) }
+                },
+            )
+            else -> TextInputItem(
+                id = id,
+                title = option.label,
+                subtitle = option.description,
+                value = option.value,
+                onChange = { ctx, value -> AppCatalogs.setSourceOption(ctx, record, source.id, option, value) },
+            )
+        }
+    }
 
     // ------------------------------------------------------------------
     // An app's page.

@@ -1435,6 +1435,17 @@ writes real files that droidtop's own scan finds (A2).
     index (the person's Accept).
   - `remove_source {source}`, `set_source_enabled {source, enabled}` →
     `{message}`.
+  - `set_source_options {source, options: {name: value}}` → `{message}`: one of
+    the source's own settings changed on its page. A source lists its settings
+    in `list_sources` as `options: [{name, label, kind, value, description?,
+    choices?}]` (`kind` `bool`, `text` or `choice` with `choices: [{value,
+    label}]`, at most 16); droidtop draws them on the source's page and sends
+    each change; what a setting means is the plugin's (a tracked page's
+    pre-releases, its file-name pattern).
+  - A source a plugin lists to add (`known`) may carry an address that is not a
+    URL, such as `obtainium:import`; droidtop passes it to `open_link` unchanged,
+    as a call the person started, so the plugin may ask for a file there
+    (`files.pick`) within that call's three minutes.
   - `refresh {source?}`, a **job**: fetches and verifies the indexes again.
   - `search {query, limit}` → `{apps: [{id, name, summary?, version?,
     versionCode?, source?, antiFeatures: [key]}]}` (an empty query lists recent
@@ -1450,6 +1461,10 @@ writes real files that droidtop's own scan finds (A2).
   - `acquire {id, versionCode}`, a **job** whose reply is the acquire reply's
     single `download` descriptor (1.6) plus `packageName`, `versionCode` and
     `signers` (comma-separated certificate SHA-256s). No `session`, no unpack.
+    The descriptor may say `"auth": "github"` (a private repository's release
+    asset): droidtop then adds the person's GitHub token where GitHubAuth allows it
+    (resolving the asset's redirect itself), held by Downloads in memory only and
+    never shown to the plugin, and only for a plugin granted `github.api`.
 - **What droidtop does with it:** the download is a Downloads job whose post
   step installs only the package and version named, signed by one of the keys
   named and by the installed app's key (docs/SPEC.md 10b).
@@ -2126,7 +2141,7 @@ database on the PC follows.
 | G1 | Secure vault | per-plugin secrets (API keys, refresh tokens) | `vault.put {key, value}` → `{stored}`, `vault.get {key}` → `{value \| null}`, `vault.delete {key}` → `{deleted}`, `vault.keys` → `{keys}`; keys 1 to 128 of `[A-Za-z0-9._-]`, values up to 16 KiB, 256 per plugin; sealed with droidtop's one at-rest cipher (`KeystoreSecretCipher`, AES-GCM) under a Keystore key per plugin; in `noBackupFilesDir`, so **never in a backup**; file and key deleted on uninstall; a value whose key is gone reads as null | — | `vault.own` (normal; own namespace only) | low | built (2026-10-08, `PluginVault`) |
 | G2 | OAuth helper | sign in to a service without the plugin handling a password | `auth.oauth {authUrl, tokenUrl, clientId, scopes, pkce: true}` → the host opens a Custom Tab, catches the redirect on its own scheme, exchanges the code and stores the tokens in G1 → returns a vault key | A/G/D: a host sign-in sheet | `auth.oauth` (normal: the user sees and does the sign-in) | medium | not built |
 | G3 | Web session | sources that need a real browser session: a site sign-in, a "click to download" page, a protected link (#9, Droidtop/tracker#380) | Declared as `web.session` with the plugin's sites: `{"id": "web.session", "domains": ["f95zone.to"]}` (each covers its subdomains; https only). `web.session sign_in {url, doneCookie?}` → `{signedIn}`: droidtop's own web view (`WebSessionActivity`, the one view droidtop shows signed-in pages in, also a store's own pages, SPEC 7g) opens `url` (a declared site) during a call the person started; the person signs in on the site's own page and presses Done, or the site setting `doneCookie` ends it; the cookies of the declared sites are sealed in the plugin's vault under a host key the plugin can neither read nor list (`@web.session`). `status` → `{signedIn}`; `clear` → `{cleared}`. `fetch {url, method?, headers?, body?, as?}` → the `net.http` answer plus `signedIn`: one request to a declared site with the session's cookies and the web view's user agent added by droidtop (they replace any the plugin sent), refused if it would be redirected off the declared sites; it also needs `net.domains` for the site. `open_in_session {url}` → `{captured, download: {url, fileName, size?, mimeType?, session}}`: any https link (a thread on a declared site, or a file host it links to; the session's cookies still go only to the declared sites) opens in the web view with the session; the first download the page starts is captured (address, the cookies it needs, user agent, referrer) and the view closes; the plugin returns that `download` as its `acquire` reply's `values.download`, and droidtop adds the captured headers by the one-use `session` token (its own plugin, the same address, within 30 minutes) and runs it through the Downloads job like any acquire download, with the cookies held in memory only. The session's cookies are in droidtop's shared cookie store only while the web view is open. Deleted with the plugin's vault on uninstall. | droidtop's web view, headed with the plugin's name and the site the page is on, with Done (sign-in) and Close; B goes back a page | `web.session` (dangerous: authenticated access to your accounts on those sites) | high | built (2026-10-09, `HostWebApis`, `WebSessions`, `WebSessionActivity`) |
-| G4 | GitHub token | higher API limits for sources on GitHub (#16) | `github.token()` → the user's token (set once in Accounts and sources), or `github.request {path}` executed by the host with it (**preferred**: the token never leaves the host) | Accounts and sources | `github.api` (normal, through the host request) / `github.token.read` (dangerous: the raw token) | medium / high | #16 in progress |
+| G4 | GitHub token | higher API limits and private repositories for sources on GitHub (#16) | `github.request {path, headers?, as?, timeoutMs?}` → the `net.request` answer: a GET to `https://api.github.com<path>` made by the host with the person's token (set once in Accounts and sources; unauthenticated when there is none). The token never reaches the plugin; GitHubAuth decides on every redirect hop whether it may go there. The plugin's headers (a `Range`, `If-None-Match`) go on every hop. A download descriptor's `"auth": "github"` (A12) asks the same for a file. `github.token()` (the raw token) is not offered | Accounts and sources | `github.api` (normal, through the host request) / `github.token.read` (dangerous: the raw token, not built) | medium / high | `github.request` built 2026-10-10 (Droidtop/tracker#261) |
 | G5 | Accounts registry | a plugin's account shown as a row in Accounts and sources (signed in or not, sign out) | EP `accounts.provider@1`: `status → {signedIn, name}`; `sign_in` (runs G2/G3), `sign_out` | A/G/D: Accounts and sources | `provide:accounts.provider` | low | not built |
 | G6 | Identity of the device user | "who is this" | not offered: plugins get no Android account list, no email, no device ids. `host.info()` gives a **per-plugin random install id** only | — | — | — | by design |
 

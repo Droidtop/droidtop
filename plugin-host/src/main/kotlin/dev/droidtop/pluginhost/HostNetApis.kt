@@ -163,6 +163,11 @@ internal object HostNetApis {
             hopCheck(hop)
             reach(env, record, hop)
         }
+        return answerJson(answer, args)
+    }
+
+    /** An answer as the plugin reads it: status, final URL, headers, and the body as text or base64 (`as`). */
+    private fun answerJson(answer: HttpAnswer, args: JSONObject): JSONObject {
         val asBase64 = when (args.optString("as")) {
             "base64" -> true
             "text" -> false
@@ -188,6 +193,21 @@ internal object HostNetApis {
             target = { NetScope.hostOf(it.optString("url")).orEmpty() },
             alwaysAudit = true,
         ) { env, record, args -> request(env, record, args) },
+        // G4: a GET to api.github.com made with the person's own GitHub token, which never reaches the plugin
+        // (GitHubAuth decides per hop where it may go). Its headers, a Range included, go on every hop.
+        HostOp(
+            "github", "request",
+            permission = "github.api",
+            target = { "api.github.com" + it.optString("path") },
+            alwaysAudit = true,
+        ) { env, record, args ->
+            val path = args.optString("path").trim()
+            if (!path.startsWith("/") || path.startsWith("//") || path.length > 2000 || path.any { it.isWhitespace() || it == '#' }) {
+                invalid("path is an api.github.com path starting with /")
+            }
+            val request = HttpCall("GET", "https://api.github.com$path", headers(args), null, timeout(env, record, args), MAX_BODY)
+            answerJson(env.github(request), args)
+        },
         // D2: a file of any size, as a job, into the plugin's own data (docs/plugin-api.md 3 H1).
         HostOp(
             "net", "download",

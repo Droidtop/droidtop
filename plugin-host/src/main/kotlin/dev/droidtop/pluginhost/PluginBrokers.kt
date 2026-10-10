@@ -262,6 +262,23 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         }
     }
 
+    override fun github(call: HttpCall): HttpAnswer {
+        val ms = call.timeoutMs.toInt()
+        val token = dev.droidtop.net.GitHubTokenStore.get(appContext)
+        val connection = dev.droidtop.net.GitHubAuth.open(call.url, token, ms, ms, call.headers, everyHop = true)
+        try {
+            val status = connection.responseCode
+            val headers = connection.headerFields.entries
+                .mapNotNull { (name, values) -> name?.lowercase()?.let { it to values.joinToString(", ") } }
+                .toMap()
+            val stream = (if (status >= 400) connection.errorStream else runCatching { connection.inputStream }.getOrNull())
+            val (body, truncated) = stream?.use { readCapped(it, call.maxBytes) } ?: (ByteArray(0) to false)
+            return HttpAnswer(status, connection.url.toString(), headers, body, truncated)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     private fun readCapped(input: java.io.InputStream, max: Int): Pair<ByteArray, Boolean> {
         val out = java.io.ByteArrayOutputStream()
         val buffer = ByteArray(16 * 1024)

@@ -16844,6 +16844,20 @@ probably make it a plugin? Obtainium too").
   apps are installed and never says "update available". No source is
   configured by default; there is no background refresh yet (Check app
   catalogs now, or a plugin's own refresh).
+- **A source's own settings** (owner's GitHub-releases plugin, #261): a plugin
+  lists them with the source (`options`: on/off, text or a choice, with a
+  label and a line of help), droidtop draws them on the source's page, read
+  again each time it opens, and sends each change as `set_source_options`.
+  Settings are not carried in a source's address any more.
+- **Importing from another app**: a plugin's "sources you can add" may hold an
+  entry whose address is not a web address (`obtainium:import`, "Import from an
+  Obtainium export file"); pressing it is the same `open_link` call, made as the
+  person's own, so the plugin may ask for a file with `files.pick` (three
+  minutes for the call) and answer with a review of what it found.
+- **GitHub**: `github.request` lets a plugin make a GitHub API request with the
+  person's token without ever seeing it, and a download may ask droidtop to add
+  the token for a private repository's asset (`"auth": "github"`), both under
+  the `github.api` permission (docs/plugin-api.md G4).
 
 ## 10c. Diagnostics, crash recovery and privacy
 

@@ -112,6 +112,10 @@ interface BrokerEnvironment {
     fun http(call: HttpCall, allow: (String) -> Unit): HttpAnswer =
         throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop makes no requests for plugins")
 
+    /** G4: runs [call] (a GET to api.github.com) with the person's GitHub token, which never reaches the plugin; unauthenticated when there is none. */
+    fun github(call: HttpCall): HttpAnswer =
+        throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop makes no GitHub requests for plugins")
+
     /** D2: downloads [url] into [file] of the plugin's [store] as a job owned by [record]; the job id, or null when it could not start. */
     fun startDownload(record: PluginRecord, url: String, file: java.io.File, store: PluginDataStore, allow: (String) -> Unit): String? = null
 
