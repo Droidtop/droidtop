@@ -574,7 +574,9 @@ internal fun MenuRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = (
                         if (columnWidth != null) {
-                            Modifier.width(columnWidth)
+                            // The shared width is a minimum, not a box: a value measured narrower than it draws
+                            // (the rig wrapped "Review" as "Revie/w", Droidtop/tracker#480) still gets the room it needs.
+                            Modifier.widthIn(min = columnWidth, max = MenuTokens.ValueColumnMaxWidth)
                         } else {
                             Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth, max = MenuTokens.ValueColumnMaxWidth)
                         }

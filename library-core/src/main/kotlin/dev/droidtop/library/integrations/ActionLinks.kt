@@ -693,10 +693,17 @@ object ActionLinks {
                     }
                 }
                 when {
-                    review.problem != null -> add(ActionItem("links_actions_${step.number}_problem", "Cannot run", subtitle = review.problem, run = {}))
+                    review.problem != null -> {
+                        // The reason is its own text block: the rig showed no reason under the "Cannot run" row (Droidtop/tracker#480).
+                        add(TextBlockItem("links_actions_${step.number}_problem_reason", text = review.problem))
+                        add(ActionItem("links_actions_${step.number}_problem", "Cannot run", run = {}))
+                    }
                     review.done -> add(ActionItem("links_actions_${step.number}_done", "Already done on this device", run = {}))
                     step.number in refused && step.number !in denied ->
-                        add(ActionItem("links_actions_${step.number}_refused", "Refused", subtitle = "It needs a step you denied", run = {}))
+                    {
+                        add(TextBlockItem("links_actions_${step.number}_refused_reason", text = "It needs a step you denied"))
+                        add(ActionItem("links_actions_${step.number}_refused", "Refused", run = {}))
+                    }
                     else -> add(
                         ToggleItem(
                             id = "links_actions_${step.number}_approve",
