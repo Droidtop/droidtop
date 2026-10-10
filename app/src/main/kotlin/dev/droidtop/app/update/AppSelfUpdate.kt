@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
 import androidx.core.content.pm.PackageInfoCompat
-import dev.droidtop.pluginhost.DownloadJobs
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -353,13 +352,11 @@ object AppSelfUpdate {
     }
 
     /**
-     * Downloads the release APK, verifies it against the digest published in
-     * release-info.json, and hands it to the system installer, narrating
-     * through [onStatus]. Blocking; call from a worker context. Throws on
-     * failure. The system takes over from the commit: either a silent
-     * update where it allows one, or its confirmation UI.
+     * Throws (with [UNKNOWN_APPS_BLOCKED]) when Android does not yet let
+     * droidtop install its own update, after opening the one screen that
+     * fixes it. The forced pass asks before it downloads anything.
      */
-    fun downloadAndInstall(context: Context, info: Info, onStatus: (String) -> Unit): Int {
+    fun requireInstallAllowed(context: Context) {
         // Android 8 and later install an app's own download only once the
         // person has allowed that app under "Install unknown apps"; without
         // it the installer stops at "not allowed to install unknown apps
@@ -377,10 +374,22 @@ object AppSelfUpdate {
             }
             throw IllegalStateException(UNKNOWN_APPS_BLOCKED)
         }
-        onStatus("Downloading ${info.versionName}...")
-        val apk = download(context, info, onStatus)
-        onStatus("Handing the update to the Android installer...")
-        return commitSession(context, apk, info)
+    }
+
+    /**
+     * Verifies [apk] against the digest published in release-info.json and
+     * hands it to the system installer; returns the installer session.
+     * Blocking; call from a worker context. Throws on failure, including
+     * bytes that do not match the digest, whatever served them. The system
+     * takes over from the commit: either a silent update where it allows
+     * one, or its confirmation UI. The APK itself comes from Android's
+     * DownloadManager ([UpdateDownload]).
+     */
+    fun install(context: Context, apk: File, versionCode: Long, versionName: String, digest: String): Int {
+        requireInstallAllowed(context)
+        require(apk.isFile) { "the downloaded APK is missing" }
+        require(sha256(apk) == digest.uppercase()) { "the downloaded APK does not match the published digest" }
+        return commitSession(context, apk, "$versionName (build $versionCode)")
     }
 
     /** What the person reads when Android has not allowed droidtop to install its own updates. */
@@ -406,27 +415,7 @@ object AppSelfUpdate {
     fun awaitOutcome(sessionId: Int, timeoutMs: Long): String? =
         runCatching { outcomes[sessionId]?.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) }.getOrNull()
 
-    /**
-     * The APK as one resumable download job in "Downloads and installs" ([DownloadJobs], digest checked
-     * there against the one published next to it: bytes that do not match are discarded, whatever
-     * served them). The file stays where it landed for [commitSession]; a copy already there that
-     * matches is used as it is. Blocking, like the rest of the update path.
-     */
-    private fun download(context: Context, info: Info, onStatus: (String) -> Unit): File {
-        val name = "droidtop-${info.versionCode}.apk"
-        val apk = DownloadJobs.fileFor(context, name)
-        if (apk.isFile && sha256(apk) == info.apkSha256) return apk
-        val result = kotlinx.coroutines.runBlocking {
-            DownloadJobs.run(
-                context, "droidtop ${info.versionName}", DownloadJobs.POST_KEEP, info.apkUrl, name,
-                sha256 = info.apkSha256, onStatus = onStatus,
-            )
-        }
-        require(result.ok) { "APK download failed: ${result.error}" }
-        return apk
-    }
-
-    private fun commitSession(context: Context, apk: File, info: Info): Int {
+    private fun commitSession(context: Context, apk: File, label: String): Int {
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(context.packageName)
@@ -439,7 +428,7 @@ object AppSelfUpdate {
         }
         val sessionId = installer.createSession(params)
         outcomes[sessionId] = java.util.concurrent.CompletableFuture()
-        pendingNames[sessionId] = info.versionName + " (build " + info.versionCode + ")"
+        pendingNames[sessionId] = label
         installer.openSession(sessionId).use { session ->
             apk.inputStream().use { input ->
                 session.openWrite("droidtop.apk", 0, apk.length()).use { output ->

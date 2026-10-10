@@ -12,8 +12,6 @@
          API 33+ for the foreground-service notification itself to show. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <!-- UpdateService (below) downloads droidtop's own update as a dataSync foreground service. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Real outbound HTTP: ScreenScraper/TheGamesDB/Lutris/IGDB metadata
@@ -645,14 +643,19 @@
                 android:resource="@xml/typing_accessibility_service" />
         </service>
         <!--
-          The whole self-update pass (check, download, request to the installer) runs here as a foreground
-          service, so Android keeps the process while droidtop is in the background (docs/SPEC.md 10b,
-          Droidtop/tracker#445). dataSync has no time limit on the targetSdk 34 we build for.
+          Android's DownloadManager reports the end of the self-update's APK download here; droidtop then
+          verifies it and asks the installer (docs/SPEC.md 10b, Droidtop/tracker#445). Exported because the
+          downloads provider is another app; only a sender holding SEND_DOWNLOAD_COMPLETED_INTENTS (the
+          provider itself, a signature permission) can deliver it.
         -->
-        <service
-            android:name="dev.droidtop.app.update.UpdateService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
+        <receiver
+            android:name="dev.droidtop.app.update.UpdateDownloadReceiver"
+            android:exported="true"
+            android:permission="android.permission.SEND_DOWNLOAD_COMPLETED_INTENTS">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
         <!-- PackageInstaller reports the self-update verdict here. -->
         <receiver
             android:name="dev.droidtop.app.update.AppUpdateStatusReceiver"

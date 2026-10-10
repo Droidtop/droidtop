@@ -76,13 +76,46 @@ class UpdateNowTest {
     }
 
     @Test
-    fun `startDetached hands the work to the spawner and does not run it on the caller`() {
+    fun `a started pass runs off the caller and hands off only once it has run`() {
         val spawned = mutableListOf<Runnable>()
         var ran = false
-        UpdateNow.startDetached({ ran = true }) { spawned += it }
+        var handedOff = 0
+        assertTrue(UpdateNow.launch({ ran = true }, { handedOff++ }) { spawned += it })
         assertFalse(ran)
+        assertEquals(0, handedOff)
         assertEquals(1, spawned.size)
         spawned.single().run()
         assertTrue(ran)
+        assertEquals(1, handedOff)
+        UpdateNow.finish("done")
+    }
+
+    @Test
+    fun `joining a running pass hands off at once and starts nothing`() {
+        assertTrue(UpdateNow.begin())
+        val spawned = mutableListOf<Runnable>()
+        var handedOff = 0
+        assertFalse(UpdateNow.launch({ error("must not run") }, { handedOff++ }) { spawned += it })
+        assertEquals(1, handedOff)
+        assertTrue(spawned.isEmpty())
+        UpdateNow.finish("done")
+    }
+
+    @Test
+    fun `the hand off still happens when the pass throws`() {
+        val spawned = mutableListOf<Runnable>()
+        var handedOff = 0
+        UpdateNow.launch({ error("boom") }, { handedOff++ }) { spawned += it }
+        runCatching { spawned.single().run() }
+        assertEquals(1, handedOff)
+        UpdateNow.finish("done")
+    }
+
+    @Test
+    fun `the UPDATE_NOW broadcast is held under Android's broadcast timeouts`() {
+        // BROADCAST_FG_TIMEOUT is 10 s and BROADCAST_BG_TIMEOUT 60 s; adb's am broadcast is a background one.
+        assertTrue(UpdateNow.broadcastHoldMs(foreground = true) < 10_000L)
+        assertTrue(UpdateNow.broadcastHoldMs(foreground = false) < 60_000L)
+        assertTrue(UpdateNow.broadcastHoldMs(foreground = false) > UpdateNow.broadcastHoldMs(foreground = true))
     }
 }

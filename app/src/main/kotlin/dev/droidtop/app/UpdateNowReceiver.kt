@@ -3,9 +3,11 @@ package dev.droidtop.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import dev.droidtop.app.update.UpdateNow
-import dev.droidtop.app.update.UpdateService
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The "update now" trigger (docs/SPEC.md 10b, decision 2026-09-11):
@@ -32,19 +34,24 @@ import dev.droidtop.app.update.UpdateService
  * which adb's `am broadcast` never does -- so a uid check would reject the
  * one caller this receiver exists for.
  *
- * The broadcast itself returns at once: the feed fetch and the download run
- * in UpdateService, a foreground service, so that Android does not freeze
- * the backgrounded process mid-download (a cached process was frozen 7 s
- * after the broadcast returned, rig 2026-10-09). They must not be held
- * open with goAsync(), because the system's broadcast timeout (10 s for the
- * foreground broadcast adb sends) counts until pending.finish(), and a
- * download takes longer than that: the ANR "Broadcast of Intent UPDATE_NOW"
- * on emulator-5560 (Droidtop/tracker#445).
+ * The broadcast is held open (goAsync) only while the pass reads the feed and
+ * hands the APK download to Android's DownloadManager, a few seconds, and never
+ * past [UpdateNow.broadcastHoldMs]: while it is held droidtop's process is not
+ * cached, so Android does not freeze it. The download itself runs in the
+ * system's downloads provider, and droidtop is woken to install when it ends
+ * (Droidtop/tracker#445). Holding the broadcast for the whole download ANRed;
+ * a bare thread after it returned was frozen mid-download; and a foreground
+ * service started from here is refused on Android 12+ (rig, Android 14).
  */
 class UpdateNowReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != UpdateNow.ACTION) return
         Log.i(UpdateNow.TAG, "UPDATE_NOW received (sender holds android.permission.DUMP): checking the release feed now")
-        UpdateService.start(context)
+        val pending = goAsync()
+        val released = AtomicBoolean(false)
+        val release: () -> Unit = { if (released.compareAndSet(false, true)) pending.finish() }
+        val foreground = (intent.flags and Intent.FLAG_RECEIVER_FOREGROUND) != 0
+        Handler(Looper.getMainLooper()).postDelayed({ release() }, UpdateNow.broadcastHoldMs(foreground))
+        UpdateNow.start(context, onHandedOff = release)
     }
 }
