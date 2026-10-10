@@ -18537,8 +18537,8 @@ what the index says is display data, never a trust decision.
     address can be pasted under Plugins > Add > More catalogs. The page only
     forwards; the review and its Accept are in the app.
   - **READMEs.** Each catalog's README carries its add-catalog link and a QR
-    code of the same link (`docs/add-catalog-qr.svg`, made with segno from the
-    link in the README).
+    code of the same link (`add-catalog-qr.svg` beside it, made with segno from
+    the link in the README).
 - **Not built:** the deferred droidtop root key that would certify new origins
   without an app change; offering testing/unstable streams; F-Droid style
   repositories as catalogs (Droidtop/tracker#261): their indexes are already
