@@ -2,7 +2,7 @@ package dev.droidtop.app
 
 import android.os.Bundle
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import dev.droidtop.library.integrations.PluginCatalogScreen
 import dev.droidtop.library.integrations.PluginCatalogSources
@@ -18,8 +18,11 @@ import kotlinx.coroutines.withContext
  * screen of its own. It fetches the catalog the link names and opens More catalogs on that catalog's review,
  * its notice above Accept ([PluginCatalogScreen.prepareLink]); the link can neither add nor trust anything,
  * because adding is the person's Accept on that review. Where Settings is hidden (Kiosk, Kid) a link does nothing.
+ *
+ * A plain ComponentActivity: its manifest theme is the platform's translucent one (it draws nothing), which an
+ * AppCompatActivity refuses at launch ("You need to use a Theme.AppCompat theme").
  */
-class AddCatalogLinkActivity : AppCompatActivity() {
+class AddCatalogLinkActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val address = intent?.dataString?.let(PluginCatalogSources::addressFromLink)
