@@ -1102,6 +1102,54 @@ the Shizuku binder must run full-trust.
 The group ids (A1, B3, ...) are stable references for issues and code
 comments.
 
+### Naming (owner, 2026-10-10, Droidtop/tracker#459)
+
+"It probably makes sense to make API call names simple and descriptive. We
+should be able to parse the api call behavior by what it does, and the name
+should match it." A call is `<area>.<verb>` or `<area>.<verb>_<object>`: the
+area is what it acts on, the verb says what happens, lower-case words joined
+by `_`. A read-only call starts with a read verb (`get`, `list`, `check`,
+`read`, `find`, `search`, `count`); a call that changes something uses the
+verb of that change (`add`, `remove`, `trust`, `install`, `open`, `send`,
+`set`, `report`, `cancel`, `post`, `write`, `delete`, `move`). No bare nouns
+(`status`, `info`), no event-style past tenses (`changed`). The same rule
+holds for a plugin's own ops (`exports`, `linkOps`). droidtop cannot enforce it
+on a plugin, so the bundle workflow warns on names that break it
+(`HostOpNames.check`, the rule as code) and the action-link review never relies
+on a plugin op's name (docs/SPEC.md 12a "Action links").
+
+**Contract 2.1 renames** (`host.get_info` reports `contractMinor: 1` and the
+map as `deprecatedOps`). Each old name stays a deprecated alias that answers as
+the new one until contract 2.2 (§7):
+
+| Before 2.1 | From 2.1 |
+| --- | --- |
+| `net.state` | `net.get_state` |
+| `net.http` | `net.request` |
+| `host.info` | `host.get_info` |
+| `plugins.available` | `plugins.list_available` |
+| `plugins.job_status` | `job.get_status` |
+| `plugins.job_cancel` | `job.cancel` |
+| `plugins.report_level` | `provider.report_level` |
+| `data.usage` | `data.get_usage` |
+| `data.path` | `data.get_path` |
+| `storage.volumes` | `storage.list_volumes` |
+| `vault.keys` | `vault.list_keys` |
+| `web.session.status` | `web.session.get_status` |
+| `apps.check` | `apps.check_installed` |
+| `apps.intent` | `apps.send_intent` |
+| `apps.view` | `link.open` (permission still `apps.view`) |
+| `social.changed` | `social.report_changed` |
+| `library.files.changed` | `library.files.report_changed` |
+| `library.read.systems` | `library.read.list_systems` |
+| `companion.recording` | `companion.set_recording` |
+| `retroarch.status` | `retroarch.get_status` |
+| `retroarch.command` | `retroarch.send_command` |
+
+The `apps.catalog` point's ops follow it from the start (`list_sources`,
+`get_app`, `list_latest`, `search`, `add_source`, `refresh`, `acquire`).
+Names elsewhere in this document that predate 2.1 mean the op in this table.
+
 ### A. Library and content
 
 **A1 Library read.** API `library.read@1`. Risk medium.
@@ -1376,7 +1424,7 @@ writes real files that droidtop's own scan finds (A2).
   "Installing apps", Droidtop/tracker#261).
 - **Ops** (every call also carries `device {sdk, abis, locale}`, so the plugin
   answers for this device):
-  - `sources {}` → `{sources: [{id, name, address, enabled, updated?, apps?,
+  - `list_sources {}` → `{sources: [{id, name, address, enabled, updated?, apps?,
     fingerprint?, note?}], known: [{name, address, about?}]}`: the sources the
     person added, and the ones the plugin lists to add (F-Droid's own lists).
   - `open_link {link}` → `{review: {token, name, address, fingerprint?,
@@ -1391,11 +1439,11 @@ writes real files that droidtop's own scan finds (A2).
   - `search {query, limit}` → `{apps: [{id, name, summary?, version?,
     versionCode?, source?, antiFeatures: [key]}]}` (an empty query lists recent
     apps; at most 200).
-  - `app {id}` → `{app: {id, name, summary?, description?, license?, website?,
+  - `get_app {id}` → `{app: {id, name, summary?, description?, license?, website?,
     sourceCode?, author?, source?, versions: [{version, versionCode, size?,
     signers: [sha256], minSdk?, added?, antiFeatures: [{key, label, reason?}],
     whatsNew?}]}}` (at most 20 versions, compatible with `device`).
-  - `latest {after?, limit}` → `{apps: [{id, name, version, versionCode,
+  - `list_latest {after?, limit}` → `{apps: [{id, name, version, versionCode,
     signers, source?}], next?}`: the newest compatible version of every app,
     paged by package name. droidtop compares; the plugin is never told what is
     installed.
@@ -1998,7 +2046,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | F1 | App bridges | a plugin that represents another installed app (Syncthing, Key Mapper, Obtainium, Discord, #15): status, actions, and **droidtop's own fallback when the app is absent** | EP `apps.bridge@1` (today's `app_status`): `status {package}` → {installed, version, state, actions[]}; `action {id}` (quick call or **job**) | A/G/D: the app's row wherever droidtop shows that app (the Player screen today), Accounts and sources, C3 tiles | `provide:apps.bridge` + `apps.check` (declared packages) + `apps.bind` (for live connections) | medium | built as `app_status` (`PluginAppStatus`) |
 | F2 | Intents out | start another app, share to it, hand it a link or a file | `apps.launch {package}` (exists); `apps.intent {package, action, extras(strings), data?}` → the host builds and fires it; `apps.view {uri, title?}` → `{opened, reason?}`: droidtop builds `ACTION_VIEW` for the link and shows Android's own chooser (a magnet to a torrent app, a web page to a browser); the allowed schemes are `https`, `http` and `magnet` only (no `file`, `content`, `intent`, `javascript` or droidtop's own), at most 8192 characters, and only during a call the person started (a button's job); when no app takes the link the answer is `{opened: false, reason: "no app opens magnet links"}`, not an error, and the plugin shows the link to copy; every use is in the activity log (the kind of link and a web page's host, never a query or a magnet's contents); `apps.share {text \| file token}` → the system share sheet | — | `apps.launch` (normal) / `apps.view` (normal: "Open links in other apps") / `apps.intents.out` (normal for declared packages; dangerous for any package) | medium | partial (`launchApp`, `launchAppWithExtras`; `apps.view` built 2026-10-09, `AppLinks`, Droidtop/tracker#418) |
-| F3 | Intents in | let links reach a plugin: a third-party scheme (fdroidrepos://), a site (`f95zone.to`), a path on any host (`/fdroid/repo`), share *to* droidtop; and link-callable actions in droidtop's own `droidtop://do` grammar (docs/SPEC.md 12a "Links", "Action links") | a `provides` entry's `links: [{scheme, host?, pathPrefix?, pathSuffix?, query?}]` → droidtop's one router (`LinkRouter`) calls `open_link {link}` on that point; `actions: [{id, label, params}]` → `run_action {action, params}` after the person approved the step | "Open this link with" when several handlers match (remembered per kind of link); an action link's step-by-step review | `intents.in` (dangerous: other apps can trigger it) | high | built 2026-10-10 (Droidtop/tracker#459); droidtop declares the scheme aliases, the links-helper APK for other schemes is not built |
+| F3 | Intents in | let links reach a plugin: a third-party scheme (fdroidrepos://), a site (`f95zone.to`), a path on any host (`/fdroid/repo`), share *to* droidtop; and ops callable from droidtop's own action links (`droidtop://call?v=2&...`, docs/SPEC.md 12a "Links", "Action links") | a `provides` entry's `links: [{scheme, host?, pathPrefix?, pathSuffix?, query?}]` → droidtop's one router (`LinkRouter`) calls `open_link {link}` on that point; `linkOps: [{op, label, description, risk, args}]` → that op, called literally on that point after the person approved the call | "Open this link with" when several handlers match (remembered per kind of link); an action link's call-by-call review, showing the plugin's description and the permissions the call could use | `intents.in` (dangerous: other apps can trigger it) | high | built 2026-10-10 (Droidtop/tracker#459); droidtop declares the scheme aliases, the links-helper APK for other schemes is not built |
 | F4 | Installed apps | know what is installed (to find emulators, detect a bridge target) | `apps.check {packages[] declared}`; `apps.list()` → all packages | data | `apps.check` (normal, declared list) / `apps.list` (dangerous: the full list is personal) | low / high | partial (`isAppInstalled`) |
 | F5 | Install apps | install or update an APK (an Obtainium-style updater) | `apps.install {file token}` → Android's own installer UI | Android's confirmation | `apps.install` (dangerous) | high | not built |
 | F6 | Bound connections | a live service or binder connection to another app | manifest `boundServiceTargets` (exists); the host binds, the plugin exchanges data through the broker (`apps.bound.call {package, method, args}` for AIDL surfaces the host knows) | — | `apps.bind` (dangerous, per package) | high | declared only |

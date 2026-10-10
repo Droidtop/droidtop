@@ -136,12 +136,12 @@ internal object HostDataApis {
         },
         // Where a file of the plugin's lives, as a path droidtop resolved: only to hand to a provider plugin (a root helper
         // copying it somewhere), which runs with full access. The contained plugin itself can open no path.
-        HostOp("data", "path", target = { it.optString("name") }) { env, record, args ->
+        HostOp("data", "get_path", target = { it.optString("name") }) { env, record, args ->
             val file = storeOf(env, record).resolve(args.optString("name"))
             if (!file.isFile) throw BrokerException(PluginErrorCode.NOT_FOUND, "no data named ${args.optString("name")}")
             JSONObject().put("path", file.absolutePath)
         },
-        HostOp("data", "usage") { env, record, _ ->
+        HostOp("data", "get_usage") { env, record, _ ->
             JSONObject().put("bytes", storeOf(env, record).usage()).put("limit", PluginDataStore.LIMIT_BYTES)
         },
         // The file itself, for anything larger than a chunk: mode r (read), w (replace), a (append) or rw.

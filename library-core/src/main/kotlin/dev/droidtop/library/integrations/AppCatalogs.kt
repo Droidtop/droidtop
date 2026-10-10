@@ -20,7 +20,7 @@ import org.json.JSONObject
  * that touches the device. Core owns installing and update tracking; a plugin supplies a catalog:
  *
  * - **The plugin** keeps its sources (repositories, tracked pages), fetches and verifies their indexes, answers
- *   searches and an app's page, lists its newest compatible versions ([latestPage]) and, asked for one version
+ *   searches and an app's page, lists its newest compatible versions (`list_latest`) and, asked for one version
  *   ([install]), returns the download and what the APK must be (package, version code, signing keys).
  * - **droidtop** downloads it as a Downloads job, checks the file is that package and version signed by one of those
  *   keys (and by the installed app's key, so a changed key is refused plainly), installs it through the one
@@ -348,7 +348,7 @@ object AppCatalogs {
     private fun args(): JSONObject = JSONObject().put("device", device())
 
     suspend fun sources(context: Context, record: PluginRecord): Result<Sources> {
-        val reply = PluginViews.call(context, record, POINT, "sources", args())
+        val reply = PluginViews.call(context, record, POINT, "list_sources", args())
         return if (reply.ok) Result.success(parseSources(reply.data)) else Result.failure(IllegalStateException(reply.message ?: "it did not answer"))
     }
 
@@ -390,7 +390,7 @@ object AppCatalogs {
         var after: String? = null
         for (page in 0 until MAX_PAGES) {
             val call = args().put("limit", PAGE).apply { after?.let { put("after", it) } }
-            val reply = PluginViews.call(context, record, POINT, "latest", call)
+            val reply = PluginViews.call(context, record, POINT, "list_latest", call)
             if (!reply.ok) return@withContext null
             val (offers, next) = parseOffers(reply.data)
             all += offers
@@ -406,7 +406,7 @@ object AppCatalogs {
     }
 
     suspend fun app(context: Context, record: PluginRecord, id: String): Result<AppPage> {
-        val reply = PluginViews.call(context, record, POINT, "app", args().put("id", id))
+        val reply = PluginViews.call(context, record, POINT, "get_app", args().put("id", id))
         if (!reply.ok) return Result.failure(IllegalStateException(reply.message ?: "it did not answer"))
         return parseApp(reply.data)?.let { Result.success(it) } ?: Result.failure(IllegalStateException("it returned no app"))
     }

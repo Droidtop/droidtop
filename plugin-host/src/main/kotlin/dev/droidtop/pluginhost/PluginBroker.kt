@@ -276,7 +276,7 @@ object HostApis {
     }
 
     private val core: List<HostOp> = listOf(
-        HostOp("host", "info") { env, record, _ ->
+        HostOp("host", "get_info") { env, record, _ ->
             val points = JSONObject()
             ExtensionPoints.all.forEach { points.put(it.id, JSONArray(it.versions.sorted())) }
             val apis = JSONObject()
@@ -286,11 +286,13 @@ object HostApis {
             PluginModes.canonical(facts.optString("mode"))?.let { facts.put("mode", it) }
             facts
                 .put("contract", PLUGIN_CONTRACT_VERSION)
+                .put("contractMinor", HostOpNames.CONTRACT_MINOR)
+                .put("deprecatedOps", JSONObject(HostOpNames.DEPRECATED as Map<*, *>))
                 .put("points", points)
                 .put("apis", apis)
                 .put("installId", env.installId(record.manifest.id))
         },
-        HostOp("plugins", "available") { env, record, args ->
+        HostOp("plugins", "list_available") { env, record, args ->
             val api = args.optString("api").takeIf { it.isNotBlank() } ?: invalid("api is required")
             val minLevel = args.optString("minLevel").takeIf { it.isNotBlank() }
                 ?: record.manifest.v2.requires.firstOrNull { it.api == api }?.minLevel
@@ -307,7 +309,7 @@ object HostApis {
         },
         // A provider says which privilege level it holds right now (docs/plugin-api.md 2.7): its root-level export is offered
         // only while it reports "root". Only for an API it exports at a level it declared; it grants nothing by itself.
-        HostOp("plugins", "report_level") { env, record, args ->
+        HostOp("provider", "report_level") { env, record, args ->
             val api = args.optString("api").takeIf { it.isNotBlank() } ?: invalid("api is required")
             val level = args.optString("level").takeIf { it in setOf("none", "adb", "root") } ?: invalid("level is none, adb or root")
             val declared = record.manifest.v2.exports.filter { it.api == api }.map { it.level }
@@ -315,19 +317,19 @@ object HostApis {
             if (level != "none" && level !in declared) invalid("$api is not exported at level $level")
             JSONObject().put("recorded", env.reportProviderLevel(record, api, level))
         },
-        HostOp("plugins", "job_status") { env, record, args ->
+        HostOp("job", "get_status") { env, record, args ->
             val id = args.optString("jobId").takeIf { it.isNotBlank() } ?: invalid("jobId is required")
             val reply = env.brokeredJobStatus(record, id)
             if (!reply.ok) throw BrokerException(reply.code ?: PluginErrorCode.FAILED, reply.message.orEmpty())
             reply.data
         },
         // A job the plugin started through the broker (a provider's job op, a `net.download`), stopped at its next step.
-        HostOp("plugins", "job_cancel") { env, record, args ->
+        HostOp("job", "cancel") { env, record, args ->
             val id = args.optString("jobId").takeIf { it.isNotBlank() } ?: invalid("jobId is required")
             JSONObject().put("cancelled", env.cancelBrokeredJob(record, id))
         },
         HostOp(
-            "apps", "check",
+            "apps", "check_installed",
             permission = "apps.check",
             scope = { declared, args -> packageScope(declared, args) },
             target = { runCatching { packages(it).joinToString(",") }.getOrDefault("") },
@@ -347,7 +349,7 @@ object HostApis {
         // docs/plugin-api.md 3 F2: a link handed to another app (a magnet to a torrent app, a page to the browser). droidtop
         // builds the intent and shows Android's chooser; the plugin never sees an Intent. Only during a call the person started.
         HostOp(
-            "apps", "view",
+            "link", "open",
             permission = "apps.view",
             userOnly = true,
             alwaysAudit = true,
@@ -360,7 +362,7 @@ object HostApis {
             JSONObject().put("opened", reason == null).also { if (reason != null) it.put("reason", reason) }
         },
         HostOp(
-            "apps", "intent",
+            "apps", "send_intent",
             permission = "apps.intents.out",
             scope = { declared, args ->
                 if (scopeAny(declared) || "*" in declaredPackages(declared)) {
@@ -402,7 +404,7 @@ object HostApis {
         // docs/plugin-api.md 3 C19: a social provider with a live connection says something changed, so droidtop never
         // polls it. Only a plugin that provides social.provider, with that point still on, may say so.
         HostOp(
-            "social", "changed",
+            "social", "report_changed",
             target = { it.optString("friendId") },
         ) { env, record, args ->
             val point = "social.provider"
@@ -416,7 +418,7 @@ object HostApis {
         // docs/plugin-api.md 3 B: a command to the RetroArch running the game (save, load, slot, shader, fast-forward), sent by
         // droidtop to the loopback address only, then RetroArch's status, so the plugin can say whether it answered.
         HostOp(
-            "retroarch", "command",
+            "retroarch", "send_command",
             permission = "retroarch.commands",
             target = { it.optString("command") },
         ) { env, _, args ->
@@ -426,10 +428,10 @@ object HostApis {
             retroArchStatus(env).put("sent", true)
         },
         // Whether RetroArch answers, and what it runs, without sending anything else: a panel decides what to show.
-        HostOp("retroarch", "status", permission = "retroarch.commands") { env, _, _ -> retroArchStatus(env) },
+        HostOp("retroarch", "get_status", permission = "retroarch.commands") { env, _, _ -> retroArchStatus(env) },
         // docs/plugin-api.md 3 C15: a recorder says it started or stopped, and the companion's status line shows "Recording"
         // with a timer. Only a plugin whose panel declares the `recording` ability, with that point still on, may say so.
-        HostOp("companion", "recording") { env, record, args ->
+        HostOp("companion", "set_recording") { env, record, args ->
             PluginGrants.pointRefusal(record, env.grants(record.manifest.id), "ui.panel")?.let {
                 throw BrokerException(PluginErrorCode.PERMISSION_DENIED, it)
             }
@@ -444,7 +446,7 @@ object HostApis {
         // that, never at the whole library. The grant is the one that lets it write there at all; the paths must be inside the
         // person's game folders (a game folder itself is a rescan, not a report).
         HostOp(
-            "library.files", "changed",
+            "library.files", "report_changed",
             permission = "library.folders.write",
             target = { "${it.optJSONArray("added")?.length() ?: 0} added, ${it.optJSONArray("removed")?.length() ?: 0} removed, ${it.optJSONArray("changed")?.length() ?: 0} changed" },
         ) { env, record, args ->
@@ -456,7 +458,7 @@ object HostApis {
             JSONObject().put("accepted", env.libraryFilesChanged(record.manifest.id, change))
         },
         // docs/plugin-api.md 3 A1: the user's systems and each one's chosen emulator, so a panel can list every system, not only those it heard about.
-        HostOp("library.read", "systems", permission = "library.read") { env, _, _ -> env.librarySystems() },
+        HostOp("library.read", "list_systems", permission = "library.read") { env, _, _ -> env.librarySystems() },
         // docs/plugin-api.md 3 G1: the caller's own secrets. The broker names the caller, so a plugin can only ever reach its own;
         // the audit and every log carry the key's name at most, never a value.
         HostOp("vault", "put", permission = "vault.own", target = { it.optString("key") }) { env, record, args ->
@@ -479,7 +481,7 @@ object HostApis {
             val key = args.optString("key").takeIf { PluginVault.validKey(it) } ?: invalid("key is required")
             JSONObject().put("deleted", vaultOf(env).delete(record.manifest.id, key))
         },
-        HostOp("vault", "keys", permission = "vault.own") { env, record, _ ->
+        HostOp("vault", "list_keys", permission = "vault.own") { env, record, _ ->
             JSONObject().put("keys", JSONArray(vaultOf(env).keys(record.manifest.id)))
         },
     )
@@ -514,10 +516,14 @@ object HostApis {
 
     fun all(): List<HostOp> = ops
 
-    fun find(api: String, op: String): HostOp? = ops.firstOrNull { it.api == api && it.op == op }
+    /** The op [api] [op] names, by its current name or a deprecated one ([HostOpNames.DEPRECATED]). */
+    fun find(api: String, op: String): HostOp? {
+        val (a, o) = HostOpNames.current(api, op)
+        return ops.firstOrNull { it.api == a && it.op == o }
+    }
 
-    /** True for an API id the host owns: a provider plugin can never take one over. */
-    fun isHostApi(api: String): Boolean = ops.any { it.api == api }
+    /** True for an API id the host owns, by its current name or a deprecated one: a provider plugin can never take one over. */
+    fun isHostApi(api: String): Boolean = ops.any { it.api == api } || HostOpNames.DEPRECATED.keys.any { it.substringBeforeLast('.') == api }
 }
 
 /**

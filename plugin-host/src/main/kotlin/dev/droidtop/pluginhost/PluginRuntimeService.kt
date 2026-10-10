@@ -111,7 +111,7 @@ open class PluginRuntimeService : PluginProcessService() {
          * started or stopped between calls.
          */
         private fun rootProviderAvailable(): Boolean = runCatching {
-            val reply = JSONObject(call("plugins", 1, "available", JSONObject().put("api", "priv.shell").put("minLevel", "root").toString()))
+            val reply = JSONObject(call("plugins", 1, "list_available", JSONObject().put("api", "priv.shell").put("minLevel", "root").toString()))
             reply.optBoolean("ok") && reply.optJSONObject("data")?.optBoolean("available") == true
         }.getOrDefault(false)
         override fun hasShizukuAccess(): Boolean = checkShizukuAccess(applicationContext)

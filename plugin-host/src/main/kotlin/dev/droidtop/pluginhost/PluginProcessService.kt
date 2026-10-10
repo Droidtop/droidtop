@@ -448,7 +448,7 @@ internal open class BrokerPluginContext(private val broker: IPluginHostBroker) :
 
     override fun isAppInstalled(packageName: String): Boolean = runCatching {
         // The reply carries one boolean per package: read it by name.
-        val reply = JSONObject(call("apps", 1, "check", JSONObject().put("packages", org.json.JSONArray(listOf(packageName))).toString()))
+        val reply = JSONObject(call("apps", 1, "check_installed", JSONObject().put("packages", org.json.JSONArray(listOf(packageName))).toString()))
         reply.optBoolean("ok") && reply.optJSONObject("data")?.optJSONObject("installed")?.optBoolean(packageName) == true
     }.getOrDefault(false)
 
@@ -457,7 +457,7 @@ internal open class BrokerPluginContext(private val broker: IPluginHostBroker) :
 
     override fun launchAppWithExtras(packageName: String, extras: Map<String, String>, action: String?): Boolean =
         flag(
-            "apps", "intent",
+            "apps", "send_intent",
             JSONObject().put("package", packageName).put("extras", JSONObject(extras as Map<*, *>)).also { if (action != null) it.put("action", action) },
             "launched",
         )

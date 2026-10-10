@@ -180,10 +180,10 @@ internal object HostNetApis {
 
     val ops: List<HostOp> = listOf(
         // D1: whether the device is online, and how.
-        HostOp("net", "state", permission = "net.state") { env, _, _ -> env.netState() },
+        HostOp("net", "get_state", permission = "net.state") { env, _, _ -> env.netState() },
         // D2: one request and its answer, at most 128 KiB each way.
         HostOp(
-            "net", "http",
+            "net", "request",
             permissionFor = { declared, args, _ -> permissionOf(declared, args) },
             target = { NetScope.hostOf(it.optString("url")).orEmpty() },
             alwaysAudit = true,

@@ -54,7 +54,7 @@ internal object HostWebApis {
             if (result.completed) save(env, record, result.session)
             JSONObject().put("signedIn", result.completed && result.session?.cookies?.isNotEmpty() == true)
         },
-        HostOp("web.session", "status", permission = WebSessions.PERMISSION) { env, record, _ ->
+        HostOp("web.session", "get_status", permission = WebSessions.PERMISSION) { env, record, _ ->
             JSONObject().put("signedIn", stored(env, record)?.cookies?.isNotEmpty() == true)
         },
         HostOp("web.session", "clear", permission = WebSessions.PERMISSION, alwaysAudit = true) { env, record, _ ->

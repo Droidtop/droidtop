@@ -146,7 +146,7 @@ internal object HostFileApis {
 
     val ops: List<HostOp> = listOf(
         // D3: the storage volumes and their free space.
-        HostOp("storage", "volumes", permission = "storage.volumes") { env, _, _ -> JSONObject().put("volumes", env.storageVolumes()) },
+        HostOp("storage", "list_volumes", permission = "storage.volumes") { env, _, _ -> JSONObject().put("volumes", env.storageVolumes()) },
 
         // D4: the person picks a file in Android's own picker; the pick is the consent, and the plugin gets a token.
         HostOp(
