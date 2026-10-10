@@ -2615,7 +2615,8 @@ with it:
 **The rigs (plugin-enforce-7, v0.2.0-dev.1649 and the fixes after it).**
 - **The system-call filter in every plugin process.** The isolated sandbox
   now takes the same seccomp filter as a `gpu.render` process (sockets only
-  as local datagrams, no io_uring, no ptrace; `PluginSyscallFilter`). The
+  as local datagrams, no programs, no io_uring, no ptrace;
+  `PluginSyscallFilter`). The
   BlueStacks rig runs with SELinux disabled (`getenforce`: Disabled) and its
   isolated UID could open a socket; with the filter the check reads
   "Network: refused" there as on stock Android. Where the filter cannot be
@@ -2712,19 +2713,28 @@ opens that one hole:
   broker with the same grant, scope, quota and audit. It draws into a
   droidtop-owned `Surface` (`PluginScreenActivity`), with hardware instead
   of `--enable-software-rendering`.
-- **The system-call filter (plugin-enforce-6).** Before any of the plugin's
-  code loads, the process installs a seccomp-bpf filter on every thread
-  (`native/src/gpu_filter.c`, `PluginSyscallFilter`; `SECCOMP_FILTER_FLAG_TSYNC`
-  after `PR_SET_NO_NEW_PRIVS`), which nothing in the process can lift. It
-  refuses `socket()` for every family but `AF_UNIX`, and `AF_UNIX` for
-  everything but datagrams (liblog's socket to logd), with `EACCES` as an
-  isolated process gets: no internet socket and no DNS lookup (netd's
-  resolver socket is a stream socket), and no stream socket to a root
-  manager's daemon or to a relay droidtop runs. It refuses `io_uring`
-  (`ENOSYS`; its operations open files and sockets without passing through
-  the filter), `ptrace` and `process_vm_readv`/`writev` (`EPERM`), and any
-  foreign system-call ABI (x86_64's x32 numbers). A process that cannot take
-  the filter does not run the plugin. The Containment check (Advanced)
+- **The system-call filter (plugin-enforce-6; since 2026-10-10 the sandbox
+  library's, Droidtop/tracker#470).** Before any of the plugin's code
+  loads, the process installs a seccomp-bpf filter on every thread
+  (`native/src/plugin_filter.c`, `PluginSyscallFilter`). It is the
+  lockdown of the sandbox library droidtop shares with Enginehost
+  (`vendor/sandbox`, bi0shacker001/sandbox, GPL-3.0), in its unbrokered form
+  (`SBX_LOCK_UNBROKERED`: path calls stay the kernel's), with
+  `SECCOMP_FILTER_FLAG_TSYNC` after `PR_SET_NO_NEW_PRIVS`, so nothing in the
+  process can lift it. It refuses `socket()` for every family but
+  `AF_UNIX`, and `AF_UNIX` for everything but datagrams (liblog's socket to
+  logd, which `connect` may still reach), with `EACCES` as an isolated
+  process gets: no internet socket and no DNS lookup (netd's resolver
+  socket is a stream socket), and no stream socket to a root manager's
+  daemon or to a relay droidtop runs. It also refuses `bind`, `execve`,
+  `io_uring` (its operations open files and sockets without passing through
+  the filter), `ptrace` and `process_vm_readv`/`writev`, `bpf` and
+  `perf_event_open` (`EACCES`); new namespaces and mounts, the kernel
+  keyring, pidfds and a signal to any process but its own (`EPERM`); and any
+  foreign system-call ABI (x86_64's x32 numbers). The library's own test
+  runs every one of these as an escape attempt, first unconfined as a
+  control, on Linux and on the Android emulator at API 28 and 34. A process
+  that cannot take the filter does not run the plugin. The Containment check (Advanced)
   shows "System-call filter: on: ..." and the network line reads "refused".
 - **What it cannot stop, stated plainly.** The process still has droidtop's
   UID. seccomp sees system-call numbers and integer arguments only ("BPF

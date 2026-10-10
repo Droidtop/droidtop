@@ -21,10 +21,15 @@ add_library(droidtoppy SHARED
     src/droidtoppy_jni.c
     # The guarded hooks of a contained plugin's isolated process (docs/plugin-api.md 5.3).
     src/sandbox_hooks.c
-    # The system-call filter of a gpu.render plugin's process (docs/plugin-api.md 5.3, "The graphics tier").
-    src/gpu_filter.c
+    # The system-call filter of every plugin process (docs/plugin-api.md 5.3): the sandbox library's lockdown.
+    src/plugin_filter.c
     # The stand-in window a contained plugin's own screen draws into (docs/plugin-api.md 5.3, "ui.main in the sandbox").
     src/screen_bridge.c
 )
 
-target_link_libraries(droidtoppy dl log android)
+# The sandbox library droidtop shares with Enginehost (bi0shacker001/sandbox, Droidtop/tracker#470), pinned as a
+# submodule; only its static library is built here.
+set(SBX_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/sandbox ${CMAKE_CURRENT_BINARY_DIR}/sandbox)
+
+target_link_libraries(droidtoppy sbx dl log android)

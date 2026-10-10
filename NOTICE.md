@@ -82,6 +82,10 @@ This project is distributed under the GNU General Public License v3.0 (see
   executables `runtime-linux-noroot` runs containers through on a device
   without root. Linked with the single-file talloc (LGPL-3.0-or-later)
   in `build-scripts/talloc` (the copy GameNative's proot tree carried).
+- **sandbox** — `vendor/sandbox`, https://github.com/bi0shacker001/sandbox — GPL-3.0-or-later.
+  The process sandbox library droidtop shares with Enginehost (seccomp lockdown
+  and syscall broker), linked statically into `libdroidtoppy.so` for the plugin
+  processes' system-call filter.
 - **hev-socks5-tunnel** — `vendor/hev-socks5-tunnel`, https://github.com/heiher/hev-socks5-tunnel — MIT,
   with its submodules hev-task-system, hev-socks5-core and yaml (MIT) and lwIP
   (BSD-3-Clause). Built into `libhev-socks5-tunnel.so`, the userspace IP

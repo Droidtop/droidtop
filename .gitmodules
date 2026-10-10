@@ -40,3 +40,6 @@
 	path = vendor/libsndfile
 	url = https://github.com/libsndfile/libsndfile
 	shallow = true
+[submodule "vendor/sandbox"]
+	path = vendor/sandbox
+	url = https://github.com/bi0shacker001/sandbox

@@ -185,8 +185,9 @@ class PluginGpuSlot7 : PluginGpuService()
 
 /**
  * The seccomp-bpf filter of every plugin process droidtop loads from descriptors, the isolated sandbox and a
- * `gpu.render` process alike (docs/plugin-api.md 5.3; `native/src/gpu_filter.c`): no socket but a local datagram one (so no internet and no DNS), no io_uring, no ptrace,
- * on every thread and for good. An app may add such a filter to its own process (Chrome does for its renderers); it
+ * `gpu.render` process alike (docs/plugin-api.md 5.3; `native/src/plugin_filter.c`, the sandbox library's lockdown in
+ * `vendor/sandbox`): no socket but a local datagram one (so no internet and no DNS), no programs, no io_uring, no ptrace,
+ * no namespaces and no signals to other processes, on every thread and for good. An app may add such a filter to its own process (Chrome does for its renderers); it
  * cannot filter by path or look inside a binder call, which is what the permission's warning is about.
  */
 internal object PluginSyscallFilter {

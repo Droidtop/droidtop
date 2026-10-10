@@ -17318,7 +17318,16 @@ Advanced.
   datagrams), the same one a `gpu.render` process takes, so the wall holds
   on a device that does not enforce Android's own rules (the BlueStacks
   rig runs with SELinux disabled; plugin-enforce-7, `docs/plugin-api.md`
-  §5.3 "The rigs").
+  §5.3 "The rigs"). **The filter is the sandbox library's** (decided
+  2026-10-10, Droidtop/tracker#470): one sandbox library, written once and
+  bundled separately by droidtop and Enginehost at a pinned version
+  (`vendor/sandbox`, the owner's bi0shacker001/sandbox, GPL-3.0), replaces
+  each app's own filter, path layer and file broker; each app keeps only a
+  thin layer for its tiers, its permission wording and its broker
+  operations. Its file broker keeps every file access going through
+  droidtop's permission system (the owner: "merge, not replace": a
+  decider callback sees every access droidtop asks it to), and the
+  migration of the guarded hooks onto it follows.
 - **The graphics tier** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
   a plugin that needs the GPU and nothing else declares `gpu.render` and the
   person ticks it. Granting it runs the plugin in a droidtop-owned process
