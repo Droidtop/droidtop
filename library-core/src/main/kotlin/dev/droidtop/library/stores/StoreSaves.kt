@@ -127,7 +127,7 @@ object StoreSaves {
             // No store cloud for this game: the paired computers, when there are any.
             if (Computers.list(context).isEmpty()) return@withContext null
             val prefix = locator?.locate(context, entryId) ?: return@withContext null
-            return@withContext runCatching { ComputerSaves.sync(context, entryId, title, phase, prefix, resolver) }
+            return@withContext runCatching { ComputerSaves.sync(context, entryId, title, phase, prefix) }
                 .onFailure { Log.w(TAG, "Computer save sync failed for $entryId", it) }
                 .getOrElse { SaveSyncResult("Saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
         }

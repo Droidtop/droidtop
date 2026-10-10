@@ -29,6 +29,8 @@ data class Computer(
     /** Which way the last session reached it: [Computers.PATH_LAN], [Computers.PATH_WIREGUARD] or [Computers.PATH_RENDEZVOUS]. */
     val lastPath: String? = null,
     val lastPathMs: Long = 0L,
+    /** The person's primary computer: its saves win when both sides changed (at most one). */
+    val primary: Boolean = false,
 )
 
 /**
@@ -96,6 +98,28 @@ object Computers {
         write(context, current.map { if (it.id == id) change(it) else it })
     }
 
+    /** Makes [id] the primary computer, or none with null: the newest saves win then. */
+    @Synchronized
+    fun setPrimary(context: Context, id: String?) {
+        write(context, list(context).map { it.copy(primary = it.id == id) })
+    }
+
+    /**
+     * Follows a computer that moved to a new identity (droidtop-agent docs/DESIGN.md
+     * section 3): the agent core checked that both its old and its new key signed
+     * the move. The computer is kept under the new id, with its folder.
+     */
+    @Synchronized
+    private fun moved(context: Context, old: String, new: String) {
+        if (!ID.matches(old) || !ID.matches(new) || old == new) return
+        val current = list(context)
+        if (current.none { it.id == old }) return
+        val from = File(folder(context), old)
+        val to = File(folder(context), new)
+        if (from.isDirectory && !to.exists()) from.renameTo(to)
+        write(context, current.filter { it.id != new }.map { if (it.id == old) it.copy(id = new) else it })
+    }
+
     /** Forgets a computer and everything kept for it on this device. */
     @Synchronized
     fun remove(context: Context, id: String) {
@@ -157,6 +181,8 @@ object Computers {
         }
         val reply = AgentNative.call(op, args)
         if (!reply.has("computer")) return reply
+        // The computer now shares one identity with windowcast; later calls use the new one.
+        val movedTo = reply.optString("moved_to").takeIf { ID.matches(it) }
         val address = reply.optString("address").takeIf { it.isNotBlank() }
         val endpoints = reply.optJSONArray("endpoints")
             ?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.startsWith("wg:") }.take(MAX_ENDPOINTS) }
@@ -171,6 +197,7 @@ object Computers {
                 lastPathMs = if (path != null) System.currentTimeMillis() else c.lastPathMs,
             )
         }
+        movedTo?.let { moved(context, computer.id, it) }
         return reply
     }
 
@@ -202,6 +229,7 @@ object Computers {
         .put("disco", c.disco ?: JSONObject.NULL)
         .put("lastPath", c.lastPath ?: JSONObject.NULL)
         .put("lastPathMs", c.lastPathMs)
+        .put("primary", c.primary)
 
     private fun fromJson(o: JSONObject): Computer? {
         val id = o.optString("id").takeIf { ID.matches(it) } ?: return null
@@ -218,6 +246,7 @@ object Computers {
             disco = text("disco"),
             lastPath = text("lastPath"),
             lastPathMs = o.optLong("lastPathMs"),
+            primary = o.optBoolean("primary"),
         )
     }
 

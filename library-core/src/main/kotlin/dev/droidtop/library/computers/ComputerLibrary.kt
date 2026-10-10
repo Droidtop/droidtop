@@ -148,8 +148,16 @@ object ComputerLibrary {
     /** A game installed on a computer, as the last exchange left it. */
     data class RemoteGame(val key: String, val title: String, val platform: String?, val sizeBytes: Long, val launcher: String?, val path: String?)
 
+    /** The platform the agent gives a computer's installed applications. */
+    const val APP_PLATFORM = "app"
+
     /** The games [computer] has, from the state file. Reads a file: never on the main thread. */
-    fun gamesOn(context: Context, computer: Computer): List<RemoteGame> {
+    fun gamesOn(context: Context, computer: Computer): List<RemoteGame> = installedOn(context, computer).filter { it.platform != APP_PLATFORM }
+
+    /** The other applications [computer] has installed (the agent's `app:` entries). Reads a file: never on the main thread. */
+    fun appsOn(context: Context, computer: Computer): List<RemoteGame> = installedOn(context, computer).filter { it.platform == APP_PLATFORM }
+
+    private fun installedOn(context: Context, computer: Computer): List<RemoteGame> {
         val games = runCatching { JSONObject(stateFile(context).readText()).optJSONObject("games") }.getOrNull() ?: return emptyList()
         val out = mutableListOf<RemoteGame>()
         games.keys().forEach { key ->

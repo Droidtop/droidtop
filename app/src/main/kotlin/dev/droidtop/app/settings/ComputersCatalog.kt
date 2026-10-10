@@ -33,7 +33,8 @@ import java.util.Date
 /**
  * Settings > Accounts and sources > Computers (docs/SPEC.md 7o): the person's
  * computers running droidtop-agent. Pair one, see what the last sync with it
- * did, sync the library now, see the games it has, or forget it. Saves sync by
+ * did, sync the library now, see the games and apps it has, prefer its saves,
+ * or forget it. Saves sync by
  * themselves around a game's launch and exit; plugin contexts sync from their
  * plugin. A catalog screen, so both Settings surfaces draw it.
  */
@@ -195,6 +196,7 @@ object ComputersCatalog {
         val computer = Computers.list(context).firstOrNull { it.id == id }
             ?: return@withContext listOf(CatalogGroup(id = "computer_gone", title = null, items = listOf(ActionItem(id = "computer_gone_row", title = "This computer is no longer paired", run = {}))))
         val games = ComputerLibrary.gamesOn(context, computer)
+        val apps = ComputerLibrary.appsOn(context, computer)
         val last = if (computer.lastSyncMs > 0) DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(computer.lastSyncMs)) else null
         listOf(
             CatalogGroup(
@@ -238,6 +240,20 @@ object ComputersCatalog {
                         inline = gamesScreen(computer, games),
                         valueLabel = { games.size.toString() },
                     ),
+                    NestedScreenItem(
+                        id = "computer_apps",
+                        title = "Apps on ${computer.name}",
+                        subtitle = if (apps.isEmpty()) "Sync the library to see them" else "Everything else its last sync said it has installed",
+                        inline = gamesScreen(computer, apps, apps = true),
+                        valueLabel = { apps.size.toString() },
+                    ),
+                    ToggleItem(
+                        id = "computer_primary",
+                        title = "Prefer this computer's saves",
+                        subtitle = "When a game's saves changed here and on ${computer.name}, its copy wins even when this device's is newer. Otherwise the newest copy wins. Either way the other copy is kept",
+                        current = computer.primary,
+                        onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setPrimary(ctx, if (on) computer.id else null) } },
+                    ),
                 ),
             ),
             CatalogGroup(
@@ -256,9 +272,9 @@ object ComputersCatalog {
         )
     }
 
-    private fun gamesScreen(computer: Computer, games: List<ComputerLibrary.RemoteGame>) = CatalogScreen(
-        id = "computer_games_${computer.id.take(16)}",
-        title = "Games on ${computer.name}",
+    private fun gamesScreen(computer: Computer, games: List<ComputerLibrary.RemoteGame>, apps: Boolean = false) = CatalogScreen(
+        id = "computer_${if (apps) "apps" else "games"}_${computer.id.take(16)}",
+        title = "${if (apps) "Apps" else "Games"} on ${computer.name}",
         groups = {
             listOf(
                 CatalogGroup(
@@ -268,7 +284,7 @@ object ComputersCatalog {
                         ActionItem(
                             id = "computer_game_${game.key}",
                             title = game.title,
-                            subtitle = listOfNotNull(game.launcher, game.platform?.takeIf { it != "pc" }).joinToString(" · ").ifBlank { null },
+                            subtitle = listOfNotNull(game.launcher, game.platform?.takeIf { it != "pc" && it != ComputerLibrary.APP_PLATFORM }).joinToString(" · ").ifBlank { null },
                             value = game.sizeBytes.takeIf { it > 0 }?.let { "${it / (1024 * 1024)} MB" },
                             run = {},
                         )

@@ -164,9 +164,9 @@ private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
             PairState.Starting -> Text("Getting a code…", style = MaterialTheme.typography.bodyLarge)
             is PairState.Showing -> Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("On the computer, run droidtop-agent and type:", style = MaterialTheme.typography.bodyLarge)
-                    Text("droidtop-agent pair ${s.code.chunked(3).joinToString(" ")}", style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace)
+                    Text("On the computer, open droidtop-agent, choose Pair a handheld and type:", style = MaterialTheme.typography.bodyLarge)
                     Text(s.code.chunked(3).joinToString(" "), fontSize = 56.sp, fontFamily = FontFamily.Monospace)
+                    Text("(or at a command line: droidtop-agent pair ${s.code})", style = MaterialTheme.typography.bodyMedium)
                     Text(
                         "Keep this screen open until the computer says it is paired. Both have to be on the same network. " +
                             "No droidtop-agent yet? It is at github.com/Droidtop/droidtop-agent.",
@@ -186,7 +186,7 @@ private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
         if (state !is PairState.Paired) {
             Text("Use a code from the computer", style = MaterialTheme.typography.titleMedium)
             Text(
-                "If the computer cannot find this device, run droidtop-agent pair on the computer with nothing after it, and type the address and code it shows.",
+                "If the computer cannot find this device, choose Show a code in droidtop-agent's Pair a handheld on the computer, and type the address and code it shows.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             OutlinedTextField(

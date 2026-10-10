@@ -1,10 +1,6 @@
 package dev.droidtop.library.computers
 
 import android.content.Context
-import dev.droidtop.library.stores.SaveChoice
-import dev.droidtop.library.stores.SaveConflict
-import dev.droidtop.library.stores.SaveConflictResolver
-import dev.droidtop.library.stores.SaveSide
 import dev.droidtop.library.stores.SaveSyncPhase
 import dev.droidtop.library.stores.SaveSyncResult
 import dev.droidtop.library.stores.WinePrefixLocation
@@ -20,9 +16,11 @@ import java.util.concurrent.ConcurrentHashMap
  * ([dev.droidtop.library.stores.StoreSaves]): before the game starts and after
  * it ends. The computer says where the game keeps its saves (from the person's
  * own entries or the Ludusavi manifest), droidtop resolves those places in the
- * game's Wine prefix and folder here, and the agent core decides with the rule
- * the Steam Cloud sync uses. A conflict goes to the same "Saves differ"
- * question, naming the computer; the side that loses is archived first.
+ * game's Wine prefix and folder here, and the agent core decides: a side that
+ * alone changed wins; when both changed, the person's primary computer, else
+ * the newest copy (droidtop-agent docs/DESIGN.md sections 6 and 9). Nothing is
+ * asked and nothing is lost: the side that is overwritten keeps its own changed
+ * saves as a copy first, here in the computer's archive folder.
  */
 object ComputerSaves {
     /** The folder each game was launched from this run, so the sync after it ends knows `<base>`. */
@@ -46,9 +44,8 @@ object ComputerSaves {
         title: String,
         phase: SaveSyncPhase,
         prefix: WinePrefixLocation,
-        resolver: SaveConflictResolver?,
     ): SaveSyncResult? {
-        val results = Computers.list(context).mapNotNull { one(context, it, entryId, title, phase, prefix, resolver) }
+        val results = Computers.list(context).mapNotNull { one(context, it, entryId, title, phase, prefix) }
         if (results.isEmpty()) return null
         return SaveSyncResult(
             line = results.joinToString("; ") { it.line },
@@ -61,10 +58,9 @@ object ComputerSaves {
     }
 
     /**
-     * What leaving the saves in the cloud folder did. The computer applies the
-     * set only while its own saves still match the set this device last knew
-     * it had; otherwise it keeps the set aside and says so in the folder, and
-     * the next live sync asks the person.
+     * What leaving the saves in the cloud folder did. When the computer's own
+     * saves changed too, the newest (or the primary computer's) copy wins there
+     * and the other is kept as a copy; a refusal in the folder says so.
      */
     private fun posted(computer: Computer, reply: JSONObject?, phase: SaveSyncPhase): SaveSyncResult? = when {
         reply == null -> null
@@ -77,9 +73,6 @@ object ComputerSaves {
         }
     }
 
-    private fun side(o: JSONObject?): SaveSide =
-        SaveSide(timestampMs = o?.optLong("newest_ms") ?: 0L, files = o?.optInt("files") ?: 0, bytes = o?.optLong("bytes") ?: 0L)
-
     private suspend fun one(
         context: Context,
         computer: Computer,
@@ -87,35 +80,22 @@ object ComputerSaves {
         title: String,
         phase: SaveSyncPhase,
         prefix: WinePrefixLocation,
-        resolver: SaveConflictResolver?,
     ): SaveSyncResult? {
         val dir = Computers.stateDir(context, computer)
         val key = fileKey(entryId)
-        fun args(choice: String?) = JSONObject()
+        fun args() = JSONObject()
             .put("game", JSONObject().put("key", entryId).put("title", title))
             .put("prefix", File(prefix.prefixDir, "drive_c").absolutePath)
             .put("user", prefix.user)
             .put("baseline", File(dir, "saves/$key.json").absolutePath)
             .put("archive", File(dir, "archive/$key").absolutePath)
-            .apply {
-                bases[entryId]?.let { put("base", it) }
-                choice?.let { put("choice", it) }
-            }
-        var reply = Computers.call(context, computer, "sync_saves", args(null))
-        if (reply.optString("outcome") == "conflict") {
-            val conflict = SaveConflict(local = side(reply.optJSONObject("here")), cloud = side(reply.optJSONObject("there")), cloudLabel = computer.name)
-            val choice = resolver?.resolve(title, conflict)
-            if (choice == null) {
-                val line = "Saves differ from ${computer.name}; nothing was changed"
-                Computers.noteSync(context, computer.id, line)
-                return SaveSyncResult(line, unresolved = true)
-            }
-            reply = Computers.call(context, computer, "sync_saves", args(if (choice == SaveChoice.LOCAL) "here" else "there"))
-        }
+            .put("primary", computer.primary)
+            .apply { bases[entryId]?.let { put("base", it) } }
+        val reply = Computers.call(context, computer, "sync_saves", args())
         val result = when {
             // Away from the computer after playing: the saves wait in the person's cloud folder, when one is set.
             reply.has("unreachable") && phase != SaveSyncPhase.BEFORE_LAUNCH && ComputerShare.folder(context) != null ->
-                posted(computer, ComputerShare.postSaves(context, computer, args(null)), phase)
+                posted(computer, ComputerShare.postSaves(context, computer, args()), phase)
             // Away from the computer is normal: said on the screen only when the person asked for the sync.
             reply.has("unreachable") -> SaveSyncResult("${computer.name} did not answer", failed = phase == SaveSyncPhase.MANUAL)
             reply.has("error") -> SaveSyncResult("Saves with ${computer.name}: ${reply.optString("error")}", failed = true)
@@ -124,10 +104,14 @@ object ComputerSaves {
                 "copied" -> {
                     val files = reply.optInt("files")
                     val removed = reply.optInt("removed")
+                    // Both sides had changed: the other side's saves were kept as its own copy.
+                    val kept = reply.optBoolean("kept")
                     if (reply.optString("from") == "there") {
-                        SaveSyncResult("Saves: $files from ${computer.name}", downloaded = files, removed = removed)
+                        val why = if (kept) " (${if (computer.primary) "your primary computer" else "newer"}; this device's are kept as a copy)" else ""
+                        SaveSyncResult("Saves: $files from ${computer.name}$why", downloaded = files, removed = removed)
                     } else {
-                        SaveSyncResult("Saves: $files sent to ${computer.name}", uploaded = files, removed = removed)
+                        val why = if (kept) " (newer here; ${computer.name} kept its own as a copy)" else ""
+                        SaveSyncResult("Saves: $files sent to ${computer.name}$why", uploaded = files, removed = removed)
                     }
                 }
                 // The computer knows no save location for this game.
