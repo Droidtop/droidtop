@@ -75,7 +75,7 @@ class OriginLabelTest {
     fun `engine is every kind that is not a program, a remote PC, an app or a ROM`() {
         val programs = setOf(
             LibraryEntryKind.NATIVE_ANDROID_APP, LibraryEntryKind.WINE_PROFILE, LibraryEntryKind.LINUX_CONTAINER_APP,
-            LibraryEntryKind.REMOTE_STREAM, LibraryEntryKind.CONSOLE_ROM,
+            LibraryEntryKind.REMOTE_STREAM, LibraryEntryKind.COMPUTER_GAME, LibraryEntryKind.CONSOLE_ROM,
         )
         for (kind in LibraryEntryKind.entries) assertEquals(kind.name, kind !in programs, kind.engineFamily() != null)
     }

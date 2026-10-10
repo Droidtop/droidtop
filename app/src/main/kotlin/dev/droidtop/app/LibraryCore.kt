@@ -98,6 +98,9 @@ object LibraryCore {
                 // It launches through the WineEngine seam, so it needs no
                 // desktop session and no root.
                 PcGameProvider(app),
+                // What the person's paired computers have and this device does
+                // not, behind their switches (docs/SPEC.md 7o, "Library").
+                dev.droidtop.library.computers.ComputerEntriesProvider(app),
             ),
             playHistory = RoomPlayHistoryStore(app),
             favorites = RoomFavoritesStore(app),

@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,7 +46,6 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -115,7 +115,7 @@ class PairComputerActivity : AppCompatActivity() {
 private sealed interface PairState {
     data object Starting : PairState
     data class Showing(val code: String, val uri: String) : PairState
-    data class Paired(val name: String) : PairState
+    data class Paired(val computer: Computer) : PairState
     data class Failed(val reason: String) : PairState
 }
 
@@ -146,10 +146,6 @@ private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
         // Paired the other way meanwhile: that cancelled this wait, and its failure is not news.
         if (state is PairState.Paired) return@LaunchedEffect
         state = waited
-        if (waited is PairState.Paired) {
-            delay(SHOW_PAIRED_MS)
-            onDone()
-        }
     }
     val scope = rememberCoroutineScope()
     var address by remember { mutableStateOf("") }
@@ -175,7 +171,7 @@ private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
                 }
                 QrCode(content = s.uri, size = 220.dp)
             }
-            is PairState.Paired -> Text("Paired with ${s.name}.", style = MaterialTheme.typography.titleLarge)
+            is PairState.Paired -> PairedChoices(s.computer, onDone)
             is PairState.Failed -> {
                 Text(s.reason, style = MaterialTheme.typography.bodyLarge)
                 Button(onClick = { attempt++ }, modifier = Modifier.fillMaxWidth()) { Text("Get a new code") }
@@ -208,25 +204,21 @@ private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
                 onClick = {
                     connecting = "Pairing…"
                     scope.launch {
-                        // The name of the computer paired with, or why not.
-                        val (paired, failure) = withContext<Pair<String?, String?>>(Dispatchers.IO) {
+                        // The computer paired with, or why not.
+                        val (paired, failure) = withContext<Pair<Computer?, String?>>(Dispatchers.IO) {
                             val seed = DeviceIdentity.seed(context) ?: return@withContext null to "This device's key could not be made."
                             val reply = AgentNative.call(
                                 "pair_connect",
                                 JSONObject().put("seed", seed).put("name", Computers.deviceName(context)).put("address", address).put("code", typed),
                             )
                             AgentNative.failure(reply)?.let { return@withContext null to it.replaceFirstChar { c -> c.uppercase() } }
-                            val name = keep(context, reply)
+                            val computer = keep(context, reply)
                             // This screen's own code is not needed any more.
                             AgentNative.call("pair_cancel")
-                            name to null
+                            computer to null
                         }
                         connecting = failure
-                        if (paired != null) {
-                            state = PairState.Paired(paired)
-                            delay(SHOW_PAIRED_MS)
-                            onDone()
-                        }
+                        if (paired != null) state = PairState.Paired(paired)
                     }
                 },
                 enabled = connecting != "Pairing…" && address.isNotBlank() && typed.length == 6,
@@ -236,20 +228,61 @@ private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
     }
 }
 
-/** Keeps the computer a pairing reply names, and returns its name. Writes a small file: never on the main thread. */
-private fun keep(context: Context, reply: JSONObject): String {
-    val name = reply.optString("name").ifBlank { "Computer" }
-    Computers.put(
-        context,
-        Computer(
-            id = reply.optString("peer"),
-            name = name,
-            addresses = listOfNotNull(reply.optString("address").takeIf { it.isNotBlank() }),
-            pairedAtMs = System.currentTimeMillis(),
-        ),
+/**
+ * Keeps the computer a pairing reply names. Its games and apps stay out of the
+ * library until the person turns them on. Writes a small file: never on the
+ * main thread.
+ */
+private fun keep(context: Context, reply: JSONObject): Computer {
+    val computer = Computer(
+        id = reply.optString("peer"),
+        name = reply.optString("name").ifBlank { "Computer" },
+        addresses = listOfNotNull(reply.optString("address").takeIf { it.isNotBlank() }),
+        pairedAtMs = System.currentTimeMillis(),
     )
-    return name
+    Computers.put(context, computer)
+    return computer
+}
+
+/**
+ * The paired screen asks, once and in plain words, whether the computer's
+ * games and apps should show in this device's library (docs/SPEC.md 7o,
+ * "Library"). Both start off; leaving without an answer keeps them off, and
+ * the computer's page in Settings has the same switches.
+ */
+@Composable
+private fun PairedChoices(computer: Computer, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var games by remember { mutableStateOf(false) }
+    var apps by remember { mutableStateOf(false) }
+    fun save() {
+        val (g, a) = games to apps
+        scope.launch {
+            withContext(Dispatchers.IO) { Computers.setShown(context, computer.id, games = g, apps = a) }
+            dev.droidtop.app.settings.ComputersCatalog.refreshLibrary(context)
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Paired with ${computer.name}.", style = MaterialTheme.typography.titleLarge)
+        Text("Saves sync with it when a game starts and ends. Should its games and programs also show here?", style = MaterialTheme.typography.bodyLarge)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Show its games in my library (the ones not on this device)", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = games, onCheckedChange = {
+                games = it
+                save()
+            })
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Show its programs in Apps", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = apps, onCheckedChange = {
+                apps = it
+                save()
+            })
+        }
+        Text("You can change both later in Settings > Computers > ${computer.name}.", style = MaterialTheme.typography.bodyMedium)
+        Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+    }
 }
 
 private const val WAIT_MS = 10 * 60 * 1000L
-private const val SHOW_PAIRED_MS = 1500L

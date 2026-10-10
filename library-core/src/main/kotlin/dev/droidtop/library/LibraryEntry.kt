@@ -507,6 +507,14 @@ enum class LibraryEntryKind {
     REMOTE_STREAM,
 
     /**
+     * A game installed on one of the person's paired computers and not on
+     * this device (docs/SPEC.md 7o, "Library"), shown when the person turned
+     * on that computer's games. It sits with the games, filed under its
+     * computer as its source ([PcSource.Computer]).
+     */
+    COMPUTER_GAME,
+
+    /**
      * A detected engine game — kind named after the engine, not any one
      * launcher, since the same engine can be reachable through several
      * real paths (see [GameLaunchStrategy]/[GameLaunchStrategyResolver]):
@@ -628,6 +636,7 @@ fun LibraryEntryKind.itemName(): String = when (this) {
     LibraryEntryKind.WINE_PROFILE -> "Windows game"
     LibraryEntryKind.LINUX_CONTAINER_APP -> "Linux app"
     LibraryEntryKind.REMOTE_STREAM -> "Remote PC"
+    LibraryEntryKind.COMPUTER_GAME -> "Game on a computer"
     LibraryEntryKind.CONSOLE_ROM -> "Console game"
     LibraryEntryKind.RENPY, LibraryEntryKind.KIRIKIRI,
     LibraryEntryKind.AUGUST, LibraryEntryKind.BURIKO, LibraryEntryKind.CATSYSTEM2,
@@ -647,6 +656,7 @@ fun LibraryEntryKind.displayName(): String = when (this) {
     LibraryEntryKind.WINE_PROFILE -> "Windows"
     LibraryEntryKind.LINUX_CONTAINER_APP -> "Linux"
     LibraryEntryKind.REMOTE_STREAM -> "Remote PC"
+    LibraryEntryKind.COMPUTER_GAME -> "On your computers"
     LibraryEntryKind.RENPY, LibraryEntryKind.KIRIKIRI,
     LibraryEntryKind.AUGUST, LibraryEntryKind.BURIKO, LibraryEntryKind.CATSYSTEM2,
     LibraryEntryKind.CMVS, LibraryEntryKind.FLASH_AIR,

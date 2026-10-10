@@ -31,6 +31,10 @@ data class Computer(
     val lastPathMs: Long = 0L,
     /** The person's primary computer: its saves win when both sides changed (at most one). */
     val primary: Boolean = false,
+    /** Its games that are not on this device are shown in the library ("Show this computer's games"). */
+    val showGames: Boolean = false,
+    /** Its other applications are shown in Apps ("Show this computer's apps"). */
+    val showApps: Boolean = false,
 )
 
 /**
@@ -57,6 +61,8 @@ object Computers {
     private const val PREFS = "droidtop_agent_rendezvous"
     private const val KEY_ON = "on"
     private const val KEY_SERVER = "server"
+    private const val KEY_GAMES = "show_games"
+    private const val KEY_APPS = "show_apps"
 
     @Volatile
     private var cache: List<Computer>? = null
@@ -96,6 +102,26 @@ object Computers {
         val current = list(context)
         if (current.none { it.id == id }) return
         write(context, current.map { if (it.id == id) change(it) else it })
+    }
+
+    /** Turns [id]'s games or apps in this device's library on or off; null leaves that one as it is. */
+    @Synchronized
+    fun setShown(context: Context, id: String, games: Boolean? = null, apps: Boolean? = null) {
+        update(context, id) { it.copy(showGames = games ?: it.showGames, showApps = apps ?: it.showApps) }
+    }
+
+    /** Whether computers' games are shown at all (Settings > Computers; on unless the person turned it off). */
+    fun gamesShown(context: Context): Boolean = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_GAMES, true)
+
+    /** Whether computers' apps are shown at all (Settings > Computers; on unless the person turned it off). */
+    fun appsShown(context: Context): Boolean = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_APPS, true)
+
+    fun setGamesShown(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_GAMES, on).apply()
+    }
+
+    fun setAppsShown(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_APPS, on).apply()
     }
 
     /** Makes [id] the primary computer, or none with null: the newest saves win then. */
@@ -230,6 +256,8 @@ object Computers {
         .put("lastPath", c.lastPath ?: JSONObject.NULL)
         .put("lastPathMs", c.lastPathMs)
         .put("primary", c.primary)
+        .put("showGames", c.showGames)
+        .put("showApps", c.showApps)
 
     private fun fromJson(o: JSONObject): Computer? {
         val id = o.optString("id").takeIf { ID.matches(it) } ?: return null
@@ -247,6 +275,8 @@ object Computers {
             lastPath = text("lastPath"),
             lastPathMs = o.optLong("lastPathMs"),
             primary = o.optBoolean("primary"),
+            showGames = o.optBoolean("showGames"),
+            showApps = o.optBoolean("showApps"),
         )
     }
 

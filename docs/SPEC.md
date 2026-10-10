@@ -15783,9 +15783,26 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   ("Games on <computer>"). Its other installed applications come as entries
   of the platform `app` (Windows programs and Store apps, Linux desktop apps
   with Flatpak and Snap, macOS applications) and are listed apart ("Apps on
-  <computer>"). Whether they also join this device's Apps place is still the
-  owner's decision (droidtop-agent docs/DESIGN.md decision 6).
+  <computer>").
 - A game installed on two computers is one entry with an install per device.
+- **In this device's own library, behind switches** (owner, 2026-10-10:
+  "Apps should be toggleable"; "Games on the desktop should ALSO be
+  toggleable. We don't actually know if the user will want to stream stuff
+  from the computer"). `ComputerEntriesProvider` adds:
+  - a computer's games that this device does not have, as `COMPUTER_GAME`
+    entries with the games. Their source is the computer ("On <computer>",
+    `PcSource.Computer`), so the Source filter picks them out by location;
+  - its other applications, as `REMOTE_STREAM` entries in Apps.
+
+  Each shows only while its computer's switch ("Show this computer's games",
+  "Show this computer's apps") and the global one (Settings > Computers >
+  "Show computers' games" and "Show computers' apps", on by default) are on.
+  The pairing-finished screen asks once, with both switches, and leaving it
+  without an answer keeps them off. A game this device has too stays one
+  entry, this device's own, and the switches change nothing about save sync.
+  Opening such an entry says which computer has it; streaming it is
+  windowcast's (7a). The entries are read from the core's library file after
+  each sync and switch change (not indexed).
 - **The person's marks travel both ways:** favourite, hidden and completed,
   last writer wins per field (the core's hybrid logical clock).
   - Each exchange reports every mark droidtop keeps on its games, unset ones

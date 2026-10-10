@@ -27,6 +27,15 @@ sealed class PcSource {
         override val id: String get() = FOLDER_PREFIX + rootId
     }
 
+    /**
+     * The games on one of the person's paired computers that are not on this
+     * device (docs/SPEC.md 7o, "Library"), by the computer's id. The name is
+     * read from what the library last learned of it ([computerNames]).
+     */
+    data class Computer(val computerId: String) : PcSource() {
+        override val id: String get() = COMPUTER_PREFIX + computerId
+    }
+
     /** A shortcut the person made in a Wine prefix by hand. */
     data object WineShortcut : PcSource() {
         override val id: String get() = WINE_ID
@@ -36,6 +45,7 @@ sealed class PcSource {
     fun label(): String = when (this) {
         is Store -> StoreLibraries.byId(storeId)?.label ?: storeId.replaceFirstChar { it.uppercase() }
         is Folder -> rootId.takeIf { it.isNotBlank() }?.let { root -> File(root).name.ifBlank { root } } ?: FOLDER_LABEL
+        is Computer -> "On ${computerNames[computerId] ?: "a computer"}"
         WineShortcut -> WINE_LABEL
     }
 
@@ -56,12 +66,18 @@ sealed class PcSource {
     fun detail(): String = when (this) {
         is Store -> label()
         is Folder -> if (rootId.isBlank()) FOLDER_LABEL else "$FOLDER_LABEL: ${label()}"
+        is Computer -> label()
         WineShortcut -> "Wine shortcut"
     }
 
     companion object {
         private const val FOLDER_PREFIX = "folder:"
+        private const val COMPUTER_PREFIX = "computer:"
+
+        /** The names of the computers a [Computer] source names, as the library last read them. */
+        val computerNames: MutableMap<String, String> = java.util.concurrent.ConcurrentHashMap()
         private const val FOLDER_KEY = "folder"
+        private const val COMPUTER_KEY = "computer"
         private const val WINE_ID = "wine"
         private const val FOLDER_LABEL = "Folder"
         private const val WINE_LABEL = "Wine shortcuts"
@@ -91,6 +107,7 @@ sealed class PcSource {
         fun fromId(id: String): PcSource = when {
             id == WINE_ID -> WineShortcut
             id.startsWith(FOLDER_PREFIX) -> Folder(id.removePrefix(FOLDER_PREFIX))
+            id.startsWith(COMPUTER_PREFIX) -> Computer(id.removePrefix(COMPUTER_PREFIX))
             else -> Store(id)
         }
 
@@ -104,6 +121,7 @@ sealed class PcSource {
          * work over a handful of roots), so a list may ask it per row.
          */
         fun of(entry: LibraryEntry, roots: List<String> = emptyList()): PcSource? {
+            if (entry.kind == LibraryEntryKind.COMPUTER_GAME) return Computer(entry.id.removePrefix(COMPUTER_PREFIX).substringBefore(':'))
             val pc = entry.pcInfo
             storeIdOf(pc?.storeId ?: entry.id)?.let { return Store(it) }
             // A folder a store installed outside droidtop reads as that store (its marker, 7g "Store markers").
@@ -125,7 +143,7 @@ sealed class PcSource {
         fun storeIdOf(key: String?): String? {
             if (key == null || key.startsWith("/")) return null
             val prefix = key.substringBefore(':', "")
-            return prefix.takeIf { it.isNotEmpty() && it != FOLDER_KEY }
+            return prefix.takeIf { it.isNotEmpty() && it != FOLDER_KEY && it != COMPUTER_KEY }
         }
 
         /** The most specific of [roots] holding [path], or null. */
@@ -141,7 +159,8 @@ sealed class PcSource {
             { source ->
                 when (source) {
                     is Store -> StoreLibraries.all().indexOfFirst { it.id == source.storeId }.let { if (it < 0) Int.MAX_VALUE / 2 else it }
-                    is Folder -> Int.MAX_VALUE - 1
+                    is Folder -> Int.MAX_VALUE - 2
+                    is Computer -> Int.MAX_VALUE - 1
                     WineShortcut -> Int.MAX_VALUE
                 }
             },

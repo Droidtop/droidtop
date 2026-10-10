@@ -96,8 +96,41 @@ object ComputersCatalog {
             if (computers.isNotEmpty()) {
                 add(CatalogGroup(id = "computers_paired", title = "Paired", items = computers.map { computerRow(it) }))
             }
+            add(CatalogGroup(id = "computers_library", title = "In this device's library", items = libraryRows(context)))
             add(CatalogGroup(id = "computers_share", title = "When a computer is away", items = shareRows(context)))
         }
+    }
+
+    /**
+     * Whether paired computers' games and apps show in this device's library
+     * at all (docs/SPEC.md 7o, "Library"); each computer has its own switches
+     * too, asked when it is paired. Read on an IO thread by [groups].
+     */
+    private fun libraryRows(context: Context): List<CatalogItem> = listOf(
+        ToggleItem(
+            id = "computers_show_games",
+            title = "Show computers' games",
+            subtitle = "Games on a computer and not on this device appear in the library, marked with the computer's name, for the computers whose games you turned on",
+            current = Computers.gamesShown(context),
+            onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setGamesShown(ctx, on) }.also { refreshLibrary(ctx) } },
+        ),
+        ToggleItem(
+            id = "computers_show_apps",
+            title = "Show computers' apps",
+            subtitle = "Programs installed on a computer appear in Apps, for the computers whose apps you turned on",
+            current = Computers.appsShown(context),
+            onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setAppsShown(ctx, on) }.also { refreshLibrary(ctx) } },
+        ),
+    )
+
+    /**
+     * Reads computers' games and apps into the library again: only that
+     * source walks (it is not indexed), the rest come from the index.
+     */
+    fun refreshLibrary(context: Context) {
+        val library = LibraryCore.library(context)
+        library.scanInBackground(LibraryKinds.GAMES, restart = true)
+        library.scanInBackground(LibraryKinds.APPS, restart = true)
     }
 
     /**
@@ -219,6 +252,7 @@ object ComputersCatalog {
                             val entries = libraryGames(ctx) ?: return@AsyncActionItem "The library is still being scanned; try again in a moment"
                             onStatus("Talking to ${computer.name}…")
                             withContext(Dispatchers.IO) { ComputerLibrary.sync(ctx, computer, LibraryCore.library(ctx), entries) }
+                                .also { refreshLibrary(ctx) }
                         },
                     ),
                     ActionItem(
@@ -246,6 +280,20 @@ object ComputersCatalog {
                         subtitle = if (apps.isEmpty()) "Sync the library to see them" else "Everything else its last sync said it has installed",
                         inline = gamesScreen(computer, apps, apps = true),
                         valueLabel = { apps.size.toString() },
+                    ),
+                    ToggleItem(
+                        id = "computer_show_games",
+                        title = "Show this computer's games",
+                        subtitle = "Its games that are not on this device appear in the library, marked \"On ${computer.name}\". A game on both stays one entry",
+                        current = computer.showGames,
+                        onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setShown(ctx, computer.id, games = on) }.also { refreshLibrary(ctx) } },
+                    ),
+                    ToggleItem(
+                        id = "computer_show_apps",
+                        title = "Show this computer's apps",
+                        subtitle = "Its installed programs appear in Apps",
+                        current = computer.showApps,
+                        onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setShown(ctx, computer.id, apps = on) }.also { refreshLibrary(ctx) } },
                     ),
                     ToggleItem(
                         id = "computer_primary",

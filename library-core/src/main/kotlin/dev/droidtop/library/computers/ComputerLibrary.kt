@@ -148,6 +148,14 @@ object ComputerLibrary {
     /** A game installed on a computer, as the last exchange left it. */
     data class RemoteGame(val key: String, val title: String, val platform: String?, val sizeBytes: Long, val launcher: String?, val path: String?)
 
+    /** The keys of the games [device] (this one) has installed, from the state file. Reads a file: never on the main thread. */
+    fun installedKeys(context: Context, device: String): Set<String> {
+        val games = runCatching { JSONObject(stateFile(context).readText()).optJSONObject("games") }.getOrNull() ?: return emptySet()
+        return games.keys().asSequence().filter { key ->
+            games.optJSONObject(key)?.optJSONObject("installs")?.optJSONObject(device)?.optJSONObject("install")?.optBoolean("installed") == true
+        }.toSet()
+    }
+
     /** The platform the agent gives a computer's installed applications. */
     const val APP_PLATFORM = "app"
 

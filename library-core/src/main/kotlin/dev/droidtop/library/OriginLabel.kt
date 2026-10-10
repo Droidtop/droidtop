@@ -29,7 +29,7 @@ fun LibraryEntryKind.engineFamily(): String? = when (this) {
     LibraryEntryKind.LOVE2D -> "LOVE"
     LibraryEntryKind.AGS -> "AGS"
     LibraryEntryKind.NATIVE_ANDROID_APP, LibraryEntryKind.WINE_PROFILE, LibraryEntryKind.LINUX_CONTAINER_APP,
-    LibraryEntryKind.REMOTE_STREAM, LibraryEntryKind.CONSOLE_ROM,
+    LibraryEntryKind.REMOTE_STREAM, LibraryEntryKind.COMPUTER_GAME, LibraryEntryKind.CONSOLE_ROM,
     -> null
 }
 
