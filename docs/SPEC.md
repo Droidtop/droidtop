@@ -16826,7 +16826,7 @@ probably make it a plugin? Obtainium too").
   Refresh, Remove), the sources it lists to add with a press, and Add by
   address or QR code; adding a source is the plugin's review, then the
   person's Accept, however it starts (a link through the router, a QR code,
-  the address field, a listed source, an action link's `apps.source.add`). An
+  the address field, a listed source, an action link's `app_source.add`). An
   app's page shows its description, anti-features with the catalog's reasons,
   who signs it, and Install / Update to / Installed per version.
 - **Installing from a catalog** (`AppCatalogs.install`): the plugin's `acquire`
@@ -16838,7 +16838,7 @@ probably make it a plugin? Obtainium too").
   the installed app has (`AppPackages.refusal`): a changed signing key is said
   plainly and not left to Android's error.
 - **Updates are droidtop's decision** (`AppCatalogs.updates`): the plugins'
-  newest compatible versions are read page by page (`latest`, 500 a page) after
+  newest compatible versions are read page by page (`list_latest`, 500 a page) after
   a refresh into one cache file; the Updates place compares them with the
   installed apps from ONE package-manager query. A plugin never learns which
   apps are installed and never says "update available". No source is
@@ -18376,7 +18376,7 @@ what the index says is display data, never a trust decision.
     - **A link.** A catalog's README, its web page and its QR code carry a
       droidtop action link (below, "Action links"): `catalog.add` for the
       catalog, `key.trust` for each publisher key it vouches for, and
-      `plugin.install` for a plugin, each its own step the person approves or
+      `plugin.install` for a plugin, each its own call the person approves or
       denies. The older `droidtop://add-catalog?address=` and
       `droidtop://install-plugin?catalog=&id=` links, and their https forms on
       droidtop.github.io, are read by the same parser as one step each
@@ -18569,7 +18569,7 @@ what the index says is display data, never a trust decision.
   - **Entry points** (`LinkActivity`, a plain ComponentActivity with the
     platform translucent theme: an AppCompatActivity refuses that theme at
     launch, which crashed build 1750): droidtop's own `droidtop://` links
-    (hosts `do`, and the older `add-catalog`, `install-plugin`); **every https
+    (hosts `call`, and the older `add-catalog`, `install-plugin`); **every https
     link**, as a general web-link handler that names no site (owner: "computer
     in a box. Maybe the user wants to use a browser in linux"), so a page in
     any browser can hand droidtop a link; text shared to droidtop (the first
@@ -18607,46 +18607,66 @@ what the index says is display data, never a trust decision.
     choices). An https link nothing claims goes on to the person's default
     browser (or Android's chooser without droidtop); any other unclaimed link is
     told in a line.
-- **Action links (owner, 2026-10-10, Droidtop/tracker#459: "The droidtop URL
-  scheme can do a complete mix of arbitrary API calls, so the parser will read
-  the url and announce to the user what it's doing").** One grammar, one parser
-  (`ActionLinks`):
+- **Action links, grammar 2 (owner, 2026-10-10, Droidtop/tracker#459: "They
+  should be literal api call strings through the URL parser. They can be strung
+  together using ampersands, and we should support base64").** One parser
+  (`ActionLinks`); grammar 1 (`droidtop://do?v=1&a=...`) was never published and
+  is gone.
   ```
-  droidtop://do?v=1&a=<action>[&<param>=<value>]...[&a=<action>...]...
-  https://droidtop.github.io/do?v=1&a=...      (the same query)
+  droidtop://call?v=2&<call>[&<call>]...
+  https://droidtop.github.io/call?v=2&<call>...     (the same strings)
+  <call> := <area>.<verb>(<JSON args>) | <plugin id>:<op>(<JSON args>)
+          | b64:<base64url of one call, or of several joined by &>
   ```
-  - `v=1` first; each `a=` starts a step and the parameters up to the next
-    `a=` are its own; at most 10 steps and 4096 characters. An action is
-    built in or a plugin's (`<plugin id>:<action>`). An unknown action, an
-    unknown, repeated, missing or malformed parameter, or a wrong version
-    refuses the WHOLE link with a plain reason, and nothing changes.
-  - **Built-in actions:** `catalog.add {address}` (a plugin catalog: its notice
-    is shown in full and must be read; it trusts no key),
-    `key.trust {catalog, origin, sha256}` (a publisher's key in an added
-    catalog, trusted only when the catalog names exactly that key),
-    `plugin.install {id, catalog?}` (the one install path; the plugin still
-    waits for approval) and `apps.source.add {plugin, address, fingerprint?}`
-    (an app catalog plugin reviews and adds a source, 10b). Adding a catalog and
-    trusting its key are separate steps, as by hand (owner), and any
-    publisher's link may carry all three.
-  - **Plugin actions:** a `provides` entry's `actions: [{id, label, params:
-    [{name, kind, required}]}]`, kinds text, url (https), id, sha256, number,
-    bool; offered while the plugin holds `intents.in` and may provide the
-    point; run as a broker call, op `run_action {action, params}`.
-  - **Dependencies:** a step depends on an earlier step that provides what it
-    uses (a `catalog.add` for the catalog a `key.trust` or `plugin.install`
-    names, a `key.trust` for the catalog a `plugin.install` names) and on the
-    steps in its `needs` (earlier step numbers).
-  - **Review** ("Open a droidtop link"): every step in plain words with its
+  - Each call is a literal API call: a host op as docs/plugin-api.md names it,
+    or an op a plugin declares callable from links, with that op's own
+    argument object (empty parentheses mean `{}`). The query is
+    percent-decoded once (`+` stays `+`) and read call by call; an `&` or `)`
+    inside a JSON string belongs to the string. A `b64:` call (base64url, RFC
+    4648 section 5, padding optional) is decoded and read the same way, one
+    level deep, so a whole list can be one `b64:`. `v=2` comes first; at most
+    10 calls and 8192 characters. The query is read by hand, not by
+    `java.net.URI`, so unescaped `{`, `"` and spaces handed over by Android or a
+    page still parse.
+  - Any malformed call, an op a link cannot call, an unknown, missing or
+    malformed argument refuses the WHOLE link with a plain reason; nothing runs
+    on open.
+  - **Host ops a link may call** (each with a plain-language line, a risk, and
+    the permission a plugin would need for the same call; no plugin is offered
+    them yet): `catalog.add {address}` (a plugin catalog; its notice shown in
+    full and read before Run; trusts no key), `key.trust {catalog, origin,
+    sha256}` (only if the catalog names exactly that key), `plugin.install {id,
+    catalog?}` (the one install path; the plugin still waits for approval),
+    `app_source.add {plugin, address, fingerprint?}` (an app catalog plugin
+    reviews and adds the source, 10b). Adding a catalog and trusting its key
+    are separate calls, as by hand, and any publisher's link may carry all
+    three.
+  - **Plugin ops:** a `provides` entry's `linkOps: [{op, label, description,
+    risk, args: {name: "text|url|id|sha256|number|bool", optional with ?}}]`,
+    offered while the plugin holds `intents.in` and may provide that point, and
+    called literally on that point with the link's arguments. A plugin's own
+    risk is never shown as lower than medium. Because droidtop cannot make a
+    plugin name its ops well (owner: "We can't control if a plugin follows
+    these rules"), the review never relies on the name: it shows the plugin's
+    declared description, the permissions that plugin holds which the call
+    could use, the values, and "This plugin gave no description of what this
+    call does" when it gave none.
+  - **Dependencies** are inferred from the calls' inputs and outputs (a
+    `catalog.add` provides its catalog to a later `key.trust` or
+    `plugin.install` naming it; a `key.trust` provides that catalog's key to a
+    later `plugin.install`) plus a call's `"$needs": [n, ...]` (earlier call
+    numbers, removed before the call).
+  - **Review** ("Open a droidtop link"): every call in plain words with its
     risk and its own "Do this step" switch (owner: "Users can line-item approve
-    and deny parts"); a step that cannot run (its catalog is not added and the
-    link does not add it) says why and is off; a step already true (the
-    catalog is already added) says so. Denying a step marks its dependants
-    "Refused" before anything runs. "Run the approved steps" (opens once every
-    notice was read, then a confirm) runs them in order; a step whose
-    precondition fails at run time (the catalog cannot be read, the key differs
-    from the one named) stops its dependants with the reason, independent
-    steps still run, and "What happened" lists every step.
+    and deny parts"); a call that cannot run says why and is off; one already
+    true says so. Denying a call marks its dependants "Refused" before
+    anything runs. "Run the approved steps" (opens once every notice was read,
+    then a confirm) runs them in order; a failed precondition stops its
+    dependants with the reason, independent calls still run, and "What
+    happened" lists every call.
+  - The older `droidtop://add-catalog` and `droidtop://install-plugin` links and
+    their https forms are read as one call each. droidtop.github.io's link
+    pages and generator emit grammar 2.
 - **Not built:** the deferred droidtop root key that would certify new origins
   without an app change; offering testing/unstable streams; the links-helper
   APK for unofficial plugins' schemes; the container, Wine and peer link
