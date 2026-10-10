@@ -29,6 +29,13 @@ enum class RiskyClass(val id: String, val title: String, val summary: String) {
         "Let droidtop set a screen's refresh rate for every app, through the helper app",
     ),
 
+    /** The helper app changing Android's accessibility settings for every app: font and display size, TalkBack. */
+    ACCESSIBILITY_SETTINGS(
+        "accessibility_settings",
+        "Change accessibility settings",
+        "Let droidtop set font size, display size, magnification, contrast, inversion and TalkBack for every app, through the helper app",
+    ),
+
     /** Root-level commands through a provider that holds root (Sui, or a root provider plugin). */
     ROOT_COMMANDS(
         "root_commands",

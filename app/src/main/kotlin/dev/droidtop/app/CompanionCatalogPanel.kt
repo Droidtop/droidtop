@@ -71,6 +71,7 @@ internal fun companionSystemCards(
     section: (QuickSection) -> List<CatalogItem>,
     performanceMode: CatalogItem?,
     privacy: CatalogItem?,
+    accessibility: List<CatalogItem> = emptyList(),
 ): List<SystemCard> = listOf(
     SystemCard("system", "System", section(QuickSection.SYSTEM), folded = false),
     SystemCard("display", "Display", section(QuickSection.DISPLAY), folded = true),
@@ -80,6 +81,8 @@ internal fun companionSystemCards(
     SystemCard("power", "Power", listOfNotNull(performanceMode), folded = true),
     SystemCard("storage", "Storage", emptyList(), folded = true, storage = true),
     SystemCard("privacy", "Privacy", listOfNotNull(privacy), folded = true),
+    // Android's accessibility settings (slice C22): written with the helper app, else opening Android's screens.
+    SystemCard("accessibility", "Accessibility", accessibility, folded = true),
 ).filter { it.storage || it.id in DRAWN_CARDS || it.items.isNotEmpty() }
 
 /** Cards that draw rows of their own beside any catalog items, so they show even with none. */

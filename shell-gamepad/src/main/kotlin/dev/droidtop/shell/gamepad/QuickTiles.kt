@@ -103,6 +103,8 @@ object QuickTiles {
         GamingSettingsCatalog.ID_SYSTEM_ROTATE,
         GamingSettingsCatalog.ID_SYSTEM_TIMEOUT,
         GamingSettingsCatalog.ID_ORIENTATION,
+        dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_FONT,
+        dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_DISPLAY_SIZE,
         GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
         GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
         GamingSettingsCatalog.ID_DISPLAY_SWAP,

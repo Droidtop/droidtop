@@ -585,6 +585,14 @@ object GamingSettingsCatalog {
                         run = { _ -> dev.droidtop.runtime.DisplayArrangement.reinitialize() },
                     ),
                 )
+                // Android's font and display size (slice C22): the Quick Menu's Display section and the companion's
+                // Accessibility card draw the same items (AccessibilityControls).
+                addAll(
+                    dev.droidtop.runtime.systemstatus.AccessibilityControls.items(context).filter {
+                        it.id == dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_FONT ||
+                            it.id == dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_DISPLAY_SIZE
+                    },
+                )
                 // A screenshot of the main screen, pinnable on the companion's Home (slice C15, Capture).
                 add(
                     AsyncActionItem(

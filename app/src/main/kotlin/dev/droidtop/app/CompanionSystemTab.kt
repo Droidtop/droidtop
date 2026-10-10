@@ -55,6 +55,7 @@ internal fun CompanionSystemTab() {
                 section = { section -> quickSectionGroups(catalog, section, uiMode).flatMap { it.items } },
                 performanceMode = GamingSettingsCatalog.performanceModeItem(),
                 privacy = GamingSettingsCatalog.privacyDashboardItem(),
+                accessibility = dev.droidtop.runtime.systemstatus.AccessibilityControls.items(context.applicationContext),
             )
         }
     }

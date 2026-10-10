@@ -3634,6 +3634,12 @@ row of recent apps, became Home's Recent apps section for every mode.
 - **Storage (slice C21).** System > Storage (and Home's System section) shows every volume: internal storage, then
   each SD card or USB drive Android has mounted (`StorageManager.getStorageVolumes`, each volume's folder measured
   with `StatFs`; before Android 11, droidtop's own folder on it), with its free and total space and a bar.
+- **Accessibility (slice C22).** System > Accessibility has Android's own font size, display size, magnification,
+  high-contrast text, colour inversion and TalkBack (`AccessibilityControls`). With the helper app and Settings >
+  Risky actions > "Change accessibility settings" droidtop writes them for every app (`settings put`, `wm density`
+  as a factor of the panel's own density); otherwise each row opens Android's screen and says which switch would let
+  droidtop do it. Turning TalkBack or magnification off asks first, Cancel first. Font size and display size are the
+  same catalog items in the Quick Menu's Display section, so the two surfaces always agree.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 
@@ -8266,6 +8272,8 @@ or the system through the privileged helper:
   of its own or one the person gave it, is not this class.
 - **Change display settings** (`DISPLAY_SETTINGS`): the helper app setting a screen's refresh rate for every app
   (`cmd display set-user-preferred-display-mode`, the companion's System > Display cards, Droidtop/tracker#414).
+- **Change accessibility settings** (`ACCESSIBILITY_SETTINGS`): the helper app setting Android's font size, display
+  size, magnification, contrast, inversion and TalkBack for every app (the companion's System > Accessibility).
 - **Root-level commands** (`ROOT_COMMANDS`): commands run as root through a provider that holds it: a CPU cluster's
   governor and highest clock from the companion's System > Power (`PowerProbe.write`), and
   placing a RetroArch core in RetroArch's private folder (`RetroArchCores`); with the class off droidtop does not
