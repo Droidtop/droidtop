@@ -16709,7 +16709,10 @@ guard: a receiver cannot learn the sender uid of an adb broadcast (on API
 34+ `getSentFromUid` reports only senders that opted in, which adb never
 does), so there is no uid re-check. Every forced pass logs its outcome under
 the tag `DroidtopUpdateNow`, which is also where the outcome
-of every forced pass is logged. Enginehost gets the same trigger,
+of every forced pass is logged. The receiver returns at once and the pass runs on its own
+thread (`UpdateNow.startDetached`); holding the broadcast open with `goAsync()` for the
+download exceeded the 10 s broadcast timeout and ANRed on the Android 14 emulator
+(Droidtop/tracker#445). Enginehost gets the same trigger,
 `dev.enginehost.UPDATE_NOW`, extended to its plugin catalogs.
 
 **Self-update (both APKs) -- what is honestly possible.** A normally

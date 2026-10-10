@@ -40,6 +40,19 @@ object UpdateNow {
         if (publishedVersionCode > installedVersionCode) Verdict.INSTALL else Verdict.ALREADY_CURRENT
 
     /**
+     * Starts [work] (the receiver passes [runNow]) on a thread of its own and returns immediately, so a
+     * BroadcastReceiver can call it from onReceive without keeping the
+     * broadcast open for the length of a download (Droidtop/tracker#445).
+     * [spawn] is how the work is started; the default is a new thread.
+     */
+    fun startDetached(
+        work: () -> Unit,
+        spawn: (Runnable) -> Unit = { Thread(it, "UpdateNow").start() },
+    ) {
+        spawn(Runnable { work() })
+    }
+
+    /**
      * Checks now and installs if newer. Blocking: call from a worker
      * thread. Returns the one-line outcome, which is also logged under
      * [TAG] so the adb path can be read back with logcat. Throws nothing;

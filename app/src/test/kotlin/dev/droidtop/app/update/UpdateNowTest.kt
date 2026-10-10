@@ -61,4 +61,15 @@ class UpdateNowTest {
         assertTrue(scheduled(unmeteredOnly = true, metered = false))
         assertTrue(scheduled(frequency = AppSelfUpdate.Frequency.WEEKLY, lastAttemptMs = 0L))
     }
+
+    @Test
+    fun `startDetached hands the work to the spawner and does not run it on the caller`() {
+        val spawned = mutableListOf<Runnable>()
+        var ran = false
+        UpdateNow.startDetached({ ran = true }) { spawned += it }
+        assertFalse(ran)
+        assertEquals(1, spawned.size)
+        spawned.single().run()
+        assertTrue(ran)
+    }
 }

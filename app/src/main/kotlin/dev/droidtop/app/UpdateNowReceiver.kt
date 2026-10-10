@@ -30,19 +30,20 @@ import dev.droidtop.app.update.UpdateNow
  * only when that sender opted in through BroadcastOptions.setShareIdentity,
  * which adb's `am broadcast` never does -- so a uid check would reject the
  * one caller this receiver exists for.
+ *
+ * The broadcast itself returns at once: the feed fetch and the download run
+ * on a thread of their own (UpdateNow.startDetached). They must not be held
+ * open with goAsync(), because the system's broadcast timeout (10 s for the
+ * foreground broadcast adb sends) counts until pending.finish(), and a
+ * download takes longer than that: the ANR "Broadcast of Intent UPDATE_NOW"
+ * on emulator-5560 (Droidtop/tracker#445). The scheduled pass
+ * (AppSelfUpdate.maybeCheck) detaches the same way.
  */
 class UpdateNowReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != UpdateNow.ACTION) return
         Log.i(UpdateNow.TAG, "UPDATE_NOW received (sender holds android.permission.DUMP): checking the release feed now")
-        val pending = goAsync()
         val application = context.applicationContext
-        Thread {
-            try {
-                UpdateNow.runNow(application)
-            } finally {
-                pending.finish()
-            }
-        }.start()
+        UpdateNow.startDetached({ UpdateNow.runNow(application) })
     }
 }
