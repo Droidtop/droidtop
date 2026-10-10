@@ -63,6 +63,19 @@ class UpdateNowTest {
     }
 
     @Test
+    fun `a pass already running is joined, not started twice`() {
+        assertTrue(UpdateNow.begin())
+        assertTrue(UpdateNow.pass.value.running)
+        assertFalse(UpdateNow.begin())
+        UpdateNow.finish("done")
+        assertFalse(UpdateNow.pass.value.running)
+        assertEquals("done", UpdateNow.pass.value.outcome)
+        assertTrue(UpdateNow.begin())
+        assertEquals(null, UpdateNow.pass.value.outcome)
+        UpdateNow.finish("again")
+    }
+
+    @Test
     fun `startDetached hands the work to the spawner and does not run it on the caller`() {
         val spawned = mutableListOf<Runnable>()
         var ran = false

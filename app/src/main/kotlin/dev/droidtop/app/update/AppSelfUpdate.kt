@@ -233,6 +233,14 @@ object AppSelfUpdate {
     private fun isMetered(context: Context): Boolean =
         context.getSystemService(android.net.ConnectivityManager::class.java)?.isActiveNetworkMetered ?: false
 
+    /**
+     * After an install succeeded the new process finds the build it now is: its own APK and every older
+     * download are stale ([UpdateFiles]). Blocking file work, so not on the main thread.
+     */
+    fun cleanStaleDownloads(context: Context) {
+        UpdateFiles.clean(context, installedVersionCode(context), target = null)
+    }
+
     /** Records that a check ran now; the manual check calls this so "last checked" stays truthful. */
     fun noteAttempt(context: Context) {
         prefs(context.applicationContext).edit().putLong(KEY_LAST_ATTEMPT, System.currentTimeMillis()).apply()

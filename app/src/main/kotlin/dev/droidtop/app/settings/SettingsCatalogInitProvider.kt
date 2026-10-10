@@ -58,6 +58,11 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.library.integrations.PluginCatalog.registerDownloadPost()
         dev.droidtop.library.consoles.RetroArchCores.registerDownloadPost()
         dev.droidtop.library.integrations.PluginBios.registerDownloadPost()
+        // The installed build's own APK and older partial updates are dead weight, and a restored job
+        // must not fetch an old build again (tracker#445); runs once the jobs are restored.
+        dev.droidtop.pluginhost.PluginJobsCenter.onRestored = {
+            dev.droidtop.app.update.AppSelfUpdate.cleanStaleDownloads(appContext)
+        }
         dev.droidtop.pluginhost.PluginJobsCenter.attach(appContext)
         dev.droidtop.app.JobsSummaryNotification.start(appContext)
         dev.droidtop.app.LaunchWatchNotification.start(appContext)

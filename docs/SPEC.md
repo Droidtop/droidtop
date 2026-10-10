@@ -540,7 +540,7 @@ it plus the integrations only that surface can offer.
 | A mode-independent launch entry point | `GameLaunchActivity` (`:app`) |
 | Settings catalogs and their registry | `SettingsCatalogInitProvider`, `:runtime-common` |
 | Preferences, including the mode switches themselves | `Modes` (`:runtime-common`), one prefs file |
-| Self-update and the update-now trigger (§10b) | `AppSelfUpdate`, `UpdateNowReceiver` |
+| Self-update and the update-now trigger (§10b) | `AppSelfUpdate`, `UpdateNowReceiver`, `UpdateService`, `UpdateFiles` |
 | Crash reporting | `CrashReporting`, `LauncherApplication` |
 | Keeping the index honest over time: the slow rebuild pass (§7g) | `Library` (`:library-core`) |
 
@@ -16709,10 +16709,27 @@ guard: a receiver cannot learn the sender uid of an adb broadcast (on API
 34+ `getSentFromUid` reports only senders that opted in, which adb never
 does), so there is no uid re-check. Every forced pass logs its outcome under
 the tag `DroidtopUpdateNow`, which is also where the outcome
-of every forced pass is logged. The receiver returns at once and the pass runs on its own
-thread (`UpdateNow.startDetached`); holding the broadcast open with `goAsync()` for the
-download exceeded the 10 s broadcast timeout and ANRed on the Android 14 emulator
-(Droidtop/tracker#445). Enginehost gets the same trigger,
+of every forced pass is logged. The receiver returns at once and the whole pass (feed
+check, download, request to the installer) runs in `UpdateService`, a `dataSync` foreground
+service with a "Updating droidtop" progress notification (decision 2026-10-09,
+Droidtop/tracker#445). Holding the broadcast open with `goAsync()` for the download exceeded the
+10 s broadcast timeout and ANRed on the Android 14 emulator; a bare thread after the broadcast
+returned was not enough either, because Android froze the cached process seven seconds later,
+mid-download, and the download only went on when the app came to the foreground. Both callers,
+the receiver and the "Check now" row, start the pass through `UpdateService.start`, so there is
+one mechanism (`UpdateNow.runPass`, around `runNow`); a pass already running is joined, not
+doubled, and the service stops when the pass ends or fails. dataSync (permission
+`FOREGROUND_SERVICE_DATA_SYNC`) rather than shortService, which is cut off after about three
+minutes and the APK is about 130 MB. If Android refuses the service start (a cached app may not
+start one), the same pass runs on a thread, as it did before. The scheduled pass downloads
+nothing (it only reads the feed), so it needs no service.
+
+**Update files.** The APK lands as `droidtop-<versionCode>.apk` (its partial download beside it as
+`.apk.part`) in the updates folder under droidtop's downloads folder. `UpdateFiles` deletes the
+files of the installed build and every older build whenever a pass starts and when the process
+starts after an install, and, once a newer build is being fetched, every file of a build older
+than it, cancelling any download job still holding one. A `.part` of an older build is therefore
+never resumed. Enginehost gets the same trigger,
 `dev.enginehost.UPDATE_NOW`, extended to its plugin catalogs.
 
 **Self-update (both APKs) -- what is honestly possible.** A normally

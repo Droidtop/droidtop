@@ -2,6 +2,9 @@ package dev.droidtop.app.update
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * The forced update pass: check the release feed right now, and install
@@ -23,6 +26,9 @@ import android.util.Log
  *
  * Reached two ways: the "Check now" row on Settings > Software
  * updates, and the UPDATE_NOW broadcast (dev.droidtop.app.UpdateNowReceiver).
+ * Both start it through [UpdateService], the foreground service the whole pass
+ * runs in so that Android keeps the process alive for the download
+ * (Droidtop/tracker#445); [runPass] is what the service runs.
  */
 object UpdateNow {
     const val ACTION = "dev.droidtop.UPDATE_NOW"
@@ -31,19 +37,55 @@ object UpdateNow {
     /** How long the Check now row waits on the installer's answer. */
     private const val OUTCOME_WAIT_MS = 10 * 60 * 1000L
 
-    /** The Android shell (what adb runs as) and root. Fixed platform uids. */
-
     /** What a forced pass decides, once it knows what is published. */
     enum class Verdict { ALREADY_CURRENT, INSTALL }
 
     fun verdict(installedVersionCode: Long, publishedVersionCode: Long): Verdict =
         if (publishedVersionCode > installedVersionCode) Verdict.INSTALL else Verdict.ALREADY_CURRENT
 
+    /** Where the running pass is, for whoever started or joined it. [outcome] is set once [running] is false. */
+    data class PassState(val running: Boolean, val line: String = "", val outcome: String? = null)
+
+    private val passState = MutableStateFlow(PassState(running = false))
+    val pass: StateFlow<PassState> = passState
+
+    /** Marks a pass as running. False when one already is: the caller joins it instead of starting another. */
+    fun begin(): Boolean {
+        var started = false
+        passState.update { current ->
+            started = !current.running
+            if (started) PassState(running = true, line = "Starting...") else current
+        }
+        return started
+    }
+
     /**
-     * Starts [work] (the receiver passes [runNow]) on a thread of its own and returns immediately, so a
-     * BroadcastReceiver can call it from onReceive without keeping the
-     * broadcast open for the length of a download (Droidtop/tracker#445).
-     * [spawn] is how the work is started; the default is a new thread.
+     * The pass [UpdateService] runs (after [begin]): [runNow], with its narration kept in [pass] and
+     * passed to [onStatus] (the notification). Always ends with [pass] not running and the outcome set.
+     */
+    fun runPass(context: Context, waitForOutcome: Boolean = false, onStatus: (String) -> Unit = {}): String {
+        val outcome = try {
+            runNow(context, waitForOutcome) { line ->
+                passState.update { it.copy(line = line) }
+                onStatus(line)
+            }
+        } catch (error: Throwable) {
+            log("Update failed: " + (error.message ?: error.javaClass.simpleName))
+        }
+        finish(outcome)
+        return outcome
+    }
+
+    /** Ends the running pass with its one-line [outcome]. */
+    internal fun finish(outcome: String) {
+        passState.value = PassState(running = false, line = outcome, outcome = outcome)
+    }
+
+    /**
+     * Starts [work] (always [runPass]) on a thread of its own and returns immediately: how
+     * [UpdateService] runs the pass, and what [UpdateService.start] falls back to when Android
+     * refuses a foreground service start. [spawn] is how the work is started; the default is
+     * a new thread.
      */
     fun startDetached(
         work: () -> Unit,
@@ -63,6 +105,9 @@ object UpdateNow {
         val installed = AppSelfUpdate.installedVersionCode(application)
         onStatus("Checking for a newer build...")
         AppSelfUpdate.noteAttempt(application)
+        // Whatever an earlier build left behind goes before anything is fetched: the installed build's
+        // own APK and any older partial download, so a stale .part is never resumed (tracker#445).
+        UpdateFiles.clean(application, installed, target = null)
         val info = try {
             AppSelfUpdate.fetch(application)
         } catch (error: Exception) {
@@ -75,6 +120,8 @@ object UpdateNow {
             )
         }
         log("newer build published: " + info.versionName + " (build " + info.versionCode + "), installed " + installed)
+        // A newer build than one already half fetched supersedes it.
+        UpdateFiles.clean(application, installed, target = info.versionCode)
         return try {
             val sessionId = AppSelfUpdate.downloadAndInstall(application, info, onStatus)
             val handed = "asked Android's installer to install " + info.versionName + " (build " + info.versionCode + ")"

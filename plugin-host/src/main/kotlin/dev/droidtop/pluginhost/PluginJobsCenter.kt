@@ -147,12 +147,20 @@ object PluginJobsCenter {
     private var persistenceContext: Context? = null
     private val persistedKey = stringPreferencesKey("entries")
 
+    /**
+     * Runs on the restore thread after [attach] has restored the interrupted jobs; :app uses it to drop what
+     * a previous run left that should not carry on (the self-update's stale downloads).
+     */
+    @Volatile
+    var onRestored: () -> Unit = {}
+
     /** Connects the registry to app storage and restores interrupted resumable jobs as paused. */
     fun attach(context: Context) {
         persistenceContext = context.applicationContext
         persistenceScope.launch {
             val prefs = context.applicationContext.pluginJobsStore.data.first()
             restore(decodeEntries(prefs[persistedKey].orEmpty()))
+            runCatching { onRestored() }
         }
     }
 

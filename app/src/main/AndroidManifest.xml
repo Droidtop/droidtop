@@ -12,6 +12,8 @@
          API 33+ for the foreground-service notification itself to show. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- UpdateService (below) downloads droidtop's own update as a dataSync foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Real outbound HTTP: ScreenScraper/TheGamesDB/Lutris/IGDB metadata
@@ -642,6 +644,15 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/typing_accessibility_service" />
         </service>
+        <!--
+          The whole self-update pass (check, download, request to the installer) runs here as a foreground
+          service, so Android keeps the process while droidtop is in the background (docs/SPEC.md 10b,
+          Droidtop/tracker#445). dataSync has no time limit on the targetSdk 34 we build for.
+        -->
+        <service
+            android:name="dev.droidtop.app.update.UpdateService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <!-- PackageInstaller reports the self-update verdict here. -->
         <receiver
             android:name="dev.droidtop.app.update.AppUpdateStatusReceiver"
