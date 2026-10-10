@@ -102,20 +102,41 @@ internal fun CompanionSystemTab() {
     }
 }
 
-/** Internal storage free and total, read off the main thread, with its bar. */
+/** One storage volume as the Storage card shows it. */
+internal data class StorageVolumeLine(val name: String, val free: Long, val total: Long)
+
+/**
+ * Every storage volume's free and total space (slice C21): internal storage, then each SD card or USB drive Android
+ * has mounted (`StorageManager.getStorageVolumes`, each volume's own folder measured with `StatFs`), read off the
+ * main thread, each with its bar.
+ */
 @Composable
 internal fun StorageLine() {
-    val storage by produceState<Pair<Long, Long>?>(null) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                val stat = StatFs(Environment.getDataDirectory().path)
-                stat.availableBytes to stat.totalBytes
-            }.getOrNull()
-        }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val volumes by produceState<List<StorageVolumeLine>?>(null) {
+        value = withContext(Dispatchers.IO) { storageVolumes(context.applicationContext) }
     }
-    val (free, total) = storage ?: run { CompanionNote("Reading…"); return }
-    Text(storageText(free, total), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-    CompanionBar(if (total > 0) (total - free).toFloat() / total else 0f)
+    val list = volumes ?: run { CompanionNote("Reading…"); return }
+    list.forEach { volume ->
+        Text(volume.name, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(storageText(volume.free, volume.total), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        CompanionBar(if (volume.total > 0) (volume.total - volume.free).toFloat() / volume.total else 0f)
+    }
+}
+
+private fun storageVolumes(context: android.content.Context): List<StorageVolumeLine> {
+    val internal = runCatching { StatFs(Environment.getDataDirectory().path).let { StorageVolumeLine("Internal storage", it.availableBytes, it.totalBytes) } }.getOrNull()
+    val manager = context.getSystemService(android.os.storage.StorageManager::class.java)
+    val removable = manager?.storageVolumes.orEmpty().filter { it.isRemovable && it.state == Environment.MEDIA_MOUNTED }.mapNotNull { volume ->
+        val dir = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            volume.directory
+        } else {
+            // Before Android 11 a volume names no folder: droidtop's own folder on it is measured instead.
+            context.getExternalFilesDirs(null).filterNotNull().firstOrNull { Environment.isExternalStorageRemovable(it) }
+        } ?: return@mapNotNull null
+        runCatching { StatFs(dir.path).let { StorageVolumeLine(volume.getDescription(context), it.availableBytes, it.totalBytes) } }.getOrNull()
+    }
+    return listOfNotNull(internal) + removable.distinctBy { it.name to it.total }
 }
 
 /** A thin filled bar, [fraction] of the way: storage used, a download's progress. */

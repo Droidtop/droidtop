@@ -3631,6 +3631,9 @@ row of recent apps, became Home's Recent apps section for every mode.
   something used data. Home's Edit pins lists apps, and, while droidtop is the home app (Android's launcher API
   answers only then), the shortcuts of a pinned app: a tap opens it on the main screen, Here (also a TalkBack action)
   on the companion's.
+- **Storage (slice C21).** System > Storage (and Home's System section) shows every volume: internal storage, then
+  each SD card or USB drive Android has mounted (`StorageManager.getStorageVolumes`, each volume's folder measured
+  with `StatFs`; before Android 11, droidtop's own folder on it), with its free and total space and a bar.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 
