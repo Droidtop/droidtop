@@ -84,6 +84,8 @@ internal fun CompanionSystemTab() {
                             if (card.id == "display") CompanionDisplayCards()
                             // Battery, clocks and what the probe finds (slice C16), under performance mode.
                             if (card.id == "power") CompanionPowerCard()
+                            // Recent camera, mic and location use, and droidtop's own grants (slice C17).
+                            if (card.id == "privacy") CompanionPrivacyCard()
                             CompanionCatalogItems(
                                 card.items,
                                 onChanged = { version++ },

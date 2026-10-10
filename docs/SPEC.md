@@ -3600,6 +3600,12 @@ row of recent apps, became Home's Recent apps section for every mode.
   commands and a root provider, each cluster has its governor and its highest clock to pick (cpufreq's own
   `scaling_governor` and `scaling_max_freq`, written as root, values checked against what the cluster lists). Owner
   question 5's default (yes, behind Root-level commands, off by default).
+- **Privacy (slice C17).** System > Privacy has Android's privacy dashboard link, then, with the helper app, the
+  apps that used the camera, microphone or location in the last 24 hours (`PrivacyAccess`, from Android's own record,
+  `dumpsys appops --op CAMERA|RECORD_AUDIO|FINE_LOCATION`, each package's latest access), each opening its App info
+  (Android has no public page for one permission of one app). Then "What droidtop can access": notification access,
+  Usage access, the accessibility service (its two jobs, typing and screenshots), Bluetooth and the helper app, each
+  with whether droidtop holds it and why it asks, opening droidtop's own App info.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
 
