@@ -429,7 +429,7 @@
 
         <!--
           Every link droidtop answers goes to one router (docs/SPEC.md 12a "Links", Droidtop/tracker#459):
-          droidtop's own action links (droidtop://do?v=1&a=..., and the older add-catalog and
+          droidtop's own action links (droidtop://call?v=2&..., and the older add-catalog and
           install-plugin forms), every https link as a general web-link handler that names no site
           (plugins register the sites they handle; a link nothing claims goes on to the browser), and
           links shared to droidtop. Third-party schemes are the disabled aliases below. Plugins never get
@@ -446,7 +446,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="droidtop" android:host="do" />
+                <data android:scheme="droidtop" android:host="call" />
                 <data android:scheme="droidtop" android:host="add-catalog" />
                 <data android:scheme="droidtop" android:host="install-plugin" />
             </intent-filter>

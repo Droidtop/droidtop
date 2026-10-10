@@ -18790,7 +18790,9 @@ what the index says is display data, never a trust decision.
   should be literal api call strings through the URL parser. They can be strung
   together using ampersands, and we should support base64").** One parser
   (`ActionLinks`); grammar 1 (`droidtop://do?v=1&a=...`) was never published and
-  is gone.
+  is gone. LinkActivity's manifest filter declares
+  the host `call` (plus the older `add-catalog` and `install-plugin`); `LinkManifestTest` reads the
+  manifest and fails when its hosts drift from `ActionLinks.HOST` (Droidtop/tracker#477).
   ```
   droidtop://call?v=2&<call>[&<call>]...
   https://droidtop.github.io/call?v=2&<call>...     (the same strings)
