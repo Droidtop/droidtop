@@ -103,7 +103,7 @@ class NativePluginRunner(
                             runtime.loadPlugin(id, installDir, record.manifest.entryClass ?: "", record.rootApproved, PluginBrokers.binderFor(appContext, id))
                         // A gpu.render process loads the plugin from the same descriptors as a contained one; it differs only
                         // in being a non-isolated, GPU-capable process (docs/plugin-api.md 5.3, "The graphics tier").
-                        PluginTier.CONTAINED, PluginTier.GPU_RENDER -> loadContained(runtime, record)
+                        PluginTier.CONTAINED, PluginTier.GPU_RENDER -> loadContained(runtime, record, tier)
                     }
                 }
             }
@@ -124,8 +124,11 @@ class NativePluginRunner(
         }
     }
 
-    /** Opens what the contained plugin needs, hands it over and closes droidtop's own copies of the descriptors. */
-    private fun loadContained(runtime: IPluginRuntime, record: PluginRecord): Boolean {
+    /**
+     * Opens what the contained plugin needs, hands it over and closes droidtop's own copies of the descriptors. A
+     * `gpu.render` process also gets the socket to a file broker started for it here ([SandboxBroker]).
+     */
+    private fun loadContained(runtime: IPluginRuntime, record: PluginRecord, tier: PluginTier): Boolean {
         val id = record.manifest.id
         val files = when (val result = ContainedFiles.forRecord(appContext, record)) {
             is ContainedFiles.Result.Missing -> {
@@ -134,11 +137,21 @@ class NativePluginRunner(
             }
             is ContainedFiles.Result.Files -> result.files
         }
-        val opened = ArrayList<ParcelFileDescriptor>(files.size)
+        val opened = ArrayList<ParcelFileDescriptor>(files.size + 1)
+        val names = files.map { it.first }.toMutableList()
         try {
             files.forEach { (_, file) -> opened += ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY) }
+            if (tier == PluginTier.GPU_RENDER) {
+                val broker = SandboxBroker.serve(appContext, id)
+                if (broker == null) {
+                    loadFailures[id] = "its file broker could not be started"
+                    return false
+                }
+                opened += broker
+                names += ContainedFiles.BROKER
+            }
             val manifest = JSONObject(java.io.File(PluginStore.payloadDirFor(appContext, id), "manifest.json").readText()).toString()
-            return runtime.loadContained(id, manifest, opened.toTypedArray(), files.map { it.first }.toTypedArray(), PluginBrokers.binderFor(appContext, id))
+            return runtime.loadContained(id, manifest, opened.toTypedArray(), names.toTypedArray(), PluginBrokers.binderFor(appContext, id))
         } finally {
             opened.forEach { runCatching { it.close() } }
         }

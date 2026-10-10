@@ -17343,9 +17343,11 @@ Advanced.
   `io_uring`, no `ptrace`; a process that cannot take it does not run the
   plugin. **The limit stands, so the warning is explicit** (owner,
   2026-10-09: "no sandboxing is perfectly effective ... if it's not
-  mitigatable, make the warning more explicit"): seccomp cannot filter paths
-  or binder, so its own code could still open droidtop's files or ask
-  Android's services for things as droidtop. The approval line's detail
+  mitigatable, make the warning more explicit"): every call it makes that
+  names a path goes to a file broker in :app whose rules hold none of
+  droidtop's private data (since 2026-10-10, the sandbox library's broker,
+  Droidtop/tracker#470), but a filter cannot look inside binder, so its own
+  code could still ask Android's services for things as droidtop. The approval line's detail
   says "A plugin with this could reach past droidtop's checks, so only allow
   it for a plugin from a source you trust", and while it is granted the
   plugin's page repeats it ("Could reach past droidtop's checks") and so does

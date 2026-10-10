@@ -23,6 +23,8 @@ add_library(droidtoppy SHARED
     src/sandbox_hooks.c
     # The system-call filter of every plugin process (docs/plugin-api.md 5.3): the sandbox library's lockdown.
     src/plugin_filter.c
+    # A gpu.render plugin's file broker, in :app (docs/plugin-api.md 5.3, "The graphics tier").
+    src/plugin_broker.c
     # The stand-in window a contained plugin's own screen draws into (docs/plugin-api.md 5.3, "ui.main in the sandbox").
     src/screen_bridge.c
 )

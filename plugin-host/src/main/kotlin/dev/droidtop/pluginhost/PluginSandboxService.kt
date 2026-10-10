@@ -57,7 +57,14 @@ open class PluginSandboxService : PluginProcessService() {
         // The first native call of the process, which loads droidtop's own libdroidtoppy.so; timed in logcat because on the
         // BlueStacks rig that first library load waits 10 s inside its native bridge (docs/plugin-api.md 5.3, "The rigs").
         val before = android.os.SystemClock.uptimeMillis()
-        val report = PluginSyscallFilter.install().also { filter = it }
+        // A graphics process runs under droidtop's UID, so its path calls go to the broker :app started for it
+        // ([SandboxBroker]); the isolated sandbox's files are already out of its UID's reach.
+        val brokerFd = if (requiresIsolation) {
+            -1
+        } else {
+            files[ContainedFiles.BROKER]?.detachFd() ?: return failLoad(pluginId, "droidtop did not hand over its file broker")
+        }
+        val report = PluginSyscallFilter.install(brokerFd).also { filter = it }
         android.util.Log.i("droidtop.plugin", "$pluginId: system-call filter ${report.substringBefore(':')} in ${android.os.SystemClock.uptimeMillis() - before} ms (first native call)")
         if (!requiresIsolation && !PluginSyscallFilter.isOn(report)) {
             return failLoad(pluginId, "its process could not take droidtop's system-call filter ($report), so it is not run with the graphics chip")
@@ -187,7 +194,8 @@ class PluginGpuSlot7 : PluginGpuService()
  * The seccomp-bpf filter of every plugin process droidtop loads from descriptors, the isolated sandbox and a
  * `gpu.render` process alike (docs/plugin-api.md 5.3; `native/src/plugin_filter.c`, the sandbox library's lockdown in
  * `vendor/sandbox`): no socket but a local datagram one (so no internet and no DNS), no programs, no io_uring, no ptrace,
- * no namespaces and no signals to other processes, on every thread and for good. An app may add such a filter to its own process (Chrome does for its renderers); it
+ * no namespaces and no signals to other processes, on every thread and for good. In a `gpu.render` process every call
+ * that names a path also goes to its broker in :app ([SandboxBroker]). An app may add such a filter to its own process (Chrome does for its renderers); it
  * cannot filter by path or look inside a binder call, which is what the permission's warning is about.
  */
 internal object PluginSyscallFilter {
@@ -195,11 +203,21 @@ internal object PluginSyscallFilter {
         System.loadLibrary("droidtoppy")
     }
 
-    @JvmStatic private external fun nativeInstall(): String
+    @JvmStatic private external fun nativeInstall(brokerFd: Int, ownOpens: Array<String>): String
 
-    /** Installs the filter once per process; returns what happened, starting "on:" or "error:". */
+    /**
+     * Device files a graphics process opens itself before the lockdown: the kernel ties binder and some GPU drivers'
+     * state to the process that opened them, so the broker's descriptor would not do (Droidtop/tracker#26, the
+     * Enginehost lockdown on emulator-5560: a broker-opened /dev/hwbinder failed to map).
+     */
+    private val OWN_OPENS = arrayOf("/dev/hwbinder", "/dev/kgsl-3d0", "/dev/mali0", "/dev/dri/renderD128")
+
+    /**
+     * Installs the filter once per process; returns what happened, starting "on:" or "error:". [brokerFd] is the
+     * process's end of its broker's socket (taken), or -1 for the isolated sandbox, which keeps its own path calls.
+     */
     @Synchronized
-    fun install(): String = nativeInstall()
+    fun install(brokerFd: Int): String = nativeInstall(brokerFd, if (brokerFd < 0) emptyArray() else OWN_OPENS)
 
     fun isOn(report: String): Boolean = report.startsWith("on:")
 }

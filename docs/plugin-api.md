@@ -2466,9 +2466,9 @@ Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
 | Process | an isolated process of its own: a random UID, no permissions, the `isolated_app` SELinux domain | a process of its own (one of eight slots) under droidtop's UID, **not** isolated, so it may open the GPU | a process of its own (one of eight slots) under droidtop's UID |
 | Graphics chip | no: an isolated process may not open `gpu_device` (sepolicy), so Flutter draws in software | yes: hardware rendering into a droidtop-owned surface | yes |
 | Network | none: not in the `inet` group, so `socket()` is refused; `net.http`/`net.download` only, checked against `net.domains`/`net.any`/`net.local` per hop and logged | none of its own: droidtop's system-call filter refuses every socket but a local datagram one (§5.3), so `net.http`/`net.download` only, as contained; **but** its own code could ask Android's services (the system download manager, say) to fetch something as droidtop, unseen | droidtop's `INTERNET`: any socket, unseen by droidtop |
-| droidtop's files (databases, preferences, sign-in tokens, other plugins' data) | none | the broker hands over nothing, **but** its own native code shares droidtop's UID and could read them directly; this cannot be walled off by an app | all of them |
-| Its own files | the `data` API on its own folder only | the `data` API on its own folder only (same caveat as above for raw native syscalls) | its own folder by path, and everything else droidtop's UID reaches |
-| Shared storage | `files.shared` within its declared folders, `files.pick` documents, logged | the same as contained through the broker (same native caveat) | all of it (`MANAGE_EXTERNAL_STORAGE`) |
+| droidtop's files (databases, preferences, sign-in tokens, other plugins' data) | none | none by path: every call that names a path goes to its file broker in :app, whose rules hold none of them (§5.3, since 2026-10-10); **but** its own code could still ask Android's services for files as droidtop over binder | all of them |
+| Its own files | the `data` API on its own folder only | the `data` API on its own folder only (same binder caveat) | its own folder by path, and everything else droidtop's UID reaches |
+| Shared storage | `files.shared` within its declared folders, `files.pick` documents, logged | the same as contained through the broker (same binder caveat) | all of it (`MANAGE_EXTERNAL_STORAGE`) |
 | Installed apps, usage stats, secure settings, logs | through declared host APIs only | through declared host APIs only | whatever droidtop's UID holds (`QUERY_ALL_PACKAGES`, `PACKAGE_USAGE_STATS`, `WRITE_SECURE_SETTINGS` and `READ_LOGS` if granted) |
 | Shizuku, `su` | none (no binder, no permission; it can reach privilege only through a `priv.*` provider, with its own grant) | none through the broker, and the filter refuses the stream socket a root manager's `su` talks over; **but** as droidtop's UID its own code could ask Shizuku for a binder if droidtop was allowed it | Shizuku's binder if droidtop was allowed, and `su` if the root manager granted droidtop's UID |
 | Other plugins | only through the broker (§2) | only through the broker | other full-trust plugins' files (same UID); not their objects (separate processes) |
@@ -2736,17 +2736,34 @@ opens that one hole:
   control, on Linux and on the Android emulator at API 28 and 34. A process
   that cannot take the filter does not run the plugin. The Containment check (Advanced)
   shows "System-call filter: on: ..." and the network line reads "refused".
-- **What it cannot stop, stated plainly.** The process still has droidtop's
-  UID. seccomp sees system-call numbers and integer arguments only ("BPF
+- **Files by path go to a broker (since 2026-10-10, Droidtop/tracker#470).**
+  seccomp sees system-call numbers and integer arguments only ("BPF
   programs may not dereference pointers", kernel
   Documentation/userspace-api/seccomp_filter.rst), so it cannot tell an
-  `openat` of the GPU's device node from one of droidtop's database, and it
-  cannot look inside a binder call. The plugin's own native code (and a
-  Flutter plugin's Dart, which is machine code in `libapp.so` with `dart:ffi`)
-  could therefore still open droidtop's files and shared storage by path, and
-  ask Android's services for things as droidtop (the system download manager,
-  media store, starting activities, droidtop's own components, Shizuku if
-  droidtop's UID was allowed it), below the broker and unseen by it.
+  `openat` of the GPU's device node from one of droidtop's database. So
+  every call that names a path traps instead, after Chromium's syscall
+  broker: the sandbox library's handler sends it over a socket :app handed
+  the process with its descriptors (`ContainedFiles.BROKER`) to a broker
+  thread in :app (`SandboxBroker`, `native/src/plugin_broker.c`), which
+  answers from rules holding the system's read-only code and data,
+  droidtop's APK and the device nodes a graphics driver opens, and nothing
+  of droidtop's private data; every refusal is logged under
+  `droidtop.sandbox` with the plugin's id. The broker resolves with
+  `readlink` alone and makes only the call asked for, and acts from a
+  re-checked parent directory, so a symlink swapped in cannot lead it out.
+  Device files the kernel ties to their opener (hwbinder, kgsl, Mali, DRM
+  render nodes) are opened by the process just before the lockdown and
+  duplicated afterwards; the process is made dumpable so the broker, under
+  the same UID, can answer for its own `/proc` entries (ptrace stays
+  refused). The plugin's own files keep arriving as descriptors through
+  the guarded hooks.
+- **What it cannot stop, stated plainly.** The process still has droidtop's
+  UID, and a filter cannot look inside a binder call. The plugin's own
+  native code (and a Flutter plugin's Dart, which is machine code in
+  `libapp.so` with `dart:ffi`) could still ask Android's services for
+  things as droidtop (the system download manager, media store, starting
+  activities, droidtop's own components, Shizuku if droidtop's UID was
+  allowed it), below the broker and unseen by it.
 - **So the person is told, in plain words** (owner, 2026-10-09: "no
   sandboxing is perfectly effective, and as with any third party code, users
   are cautioned to be careful what they install ... if it's not mitigatable,
