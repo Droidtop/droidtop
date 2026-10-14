@@ -14923,6 +14923,14 @@ A condition the person should know about (an unofficial plugin, a feature that i
 
 **Enforcement** (`scripts/check-ui-rules.sh`, run by `android-checks.yml`): `--check` fails on a site of a switched-on rule, `--inventory` lists every rule's remaining sites, and `scripts/test-check-ui-rules.sh` proves each rule catches its fixture. The rules: `Toast.makeText` outside `Notices`; `colorScheme.error` outside `:ui-shared`; `run = {}`; a `TextBlockItem` starting "WARNING" or a "(high risk)" suffix; hex colours in screens; the names the notice and text-entry work deletes (`MenuHint`, `SafeModeBanner`, `ReinitPill`, `MenuTokens.Danger`/`DangerPlate`, `OwnFieldKeyboard`); banned words in `Notice(` strings and in permission titles; and `TextField`/`OutlinedTextField`/`BasicTextField` outside `TextEntry`. Each rule is switched on in the commit that clears its last site.
 
+### Asking before a change, and the flash (decided 2026-10-14, Droidtop/tracker#485)
+
+**The danger dialog** (`NoticeDialogs.confirmDanger`, drawn by `:ui-shared`'s `ConfirmDialogCard`): Steam's shape. A centred dark card, min(480 dp, 90% of the window) wide, on a 0.6 scrim; the octagon and the title at 22/28 bold; the outcome; the recommendation ("We recommend Cancel.") in the danger ink; the plugins it is about; a Details row; and two 48 dp buttons side by side, **Cancel** on the left with the focus, the risky button on the right in the danger fill. There is no second-press arm and no delay: Cancel has the focus, so a mashed A cancels, and reaching the risky button is a deliberate move and a press. B, a tap on the scrim and Cancel all answer Cancel; Left/Right move between the buttons, Up reaches Details, Y opens Details. A danger dialog appears only when something changes (an install, an update, a different maker, protection failing to start); afterwards the page says it quietly. `NoticeDialogs.confirm` is the same card for an Info or Caution question with no fill on the proceed button. Code anywhere asks and suspends; the surface on top (the last to attach as a host) draws the question in its own window, one question at a time, and with no surface attached the answer is Cancel, so nothing risky happens unseen. Gaming draws the card; Standard's settings ask with a platform dialog whose default button is Cancel.
+
+**The flash** (`Notices.flash`): a corner card at the bottom right above the hint row, at most 320 dp wide, the tone's glyph and up to two lines (four at font scale 1.3 and above) of 14 sp text, led by the plugin's name for a plugin's flash. It is drawn in a window that never takes focus, so the page's focus and hints are untouched; it stays for the longer of 4 s and Android's recommended accessibility timeout and never less than 1.5 s, and is announced politely. Nothing in a flash needs action; acknowledgements are past tense with no period ("Saved", "Copied").
+
+**Recent**: every flash is also kept in memory (the last 50, with time, source and tone) unless it was marked private, and shown as a "droidtop" group at the top of the Quick Menu's Notifications tab, with an unread dot on the group and the tab, and Copy all on Select. It is a source of its own, so it shows without notification access.
+
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 
 The owner could not read some settings items: rows were one line with
@@ -18060,7 +18068,7 @@ provider plugin). The Shizuku plugin is that provider (2026-10-09,
 plugin-enforce-5): while Shizuku's server runs as uid 0 (started as root,
 or Sui) it reports `root` through `plugins.report_level` and its
 `priv.shell` root export is offered, each level its own grant on the
-usual list ("Run commands as the system (adb)", "Run commands as root";
+usual list ("Run system commands", "Full control of the device";
 `docs/plugin-api.md` §2.7).
 
 **Root is an opt-in, per-plugin enhancement — never a requirement, never
@@ -19057,6 +19065,15 @@ what the index says is display data, never a trust decision.
    the one `PluginRecord`, and `PluginStore.runnableFor` is the only
    thing a real call site should iterate, so a disabled plugin's rows
    simply stop appearing rather than needing every caller to re-check.
+
+**Full access asks in red (owner 2026-10-10, Droidtop/tracker#481; built 2026-10-14 with the notice work, Droidtop/tracker#485).** Owner, verbatim: "Running plugins unsandboxed should be possible, but big red warnings and a recommendation that users not install unsandboxed plugins". Every moment a plugin would run without droidtop's protection is asked in the danger dialog (7k, "Asking before a change"), once, at the moment it changes, and running it stays possible:
+
+- **D1, allowing full access**: approving a plugin with "Full access" (`host.full_trust`) ticked or an older contract 1 plugin ("Install anyway"), saving an update's new items when they include full access ("Update anyway"), choosing Allowed for full access on its Permissions screen, the page's "Needs full access to work" notice (Allow), and the first call of a plugin whose full access is still unanswered. Cancel leaves it unanswered; it is never Never.
+- **D2, protection didn't start**: a contained plugin whose system-call filter (the sandbox library's lockdown) cannot be installed is no longer run silently. Its process refuses the load with `protection-failed: <report>`; during a call the person started droidtop asks ("Run anyway"), and the answer holds for this run of droidtop only, so protection is tried again next time. The mark that lets the load through is added by :app to the manifest it hands the process and stripped from the plugin's own file, so a plugin cannot set it.
+- **D4, several at once**: plugins held back in the background are listed on the Plugins page as a caution notice ("Protection didn't start", Review), which asks for all of them in one dialog ("Run all anyway", this run only).
+- **D3, a different maker**: an update verified under a different trust anchor than the approved version starts pending as before, and now remembers what it replaced (`PluginRecord.replacedKeySha256`/`replacedOrigin`); its page shows "Update made by someone else" with both fingerprints in groups of four in Info, and approving it asks "Update anyway" before anything else.
+
+After it is allowed, the plugin's page carries the Full access chip on its status row and the quiet caution notice "Has full access" with **Limit access**, which takes the grant away when the plugin can run with normal protection and otherwise turns the plugin off; there is no permanent red banner. The permission titles are plain words (`host.full_trust` is "Full access", `priv.shell.root` "Full control of the device", the full list in plugin-api.md 4.1), and the approval list's "(high risk)" suffix moved into the row's explanation. The Standard surface asks the same questions with a platform dialog (Cancel the default button); Gaming draws the Steam-shaped card.
 
 **What is built vs. open.** Built: the manifest format and validation,
 signing/hashing, install/uninstall/enable/approve, the approval screen,

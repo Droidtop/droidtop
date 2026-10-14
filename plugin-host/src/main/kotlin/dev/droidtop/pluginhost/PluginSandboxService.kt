@@ -53,7 +53,8 @@ open class PluginSandboxService : PluginProcessService() {
         // graphics process it is the only network wall, so a process that cannot take it does not run the plugin. In the
         // isolated sandbox Android's own rules already refuse sockets, except where a device does not enforce them: the
         // BlueStacks rig runs with SELinux disabled and let an isolated UID open a socket (rig, v0.2.0-dev.1649). There the
-        // filter is the wall; where it cannot be installed, the isolated process still stands, so the plugin runs.
+        // filter is the wall. Where it cannot be installed nothing is silently best-effort (Droidtop/tracker#481): the
+        // plugin is not run, and droidtop asks the person in red whether to run it this time anyway.
         // The first native call of the process, which loads droidtop's own libdroidtoppy.so; timed in logcat because on the
         // BlueStacks rig that first library load waits 10 s inside its native bridge (docs/plugin-api.md 5.3, "The rigs").
         val before = android.os.SystemClock.uptimeMillis()
@@ -66,6 +67,9 @@ open class PluginSandboxService : PluginProcessService() {
         }
         val report = PluginSyscallFilter.install(brokerFd).also { filter = it }
         android.util.Log.i("droidtop.plugin", "$pluginId: system-call filter ${report.substringBefore(':')} in ${android.os.SystemClock.uptimeMillis() - before} ms (first native call)")
+        if (requiresIsolation && !PluginSyscallFilter.isOn(report) && pluginId !in runUnprotected) {
+            return failLoad(pluginId, PluginDangers.PROTECTION_FAILED + report)
+        }
         if (!requiresIsolation && !PluginSyscallFilter.isOn(report)) {
             return failLoad(pluginId, "its process could not take droidtop's system-call filter ($report), so it is not run with the graphics chip")
         }

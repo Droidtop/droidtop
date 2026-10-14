@@ -17,8 +17,12 @@ enum class NoticeTone { Info, Caution, Danger }
  */
 enum class NoticePlacement { Row, Group, Page }
 
-/** The one thing a notice offers to do about its condition ("Approve", "Turn on"). [label] is three words or fewer. */
-class NoticeAction(val label: String, val run: (Context) -> Unit)
+/**
+ * The one thing a notice offers to do about its condition ("Approve", "Turn on"). [label] is three words or fewer.
+ * [run] is suspend and main-safe, so an action may ask first (a danger dialog) before it changes anything; the
+ * surface runs it in its own scope and reads the screen again when it returns.
+ */
+class NoticeAction(val label: String, val run: suspend (Context) -> Unit)
 
 /**
  * One condition the person should know about, in one shape every surface

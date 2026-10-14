@@ -272,6 +272,9 @@ private fun GamepadShellBody(
     val context = LocalContext.current
     // Where a plugin's first-use permission sheet is drawn (docs/plugin-api.md 4.3).
     PluginGrantSheetHost()
+    // Where droidtop's danger and confirm dialogs and its corner flashes are drawn (docs/SPEC.md 7k, "Notices").
+    NoticeDialogHost()
+    NoticeFlashHost()
     // One layout system for both orientations: every screen below reads
     // LocalShellWindow instead of assuming the console's landscape
     // geometry. There is no portrait COPY of any screen.
