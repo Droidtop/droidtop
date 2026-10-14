@@ -109,7 +109,7 @@ object PluginStore {
 
     /**
      * Once per new droidtop build, on start: plugins an older droidtop disabled after a failure get another go
-     * ([PluginRecord.afterHostUpdate]). Rig 2026-10-09: build 1535 disabled the sample status tile (its Kotlin classes
+     * ([PluginRecord.afterHostUpdate]). Rig 2026-10-09: build 1535 disabled a status tile plugin (its Kotlin classes
      * were shrunk away), build 1649 fixed that, and the plugin still read "Crashed" because nothing ever switched it
      * back on. Disk: off the main thread. Returns the ids it switched on.
      */

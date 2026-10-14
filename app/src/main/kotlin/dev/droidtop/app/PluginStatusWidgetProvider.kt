@@ -96,8 +96,8 @@ class PluginStatusWidgetProvider : AppWidgetProvider() {
         /**
          * One real invoke() per candidate plugin ([PluginStore.runnableFor]
          * -- installed, approved, enabled and re-verified), reading
-         * `label`/`value` from its result the same way the one real
-         * sample plugin (`plugin-sample-statustile`) returns them,
+         * `label`/`value` from its result the same way a real
+         * status-tile plugin returns them,
          * falling back to the manifest's own label and a joined dump of
          * whatever the plugin returned when it uses different keys --
          * `status_tile`'s contract names no required keys, so this can't

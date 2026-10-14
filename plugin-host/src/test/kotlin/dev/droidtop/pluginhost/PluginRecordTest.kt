@@ -22,10 +22,10 @@ import org.junit.Test
  * real device, not just a JVM unit test, to show up.
  */
 class PluginRecordTest {
-    private fun manifest(entryClass: String? = "dev.droidtop.samples.statustile.StatusTilePlugin") = PluginManifest(
-        id = "droidtop.sample-statustile",
+    private fun manifest(entryClass: String? = "dev.droidtop.testplugin.StatusTilePlugin") = PluginManifest(
+        id = "droidtop.statustile",
         origin = "droidtop",
-        label = "Sample status tile",
+        label = "Status tile",
         description = null,
         version = "1.0.0",
         kind = PluginKind.NATIVE_BUNDLE,
@@ -118,9 +118,9 @@ class PluginRecordTest {
     @Test
     fun `JSONObject NULL is read as null through PluginManifest fromJson directly, not the string null`() {
         val json = JSONObject().apply {
-            put("id", "droidtop.sample-statustile")
+            put("id", "droidtop.statustile")
             put("origin", "droidtop")
-            put("label", "Sample status tile")
+            put("label", "Status tile")
             put("kind", "native_bundle")
             put("capabilities", org.json.JSONArray(listOf("status_tile")))
             put("contractVersion", PLUGIN_CONTRACT_VERSION)

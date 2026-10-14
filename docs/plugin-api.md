@@ -224,7 +224,7 @@ The rules that make this "no kind-specific features":
    carry. Kind-internal plumbing (the Flutter readiness handshake, the
    Python module namespacing) is invisible above the adapter.
 2. **Parity is tested, not claimed.** One conformance script (the fake
-   host, §3 I2) drives the same calls against each kind's sample, and a
+   host, §3 I2) drives the same calls against a test fixture of each kind, and a
    kind that fails a case is a bug in that kind's adapter. The known gaps
    (audit 2026-10-01): event delivery
    (`onEvent`) for `python` and `flutter_embed`, which both still answer
@@ -2009,8 +2009,7 @@ dropped, one panel per plugin).
 - **Permission:** the approval of the point ("Friends and chat"), and
   `notify.post` for notifications. Staying connected in the background
   needs `jobs.service` (E8).
-- **Status:** built (2026-10-08, `PluginSocialProviders`, `SocialHub`);
-  sample `samples/plugin-sample-py-social`.
+- **Status:** built (2026-10-08, `PluginSocialProviders`, `SocialHub`).
 
 ### D. System and device
 
@@ -2161,9 +2160,9 @@ database on the PC follows.
 | Id | Group | For | What | Status |
 | --- | --- | --- | --- | --- |
 | I1 | Debug surface | plugin authors and bug reports | Accounts and sources → Plugins → <plugin> → Developer (shown when developer options are on): the manifest as parsed; its grants; the last 50 calls with durations and error codes; the last 50 broker calls; the log (H5); "Call op…" with a JSON argument box (replaces today's status-tile "Call …" debug row); "Force crash" (today's `force-crash` query) | the debug row exists, status_tile only |
-| I2 | Fake host / test harness | test a plugin without a device | a JVM library `plugin-host-testing` (and a Python `droidtop_fake_host.py`) that loads a plugin, serves the host API from in-memory fakes with configurable grants, and runs the **conformance script** (§1.3) that every kind's sample must pass in CI | not built |
-| I3 | Manifest schema | validation for authors and CI | `docs/plugin-manifest.schema.json` (JSON Schema for contract 2, with v1 accepted), used by `PluginManifest` tests and by the sample CI jobs | not built |
-| I4 | Samples | a working starting point per kind | `samples/plugin-sample-statustile` (native), `-py-statustile`, `-flutter-statustile` and `-py-social` (a C19 provider) exist; add one sample exercising `provides` + a dangerous permission + `requires` (a provider/caller pair) per kind | four built |
+| I2 | Fake host / test harness | test a plugin without a device | a JVM library `plugin-host-testing` (and a Python `droidtop_fake_host.py`) that loads a plugin, serves the host API from in-memory fakes with configurable grants, and runs the **conformance script** (§1.3) that a test fixture of every kind must pass in CI | not built |
+| I3 | Manifest schema | validation for authors and CI | `docs/plugin-manifest.schema.json` (JSON Schema for contract 2, with v1 accepted), used by `PluginManifest` tests | not built |
+| I4 | Test fixtures | a provider/caller pair per kind for the conformance script | droidtop ships no sample plugins (owner, 2026-10-14); fixtures live under the test directories and are never packaged | not built |
 
 ### J. Plugin platform (cross-cutting)
 
@@ -3315,15 +3314,15 @@ Enforcement comes later.
 | P1-4 (#60) | Permissions screen per plugin (state, last used, revoke) under Accounts and sources → Plugins | a rig check |
 | P1-5 **oc** (#61) | Audit log store (a ring buffer per plugin, 2,000 / 30 d, kept 7 d after uninstall) + an Activity screen that reads it | unit tests on the ring; a rig check of the screen |
 | P1-6 (#62) | `PluginApiResolver`: the exports/requires graph, the "Waiting" state, "Provided by" per interface | unit tests: resolve, a provider removed → Waiting, a returning provider → runnable |
-| P1-7 (#63) | Plugin → plugin calls through the broker: the caller's own grant, the `caller`/`via` block, depth ≤ 3, cycle refusal, provider timeout = provider crash, job ownership | unit tests on each rule; a sample provider/caller pair |
-| P1-8 **oc** (#64) | `startJob`/`cancelJob` for the `python` kind (the kind-parity gap) | the python sample gains a job; `sample-plugin-python` CI green; a rig check |
+| P1-7 (#63) | Plugin → plugin calls through the broker: the caller's own grant, the `caller`/`via` block, depth ≤ 3, cycle refusal, provider timeout = provider crash, job ownership | unit tests on each rule; a test-fixture provider/caller pair |
+| P1-8 **oc** (#64) | `startJob`/`cancelJob` for the `python` kind (the kind-parity gap) | a python test fixture gains a job; a rig check |
 | P1-9 (#65) | Permission diff on update: new dangerous items → `ask`, "Wants new access" on the row | unit test on the diff |
 | P1-10 **oc** (#66) | Event namespacing + the events `game.launching`, `game.exited`, `library.scan_finished`, `mode.changed`; `default_player_changed` kept as an alias | unit tests on the args builders (like `DefaultPlayerChangedArgsTest`) |
-| P1-11 (#67) | Wire the two dead capabilities: `library_action` → a game's detail screen (C4), `metadata_source` → the scrape pass (A3) | a rig check with a sample |
+| P1-11 (#67) | Wire the two dead capabilities: `library_action` → a game's detail screen (C4), `metadata_source` → the scrape pass (A3) | a rig check with a test fixture |
 | P1-12 **oc** (#68) | The crash policy tells a system kill (LMK/process death with no plugin in a call) from a plugin crash: only the latter disables; a whole-process death disables the plugins that had calls in flight (today it returns without disabling) | unit tests with the fake runner |
 | P1-13 **oc** (#69) | Vault API (G1): per-plugin Keystore-wrapped storage, excluded from backups, deleted on uninstall | unit tests (JVM with a fake key provider) |
-| P1-14 **oc** (#70) | Manifest JSON Schema (`docs/plugin-manifest.schema.json`) + CI validating every sample's manifest | CI job green |
-| P1-15 **oc** (#71) | Fake host (`plugin-host-testing`) + the conformance script, run against the native and python samples in CI | CI job green |
+| P1-14 **oc** (#70) | Manifest JSON Schema (`docs/plugin-manifest.schema.json`) + CI validating the test-fixture manifests | CI job green |
+| P1-15 **oc** (#71) | Fake host (`plugin-host-testing`) + the conformance script, run against the native and python test fixtures in CI | CI job green |
 | P1-16 (#72) | The official Shizuku provider plugin (`droidtop-plugin-shizuku`: exports `priv.shell@1 level=adb`, `priv.packages@1`), replacing `hasShizukuAccess` for v2 | **owner-action**: create the repo; then build it; a rig check with Shizuku |
 | P1-17 (#73) | Quick Menu surface for `ui.status_tile` / `ui.quick_tile` in Gaming (C2/C3) | a rig check |
 
@@ -3390,7 +3389,7 @@ the tracker honest.
   - P2-45: opt-in telemetry (H6).
 - **Developer:**
   - P2-46: the Developer screen (I1);
-  - P2-47: a provider/caller sample pair for each kind (I4).
+  - P2-47: a provider/caller test-fixture pair for each kind (I4).
 
 **Counts:** 4 P0, 17 P1, 47 P2.
 

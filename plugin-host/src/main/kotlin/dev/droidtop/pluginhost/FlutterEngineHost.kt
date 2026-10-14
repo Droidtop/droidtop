@@ -132,7 +132,7 @@ internal object FlutterEngineHost {
         } catch (e: ClassNotFoundException) {
             return
         }
-        // A registrant without registerWith(FlutterEngine) (the sample's, whose Dart code uses no plugin package, once its
+        // A registrant without registerWith(FlutterEngine) (a plugin whose Dart code uses no plugin package, once its
         // dex was in the bundle: emulator-5560) registers nothing; that is not a failed load. What it does have is logged.
         val register = try {
             registrantClass.getMethod("registerWith", FlutterEngine::class.java)

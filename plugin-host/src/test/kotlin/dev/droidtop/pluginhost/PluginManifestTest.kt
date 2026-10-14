@@ -10,19 +10,19 @@ import org.junit.Test
 
 class PluginManifestTest {
     private fun manifestJson(
-        id: String = "droidtop.sample-statustile",
+        id: String = "droidtop.statustile",
         origin: String = "droidtop",
         kind: String = "native_bundle",
         capabilities: List<String> = listOf("status_tile"),
         contractVersion: Int = PLUGIN_CONTRACT_VERSION,
         abis: List<String> = listOf("arm64-v8a", "x86_64"),
         payload: List<Pair<String, String>> = listOf("classes.jar" to "a".repeat(64)),
-        entryClass: String? = "dev.droidtop.samples.statustile.StatusTilePlugin",
+        entryClass: String? = "dev.droidtop.testplugin.StatusTilePlugin",
         runtimeVersion: String? = null,
     ): JSONObject = JSONObject().apply {
         put("id", id)
         put("origin", origin)
-        put("label", "Sample status tile")
+        put("label", "Status tile")
         put("kind", kind)
         // JSONObject.put(String, Object) is what Kotlin resolves for a
         // List<T> argument (not the Collection overload that would wrap

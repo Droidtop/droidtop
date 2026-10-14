@@ -299,7 +299,7 @@ class PluginCertificatesTest {
             put("capabilities", JSONArray(listOf("status_tile")))
             put("contractVersion", PLUGIN_CONTRACT_VERSION)
             put("abis", JSONArray(listOf("arm64-v8a", "x86_64")))
-            put("entryClass", "dev.droidtop.samples.statustile.StatusTilePlugin")
+            put("entryClass", "dev.droidtop.testplugin.StatusTilePlugin")
             put("payload", JSONArray(listOf(JSONObject().put("path", "classes.jar").put("sha256", Sha256.hex(payloadBytes)))))
         }.toString().toByteArray()
         val out = ByteArrayOutputStream()

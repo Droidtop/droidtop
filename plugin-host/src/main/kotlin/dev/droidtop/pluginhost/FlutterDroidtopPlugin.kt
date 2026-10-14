@@ -101,8 +101,8 @@ class FlutterDroidtopPlugin internal constructor(
     // flutter_embed plugin, the acquire_content UI's own first real
     // caller. Every flutter_embed plugin's own Dart entrypoint MUST call
     // `_channel.invokeMethod("ready")` as the very first thing it does
-    // after `setMethodCallHandler` (see samples/plugin-sample-flutter-
-    // statustile's own main.dart) -- this is now part of the
+    // after `setMethodCallHandler` (the contract is documented
+    // in docs/plugin-api.md) -- this is part of the
     // flutter_embed contract, documented in docs/SPEC.md 12a. No sleep,
     // no polling: [onLoad] blocks the CALLING thread (never the main
     // thread, which must stay free to deliver that very "ready" call)

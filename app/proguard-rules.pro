@@ -49,8 +49,8 @@
 # compiled against the plugin API and links kotlin.* from droidtop's own class
 # loader (its loader is parented to droidtop's), so droidtop provides all of
 # it, not only the parts its own code happens to call. Shrinking it removed
-# kotlin.collections.MapsKt from build 1535, and the CI-signed status tile
-# sample was disabled at once with "Failed resolution of:
+# kotlin.collections.MapsKt from build 1535, and a CI-signed status tile plugin
+# was disabled at once with "Failed resolution of:
 # Lkotlin/collections/MapsKt;" (BlueStacks, Droidtop/tracker#378).
 -keep class kotlin.** { *; }
 

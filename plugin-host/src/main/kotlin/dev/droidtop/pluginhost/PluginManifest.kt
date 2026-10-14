@@ -27,7 +27,7 @@ data class PluginPayloadFile(val path: String, val sha256: String)
  * [dev.droidtop.library.integrations.Integration.fromJson] uses.
  */
 data class PluginManifest(
-    /** Stable id, namespaced by origin (checklist point 2): "<origin>.<name>", e.g. "droidtop.sample-statustile". */
+    /** Stable id, namespaced by origin (checklist point 2): "<origin>.<name>", e.g. "droidtop.statustile". */
     val id: String,
     val origin: String,
     val label: String,

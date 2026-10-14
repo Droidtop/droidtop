@@ -1080,9 +1080,9 @@ neither of them specific to the new widget:
    "read-only" as if this were already true, and now it actually is.
 
 Rig-verified on emulator-5560 end to end, the user way: installed and
-approved the real `plugin-sample-statustile` bundle through Settings'
+approved a real status tile bundle through Settings'
 own file picker, placed "Plugin status" from the stock widget picker,
-and it showed "Sample tile: loaded 1 time(s), called OK" -- a real
+and it showed "loaded 1 time(s), called OK" -- a real
 `invoke()` round trip through the isolated `:pluginhost` process,
 rendered on the home screen.
 
@@ -1090,7 +1090,7 @@ Scoped to status tiles only this pass, not search providers or app
 actions: `PluginCapability` has no search-provider capability defined at
 all (adding one here would be inventing API surface, not building
 against the real one -- a decision for whoever owns §12a next), and app
-actions (`PluginCapability.APP_STATUS`) has no real sample plugin yet to
+actions (`PluginCapability.APP_STATUS`) has no real plugin yet to
 verify against. Both left open.
 
 **A real "Recent" row in the app drawer (built this change).**
@@ -14699,8 +14699,7 @@ live connection saying something happened) is refused unless the caller
 declares `social.provider` and that point is on; droidtop then asks it again
 off the binder thread. A plugin that wants to stay connected in the
 background declares a `jobs.service@1` entry (12a "Plugins in every mode"):
-droidtop keeps it running while the person allows it. The sample is
-`samples/plugin-sample-py-social` (a fake service; CI tests and builds it).
+droidtop keeps it running while the person allows it.
 
 ### Social: messages from your apps (decided 2026-10-08, Droidtop/tracker#329)
 
@@ -17384,8 +17383,8 @@ Droidtop/tracker#400).** A disable is evidence about the plugin and the
 droidtop that ran it, so the record keeps the build that disabled it
 (`PluginRecord.disabledBuild`) and a newer build switches the plugin back
 on once at start (`PluginStore.retryAfterHostUpdate`); if it fails again it
-is disabled again under the new build. Rig: build 1535 disabled the sample
-status tile because R8 had shrunk the Kotlin standard library it links
+is disabled again under the new build. Rig: build 1535 disabled a status
+tile plugin because R8 had shrunk the Kotlin standard library it links
 against, build 1649 fixed that, and the plugin still read "Crashed" for ever
 because nothing re-enabled it. The list says "Stopped", or "Needs an update"
 when the catalog has a newer version of it (or when it is a contract 2 plugin
@@ -17480,17 +17479,11 @@ one runner per kind:
     downloaded yet fails to load with that reason, same non-crashing
     "not ready" signal a native_bundle plugin's own connection failure
     already produces — it does not disable the plugin.
-  - **Sample**: `samples/plugin-sample-py-statustile`, the python
-    analogue of `plugin-sample-statustile`; its `build.sh` needs no
-    compiler at all (a python-kind plugin's payload is its own source),
-    so the `sample-plugin-python` CI job runs it with no Android
-    SDK/NDK setup.
   - **Jobs (built 2026-10-01, Droidtop/tracker#64)**: Python jobs run on
     interpreter-owned worker threads so the binder call can poll live
     progress while the plugin's work runs. `cancel_job(job_id)` is called
     from the runtime's cancellation path; plugins cooperate by checking
-    their own cancellation state. The Python sample exposes a cancellable
-    job from its contract 2 settings page. A catalog-repo install source
+    their own cancellation state. A catalog-repo install source
     for the runtime itself (today's pinned
     single version in `python-runtimes.json` is hand-updated, matching
     how plugin bundles themselves are installed today).
@@ -17774,14 +17767,9 @@ take.
   A plugin learns system ids, names, game counts and emulator facts, never
   a title, a path or an entry id. A plugin that cannot have the permission
   keeps working from the event-fed list.
-- **Samples** (`samples/plugin-sample-statustile` 1.1.0,
-  `samples/plugin-sample-py-statustile` 1.2.0) show a panel, and the native
-  sample also a game section, a Home shelf and a toast. The Python sample's
-  panel has a "Say hello as a toast" button that calls `ui.toast` through
-  `droidtop.host.call`; `sample-plugin-python` CI runs its unit test against
-  a fake `droidtop` module. Any python plugin can provide `ui.panel`,
-  `ui.game_section` and `gaming.rows` through `handle` like a native one,
-  since the adapter serialises the envelope and nothing else.
+- Any python plugin can provide `ui.panel`, `ui.game_section` and
+  `gaming.rows` through `handle` like a native one, since the adapter
+  serialises the envelope and nothing else.
 
 **Plugins in every mode (decided 2026-10-08, Droidtop/tracker#53;
 `docs/plugin-api.md` 1.9, E8, E9, G1, J4).** The owner: "they need to be
@@ -18054,8 +18042,16 @@ the secondary path for sources that publish no key.
   paste/file path never replaces at all — a different key for an origin
   you already trust is refused with that reason; rotating by hand means
   removing the origin and adding it again, two explicit steps.
+- **droidtop ships no sample plugins (owner, 2026-10-14: "get rid of the sample
+  plugins").** The native, python, flutter and social samples under `samples/`,
+  their CI jobs and the sample-manifest check are gone; nothing is preinstalled
+  or offered as a demo, and the catalog indexes carry none. `docs/plugin-api.md`
+  stays the authors' reference. Anything a test needs from a plugin is a fixture
+  under the test directories (`plugin-host/src/test`, `library-core/src/test`),
+  never a packaged plugin. A new plugin repository starts from the contract in
+  `docs/plugin-api.md`, not from a droidtop-hosted sample.
 - **Plugin bundles are signed by CI (owner, 2026-10-07).** Official plugin
-  repos and droidtop's own samples sign in their GitHub Actions jobs, not by
+  repos sign in their GitHub Actions jobs, not by
   hand: the repo secret `PLUGIN_SIGNING_KEY` (that plugin's origin EC private
   key PEM) is written to a 600 temp file inside the job, `sign.sh` produces
   the `.droidplugin.tar.xz`, and an `always()` step deletes the file. Every
@@ -18908,18 +18904,10 @@ all from Settings → Plugins, "The catalog" above),
 the `native_bundle` runner (isolated process, binder API, crash
 containment via `PluginCrashPolicy`), the job shape, the `python` runner
 (`PythonRuntimeManager`, the `plugin-host/native` dlopen bridge,
-`PythonDroidtopPlugin`, above), and two sample plugins
-(`samples/plugin-sample-statustile` for `native_bundle`,
-`samples/plugin-sample-py-statustile` for `python`) each exercising
-`status_tile` end to end, including a deliberate forced crash for testing
-the disable path. Both samples are built and signed by CI
-(`sample-plugin`, `sample-plugin-python` in
-`.github/workflows/android-build.yml`, using each sample's own `sign.sh`)
-into an installable `.droidplugin.tar.xz`; see "Plugin bundles are signed by CI" below. The `flutter_embed` runner (`FlutterRuntimeManager`,
-`FlutterDroidtopPlugin`, above) and its own sample
-(`samples/plugin-sample-flutter-statustile`) are built and rig-verified
-the same way (`dq-flutterembed-01` — see "The `flutter_embed` kind"
-below), including `startJob` (built 2026-09-26, above). Built 2026-09-28:
+`PythonDroidtopPlugin`, above). Plugins are built and signed in their own
+repositories (see "Plugin bundles are signed by CI" below). The `flutter_embed` runner (`FlutterRuntimeManager`,
+`FlutterDroidtopPlugin`, above) was rig-verified (`dq-flutterembed-01`
+-- see "The `flutter_embed` kind" below), including `startJob` (built 2026-09-26, above). Built 2026-09-28:
 the user-trusted origin keys ("Keys you trust", above) — the store, the
 official-first resolution, the source-key fetch with its TOFU confirm
 and changed-key warning, and the trust badge on the Plugins screen.
@@ -19208,7 +19196,7 @@ unused on the python path"). Fixed by defaulting to `""` for that case
 instead of bailing out, the same "unused" placeholder the service side
 already assumed the caller would send.
 
-Re-verified on BlueStacks with the signed `plugin-sample-py-statustile`
+Re-verified on BlueStacks with a signed python status tile
 bundle after this fix: the plugin now genuinely loaded, but its first
 real invoke() crashed `:pluginhost` outright with SIGSEGV (fault addr
 0x10, null pointer dereference, tombstone_14) — a second, separate bug in
@@ -19234,7 +19222,7 @@ keeps plugin-host's unstripped `libdroidtoppy.so` as its own artifact
 symbolised against the exact commit that built it.
 
 Re-verified end to end on BlueStacks after the GIL fix, fresh CI build:
-download the Python runtime, install and approve the signed sample
+download the Python runtime, install and approve the signed
 bundle, "Call ... status tile" now genuinely succeeds ("called OK",
 repeated calls stayed stable, no crash), and "Debug: force ... to crash"
 still disables the plugin the same as before — droidtop's main process
@@ -19349,11 +19337,7 @@ failure mode), checked byte-for-byte against
 disables the plugin with that reason rather than failing deep inside
 native engine init. Settings → Plugins gets the same "separate, explicit
 download" row shape the Python runtime already has
-(`AppSettingsCatalogs.kt`). Sample:
-`samples/plugin-sample-flutter-statustile`, a minimal Dart app (one
-`status_tile` handler) built by a pinned Flutter SDK in CI
-(`sample-plugin-flutter` job) and signed the same way every other sample
-is (`sign.sh`, run by CI with the repo secret).
+(`AppSettingsCatalogs.kt`).
 
 **The readiness handshake (found needed 2026-09-26, part of the
 flutter_embed contract).** The acquire_content UI's own first real
@@ -19366,14 +19350,13 @@ run far enough to call `setMethodCallHandler`. `FlutterDroidtopPlugin.
 onLoad()` used to return as soon as `executeDartEntrypoint` did, so the
 very next `invoke()`/`startJob()` call could be posted to the engine's
 platform thread before Dart's own handler existed at all -- a real race,
-not a timing coincidence specific to one plugin (the trivial sample's own
+not a timing coincidence specific to one plugin (the trivial plugin's own
 rig check, `dq-flutterembed-01`, happened not to call `invoke()`
 immediately enough after load to hit it).
 
 Fixed with a no-sleep, no-polling handshake: every flutter_embed plugin's
 Dart entrypoint MUST call `_channel.invokeMethod('ready')` as the very
-first thing it does right after `setMethodCallHandler` (`samples/
-plugin-sample-flutter-statustile/lib/main.dart` does this now).
+first thing it does right after `setMethodCallHandler`.
 `FlutterDroidtopPlugin.onLoad()` creates a `CountDownLatch` right before
 `executeDartEntrypoint`, registers a `"ready"` handler in its own
 `handleIncomingCall` dispatch that counts it down, and -- after
@@ -19465,7 +19448,7 @@ and fixed before a flutter_embed plugin could actually run at all:**
    `FlutterEngine` constructor that just ran -- instead of calling
    `createDefault()`.
 
-After all three fixes: the signed sample plugin's real Dart code ran
+After all three fixes: a signed plugin's real Dart code ran
 inside `:pluginhost` and returned its real value ("Hello from Dart,
 running inside :pluginhost (flutter_embed)"), confirming `flutter_assets`
 loading from outside the APK works (point 1 above, "Rig-verified" in
@@ -19478,13 +19461,13 @@ containment shape the `native_bundle` and `python` kinds' own rig checks
 already confirmed.
 
 **Open question for a real Flutter/Dart app being embedded this way:**
-this build's own sample only exercises `status_tile`, the simplest
+that rig check only exercised `status_tile`, the simplest
 capability, over one MethodChannel handler for `"invoke"`. A real app
 being adapted this way still needs to work out how its own capability
 calls map onto that Dart `main()`/`"invoke"` handler, and whether its own
 Dart dependencies (image/network libraries with their OWN native code)
 fit inside a single `FlutterEngine`'s asset/native-lib model the same way
-this sample's trivial UI-less Dart does — untested here, and specific to
+a trivial UI-less Dart does — untested here, and specific to
 whatever plugin is being built, not this runner itself.
 
 **Search fan-out, the Sources API and the Recommendations API
@@ -19543,9 +19526,7 @@ interface GameSourceProvider {
   adapters (Steam/GOG/Epic/Amazon/itch/DLsite, and later official
   re-release markets) as further `GameSourceProvider` implementations —
   each needs its own store search/catalog API or scrape, separate
-  infrastructure from this interface; a dedicated per-kind `source`
-  sample plugin beyond the existing `acquire_content` wire contract
-  samples already exercise; a distinct `recommender` plugin capability
+  infrastructure from this interface; a distinct `recommender` plugin capability
   (Recommendations stays droidtop's own and plugin-independent by owner
   directive below, so this is not planned unless that direction changes).
   Tracked on Droidtop/tracker (see the Recommendations issue below).

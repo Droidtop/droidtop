@@ -35,14 +35,14 @@ class PluginBundleInstallerTest {
     ): File {
         val classesSha = Sha256.hex(payloadBytes)
         val manifestJson = JSONObject().apply {
-            put("id", "$origin.sample-statustile")
+            put("id", "$origin.statustile")
             put("origin", origin)
-            put("label", "Sample status tile")
+            put("label", "Status tile")
             put("kind", "native_bundle")
             put("capabilities", JSONArray(listOf("status_tile")))
             put("contractVersion", PLUGIN_CONTRACT_VERSION)
             put("abis", JSONArray(listOf("arm64-v8a", "x86_64")))
-            put("entryClass", "dev.droidtop.samples.statustile.StatusTilePlugin")
+            put("entryClass", "dev.droidtop.testplugin.StatusTilePlugin")
             put("payload", JSONArray(listOf(JSONObject().put("path", "classes.jar").put("sha256", classesSha))))
         }
         manifestOverride(manifestJson)
@@ -88,7 +88,7 @@ class PluginBundleInstallerTest {
             assertTrue(result is PluginInstallResult.Installed)
             val record = (result as PluginInstallResult.Installed).record
             assertEquals(PluginTrustState.PENDING, record.trust)
-            val extracted = File(pluginsRoot, "testorigin.sample-statustile/classes.jar")
+            val extracted = File(pluginsRoot, "testorigin.statustile/classes.jar")
             assertTrue(extracted.isFile)
             assertTrue(extracted.readBytes().contentEquals(classesJarBytes))
         }
@@ -132,7 +132,7 @@ class PluginBundleInstallerTest {
 
         // An update (different bytes, same origin, same key) verifies while the key is trusted...
         val update = PluginBundleInstaller.install(
-            buildBundle("acme", pair.private, manifestOverride = { it.put("label", "Sample status tile v2") }),
+            buildBundle("acme", pair.private, manifestOverride = { it.put("label", "Status tile v2") }),
             pluginsRoot,
             userKeys,
         )
@@ -188,7 +188,7 @@ class PluginBundleInstallerTest {
         val pluginsRoot = tmp.newFolder("plugins")
         PluginOriginKeys.withOrigin("testorigin", Base64.getEncoder().encodeToString(pair.public.encoded)) {
             PluginOriginKeys.withOrigin("otherorigin", Base64.getEncoder().encodeToString(other.public.encoded)) {
-                // First install under "testorigin" claims testorigin.sample-statustile.
+                // First install under "testorigin" claims testorigin.statustile.
                 PluginBundleInstaller.install(buildBundle("testorigin", pair.private), pluginsRoot)
                 // A same-id manifest but reporting a different origin should be refused,
                 // since fromJson's own namespace check ties id to origin the manifest itself
@@ -198,7 +198,7 @@ class PluginBundleInstallerTest {
                 // happens to collide is not constructible here, so this test instead confirms
                 // a genuinely different origin cannot silently take over an id namespaced to
                 // the first.
-                val collidingManifest: (JSONObject) -> Unit = { json -> json.put("id", "testorigin.sample-statustile") }
+                val collidingManifest: (JSONObject) -> Unit = { json -> json.put("id", "testorigin.statustile") }
                 val result = PluginBundleInstaller.install(
                     buildBundle("otherorigin", other.private, manifestOverride = collidingManifest),
                     pluginsRoot,
@@ -224,7 +224,7 @@ class PluginBundleInstallerTest {
             // access could always do, or this write fails with
             // FileNotFoundException (permission denied) before ever reaching
             // the check this test is actually exercising.
-            val edited = File(pluginsRoot, "testorigin.sample-statustile/classes.jar")
+            val edited = File(pluginsRoot, "testorigin.statustile/classes.jar")
             edited.setWritable(true)
             edited.writeBytes("edited on disk".toByteArray())
             val problem = PluginBundleInstaller.verifyInstalled(pluginsRoot, record)
