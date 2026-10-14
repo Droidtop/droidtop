@@ -192,13 +192,13 @@ object GamingSettingsCatalog {
                         },
                     ),
                 )
-                // The optional passkey for leaving Kid and Kiosk (UiModePasskey): digits, stored hashed. Its row
+                // The optional passkey for leaving Kid, Kiosk and Guest (UiModePasskey): digits, stored hashed. Its row
                 // says whether one is set, never what it is, and how to get out when it is forgotten.
                 val passkeySet = UiModePasskey.isSet(context)
                 add(
                     TextInputItem(
                         id = ControlAccess.ID_UI_MODE_PASSKEY,
-                        title = "Passkey to leave Kid and Kiosk",
+                        title = "Passkey to leave Kid, Kiosk and Guest",
                         subtitle = (
                             if (passkeySet) {
                                 "Set: leaving asks for it. Clear the field to remove it. "

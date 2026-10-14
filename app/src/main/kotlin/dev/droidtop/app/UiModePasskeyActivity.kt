@@ -120,6 +120,7 @@ private fun PasskeyEntry(onDone: () -> Unit) {
             val modeLabel = when (loaded?.first) {
                 UiMode.KID -> "Kid"
                 UiMode.KIOSK -> "Kiosk"
+                UiMode.GUEST -> "Guest"
                 else -> "this mode"
             }
             Text("Passkey to leave $modeLabel", style = MaterialTheme.typography.titleMedium, color = colors.onSurface)

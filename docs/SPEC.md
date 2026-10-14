@@ -9679,8 +9679,7 @@ System tab.
 
 **UI modes and ControlAccess (decided 2026-10-09, Droidtop/tracker#414).**
 `ControlAccess` (`:runtime-common`) is the one restriction model. It takes
-the UI mode as a value (Full, Kid, Kiosk; Guest is reserved and gets its
-rules when it is defined, Droidtop/tracker#420) and answers, for the
+the UI mode as a value (Full, Kid, Kiosk, Guest) and answers, for the
 companion and the Quick Menu alike: which panels show (`ControlPanel`, the
 companion's tabs and the Quick Menu's sections named once), which panels
 are read-only, which non-catalog rows show inside them (`ControlRow`),
@@ -9700,11 +9699,23 @@ sets, so an added mode fails until its sets are written.
   companion's own preferences (the Companion catalog group), Kid's volume
   cap, the passkey and the UI mode choice. The way out (Leave Kid, Leave
   Kiosk on the Quick Menu's System section) stays.
+- **Guest (decided 2026-10-14, Droidtop/tracker#420).** For somebody else's
+  hands on the owner's handheld. Kid's limits, but the whole library
+  (`kidGamesOnly` off) and none of Kid's own parts: no volume cap and no
+  play-time limit (7f "Play-time limits"), and no passkey of its own. Settings
+  and the places (Game sources, Social, Downloads and installs, Updates,
+  Plugins) are hidden as in Kid, so there are no stores, accounts or plugin
+  installs, and the companion shows Home, Game and Performance as in Kid.
+  Because the owner's private things are on the Quick Menu, Guest drops its
+  Notifications, Social, Plugins and Downloads sections (Kid and Kiosk keep
+  every section, as before). It is chosen from the UI mode choice like the
+  others, and leaving it is the same Leave row: with the Kid and Kiosk
+  passkey set it asks for it, with none it asks yes or no.
 - **Passkey (decided 2026-10-09, Droidtop/tracker#414 owner question 4,
   on its default).** ES-DE asks for a passkey to leave its Kid and Kiosk
   modes (`UIModeController`); droidtop had chosen no passcode. Now an
   optional one, none by default (`UiModePasskey`): Settings > "Passkey to
-  leave Kid and Kiosk" takes 4 to 8 digits, stored as a salted SHA-256,
+  leave Kid, Kiosk and Guest" takes 4 to 8 digits, stored as a salted SHA-256,
   never the digits, and its row says only whether one is set, with the
   recovery line "Forgot it? Android Settings > Apps > droidtop > Clear
   storage resets droidtop's settings." With none set, Leave asks yes or no

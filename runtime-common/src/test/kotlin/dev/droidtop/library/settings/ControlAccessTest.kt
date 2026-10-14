@@ -12,8 +12,8 @@ class ControlAccessTest {
     private val restrictedRows = setOf(ControlRow.PINS, ControlRow.GAME_RESUME, ControlRow.GAME_QUIT, ControlRow.STATS)
 
     /**
-     * Every mode's sets, written out. A mode added to [UiMode] (Guest is reserved) is missing here and fails
-     * this test until its sets are decided and written down.
+     * Every mode's sets, written out. A mode added to [UiMode] is missing here and fails this test until its
+     * sets are decided and written down.
      */
     private val expected: Map<UiMode, Triple<Set<ControlPanel>, Set<ControlPanel>, Set<ControlRow>>> = mapOf(
         UiMode.FULL to Triple(
@@ -26,6 +26,12 @@ class ControlAccessTest {
         ),
         UiMode.KIOSK to Triple(restrictedCompanion, ControlPanel.entries.toSet(), restrictedRows),
         UiMode.KID to Triple(restrictedCompanion, ControlPanel.entries.toSet(), restrictedRows),
+        UiMode.GUEST to Triple(
+            restrictedCompanion,
+            ControlPanel.entries.toSet() -
+                setOf(ControlPanel.NOTIFICATIONS, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.DOWNLOADS),
+            restrictedRows,
+        ),
     )
 
     @Test
@@ -51,7 +57,7 @@ class ControlAccessTest {
     @Test
     fun `the items that control the restriction are hidden in Kid and Kiosk only`() {
         val ids = listOf(GamingSettingsCatalog.ID_UI_MODE, ControlAccess.ID_KID_VOLUME_CAP, ControlAccess.ID_UI_MODE_PASSKEY)
-        for (mode in listOf(UiMode.KID, UiMode.KIOSK)) {
+        for (mode in listOf(UiMode.KID, UiMode.KIOSK, UiMode.GUEST)) {
             ids.forEach { assertFalse("$mode shows $it", ControlAccess.shows(mode, it)) }
             assertFalse(ControlAccess.shows(mode, "pref_companion_anything", ControlAccess.GROUP_COMPANION))
         }
@@ -89,8 +95,23 @@ class ControlAccessTest {
     @Test
     fun `UiMode reads its settings and kid-game answers from ControlAccess`() {
         assertFalse(UiMode.FULL.hidesSettings)
-        assertTrue(UiMode.KIOSK.hidesSettings && UiMode.KID.hidesSettings)
+        assertTrue(UiMode.KIOSK.hidesSettings && UiMode.KID.hidesSettings && UiMode.GUEST.hidesSettings)
         assertTrue(UiMode.KID.kidGamesOnly)
-        assertFalse(UiMode.KIOSK.kidGamesOnly || UiMode.FULL.kidGamesOnly)
+        assertFalse(UiMode.KIOSK.kidGamesOnly || UiMode.FULL.kidGamesOnly || UiMode.GUEST.kidGamesOnly)
+    }
+
+    @Test
+    fun `Guest has the whole library and Kid's restrictions, without the owner's private panels`() {
+        val guest = ControlAccess.rules(UiMode.GUEST)
+        assertFalse(guest.kidGamesOnly)
+        assertFalse(guest.settings)
+        assertTrue(guest.alwaysAsk)
+        assertFalse(guest.longPress || guest.openOnCompanion)
+        assertFalse(ControlAccess.panels(UiMode.GUEST, ControlSurface.COMPANION).contains(ControlPanel.SOCIAL))
+        for (panel in listOf(ControlPanel.NOTIFICATIONS, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.DOWNLOADS)) {
+            assertFalse("$panel", panel in ControlAccess.panels(UiMode.GUEST, ControlSurface.QUICK_MENU))
+        }
+        // Kid and Kiosk keep every Quick Menu section, as before.
+        assertEquals(ControlPanel.entries.toSet(), ControlAccess.panels(UiMode.KID, ControlSurface.QUICK_MENU))
     }
 }
