@@ -14031,8 +14031,23 @@ used, Recently installed.
   facts an app list reads (first install time, installer, Android's game
   and system flags) come from the one package pass the scan already makes
   (`InstalledAppFacts`), never per row.
-- Select on an app opens its Options (details, favourite, Mark as game);
-  the details screen is no longer a Y press.
+- Select on an app opens its Options (details, favourite, Mark as game, Hide from
+  droidtop, Uninstall); the details screen is no longer a Y press. **Hide** writes the
+  launcher's own hidden list (`AppHiding`, the list the scan and Standard's drawer read), so
+  one rule hides an app everywhere and the Filter's Hidden view brings it back (the row then
+  reads Show in droidtop). **Uninstall** is Android's own prompt (`startUninstall`, shared with
+  the app's details screen) and is offered only for an app Android will let go, never a system app.
+  The Filter sheet opens with Search, the same row every library list has, over the one search
+  dialog (Droidtop/tracker#498, #499).
+- **Apps opens on something.** A remembered built-in view that holds nothing (the Games view of
+  a person who has marked no game) lands on All once the counts are in (`appsLandingQuery`).
+  An empty list says what its view holds and how something gets into it (`appsEmptyMessage`: "No
+  games here. Select an app, then Mark as game"), A offers "Show all apps" on an empty view and
+  "Clear filters" only while filters no view stands for are set. The line under a tile's name is
+  the app's own declared category and nothing when it declares none, never the word "Android app"
+  on every tile (Droidtop/tracker#500). **Get apps** (the app catalogs, one registered screen
+  `AppCatalogScreen.ID`) is a chip at the foot of the list beside Get games and in the empty
+  state; the same screen stays under Updates, two doors to one screen (Droidtop/tracker#501).
 
 **Retro gamelists** keep ES-DE's own bindings on the themed canvas; their
 Select menu's "Sort by" and "Filter" rows open the same sheets over the

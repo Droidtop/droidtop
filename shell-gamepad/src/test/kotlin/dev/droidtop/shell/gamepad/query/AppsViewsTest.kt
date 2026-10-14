@@ -76,4 +76,27 @@ class AppsViewsTest {
         assertEquals("Running, 2 of 4", query.pillText(scope, shown = 2, total = 4))
         assertNull(LibraryQuery().pillText(scope, shown = 4, total = 4))
     }
+
+    @Test
+    fun `opening on a built-in view that holds nothing lands on All`() {
+        val views = appsStripViews(emptyList())
+        val gamesNone = appsViewQuery(views[1], LibraryQuery())
+        val counts = mapOf("All" to 4, "Games" to 0, "Emulators" to 1, "Tools" to 2, "Recently used" to 1)
+
+        assertEquals(views[0].query.facets, appsLandingQuery(views, gamesNone, counts)?.facets)
+        // A view with apps, All itself, a pill of other filters, and counts not in yet are left alone.
+        assertNull(appsLandingQuery(views, appsViewQuery(views[2], LibraryQuery()), counts))
+        assertNull(appsLandingQuery(views, LibraryQuery(), counts))
+        assertNull(appsLandingQuery(views, LibraryQuery().withToggled(LibraryFacet.RUNNING, RUNNING_YES, true), counts))
+        assertNull(appsLandingQuery(views, gamesNone, emptyMap()))
+    }
+
+    @Test
+    fun `an empty list says what its view holds, and Clear filters is for filters only`() {
+        assertEquals("No apps found yet", appsEmptyMessage(hasApps = false, view = null))
+        assertEquals("No games here. Select an app, then Mark as game", appsEmptyMessage(hasApps = true, view = APPS_VIEW_GAMES))
+        assertEquals("No emulators installed", appsEmptyMessage(hasApps = true, view = APPS_VIEW_EMULATORS))
+        assertEquals("Nothing in Night", appsEmptyMessage(hasApps = true, view = "Night"))
+        assertEquals("No apps match these filters", appsEmptyMessage(hasApps = true, view = null))
+    }
 }

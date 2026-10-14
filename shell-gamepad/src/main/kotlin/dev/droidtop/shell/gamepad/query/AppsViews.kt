@@ -59,3 +59,30 @@ internal fun appsActiveView(views: List<NamedLibraryView>, query: LibraryQuery):
  */
 internal fun appsViewQuery(view: NamedLibraryView, current: LibraryQuery): LibraryQuery =
     if (appsBuiltInViews.any { it.name == view.name }) current.copy(text = view.query.text, facets = view.query.facets) else view.query
+
+/**
+ * What opening Apps shows: the remembered view, unless it is a built-in one that holds nothing (the
+ * Games tab of a person who has marked none), which opened onto "No apps match these filters" with
+ * nothing filtered (Droidtop/tracker#500). Then All. Null leaves the query as it is. [counts] is
+ * [appsViewCounts]; an empty map means the counts are not in yet, and nothing is decided.
+ */
+internal fun appsLandingQuery(views: List<NamedLibraryView>, query: LibraryQuery, counts: Map<String, Int>): LibraryQuery? {
+    if (counts.isEmpty()) return null
+    val active = appsActiveView(views, query)
+    if (active <= 0 || views[active].name !in appsBuiltInViews.map { it.name }) return null
+    return if (counts[views[active].name] == 0) appsViewQuery(views[0], query) else null
+}
+
+/**
+ * What an empty Apps list says: what the lit view holds and how something gets into it, or that the
+ * filters leave nothing. [view] is the lit view's name, null while a search or filters no view stands
+ * for are set.
+ */
+internal fun appsEmptyMessage(hasApps: Boolean, view: String?): String = when {
+    !hasApps -> "No apps found yet"
+    view == APPS_VIEW_GAMES -> "No games here. Select an app, then Mark as game"
+    view == APPS_VIEW_EMULATORS -> "No emulators installed"
+    view == APPS_VIEW_RECENT -> "Nothing used recently"
+    view != null -> "Nothing in $view"
+    else -> "No apps match these filters"
+}

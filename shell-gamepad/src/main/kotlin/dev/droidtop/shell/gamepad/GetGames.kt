@@ -99,3 +99,21 @@ internal fun GetGamesSheet(
         onChanged()
     }
 }
+
+/**
+ * "Get apps" as a chip: the app catalogs screen (F-Droid, GitHub, whatever the plugins add) that also
+ * lives under Updates, one registered screen with two doors (Droidtop/tracker#501).
+ */
+@Composable
+internal fun GetAppsChip(modifier: Modifier = Modifier) {
+    var open by remember { mutableStateOf(false) }
+    ShellChip("Get apps", modifier = modifier, onClick = { open = true })
+    if (open) {
+        val screen = remember { SettingsScreenRegistry.get(dev.droidtop.library.integrations.AppCatalogScreen.ID) }
+        if (screen == null) {
+            androidx.compose.runtime.LaunchedEffect(Unit) { open = false }
+        } else {
+            CatalogSheet(screen) { open = false }
+        }
+    }
+}

@@ -20,7 +20,8 @@ import dev.droidtop.shell.gamepad.input.HintBinding
  * Select on an app: the focused app's own menu (docs/SPEC.md 7j, "Filters,
  * sort and the hint bar"). Its details, its favourite, and Mark as game
  * (the Apps view's Category filter seeds Games from Android's own flag and
- * droidtop's lists; this is the person's override, also on a long press).
+ * droidtop's lists; this is the person's override, also on a long press),
+ * then Hide from droidtop and Uninstall (Android's own prompt) for an installed app.
  * Controller-first like every menu here: Up/Down moves, A chooses, B closes,
  * and every row is a touch target.
  */
@@ -33,11 +34,15 @@ internal fun AppOptionsMenu(
     isGame: Boolean = false,
     // Null where the caller has no category to mark (Home's mixed shelves).
     onMarkGame: (() -> Unit)? = null,
+    // Null where the caller does not manage installed apps (Hide, Uninstall).
+    hidden: Boolean = false,
+    onToggleHidden: (() -> Unit)? = null,
+    onUninstall: (() -> Unit)? = null,
     detailsLabel: String = "App details",
 ) {
     class Option(val title: String, val subtitle: String?, val onClick: () -> Unit)
 
-    val options = remember(entry, isGame, detailsLabel) {
+    val options = remember(entry, isGame, hidden, detailsLabel) {
         buildList<Option> {
             add(Option(detailsLabel, null, onDetails))
             add(Option(if (entry.favorite) "Remove from favourites" else "Add to favourites", null, onToggleFavorite))
@@ -51,6 +56,17 @@ internal fun AppOptionsMenu(
                     },
                 )
             }
+            if (entry.appFacts != null && onToggleHidden != null) {
+                add(
+                    if (hidden) {
+                        Option("Show in droidtop", null, onToggleHidden)
+                    } else {
+                        Option("Hide from droidtop", "Filter, then Hidden, brings it back", onToggleHidden)
+                    },
+                )
+            }
+            // Android refuses to uninstall a system app, so the row is only for the ones it will take.
+            if (entry.appFacts?.system == false && onUninstall != null) add(Option("Uninstall", null, onUninstall))
             add(Option("Close", null, onDismiss))
         }
     }
@@ -87,5 +103,17 @@ internal fun AppOptionsMenu(
                 )
             }
         }
+    }
+}
+
+/** Android's own uninstall prompt for [packageName]; it asks its own confirmation and refuses a system app. */
+internal fun startUninstall(context: android.content.Context, packageName: String) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(
+                android.content.Intent.ACTION_DELETE,
+                android.net.Uri.fromParts("package", packageName, null),
+            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }

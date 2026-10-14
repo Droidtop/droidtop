@@ -93,7 +93,10 @@ import dev.droidtop.shell.gamepad.query.LibraryViewPrefs
 import dev.droidtop.shell.gamepad.query.retroQueryScope
 import dev.droidtop.shell.gamepad.query.LibrarySortSheet
 import dev.droidtop.shell.gamepad.query.PersistQuery
+import dev.droidtop.shell.gamepad.query.LibrarySearchDialog
 import dev.droidtop.shell.gamepad.query.appsActiveView
+import dev.droidtop.shell.gamepad.query.appsEmptyMessage
+import dev.droidtop.shell.gamepad.query.appsLandingQuery
 import dev.droidtop.shell.gamepad.query.appsStripLabel
 import dev.droidtop.shell.gamepad.query.appsStripViews
 import dev.droidtop.shell.gamepad.query.appsViewCounts
@@ -1940,16 +1943,7 @@ private fun EntryDetailScreen(
                         )
                     }
                 })
-                ShellChip("Uninstall", onClick = {
-                    runCatching {
-                        context.startActivity(
-                            android.content.Intent(
-                                android.content.Intent.ACTION_DELETE,
-                                android.net.Uri.fromParts("package", entry.id, null),
-                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
-                    }
-                })
+                ShellChip("Uninstall", onClick = { startUninstall(context, entry.id) })
             }
         }
         (pluginActionStatus ?: scrapeStatus ?: scrapeResult)?.let {
@@ -3448,6 +3442,13 @@ private fun AppsSection(
     val running by TaskManager.snapshot.collectAsState()
     val runningPackages = remember(running) { running?.apps?.mapTo(HashSet()) { it.packageName }.orEmpty() }
 
+    // Apps hidden or shown from the options menu in this visit: the list follows at once, and the
+    // launcher's own hidden list (written off the main thread) is what the next scan reads.
+    var hiddenNow by remember { mutableStateOf(emptyMap<String, Boolean>()) }
+    val apps = remember(entries, hiddenNow) {
+        if (hiddenNow.isEmpty()) entries else entries.map { e -> hiddenNow[e.id]?.let { e.copy(hidden = it) } ?: e }
+    }
+
     var query by remember { mutableStateOf(LibraryQuery()) }
     var queryLoaded by remember { mutableStateOf(false) }
     PersistQuery(APPS_SCOPE_ID, query, queryLoaded) {
@@ -3472,20 +3473,40 @@ private fun AppsSection(
     }
     val scope = remember(rules, usage, runningPackages) { appsQueryScope(rules, usage, runningPackages) }
 
-    val shown by produceState<List<LibraryEntry>?>(null, entries, query, scope) {
-        value = withContext(Dispatchers.Default) { query.applyTo(entries, scope) }
+    val shown by produceState<List<LibraryEntry>?>(null, apps, query, scope) {
+        value = withContext(Dispatchers.Default) { query.applyTo(apps, scope) }
     }
-    val total = remember(entries, query, scope) { query.totalIn(entries, scope) }
+    val total = remember(apps, query, scope) { query.totalIn(apps, scope) }
     // The strip's views and their counts (docs/SPEC.md 7j).
     val views = remember(savedViews.views) { appsStripViews(savedViews.views) }
-    val counts by produceState(emptyMap<String, Int>(), entries, scope, views) {
-        value = withContext(Dispatchers.Default) { appsViewCounts(entries, scope, views) }
+    val counts by produceState(emptyMap<String, Int>(), apps, scope, views) {
+        value = withContext(Dispatchers.Default) { appsViewCounts(apps, scope, views) }
+    }
+    // Opening on a view that holds nothing lands on All instead, once the counts are in.
+    var landed by remember { mutableStateOf(false) }
+    LaunchedEffect(counts, queryLoaded) {
+        if (landed || !queryLoaded || counts.isEmpty()) return@LaunchedEffect
+        landed = true
+        appsLandingQuery(views, query, counts)?.let { query = it }
     }
 
     var filterOpen by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }
     var sortOpen by remember { mutableStateOf(false) }
     LaunchedEffect(filterOpen) { TaskManager.refresh(context) }
     var optionsFor by remember { mutableStateOf<LibraryEntry?>(null) }
+
+    val toggleHidden: (LibraryEntry) -> Unit = { entry ->
+        val nowHidden = !entry.hidden
+        hiddenNow = hiddenNow + (entry.id to nowHidden)
+        coroutineScope.launch {
+            withContext(Dispatchers.IO) { dev.droidtop.library.AppHiding.set(context, entry.id, nowHidden) }
+            dev.droidtop.shell.gamepad.theme.shellToast(
+                context,
+                if (nowHidden) "${entry.title} hidden" else "${entry.title} shown",
+            )
+        }
+    }
 
     // "Mark as game" from a long press and from the app's options: the
     // one answer is stored, then the category rules reload.
@@ -3560,9 +3581,11 @@ private fun AppsSection(
             modifier = Modifier.padding(top = MenuTokens.SectionListTopGap),
         )
         if (list.isEmpty()) {
-            val emptyHints = remember {
+            // A lit view is not a filter: only what no view stands for is cleared, and an empty view
+            // offers All (Droidtop/tracker#500).
+            val emptyHints = remember(activeView) {
                 listOf(
-                    HintBinding(GamepadAction.A, "Clear filters") { !query.isEmpty },
+                    HintBinding(GamepadAction.A, if (activeView > 0) "Show all apps" else "Clear filters") { activeView > 0 || !query.isEmpty },
                     HintBinding(GamepadAction.X, "Filter"),
                     HintBinding(GamepadAction.Y, "Sort By"),
                 )
@@ -3574,7 +3597,10 @@ private fun AppsSection(
                     .focusRequester(emptyFocus)
                     .declaresHints(emptyHints)
                     .onPad { press ->
-                        if (press.action == GamepadAction.A && !query.isEmpty) {
+                        if (press.action == GamepadAction.A && activeView > 0) {
+                            query = appsViewQuery(views[0], query)
+                            true
+                        } else if (press.action == GamepadAction.A && !query.isEmpty) {
                             query = query.cleared
                             true
                         } else {
@@ -3584,10 +3610,13 @@ private fun AppsSection(
                     .focusable(),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    if (entries.isEmpty()) "No apps found yet." else "No apps match these filters",
-                    color = MenuTokens.OnSurfaceMuted,
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(
+                        appsEmptyMessage(apps.isNotEmpty(), views.getOrNull(activeView)?.name),
+                        color = MenuTokens.OnSurfaceMuted,
+                    )
+                    if (apps.isEmpty()) GetAppsChip()
+                }
             }
         } else {
             var firstAssigned = false
@@ -3628,11 +3657,15 @@ private fun AppsSection(
                     firstAssigned = true
                 }
                 // Games are not apps, but this is where a person on the Apps tab looks for more of anything.
+                // The app catalogs are one screen with two doors, here and under Updates (tracker#501).
                 item(key = "get_games") {
-                    GetGamesChip(
-                        dev.droidtop.library.integrations.GetGamesContext.APPS,
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding),
-                    )
+                    ) {
+                        GetAppsChip()
+                        GetGamesChip(dev.droidtop.library.integrations.GetGamesContext.APPS)
+                    }
                 }
             }
         }
@@ -3646,13 +3679,17 @@ private fun AppsSection(
         )
         LibraryFilterSheet(
             scope = scope,
-            base = entries,
+            base = apps,
             query = query,
             savedViews = savedViews.views,
             onQueryChange = { query = it },
             onSaveView = { savedViews.save(it, query) },
             onForgetView = { savedViews.forget(it) },
-            onSearch = null,
+            // The same Search row every library list's Filter opens with (tracker#498).
+            onSearch = {
+                filterOpen = false
+                searchOpen = true
+            },
             onDismiss = {
                 filterOpen = false
                 // Back from the system's Usage access screen lands here.
@@ -3664,6 +3701,15 @@ private fun AppsSection(
     }
     if (sortOpen) {
         LibrarySortSheet(scope = scope, query = query, onQueryChange = { query = it }, onDismiss = { sortOpen = false })
+    }
+    if (searchOpen) {
+        LibrarySearchDialog(
+            query = query,
+            matchCount = list.size,
+            totalCount = total,
+            onTextChange = { query = query.copy(text = it) },
+            onDismiss = { searchOpen = false },
+        )
     }
     optionsFor?.let { entry ->
         AppOptionsMenu(
@@ -3680,6 +3726,15 @@ private fun AppsSection(
             onMarkGame = {
                 optionsFor = null
                 markGame(entry)
+            },
+            hidden = entry.hidden,
+            onToggleHidden = {
+                optionsFor = null
+                toggleHidden(entry)
+            },
+            onUninstall = {
+                optionsFor = null
+                startUninstall(context, entry.id)
             },
             onDismiss = { optionsFor = null },
         )
@@ -3851,14 +3906,18 @@ private fun AppIconTile(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp).focusMarquee(focused),
         )
-        Text(
-            entry.kindLine(),
-            color = MenuTokens.OnSurfaceMuted,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.focusMarquee(focused),
-        )
+        // An app that declares no category says nothing: "Android app" under every tile said nothing
+        // about this one (tracker#500).
+        entry.genre?.takeIf { it.isNotBlank() }?.let { line ->
+            Text(
+                line,
+                color = MenuTokens.OnSurfaceMuted,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.focusMarquee(focused),
+            )
+        }
     }
 }
 
