@@ -32,8 +32,52 @@ class AppCloserTest {
     private val killed = mutableListOf<String>()
     private val closed = mutableListOf<String>()
 
+    private var endGameAnswer: Boolean? = null
+    private var endGameAsks = 0
+
     private fun closer(ops: PrivilegedShell, killWorks: Boolean = true) =
-        AppCloser(ops, killBackground = { killed += it; killWorks }, onClosed = { closed += it })
+        AppCloser(
+            ops,
+            killBackground = { killed += it; killWorks },
+            endEnginehostGame = { endGameAsks++; endGameAnswer },
+            onClosed = { closed += it },
+        )
+
+    @Test
+    fun `an engine game Enginehost ended without a helper is Closed`() {
+        endGameAnswer = true
+
+        val outcome = closer(FakeOps(TaskPrivileges.NONE)).close(TaskPolicy.ENGINEHOST_PACKAGE)
+
+        assertEquals(CloseOutcome.Closed, outcome)
+        assertTrue(killed.isEmpty())
+        assertEquals(listOf(TaskPolicy.ENGINEHOST_PACKAGE), closed)
+    }
+
+    @Test
+    fun `when Enginehost had no game or could not be asked the close is only asked of Android`() {
+        for (answer in listOf(false, null)) {
+            endGameAnswer = answer
+            killed.clear()
+
+            val outcome = closer(FakeOps(TaskPrivileges.NONE)).close(TaskPolicy.ENGINEHOST_PACKAGE)
+
+            assertTrue(outcome is CloseOutcome.Requested)
+            assertEquals(listOf(TaskPolicy.ENGINEHOST_PACKAGE), killed)
+        }
+        assertTrue(closed.isEmpty())
+    }
+
+    @Test
+    fun `a helper's force-stop of Enginehost does not ask Enginehost, and other apps are never asked`() {
+        endGameAnswer = true
+        val ops = FakeOps(TaskPrivileges(forceStop = true, shell = true), ForceStopResult.Stopped)
+
+        assertEquals(CloseOutcome.Closed, closer(ops).close(TaskPolicy.ENGINEHOST_PACKAGE))
+        closer(FakeOps(TaskPrivileges.NONE)).close("com.retroarch.aarch64")
+
+        assertEquals(0, endGameAsks)
+    }
 
     @Test
     fun `a force-stop provider that stops the package makes it Closed, and nothing else is tried`() {

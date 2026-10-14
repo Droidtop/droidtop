@@ -1,1 +1,15 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Asks Enginehost to end its running game and waits for the answer (EnginehostEndGame).
+             Invisible, a task of its own, never in Recents: it exists only so that Android records
+             droidtop as the caller of a startActivityForResult. -->
+        <activity
+            android:name="dev.droidtop.runtime.tasks.EnginehostEndGame"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity="dev.droidtop.app.endgame"
+            android:excludeFromRecents="true" />
+    </application>
+
+</manifest>

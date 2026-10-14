@@ -53,6 +53,12 @@ enum class CloseStep {
     /** Ask a `priv.packages` provider (Shizuku, or a root provider) to force-stop the package: ends it for real. */
     FORCE_STOP,
 
+    /**
+     * Enginehost only: ask it to end its running game (`dev.enginehost.END_GAME`, answered to droidtop alone, by
+     * signature). Confirmed by Enginehost's own answer, so it needs no helper (Droidtop/tracker#289).
+     */
+    ENGINEHOST_END_GAME,
+
     /** `ActivityManager.killBackgroundProcesses`: a normal permission, but Android decides, and it cannot be confirmed. */
     KILL_BACKGROUND,
 }
@@ -98,11 +104,13 @@ object TaskPolicy {
      * Which close paths exist for [privileges], in the order they are tried. The background kill is
      * always listed as the last, unconfirmable try: on the console's Android 13 it ends an app that
      * has really gone to the background and is documented to do nothing for other apps on later
-     * releases, so its result is never reported as "closed".
+     * releases, so its result is never reported as "closed". Enginehost has a step of its own between the
+     * two: it ends its game when droidtop asks, and says whether it did.
      */
-    fun closeSteps(privileges: TaskPrivileges): List<CloseStep> =
+    fun closeSteps(privileges: TaskPrivileges, packageName: String? = null): List<CloseStep> =
         buildList {
             if (privileges.forceStop) add(CloseStep.FORCE_STOP)
+            if (packageName == ENGINEHOST_PACKAGE) add(CloseStep.ENGINEHOST_END_GAME)
             add(CloseStep.KILL_BACKGROUND)
         }
 

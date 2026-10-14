@@ -85,6 +85,19 @@ class TaskPolicyTest {
     }
 
     @Test
+    fun `enginehost is asked to end its game before the background kill, after a force-stop`() {
+        assertEquals(
+            listOf(CloseStep.ENGINEHOST_END_GAME, CloseStep.KILL_BACKGROUND),
+            TaskPolicy.closeSteps(TaskPrivileges.NONE, TaskPolicy.ENGINEHOST_PACKAGE),
+        )
+        assertEquals(
+            listOf(CloseStep.FORCE_STOP, CloseStep.ENGINEHOST_END_GAME, CloseStep.KILL_BACKGROUND),
+            TaskPolicy.closeSteps(TaskPrivileges(forceStop = true, shell = false), TaskPolicy.ENGINEHOST_PACKAGE),
+        )
+        assertEquals(listOf(CloseStep.KILL_BACKGROUND), TaskPolicy.closeSteps(TaskPrivileges.NONE, "com.retroarch.aarch64"))
+    }
+
+    @Test
     fun `the list hides droidtop, home apps and the system but not enginehost`() {
         val hidden = TaskPolicy.hiddenFromList("dev.droidtop.app", setOf("com.example.launcher"))
         assertTrue("dev.droidtop.app" in hidden)

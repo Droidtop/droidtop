@@ -2966,7 +2966,16 @@ a close path of its own. Every call works off the main thread.
      `priv.packages` provider plugin such as the official Shizuku plugin or a root provider: all are
      reached through `PrivilegedShell`, never code in the task manager, and root is only ever an
      enhancement behind the same interface).
-  2. `ActivityManager.killBackgroundProcesses` (the `KILL_BACKGROUND_PROCESSES` normal permission),
+  2. Enginehost only: droidtop asks Enginehost to end its running game (`dev.enginehost.END_GAME`,
+     Enginehost's SPEC "Ending the running game"; answered to droidtop alone, by Android's record of the
+     caller and droidtop's signing certificate). Android records the caller only for
+     `startActivityForResult`, so an invisible activity of droidtop's (`EnginehostEndGame`, its own task,
+     not in Recents) starts it and waits up to 4 s for the answer. "A game was running and has ended" is a
+     confirmed close; "none was running" is not (Enginehost's own screens may still be open) and falls
+     through to the next step, as do an Enginehost without END_GAME and a blocked start. So Kill on an
+     engine game is confirmed without Shizuku (Droidtop/tracker#289: it said "cannot confirm" after the
+     game had gone).
+  3. `ActivityManager.killBackgroundProcesses` (the `KILL_BACKGROUND_PROCESSES` normal permission),
      always tried last. It ends a process only while it is cached, and nothing confirms the result, so
      it is never reported as a close.
   `ActivityManager.getAppTasks` / `AppTask.finishAndRemoveTask` is deliberately not a step: Android
@@ -2974,7 +2983,7 @@ a close path of its own. Every call works off the main thread.
   (this was the dead leg of the old `ConsoleRomProvider.quit`), and droidtop never closes its own tasks
   (the shell and the companion).
 - **The outcome is stated, never assumed** (`CloseOutcome`): `Closed` only when a provider confirmed
-  the force-stop; `Requested` when droidtop only asked Android and cannot tell; `Failed` with the
+  the force-stop or Enginehost said it ended its game; `Requested` when droidtop only asked Android and cannot tell; `Failed` with the
   provider's own words. `Requested` says "Not confirmed" (`TaskPolicy.NOT_CONFIRMED`), with
   `NOT_CONFIRMED_TIP` as the tooltip saying what Android does not report and that an elevated backend
   closes apps for real. "Not confirmed" never stands alone when droidtop knows why no helper ended the

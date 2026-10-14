@@ -46,7 +46,7 @@ object TaskManager {
                 Log.d(TAG, "Couldn't ask Android to end $pkg", t)
                 false
             }
-        })
+        }, endEnginehostGame = { EnginehostEndGame.request(context.applicationContext) })
     }
 
     private val snapshotFlow = MutableStateFlow<RunningSnapshot?>(null)
