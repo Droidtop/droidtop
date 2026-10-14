@@ -9723,6 +9723,30 @@ sets, so an added mode fails until its sets are written.
   worked by touch or by pad (D-pad between keys, A presses, B cancels): a
   wrong passkey says "Wrong passkey" and stays, the right one leaves.
 
+**Play-time limits (decided 2026-10-14, Droidtop/tracker#421).** Settings >
+Play time (`PlayTimeSettings`, hidden in Kid, Kiosk and Guest like the other
+items that control the restriction) sets a limit per day and one per week, in
+minutes, none by default. They count all play together, not one game's, and
+they belong to Kid mode, the mode that is handed to a child: play is counted,
+and the limits hold, only while Kid is on (the owner said "for all play" and
+asked that Guest lack the play-time part). `PlayTimeLimiter` (`:app`, started
+in `DroidtopApplication`) watches `LaunchDisplay.running`: every 15 s while a
+game runs in Kid it adds the elapsed time to the ledger (`PlayTimePrefs`,
+seconds per local day, kept two weeks; the week starts on Monday) and asks
+`PlayEnforcer` for the step. Five minutes before the tighter limit it warns
+once, at the limit it says the game closes in 60 seconds, and then it quits the
+game through `Library.quitRunning`, the one quit path, so the player saves the
+way a Quit from the Quick Menu does; a quit that did not end the game is asked
+again every tick. A warning is a toast (it shows over any app) and, where
+notifications are allowed, a notification that returns to droidtop. A game
+started after the limit is told and closed after the same minute. The
+companion's Home shows "Today 45 min of 2 h · This week 3 h 10 min of 10 h"
+under the status line in Full and Kid while a limit is set
+(`ControlRow.PLAY_TIME`, Kid's alone among the restricted modes). Real play
+time is not stored per game (7g): this ledger is the only measure, and counts
+droidtop's own running-game state, so a game droidtop never saw start is not
+counted.
+
 **Screensaver.** ES-DE's four kinds — dim, black, slideshow and video —
 after Off/2/5/10/15/30 minutes (today: the slideshow only), with the
 slideshow's and the video's source (all games, favourites or one

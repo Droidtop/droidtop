@@ -34,6 +34,8 @@ enum class ControlRow {
     GAME_PLUGIN_ROWS, GAME_SCREENSHOT,
     // Performance
     STATS, PERFORMANCE_CONTROLS, LOGS,
+    // Home: today's and this week's play against the play-time limits (Kid and Full)
+    PLAY_TIME,
 }
 
 /** Everything one UI mode allows, written out per mode in [ControlAccess.rules]. */
@@ -106,9 +108,13 @@ object ControlAccess {
         alwaysAsk = true,
         hiddenItemIds = setOf(
             GamingSettingsCatalog.ID_UI_MODE, GamingSettingsCatalog.ID_DISPLAY_COMPANION, ID_KID_VOLUME_CAP, ID_UI_MODE_PASSKEY,
+            PlayTimeSettings.ID_LINK,
         ),
         hiddenGroupIds = setOf(GROUP_COMPANION),
     )
+
+    /** Kid: the restricted set over kid-friendly games, with the play-time line on Home (Droidtop/tracker#421). */
+    private val KID = RESTRICTED.copy(kidGamesOnly = true, rows = RESTRICTED.rows + ControlRow.PLAY_TIME)
 
     /**
      * Guest (Droidtop/tracker#420): the handheld handed to somebody who is not the owner, with the owner's
@@ -127,7 +133,7 @@ object ControlAccess {
     fun rules(mode: UiMode): ControlRules = when (mode) {
         UiMode.FULL -> FULL
         UiMode.KIOSK -> RESTRICTED
-        UiMode.KID -> RESTRICTED.copy(kidGamesOnly = true)
+        UiMode.KID -> KID
         UiMode.GUEST -> GUEST
     }
 

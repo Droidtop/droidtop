@@ -223,6 +223,7 @@ object GamingSettingsCatalog {
                         onSelect = { ctx, value -> dev.droidtop.runtime.systemstatus.VolumeControl.setKidCap(ctx, value.toIntOrNull() ?: 0) },
                     ),
                 )
+                add(PlayTimeSettings.link())
                 add(
                     ChoiceItem(
                         id = ID_SCREENSAVER,

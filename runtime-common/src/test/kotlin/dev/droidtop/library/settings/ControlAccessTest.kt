@@ -25,7 +25,7 @@ class ControlAccessTest {
             ControlRow.entries.toSet(),
         ),
         UiMode.KIOSK to Triple(restrictedCompanion, ControlPanel.entries.toSet(), restrictedRows),
-        UiMode.KID to Triple(restrictedCompanion, ControlPanel.entries.toSet(), restrictedRows),
+        UiMode.KID to Triple(restrictedCompanion, ControlPanel.entries.toSet(), restrictedRows + ControlRow.PLAY_TIME),
         UiMode.GUEST to Triple(
             restrictedCompanion,
             ControlPanel.entries.toSet() -
@@ -56,7 +56,10 @@ class ControlAccessTest {
 
     @Test
     fun `the items that control the restriction are hidden in Kid and Kiosk only`() {
-        val ids = listOf(GamingSettingsCatalog.ID_UI_MODE, ControlAccess.ID_KID_VOLUME_CAP, ControlAccess.ID_UI_MODE_PASSKEY)
+        val ids = listOf(
+            GamingSettingsCatalog.ID_UI_MODE, ControlAccess.ID_KID_VOLUME_CAP, ControlAccess.ID_UI_MODE_PASSKEY,
+            PlayTimeSettings.ID_LINK,
+        )
         for (mode in listOf(UiMode.KID, UiMode.KIOSK, UiMode.GUEST)) {
             ids.forEach { assertFalse("$mode shows $it", ControlAccess.shows(mode, it)) }
             assertFalse(ControlAccess.shows(mode, "pref_companion_anything", ControlAccess.GROUP_COMPANION))
@@ -111,6 +114,9 @@ class ControlAccessTest {
         for (panel in listOf(ControlPanel.NOTIFICATIONS, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.DOWNLOADS)) {
             assertFalse("$panel", panel in ControlAccess.panels(UiMode.GUEST, ControlSurface.QUICK_MENU))
         }
+        // Play time is Kid's alone: the line on Home is not Guest's or Kiosk's.
+        assertTrue(ControlAccess.shows(UiMode.KID, ControlRow.PLAY_TIME))
+        assertFalse(ControlAccess.shows(UiMode.GUEST, ControlRow.PLAY_TIME) || ControlAccess.shows(UiMode.KIOSK, ControlRow.PLAY_TIME))
         // Kid and Kiosk keep every Quick Menu section, as before.
         assertEquals(ControlPanel.entries.toSet(), ControlAccess.panels(UiMode.KID, ControlSurface.QUICK_MENU))
     }

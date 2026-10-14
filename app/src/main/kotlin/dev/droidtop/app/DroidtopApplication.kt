@@ -51,6 +51,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         dev.droidtop.library.ScanLog.install(this)
         // Kid's maximum volume holds against the volume keys too (one prefs read, then a settings observer).
         dev.droidtop.runtime.systemstatus.VolumeControl.watchKidCap(this)
+        // Kid's play-time limits: counts play while a game runs and closes it at the limit (SPEC 7f, tracker#421).
+        PlayTimeLimiter.install(this)
         // Crash notes and crash-loop safe mode (SPEC 10c): after ScanLog so
         // a note can carry its tail, before anything that could crash.
         dev.droidtop.library.diagnostics.CrashRecovery.install(this)
