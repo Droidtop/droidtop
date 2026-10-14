@@ -991,8 +991,8 @@ never disables its callers.
    - **Levels (built 2026-10-09, plugin-enforce-5).** A provider may export
      the same API at two levels, `{"level":"adb"}` and `{"level":"root"}`.
      Each export is its own grant on the provider's approval list, in plain
-     words from the op's permission ("Other plugins may: Run commands as
-     the system (adb)", "Other plugins may: Run commands as root"); the
+     words from the op's permission ("Other plugins may: Run system
+     commands", "Other plugins may: Full control of the device"); the
      root one is kept under the key `priv.shell@root`, the adb one under the
      API's plain name. Callers declare `priv.shell.adb` or `priv.shell.root`,
      each its own critical grant.
@@ -1015,7 +1015,7 @@ never disables its callers.
      that cannot run a plugin's call at its granted level refuses it
      rather than run it higher: Shizuku running as root cannot drop to the
      shell user without `su`, so it refuses an adb-level plugin call then
-     and says to allow "Run commands as root".
+     and says to allow "Full control of the device".
    - **Stream sessions (`exec_stream`, built 2026-10-09,
      plugin-enforce-5).** A command that outlives one call or takes input
      (droidtop's `PrivilegedShell.spawn`, the rooted desktop stack,
@@ -2267,27 +2267,27 @@ wording the host uses, so it is identical in every mode.
 | `apps.list` | dangerous | See all apps installed on this device | F4, C12 |
 | `apps.launch` | normal | Open other apps | F2 |
 | `apps.view` | normal | Open links in other apps | F2 |
-| `apps.intents.out` | normal (declared packages) / dangerous (any) | Send information to *listed apps* / to any app | F2, B1 |
+| `apps.intents.out` | normal (declared packages) / dangerous (any) | Send information to other apps | F2, B1 |
 | `intents.in` | dangerous | Be opened by other apps and links | F3 |
-| `apps.install` | dangerous | Install and update apps (Android asks you each time) | F5 |
-| `apps.bind` | dangerous | Stay connected to *listed apps* in the background | F6, F1 |
-| `vault.own` | normal | Store its own passwords and keys securely | G1 |
+| `apps.install` | dangerous | Install and update apps (Android asks each time) | F5 |
+| `apps.bind` | dangerous | Stay connected to other apps | F6, F1 |
+| `vault.own` | normal | Keep its own saved passwords | G1 |
 | `context.sync` | dangerous | Keep its data in step with apps on your paired computers | F8 |
 | `auth.oauth` | normal | Ask you to sign in to a service | G2 |
-| `web.session` | dangerous | Use your signed-in session on *listed sites* | G3 |
-| `github.api` | normal | Use your GitHub token for GitHub requests (the token stays in droidtop) | G4 |
-| `github.token.read` | dangerous | Read your GitHub token | G4 |
-| `diagnostics.read` † | dangerous | Read droidtop's own logs | H5 |
-| `telemetry.send` | dangerous (opt-in) | Send usage data to *listed address* | H6 |
+| `web.session` | dangerous | Use your sign-in on its sites | G3 |
+| `github.api` | normal | Use your GitHub account for GitHub requests | G4 |
+| `github.token.read` | dangerous | See your GitHub sign-in | G4 |
+| `diagnostics.read` † | dangerous | Read droidtop's logs | H5 |
+| `telemetry.send` | dangerous (opt-in) | Send usage data | H6 |
 | `plugins.export` | normal | Offer features to other plugins | §2.8 |
-| `plugins.export_privileged` | critical | Give other plugins root or system-level access | §2.7 |
-| `host.full_trust` | critical | Run with droidtop's full access | §5.3 |
-| `priv.shell.adb` | critical | Run commands as the system (adb) | F7, §2 |
-| `priv.shell.root` | critical | Run commands as root | F7, §2 |
-| `priv.packages` | critical | Install, remove and change permissions of apps without asking (through *provider*) | F7 |
-| `priv.settings` | critical | Change protected system settings (through *provider*) | F7 |
-| `root.modules` | critical | Install and remove root modules (through *provider*) | F7 |
-| `input.remap.apply` | dangerous | Change your controller mapping (through *provider*) | B5 |
+| `plugins.export_privileged` | critical | Give other plugins full control of the device | §2.7 |
+| `host.full_trust` | critical | Full access | §5.3 |
+| `priv.shell.adb` | critical | Run system commands | F7, §2 |
+| `priv.shell.root` | critical | Full control of the device | F7, §2 |
+| `priv.packages` | critical | Install and remove apps without asking | F7 |
+| `priv.settings` | critical | Change protected settings | F7 |
+| `root.modules` | critical | Install system add-ons | F7 |
+| `input.remap.apply` | dangerous | Change your controller mapping | B5 |
 
 That is 66 permissions. Those marked † are restricted to official
 origins.

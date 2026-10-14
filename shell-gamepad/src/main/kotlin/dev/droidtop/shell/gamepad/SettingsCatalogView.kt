@@ -500,9 +500,11 @@ fun CatalogNavigator(
             is TextBlockItem -> {}
             // A notice's action, else its Info (Y is the other way there), else nothing.
             is NoticeItem -> when (item.notice.aPress()) {
-                NoticePress.ACTION -> {
-                    item.notice.action?.run?.invoke(context)
-                    refresh()
+                NoticePress.ACTION -> item.notice.action?.let { action ->
+                    scope.launch {
+                        action.run(context)
+                        refresh()
+                    }
                 }
                 NoticePress.INFO -> infoRow = item
                 NoticePress.NONE -> {}

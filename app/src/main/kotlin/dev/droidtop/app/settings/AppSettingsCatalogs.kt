@@ -62,6 +62,7 @@ import dev.droidtop.pluginhost.ExtensionPoints
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginTier
 import dev.droidtop.pluginhost.PluginTiers
+import dev.droidtop.pluginhost.PluginDangers
 import dev.droidtop.pluginhost.PluginOriginKeys
 import dev.droidtop.pluginhost.PluginSourceKeys
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
@@ -90,6 +91,11 @@ import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.library.settings.NoticeAction
+import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.TextInputItem
@@ -97,6 +103,7 @@ import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.theme.SystemThemeColors
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -1653,7 +1660,27 @@ object AppSettingsCatalogs {
         val catalogNames = catalogNames(context)
         val catalogsSummary = PluginCatalogScreen.summary(context)
 
-        listOf(
+        val heldBack = PluginDangers.failures.value.values.toList()
+        listOfNotNull(
+            heldBack.takeIf { it.isNotEmpty() }?.let { list ->
+                CatalogGroup(
+                    id = "plugins_protection",
+                    title = null,
+                    items = listOf(
+                        NoticeItem(
+                            id = "plugins_protection_notice",
+                            notice = Notice(
+                                tone = NoticeTone.Caution,
+                                title = "Protection didn't start",
+                                body = if (list.size == 1) "${list.single().label} is waiting for you to decide." else "${list.size} plugins are waiting for you to decide.",
+                                details = list.joinToString("\n") { "${it.label}: ${it.report}" },
+                                action = NoticeAction("Review") { PluginDangers.askRunAllUnprotected() },
+                            ),
+                            placement = NoticePlacement.Page,
+                        ),
+                    ),
+                )
+            },
             CatalogGroup(
                 id = "plugins_installed",
                 title = if (installed.isEmpty()) null else "Installed",
@@ -1858,6 +1885,7 @@ object AppSettingsCatalogs {
                 }
             }
         },
+        live = PluginGrants.changes,
     )
 
     private fun pluginDetailGroups(
@@ -1891,6 +1919,23 @@ object AppSettingsCatalogs {
             val unofficialFrom = userKeys[m.origin]?.catalog?.takeIf { !PluginOriginKeys.isOfficial(m.origin) }
             // The approval screen says where the plugin came from before anything is approved
             // (docs/SPEC.md 12a "Added catalogs"): from a catalog that is not droidtop's, it is Unofficial.
+            // U3 (docs/SPEC.md 7k, "Notices"): an update from a different maker waits for the person, in caution, with the
+            // fingerprints in Info; approving it asks in red (D3).
+            if (record.trust == PluginTrustState.PENDING && record.replacedKeySha256 != null) {
+                add(
+                    NoticeItem(
+                        id = "plugin_${m.id}_other_maker",
+                        notice = Notice(
+                            tone = NoticeTone.Caution,
+                            title = "Update made by someone else",
+                            body = "The update isn't from the maker of your version.",
+                            details = "Your version: ${PluginDangers.groupsOfFour(record.replacedKeySha256.orEmpty())} (${record.replacedOrigin ?: m.origin})\n" +
+                                "This update: ${PluginDangers.groupsOfFour(record.approvedKeySha256)} (${m.origin})",
+                        ),
+                        placement = NoticePlacement.Page,
+                    ),
+                )
+            }
             if (record.trust == PluginTrustState.PENDING && unofficialFrom != null) {
                 add(
                     TextBlockItem(
@@ -1904,7 +1949,15 @@ object AppSettingsCatalogs {
             // A pending status used to look like a button but had no action. The approval controls below
             // are the action; keep the trust/status row for plugins that already have a decision.
             if (record.trust != PluginTrustState.PENDING) {
-                add(ActionItem(id = "plugin_${m.id}_status", title = statusLine, subtitle = trustLine, run = {}))
+                add(
+                    ActionItem(
+                        id = "plugin_${m.id}_status",
+                        title = statusLine,
+                        subtitle = trustLine,
+                        chip = PluginTiers.badge(record, grantSnapshot)?.let { "Full access" },
+                        run = {},
+                    ),
+                )
                 // The only access rows the person ever sees are the full-access warning, a plugin that needs it and has
                 // not been allowed it (docs/plugin-api.md 4.6), and the plain warning of a granted permission that lets
                 // the plugin reach past droidtop's checks (gpu.render, 5.3). A plugin on the safe default carries no
@@ -1913,8 +1966,9 @@ object AppSettingsCatalogs {
                 val accessBadge = PluginTiers.badge(record, grantSnapshot)
                 val caution = PluginTiers.caution(record, grantSnapshot)
                 when {
-                    refusal != null -> add(ActionItem(id = "plugin_${m.id}_access", title = if (PluginTiers.declaresFullTrust(m)) "Needs full access to work" else "Needs an update", subtitle = refusal, run = {}))
-                    accessBadge != null -> add(ActionItem(id = "plugin_${m.id}_access", title = accessBadge, subtitle = accessLine(record, grantSnapshot), run = {}))
+                    refusal != null && PluginTiers.declaresFullTrust(m) -> add(NoticeItem("plugin_${m.id}_access", needsFullAccessNotice(record, refusal)))
+                    refusal != null -> add(ActionItem(id = "plugin_${m.id}_access", title = "Needs an update", subtitle = refusal, run = {}))
+                    accessBadge != null -> add(NoticeItem("plugin_${m.id}_access", hasFullAccessNotice(record, grantSnapshot)))
                     // A granted permission that lets its own code reach past droidtop's checks (gpu.render, docs/plugin-api.md 5.3).
                     caution != null -> add(ActionItem(id = "plugin_${m.id}_access", title = CAUTION_TITLE, subtitle = caution, run = {}))
                 }
@@ -2021,9 +2075,20 @@ object AppSettingsCatalogs {
                 pendingTicks.remove(m.id)
                 pluginsChanged(ctx)
             }
+
+            // Approving with full access ticked (or an older plugin, which always has it) asks in red first
+            // (Droidtop/tracker#481, D1); Cancel approves nothing.
+            suspend fun approveAsking(ctx: Context, root: Boolean): String {
+                // An update from a different maker asks first (D3), then full access does (D1).
+                if (!PluginDangers.askDifferentMaker(record)) return "Not approved"
+                val full = m.contractVersion < 2 || PluginTiers.FULL_TRUST in approvalTicks
+                if (full && !PluginDangers.askFullAccess(record, update = false)) return "Not approved"
+                withContext(Dispatchers.Main) { approve(ctx, root) }
+                return "Approved"
+            }
             buildList {
                 add(
-                    ActionItem(
+                    AsyncActionItem(
                         id = "plugin_${m.id}_approve",
                         title = "Approve",
                         subtitle = if (m.requestsRoot) {
@@ -2031,17 +2096,17 @@ object AppSettingsCatalogs {
                         } else {
                             "Allows what is ticked above. You can change any of it later under Permissions."
                         },
-                        run = { ctx -> approve(ctx, false) },
+                        run = { ctx, _ -> approveAsking(ctx, false) },
                     ),
                 )
                 if (m.requestsRoot) {
                     add(
-                        ActionItem(
+                        AsyncActionItem(
                             id = "plugin_${m.id}_approve_root",
                             title = "Approve and allow root",
                             subtitle = "Only used if this device has root",
                             confirmTitle = "Let \"${m.label}\" use root on this device?",
-                            run = { ctx -> approve(ctx, true) },
+                            run = { ctx, _ -> approveAsking(ctx, true) },
                         ),
                     )
                 }
@@ -2066,14 +2131,21 @@ object AppSettingsCatalogs {
                 id = "plugin_${m.id}_new_access_group",
                 title = null,
                 items = listOf(
-                    ActionItem(
+                    AsyncActionItem(
                         id = "plugin_${m.id}_new_access_save",
                         title = "Allow what is ticked",
                         subtitle = "Changes only the new items",
-                        run = { ctx ->
-                            PluginGrants.forContext(ctx).answerNew(record, freshIds, newTicks.toSet())
-                            pendingTicks.remove(newKey)
-                            pluginsChanged(ctx)
+                        run = { ctx, _ ->
+                            if (PluginTiers.FULL_TRUST in newTicks && !PluginDangers.askFullAccess(record, update = true)) {
+                                "Nothing changed"
+                            } else {
+                                withContext(Dispatchers.IO) { PluginGrants.forContext(ctx).answerNew(record, freshIds, newTicks.toSet()) }
+                                withContext(Dispatchers.Main) {
+                                    pendingTicks.remove(newKey)
+                                    pluginsChanged(ctx)
+                                }
+                                "Saved"
+                            }
                         },
                     ),
                 ),
@@ -2321,6 +2393,50 @@ object AppSettingsCatalogs {
     /** The title of the access row of a plugin holding a permission with a caution (`gpu.render`, docs/plugin-api.md 5.3). */
     private const val CAUTION_TITLE = "Could reach past droidtop's checks"
 
+    /** Where a notice's action that asks first (a red dialog) runs: the process's main scope, outliving the row that started it. */
+    private val noticeScope = kotlinx.coroutines.MainScope()
+
+    /**
+     * U4 (docs/SPEC.md 7k, "Notices"; Droidtop/tracker#481): a plugin running with full access says so quietly on its page
+     * after it was allowed, with the way back. Limit access takes the grant away when the plugin can run with normal
+     * protection, and otherwise turns the plugin off, since it cannot run any other way.
+     */
+    private fun hasFullAccessNotice(record: dev.droidtop.pluginhost.PluginRecord, grants: PluginGrants.Snapshot): Notice {
+        val m = record.manifest
+        val blocker = PluginTiers.containmentBlocker(m)
+        return Notice(
+            tone = NoticeTone.Caution,
+            title = "Has full access",
+            body = "It can use your files and go online freely.",
+            details = accessLine(record, grants) +
+                (blocker?.let { "\nThis plugin can only run with full access ($it), so Limit access turns it off." } ?: ""),
+            action = NoticeAction("Limit access") { ctx ->
+                withContext(Dispatchers.IO) {
+                    if (blocker == null && PluginTiers.declaresFullTrust(m)) {
+                        PluginGrants.forContext(ctx).set(m.id, PluginTiers.FULL_TRUST, GrantState.DENIED)
+                    } else {
+                        PluginStore.setEnabled(ctx, m.id, false)
+                    }
+                }
+                pluginsChanged(ctx)
+            },
+        )
+    }
+
+    /** A plugin that can only run with full access and was not allowed it: Allow asks in red (D1). */
+    private fun needsFullAccessNotice(record: dev.droidtop.pluginhost.PluginRecord, refusal: String): Notice = Notice(
+        tone = NoticeTone.Caution,
+        title = "Needs full access to work",
+        body = "It won't run until you allow it.",
+        details = refusal,
+        action = NoticeAction("Allow") { ctx ->
+            if (PluginDangers.askFullAccess(record, update = false)) {
+                withContext(Dispatchers.IO) { PluginGrants.forContext(ctx).set(record.manifest.id, PluginTiers.FULL_TRUST, GrantState.GRANTED) }
+                pluginsChanged(ctx)
+            }
+        },
+    )
+
     /** The subtitle of the full-access row (docs/plugin-api.md 4.6): the one warning, in plain words. */
     private fun accessLine(record: dev.droidtop.pluginhost.PluginRecord, grants: PluginGrants.Snapshot): String =
         "This plugin can do anything droidtop can. Only what it asks droidtop to do is listed under Activity. Allow it only if you trust the plugin."
@@ -2367,6 +2483,7 @@ object AppSettingsCatalogs {
         title = "Permissions",
         subtitle = "A change takes effect on the plugin's next call",
         groups = { context -> withContext(Dispatchers.IO) { pluginPermissionGroups(context, pluginId) } },
+        live = PluginGrants.changes,
     )
 
     /**
@@ -2452,8 +2569,19 @@ object AppSettingsCatalogs {
                 ),
                 current = row.state.name,
                 onSelect = { ctx, value ->
-                    GrantState.fromId(value)?.let { PluginGrants.forContext(ctx).set(pluginId, row.id, it) }
-                    pluginsChanged(ctx)
+                    val state = GrantState.fromId(value)
+                    if (row.id == PluginTiers.FULL_TRUST && state == GrantState.GRANTED) {
+                        // Droidtop/tracker#481, D1: allowed only through the red dialog; the screen reads again on the grant.
+                        noticeScope.launch {
+                            if (PluginDangers.askFullAccess(record, update = false)) {
+                                withContext(Dispatchers.IO) { PluginGrants.forContext(ctx).set(pluginId, row.id, GrantState.GRANTED) }
+                                pluginsChanged(ctx)
+                            }
+                        }
+                    } else {
+                        state?.let { PluginGrants.forContext(ctx).set(pluginId, row.id, it) }
+                        pluginsChanged(ctx)
+                    }
                 },
             )
         }
@@ -2587,8 +2715,8 @@ object AppSettingsCatalogs {
             }
             return ToggleItem(
                 id = "plugin_${m.id}_${scope}tick_$grantKey",
-                title = if (l.highRisk) "${l.title} (high risk)" else l.title,
-                subtitle = listOfNotNull(lead, l.detail, trail).joinToString(" - ").ifEmpty { null },
+                title = l.title,
+                subtitle = listOfNotNull(lead, l.detail, trail, if (l.highRisk) "High risk: allow it only for a plugin you trust" else null).joinToString(" - ").ifEmpty { null },
                 current = grantKey in ticks,
                 onToggle = { _, on -> if (on) ticks.add(grantKey) else ticks.remove(grantKey) },
             )

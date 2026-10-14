@@ -315,11 +315,12 @@ private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst
 private fun CompanionNotice(item: NoticeItem, onChanged: () -> Unit) {
     val context = LocalContext.current
     var info by remember(item.id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         NoticeCard(
             notice = item.notice,
             placement = item.placement,
-            onAction = item.notice.action?.let { action -> { action.run(context); onChanged() } },
+            onAction = item.notice.action?.let { action -> { scope.launch { action.run(context); onChanged() } } },
             onInfo = { info = !info },
         )
         val details = item.notice.details

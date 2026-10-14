@@ -81,6 +81,8 @@ object PluginStore {
                 // false even if the plugin wanted it.
                 rootApproved = approved && grantRoot && record.manifest.requestsRoot,
                 disabledReason = null,
+                replacedKeySha256 = null,
+                replacedOrigin = null,
             )
         PluginBundleInstaller.writeRecord(dir, updated)
         if (approved) PluginGrants.forContext(context).initialiseOnApproval(updated, ticked)
