@@ -28,6 +28,8 @@ data class SourceOutcome(
     val results: List<AcquireContentResult>,
     val failure: String? = null,
     val runtimeNeed: RuntimeNeed? = null,
+    /** What the source itself said when it failed, markup removed and bounded: behind "Technical details", never on a row. */
+    val technical: String? = null,
 ) {
     val hits: List<SourceHit> get() = results.map { SourceHit(source, it) }
 }
@@ -102,7 +104,10 @@ object PluginSearchAggregator {
                 }
                 answer.fold(
                     onSuccess = { SourceOutcome(source, it) },
-                    onFailure = { SourceOutcome(source, emptyList(), failure = describe(it)) },
+                    onFailure = {
+                        val said = describe(it)
+                        SourceOutcome(source, emptyList(), failure = SourceFailures.plain(said), technical = SourceFailures.technical(said))
+                    },
                 )
             }
         }.map { it.await() }

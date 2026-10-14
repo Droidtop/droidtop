@@ -1155,9 +1155,8 @@ deleted: `LibrarySearch`/`LibrarySearchEntry` in `:runtime-common`,
 filter). Known differences from the stock drawer search: the private-space
 "unlock" row that a search for its name used to offer is gone with the in-place
 list, and a source's result from here has no download destination (the list has no
-system, as in the PC library), so a pick says where to download it from instead
-of starting a job; a per-title system guess is the follow-up if the owner wants
-downloads started from the drawer.
+system, as in the PC library), so the destination comes from the result itself
+(12a "One search", "Download destination").
 
 **RadioGroupBottomSheet renders no options on this rig -- four real fixes
 landed, root cause still open (2026-09-26).** Verifying the gesture-action
@@ -19624,9 +19623,24 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   on the text collects the flow), so nothing runs for text that is gone. The
   plugin store is read once per settled query, on the IO dispatcher.
 - **A source that could not answer is a line, not a mode.** After the rows:
-  an installed plugin waiting for approval or turned off, a source's failure
-  with its technical details, its settings and the runtime it lacks (a
-  press installs it and searches again). The "Get games" entry (browsing a
+  a source's failure in plain words with its technical details behind a row,
+  its settings and the runtime it lacks (a press installs it and searches
+  again). Plugins that wait for approval are ONE row ("Nyaa is waiting for
+  your approval", or "3 sources are waiting for your approval") that opens
+  the plugin's page in Settings, Plugins (the whole list when there are
+  several); one that is turned off or denied is a row that opens its page.
+  None of them is a line of text that looks pressable and is not.
+  **A failure is a sentence the person can act on** (`SourceFailures.plain`,
+  Droidtop/tracker#375, #485): what a source reports (a site's own page text
+  such as "JavaScript is disabled...", a platform exception, a socket error)
+  never reaches a row. A sign-in or bot-check page reads "This site needs a
+  sign-in in the browser", rate limiting "The site asked for a pause", an
+  unreachable host "It could not reach the site", an exception or stack
+  "This source is not ready to run here yet", markup or a long unknown text
+  "The site answered in a way droidtop could not read". A short plain reason
+  is kept as the source wrote it. What the source said stays behind the
+  "Technical details" row, with markup removed and at most 400 characters
+  (`SourceOutcome.technical`). The "Get games" entry (browsing a
   source's own catalogue, `GetGamesEntry`) stays as the last row; it is
   where a source's own filters live (`SourceScreens`), reached from the list
   and never a second search. A plugin's own full screen (`ui.main`) is opened
@@ -19634,20 +19648,30 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   (`GameSourceProvider.hasMainUi`/`openMainUi` are deleted).
 - **Where it is opened.** The PC library's search (`PcGamesSection`), a
   console gamelist's Select menu, Search (`GamelistOptionsMenu`, with that
-  system's id and games folder as the download destination) and the
-  launcher's drawer (`LauncherSearchActivity`, which passes the apps and games
-  as `local`). The first two have their list on screen under the dialog and
-  narrow it live through `matchesSearchText`, so they pass no `local` and show
-  the match count above the sources' rows (the Select row reads "Search: <text>"
-  while a search is on, and the search lasts as long as the gamelist stays open;
-  the PC Games tab keeps its own query, 7i); the launcher has no list under it,
-  so the device's rows are in the one list; so are Desktop's (its Start menu and R1 open
-  it, with the library and the container's apps as the device's rows, 2b "Desktop chrome with a pad"). Settings has its own search over
+  system's id) and the launcher's drawer (`LauncherSearchActivity`, which
+  passes the apps and games as `local`). The PC library passes its games as
+  `local` too, so the one list holds them (a row opens the game's page) and
+  the grid behind still narrows to the same text, which is the Filter sheet's
+  Search row; the PC search also drops a source's result that names a console
+  system (`SourceDestinations.isPcResult`, so a Nyaa PSP or Vita torrent is
+  not a PC result). A console gamelist has its list on screen under the dialog
+  and narrows it live through `matchesSearchText`, so it passes no `local` and
+  shows the match count above the sources' rows (the Select row reads "Search:
+  <text>" while a search is on, and the search lasts as long as the gamelist
+  stays open; the PC Games tab keeps its own query, 7i); the launcher has no
+  list under it, so the device's rows are in the one list; so are Desktop's
+  (its Start menu and R1 open it, with the library and the container's apps as
+  the device's rows, 2b "Desktop chrome with a pad"). Settings has its own search over
   settings rows (`SettingsSearchIndex`, 7k), which is a different thing being
   searched, not a plugin mode.
-- **Picking.** A device row opens the app or plays the game. A source row opens
-  its detail (`GameSourceProvider.detailScreen`) with the system's download
-  folder; a list with no folder says "No download folder for this list".
+- **Picking.** A device row opens the app or plays the game (the PC library's
+  opens the game's page). A source row always opens its detail
+  (`GameSourceProvider.detailScreen`); the destination is worked out when it is
+  picked, off the main thread (`SourceDestinations`), never while typing.
+  The pad reaches every row: Down leaves the field for the first row (the
+  soft keyboard goes away), Up from the first row returns to the field, A
+  opens the row, and typing puts the cursor back in the field. The cursor
+  follows a row by its key, so a source answering above it does not move it.
 - **The field and the keyboard.** The field asks for the soft keyboard
   explicitly when it opens (`SoftwareKeyboardController.show`; Compose's own
   request on focus is implicit, and Android drops an implicit request while a
@@ -19661,11 +19685,23 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   its caret is at the END of the text, so Backspace deletes the last letter at
   once (console, build 1519, Droidtop/tracker#376: the field opened unfocused
   and, after A, with the caret at the start).
-- **Download destination.** A cross-system list (the PC library, the
-  launcher) has no natural download folder: `LibrarySearchDialog` takes an
-  optional `systemFolder: File?`/`systemId: String?`. The result is still
-  listed; picking it without a folder says so rather than sending an invalid
-  path to `startJob`.
+- **Download destination.** A console list passes its system id and the
+  dialog finds that system's folder. A cross-system list (the PC library, the
+  launcher, the Desktop Start menu) has no natural download folder, so the
+  destination comes from the result: a platform it names that is a console
+  system with a games folder goes to that folder; anything else is a PC game
+  and goes to the PC folder, which is a `windows` or `pc` system folder when
+  the person has one, else the first games folder they named under Settings,
+  Game folders (the PC walk finds a game under any of them). The plugin's
+  context carries `system` `pc` there. When no folder exists the result
+  still opens, on a page that says which games folder is missing and where to
+  add it, so a row is never a dead end and nothing is sent to `startJob`
+  with an invented path.
+- **Paging.** The one search shows ten rows per source, so it asks for ten:
+  `library.sources` `search` args carry `limit` (docs/plugin-api.md 1.8), and
+  the host cuts a longer answer to it. A source that honours `limit` sends a
+  page, not its whole answer (a Get games screen asks without one and shows
+  up to 200).
 - **Unit tests** (`UnifiedSearchTest`): the rank order, device before source on
   a tie, a source's own order and cap, the device's rows before any source,
   each source joining as it answers, a failing or hung source not stopping the

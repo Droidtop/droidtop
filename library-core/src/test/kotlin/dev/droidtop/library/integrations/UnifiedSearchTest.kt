@@ -47,10 +47,12 @@ class UnifiedSearchTest {
         sources: List<GameSourceProvider> = emptyList(),
         carry: List<SourceHit> = emptyList(),
         timeoutMs: Long = 2_000,
+        keep: (AcquireContentResult) -> Boolean = { true },
     ): Flow<UnifiedState> = UnifiedSearch.stream(
         query = query,
         local = { local },
         carry = carry,
+        keep = keep,
         debounceMs = 0,
         timeoutMs = timeoutMs,
         loadSources = { sources to emptyList() },
@@ -146,6 +148,13 @@ class UnifiedSearchTest {
         assertTrue(state.settled)
         assertTrue(state.rows.isEmpty())
         assertFalse(asked)
+    }
+
+    @Test
+    fun `a surface can drop the results it has no use for`() = runBlocking {
+        val s = source("s", results = listOf(result("pc1", "Sonic PC").copy(platform = "Windows"), result("psp1", "Sonic PSP").copy(platform = "PSP")))
+        val last = run("sonic", sources = listOf(s), keep = { it.platform != "PSP" }).toList().last()
+        assertEquals(listOf("pc1"), last.rows.map { it.hit!!.result.id })
     }
 
     @Test

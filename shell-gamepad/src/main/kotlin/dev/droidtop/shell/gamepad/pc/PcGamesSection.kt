@@ -95,6 +95,10 @@ import dev.droidtop.shell.gamepad.query.rememberSavedViews
 import dev.droidtop.shell.gamepad.query.LibraryQuery
 import dev.droidtop.shell.gamepad.query.LibraryQueryScope
 import dev.droidtop.shell.gamepad.query.LibrarySearchDialog
+import dev.droidtop.shell.gamepad.query.matchesSearchText
+import dev.droidtop.library.GameNaming
+import dev.droidtop.library.integrations.LocalSearchRow
+import dev.droidtop.library.integrations.SearchRowKind
 import dev.droidtop.shell.gamepad.query.LibrarySortKey
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
@@ -1112,6 +1116,13 @@ internal fun PcGamesSection(
             value = dev.droidtop.library.integrations.LocalSimilarityRecommendations({ all })
                 .recommend(context, dev.droidtop.library.integrations.RecommendationScope.Overall, 5)
         }
+        // The console systems' names, read once while the dialog is open: a source's result that names one of them
+        // (a PSP or Vita torrent) is not a PC game and is left out of this list.
+        val consoleNames by produceState<Set<String>?>(null) {
+            value = withContext(Dispatchers.IO) {
+                dev.droidtop.library.integrations.SourceDestinations.consoleNamesOf(ConsoleSystemsRepository.allSystems(context))
+            }
+        }
         LibrarySearchDialog(
             query = state.query,
             matchCount = grid.size,
@@ -1119,6 +1130,17 @@ internal fun PcGamesSection(
             onTextChange = { state.showGrid(state.query.copy(text = it)) },
             onDismiss = { state.searchOpen = false },
             suggestions = suggestions,
+            // The PC library's own games are rows of the one list ("One search"), as the launcher's are; the grid
+            // behind still narrows to the same text. Matched in memory over the list already loaded.
+            localKey = all to consoleNames,
+            local = { text ->
+                all.filter { matchesSearchText(it, text) }.take(SEARCH_GAME_ROWS).map { game ->
+                    LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), "Game") { openPage(game) }
+                }
+            },
+            sourceFilter = { result ->
+                consoleNames?.let { dev.droidtop.library.integrations.SourceDestinations.isPcResult(result.platform, it) } ?: true
+            },
         )
     }
     if (state.optionsOpen) {
@@ -1511,3 +1533,6 @@ private fun HomeDestinations(selected: Int?, onOpen: (Int) -> Unit, modifier: Mo
         }
     }
 }
+
+/** The most PC games the search lists as rows; the grid behind it narrows to all of them. */
+private const val SEARCH_GAME_ROWS = 20

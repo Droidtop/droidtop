@@ -92,24 +92,30 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
     override val label get() = source.label
 
     override suspend fun search(context: Context, query: String, platform: String?): Result<List<AcquireContentResult>> =
-        searchWithValues(context, query, platform, emptyMap(), null, platform.orEmpty())
+        searchWithValues(context, query, platform, emptyMap(), null, platform.orEmpty(), limit = UnifiedSearch.MAX_ROWS_PER_SOURCE)
 
-    internal suspend fun searchWithValues(context: Context, query: String, platform: String?, values: Map<String, String>, destination: File?, systemName: String): Result<List<AcquireContentResult>> {
+    /**
+     * [limit] is how many results the caller will show: the one search shows ten per source, so it asks for ten
+     * (`args.limit`, docs/plugin-api.md 1.8) and a source that honours it sends a page, not its whole answer. A
+     * source that ignores it is cut to [limit] here.
+     */
+    internal suspend fun searchWithValues(context: Context, query: String, platform: String?, values: Map<String, String>, destination: File?, systemName: String, limit: Int? = null): Result<List<AcquireContentResult>> {
         if (source.record.manifest.contractVersion < 2) return AcquireContentSources.search(context, source, platform.orEmpty(), systemName, query)
         val systemId = platform.orEmpty()
         val hostContext = org.json.JSONObject().put("system", org.json.JSONObject().put("id", systemId).put("name", systemName))
         destination?.let { hostContext.put("destination", it.absolutePath) }
         val args = org.json.JSONObject().put("query", query).put("values", org.json.JSONObject(values as Map<*, *>)).put("context", hostContext)
+        limit?.let { args.put("limit", it) }
         val reply = PluginViews.call(context, source.record, "library.sources", "search", args)
         if (!reply.ok) return Result.failure(IllegalStateException(reply.message ?: "Search failed"))
-        return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).map { row ->
+        return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).let { rows -> if (limit != null) rows.take(limit) else rows }.map { row ->
             AcquireContentResult(row.id, row.title, row.subtitle, null, row.platform, null, emptyList(), row.refJson, row.columns, row.badges)
         })
     }
 
     override fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: File?): CatalogScreen {
         if (source.record.manifest.contractVersion < 2) return SourceScreens.legacyDetail(source, result, systemId, systemName, destination)
-        if (destination == null) return SourceScreens.noDestination(result)
+        if (destination == null) return SourceScreens.noDestination(result, systemName)
         val ref = org.json.JSONObject(result.raw)
         val context = org.json.JSONObject().put("system", org.json.JSONObject().put("id", systemId.orEmpty()).put("name", systemName.orEmpty())).put("destination", destination.absolutePath)
         val fallback = {

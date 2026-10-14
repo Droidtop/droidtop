@@ -61,7 +61,7 @@ class GetGamesEntryTest {
 
     @Test
     fun `an installed source that cannot answer is not ready, not absent`() {
-        val waiting = listOf(UnavailableSource("Source", "is waiting for your approval"))
+        val waiting = listOf(UnavailableSource("Source", "is waiting for your approval", pluginId = "source", waitingForApproval = true))
         assertEquals(GetMoreState.NOT_READY, GetMoreState.of(emptyList(), waiting))
     }
 
@@ -83,7 +83,7 @@ class GetGamesEntryTest {
             SourceOutcome(source("A"), listOf(result("a1"))),
             SourceOutcome(source("B"), emptyList(), failure = "did not answer in time"),
         )
-        assertEquals(GetMoreState.FOUND, GetMoreState.of(outcomes, listOf(UnavailableSource("C", "is turned off"))))
+        assertEquals(GetMoreState.FOUND, GetMoreState.of(outcomes, listOf(UnavailableSource("C", "is turned off", pluginId = "c", waitingForApproval = false))))
     }
 
     @Test

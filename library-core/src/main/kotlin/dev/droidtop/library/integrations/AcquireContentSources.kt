@@ -132,7 +132,14 @@ class AcquireContentJob internal constructor(
 }
 
 /** An installed plugin that offers downloads but cannot answer right now, and why, in words a person reads. */
-data class UnavailableSource(val label: String, val reason: String)
+data class UnavailableSource(
+    val label: String,
+    val reason: String,
+    /** The plugin's id: what opens its page in Settings, Plugins, where it is approved or turned on. */
+    val pluginId: String,
+    /** True while the plugin only waits for the person's approval (the sentence "is waiting for your approval"). */
+    val waitingForApproval: Boolean,
+)
 
 object AcquireContentSources {
     /** The registered settings screen id of Accounts and sources > Plugins: where "no source" and "needs approval" lead. */
@@ -157,6 +164,8 @@ object AcquireContentSources {
                         record.disabledReason != null -> "is disabled: ${record.disabledReason}"
                         else -> "is turned off"
                     },
+                    pluginId = record.manifest.id,
+                    waitingForApproval = record.trust == PluginTrustState.PENDING,
                 )
             }
 

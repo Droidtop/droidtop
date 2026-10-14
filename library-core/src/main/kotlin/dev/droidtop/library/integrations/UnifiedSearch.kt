@@ -61,6 +61,7 @@ class SourceStatus(
     val pending: Boolean get() = outcome == null
     val failure: String? get() = outcome?.failure
     val runtimeNeed: RuntimeNeed? get() = outcome?.runtimeNeed
+    val technical: String? get() = outcome?.technical
 }
 
 /**
@@ -142,7 +143,9 @@ object UnifiedSearch {
      * to one system when the surface has one. [carry] is the previous
      * query's source rows: they stay in the list (while they still show the
      * query) until their source answers again, so the list does not blink
-     * with every keystroke.
+     * with every keystroke. [keep] drops a source result the surface has no
+     * use for before it is ranked (the PC library drops the console systems'
+     * results), so what a source answers for other platforms never reaches the list.
      */
     fun search(
         context: Context,
@@ -150,10 +153,12 @@ object UnifiedSearch {
         platform: String?,
         local: suspend (String) -> List<LocalSearchRow>,
         carry: List<SourceHit> = emptyList(),
+        keep: (AcquireContentResult) -> Boolean = { true },
     ): Flow<UnifiedState> = stream(
         query = query,
         local = local,
         carry = carry,
+        keep = keep,
         loadSources = {
             withContext(Dispatchers.IO) { GameSources.plugins(context) to AcquireContentSources.unavailablePlugins(context) }
         },
@@ -167,6 +172,7 @@ object UnifiedSearch {
         local: suspend (String) -> List<LocalSearchRow>,
         carry: List<SourceHit> = emptyList(),
         debounceMs: Long = SOURCE_DEBOUNCE_MS,
+        keep: (AcquireContentResult) -> Boolean = { true },
         timeoutMs: Long = PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS,
         loadSources: suspend () -> Pair<List<GameSourceProvider>, List<UnavailableSource>>,
         fetch: suspend (GameSourceProvider) -> Result<List<AcquireContentResult>>,
@@ -181,7 +187,7 @@ object UnifiedSearch {
         var statuses: List<SourceStatus> = emptyList()
         var unavailable: List<UnavailableSource> = emptyList()
         val answered = LinkedHashMap<String, SourceOutcome>()
-        val stale = carry.filter { SearchRank.score(it.result.title, q) < SearchRank.OTHER }
+        val stale = carry.filter { SearchRank.score(it.result.title, q) < SearchRank.OTHER && keep(it.result) }
 
         fun state(settled: Boolean): UnifiedState {
             // A source that has not answered yet keeps its carried rows; one that has answered replaces them.
@@ -205,7 +211,7 @@ object UnifiedSearch {
             for (source in sources) {
                 launch {
                     val asked = PluginSearchAggregator.fanOutOutcomes(listOf(source), timeoutMs, fetch).single()
-                    val outcome = if (asked.failure == null) asked else asked.copy(runtimeNeed = needOf(source))
+                    val outcome = if (asked.failure == null) asked.copy(results = asked.results.filter(keep)) else asked.copy(runtimeNeed = needOf(source))
                     gate.withLock {
                         answered[source.id] = outcome
                         statuses = statuses.map { if (it.source.id == source.id) SourceStatus(source, outcome) else it }

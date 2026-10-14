@@ -78,10 +78,21 @@ object SourceScreens {
         )
     }
 
-    fun noDestination(result: AcquireContentResult) = CatalogScreen("source_no_destination_${result.id}", result.title, groups = { listOf(CatalogGroup("info", null, listOf(ActionItem("destination_missing", "Open this game's own system to download it", run = {})))) })
+    /** A result that has nowhere to go yet: says which folder is missing and where to add it (never a dead row). */
+    fun noDestination(result: AcquireContentResult, systemName: String? = null) = CatalogScreen(
+        "source_no_destination_${result.id}", result.title,
+        groups = {
+            listOf(CatalogGroup("info", null, listOf(ActionItem(
+                "destination_missing",
+                if (systemName.isNullOrBlank()) "No games folder to download into yet" else "No games folder for $systemName yet",
+                subtitle = "Add one under Settings, Game folders, then open this result again.",
+                run = {},
+            ))))
+        },
+    )
 
     fun legacyDetail(source: AcquireContentSource.Plugin, result: AcquireContentResult, systemId: String?, systemName: String?, destination: File?) =
-        if (destination == null) noDestination(result) else {
+        if (destination == null) noDestination(result, systemName) else {
             var picked = result.options.firstOrNull()?.index ?: 0
             CatalogScreen("source_detail_${source.id}_${result.id}", result.title, groups = { context ->
                 listOf(CatalogGroup("detail", null, buildList {

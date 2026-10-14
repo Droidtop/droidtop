@@ -436,8 +436,15 @@ no destination, such as the PC library). Ops:
   committed input runs `search` again with all `values`. Optional: a source
   that answers UNSUPPORTED (or a contract 1 source) gets droidtop's default
   form, one `text` node `query`.
-- `search {query, values, context}` → `{results: [result]}`, where a result
+- `search {query, values, limit?, context}` → `{results: [result]}`, where a result
   is `{id, title, subtitle?, columns?[], badges?[], platform?, ref?}`.
+  `limit` is how many results the host will show (ten per source in the one
+  search): send at most that many, a page and not the whole answer; the host
+  cuts a longer list to it. A failing search answers `ok: false` with a short
+  plain `message`; the host shows its own sentence ("This site needs a
+  sign-in in the browser", "It could not reach the site"), never the message,
+  and keeps the message, with markup removed, behind "Technical details", so a
+  site's page text is not a good message.
   `ref` is any JSON object; droidtop hands it back unread in `detail` and
   `acquire` and never parses it (12a checklist point 5). droidtop renders a
   result as a `row` that opens `detail`. At most 200 results are shown.

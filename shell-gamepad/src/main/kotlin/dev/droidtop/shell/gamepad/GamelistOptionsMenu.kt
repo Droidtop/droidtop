@@ -471,12 +471,8 @@ internal fun GamelistOptionsMenu(
 
     // The same search dialog the PC library opens (LibraryQueryUi), so the
     // one search over the library and the download sources is one component, not a copy.
-    // Downloads land in this system's own folder.
+    // Downloads land in this system's own folder, which the dialog finds when a result is picked.
     if (searchOpen && onSearchTextChange != null) {
-        var searchFolder by remember { mutableStateOf<java.io.File?>(null) }
-        androidx.compose.runtime.LaunchedEffect(systemId) {
-            searchFolder = systemId?.let { id -> withContext(Dispatchers.IO) { consoleFoldersFor(id).firstOrNull() } }
-        }
         dev.droidtop.shell.gamepad.query.LibrarySearchDialog(
             query = dev.droidtop.shell.gamepad.query.LibraryQuery(text = searchText),
             matchCount = games.size,
@@ -484,7 +480,6 @@ internal fun GamelistOptionsMenu(
             onTextChange = onSearchTextChange,
             onDismiss = { searchOpen = false },
             systemId = systemId,
-            systemFolder = searchFolder,
         )
     }
 }

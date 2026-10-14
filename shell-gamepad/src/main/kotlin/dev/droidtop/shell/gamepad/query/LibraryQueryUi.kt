@@ -5,6 +5,8 @@ import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.menuMove
+import dev.droidtop.shell.gamepad.moveCue
+import dev.droidtop.shell.gamepad.input.DeclareLayerHints
 import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -35,14 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
@@ -57,10 +57,13 @@ import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.integrations.GetMoreState
 import dev.droidtop.library.integrations.PluginGameSource
 import dev.droidtop.library.integrations.LocalSearchRow
-import dev.droidtop.library.integrations.SearchRow
+import dev.droidtop.library.integrations.AcquireContentSources
+import dev.droidtop.library.integrations.SourceDestinations
+import dev.droidtop.library.integrations.SourceHit
 import dev.droidtop.library.integrations.UnifiedSearch
 import dev.droidtop.library.integrations.UnifiedState
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.shell.gamepad.CatalogNavigator
@@ -432,24 +435,31 @@ internal fun PersistQuery(scopeId: String, query: LibraryQuery, loaded: Boolean,
  * matched in memory by the caller) and every download source, built-in or
  * plugin, which join the same list as they answer. A source's result is a
  * row like any other; there is no "Get more" group and no plugin mode.
- * Only a source that could not answer is told apart, by a line under the
- * rows that names it and the way to fix it.
+ * A source that could not answer is told apart by a line under the rows
+ * that names it; one that waits for approval or is turned off is a row
+ * that opens its page in Settings, Plugins.
  *
- * A surface whose list is on screen under the dialog (the PC library, a
- * console gamelist) passes no [local]: that list narrows live as the text
- * changes ([onTextChange]) and the dialog shows the match count above the
- * sources' rows.
+ * Every surface passes [local] for the rows of its own library, the PC
+ * library included, so the one list always holds the device's rows and the
+ * sources'. A surface whose list is on screen under the dialog (a console
+ * gamelist) may pass none: that list narrows live as the text changes
+ * ([onTextChange]) and the dialog shows the match count above the sources'
+ * rows.
  *
  * [systemId]/[systemFolder] scope the sources to one system and give a
- * download its destination; both are null for a cross-system list (the PC
- * library, the launcher), where picking a source's row says there is no
- * folder instead of sending an invalid path to the plugin.
+ * download its destination. Without them (the PC library, the launcher) a
+ * picked source row works its destination out from the result itself
+ * ([SourceDestinations]), and a result that has nowhere to go opens a page
+ * saying which folder is missing, never nothing. [sourceFilter] drops the
+ * results a surface has no use for (the PC library drops console systems).
  *
  * Typing is text entry, by the platform's keyboard or an attached one. The
  * field asks for the soft keyboard explicitly when it opens (an implicit
  * request is dropped while a pad or keyboard counts as a hardware
- * keyboard), Search on the keyboard hides it and moves the selection to the
- * first row, and B leaves without clearing what was typed.
+ * keyboard). The pad reaches the rows: Down (or Search on the keyboard)
+ * leaves the field for the first row, Up from the first row returns to the
+ * field, A opens the row under the cursor, and typing puts the cursor back
+ * in the field. B leaves without clearing what was typed.
  */
 @Composable
 internal fun LibrarySearchDialog(
@@ -464,14 +474,16 @@ internal fun LibrarySearchDialog(
     // field is empty; picking one puts its title in the field. Computed by
     // the caller off the main thread, never here.
     suggestions: List<dev.droidtop.library.integrations.Recommendation> = emptyList(),
-    // The device's own rows for the text (the launcher: installed apps and
-    // library games). Runs off the main thread over lists already in memory.
+    // The device's own rows for the text (installed apps and library games).
+    // Runs off the main thread over lists already in memory.
     local: (suspend (String) -> List<LocalSearchRow>)? = null,
-    // Changes when what [local] reads changed (the library finished loading): the search runs again for the same text.
+    // Changes when what [local] or [sourceFilter] read changed (the library finished loading): the search runs again for the same text.
     localKey: Any? = null,
     // Switches under the field that widen what [local] matches (the launcher's
     // "Include hidden games"); the caller holds their state, off each time it opens.
     switches: List<SearchSwitch> = emptyList(),
+    // Drops a source's result this surface has no use for, before it is ranked.
+    sourceFilter: ((dev.droidtop.library.integrations.AcquireContentResult) -> Boolean)? = null,
 ) {
     // The field reopens with what was typed and the caret at its END, so Backspace deletes the last letter
     // (Droidtop/tracker#376: a plain String field put the caret at the start).
@@ -481,7 +493,6 @@ internal fun LibrarySearchDialog(
     val text = field.text
     val fieldFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
     val view = LocalView.current
     LaunchedEffect(Unit) {
         // The field lives in the dialog's own composition, which attaches a frame or more after this
@@ -505,9 +516,15 @@ internal fun LibrarySearchDialog(
     // Bumped to search again after the person fixed something (installed a runtime, approved a plugin).
     var searchTick by remember { mutableIntStateOf(0) }
     var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
-    // What a failed source's plugin reported in its own words, shown on request under its plain sentence (Droidtop/tracker#167).
+    // What a failed source reported in its own words, shown on request under its plain sentence (Droidtop/tracker#167), by source id.
     var technicalDetails by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // The row under the pad's cursor, by key so a source answering above it does not move it; null is the field.
+    var focusKey by remember { mutableStateOf<String?>(null) }
     val currentLocal by rememberUpdatedState(local)
+    val currentFilter by rememberUpdatedState(sourceFilter)
+
+    // Typing puts the cursor back in the field.
+    LaunchedEffect(text) { focusKey = null }
 
     // Restarted by every keystroke: the previous query is cancelled, the device's rows are back at once and the sources
     // are asked only once the text rests (UnifiedSearch.SOURCE_DEBOUNCE_MS).
@@ -518,8 +535,138 @@ internal fun LibrarySearchDialog(
             platform = systemId,
             local = { q -> currentLocal?.invoke(q).orEmpty() },
             carry = state.sourceHits,
+            keep = { result -> currentFilter?.invoke(result) ?: true },
         ).collect { state = it }
     }
+
+    // Opening a source's result: its destination is worked out off the main thread, then its detail opens. The row is
+    // never a dead end: a result with no folder to go to opens a page that says which one is missing.
+    fun openHit(hit: SourceHit) {
+        coroutineScope.launch {
+            val pick = SourceDestinations.resolve(context, systemId, systemFolder, hit.result.platform)
+            activeCatalog = hit.source.detailScreen(hit.result, pick.systemId, pick.systemName, pick.folder)
+        }
+    }
+
+    fun openPlugin(pluginId: String?) {
+        activeCatalog = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, pluginId)
+    }
+
+    val lines = buildList<SearchLine> {
+        switches.forEach { switch ->
+            add(SearchLine.Entry("switch:${switch.label}", switch.label, value = if (switch.on) "On" else "Off", onPick = switch.toggle))
+        }
+        if (local == null) {
+            add(
+                SearchLine.Note(
+                    if (text.isBlank()) {
+                        "$totalCount games"
+                    } else if (matchCount == 0) {
+                        "No games match"
+                    } else {
+                        "$matchCount ${if (matchCount == 1) "game" else "games"} match"
+                    },
+                ),
+            )
+        }
+        if (text.isBlank() && suggestions.isNotEmpty()) {
+            add(SearchLine.Header("Recommended for you"))
+            suggestions.forEach { pick ->
+                add(
+                    SearchLine.Entry("suggestion:${pick.title}", pick.title, subtitle = pick.reason) {
+                        field = TextFieldValue(pick.title, selection = TextRange(pick.title.length))
+                        onTextChange(pick.title)
+                    },
+                )
+            }
+        }
+        if (text.isNotBlank()) {
+            state.rows.forEach { row ->
+                add(
+                    SearchLine.Entry("row:${row.kind}:${row.key}", row.title, subtitle = row.detail, icon = row.icon) {
+                        val hit = row.hit
+                        val open = row.open
+                        when {
+                            open != null -> {
+                                open()
+                                onDismiss()
+                            }
+                            hit != null -> openHit(hit)
+                        }
+                    },
+                )
+            }
+            when {
+                !state.settled -> add(SearchLine.Note("Searching"))
+                state.rows.isEmpty() -> add(SearchLine.Note("No match"))
+            }
+            if (state.settled) {
+                // Sources that wait for the person: one row that opens the approval, not a line per plugin.
+                val waiting = state.unavailable.filter { it.waitingForApproval }
+                if (waiting.isNotEmpty()) {
+                    add(
+                        SearchLine.Entry(
+                            "waiting",
+                            if (waiting.size == 1) "${waiting.first().label} is waiting for your approval" else "${waiting.size} sources are waiting for your approval",
+                            subtitle = if (waiting.size == 1) "Open it to approve" else "Open to approve them",
+                        ) { openPlugin(waiting.singleOrNull()?.pluginId) },
+                    )
+                }
+                state.unavailable.filter { !it.waitingForApproval }.forEach { off ->
+                    add(SearchLine.Entry("off:${off.pluginId}", "${off.label} ${off.reason}", subtitle = "Open its page") { openPlugin(off.pluginId) })
+                }
+                state.sources.filter { it.failure != null }.forEach { status ->
+                    val source = status.source
+                    add(SearchLine.Note("${source.label}: ${status.failure}"))
+                    val shown = technicalDetails[source.id]
+                    if (shown != null) {
+                        add(SearchLine.Note(shown))
+                    } else {
+                        add(
+                            SearchLine.Entry("technical:${source.id}", "Technical details", subtitle = source.label) {
+                                coroutineScope.launch {
+                                    val pluginId = (source as? PluginGameSource)?.source?.record?.manifest?.id
+                                    val recorded = pluginId?.let { withContext(Dispatchers.IO) { PluginStore.disabledDetail(context, it) } }
+                                    technicalDetails = technicalDetails + (
+                                        source.id to (listOfNotNull(status.technical, recorded).joinToString("\n").ifBlank { "The source reported nothing more." })
+                                    )
+                                }
+                            },
+                        )
+                    }
+                    source.settingsScreen()?.let { settings ->
+                        add(SearchLine.Entry("settings:${source.id}", "${source.label} settings") { activeCatalog = settings })
+                    }
+                    status.runtimeNeed?.let { need ->
+                        add(
+                            SearchLine.Entry("runtime:${source.id}", need.actionLabel, subtitle = "Searches again after") {
+                                coroutineScope.launch {
+                                    val error = withContext(Dispatchers.IO) {
+                                        PluginRuntimeNeeds.install(context, need) { statusLine = it }
+                                    }
+                                    if (error == null) {
+                                        statusLine = null
+                                        searchTick++
+                                    } else {
+                                        statusLine = "The ${need.runtime} runtime could not be installed: $error"
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
+                // The one way on from a search that found nothing to get: browse the sources, or install one.
+                val getGames = GetMoreState.of(state.sources.mapNotNull { it.outcome }, state.unavailable)
+                add(
+                    SearchLine.Entry("get_games", GetGamesEntry.LABEL, subtitle = GetGamesEntry.searchSubtitle(getGames)) {
+                        activeCatalog = getGamesScreen(GetGamesContext.SEARCH, systemId)
+                    },
+                )
+            }
+            statusLine?.let { add(SearchLine.Note(it)) }
+        }
+    }
+    val entries = lines.filterIsInstance<SearchLine.Entry>()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -527,19 +674,53 @@ internal fun LibrarySearchDialog(
     ) {
         GatePadInThisDialog()
         HideSystemBarsInThisDialog()
+        DeclareLayerHints(listOf(HintBinding(GamepadAction.A, "Open") { focusKey != null }, HintBinding(GamepadAction.B, "Close")))
         Column(
             modifier = Modifier
                 .width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp))
-                // The pad's own B (and a keyboard's Escape) is not the
-                // system back key, so the Dialog's dismiss-on-back does not
-                // see it; the field does not type it either. Ahead of the
-                // field, which leaves the keys it types to it (SPEC 6e).
+                // The pad's own B (and a keyboard's Escape) is not the system back key, so the Dialog's
+                // dismiss-on-back does not see it; the field does not type it either. Up, Down and A move
+                // the cursor between the field and the rows. All of it ahead of the field, which keeps the
+                // keys it types (SPEC 6e).
                 .onPad(preview = true) { press ->
-                    if (press.action == GamepadAction.B) {
-                        onDismiss()
-                        true
-                    } else {
-                        false
+                    val at = entries.indexOfFirst { it.key == focusKey }
+                    when (press.action) {
+                        GamepadAction.B -> {
+                            onDismiss()
+                            true
+                        }
+                        GamepadAction.DOWN -> if (entries.isEmpty()) {
+                            false
+                        } else {
+                            if (at < 0) {
+                                keyboard?.hide()
+                                moveCue(true, press.repeat)
+                                focusKey = entries.first().key
+                            } else {
+                                focusKey = entries[menuMove(at, entries.size, press)].key
+                            }
+                            true
+                        }
+                        GamepadAction.UP -> when {
+                            at < 0 -> false
+                            at == 0 -> {
+                                moveCue(true, press.repeat)
+                                focusKey = null
+                                keyboard?.show()
+                                true
+                            }
+                            else -> {
+                                focusKey = entries[menuMove(at, entries.size, press)].key
+                                true
+                            }
+                        }
+                        GamepadAction.A -> if (at >= 0) {
+                            entries[at].onPick()
+                            true
+                        } else {
+                            false
+                        }
+                        else -> false
                     }
                 }
                 .clip(MenuTokens.OverlayShape)
@@ -568,7 +749,7 @@ internal fun LibrarySearchDialog(
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                     onSearch = {
                         keyboard?.hide()
-                        focusManager.moveFocus(FocusDirection.Down)
+                        entries.firstOrNull()?.let { focusKey = it.key }
                     },
                 ),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
@@ -582,115 +763,18 @@ internal fun LibrarySearchDialog(
             )
             // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).
             dev.droidtop.shell.gamepad.OwnFieldKeyboard()
-            switches.forEach { switch ->
-                MenuRow(title = switch.label, value = if (switch.on) "On" else "Off", onClick = switch.toggle)
-            }
-            if (local == null) {
-                Text(
-                    if (text.isBlank()) {
-                        "$totalCount games"
-                    } else if (matchCount == 0) {
-                        "No games match"
-                    } else {
-                        "$matchCount ${if (matchCount == 1) "game" else "games"} match"
-                    },
-                    color = MenuTokens.OnSurfaceMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-            if (text.isBlank() && suggestions.isNotEmpty()) {
-                MenuSectionLabel("Recommended for you")
-                suggestions.forEach { pick ->
-                    MenuRow(
-                        title = pick.title,
-                        subtitle = pick.reason,
-                        onClick = {
-                            field = TextFieldValue(pick.title, selection = TextRange(pick.title.length))
-                            onTextChange(pick.title)
-                        },
-                    )
-                }
-            }
-            if (text.isNotBlank()) {
-                Column(modifier = Modifier.padding(top = 8.dp)) {
-                    state.rows.forEach { row ->
-                        SearchResultRow(
-                            row = row,
-                            onPick = {
-                                val hit = row.hit
-                                val open = row.open
-                                when {
-                                    open != null -> {
-                                        open()
-                                        onDismiss()
-                                    }
-                                    hit == null -> Unit
-                                    systemFolder == null -> statusLine = "No download folder for this list"
-                                    else -> activeCatalog = hit.source.detailScreen(hit.result, systemId, null, systemFolder)
-                                }
-                            },
-                        )
-                    }
-                    when {
-                        !state.settled -> SourceNote("Searching")
-                        state.rows.isEmpty() -> SourceNote("No match")
-                    }
-                    if (state.settled) {
-                        state.unavailable.forEach { SourceNote("${it.label} ${it.reason}") }
-                        state.sources.filter { it.failure != null }.forEach { status ->
-                            val source = status.source
-                            SourceNote("${source.label}: ${status.failure}")
-                            val pluginId = (source as? PluginGameSource)?.source?.record?.manifest?.id
-                            if (pluginId != null) {
-                                technicalDetails[pluginId]?.let { SourceNote(it) } ?: MenuRow(
-                                    title = "Technical details",
-                                    subtitle = source.label,
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            val detail = withContext(Dispatchers.IO) { PluginStore.disabledDetail(context, pluginId) }
-                                            technicalDetails = technicalDetails + (pluginId to (detail ?: "The plugin reported nothing more."))
-                                        }
-                                    },
-                                )
-                            }
-                            source.settingsScreen()?.let { settings ->
-                                MenuRow(title = "${source.label} settings", onClick = { activeCatalog = settings })
-                            }
-                            status.runtimeNeed?.let { need ->
-                                MenuRow(
-                                    title = need.actionLabel,
-                                    subtitle = "Searches again after",
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            val error = withContext(Dispatchers.IO) {
-                                                PluginRuntimeNeeds.install(context, need) { statusLine = it }
-                                            }
-                                            if (error == null) {
-                                                statusLine = null
-                                                searchTick++
-                                            } else {
-                                                statusLine = "The ${need.runtime} runtime could not be installed: $error"
-                                            }
-                                        }
-                                    },
-                                )
-                            }
+            Column(modifier = Modifier.padding(top = 8.dp)) {
+                lines.forEach { line ->
+                    when (line) {
+                        is SearchLine.Header -> MenuSectionLabel(line.text)
+                        is SearchLine.Note -> SourceNote(line.text)
+                        is SearchLine.Entry -> SearchEntryRow(line, selected = line.key == focusKey) {
+                            focusKey = line.key
+                            line.onPick()
                         }
-                        // The one way on from a search that found nothing to get: browse the sources, or install one.
-                        val getGames = GetMoreState.of(state.sources.mapNotNull { it.outcome }, state.unavailable)
-                        MenuRow(
-                            title = GetGamesEntry.LABEL,
-                            subtitle = GetGamesEntry.searchSubtitle(getGames),
-                            onClick = { activeCatalog = getGamesScreen(GetGamesContext.SEARCH, systemId) },
-                        )
-                    }
-                    statusLine?.let { line ->
-                        Text(line, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
             }
-            MenuHint("B keeps what is typed; delete the text to clear it")
         }
     }
 
@@ -709,11 +793,26 @@ internal fun LibrarySearchDialog(
 /** A switch under the search field: its label, whether it is on, and what pressing it does. */
 internal data class SearchSwitch(val label: String, val on: Boolean, val toggle: () -> Unit)
 
-/** One row of the one list: an app with its icon, a library game, or a source's result. */
+/** What the search dialog draws, top to bottom: a heading, a muted line, or a row the pad's cursor can stop on. */
+private sealed interface SearchLine {
+    data class Header(val text: String) : SearchLine
+    data class Note(val text: String) : SearchLine
+    class Entry(
+        /** Stable across a redraw, so the cursor stays on its row while sources answer above it. */
+        val key: String,
+        val title: String,
+        val subtitle: String? = null,
+        val value: String? = null,
+        val icon: android.graphics.Bitmap? = null,
+        val onPick: () -> Unit,
+    ) : SearchLine
+}
+
+/** One row of the one list: an app with its icon, a library game, a source's result, or a follow-up action. */
 @Composable
-private fun SearchResultRow(row: SearchRow, onPick: () -> Unit) {
+private fun SearchEntryRow(entry: SearchLine.Entry, selected: Boolean, onPick: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        row.icon?.let {
+        entry.icon?.let {
             Image(
                 bitmap = it.asImageBitmap(),
                 contentDescription = null,
@@ -721,8 +820,10 @@ private fun SearchResultRow(row: SearchRow, onPick: () -> Unit) {
             )
         }
         MenuRow(
-            title = row.title,
-            subtitle = row.detail,
+            title = entry.title,
+            subtitle = entry.subtitle,
+            value = entry.value,
+            selected = selected,
             modifier = Modifier.weight(1f),
             onClick = onPick,
         )
