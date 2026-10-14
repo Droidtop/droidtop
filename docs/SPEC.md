@@ -10363,7 +10363,15 @@ answered). Steam's are its static collections (cloud config store, namespace 1,
 rest of the Steam stack), read with the connection each library sync already
 holds and kept in `steam/collections.json`; a dynamic collection is a filter
 Steam evaluates itself and is counted, not copied, and Steam's hidden-games
-list is not a grouping and is left out. The decision: **mirror, read-only,
+list is not a grouping and is left out of the collections. **Steam's hidden
+list becomes droidtop's Hidden (2026-10-14, Droidtop/tracker#402):**
+`StoreLibrary.hiddenGames` gives it from the same saved read, and after each
+good sync `StoreHidden` carries its changes only into the games'
+`game_metadata.hidden`, the one Hidden rule (7j): a game that joins Steam's
+list is hidden, one that leaves it is shown again only when the last read had
+it (so the mirror hid it), and a game the person shows again in droidtop while
+Steam still hides it stays shown until Steam's list changes for it. The first
+read hides everything the list holds. Read-only, like the collections. The decision: **mirror, read-only,
 never write back.** After a good read, `StoreSyncs.run` has `StoreCollections`
 make droidtop collections named "<store>: <name>" (ids start `import:<store>:`)
 whose members are that store's games by library id (`steam:440`), in one

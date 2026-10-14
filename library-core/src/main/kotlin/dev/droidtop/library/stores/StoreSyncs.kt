@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
  * records when it last succeeded, so every store has a last-synced time and
  * the services need not keep one of their own (they kept it in memory, so it
  * was gone at the next start), and copies the store's collections in
- * ([StoreCollections]). A failed read records nothing: the time says when the
+ * ([StoreCollections]) and its hidden-games list ([StoreHidden]). A failed read records nothing: the time says when the
  * library was last read, not when someone last asked.
  */
 object StoreSyncs {
@@ -28,6 +28,8 @@ object StoreSyncs {
             record(context, store.id)
             // The store's own groupings follow its library; a failure here never fails the read.
             runCatching { StoreCollections.import(context, store) }
+            // So is its hidden-games list, carried into droidtop's Hidden by its changes only.
+            runCatching { StoreHidden.mirror(context, store) }
             // A freshly read library is the moment to look for updates of the games set to keep themselves current.
             StoreAutoUpdates.request(context)
             SyncChange.between(count, before, rowKeys(context, store))

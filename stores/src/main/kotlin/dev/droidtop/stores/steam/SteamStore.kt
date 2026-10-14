@@ -136,6 +136,12 @@ class SteamStore : StoreLibrary {
             ?.map { StoreCollection(it.id, it.name, it.appIds.mapTo(HashSet()) { app -> app.toString() }) }
     }
 
+    /** Steam's hidden-games list as the last sync read it (Droidtop/tracker#402); null before Steam has answered. */
+    override suspend fun hiddenGames(context: Context): Set<String>? = withContext(Dispatchers.IO) {
+        val parsed = SteamCollections.load(context) ?: return@withContext null
+        parsed.collections.firstOrNull { it.id == SteamCollections.ID_HIDDEN }?.appIds?.mapTo(HashSet()) { it.toString() } ?: emptySet()
+    }
+
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
         val language = StoreLanguage.current()
         SteamLibraryRows.read(context, db(context)).map { row ->

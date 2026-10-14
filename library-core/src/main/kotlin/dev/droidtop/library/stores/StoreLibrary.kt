@@ -262,6 +262,14 @@ interface StoreLibrary {
      */
     suspend fun collections(context: Context): List<StoreCollection>? = null
 
+    /**
+     * The store's own ids of the games the person hid in the store itself, as
+     * the last [sync] read them, from droidtop's own copy (no network); null
+     * when the store keeps no such list or has not answered, which changes
+     * nothing. Mirrored into droidtop's Hidden by [StoreHidden].
+     */
+    suspend fun hiddenGames(context: Context): Set<String>? = null
+
     /** How many DLC the account holds for its own games, for the store page; null when the store does not say. No network. */
     suspend fun dlcCount(context: Context): Int? = null
 
