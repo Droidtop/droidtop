@@ -14989,6 +14989,16 @@ The model is `CatalogPage(header, buttons, more, groups)`, built once per refres
 
 The tooltip bubble (`HintTip`) is deleted. A row's explanation is on the **focus line** under the list while the row is selected, and in **Info** (Y) with the rest; a row that has one shows a 20 dp info glyph, the hint row says `Y Info`, and a screen reader hears "More info available". **Accessibility > Info text** chooses where it shows: **Bottom line** (the default) or **Under each row** (`ReadingPrefs`; every renderer reads the one value). A screen's own explanation is the focus line's text when the selected row has none. The other bubbles moved to visible text: the PC game page's full paths and links are on its detail strip, the task manager's "not confirmed" reason shows under the selected row, the companion's heat card says "Battery temperature", and the key setup screens show their credit line and the current step's how-to. Every screen must make sense with every optional setting off and without pressing Y (rig check C11). The search index still reads the explanations. `check-ui-rules.sh` rule `hint-tip` (on) fails a new one.
 
+### High contrast, sentence case and the reading settings (decided 2026-10-14, Droidtop/tracker#485 F11)
+
+Settings > Appearance > Accessibility holds the reading settings (`ReadingPrefs`, read by every renderer):
+
+- **Info text**: Bottom line (default) or Under each row ("Explanations: no tooltips").
+- **High contrast** (off by default; Android's own high-contrast text turns it on too): every text role is moved the shortest way to 7:1 over every surface it is drawn on (`GamingThemeMapping.highContrast`), the notices hold 7:1, the focus ring's outer edge is 4 dp, the theme's texture is not drawn and the PC and Home backdrop is the plain ground (no art behind text), and labels are in sentence case. The separate "plain background" idea is this setting.
+- **Sentence case labels**: section labels, tabs, chips and eyebrows that a theme draws in capitals are drawn as written (`labelCase`; all caps is harder to read). Off by default, always on under High contrast; `ReadingPrefs.SENTENCE_CASE_DEFAULT` is the one constant to flip (owner question 4 on tracker#485). It never applies to data: a game's name and anything typed keep their own case.
+
+A change to either re-reads the palette at once (a preferences listener held by the Gaming theme's composition). **UI sounds** stay as decided in "Interface sounds": on by default (owner question 3, the coordinator's default), from the bundled Kenney Interface Sounds set (CC0, NOTICE.md), with the edge bump at list ends; a separate error tone is not bundled yet (it needs one more file from the same pack). The companion's own text size is the companion slice (F8).
+
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 
 The owner could not read some settings items: rows were one line with

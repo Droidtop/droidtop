@@ -177,6 +177,8 @@ object DroidtopWideSettings {
                             },
                         ),
                         dev.droidtop.library.settings.ReadingPrefs.infoTextItem(context),
+                        dev.droidtop.library.settings.ReadingPrefs.highContrastItem(context),
+                        dev.droidtop.library.settings.ReadingPrefs.sentenceCaseItem(context),
                     ),
                 ),
                 CatalogGroup(

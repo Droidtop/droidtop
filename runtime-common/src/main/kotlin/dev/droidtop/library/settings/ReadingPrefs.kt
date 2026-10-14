@@ -22,6 +22,47 @@ object ReadingPrefs {
 
     fun infoUnderRows(context: Context): Boolean = infoText(context) == INFO_UNDER_ROWS
 
+    /**
+     * High contrast (docs/SPEC.md 7k, "High contrast"): solid plates and no art behind text, a plain backdrop,
+     * the 4dp focus ring, body text at 7:1, and sentence case. Off by default; Android's own high-contrast text
+     * turns it on as well (the shell reads both).
+     */
+    const val KEY_HIGH_CONTRAST = "pref_global_high_contrast"
+
+    /**
+     * Sentence case for the labels themes draw in capitals (section labels, tabs, chips, eyebrows): all caps is
+     * harder to read. The owner's question 4 on Droidtop/tracker#485, answered with the coordinator's default
+     * (off, on under High contrast); this constant is the one place to flip it.
+     */
+    const val KEY_SENTENCE_CASE = "pref_global_sentence_case"
+    const val SENTENCE_CASE_DEFAULT = false
+
+    fun highContrast(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(KEY_HIGH_CONTRAST, false)
+
+    fun sentenceCase(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(KEY_SENTENCE_CASE, SENTENCE_CASE_DEFAULT)
+
+    /** The keys a surface re-reads its palette for. */
+    val PALETTE_KEYS: Set<String> = setOf(KEY_HIGH_CONTRAST, KEY_SENTENCE_CASE)
+
+    /** A label as a theme's caps style draws it, or as written when sentence case is on. Pure. */
+    fun caps(text: String, sentenceCase: Boolean): String = if (sentenceCase) text else text.uppercase()
+
+    fun highContrastItem(context: Context): ToggleItem = ToggleItem(
+        id = KEY_HIGH_CONTRAST,
+        title = "High contrast",
+        subtitle = "Solid backgrounds behind text, stronger text and focus, no art behind words",
+        current = highContrast(context),
+        onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_HIGH_CONTRAST, on).apply() },
+    )
+
+    fun sentenceCaseItem(context: Context): ToggleItem = ToggleItem(
+        id = KEY_SENTENCE_CASE,
+        title = "Sentence case labels",
+        subtitle = "Section labels and tabs as written instead of in capitals; always on with High contrast",
+        current = sentenceCase(context),
+        onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_SENTENCE_CASE, on).apply() },
+    )
+
     /** The Settings row that chooses it, for the Accessibility group. */
     fun infoTextItem(context: Context): ChoiceItem = ChoiceItem(
         id = KEY_INFO_TEXT,

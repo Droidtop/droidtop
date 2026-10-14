@@ -222,7 +222,7 @@ internal fun ShellChip(
     }
     Text(
         when {
-            tab -> label.uppercase()
+            tab -> label.labelCase()
             on -> "\u2713 $label"
             else -> label
         },
@@ -345,7 +345,7 @@ internal fun MenuHeader(title: String, subtitle: String? = null, modifier: Modif
 @Composable
 internal fun MenuSectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
-        text.uppercase(),
+        text.labelCase(),
         color = MenuTokens.SectionLabel,
         style = TypeRole.sectionLabel,
         modifier = modifier.padding(top = 18.dp, bottom = 6.dp, start = 4.dp),
@@ -705,7 +705,7 @@ internal fun ShellProgressBar(fraction: Float, modifier: Modifier = Modifier) {
 @Composable
 internal fun StatusChip(text: String, ink: Color, fill: Color, modifier: Modifier = Modifier) {
     Text(
-        text.uppercase(),
+        text.labelCase(),
         color = ink,
         style = TypeRole.eyebrow,
         maxLines = 1,

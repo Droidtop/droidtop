@@ -80,6 +80,7 @@ import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.scraper.FieldSources
 import dev.droidtop.shell.gamepad.CatalogDetailStrip
+import dev.droidtop.shell.gamepad.labelCase
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.LocalValueColumnWidth
 import dev.droidtop.shell.gamepad.MenuRow
@@ -1029,7 +1030,7 @@ private fun PageFactsStrip(facts: List<Pair<String, String>>, modifier: Modifier
     ) {
         facts.forEach { (label, value) ->
             Column(verticalArrangement = Arrangement.spacedBy(Space.Hair)) {
-                Text(label.uppercase(), color = MenuTokens.OnSurfaceMuted, style = TypeRole.eyebrow, maxLines = 1)
+                Text(label.labelCase(), color = MenuTokens.OnSurfaceMuted, style = TypeRole.eyebrow, maxLines = 1)
                 Text(value, color = MenuTokens.OnSurface, style = TypeRole.value, maxLines = 1)
             }
         }
