@@ -93,6 +93,13 @@ class ModesTest {
     }
 
     @Test
+    fun `Android asks for the Home role only when droidtops launcher is on and not Home`() {
+        assertTrue(ModeGate.androidAsksForHome(launcherOn = true, droidtopIsHome = false))
+        assertFalse(ModeGate.androidAsksForHome(launcherOn = true, droidtopIsHome = true))
+        assertFalse(ModeGate.androidAsksForHome(launcherOn = false, droidtopIsHome = false))
+    }
+
+    @Test
     fun `a disabled mode contributes no piece`() {
         val launcherOnly = ModeGate.piecesToStart(setOf(Mode.LAUNCHER))
         assertEquals(

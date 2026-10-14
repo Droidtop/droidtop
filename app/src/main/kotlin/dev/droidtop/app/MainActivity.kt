@@ -547,6 +547,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         if (intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE, false)) {
             reinitializeDisplays()
         } else {
+            // Switch mode > Gaming or Desktop after Android: the companion's screen was taken by the launcher, and
+            // the person asked for droidtop back (Droidtop/tracker#522).
+            if (intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAYS_BACK, false)) displayOrchestrator.companionBack()
             displayOrchestrator.refresh()
         }
     }

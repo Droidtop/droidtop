@@ -851,6 +851,18 @@ cursor from the start, so one A chooses it; B closes; the sheet draws its own
 hint row (A Select, B Cancel), the touch route to those presses, because the
 window has no shell footer.
 
+**Android mode without droidtop as Home asks first; the companion is the shell's, not the mode's (2026-10-14,
+Droidtop/tracker#522).** With droidtop's launcher on but another app holding Android's Home role, "Android" in
+the switcher would start that launcher, which on a dual-screen device takes the companion's screen while the
+shell stays up, with no word (rig, review D1). `ModeGate.androidAsksForHome` (droidtop's launcher on, not Home)
+makes that row ask instead, in the same sheet: "Make droidtop your Home app to use Android mode", Set (Android's own
+Home role request, then Android mode if it was granted) or Cancel. With no droidtop launcher there is nothing to
+ask for and "Android" is the other launcher as chosen. And coming back works without "Reinitialize displays":
+the switcher's Gaming and Desktop rows carry `EXTRA_DISPLAYS_BACK`, `MainActivity.onNewIntent` calls
+`SecondScreenOrchestrator.companionBack`, which releases `CompanionCover` (the mark that an app took the companion's
+screen, so the orchestrator no longer keeps the companion off it) and the next pass places the companion as after
+a hotplug. An app droidtop launched there stays (the parked display is not touched).
+
 **That fix was the dialog; a second, separate bug looked like "Gaming
 never appears" (found and fixed 2026-09-26).** The rig re-tested the
 above fix on BlueStacks (Android 9) and found selecting "Gaming" still

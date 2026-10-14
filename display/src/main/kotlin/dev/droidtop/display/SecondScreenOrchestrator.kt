@@ -120,6 +120,16 @@ class SecondScreenOrchestrator(
     }
 
     /**
+     * The person switched back to droidtop (Switch mode > Gaming or Desktop): an app that took the companion's screen
+     * in the meantime (the stock launcher, after Android mode) no longer keeps the companion off it. Only the
+     * companion's cover is released, so an app droidtop launched there ([SecondScreenHost.parkedDisplayId]) stays.
+     */
+    fun companionBack() {
+        CompanionCover.clear()
+        lastRelocationAttemptMs = 0L
+    }
+
+    /**
      * Re-runs orchestration from scratch: drops the parked display and the
      * relocation cooldown so the next pass really acts rather than being
      * suppressed as a repeat attempt.

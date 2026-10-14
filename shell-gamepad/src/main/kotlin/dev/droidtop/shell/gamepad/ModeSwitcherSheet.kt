@@ -24,10 +24,11 @@ class ModeSwitcherChoice(val label: String, val choose: () -> Unit)
  * type in Gaming and droidtop's own elsewhere. It replaced a platform AlertDialog in the system face
  * (rig, build 1535). The first row holds the cursor from the start, so one A chooses it; Up/Down move,
  * B closes, and the hint row under the rows is the touch route to the same presses, since the window
- * hosting this has no shell footer of its own.
+ * hosting this has no shell footer of its own. [title] lets the same sheet ask a question ("Make droidtop your Home
+ * app...") with its answers as the rows.
  */
 @Composable
-fun ModeSwitcherSheet(choices: List<ModeSwitcherChoice>, onDismiss: () -> Unit) {
+fun ModeSwitcherSheet(choices: List<ModeSwitcherChoice>, onDismiss: () -> Unit, title: String = "Switch mode") {
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         var focus by remember { mutableIntStateOf(0) }
         fun choose(index: Int) {
@@ -39,8 +40,8 @@ fun ModeSwitcherSheet(choices: List<ModeSwitcherChoice>, onDismiss: () -> Unit) 
             GatePadInThisDialog()
             MenuPanel(
                 modifier = Modifier.width(LocalShellWindow.current.panelWidth(420.dp)),
-                focusLabel = "Switch mode",
-                title = "Switch mode",
+                focusLabel = title,
+                title = title,
                 // No shell footer behind this window: the panel draws its own hint row below.
                 hints = emptyList(),
                 onPad = { press ->

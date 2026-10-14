@@ -77,6 +77,13 @@ object BackButtonMenu {
     const val EXTRA_DISPLAY_REINIT_FORCE = "dev.droidtop.app.EXTRA_DISPLAY_REINIT_FORCE"
 
     /**
+     * Set when the switcher sends the person to Gaming or Desktop: they asked for droidtop back, so a screen the
+     * companion was left off by another app (the stock launcher after "Android") is the companion's again
+     * (Droidtop/tracker#522). Unlike the reinit extras it covers no app droidtop launched.
+     */
+    const val EXTRA_DISPLAYS_BACK = "dev.droidtop.app.EXTRA_DISPLAYS_BACK"
+
+    /**
      * "Android" is always offered: it is the home screen the Home button
      * opens, droidtop's or not. A mode that is off is not listed; "Settings" opens
      * Global settings, where every mode is switched on and off, so turning
@@ -94,12 +101,23 @@ object BackButtonMenu {
      * (`ModeSwitcherSheet` in `:shell-gamepad`, hosted by `dev.droidtop.app.ModeSwitcherActivity`),
      * the same in every mode; this module cannot depend on that one, so it hands over the list.
      */
-    fun choices(context: Context): List<Pair<String, () -> Unit>> {
+    /** Whether "Android" must first ask to make droidtop the Home app ([ModeGate.androidAsksForHome]). */
+    fun androidAsksForHome(context: Context): Boolean = ModeGate.androidAsksForHome(
+        launcherOn = HomeRolePrefs.activeHomeImplementation(context) != HomeRolePrefs.HomeImplementation.NONE,
+        droidtopIsHome = HomeRolePrefs.isDroidtopHome(context),
+    )
+
+    /** [askForHome], when given, runs instead of "Android" while [androidAsksForHome] says it must ask first. */
+    fun choices(context: Context, askForHome: (() -> Unit)? = null): List<Pair<String, () -> Unit>> {
         val homeImplementation = HomeRolePrefs.activeHomeImplementation(context)
         return buildList {
             for (mode in ModeGate.switcherModes(Modes.enabled)) {
                 when (mode) {
-                    Mode.LAUNCHER -> add(Mode.LAUNCHER.label to { openHome(context, homeImplementation) })
+                    Mode.LAUNCHER -> add(
+                        Mode.LAUNCHER.label to {
+                            if (askForHome != null && androidAsksForHome(context)) askForHome() else openHome(context, homeImplementation)
+                        },
+                    )
                     Mode.DESKTOP -> add(Mode.DESKTOP.label to { launchAppMode(context, Mode.DESKTOP) })
                     Mode.GAMING -> add(Mode.GAMING.label to { launchAppMode(context, Mode.GAMING) })
                 }
@@ -200,6 +218,7 @@ object BackButtonMenu {
         val intent = Intent(Intent.ACTION_MAIN).apply {
             setClassName(context.packageName, APP_MAIN_ACTIVITY)
             putExtra(EXTRA_MODE, mode.id)
+            putExtra(EXTRA_DISPLAYS_BACK, true)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)

@@ -153,6 +153,14 @@ object ModeGate {
         if (Mode.GAMING in enabled) add(Mode.GAMING)
     }
 
+    /**
+     * Whether choosing "Android" in the switcher first asks to make droidtop the Home app (Droidtop/tracker#522): the
+     * person has droidtop's launcher on ([launcherOn]) but Android's Home opens another app, so "Android" would hand a
+     * screen of a dual-screen device to that launcher and leave droidtop's surfaces behind. With no droidtop launcher
+     * there is nothing to ask for: "Android" is then the other launcher, as chosen.
+     */
+    fun androidAsksForHome(launcherOn: Boolean, droidtopIsHome: Boolean): Boolean = launcherOn && !droidtopIsHome
+
     fun resolveAppMode(
         explicitId: String?,
         defaultId: String?,
