@@ -13397,6 +13397,19 @@ game of EXACTLY the same name (`ProtonDbClient.steamAppIdFor`) — a
 similar name is a suggestion, not an automatic identity, so it is never
 guessed.
 
+**What's new, asked for the same way (2026-10-14, Droidtop/tracker#229).** A
+Steam game (its own row, or an engine copy that kept its Steam store id) has a
+"What's new" row under About in `PcGameMenu`. Selecting it reads Steam's
+public news endpoint (`ISteamNews/GetNewsForApp/v2`, the developer's own
+announcements feed, no key and no account, so nothing about the person is
+sent beyond the app id) through `SteamNewsClient`: the newest post tagged as
+patch notes, else the newest announcement, shown as its title, "Patch notes,
+<date>" and a plain-text start of it; selecting it again opens Steam's news
+page for the app, which is the full history. Nothing is fetched until the
+row is selected, and every outcome is a sentence on the row. Other stores
+have no such row yet: GOG's per-product changelog and itch.io devlogs are
+the candidates, and a folder game's notes come from its source plugin.
+
 ### Relationship to the Quick Menu
 
 **A library refresh keeps the current PC Games view on screen (directed

@@ -63,6 +63,9 @@ import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.library.scraper.ProtonDbClient
 import dev.droidtop.library.scraper.ProtonDbSummary
 import dev.droidtop.library.scraper.ScrapeLookup
+import dev.droidtop.library.scraper.SteamNewsClient
+import dev.droidtop.library.scraper.SteamNewsItem
+import dev.droidtop.library.scraper.kindAndDate
 import dev.droidtop.library.scraper.line
 import dev.droidtop.shell.gamepad.CollectionMembershipEditor
 import dev.droidtop.shell.gamepad.ManualMatchPicker
@@ -172,6 +175,7 @@ internal fun PcGameMenu(
     var contentOpen by remember(entry) { mutableStateOf(false) }
     var wineSettings by remember(entry) { mutableStateOf<WineGameSettings?>(null) }
     var protonDb by remember(entry) { mutableStateOf<ProtonDbState>(ProtonDbState.NotAsked) }
+    var steamNews by remember(entry) { mutableStateOf<SteamNewsState>(SteamNewsState.NotAsked) }
     // Which page of the menu is showing and which row of it the cursor is
     // on (docs/SPEC.md 7i): the short top page, or one of the two longer
     // lists it opens. A sub-page's B goes back to the top, never out.
@@ -938,7 +942,38 @@ internal fun PcGameMenu(
                 )
             }
         }
-        pageAbout = aboutEntries
+        // What's new (docs/SPEC.md 7i, Droidtop/tracker#229): the developer's latest post on Steam, asked for like ProtonDB.
+        val newsAppId = steamAppIdOf(entry)
+        val newsRow = newsAppId?.let {
+            val state = steamNews
+            PcMenuEntry.Row(
+                PcActionRow(
+                    title = if (state is SteamNewsState.Found) state.item.title else "What's new",
+                    detail = state.detail(),
+                    onSelect = if (state !is SteamNewsState.Looking) {
+                        {
+                            if (state is SteamNewsState.Found) {
+                                status = runCatching {
+                                    context.startActivity(
+                                        android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(SteamNewsClient.pageUrl(newsAppId)),
+                                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                    )
+                                    null
+                                }.getOrElse { "There is no browser on this device to open Steam's news in." }
+                            } else {
+                                steamNews = SteamNewsState.Looking
+                                scope.launch { steamNews = lookUpSteamNews(newsAppId) }
+                            }
+                        }
+                    } else {
+                        null
+                    },
+                ),
+            )
+        }
+        pageAbout = aboutEntries + listOfNotNull(newsRow)
     }
 
     // Fix and advanced: the repairs and the internals of how this copy
@@ -1527,6 +1562,38 @@ private sealed interface ProtonDbState {
         is Found -> "Reports from Linux PCs running Proton, not from this device. Select to open ProtonDB"
         is Unavailable -> line
     }
+}
+
+/** The What's new row's states: nothing is fetched until the person asks. */
+private sealed interface SteamNewsState {
+    data object NotAsked : SteamNewsState
+    data object Looking : SteamNewsState
+    data class Found(val item: SteamNewsItem) : SteamNewsState
+    data class Unavailable(val line: String) : SteamNewsState
+
+    fun detail(): String = when (this) {
+        NotAsked -> "The developer's latest notes on Steam"
+        Looking -> "Looking it up…"
+        is Found -> listOf(item.kindAndDate(), item.excerpt.takeIf { it.isNotEmpty() }, "Select for every post on Steam")
+            .filterNotNull().joinToString(". ")
+        is Unavailable -> line
+    }
+}
+
+/** The Steam app id a game is known by on Steam itself (its own row, or the store row an engine copy kept); null otherwise. */
+private fun steamAppIdOf(entry: LibraryEntry): Long? =
+    listOfNotNull(entry.id, entry.pcInfo?.storeId)
+        .firstNotNullOfOrNull { id -> id.takeIf { it.startsWith("steam:") }?.substringAfter(':')?.toLongOrNull() }
+
+/** Network: the IO dispatcher. Every outcome is a sentence. */
+private suspend fun lookUpSteamNews(appId: Long): SteamNewsState = withContext(Dispatchers.IO) {
+    runCatching {
+        when (val lookup = SteamNewsClient.latest(appId)) {
+            is ScrapeLookup.Found -> SteamNewsState.Found(lookup.value)
+            ScrapeLookup.NoMatch -> SteamNewsState.Unavailable("The developer has posted no news on Steam for this game")
+            is ScrapeLookup.Refused -> SteamNewsState.Unavailable("Steam's news could not be reached (error ${lookup.httpStatus})")
+        }
+    }.getOrElse { SteamNewsState.Unavailable("Steam's news could not be reached: ${it.message ?: it}") }
 }
 
 /** Network: the IO dispatcher. Every outcome is a sentence, never a silent blank. */
