@@ -250,6 +250,7 @@ dependencies {
     implementation(project(":shell-default"))
     implementation(project(":shell-desktop"))
     implementation(project(":shell-gamepad"))
+    implementation(project(":ui-shared"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
