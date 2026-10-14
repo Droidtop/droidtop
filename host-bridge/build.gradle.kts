@@ -57,4 +57,6 @@ dependencies {
     api(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+    // SwayIpc reads sway's JSON with org.json; android.jar's is a throwing stub in JVM tests.
+    testImplementation(libs.json.v20240303)
 }

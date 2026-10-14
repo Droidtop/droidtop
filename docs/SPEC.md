@@ -303,8 +303,8 @@ it reads the container's POSIX `TZ`. Sway's own bar is plain `sway`, which
 also reads the person's own `~/.config/sway/config`; it is the choice for
 someone who keeps their own. labwc takes no panel here. Whichever panel
 runs, the library's games are in its launcher, since they are desktop
-entries on `XDG_DATA_DIRS`; the taskbar's minimize test reads the program
-name of the compositor command, not the whole command. droidtop's own
+entries on `XDG_DATA_DIRS`; the taskbar's choice of minimize reads the
+program name of the compositor command, not the whole command. droidtop's own
 Compose taskbar stays until it shrinks to what only Android can do (the task
 manager across containers, the mode switch).
 
@@ -6598,18 +6598,23 @@ app-drawer icon or a floating switcher button:
   the row (and un-minimizes it first if needed), a second tap on the
   already-activated row minimizes it, and its long-press menu offers
   Restore/Minimize and Close (`zwlr_foreign_toplevel_handle_v1`'s
-  activate/set_minimized/unset_minimized/close requests). The minimize
-  affordances are compositor-conditional (2026-09-29, Droidtop/tracker#145):
-  sway ignores set_minimized/unset_minimized outright — under it the
-  second-tap minimize and the menu's Minimize did nothing (rig,
-  fix2-t5.png in verify-2026-09-29) — while labwc implements the request
-  (its src/foreign-toplevel/wlr-foreign.c handle_request_minimize calls
-  view_minimize), and the protocol has no capability query to ask with,
-  so the session publishes the compositor it started
-  (`DesktopSessionState.Connected.compositorCommand`, straight from
-  CompositorProvisioning's plan) and under sway the taskbar drops the
-  second-tap minimize and hides the menu's Restore/Minimize row rather
-  than offer an action the compositor discards. The manager's
+  activate/set_minimized/unset_minimized/close requests). How a window is
+  minimized depends on the compositor (Droidtop/tracker#145, #391), and
+  the protocol has no capability query to ask with, so the session builds
+  `DesktopWindows` (`:host-bridge`) from the compositor it started: labwc
+  implements set_minimized (its src/foreign-toplevel/wlr-foreign.c
+  handle_request_minimize calls view_minimize); sway ignores it (rig,
+  fix2-t5.png in verify-2026-09-29), so under sway Minimize is sway IPC's
+  `[con_id=N] move scratchpad` and Restore is `scratchpad show`, plus
+  `floating disable` for a window that was tiled, so it returns to the
+  layout. droidtop speaks the IPC itself (`SwayIpc`) on the socket sway
+  creates in the shared `XDG_RUNTIME_DIR`, the directory host-bridge
+  already reaches for the Wayland socket, so nothing in the container is
+  needed. The container is found in `get_tree` by the app id and title
+  the protocol reported; with two windows alike the window is raised
+  first and the focused one is taken. sway reports a scratchpad window
+  only as not activated, so the windows droidtop put away are remembered
+  and shown as minimized until they come back to the front by any route. The manager's
   listener is attached in the registry callback at bind time: the compositor
   answers a bind with one `toplevel` event per window already open, and a
   listener added after connect()'s round trips lost those, so a desktop

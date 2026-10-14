@@ -127,6 +127,18 @@ object ContainerLayout {
             ?.minByOrNull { it.first }
             ?.second
 
+    private val SWAY_IPC_SOCKET = Regex("sway-ipc\\.\\d+\\.\\d+\\.sock")
+
+    /**
+     * sway's IPC socket in the host side of [SOCKET_DIR]: sway names it `sway-ipc.<uid>.<pid>.sock` in
+     * `XDG_RUNTIME_DIR` (sway/ipc-server.c ipc_init), which is [SOCKET_DIR]. The directory is emptied
+     * before the primary starts, so the newest is the running compositor's. Null with any other compositor.
+     */
+    fun findSwayIpcSocket(hostSocketDir: File): File? =
+        hostSocketDir.listFiles()
+            ?.filter { SWAY_IPC_SOCKET.matches(it.name) }
+            ?.maxByOrNull { it.lastModified() }
+
     /**
      * Environment every process droidtop starts in a container gets, so a
      * Wayland client reaches the primary compositor: [SOCKET_DIR] as

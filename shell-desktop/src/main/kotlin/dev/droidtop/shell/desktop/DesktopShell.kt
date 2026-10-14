@@ -50,6 +50,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.droidtop.hostbridge.DesktopWindows
+import dev.droidtop.hostbridge.HiddenWindow
 import dev.droidtop.hostbridge.HostBridge
 import dev.droidtop.hostbridge.Toplevel
 import dev.droidtop.input.DesktopInputRouter
@@ -64,6 +66,7 @@ import dev.droidtop.runtime.DesktopScale
 import dev.droidtop.runtime.DisplayOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.droidtop.library.integrations.PluginHub
@@ -139,15 +142,10 @@ fun DesktopShell(
     hostBridge: HostBridge?,
     primaryOutput: DisplayOutput?,
     /**
-     * The compositor the session is running (DesktopSessionState.Connected's
-     * copy of the provisioning plan's compositorCommand, null with no session).
-     * sway ignores zwlr_foreign_toplevel_handle_v1's set_minimized/
-     * unset_minimized, so under it the taskbar hides its minimize affordances
-     * rather than offering an action that does nothing (Droidtop/tracker#145);
-     * labwc implements the requests. The Wayland protocol has no capability
-     * query, so the session says which compositor it started instead.
+     * The session's window actions: raise, minimize and restore for whichever
+     * compositor it started (Droidtop/tracker#145, #391). Null with no session.
      */
-    compositorCommand: String? = null,
+    windows: DesktopWindows? = null,
     sessionMessage: DesktopSessionMessage = DesktopSessionMessage.Idle,
     onOpenTerminal: (() -> Unit)? = null,
     loadLinuxApps: (suspend () -> List<ContainerApp>)? = null,
@@ -184,6 +182,7 @@ fun DesktopShell(
     }
     // One listener on the bridge feeds the taskbar and the windows sheet alike.
     val toplevels = rememberToplevels(hostBridge)
+    LaunchedEffect(windows, toplevels) { windows?.forget(toplevels) }
     // What Android is running that droidtop started (a game or an app launched from here is a fullscreen
     // Activity over the desktop, not a window the compositor knows), polled only while Desktop shows.
     val androidApps = rememberAndroidApps()
@@ -268,7 +267,7 @@ fun DesktopShell(
             pins = pins.list,
             onOpenPin = openPin,
             onUnpin = { pins.toggle(it) },
-            compositorCommand = compositorCommand,
+            windows = windows,
             onOpenStartMenu = { startMenuOpen = true },
             onOpenQuickMenu = { quickMenuOpen = true },
             // Absent rather than disabled when there is no live session:
@@ -324,7 +323,7 @@ fun DesktopShell(
                 hostBridge = hostBridge,
                 toplevels = toplevels,
                 androidApps = androidApps,
-                compositorCommand = compositorCommand,
+                windows = windows,
                 onDismiss = { windowsOpen = false },
             )
         }
@@ -564,7 +563,7 @@ private fun BoxScope.Taskbar(
     pins: List<TaskbarPin>,
     onOpenPin: (TaskbarPin) -> Unit,
     onUnpin: (TaskbarPin) -> Unit,
-    compositorCommand: String?,
+    windows: DesktopWindows?,
     onOpenStartMenu: () -> Unit,
     onOpenQuickMenu: () -> Unit,
     onOpenTerminal: (() -> Unit)?,
@@ -614,7 +613,7 @@ private fun BoxScope.Taskbar(
             }
             Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
             TaskbarPinChips(pins, onOpenPin, onUnpin)
-            TaskbarWindowList(hostBridge, toplevels, androidApps, compositorCommand, modifier = Modifier.weight(1f))
+            TaskbarWindowList(hostBridge, toplevels, androidApps, windows, modifier = Modifier.weight(1f))
             if (onOpenTerminal != null) {
                 TaskbarButton(onClick = onOpenTerminal) {
                     Text("Terminal")
@@ -666,21 +665,18 @@ private fun TaskbarButton(onClick: () -> Unit, content: @Composable () -> Unit) 
  * The taskbar's real cross-container task manager (docs/SPEC.md's Desktop
  * shell section, Droidtop/tracker#94): one row per toplevel host-bridge
  * reports over wlr-foreign-toplevel-management. Tap activates it (raises +
- * focuses); tapping the already-activated one minimizes it instead, so a
- * single action both switches windows and gets one out of the way, the same
- * "click its taskbar button again" convention as a desktop OS. Long-press
- * opens a small menu for Restore/Minimize and Close -- the destructive one
- * deliberately not on a plain tap.
+ * focuses, restoring it first when minimized); tapping the already-activated
+ * one minimizes it instead, so a single action both switches windows and
+ * gets one out of the way, the same "click its taskbar button again"
+ * convention as a desktop OS. Long-press opens a small menu for
+ * Restore/Minimize and Close -- the destructive one deliberately not on a
+ * plain tap.
  *
- * Both minimize affordances exist only where they work. sway ignores the
- * protocol's set_minimized and unset_minimized requests outright, so under
- * it they were dead UI: the second tap and the menu's Minimize promised
- * something that never happened (rig, fix2-t5.png in verify-2026-09-29,
- * Droidtop/tracker#145). labwc implements the request (its wlr-foreign.c
- * handle_request_minimize calls view_minimize), and there is no
- * protocol-level capability query to ask with, so the one fact the shell
- * keys on is [compositorCommand]: "sway" drops the second-tap minimize and
- * hides the menu's Restore/Minimize row; anything else keeps both.
+ * Minimize and restore go through [DesktopWindows], which knows the
+ * compositor: labwc honours the protocol's set_minimized, sway ignores it
+ * (rig, fix2-t5.png in verify-2026-09-29, Droidtop/tracker#145) and gets its
+ * scratchpad over IPC instead (Droidtop/tracker#391). A minimize the
+ * compositor could not be asked for says so in a toast.
  *
  * Empty (no row shown at all, not even a placeholder) when [hostBridge] is
  * null or the compositor never advertised the protocol: an empty window
@@ -702,15 +698,12 @@ private fun TaskbarWindowList(
     hostBridge: HostBridge?,
     toplevels: List<Toplevel>,
     androidApps: List<RunningApp>,
-    compositorCommand: String?,
+    windows: DesktopWindows?,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // Sway's dead set_minimized (see the comment above) makes minimize a
-    // compositor-dependent affordance, not a universal one.
-    // The program, not the command: the Waybar panel starts sway with droidtop's config (sway -c ...).
-    val minimizeSupported = compositorCommand?.substringBefore(' ') != "sway"
+    val hidden by rememberHiddenWindows(windows)
 
     if (toplevels.isEmpty() && androidApps.isEmpty()) {
         Spacer(modifier = modifier)
@@ -719,16 +712,17 @@ private fun TaskbarWindowList(
 
     LazyRow(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         items(toplevels, key = { it.id }) { toplevel ->
+            val minimized = windows?.isMinimized(toplevel, hidden) ?: toplevel.minimized
             TaskbarWindowRow(
                 toplevel = toplevel,
-                showMinimize = minimizeSupported,
+                minimized = minimized,
                 onTap = {
-                    if (toplevel.activated) {
-                        if (minimizeSupported) hostBridge?.setToplevelMinimized(toplevel.id, true)
-                    } else {
-                        if (toplevel.minimized) hostBridge?.setToplevelMinimized(toplevel.id, false)
-                        hostBridge?.activateToplevel(toplevel.id)
+                    scope.launch {
+                        if (toplevel.activated && !minimized) minimizeWindow(context, windows, toplevel) else windows?.raise(toplevel)
                     }
+                },
+                onMinimize = {
+                    scope.launch { if (minimized) windows?.raise(toplevel) else minimizeWindow(context, windows, toplevel) }
                 },
                 onClose = { hostBridge?.closeToplevel(toplevel.id) },
             )
@@ -742,6 +736,16 @@ private fun TaskbarWindowList(
             )
         }
     }
+}
+
+/** [windows]' minimized-by-droidtop set as state; empty with no session. */
+@Composable
+private fun rememberHiddenWindows(windows: DesktopWindows?) =
+    remember(windows) { windows?.hidden ?: MutableStateFlow(emptyMap<Long, HiddenWindow>()) }.collectAsState()
+
+/** Minimizes [toplevel], and says so when the compositor could not be asked. */
+private suspend fun minimizeWindow(context: Context, windows: DesktopWindows?, toplevel: Toplevel) {
+    if (windows?.minimize(toplevel) != true) Toast.makeText(context, "Couldn't minimize this window", Toast.LENGTH_SHORT).show()
 }
 
 /**
@@ -824,33 +828,35 @@ private suspend fun closeAndroidApp(context: Context, app: RunningApp) {
 
 /**
  * The taskbar's window list as a sheet a pad drives (Droidtop/tracker#350): A raises a window (restoring it
- * first when it is minimized) or opens an Android app, X closes it, and the rest of the rules are the taskbar's own, including
- * that sway cannot minimize.
+ * first when it is minimized) or opens an Android app, X closes it, and the rest of the rules are the taskbar's own.
  */
 @Composable
 private fun WindowsSheet(
     hostBridge: HostBridge?,
     toplevels: List<Toplevel>,
     androidApps: List<RunningApp>,
-    compositorCommand: String?,
+    windows: DesktopWindows?,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val rows = remember(toplevels, androidApps) {
+    val hidden by rememberHiddenWindows(windows)
+    val rows = remember(toplevels, androidApps, hidden) {
         toplevels.map { toplevel ->
             HostedRow(
                 key = "window:" + toplevel.id,
                 title = toplevel.title.ifBlank { toplevel.appId.ifBlank { "(untitled window)" } },
                 subtitle = when {
-                    toplevel.minimized -> "Minimized"
+                    windows?.isMinimized(toplevel, hidden) ?: toplevel.minimized -> "Minimized"
                     toplevel.activated -> "In front"
                     else -> null
                 },
                 onSelect = {
-                    if (toplevel.minimized && compositorCommand != "sway") hostBridge?.setToplevelMinimized(toplevel.id, false)
-                    hostBridge?.activateToplevel(toplevel.id)
-                    onDismiss()
+                    // Dismissed after the raise: the sheet's scope ends with it.
+                    scope.launch {
+                        windows?.raise(toplevel)
+                        onDismiss()
+                    }
                 },
                 onToggle = { hostBridge?.closeToplevel(toplevel.id) },
             )
@@ -878,7 +884,13 @@ private fun WindowsSheet(
 }
 
 @Composable
-private fun TaskbarWindowRow(toplevel: Toplevel, showMinimize: Boolean, onTap: () -> Unit, onClose: () -> Unit) {
+private fun TaskbarWindowRow(
+    toplevel: Toplevel,
+    minimized: Boolean,
+    onTap: () -> Unit,
+    onMinimize: () -> Unit,
+    onClose: () -> Unit,
+) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
         Text(
@@ -895,7 +907,7 @@ private fun TaskbarWindowRow(toplevel: Toplevel, showMinimize: Boolean, onTap: (
                 .widthIn(max = 180.dp)
                 .combinedClickable(onClick = onTap, onLongClick = { menuOpen = true })
                 .background(
-                    if (toplevel.minimized) {
+                    if (minimized) {
                         MaterialTheme.colorScheme.surfaceVariant
                     } else {
                         MaterialTheme.colorScheme.surface
@@ -904,12 +916,10 @@ private fun TaskbarWindowRow(toplevel: Toplevel, showMinimize: Boolean, onTap: (
                 .padding(horizontal = 10.dp, vertical = 6.dp),
         )
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            if (showMinimize) {
-                DropdownMenuItem(
-                    text = { Text(if (toplevel.minimized) "Restore" else "Minimize") },
-                    onClick = { menuOpen = false; onTap() },
-                )
-            }
+            DropdownMenuItem(
+                text = { Text(if (minimized) "Restore" else "Minimize") },
+                onClick = { menuOpen = false; onMinimize() },
+            )
             DropdownMenuItem(
                 text = { Text("Close") },
                 onClick = { menuOpen = false; onClose() },

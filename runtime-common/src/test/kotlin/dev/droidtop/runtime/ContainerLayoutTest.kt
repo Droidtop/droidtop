@@ -97,8 +97,10 @@ class ContainerLayoutTest {
         val dir = java.nio.file.Files.createTempDirectory("sockets").toFile()
         try {
             assertEquals(null, ContainerLayout.findWaylandSocket(dir))
+            assertEquals(null, ContainerLayout.findSwayIpcSocket(dir))
             listOf("sway-ipc.0.12.sock", "wayland-1.lock", "wayland-10", "wayland-1").forEach { File(dir, it).writeText("") }
             assertEquals("wayland-1", ContainerLayout.findWaylandSocket(dir)!!.name)
+            assertEquals("sway-ipc.0.12.sock", ContainerLayout.findSwayIpcSocket(dir)!!.name)
         } finally {
             dir.listFiles()?.forEach { it.delete() }
             dir.delete()
