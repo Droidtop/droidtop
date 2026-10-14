@@ -260,6 +260,10 @@ class RoutedKeyboardSink(
             TypingRoute.NONE -> null
         }
 
+    // The elevated route starts a process per key, which a held key's repeats would queue without end.
+    override val repeatsAtSource: Boolean
+        get() = AddonKeyboardRules.route(SecondScreenKeyboard.androidTargetAvailable(), AccessibilityKeyboard.hasEditor(), elevated()) != TypingRoute.ELEVATED_INPUT
+
     override fun key(androidKeyCode: Int, down: Boolean) {
         val sink = target() ?: return onNoRoute()
         sink.key(androidKeyCode, down)

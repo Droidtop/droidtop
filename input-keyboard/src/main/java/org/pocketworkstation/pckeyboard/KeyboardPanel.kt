@@ -15,11 +15,19 @@ import android.widget.FrameLayout
  * Keys arrive on the hardware model [SecondScreenKeyboardListener] speaks: Android keycodes, pressed and
  * released, Shift as its own key around a capital. [text] carries what no key produces (an emoji from a
  * popup); a destination without a text channel (a compositor) sets [takesText] false.
+ *
+ * A held key reaches a hardware keyboard's far side as a stream of repeats the far side makes itself (a compositor
+ * does). Any other destination (an input connection, a window, a draft) sees one key-down per press, so the panel
+ * repeats Backspace, Delete, the arrows and Page Up and Down for it while they are held, unless the sink says its
+ * far side repeats ([repeatsAtSource] false).
  */
 interface KeyboardSink {
     fun key(androidKeyCode: Int, down: Boolean)
 
     val takesText: Boolean get() = true
+
+    /** Whether the panel repeats a held repeatable key (true), or the destination does it itself (false). */
+    val repeatsAtSource: Boolean get() = true
 
     fun text(chars: CharSequence) = Unit
 }
@@ -35,6 +43,10 @@ interface KeyboardSink {
  * method does not also put its own view up ([SecondScreenKeyboard.setAttached]). It follows window visibility,
  * not attachment, because a stopped Activity's views stay attached (Droidtop/tracker#156).
  *
+ * [functionRow] adds Hacker's Keyboard's own sixth row above the five of the full layout: F1 to F12, Home and End
+ * (its "extension" row, which its input method shows on request). The companion's Input tab, which stands in for a
+ * whole keyboard, asks for it; the small drafts and overlays keep the five rows.
+ *
  * [context] must belong to the display the panel is drawn on: the key grid sizes itself from its metrics.
  */
 class KeyboardPanel(
@@ -42,6 +54,7 @@ class KeyboardPanel(
     private val sink: KeyboardSink,
     private val heightPercent: Float = SecondScreenKeyboard.DEFAULT_HEIGHT_PERCENT,
     private val suppressImeView: Boolean = false,
+    private val functionRow: Boolean = false,
 ) : FrameLayout(context) {
 
     private var functionLayer = false
@@ -61,6 +74,28 @@ class KeyboardPanel(
             pending = null
         }
     }
+    private val repeatTimer = object : RepeatTimer {
+        private var pending: Runnable? = null
+
+        override fun start(delayMs: Long, intervalMs: Long, action: () -> Unit) {
+            cancel()
+            // Asked at each press: a routed sink changes where it types, and one route cannot afford a repeat.
+            if (!sink.repeatsAtSource) return
+            val run = object : Runnable {
+                override fun run() {
+                    action()
+                    holdHandler.postDelayed(this, intervalMs)
+                }
+            }
+            pending = run
+            holdHandler.postDelayed(run, delayMs)
+        }
+
+        override fun cancel() {
+            pending?.let { holdHandler.removeCallbacks(it) }
+            pending = null
+        }
+    }
     private val listener = SecondScreenKeyboardListener(
         send = { code, down -> sink.key(code, down) },
         resolver = AndroidCharKeyResolver(),
@@ -68,11 +103,12 @@ class KeyboardPanel(
         onLayoutToggle = { toggleLayout() },
         deferSpace = ToolsPrefs.spaceDrag(context),
         holdTimer = spaceTimer,
+        repeatTimer = repeatTimer,
     )
     private val keyboardView: LatinKeyboardView? = run {
         // The key grid reads the form (full, split, one-handed) from the shared settings, which only the input method loads.
         LatinIME.sKeyboardSettings.form = ToolsPrefs.form(context)
-        runCatching { SecondScreenKeyboard.createView(context, listener, heightPercent) }.getOrNull()
+        runCatching { SecondScreenKeyboard.createView(context, listener, heightPercent, functionRow) }.getOrNull()
     }
 
     // The tool strip (clipboard history, macros, incognito) above the grid, or the grid alone when it is switched off.
@@ -107,13 +143,13 @@ class KeyboardPanel(
     /** The key grid again, for a form that changed: the same layer, built with the new shape. */
     private fun rebuildKeys() {
         val view = keyboardView ?: return
-        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent)
+        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent, functionRow)
     }
 
     private fun toggleLayout() {
         val view = keyboardView ?: return
         functionLayer = !functionLayer
-        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent)
+        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent, functionRow)
     }
 
     private var countedForIme = false

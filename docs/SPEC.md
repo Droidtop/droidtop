@@ -3544,7 +3544,17 @@ row of recent apps, became Home's Recent apps section for every mode.
   never the companion's own, so touching the companion never moves the target. Pin keeps typing to that screen
   while it is connected (stored by its unique id). Chord keys above the keyboard (Esc, Tab, Alt+Tab, Super, Ctrl+C,
   Ctrl+V, Ctrl+Z) are played by the vendored keyboard's `MacroPlayer` into the same keyboard destination as typed
-  keys, which keeps its own sticky modifiers and macro keys. The trackpad's settings (Companion group > Trackpad,
+  keys, which keeps its own sticky modifiers and macro keys. **The keyboard is the whole Hacker's Keyboard layout
+  (Droidtop/tracker#486 item 2)**, the one view droidtop's input method draws (`KeyboardPanel`, no second keyboard):
+  its five rows (digits, Tab, Ctrl, Shift, then Esc, Alt, Super, space, Fn and the arrows) with its sixth row, F1 to
+  F12, Home and End, above them (`KeyboardPanel(functionRow = true)`, the layout's own "extension" row, which only the
+  input method ever turned on and so the panel never showed), and the Fn layer's Insert, Delete, Page Up and Down. Only
+  Input asks for the sixth row; the small drafts and overlays keep five. Ctrl, Alt, Shift and Super latch (a tap holds
+  one at the far side until the next key or a second tap) and Backspace, Delete, the arrows and Page Up and Down repeat
+  while held (400 ms, then 50 ms): the panel repeats for a destination that sees one key-down per press (an input
+  connection, a window, a draft, the accessibility field) and a sink whose far side repeats itself says so
+  (`KeyboardSink.repeatsAtSource` false: Desktop's seat, the compositor's own repeat; the elevated `input` route, which
+  starts a process per key). The trackpad's settings (Companion group > Trackpad,
   `TrackpadSettings`) are libinput's options with libinput's defaults: pointer speed, tap to click, tap time, hold
   to drag (the tap-and-drag window), two-finger scroll, two-finger tap right-click, three-finger tap middle-click,
   natural scrolling on; scroll momentum and drag lock off. Connected controllers show with their batteries

@@ -281,4 +281,100 @@ class SecondScreenKeyboardTest {
             sink.sent,
         )
     }
+
+    private class FakeRepeat : RepeatTimer {
+        var action: (() -> Unit)? = null
+        var delayMs = 0L
+        var intervalMs = 0L
+        var starts = 0
+
+        override fun start(delayMs: Long, intervalMs: Long, action: () -> Unit) {
+            this.delayMs = delayMs
+            this.intervalMs = intervalMs
+            this.action = action
+            starts++
+        }
+
+        override fun cancel() {
+            action = null
+        }
+    }
+
+    @Test
+    fun `a held arrow and Backspace repeat for a destination that does not, and stop on release`() {
+        val sink = Sink()
+        val repeat = FakeRepeat()
+        val listener = SecondScreenKeyboardListener(sink.send, fakeResolver, repeatTimer = repeat)
+
+        listener.onPress(-19) // up
+        assertEquals(400L, repeat.delayMs)
+        assertEquals(50L, repeat.intervalMs)
+        repeat.action!!.invoke()
+        repeat.action!!.invoke()
+        listener.onRelease(-19)
+        assertNull("release stops the repeat", repeat.action)
+        assertEquals(
+            listOf(
+                KeyEvent.KEYCODE_DPAD_UP to true,
+                KeyEvent.KEYCODE_DPAD_UP to true,
+                KeyEvent.KEYCODE_DPAD_UP to true,
+                KeyEvent.KEYCODE_DPAD_UP to false,
+            ),
+            sink.sent,
+        )
+
+        sink.sent.clear()
+        listener.onPress(-5) // Backspace
+        assertEquals(2, repeat.starts)
+        listener.onRelease(-5)
+        assertEquals(listOf(KeyEvent.KEYCODE_DEL to true, KeyEvent.KEYCODE_DEL to false), sink.sent)
+    }
+
+    @Test
+    fun `letters, Esc, F-keys and modifiers never repeat, and a latched Ctrl stays down under a repeating arrow`() {
+        val sink = Sink()
+        val repeat = FakeRepeat()
+        val listener = SecondScreenKeyboardListener(sink.send, fakeResolver, repeatTimer = repeat)
+
+        for (code in listOf('a'.code, -111, -131, -113)) {
+            listener.onPress(code)
+            listener.onRelease(code)
+        }
+        assertEquals("nothing repeatable was pressed", 0, repeat.starts)
+
+        // Ctrl is latched by the -113 tap above; an arrow under it repeats with Ctrl still held.
+        sink.sent.clear()
+        listener.onPress(-21) // left
+        repeat.action!!.invoke()
+        listener.onRelease(-21)
+        assertEquals(
+            listOf(
+                KeyEvent.KEYCODE_DPAD_LEFT to true,
+                KeyEvent.KEYCODE_DPAD_LEFT to true,
+                KeyEvent.KEYCODE_DPAD_LEFT to false,
+                KeyEvent.KEYCODE_CTRL_LEFT to false,
+            ),
+            sink.sent,
+        )
+    }
+
+    @Test
+    fun `no repeat timer, no repeat, as on the compositor route`() {
+        val sink = Sink()
+        val listener = SecondScreenKeyboardListener(sink.send, fakeResolver)
+        listener.onPress(-19)
+        listener.onRelease(-19)
+        assertEquals(listOf(KeyEvent.KEYCODE_DPAD_UP to true, KeyEvent.KEYCODE_DPAD_UP to false), sink.sent)
+    }
+
+    @Test
+    fun `releasing everything stops a repeat in progress`() {
+        val sink = Sink()
+        val repeat = FakeRepeat()
+        val listener = SecondScreenKeyboardListener(sink.send, fakeResolver, repeatTimer = repeat)
+        listener.onPress(-22)
+        listener.releaseEverything()
+        assertNull(repeat.action)
+        assertEquals(listOf(KeyEvent.KEYCODE_DPAD_RIGHT to true, KeyEvent.KEYCODE_DPAD_RIGHT to false), sink.sent)
+    }
 }

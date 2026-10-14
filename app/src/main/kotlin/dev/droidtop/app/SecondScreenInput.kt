@@ -223,7 +223,7 @@ class SecondScreenInputView(
         // droidtop's one keyboard view (KeyboardPanel); only the destination is this surface's own. It suppresses
         // the input method's view while it is on screen, so the user never gets two keyboards.
         addView(
-            KeyboardPanel(context, requestAwareSink(keyboardSink()), suppressImeView = true),
+            KeyboardPanel(context, requestAwareSink(keyboardSink()), suppressImeView = true, functionRow = true),
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
         )
 
@@ -360,6 +360,9 @@ class SecondScreenInputView(
                 // No text channel: a compositor takes keys, not strings.
                 override val takesText: Boolean = false
 
+                // And it repeats a held key by itself, as for a lapdock's keyboard.
+                override val repeatsAtSource: Boolean = false
+
                 override fun key(androidKeyCode: Int, down: Boolean) {
                     router.seat = (DesktopSessionService.state.value as? DesktopSessionState.Connected)
                         ?.let { InputSeats.of(it.hostBridge) }
@@ -382,6 +385,8 @@ class SecondScreenInputView(
      */
     private fun requestAwareSink(own: KeyboardSink): KeyboardSink = object : KeyboardSink {
         override val takesText: Boolean get() = own.takesText
+
+        override val repeatsAtSource: Boolean get() = (KeyboardTargets.companion.value?.sink ?: own).repeatsAtSource
 
         override fun key(androidKeyCode: Int, down: Boolean) =
             (KeyboardTargets.companion.value?.sink ?: own).key(androidKeyCode, down)

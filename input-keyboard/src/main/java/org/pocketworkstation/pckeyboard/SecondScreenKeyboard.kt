@@ -191,10 +191,11 @@ object SecondScreenKeyboard {
         context: Context,
         listener: LatinKeyboardBaseView.OnKeyboardActionListener,
         heightPercent: Float = DEFAULT_HEIGHT_PERCENT,
+        functionRow: Boolean = false,
     ): LatinKeyboardView {
         val view = LayoutInflater.from(context)
             .inflate(R.layout.input_material_dark, null) as LatinKeyboardView
-        applyLayout(view, context, functionLayer = false, heightPercent = heightPercent)
+        applyLayout(view, context, functionLayer = false, heightPercent = heightPercent, functionRow = functionRow)
         view.setOnKeyboardActionListener(listener)
         // No key-preview bubbles: they pop ABOVE the touched key, so the
         // top row's would be clipped by the display edge, and a keyboard
@@ -210,12 +211,18 @@ object SecondScreenKeyboard {
      * symbols and secondary keys live. Driven by the Fn and layout-switch
      * keys, which otherwise would do nothing at all on this surface,
      * because the [LatinIME] that normally handles them is not in the loop.
+     *
+     * [functionRow] builds the full layout with its extension row (F1 to F12, Home, End) above the five rows, the
+     * layout's own switch ([GlobalKeyboardSettings.useExtension]) that only the input method ever turned on. The
+     * flag is read while the keyboard is built, so it is set around that and put back: the input method's own
+     * keyboards, built from the same shared settings, are not changed by a panel asking for the row.
      */
     fun applyLayout(
         view: LatinKeyboardView,
         context: Context,
         functionLayer: Boolean,
         heightPercent: Float = DEFAULT_HEIGHT_PERCENT,
+        functionRow: Boolean = false,
     ) {
         val xml = if (functionLayer) R.xml.kbd_full_fn else R.xml.kbd_full
         val mode = if (functionLayer) {
@@ -223,7 +230,14 @@ object SecondScreenKeyboard {
         } else {
             KeyboardSwitcher.KEYBOARDMODE_NORMAL
         }
-        view.setKeyboard(LatinKeyboard(context, xml, mode, heightPercent))
+        val settings = LatinIME.sKeyboardSettings
+        val before = settings.useExtension
+        settings.useExtension = functionRow && !functionLayer
+        try {
+            view.setKeyboard(LatinKeyboard(context, xml, mode, heightPercent))
+        } finally {
+            settings.useExtension = before
+        }
     }
 
     /**
@@ -238,6 +252,16 @@ object SecondScreenKeyboard {
 /** A one-shot delay on the main thread, for [SecondScreenKeyboardListener]'s held space bar. */
 interface HoldTimer {
     fun start(delayMs: Long, action: () -> Unit)
+
+    fun cancel()
+}
+
+/**
+ * Repeats a held key for a destination that does not (see [KeyboardSink.repeatsAtSource]): [action] runs after
+ * [delayMs], then every [intervalMs] until [cancel].
+ */
+interface RepeatTimer {
+    fun start(delayMs: Long, intervalMs: Long, action: () -> Unit)
 
     fun cancel()
 }
@@ -277,9 +301,15 @@ class SecondScreenKeyboardListener(
     private val deferSpace: Boolean = false,
     /** With [deferSpace]: presses a held space bar after [SPACE_HOLD_MS], so it repeats at the far side. */
     private val holdTimer: HoldTimer? = null,
+    /**
+     * Repeats Backspace, Delete, the arrows and Page Up and Down while one is held, for a destination whose far side
+     * sees only the one key-down; null where the far side repeats by itself (a compositor).
+     */
+    private val repeatTimer: RepeatTimer? = null,
 ) : LatinKeyboardBaseView.OnKeyboardActionListener {
 
     private val latchedModifiers = LinkedHashSet<Int>()
+    private var repeatingKey: Int? = null
     private var spacePending = false
     private var spaceCancelled = false
     private var spaceDown = false
@@ -329,6 +359,11 @@ class SecondScreenKeyboardListener(
         }
         heldKeys[primaryCode] = stroke
         send(stroke.androidKeyCode, true)
+        val timer = repeatTimer
+        if (timer != null && stroke.androidKeyCode in REPEATABLE) {
+            repeatingKey = stroke.androidKeyCode
+            timer.start(REPEAT_DELAY_MS, REPEAT_INTERVAL_MS) { send(stroke.androidKeyCode, true) }
+        }
     }
 
     override fun onRelease(primaryCode: Int) {
@@ -350,6 +385,7 @@ class SecondScreenKeyboardListener(
             return
         }
         val stroke = heldKeys.remove(primaryCode) ?: return
+        if (stroke.androidKeyCode == repeatingKey) stopRepeat()
         send(stroke.androidKeyCode, false)
         if (transientShift) {
             transientShift = false
@@ -424,7 +460,13 @@ class SecondScreenKeyboardListener(
         }
     }
 
+    private fun stopRepeat() {
+        repeatTimer?.cancel()
+        repeatingKey = null
+    }
+
     fun releaseEverything() {
+        stopRepeat()
         holdTimer?.cancel()
         if (spaceDown) {
             spaceDown = false
@@ -461,6 +503,22 @@ class SecondScreenKeyboardListener(
         val LAYOUT_KEYS = setOf(-2, -119)
 
         const val SPACE = 32
+
+        /** Hold-to-repeat, as a hardware keyboard's defaults: a pause, then about twenty a second. */
+        const val REPEAT_DELAY_MS = 400L
+        const val REPEAT_INTERVAL_MS = 50L
+
+        /** The keys that repeat when held. Letters do not: a long press on one is its popup. */
+        val REPEATABLE = setOf(
+            KeyEvent.KEYCODE_DEL,
+            KeyEvent.KEYCODE_FORWARD_DEL,
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_PAGE_UP,
+            KeyEvent.KEYCODE_PAGE_DOWN,
+        )
 
         /** A space bar held this long is a held key, not a tap that may still become a cursor drag. */
         const val SPACE_HOLD_MS = 250L
