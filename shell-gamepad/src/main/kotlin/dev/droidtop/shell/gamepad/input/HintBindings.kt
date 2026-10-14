@@ -133,7 +133,7 @@ fun HintRow(
 class FocusedHints {
     private var owner: Any? = null
 
-    private class Layer(val owner: Any, val bindings: List<HintBinding>, val menus: Boolean)
+    private class Layer(val owner: Any, val bindings: List<HintBinding>, val menus: Boolean, val window: Any?)
 
     private val layers = mutableStateListOf<Layer>()
 
@@ -153,12 +153,19 @@ class FocusedHints {
      */
     val layerMenus: Boolean get() = layers.lastOrNull()?.menus == true
 
-    internal fun pushLayer(owner: Any, bindings: List<HintBinding>, menus: Boolean) {
+    /**
+     * Whether a tooltip drawn from [window] (the root view of the window its content is in) may show: with no layer
+     * open every one may; with one open only those inside the topmost layer, because a tip is a popup window of its
+     * own and the page's would otherwise stay drawn over the Quick Menu or a dialog (Droidtop/tracker#535).
+     */
+    fun tipsAllowedFor(window: Any?): Boolean = layers.isEmpty() || layers.last().window === window
+
+    internal fun pushLayer(owner: Any, bindings: List<HintBinding>, menus: Boolean, window: Any? = null) {
         val index = layers.indexOfFirst { it.owner === owner }
         when {
-            index < 0 -> layers.add(Layer(owner, bindings, menus))
+            index < 0 -> layers.add(Layer(owner, bindings, menus, window))
             layers[index].bindings !== bindings || layers[index].menus != menus ->
-                layers[index] = Layer(owner, bindings, menus)
+                layers[index] = Layer(owner, bindings, menus, window)
         }
     }
 
@@ -221,7 +228,8 @@ fun Modifier.declaresHints(bindings: List<HintBinding>): Modifier = composed {
 fun DeclareLayerHints(bindings: List<HintBinding>, menusReachable: Boolean = false) {
     val host = LocalFocusedHints.current ?: return
     val token = remember { Any() }
-    SideEffect { host.pushLayer(token, bindings, menusReachable) }
+    val window = androidx.compose.ui.platform.LocalView.current.rootView
+    SideEffect { host.pushLayer(token, bindings, menusReachable, window) }
     DisposableEffect(host, token) { onDispose { host.popLayer(token) } }
 }
 

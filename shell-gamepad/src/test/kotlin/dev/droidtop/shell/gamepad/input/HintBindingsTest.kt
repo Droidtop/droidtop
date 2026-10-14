@@ -112,4 +112,19 @@ class HintBindingsTest {
         val pairs = activeHintPairs(footerBindings(null, false, null, own, menus, emptyList()))
         assertEquals(emptyList<Pair<GamepadAction, String>>(), pairs.filter { it.first == GamepadAction.L || it.first == GamepadAction.R })
     }
+
+    @Test
+    fun `a tooltip shows only inside the topmost layer`() {
+        val hints = FocusedHints()
+        val page = Any()
+        val menu = Any()
+        val dialog = Any()
+        assertEquals(true, hints.tipsAllowedFor(page))
+        hints.pushLayer(Any(), emptyList(), false, menu)
+        assertEquals(false, hints.tipsAllowedFor(page))
+        assertEquals(true, hints.tipsAllowedFor(menu))
+        hints.pushLayer(Any(), emptyList(), false, dialog)
+        assertEquals(false, hints.tipsAllowedFor(menu))
+        assertEquals(true, hints.tipsAllowedFor(dialog))
+    }
 }

@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
+import dev.droidtop.shell.gamepad.input.LocalFocusedHints
 import kotlinx.coroutines.delay
 
 /**
@@ -42,6 +44,9 @@ fun HintTip(text: String?, modifier: Modifier = Modifier, content: @Composable (
         Box(modifier = modifier) { content() }
         return
     }
+    // A layer above this content (Quick Menu, dialog, Start menu) owns the screen: the tip is its own window and
+    // would stay drawn over it (Droidtop/tracker#535).
+    val allowed = LocalFocusedHints.current?.tipsAllowedFor(LocalView.current.rootView) ?: true
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     var focused by remember { mutableStateOf(false) }
@@ -67,7 +72,7 @@ fun HintTip(text: String?, modifier: Modifier = Modifier, content: @Composable (
             .pointerInput(Unit) { detectTapGestures(onLongPress = { touched = true }) },
     ) {
         content()
-        if (touched || (settled && (hovered || focused))) TipBubble(text)
+        if (allowed && (touched || (settled && (hovered || focused)))) TipBubble(text)
     }
 }
 

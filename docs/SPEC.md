@@ -3616,8 +3616,8 @@ row of recent apps, became Home's Recent apps section for every mode.
   wake. **Idle** (`CompanionIdle`, Companion group "Dim and turn off the companion", on by default): untouched, the
   companion dims after 2 minutes and goes off after 5, both stretched to what `AccessibilityManager
   .getRecommendedTimeoutMillis` asks; TalkBack hears "Companion screen will turn off soon. Touch to keep it on." ten
-  seconds before. It does not run while Social shows, a plugin panel that declares keep-on shows, the companion
-  keyboard is open, or a stream runs. Every touch is seen before the tab (never consumed), so a tap on a dimmed screen
+  seconds before. It does not run while Social shows, a plugin panel that declares keep-on shows, a running job is on
+  Home (Downloads and updates), the companion keyboard is open, or a stream runs. Every touch is seen before the tab (never consumed), so a tap on a dimmed screen
   brightens it and does what was tapped. A new message notification brings an off or dimmed screen back to dimmed,
   except in Kid and Kiosk. **Wake** (Companion group): a double tap (default), a single tap, or only the Quick Menu's
   "Companion screen" row (System, while a second screen holds the companion); the off screen is one TalkBack element,
@@ -3700,7 +3700,9 @@ the control itself: a row reading "Closing…" and then disappearing, a greyed s
 plugin (the radio switches, per-app load, the Quick Menu's Power menu, which sends the power key's long press through `priv.shell`) is not drawn at all without a shell provider, and simply works when
 one is present; there is no greyed control, no "opens Android's switch" fallback and no text about it. Any
 explanation that still has to exist lives in `HintTip` (`:shell-gamepad`), the app's one tooltip: long-press
-on touch, rest the pointer for a mouse, a short focus dwell for the pad. Sentences are for real errors only;
+on touch, rest the pointer for a mouse, a short focus dwell for the pad. A tip is a window of its own, so it shows
+only inside the topmost layer on the hint bar (`FocusedHints.tipsAllowedFor`): the page's tip goes while the Quick Menu,
+the Start menu or a dialog is open over it. Sentences are for real errors only;
 there are no "Info" links. The rest of the app follows the same rule.
 
 ### iiSU uses Android's own secondary-display home

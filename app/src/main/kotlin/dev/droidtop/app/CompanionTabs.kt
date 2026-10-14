@@ -317,15 +317,17 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             view.announceForAccessibility(if (now.size > before.size) "Screen connected. Companion on ${where ?: "this screen"}" else "Screen disconnected. Companion on ${where ?: "this screen"}")
         }
     }
-    // Dims and turns the companion off when untouched (slice C14); Social, the keyboard, a keep-on panel and a stream
-    // that asks hold it on.
+    // Dims and turns the companion off when untouched (slice C14); Social, the keyboard, a keep-on panel, a stream
+    // that asks and a running job on Home hold it on.
     val showTabsNow by CompanionInputHandle.showTabs.collectAsState()
     val shownForIdle = selectedId ?: when (val opening = settings.opening(modeName)) {
         CompanionPrefs.OPEN_DEFAULT -> CompanionPrefs.defaultOpening(modeName)
         CompanionPrefs.OPEN_LAST -> settings.last[modeName] ?: CompanionPrefs.defaultOpening(modeName)
         else -> opening
     }
-    val idleExempt = shownForIdle == CompanionTab.SOCIAL.id || requested != null || runningKind == LibraryEntryKind.REMOTE_STREAM
+    val jobs by dev.droidtop.pluginhost.PluginJobsCenter.entries().collectAsState()
+    val idleExempt = shownForIdle == CompanionTab.SOCIAL.id || requested != null || runningKind == LibraryEntryKind.REMOTE_STREAM ||
+        jobShownOnHome(shownForIdle, jobs.any { !it.done && !it.paused })
     CompanionIdleLayer(exempt = idleExempt, input = shownForIdle == CompanionTab.INPUT.id && requested == null, wakeRequest = showTabsNow) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val portrait = maxHeight >= maxWidth
@@ -678,3 +680,6 @@ internal fun CompanionPanels(panels: List<@Composable () -> Unit>) {
         }
     }
 }
+
+/** Home draws the jobs running now (Downloads and updates), so while one runs and Home shows the companion stays on (Droidtop/tracker#526). Pure. */
+internal fun jobShownOnHome(shownTab: String, jobRunning: Boolean): Boolean = jobRunning && shownTab == CompanionTab.HOME.id
