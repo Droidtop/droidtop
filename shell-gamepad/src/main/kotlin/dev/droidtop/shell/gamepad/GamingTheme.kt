@@ -38,7 +38,7 @@ import androidx.lifecycle.LifecycleOwner
 import dev.droidtop.library.theme.GamingThemeColors
 import dev.droidtop.library.theme.GamingThemeMapping
 import dev.droidtop.library.theme.ThemeAssets
-import dev.droidtop.library.theme.ThemeColorMath
+import dev.droidtop.notices.ColorMath
 import dev.droidtop.library.theme.ThemeSafeMode
 import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.ui.shared.NoticePalette
@@ -137,7 +137,7 @@ class GamingPalette internal constructor(
         val errorRoles = { scheme: ColorScheme ->
             scheme.copy(
                 error = Color(n.dangerInk),
-                onError = Color(ThemeColorMath.pickOn(n.dangerInk)),
+                onError = Color(ColorMath.pickOn(n.dangerInk)),
                 errorContainer = Color(n.dangerPlate),
                 onErrorContainer = Color(n.onDanger),
             )
@@ -145,8 +145,8 @@ class GamingPalette internal constructor(
         if (!colors.declared) {
             errorRoles(ChromeColors.Dark)
         } else errorRoles(run {
-            val outline = Color(ThemeColorMath.over(colors.cardOutline, colors.ground))
-            val onFavourite = Color(ThemeColorMath.pickOn(colors.favourite))
+            val outline = Color(ColorMath.over(colors.cardOutline, colors.ground))
+            val onFavourite = Color(ColorMath.pickOn(colors.favourite))
             if (colors.isLight) {
                 lightColorScheme(
                     background = ground, onBackground = onSurface,

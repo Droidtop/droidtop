@@ -5,7 +5,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.theme.GamingThemeColors
-import dev.droidtop.library.theme.NoticeColors
+import dev.droidtop.library.theme.noticeColors
+import dev.droidtop.notices.NoticeColors
 
 /**
  * The notice colours as Compose colours (docs/SPEC.md 7k, "Notices"): what
@@ -38,7 +39,7 @@ class NoticePalette(val colors: NoticeColors) {
         val Default: NoticePalette by lazy { of(GamingThemeColors.DEFAULT) }
 
         fun of(colors: GamingThemeColors, highContrast: Boolean = false): NoticePalette =
-            NoticePalette(NoticeColors.derive(colors, highContrast))
+            NoticePalette(colors.noticeColors(highContrast))
 
         /** Builds [Default] now; called off the main thread at process start so no composition pays for it. */
         fun warm() {

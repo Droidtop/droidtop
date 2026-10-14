@@ -1,10 +1,14 @@
 package dev.droidtop.ui.shared
 
-import dev.droidtop.library.theme.ColorVision
+import dev.droidtop.library.theme.noticeColors
+import dev.droidtop.library.theme.noticeInputs
+import dev.droidtop.notices.ColorVision
+import dev.droidtop.notices.NoticeChecks
 import dev.droidtop.library.theme.EsDeThemeParser
 import dev.droidtop.library.theme.GamingThemeMapping
-import dev.droidtop.library.theme.NoticeColors
+import dev.droidtop.notices.NoticeColors
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,17 +45,19 @@ class NoticeThemesTest {
                 val colors = GamingThemeMapping.map(parsed)
                 val label = "${theme.name} scheme $scheme"
                 try {
-                    val notice = NoticeColors.derive(colors)
-                    NoticeAssertions.assertReadable(colors, notice, 4.5)
-                    NoticeAssertions.assertHueLocked(colors, notice)
+                    val inputs = colors.noticeInputs()
+                    val notice = colors.noticeColors()
+                    assertEquals(emptyList<String>(), NoticeChecks.unreadable(inputs, notice, 4.5))
+                    assertEquals(emptyList<String>(), NoticeChecks.hueMoved(inputs, notice))
                     // Contrast wins over separation only where it must: a mid-tone ground confines readable ink to one end.
                     if (notice.separated) {
-                        NoticeAssertions.assertSeparated(notice)
+                        assertEquals(emptyList<String>(), NoticeChecks.tooClose(notice))
                     } else {
                         val groundL = ColorVision.lab(colors.ground)[0]
                         assertTrue("not separated on a ground of L* $groundL", groundL in MID_TONE)
                     }
-                    NoticeAssertions.assertReadable(colors, NoticeColors.derive(colors, highContrast = true), NoticeColors.HIGH_CONTRAST_FLOOR)
+                    val hc = NoticeColors.HIGH_CONTRAST_FLOOR
+                    assertEquals(emptyList<String>(), NoticeChecks.unreadable(inputs, colors.noticeColors(highContrast = true), hc))
                 } catch (e: AssertionError) {
                     throw AssertionError("$label: ${e.message}", e)
                 }
