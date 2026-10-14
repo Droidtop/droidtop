@@ -45,18 +45,20 @@ internal const val SHELF_INSTALLED = "installed"
 internal const val SHELF_NOT_PLAYED = "not-played"
 
 /**
- * The shelves Home keeps (docs/SPEC.md 7i, "Home art"): recent activity
- * across every library and what needs attention. The rest of [pcShelves]
- * (favourites, what was never played, stores, engine families) is the PC
- * library's own and lives on PC Games' Overview.
+ * The shelves Home's games row can be (docs/SPEC.md 7i, "Home"): Continue playing, else Recently added. The
+ * rest of [pcShelves] (favourites, what was never played, stores, engine families) is the PC library's own
+ * and lives on PC Games' Overview; updates and additions are What's new cards (Droidtop/tracker#485 F7a).
  */
-internal val HOME_SHELF_IDS = setOf(SHELF_CONTINUE, SHELF_RECENTLY_ADDED, SHELF_UPDATES)
+internal val HOME_SHELF_IDS = setOf(SHELF_CONTINUE, SHELF_RECENTLY_ADDED)
+
+/** The id of Home's one games row, whichever shelf fills it. */
+internal const val SHELF_RECENT_GAMES = "recent-games"
 
 /**
- * Home's shelves: [pcShelves] over the PC fold with [others] (Retro games
- * and game apps) merged in, kept to [HOME_SHELF_IDS]. One shelf builder for
- * both surfaces, so Home and PC Games never disagree about what "Recently
- * added" means.
+ * Home's games row, "Recent games": [pcShelves] over the PC fold with [others] (Retro games and game apps)
+ * merged in, Continue playing when anything was played, else Recently added. One shelf builder for both
+ * surfaces, so Home and PC Games never disagree about what "Recently added" means. Empty on a library with
+ * neither.
  */
 internal fun homeShelves(
     games: List<LibraryEntry>,
@@ -64,7 +66,11 @@ internal fun homeShelves(
     now: Long = System.currentTimeMillis(),
     options: OwnershipOptions = OwnershipOptions(),
     isRecentlyAdded: (LibraryEntry) -> Boolean = { true },
-): List<PcShelf> = pcShelves(games, now, others, options, isRecentlyAdded).filter { it.id in HOME_SHELF_IDS }
+): List<PcShelf> {
+    val shelves = pcShelves(games, now, others, options, isRecentlyAdded)
+    val recent = shelves.firstOrNull { it.id == SHELF_CONTINUE } ?: shelves.firstOrNull { it.id == SHELF_RECENTLY_ADDED }
+    return listOfNotNull(recent?.copy(id = SHELF_RECENT_GAMES, title = "Recent games"))
+}
 
 /**
  * The shelves plugins asked Home for (docs/plugin-api.md 3 C11) as Home's own shelves: the real entries from

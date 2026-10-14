@@ -83,7 +83,8 @@ object ValueFormat {
         if (seconds < 3600) (seconds + 30) / 60 * 60 else (seconds + 450) / 900 * 900
 
     /** "45%": a fraction 0 to 1, clamped. */
-    fun percent(fraction: Float): String = "${(fraction.coerceIn(0f, 1f) * 100).toInt()}%"
+    // Whole percent, rounded down (a job at 99.6 percent is not done), with room for float error (0.45f is 44.99...).
+    fun percent(fraction: Float): String = "${(fraction.coerceIn(0f, 1f) * 100 + 1e-3f).toInt()}%"
 
     /** "1,234": a count with grouping. */
     fun count(n: Long): String = String.format(Locale.US, "%,d", n)
