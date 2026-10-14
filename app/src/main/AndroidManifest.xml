@@ -321,6 +321,18 @@
           droidtop-internal surface.
         -->
         <!--
+          A plugin's first-use permission sheet (PluginGrantSheet, docs/plugin-api.md 4.3),
+          opened by the broker during a call the person started, in every mode. Its own
+          task and translucent, like the mode switcher below. Not exported.
+        -->
+        <activity
+            android:name="dev.droidtop.app.PluginGrantSheetActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!--
           The mode switcher (BackButtonMenu.choices) as the shell's own modal sheet
           (ModeSwitcherSheet), for every route: the long press of Back, the home
           screen's menu, Gaming's Quick Menu, the Desktop taskbar. Its own task, so

@@ -2964,7 +2964,7 @@ arrays under the manifest's own keys (`V2Declarations`).
     `ConsentView` lines with a grant key; the box state is kept until
     Approve writes it through `PluginStore.setApproval`.
   - A call in `ask` state during a user-initiated host to plugin call
-    shows the sheet (`PluginGrantPrompts`, drawn by Gaming's shell); a call
+    shows the sheet (`PluginGrantPrompts`, drawn in every mode); a call
     from an event or a job fails with `PERMISSION_DENIED` and records that
     the plugin "wants" it. A surface that cannot draw the sheet answers Not
     now. Only `invoke` and `handle` calls count as user-initiated: a job
@@ -3018,11 +3018,17 @@ arrays under the manifest's own keys (`V2Declarations`).
   only; normal-permission calls are not counted yet. The Activity screen
   is not built; the Permissions screen reads "last used" from it.
 - **Screens** (#59, #60, #62, #65).
-  - The first-use sheet is `PluginGrantSheetHost` in Gaming's shell:
-    Allow / Not now / Never allow, Up and Down, A, B is Not now, with the
-    plugin's own reason. Standard and Desktop have no such surface yet, so
-    a call in `ask` state there answers Not now and the permission is
-    granted from the Permissions screen.
+  - The first-use sheet is `PluginGrantSheet`, the one sheet for every
+    mode (Droidtop/tracker#128): `PluginGrantPrompts.ask` publishes the
+    question and opens `PluginGrantSheetActivity`, a translucent activity
+    of droidtop's own that draws the sheet over whatever is on screen
+    (Gaming's shell, the Android home screen, the Desktop), in the Gaming
+    theme when Gaming was the last mode, the way the mode switcher is
+    drawn. Allow / Not now / Never allow, Not now holding the cursor at
+    the start, Up and Down, A chooses, B is Not now, a hint row of its own
+    that is also the touch route, and the plugin's own reason. Leaving the
+    window without a choice (Home, Recents) is Not now, and so is a window
+    that could not be opened; nobody answering is Not now after 60 s.
   - Accounts and sources > Plugins > a plugin > Permissions lists every
     declared permission, each high-risk point it may provide and each
     export, with Allowed / Ask first / Blocked, its reason, "tried to use

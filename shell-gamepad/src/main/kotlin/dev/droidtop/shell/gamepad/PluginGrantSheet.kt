@@ -5,8 +5,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,83 +19,80 @@ import dev.droidtop.pluginhost.PermissionTier
 import dev.droidtop.pluginhost.PluginGrantPrompts
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 
 /**
- * Where the first-use sheet is drawn (docs/plugin-api.md 4.3). Placed once
- * in the shell: while it is composed it tells [PluginGrantPrompts] that a
- * surface can show the sheet, so a plugin's call in `ask` state during a
- * user-initiated call prompts here, and anywhere no such surface exists the
- * call is answered Not now and the permission is granted from the plugin's
- * Permissions screen instead. A plugin never draws anything itself: the
- * words are the registry's label and the plugin's own reason.
+ * The first-use sheet (docs/plugin-api.md 4.3): "<Plugin> wants to <label>", the plugin's own reason, and Allow /
+ * Not now / Never allow. One sheet for every mode: :app's sheet activity draws it over whatever is on screen (Gaming's
+ * shell, the Android home screen, the Desktop), in the Gaming theme when Gaming was the last mode, the way the mode
+ * switcher is drawn. A plugin never draws anything itself: the words are the registry's label and the plugin's reason.
+ *
+ * Not now holds the cursor at the start, so a mashed A changes nothing (the safe choice first, design language
+ * "Modals"); Up and Down move, A chooses, B is Not now. The window hosting it has no shell footer, so the panel draws
+ * its own hint row, which is also the touch route to A and B.
  */
 @Composable
-internal fun PluginGrantSheetHost() {
-    DisposableEffect(Unit) {
-        PluginGrantPrompts.attachHost()
-        onDispose { PluginGrantPrompts.detachHost() }
-    }
-    val pending by PluginGrantPrompts.pending.collectAsState()
-    pending?.let { PluginGrantSheet(it) }
-}
-
-@Composable
-private fun PluginGrantSheet(pending: PluginGrantPrompts.Pending) {
-    val request = pending.request
-    // Up and Down pick, A acts, B is Not now (docs/plugin-api.md 4.3).
-    val choices = remember(pending) {
-        listOf(
-            "Allow" to GrantAnswer.ALLOW,
-            "Not now" to GrantAnswer.NOT_NOW,
-            "Never allow" to GrantAnswer.NEVER,
-        )
-    }
-    var selected by remember(pending) { mutableStateOf(1) }
-    val answer: (GrantAnswer) -> Unit = { PluginGrantPrompts.answer(pending, it) }
-    val window = LocalShellWindow.current
-
-    // A dismissal that is not a choice (the system closing the dialog) is Not now, never Allow.
-    Dialog(onDismissRequest = { answer(GrantAnswer.NOT_NOW) }) {
-        GatePadInThisDialog()
-        MenuPanel(
-            modifier = Modifier.width(window.panelWidth(460.dp)),
-            focusLabel = "Plugin permission sheet",
-            hints = listOf(HintBinding(GamepadAction.A, "Choose"), HintBinding(GamepadAction.B, "Not now")),
-            onPad = { press ->
-                when (press.action) {
-                    GamepadAction.UP, GamepadAction.DOWN -> selected = menuMove(selected, choices.size, press)
-                    GamepadAction.A -> answer(choices[selected].second)
-                    GamepadAction.B -> answer(GrantAnswer.NOT_NOW)
-                    else -> Unit
-                }
-                true
-            },
-        ) {
-            Text(
-                "${request.pluginLabel} wants to ${request.permissionLabel.replaceFirstChar { it.lowercase() }}",
-                color = MenuTokens.OnSurface,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+fun PluginGrantSheet(pending: PluginGrantPrompts.Pending) {
+    CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
+        val request = pending.request
+        val choices = remember(pending) {
+            listOf(
+                "Allow" to GrantAnswer.ALLOW,
+                "Not now" to GrantAnswer.NOT_NOW,
+                "Never allow" to GrantAnswer.NEVER,
             )
-            request.reason?.let {
-                Text(it, color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium)
-            }
-            if (request.tier == PermissionTier.CRITICAL) {
+        }
+        var selected by remember(pending) { mutableStateOf(1) }
+        val answer: (GrantAnswer) -> Unit = { PluginGrantPrompts.answer(pending, it) }
+        val window = LocalShellWindow.current
+
+        // A dismissal that is not a choice (the system closing the dialog) is Not now, never Allow.
+        Dialog(onDismissRequest = { answer(GrantAnswer.NOT_NOW) }) {
+            GatePadInThisDialog()
+            MenuPanel(
+                modifier = Modifier.width(window.panelWidth(460.dp)),
+                focusLabel = "Plugin permission sheet",
+                hints = emptyList(),
+                onPad = { press ->
+                    when (press.action) {
+                        GamepadAction.UP, GamepadAction.DOWN -> selected = menuMove(selected, choices.size, press)
+                        GamepadAction.A -> answer(choices[selected].second)
+                        GamepadAction.B -> answer(GrantAnswer.NOT_NOW)
+                        else -> Unit
+                    }
+                    true
+                },
+            ) {
                 Text(
-                    "This gives the plugin system-level access. Only allow it if you trust the plugin.",
-                    color = MenuTokens.Danger,
-                    style = MaterialTheme.typography.bodySmall,
+                    "${request.pluginLabel} wants to ${request.permissionLabel.replaceFirstChar { it.lowercase() }}",
+                    color = MenuTokens.OnSurface,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                 )
-            }
-            choices.forEachIndexed { index, (label, value) ->
-                MenuRow(
-                    title = label,
-                    selected = index == selected,
-                    danger = value == GrantAnswer.NEVER,
-                    onClick = {
-                        selected = index
-                        answer(value)
-                    },
+                request.reason?.let {
+                    Text(it, color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium)
+                }
+                if (request.tier == PermissionTier.CRITICAL) {
+                    Text(
+                        "This gives the plugin system-level access. Only allow it if you trust the plugin.",
+                        color = MenuTokens.Danger,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                choices.forEachIndexed { index, (label, value) ->
+                    MenuRow(
+                        title = label,
+                        selected = index == selected,
+                        danger = value == GrantAnswer.NEVER,
+                        onClick = {
+                            selected = index
+                            answer(value)
+                        },
+                    )
+                }
+                HintRow(
+                    bindings = listOf(HintBinding(GamepadAction.A, "Choose"), HintBinding(GamepadAction.B, "Not now")),
+                    background = androidx.compose.ui.graphics.Color.Transparent,
                 )
             }
         }

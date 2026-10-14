@@ -68,11 +68,13 @@ internal object BrokerTraffic {
 
 /**
  * The first-use sheet's state (docs/plugin-api.md 4.3). The broker calls
- * [ask] from a binder thread and blocks; a surface that can show the sheet
- * attaches itself ([attachHost]), observes [pending] and answers with
- * [answer]. With no surface attached the answer is Not now at once: a
- * plugin can never make a prompt appear where nothing can draw it, and the
- * permission is granted from the plugin's Permissions screen instead.
+ * [ask] from a binder thread and blocks; [ask] publishes the question in
+ * [pending] and opens the one window that draws the sheet ([setSurface]:
+ * :app's sheet activity, over whatever is on screen in Gaming, Standard
+ * and Desktop alike), which answers with [answer]. With no surface, or one
+ * that could not open, the answer is Not now at once: a plugin can never
+ * make a prompt appear where nothing can draw it, and the permission is
+ * granted from the plugin's Permissions screen instead.
  */
 object PluginGrantPrompts {
     class Pending(val request: GrantPromptRequest) {
@@ -83,17 +85,13 @@ object PluginGrantPrompts {
     val pending: StateFlow<Pending?> = _pending
 
     private val turn = Any()
-    private var hosts = 0
 
-    @Synchronized fun attachHost() {
-        hosts++
+    @Volatile private var surface: (() -> Boolean)? = null
+
+    /** :app sets this at start: opens the sheet's window, which reads [pending]; false when it could not be opened. */
+    fun setSurface(open: (() -> Boolean)?) {
+        surface = open
     }
-
-    @Synchronized fun detachHost() {
-        if (hosts > 0) hosts--
-    }
-
-    @Synchronized fun hasHost(): Boolean = hosts > 0
 
     fun answer(pending: Pending, answer: GrantAnswer) {
         pending.answer.complete(answer)
@@ -101,12 +99,16 @@ object PluginGrantPrompts {
 
     /** Shows the sheet and waits for the answer, one prompt at a time; Not now when nothing can show it or nobody answers in [timeoutMs]. */
     fun ask(request: GrantPromptRequest, timeoutMs: Long = 60_000L): GrantAnswer {
-        if (!hasHost()) return GrantAnswer.NOT_NOW
+        val open = surface ?: return GrantAnswer.NOT_NOW
         return synchronized(turn) {
             val pending = Pending(request)
             _pending.value = pending
             try {
-                runBlocking { withTimeoutOrNull(timeoutMs) { pending.answer.await() } } ?: GrantAnswer.NOT_NOW
+                if (!runCatching { open() }.getOrDefault(false)) {
+                    GrantAnswer.NOT_NOW
+                } else {
+                    runBlocking { withTimeoutOrNull(timeoutMs) { pending.answer.await() } } ?: GrantAnswer.NOT_NOW
+                }
             } finally {
                 if (_pending.value === pending) _pending.value = null
             }
