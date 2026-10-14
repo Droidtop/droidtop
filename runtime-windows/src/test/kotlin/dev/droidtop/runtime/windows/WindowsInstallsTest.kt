@@ -50,6 +50,15 @@ class WindowsInstallsTest {
     }
 
     @Test
+    fun `only a program file is handed to the unpacker first`() {
+        assertTrue(WindowsInstalls.unpackable(File("setup_game_1.0_(12345).exe")))
+        assertTrue(WindowsInstalls.unpackable(File("SETUP.EXE")))
+        assertEquals(false, WindowsInstalls.unpackable(File("setup.msi")))
+        assertEquals(false, WindowsInstalls.unpackable(File("install.bat")))
+        assertEquals(false, WindowsInstalls.unpackable(File("setup_game_1.0-1.bin")))
+    }
+
+    @Test
     fun `a game folder takes the id of its prefix`() {
         assertEquals("CUSTOM_GAME_1234567", WindowsInstalls.containerIdOf(1234567))
     }

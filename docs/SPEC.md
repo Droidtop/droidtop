@@ -7365,6 +7365,12 @@ Two concrete references to build from rather than design blind:
     scanner was told about by hand outside the roots with the store part, which reads those folders). The
     folder stays where the installer put it. `addGame` is the function #407's flow calls to make a
     row; it takes a prefix made here.
+  - **Unpack first, Wine second (decided 2026-10-14, Droidtop/tracker#405).** Choosing an installer (picked or
+    typed) takes its files out without running it, as below, and only when that cannot be done does the screen run
+    it in a new prefix of its own: `WindowsInstalls.install` tries `InnoExtract` for a `.exe` and falls back to
+    `begin` (the new-prefix route above) when the installer is not an Inno Setup one or the unpacker cannot be had,
+    saying why in the row's line. A `.msi`, `.bat` or `.cmd` goes straight to Wine. There is one set of rows for
+    it, not one for unpacking and one for installing.
   - **Unpack an installer (2026-10-09, Droidtop/tracker#10).** The same screen takes the files out of
     an Inno Setup installer (GOG's offline installers are) without running it: `InnoExtract` runs
     innoextract 1.9 over the installer into a NEW folder (the installer's name, never an existing
