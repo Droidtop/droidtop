@@ -11744,7 +11744,15 @@ listing of a game folder says whether a marker is there
 folder reads nothing). GOG's is `goggame-<id>.info` (the file whose
 `rootGameId` is its own `gameId` is the game, every other one is DLC;
 `buildId` is the build); Epic's is `.egstore/<install id>.mancpn`, whose
-`CatalogItemId` is the id droidtop's Epic rows are keyed by. What it found is
+`CatalogItemId` is the id droidtop's Epic rows are keyed by; Battle.net's
+(decided 2026-10-14, Droidtop/tracker#404, low priority) is `.build.info`, the
+plain-text table Blizzard's installer leaves: a header of `Name!TYPE:size`
+columns and a row per branch, whose active row names the game's product code
+(`wow`, `pro`, `d3`) and its `Version`. Battle.net has no store droidtop signs
+in to, so it is a marker with the id `battle.net` and nothing more: the Source
+facet and the focus line say "Battle.net", the build is the installed version,
+and nothing asks it for updates. The game's name stays its folder's; droidtop
+keeps no table of product codes. What it found is
 written on the row (`PcInfo.marker`: store id, game id, build, DLC ids) and the
 build is the row's installed version, beating anything a folder name says.
 Consumers read the row; nothing else opens these files. A folder with a marker
