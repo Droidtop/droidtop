@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.delay
 import dev.droidtop.runtime.keyboard.AddonKeyboard
 import dev.droidtop.runtime.keyboard.AddonKeyboardRules
 import org.pocketworkstation.pckeyboard.KeyboardPanel
@@ -86,4 +87,15 @@ fun OwnFieldKeyboard(modifier: Modifier = Modifier) {
         onDispose { (now as? KeyboardTargets.Opened.Elsewhere)?.let { KeyboardTargets.close(it.request) } }
     }
     if (opened == KeyboardTargets.Opened.Here) DroidtopKeyboard(sink, modifier.padding(top = 12.dp))
+    // The keys are served on another screen: Android's own keyboard stays away from this one (#523).
+    if (opened is KeyboardTargets.Opened.Elsewhere) {
+        LaunchedEffect(view) {
+            while (true) {
+                KeyboardTargets.hideAndroidKeyboard(view)
+                delay(KEYBOARD_GUARD_MS)
+            }
+        }
+    }
 }
+
+private const val KEYBOARD_GUARD_MS = 150L

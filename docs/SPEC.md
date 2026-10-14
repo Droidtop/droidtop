@@ -4229,6 +4229,11 @@ rig check in the commit message.
   keys are dispatched into the field's own window as keys of Android's virtual keyboard device, the
   path an attached keyboard takes: no input method, no window focus, no permission. The panel is
   never a focus target, so a tap on a key leaves focus on the field.
+- **One keyboard at a time (Droidtop/tracker#523).** When a droidtop field's keys are served on another screen
+  (`KeyboardTargets.open` answers `Elsewhere`: the companion's Input controller or the internal screen), Android's own
+  keyboard is sent away from the field's window while the request stands (`KeyboardTargets.hideAndroidKeyboard`, from
+  `OwnFieldKeyboard` and `InWindowKeyboard`): the field keeps its focus and its keys, and nothing covers it on the
+  screen the person is looking at. The text-entry design itself is the UI quality pass's (Droidtop/tracker#485 S7).
 - **Other apps on the add-on display: droidtop's input method, drawn where the app is.** droidtop's
   keyboard is already a selectable input method; its connection to the focused editor exists even
   where Android draws no keyboard window. When an editor asks it for the keyboard

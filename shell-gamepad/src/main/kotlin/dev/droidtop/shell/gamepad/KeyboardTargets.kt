@@ -89,6 +89,21 @@ object KeyboardTargets {
         }
     }
 
+    /**
+     * One keyboard only (Droidtop/tracker#523): a field whose keys are served elsewhere ([Opened.Elsewhere]: the
+     * companion's Input controller, the internal screen) must not also bring up Android's keyboard over its own
+     * window, which covers what is being edited. The field's own focus asks Android for it after droidtop opened
+     * the other, so this runs while the request stands and sends the keyboard away again; the field keeps its focus
+     * and its keys. [view] is any view of the field's window.
+     */
+    fun hideAndroidKeyboard(view: android.view.View) {
+        val showing = androidx.core.view.ViewCompat.getRootWindowInsets(view)
+            ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+        if (!showing) return
+        view.context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            ?.hideSoftInputFromWindow(view.windowToken, 0)
+    }
+
     /** The companion's Hide. */
     fun hideCompanion() {
         val request = companionRequest.value ?: return

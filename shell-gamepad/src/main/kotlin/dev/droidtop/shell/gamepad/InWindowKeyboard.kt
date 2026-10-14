@@ -94,6 +94,8 @@ object InWindowKeyboard {
         override fun onPreDraw(): Boolean {
             val editing = wanted()
             if (!editing) dismissed = false
+            // The keys are served on another screen: no Android keyboard over this window as well (#523).
+            if (editing && elsewhere != null) KeyboardTargets.hideAndroidKeyboard(decor)
             if (editing && !dismissed) {
                 if (hidePending) {
                     decor.removeCallbacks(hide)
