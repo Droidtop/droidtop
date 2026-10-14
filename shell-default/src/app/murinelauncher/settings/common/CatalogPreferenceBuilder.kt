@@ -756,7 +756,7 @@ class CatalogPreferenceNavigator(
                     holder.itemView as ViewGroup,
                     item.notice,
                     item.placement,
-                    onAction = item.notice.action?.let { action -> { runNoticeAction(context, action) } },
+                    onAction = item.notice.action?.let { action -> { item.opens?.let { push(it) } ?: runNoticeAction(context, action) } },
                     onInfo = { showNoticeInfo(context, item) },
                 )
             }
@@ -767,7 +767,7 @@ class CatalogPreferenceNavigator(
             isIconSpaceReserved = false
             setOnPreferenceClickListener {
                 when (item.notice.aPress()) {
-                    NoticePress.ACTION -> item.notice.action?.let { runNoticeAction(context, it) }
+                    NoticePress.ACTION -> item.opens?.let { push(it) } ?: item.notice.action?.let { runNoticeAction(context, it) }
                     NoticePress.INFO -> showNoticeInfo(context, item)
                     NoticePress.NONE -> {}
                 }

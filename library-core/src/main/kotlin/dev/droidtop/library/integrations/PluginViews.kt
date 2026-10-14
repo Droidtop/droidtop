@@ -9,6 +9,11 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.library.settings.NoticeAction
+import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.TextInputItem
@@ -17,6 +22,7 @@ import dev.droidtop.pluginhost.LegacyManifest
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginErrorCode
 import dev.droidtop.pluginhost.PluginJobsCenter
+import dev.droidtop.pluginhost.PluginMessages
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginReply
 import dev.droidtop.pluginhost.PluginResult
@@ -81,8 +87,17 @@ object PluginViews {
         leadGroups: suspend (Context) -> List<CatalogGroup> = { emptyList() },
     ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups, leadGroups).screen(id, title)
 
-    /** What running one view action came to: the sentence to show, a view the reply carried, and whether the page should be fetched again. */
-    data class ActionOutcome(val message: String, val view: PluginView?, val refetch: Boolean)
+    /**
+     * What running one view action came to: the sentence to show, a view the reply carried, whether the page should be
+     * fetched again, and the notice to draw instead of the sentence (the reply's `data.notice`, or an error's notice).
+     */
+    data class ActionOutcome(val message: String, val view: PluginView?, val refetch: Boolean, val notice: ViewNode.Notice? = null)
+
+    /** The permissions [record] declares: an error may only point at one of these (docs/plugin-api.md 1.3). */
+    internal fun declared(record: PluginRecord): Set<String> = record.manifest.v2.permissions.map { it.id }.toSet()
+
+    /** The fallback title of a failed action's notice. */
+    internal const val FAILED_TITLE = "Couldn't finish"
 
     /**
      * Runs a `call` or `job` action of a view (docs/plugin-api.md 1.6, "Actions") on [point], with [values] and the
@@ -102,13 +117,23 @@ object PluginViews {
         onJobDone: suspend (Context, PluginResult) -> Unit = { _, _ -> },
     ): ActionOutcome {
         val callArgs = PluginViewCall.args(action.args(), HashMap(values), hostContext)
-        return when (action.kind) {
+        val messages = mutableListOf<String>()
+        val outcome = when (action.kind) {
             ViewAction.Kind.VIEW -> ActionOutcome("", null, refetch = false)
             ViewAction.Kind.CALL -> {
                 val reply = call(context, record, point, action.op, callArgs)
-                if (!reply.ok) return ActionOutcome("${record.manifest.label}: ${reply.message ?: "failed"}", null, refetch = false)
-                val view = PluginViewCall.replyView(reply.data)
-                ActionOutcome(PluginViewCall.replyMessage(reply.data) ?: "Done", view, refetch = view == null)
+                if (!reply.ok) {
+                    ActionOutcome(
+                        "${record.manifest.label}: ${reply.message ?: "failed"}", null, refetch = false,
+                        notice = PluginViewCall.errorNotice(reply, declared(record), FAILED_TITLE, messages),
+                    )
+                } else {
+                    val view = PluginViewCall.replyView(reply.data, messages)
+                    ActionOutcome(
+                        PluginViewCall.replyMessage(reply.data) ?: "Done", view, refetch = view == null,
+                        notice = PluginViewCall.replyNotice(reply.data, messages),
+                    )
+                }
             }
             ViewAction.Kind.JOB -> {
                 val startedAt = System.currentTimeMillis()
@@ -124,11 +149,18 @@ object PluginViews {
                     }
                 }
                 onJobDone(context, result)
-                val replaced = result.values["view"]?.let { text -> runCatching { PluginView.parse(JSONObject(text)) }.getOrNull() }
+                val replaced = result.values["view"]?.let { text -> runCatching { PluginView.parse(JSONObject(text), messages) }.getOrNull() }
                 val message = if (result.ok) result.values["message"] ?: "Done" else "${record.manifest.label}: ${result.error ?: "failed"}"
-                ActionOutcome(message, replaced, refetch = replaced == null)
+                val notice = if (result.ok) {
+                    result.values["notice"]?.let { text -> runCatching { PluginViewCall.replyNotice(JSONObject().put("notice", JSONObject(text)), messages) }.getOrNull() }
+                } else {
+                    PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.FAILED, result.error ?: "failed"), emptySet(), FAILED_TITLE, messages)
+                }
+                ActionOutcome(message, replaced, refetch = replaced == null, notice = notice)
             }
         }
+        withContext(Dispatchers.IO) { PluginMessages.record(context, record.manifest.id, "$point/${action.op}", messages) }
+        return outcome
     }
 
     /** A page drawn from a view the plugin already returned (a context action's or quick tile's reply). It has no op to fetch again; its actions may replace it. */
@@ -215,6 +247,12 @@ private class PluginPage(
     @Volatile private var denied: Boolean = false
     @Volatile private var stale: Boolean = initial == null
     @Volatile private var notice: String? = null
+
+    /** A reply's notice (or an action's error notice): shown until the page's next action, never cleared by a refetch. */
+    @Volatile private var replyNotice: ViewNode.Notice? = null
+
+    /** The reply a load failed with, for its error notice. */
+    @Volatile private var errorReply: PluginReply? = null
     @Volatile private var pending: Job? = null
     private val values = ConcurrentHashMap<String, String>().apply {
         putAll(seedValues)
@@ -243,9 +281,13 @@ private class PluginPage(
         if (!stale && !denied) return
         val reply = PluginViews.call(context, record, point, op, PluginViewCall.args(args, values, hostContext))
         stale = false
-        denied = !reply.ok && reply.code == PluginErrorCode.PERMISSION_DENIED
+        // An error naming a permission the plugin declared is about that grant, not the whole point.
+        denied = !reply.ok && reply.code == PluginErrorCode.PERMISSION_DENIED && reply.permission == null
+        errorReply = if (reply.ok) null else reply
         if (reply.ok) {
-            val parsed = PluginView.parse(reply.data)
+            val messages = mutableListOf<String>()
+            val parsed = PluginView.parse(reply.data, messages)
+            PluginMessages.record(context, record.manifest.id, "$point/$op", messages)
             if (parsed == null) {
                 error = "${record.manifest.label} sent a page droidtop cannot draw"
             } else {
@@ -267,16 +309,34 @@ private class PluginPage(
 
     private fun groups(screenId: String): List<CatalogGroup> {
         val head = buildList<CatalogItem> {
-            notice?.let { add(ActionItem(id = "pv_${screenId}_notice", title = it, run = {})) }
+            // A reply's notice is drawn instead of its sentence (docs/plugin-api.md 1.6, `data.notice`).
+            val shownNotice = replyNotice
+            if (shownNotice != null) {
+                add(noticeItem(screenId, "pv_${screenId}_reply_notice", shownNotice))
+            } else {
+                notice?.takeIf { it.isNotBlank() }?.let { add(ActionItem(id = "pv_${screenId}_notice", title = it, run = {})) }
+            }
             error?.let {
                 if (denied) {
-                    // docs/plugin-api.md 4.3, "A denied point": the standard error state, and the route to the Permissions screen.
-                    add(ActionItem(id = "pv_${screenId}_error", title = "${record.manifest.label} is not allowed to show this", subtitle = "$it. Allow it under Permissions to see this page.", run = {}))
-                    SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, record.manifest.id)?.let { permissions ->
-                        add(NestedScreenItem(id = "pv_${screenId}_permissions", title = "Change what ${record.manifest.label} may do", subtitle = "Opens its Permissions", inline = permissions))
-                    }
+                    // docs/plugin-api.md 4.3, "A denied point": a caution notice whose action is the Permissions screen.
+                    add(
+                        NoticeItem(
+                            id = "pv_${screenId}_error",
+                            notice = Notice(
+                                tone = NoticeTone.Caution,
+                                title = "Not allowed to show this",
+                                body = "It needs your permission for this page.",
+                                details = it,
+                                action = NoticeAction("Permissions") {},
+                                source = record.manifest.label,
+                            ),
+                            opens = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, record.manifest.id),
+                        ),
+                    )
                 } else {
-                    add(ActionItem(id = "pv_${screenId}_error", title = "${record.manifest.label} could not show this page", subtitle = it, run = {}))
+                    val failed = errorReply?.let { reply -> PluginViewCall.errorNotice(reply, PluginViews.declared(record), "Couldn't show this page") }
+                        ?: ViewNode.Notice("error", "Couldn't show this page", null, it, "caution", banner = false, action = null)
+                    add(noticeItem(screenId, "pv_${screenId}_error", failed))
                     addAll(extraWhenFailed())
                 }
             }
@@ -304,6 +364,7 @@ private class PluginPage(
     private fun item(screenId: String, node: ViewNode): CatalogItem {
         val itemId = "pv_${screenId}_${node.id}"
         return when (node) {
+            is ViewNode.Notice -> noticeItem(screenId, itemId, node)
             is ViewNode.Info -> ActionItem(id = itemId, title = node.title, subtitle = node.subtitle, value = node.value, run = {})
             is ViewNode.Progress -> ActionItem(
                 id = itemId,
@@ -351,6 +412,40 @@ private class PluginPage(
         }
     }
 
+    /**
+     * A plugin's notice as droidtop's own notice card (docs/SPEC.md 7k, "Notices"), named after the plugin. A `view`
+     * action opens its page in place; a `call` or `job` runs and the page is read again; an error that named a
+     * declared permission opens Permissions.
+     */
+    private fun noticeItem(screenId: String, itemId: String, node: ViewNode.Notice): CatalogItem {
+        val action = node.action
+        val opens: CatalogScreen? = when {
+            node.opensPermissions -> SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, record.manifest.id)
+            action?.kind == ViewAction.Kind.VIEW ->
+                PluginPage(record, point, action.op, action.args(), hostContext, HashMap(values), null, null, onJobDone, extraWhenFailed, extraGroups)
+                    .screen("${screenId}_${action.op}_${itemId.hashCode()}", action.title ?: node.title)
+            else -> null
+        }
+        val label = when {
+            node.opensPermissions -> "Permissions"
+            action != null -> action.title ?: "Open"
+            else -> null
+        }
+        return NoticeItem(
+            id = itemId,
+            notice = Notice(
+                tone = if (node.tone == "caution") NoticeTone.Caution else NoticeTone.Info,
+                title = node.title,
+                body = node.subtitle,
+                details = node.details,
+                action = label?.let { NoticeAction(it) { context -> if (opens == null && action != null) notice = perform(context, action, node.title) {} } },
+                source = record.manifest.label,
+            ),
+            placement = if (node.banner) NoticePlacement.Page else NoticePlacement.Group,
+            opens = opens,
+        )
+    }
+
     private fun actionItem(
         screenId: String,
         itemId: String,
@@ -390,10 +485,14 @@ private class PluginPage(
 
     /** Runs a call or job action and returns the sentence to show; the page is fetched again afterwards unless the reply carried a view. */
     private suspend fun perform(context: Context, action: ViewAction, label: String, onStatus: (String) -> Unit): String {
+        // A reply notice lasts until the next action (docs/plugin-api.md 1.6, `data.notice`).
+        replyNotice = null
         val outcome = PluginViews.runAction(context, record, point, action, HashMap(values), hostContext, label, onStatus, onJobDone)
         val replaced = outcome.view
         if (replaced != null) show(replaced) else if (outcome.refetch) stale = op != null
-        return outcome.message
+        replyNotice = outcome.notice
+        // With a notice to draw, the sentence is not repeated beside it.
+        return if (outcome.notice != null) "" else outcome.message
     }
 
     private companion object {

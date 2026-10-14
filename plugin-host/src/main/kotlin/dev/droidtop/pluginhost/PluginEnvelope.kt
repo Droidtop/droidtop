@@ -19,6 +19,9 @@ enum class PluginErrorCode {
     PROVIDER_CRASHED,
     CANCELLED,
     FAILED,
+
+    /** The source needs the person signed in; the error's `action` (a `web.session` sign-in) is offered as "Sign in". */
+    SIGN_IN_REQUIRED,
     ;
 
     companion object {
@@ -43,6 +46,12 @@ class PluginCall(
     val caller: JSONObject = JSONObject().put("kind", "host"),
     val surface: JSONObject = JSONObject(),
     val args: JSONObject = JSONObject(),
+    /**
+     * What this droidtop can draw, for a plugin to test without a helper library (docs/plugin-api.md 1.6):
+     * `viewFeatures` lists the view features it renders ("notice", "confirm", ...), so a plugin keeps its old form
+     * for an older droidtop.
+     */
+    val host: JSONObject = hostInfo(),
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("contract", PLUGIN_CONTRACT_VERSION)
@@ -54,6 +63,7 @@ class PluginCall(
         .put("caller", caller)
         .put("surface", surface)
         .put("args", args)
+        .put("host", host)
 
     /** The arguments as the flat string map a contract 1 capability call takes; nested values keep their JSON text. */
     fun argsAsStrings(): Map<String, String> = buildMap { args.keys().forEach { put(it, args.optString(it)) } }
@@ -70,22 +80,43 @@ class PluginCall(
                 caller = json.optJSONObject("caller") ?: JSONObject().put("kind", "host"),
                 surface = json.optJSONObject("surface") ?: JSONObject(),
                 args = json.optJSONObject("args") ?: JSONObject(),
+                host = json.optJSONObject("host") ?: JSONObject(),
             )
         }.getOrNull()
+
+        /** The `host` object every call carries. */
+        fun hostInfo(): JSONObject = JSONObject().put("viewFeatures", org.json.JSONArray(PluginViewCall.VIEW_FEATURES))
     }
 }
 
-/** A reply: `{ok:true, data}` or `{ok:false, error:{code, message}}`. */
+/**
+ * A reply: `{ok:true, data}` or `{ok:false, error:{code, message, title?, subtitle?, permission?, action?}}`. The
+ * error's [title] and [subtitle] are what the person reads (droidtop draws them as a caution notice), [permission]
+ * names the declared permission a PERMISSION_DENIED is about (its notice then opens that grant), and [action] is a
+ * view action (a SIGN_IN_REQUIRED's sign-in), docs/plugin-api.md 1.3.
+ */
 class PluginReply private constructor(
     val ok: Boolean,
     val data: JSONObject,
     val code: PluginErrorCode?,
     val message: String?,
+    val title: String? = null,
+    val subtitle: String? = null,
+    val permission: String? = null,
+    val action: JSONObject? = null,
 ) {
     fun toJson(): JSONObject = if (ok) {
         JSONObject().put("ok", true).put("data", data)
     } else {
-        JSONObject().put("ok", false).put("error", JSONObject().put("code", (code ?: PluginErrorCode.FAILED).name).put("message", message ?: ""))
+        JSONObject().put("ok", false).put(
+            "error",
+            JSONObject().put("code", (code ?: PluginErrorCode.FAILED).name).put("message", message ?: "").apply {
+                title?.let { put("title", it) }
+                subtitle?.let { put("subtitle", it) }
+                permission?.let { put("permission", it) }
+                action?.let { put("action", it) }
+            },
+        )
     }
 
     /** The compact text that crosses the binder, or a FAILED reply when it would exceed [PluginRunner.MAX_RESULT_BYTES]. */
@@ -103,6 +134,10 @@ class PluginReply private constructor(
 
         fun error(code: PluginErrorCode, message: String): PluginReply = PluginReply(false, JSONObject(), code, message)
 
+        /** An error the person reads: [title] and [subtitle] in plain words, the [permission] it is about, an [action] to offer. */
+        fun error(code: PluginErrorCode, title: String, subtitle: String? = null, permission: String? = null, action: JSONObject? = null): PluginReply =
+            PluginReply(false, JSONObject(), code, title, title, subtitle, permission, action)
+
         /** Reads a reply from a plugin. A reply that is not JSON of the right shape is FAILED, and an error code outside the closed set is read as FAILED. */
         fun parse(text: String?): PluginReply {
             if (text == null) return error(PluginErrorCode.FAILED, "plugin returned no reply")
@@ -113,7 +148,17 @@ class PluginReply private constructor(
                     ok(json.optJSONObject("data") ?: JSONObject())
                 } else {
                     val err = json.optJSONObject("error")
-                    error(PluginErrorCode.fromId(err?.optString("code")) ?: PluginErrorCode.FAILED, err?.optString("message").orEmpty())
+                    fun text(key: String) = err?.takeUnless { it.isNull(key) }?.optString(key)?.trim()?.takeIf { it.isNotEmpty() }
+                    PluginReply(
+                        false,
+                        JSONObject(),
+                        PluginErrorCode.fromId(err?.optString("code")) ?: PluginErrorCode.FAILED,
+                        err?.optString("message").orEmpty(),
+                        title = text("title"),
+                        subtitle = text("subtitle"),
+                        permission = text("permission"),
+                        action = err?.optJSONObject("action"),
+                    )
                 }
             } catch (e: Exception) {
                 error(PluginErrorCode.FAILED, "malformed reply from plugin")

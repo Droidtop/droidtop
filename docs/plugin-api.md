@@ -189,10 +189,22 @@ the same envelope in both directions:
 
 Error codes are a closed set: `INVALID_ARGS`, `UNSUPPORTED`,
 `NOT_FOUND`, `PERMISSION_DENIED`, `RATE_LIMITED`, `TIMEOUT`,
-`PROVIDER_UNAVAILABLE`, `PROVIDER_CRASHED`, `CANCELLED`, `FAILED`. A
-plugin's own ordinary failure ("no network", "nothing found") is an
-error reply, not a crash. This keeps today's distinction in
-`PluginCrashPolicy`.
+`PROVIDER_UNAVAILABLE`, `PROVIDER_CRASHED`, `CANCELLED`, `FAILED`,
+`SIGN_IN_REQUIRED`. A plugin's own ordinary failure ("no network",
+"nothing found") is an error reply, not a crash. This keeps today's
+distinction in `PluginCrashPolicy`.
+
+**What the person reads of an error (2026-10-14, Droidtop/tracker#485).**
+An error may also carry `title` and `subtitle` (plain words, at most 60
+and 140 characters), `permission` and `action`:
+`{"code": "PERMISSION_DENIED", "message": "...", "title": "Not allowed",
+"permission": "net.any"}`. droidtop draws an error as a caution notice
+(§1.6, Notices) with the code and message in Info. `PERMISSION_DENIED`
+naming a permission the plugin **declared** opens that plugin's
+Permissions; naming one it did not declare is drawn as a plain notice and
+logged as a plugin message. `SIGN_IN_REQUIRED` offers its `action` (a view
+action) as "Sign in". The helpers write it (`gg.error(code, title, ...)`,
+`PluginReply.error(code, title, subtitle, permission, action)`).
 
 **Plugin → host (the broker):**
 
@@ -311,6 +323,41 @@ Desktop with the same Settings app. A view is translated into that model by
 one host mechanism (`PluginViews`, `library-core`), so a plugin screen is a
 catalog screen: no second renderer per mode, and every improvement to the
 catalog renderers reaches plugin screens for free.
+
+**Notices (2026-10-14, Droidtop/tracker#485).** A `notice` node is a
+condition the person should know about, drawn as droidtop's own notice
+card (docs/SPEC.md 7k, "Notices") and named "from <plugin>":
+
+```json
+{ "type": "notice", "id": "signin", "tone": "caution", "placement": "section",
+  "title": "Sign in to download", "subtitle": "Downloads are for members.",
+  "details": "The site lists its download links only to signed-in members.",
+  "action": { "kind": "view", "op": "signin", "title": "Sign in" } }
+```
+
+- `tone` is `info` or `caution`; a plugin has no danger. Any other value
+  is drawn as info and logged.
+- `placement` is `section` (the default) or `banner`, at most one banner
+  a page; a second becomes a section notice and is logged.
+- Lengths (title 60, subtitle 140, details 500, the action's label 20) and
+  counts (two a section and only of different tones, three a view) are in
+  `docs/view-limits/plugin-view-limits.json`, the one file the host,
+  `gg.lint_view` and the Kotlin `PluginViewLint` read. Over a length the
+  host cuts; over a count it drops; a notice is moved first in its section.
+- A plugin notice may not use one of droidtop's own notice titles (the
+  `reservedTitles` of the limits file, exact, ignoring case); such a node
+  is drawn as a plain row and logged.
+- A reply's `data.notice` (the same object, `type` optional) is drawn
+  instead of `data.message` until the page's next action; a refetch never
+  clears it. Send both, so an older droidtop shows the message.
+- Every call envelope carries `host.viewFeatures` (`["notice",
+  "confirm"]` today): a plugin in any language tests it and keeps the old
+  `info` row for a droidtop without notices.
+- What the host changed (a cut, a drop, a move, an unknown tone, a reserved
+  title, an undeclared permission) is a **plugin message**: logged once per
+  plugin and view under the logcat tag `PluginMessages`, and the last 50
+  per plugin are kept for the plugin's page and the Plugin messages page in
+  developer options.
 
 **The document** (`docs/plugin-view.schema.json` is normative):
 
@@ -1743,11 +1790,27 @@ Risk low.
 - **For:** a short message in the moment, Decky's `toaster.toast`: "Synced",
   "Tunnel up".
 - **Ops:** `show {text}` returns `{shown}`. Text is cut to 200 characters.
-- **Surfaces:** a toast over whatever is in front, in every mode, always
-  led by the plugin's name, so it is never mistaken for droidtop's own.
+- **Surfaces:** droidtop's corner flash (docs/SPEC.md 7k), always led by
+  the plugin's name so it is never mistaken for droidtop's own; about 80
+  characters are drawn and the whole text is kept in Recent (the Quick
+  Menu's Notifications tab). While no droidtop surface is on screen (a
+  game) it is a platform toast, still led by the name.
 - **Permission:** `overlay.toast` (normal), rate-limited like every
   broker call (§8).
 - **Status:** built (2026-10-07).
+
+**C6b Confirm.** API `ui.prompt@1`, op `confirm`. Risk low.
+- **For:** a yes-or-no question before a plugin does something the person
+  should agree to.
+- **Ops:** `confirm {title, subtitle?, details?, tone: info|caution,
+  proceed, cancel?}` returns `{confirmed}`. Drawn on droidtop's confirm
+  card (the danger dialog's shape with no danger: Cancel first and
+  focused), named after the plugin, with no second press to arm.
+- **Rules:** only during a call the person started; a title that is one of
+  droidtop's own notice titles is refused (`INVALID_ARGS`); limits as the
+  notice node's. The `text` op and its `REFUSED`/`BUSY` answers come with
+  the text-entry work (Droidtop/tracker#485, slice 9).
+- **Status:** built (2026-10-14).
 
 **C7 Themes and theme assets.** EP `theme.pack@1`. Risk medium.
 - **For:** ES-DE themes, icon packs, sound packs, wallpapers,
@@ -3211,6 +3274,16 @@ version was bumped.
 - A `provides` entry for a major the host no longer serves is listed as
   "Not supported by this version" and never called, but the rest of the
   plugin still works.
+
+**Changelog (additive changes; no version moved).**
+
+- 2026-10-14 (Droidtop/tracker#485): the `notice` view node and a reply's
+  `data.notice`; `host.viewFeatures` in every call envelope; error replies
+  may carry `title`, `subtitle`, `permission` and `action`, and the new code
+  `SIGN_IN_REQUIRED`; `ui.prompt@1 confirm`; `ui.toast` is drawn as
+  droidtop's flash; the view limits moved into
+  `docs/view-limits/plugin-view-limits.json`; permission titles reworded in
+  plain words (§4.1).
 
 **Where the version facts live.** The host's registry of points, APIs,
 events and permissions is **code** in `plugin-host` (one Kotlin table:

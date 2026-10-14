@@ -140,6 +140,12 @@ private fun NoticeDialogWindow(request: NoticeDialogs.Request) {
  */
 @Composable
 internal fun NoticeFlashHost() {
+    // Attached while the shell is started: a flash raised while it is not (a plugin during a game) is a platform toast.
+    val token = remember { Any() }
+    androidx.lifecycle.compose.LifecycleStartEffect(token) {
+        Notices.attachFlashHost(token)
+        onStopOrDispose { Notices.detachFlashHost(token) }
+    }
     val flashes by Notices.flashes.collectAsState()
     val flash = flashes.firstOrNull() ?: return
     val context = LocalContext.current

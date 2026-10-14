@@ -1937,12 +1937,20 @@ object AppSettingsCatalogs {
                 )
             }
             if (record.trust == PluginTrustState.PENDING && unofficialFrom != null) {
+                // U1 (docs/SPEC.md 7k, "Notices"): the caution banner, its exact source and maker in Info.
                 add(
-                    TextBlockItem(
+                    NoticeItem(
                         id = "plugin_${m.id}_unofficial",
-                        title = "Unofficial",
-                        text = "This plugin is from \"${catalogNames[unofficialFrom] ?: unofficialFrom}\", a catalog that is not part of droidtop. " +
-                            "droidtop has not checked it. Approve it only if you trust where it came from.",
+                        notice = Notice(
+                            tone = NoticeTone.Caution,
+                            title = "Unofficial plugin",
+                            body = "Approve it only if someone you trust pointed you to it.",
+                            details = "Approving lets it run and use the permissions listed below.\n" +
+                                "Source: the catalog \"${catalogNames[unofficialFrom] ?: unofficialFrom}\", which is not part of droidtop.\n" +
+                                "Maker: ${m.origin}, key ${PluginDangers.groupsOfFour(record.approvedKeySha256)}\n" +
+                                "Digest: ${record.archiveDigest}",
+                        ),
+                        placement = NoticePlacement.Page,
                     ),
                 )
             }
@@ -2174,6 +2182,18 @@ object AppSettingsCatalogs {
                         inline = pluginPermissionsScreen(m.id),
                         valueLabel = { summary },
                     ),
+                    // What droidtop had to change to draw its pages (docs/SPEC.md 7k, "Notices"), for the plugin's maker.
+                    *dev.droidtop.pluginhost.PluginMessages.read(context, m.id).size.takeIf { it > 0 }?.let { count ->
+                        arrayOf(
+                            NestedScreenItem(
+                                id = "plugin_${m.id}_messages",
+                                title = "Plugin messages",
+                                subtitle = "What droidtop changed to draw its pages",
+                                inline = pluginMessagesScreen(m.id, m.label),
+                                valueLabel = { count.toString() },
+                            ),
+                        )
+                    }.orEmpty(),
                     NestedScreenItem(
                         id = "plugin_${m.id}_activity",
                         title = "Activity",
@@ -2533,6 +2553,46 @@ object AppSettingsCatalogs {
             ),
         )
     }
+
+    /**
+     * One plugin's messages (docs/SPEC.md 7k, "Notices"; docs/plugin-api.md 1.6): what droidtop cut, dropped or moved
+     * to draw its pages, newest first, with Copy all for a bug report.
+     */
+    private fun pluginMessagesScreen(pluginId: String, label: String) = CatalogScreen(
+        id = "plugin_messages_$pluginId",
+        title = "Plugin messages",
+        subtitle = label,
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                val entries = dev.droidtop.pluginhost.PluginMessages.read(context, pluginId).asReversed()
+                val format = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+                listOf(
+                    CatalogGroup(
+                        id = "plugin_messages_actions",
+                        title = null,
+                        items = listOf(
+                            ActionItem(
+                                id = "plugin_messages_copy",
+                                title = "Copy all",
+                                run = { ctx ->
+                                    val clipboard = ctx.getSystemService(android.content.ClipboardManager::class.java)
+                                    clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("$label messages", dev.droidtop.pluginhost.PluginMessages.asText(ctx, pluginId)))
+                                    dev.droidtop.library.settings.Notices.flash("Copied", context = ctx)
+                                },
+                            ),
+                        ),
+                    ),
+                    CatalogGroup(
+                        id = "plugin_messages_list",
+                        title = "Newest first",
+                        items = entries.mapIndexed { i, e ->
+                            TextBlockItem(id = "plugin_messages_$i", text = e.text, title = "${format.format(java.util.Date(e.atMs))} · ${e.view}")
+                        },
+                    ),
+                )
+            }
+        },
+    )
 
     /** After anything that changes which plugins run or what they may do: the status widget and background work follow. */
     private fun pluginsChanged(context: Context) {
