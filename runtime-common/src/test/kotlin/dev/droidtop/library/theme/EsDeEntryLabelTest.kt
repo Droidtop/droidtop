@@ -144,4 +144,20 @@ class EsDeEntryLabelTest {
             esDeEntryLabel(name = "Sonic", letterCase = EsDeLetterCase.NONE, sourceSystemName = null),
         )
     }
+
+    @Test
+    fun `the same title on two systems names the system on both rows and only on those`() {
+        assertEquals(
+            listOf("Glover (USA) (N64)", "Glover (USA) (PSX)", "Kingdom Hearts"),
+            esDeDisambiguatedTitles(listOf("Glover (USA)", "Glover (USA)", "Kingdom Hearts"), listOf("n64", "psx", "psx")),
+        )
+    }
+
+    @Test
+    fun `titles that differ only in case still collide, and a row with no system keeps its title`() {
+        assertEquals(
+            listOf("Sonic (MEGADRIVE)", "sonic"),
+            esDeDisambiguatedTitles(listOf("Sonic", "sonic"), listOf("megadrive", null)),
+        )
+    }
 }

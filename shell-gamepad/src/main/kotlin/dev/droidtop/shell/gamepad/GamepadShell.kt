@@ -122,6 +122,7 @@ import dev.droidtop.library.theme.EsDeCollectionKind
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.scanFollowingGamesRoots
 import dev.droidtop.library.theme.EsDeTransitionAnimation
+import dev.droidtop.library.theme.boolOrNull
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.ControllerLayouts
@@ -2624,11 +2625,22 @@ private fun GamesSection(
     // Keyed on the group too: whether a game shows its own system as a
     // suffix depends on whether the list being shown IS a collection.
     val inCollectionGamelist = selectedGroup is GameGroup.Collection
-    val gamelistWidgetItems = remember(systemGamesForGroup, inCollectionGamelist) {
-        systemGamesForGroup.map { entry ->
+    // A theme whose list does not name the source system (its own `systemNameSuffix` off, or no list
+    // widget at all) would show the same title for two systems as two identical rows (tracker#497).
+    val themeNamesSystem = gamelistView?.primaryListElement()?.let { it.boolOrNull("systemNameSuffix") ?: true } ?: false
+    val gamelistWidgetItems = remember(systemGamesForGroup, inCollectionGamelist, themeNamesSystem) {
+        val labels = if (inCollectionGamelist && !themeNamesSystem) {
+            dev.droidtop.library.theme.esDeDisambiguatedTitles(
+                systemGamesForGroup.map { it.title },
+                systemGamesForGroup.map { it.systemId },
+            )
+        } else {
+            systemGamesForGroup.map { it.title }
+        }
+        systemGamesForGroup.mapIndexed { index, entry ->
             EsDeListItem(
                 key = entry.id,
-                label = entry.title,
+                label = labels[index],
                 logoPath = entry.artworkUri,
                 onSelect = { onLaunch(entry) },
                 // Lets a themed carousel/grid honour its own real

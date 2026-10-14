@@ -61,3 +61,19 @@ fun esDeEntryLabel(
     }
     return "$cased [$suffix]"
 }
+
+/**
+ * Names the system on the rows of a collection list that would otherwise read the same: the same
+ * game title for two systems ("Glover (USA)" for the N64 and the PlayStation) is two games, and
+ * two identical rows cannot be told apart (Droidtop/tracker#497). Only the colliding rows get
+ * " (SYSTEM)", cased like ES-DE's own suffix; a unique title is left alone. For a theme whose own
+ * `systemNameSuffix` is off, since a theme that draws the suffix has already named the system.
+ * [titles] and [systems] run in step; a row with no system keeps its title.
+ */
+fun esDeDisambiguatedTitles(titles: List<String>, systems: List<String?>): List<String> {
+    val counts = titles.groupingBy { it.lowercase() }.eachCount()
+    return titles.mapIndexed { index, title ->
+        val system = systems.getOrNull(index)
+        if (system.isNullOrEmpty() || (counts[title.lowercase()] ?: 0) < 2) title else "$title (${system.uppercase()})"
+    }
+}

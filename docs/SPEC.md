@@ -14040,6 +14040,10 @@ group's own query (favourites, completed, played, genre, developer, release
 year, Switch content, hidden; sorts name, rating, release date, last
 played). The earlier cycling "Sort:" and "Show:" rows and their separate
 stored preferences are gone: one mechanism.
+Two games with one title on two systems (a title on the N64 and the PlayStation) are two games,
+never one row twice: in a collection whose theme does not draw ES-DE's `systemNameSuffix` itself, the
+rows that would read the same name their system ("Glover (USA) (N64)", `esDeDisambiguatedTitles`);
+a unique title is left alone (Droidtop/tracker#497).
 A **collection** (Favorites, Last Played, a person's own) is a list like any
 other (2026-10-03, Droidtop/tracker#273): the same two rows and sheets, its
 own remembered view under `retro:<collection>`. Name is the default, except
