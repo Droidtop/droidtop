@@ -14264,7 +14264,10 @@ running on the console and asked for the visual pass on top of it. Decided and b
   not settings to find by name — stay the screen's own business. Both surfaces get this for
   free: the Gaming overlay and the Preference dialog both call the same `build`.
   `search` is then a pure, in-memory
-  substring filter, safe on every keystroke. In the Gaming shell, a synthetic "Search settings"
+  filter, safe on every keystroke, ranked as Android Settings ranks: a title that starts with the
+  text, a title with a word that does, the text inside a title, the screen's own name, and last a row
+  whose explanation has the text as a whole word (never a part of a longer word); one rank keeps the
+  tree's order (Droidtop/tracker#505). In the Gaming shell, a synthetic "Search settings"
   row (`SEARCH_ROW_ID`) is prepended to the settings home's own row list — it rides the exact
   same focus order, Up/Down, A/touch and icon slot as every real row instead of a second
   mechanism beside them — and opens a full-screen `SettingsSearchOverlay` (a text field plus
@@ -14473,7 +14476,10 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   stores first (registry order), then **Folders**, then the stores not signed
   in, then **Imported** once a game came through another launcher
   (`PcLaunchers.viaByEntry`); a store row reads "Signed in · 1,193 games" or
-  "Not signed in", Folders "3 folders · 412 games". A store page's holding rows
+  "Not signed in", Folders "3 folders · 412 games". The column can be scanned by glyph: the
+  stores keep the globe, Folders the folder, Add a game and Imported the game controller, Storage the
+  disk (Droidtop/tracker#503); a store's own mark needs brand art droidtop does not ship, which is the
+  owner's call, not drawn from memory. A store page's holding rows
   ("Shared with you · 573", Free to play) are pressable like Open library:
   the shell opens PC Games filtered to that store and that holding
   (`PcSource.holdingItemId`), and the pill says so. **Folders**
@@ -14685,7 +14691,10 @@ time), and per friend a conversation of plain-text messages kept in memory
 friend with its provider, keyed `<provider id>/<friend id>`, so two services
 never collide and one person on two services is two contacts: droidtop does
 not guess at cross-service identity. Invites, groups, friend requests,
-avatars, images and typing are out of this version for every provider.
+avatars, images and typing are out of this version for every provider. With nothing to show
+(no conversation, no friend) the Accounts heading is the page's purpose, "Connect an account to see
+friends and messages from Steam and your apps", over the setup rows that are its actions
+(`SocialCatalog.accountsTitle`, Droidtop/tracker#504).
 
 **One registry, one merge.** `SocialHub` holds the providers (the stores'
 `StoreLibrary.social` first, then one `PluginSocialProvider` per running
@@ -15006,6 +15015,10 @@ Settings tab, the left menu's places, Console systems and Containers.
   leaves any screen a row had opened. Start (left menu) and R2 (Quick Menu)
   are the shell's, unchanged. Touch: a tap on a category shows it (taking
   turns, it opens it); a tap on a row selects and acts.
+- **A screen still building says so.** A place or a pushed screen whose rows are not ready (the
+  stores' list, a plugin's panel, which asks the plugin when it opens) shows a loading row
+  ("Loading Game sources", the shell's progress track) once it has taken 250 ms, never its title on
+  black (Droidtop/tracker#502). Why a plugin panel takes ten seconds to open is Droidtop/tracker#470's.
 - **Search and deep links.** Picking a search result whose screen is a
   category's own (its rows, or its linked screen) opens that category with
   the row selected; a deeper result is pushed onto the pane as before.

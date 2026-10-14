@@ -95,9 +95,15 @@ internal object SocialCatalog {
             if (friends.isNotEmpty()) {
                 add(CatalogGroup(id = "social_friends", title = "Friends", items = friends.map { contactRow(it, "social_friend_", badged) }))
             }
-            add(CatalogGroup(id = "social_accounts", title = "Accounts", items = accountRows(context, available)))
+            // Nothing to show yet: the page says what it is for and what will appear, over the two setup
+            // rows that are its actions (Droidtop/tracker#504), instead of two bare rows on an empty page.
+            add(CatalogGroup(id = "social_accounts", title = accountsTitle(hasContacts = contacts.isNotEmpty()), items = accountRows(context, available)))
         }
     }
+
+    /** The Accounts heading; with nothing connected it is the page's purpose. */
+    internal fun accountsTitle(hasContacts: Boolean): String =
+        if (hasContacts) "Accounts" else "Connect an account to see friends and messages from Steam and your apps"
 
     private fun contactRow(contact: SocialContact, prefix: String, badged: Boolean): CatalogItem = NestedScreenItem(
         id = prefix + contact.key,

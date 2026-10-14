@@ -76,14 +76,54 @@ object SettingsSearchIndex {
         return results.distinctBy { it.itemId }
     }
 
-    /** Pure, in-memory: safe to call on every keystroke. */
+    /**
+     * Pure, in-memory: safe to call on every keystroke. Ranked as Android Settings ranks
+     * (Droidtop/tracker#505): a title that starts with the text, then a title with a word that does,
+     * then the text inside a title, then the screen's own name, and last a row whose description has
+     * the text as a whole word (a description is prose, so "them" inside "...share them with..." is a
+     * weak hit, and a part of a longer word is no hit). Rows of one rank keep the tree's order.
+     */
     fun search(index: List<SettingsSearchResult>, query: String): List<SettingsSearchResult> {
         val q = query.trim()
         if (q.length < 2) return emptyList()
-        return index.filter { result ->
-            result.itemTitle.contains(q, ignoreCase = true) ||
-                result.itemSubtitle?.contains(q, ignoreCase = true) == true ||
-                result.screenTitle.contains(q, ignoreCase = true)
-        }.take(40)
+        return index.mapNotNull { result -> rank(result, q)?.let { it to result } }
+            .sortedBy { it.first }
+            .map { it.second }
+            .take(40)
+    }
+
+    private fun rank(result: SettingsSearchResult, q: String): Int? {
+        val title = result.itemTitle
+        return when {
+            title.startsWith(q, ignoreCase = true) -> 0
+            startsAWord(title, q) -> 1
+            title.contains(q, ignoreCase = true) -> 2
+            result.screenTitle.contains(q, ignoreCase = true) -> 3
+            result.itemSubtitle?.let { hasWholeWord(it, q) } == true -> 4
+            else -> null
+        }
+    }
+
+    private fun startsAWord(text: String, q: String): Boolean {
+        var from = 0
+        while (true) {
+            val at = text.indexOf(q, from, ignoreCase = true)
+            if (at < 0) return false
+            if (at == 0 || !text[at - 1].isLetterOrDigit()) return true
+            from = at + 1
+        }
+    }
+
+    private fun hasWholeWord(text: String, q: String): Boolean {
+        var from = 0
+        while (true) {
+            val at = text.indexOf(q, from, ignoreCase = true)
+            if (at < 0) return false
+            val before = at == 0 || !text[at - 1].isLetterOrDigit()
+            val end = at + q.length
+            val after = end >= text.length || !text[end].isLetterOrDigit()
+            if (before && after) return true
+            from = at + 1
+        }
     }
 }

@@ -276,16 +276,28 @@ fun CatalogNavigator(
         if (depth == 0) delay(PANE_LOAD_SETTLE_MS)
         value = screen to mergeShortScreens(screen.groups(context)) { it.groups(context) }
     }
-    val groups = remember(screen, rootGroups, paneLoaded, category?.key) {
+    // A screen still building (the stores' list, a plugin's panel, which asks the plugin when it opens)
+    // shows a loading row from the first frame instead of its title on black, after a moment so a fast one
+    // does not flash it (Droidtop/tracker#502).
+    val loadingPending = if (screen === root) rootGroups == null else paneLoaded?.first !== screen
+    val loadingShown by produceState(false, screen, loadingPending) {
+        value = false
+        if (loadingPending) {
+            delay(LOADING_SHOW_MS)
+            value = true
+        }
+    }
+    val groups = remember(screen, rootGroups, paneLoaded, category?.key, loadingShown) {
         when {
             // A category's screen is built after the column's cursor has rested on it; until then the pane says so
             // instead of standing blank (rig, build 1715: a store row showed nothing until Right or a tap).
-            screen !== root -> paneLoaded?.takeIf { it.first === screen }?.second ?: if (depth == 0) PANE_LOADING else emptyList()
+            screen !== root -> paneLoaded?.takeIf { it.first === screen }?.second
+                ?: if (depth == 0 || loadingShown) loadingGroups(screen.title) else emptyList()
             // A plain category: its groups. One group is unheaded (the column names it); several keep
             // their titles as section labels, except a title that repeats the category's own name.
             category != null -> rootGroups.orEmpty().filter { it.id in category.groupIds }
                 .map { if (it.title == category.label || category.groupIds.size == 1) it.copy(title = null) else it }
-            else -> rootGroups.orEmpty()
+            else -> rootGroups ?: if (loadingShown) loadingGroups(root.title) else emptyList()
         }
     }
     val rows = remember(groups, showSearch, depth, categoryMode) {
@@ -1084,8 +1096,16 @@ private val TWO_PANE_MIN_WIDTH = 600.dp
 /** How long the column's cursor rests on a linked category before its screen is built. */
 private const val PANE_LOAD_SETTLE_MS = 120L
 
-private val PANE_LOADING = listOf(
-    CatalogGroup(id = "pane_loading", title = null, items = listOf(ActionItem(id = "pane_loading_row", title = "Loading...", run = {}))),
+/** How long a screen may build before its loading row shows. */
+private const val LOADING_SHOW_MS = 250L
+
+/** The loading row: what is being waited for, and the shell's own progress track (its size is not known). */
+private fun loadingGroups(title: String) = listOf(
+    CatalogGroup(
+        id = "pane_loading",
+        title = null,
+        items = listOf(ActionItem(id = "pane_loading_row", title = if (title.isBlank()) "Loading" else "Loading $title", progress = -1f, run = {})),
+    ),
 )
 
 /** A row Left/Right steps in place (a slider, a short choice); anything else is opened or flipped with A. */

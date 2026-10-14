@@ -286,7 +286,7 @@ internal object StoresCatalog {
                                     imported.values.distinct().joinToString(", ") { dev.droidtop.library.PcLaunchers.label(it) } +
                                     "). Opens them in PC Games",
                                 value = gamesWord(imported.size),
-                                icon = CatalogIcon.GLOBAL,
+                                icon = CatalogIcon.LIBRARY,
                                 run = ::openGames,
                             ),
                         )
@@ -302,7 +302,7 @@ internal object StoresCatalog {
                         title = "Add a game",
                         subtitle = "A game already on this device, from its folder or file, or one from a store's pages",
                         inline = addGameScreen(),
-                        icon = CatalogIcon.GLOBAL,
+                        icon = CatalogIcon.LIBRARY,
                     ),
                 ),
             ),
@@ -315,7 +315,7 @@ internal object StoresCatalog {
                         title = "Storage",
                         subtitle = "What installed store games take, the room left, and uninstalling",
                         inline = StorageCatalog.screen(),
-                        icon = CatalogIcon.GLOBAL,
+                        icon = CatalogIcon.DATA,
                     ),
                 ),
             ),
