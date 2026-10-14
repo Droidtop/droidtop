@@ -13846,7 +13846,11 @@ over Gaming content on a soft token-based scrim. It is not focusable and a tap
 opens the Quick Menu. On Retro Games it yields to a theme that draws its own
 `clock` or `systemstatus` in a view it shows (`GamingThemeMapping.drawsOwnStatus`,
 read once with the palette; an element whose `scope` keeps it out of a plain view
-does not count), so the two never overlap. Retro Games continues to use the
+does not count), so the two never overlap. Both clocks are one clock: droidtop's pill and an ES-DE
+theme's `clock` follow Android's own 12/24-hour setting (`DateFormat.getTimeFormat`), and a theme's `format`
+is honoured only where the theme declares one (Droidtop/tracker#492). Home's shelves scroll up under the
+cluster, so a strip of their own (`StatusScrim`: the page fades out through the cluster's band) keeps art
+from passing beneath the clock (Droidtop/tracker#494). Retro Games continues to use the
 selected ES-DE theme for its layout, colours and type; it is rendered as one
 destination inside the Gaming frame. PC Games, Apps, places and Settings use droidtop's own layouts.
 
@@ -14979,16 +14983,17 @@ Settings tab, the left menu's places, Console systems and Containers.
   number for a slider, `‹ value ›` for a short choice, a chevron for a row
   that opens something. A or a tap on a choice opens its list
   (`CatalogChoicePicker`) and never changes the value by itself (rig, build
-  1649: a tap cycled it); Left/Right and a touch screen's arrows step it in place. No explanation is drawn on a row: it is the row's
-  HintTip, shown while the pad rests on the row, and the Y Info sheet (a
-  long press on touch). A live status (working, a failure) takes the value
-  column while it lasts. Rows are `uniformRowHeight(0)` tall. The bubble sits under the row it explains
-  (above it only when the window has no room below), never over the row's own title: a Popup aligned
-  BottomStart is drawn inside its anchor, which is what the console showed as a clipped pill on the row
-  (`tipPosition`, Droidtop/tracker#366).
+  1649: a tap cycled it); Left/Right and a touch screen's arrows step it in place. No explanation is drawn on a row: it is shown while the pad rests on the
+  row (after the one tooltip delay) in a fixed-height strip under the list, three lines of the summary
+  type (`CatalogTipStrip`, reserved only on a page whose rows have explanations), and in the Y Info
+  sheet (a long press on touch). It was a bubble under the row (Droidtop/tracker#366 fixed its
+  position), which covered the next row and the next section's heading on every catalog screen
+  (Droidtop/tracker#495), so the bubble is gone from catalog rows; `HintTip` stays for hover and
+  long press on other controls. An armed confirmation shows at once in the same strip. A live status
+  (working, a failure) takes the value column while it lasts. Rows are `uniformRowHeight(0)` tall.
 - **The page has no dead space.** The pane's list runs to the bottom of the
   view (the hint bar is drawn below the view, so no room is kept for it),
-  with no strip under it. A row the viewport cuts fades out at that edge
+  with no strip under it but the explanation strip above. A row the viewport cuts fades out at that edge
   instead of ending in a slice, and the selected row is always scrolled
   whole into view.
 - **Input.** Up/Down move within the column or the pane; Up at the top does

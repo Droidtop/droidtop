@@ -1460,6 +1460,10 @@ private fun GamepadShellBody(
             // On Retro Games it yields to a theme that draws its own clock
             // or system status (docs/SPEC.md 7k2), so the two never overlap.
             if (!screensaverOn && !(section == GamingSection.GAMES && GamingTheme.palette.drawsOwnStatus)) {
+                // Home's shelves scroll up under the cluster: a strip of their own for it (tracker#494).
+                if (section == GamingSection.PC_GAMES && pcGames.home && nav.place is ShellPlace.Section) {
+                    StatusScrim(Modifier.align(Alignment.TopStart))
+                }
                 FloatingStatusCluster(onClick = { quickMenuOpen = true }, modifier = Modifier.align(Alignment.TopEnd))
             }
             // A theme that draws its own help legend (a pad is attached, so

@@ -835,13 +835,20 @@ private fun CatalogPane(
     onAdjust: (Int, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The selected row's explanation goes in a strip of its own under the list, never in a bubble over
+    // the next row (Droidtop/tracker#495); armed, the row says what pressing again will do (the app and
+    // the exact permission or file) in place of its hint, at once.
+    val tipRow = rows.getOrNull(selected)?.takeIf { active && PadModality.showsFocus && it.item !is TextBlockItem }
+    val tipArmed = tipRow != null && confirmArmedId == tipRow.item.id && tipRow.item.confirmText != null
+    val tip = tipRow?.let { catalogTip(it.item, statusById[it.item.id], confirmArmedId == it.item.id) }
+    val reserveTip = statusById.isNotEmpty() || rows.any { it.item.subtitle != null || it.item.confirmText != null }
     Column(modifier) {
         if (title != null) HintTip(hint) { MenuHeader(title) }
         LazyColumn(
             state = state,
-            // The list runs to the bottom of the page: no strip under it and
-            // no room left for a bar that is drawn below this view anyway.
-            // A row the edge cuts fades out instead of ending in a slice.
+            // The list ends above the explanation strip (when the page has any explanations) and
+            // runs to the bottom of the page otherwise: no room left for a bar that is drawn below
+            // this view anyway. A row the edge cuts fades out instead of ending in a slice.
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -884,7 +891,6 @@ private fun CatalogPane(
                             isSelected = isSelected,
                             confirmArmed = confirmArmedId == row.item.id,
                             status = statusById[row.item.id],
-                            tipShown = isSelected && PadModality.showsFocus,
                             onClick = { onClick(index) },
                             onLongClick = { onLongClick(index) },
                             onAdjust = { direction -> onAdjust(index, direction) },
@@ -893,7 +899,31 @@ private fun CatalogPane(
                 }
             }
         }
+        if (reserveTip) CatalogTipStrip(tip, immediate = tipArmed)
     }
+}
+
+/** What a row says about itself: the armed confirmation, else its live status and its explanation. */
+private fun catalogTip(item: CatalogItem, status: String?, confirmArmed: Boolean): String? =
+    (if (confirmArmed) item.confirmText else null)
+        ?: listOfNotNull(status, item.subtitle).joinToString("\n").ifEmpty { null }
+
+/**
+ * The selected row's explanation in the fixed-height strip under a settings list, so the list never
+ * changes size and nothing is drawn over the next row. Shows after the pad has rested on the row,
+ * at once for an armed confirmation ([immediate]).
+ */
+@Composable
+private fun CatalogTipStrip(text: String?, immediate: Boolean) {
+    var settled by remember { mutableStateOf(false) }
+    LaunchedEffect(text, immediate) {
+        settled = immediate
+        if (!immediate && text != null) {
+            delay(TIP_DELAY_MS)
+            settled = true
+        }
+    }
+    CatalogDetailStrip(if (settled) text.orEmpty() else "", lines = 3)
 }
 
 /**
@@ -1239,8 +1269,8 @@ private const val SEARCH_ROW_ID = "__settings_search__"
  * One settings row (docs/SPEC.md "Settings layout"): its name, and what it
  * is set to in the shared value column -- a switch for a toggle, a track
  * and a number for a slider, a chevron for a row that opens something. Its
- * explanation is never a line on the row: it is the row's [HintTip], shown
- * while the pad rests on it ([tipShown]), and the Y Info sheet. A live
+ * explanation is never a line on the row: it is shown in the pane's strip
+ * ([CatalogTipStrip]) while the pad rests on it, and in the Y Info sheet. A live
  * status (working, a failure) takes the value column while it lasts.
  */
 @Composable
@@ -1250,7 +1280,6 @@ private fun CatalogRowView(
     isSelected: Boolean,
     confirmArmed: Boolean,
     status: String?,
-    tipShown: Boolean,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     onAdjust: ((Int) -> Unit)? = null,
@@ -1265,37 +1294,32 @@ private fun CatalogRowView(
     val slider = item as? SliderItem
     val value = if (toggle != null) null else catalogRowValue(item, context)
     val placeholder = status == null && value == null && item is TextInputItem
-    // Armed, the row says what pressing again will do (the app and the exact permission or file), in place of its hint.
-    val tip = (if (confirmArmed) item.confirmText else null)
-        ?: listOfNotNull(status, item.subtitle).joinToString("\n").ifEmpty { null }
-    HintTip(text = tip, shown = tipShown || (confirmArmed && item.confirmText != null)) {
-        MenuRow(
-            title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
-            value = if (locked) "Read it first" else status ?: value ?: if (placeholder) (if ((item as? TextInputItem)?.search == true) "Type to search" else "not set") else null,
-            chip = item.chip,
-            placeholder = placeholder,
-            adjustable = status == null && item.stepsInPlace(),
-            chevron = chevron,
-            selected = isSelected,
-            danger = confirmArmed,
-            accent = (item as? NestedScreenItem)?.accent?.let { Color(it) },
-            icon = item.icon,
-            onClick = onClick,
-            onLongClick = onLongClick,
-            onAdjust = onAdjust,
-            // The enclosing LazyColumn (CatalogPane, above) already runs
-            // `listState.keepInView` on every selection change -- see
-            // MenuRow's own `ownScrollKeeping` doc comment for why a second,
-            // independent scroll animation here was the real jank.
-            ownScrollKeeping = true,
-            uniformHeight = true,
-            uniformSummaryLines = 0,
-            // A system state an action opens (Airplane mode, Bluetooth, VPN) is the same switch.
-            switchOn = if (status == null) toggle?.current ?: (item as? ActionItem)?.state else null,
-            sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
-            progress = item.progress,
-        )
-    }
+    MenuRow(
+        title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
+        value = if (locked) "Read it first" else status ?: value ?: if (placeholder) (if ((item as? TextInputItem)?.search == true) "Type to search" else "not set") else null,
+        chip = item.chip,
+        placeholder = placeholder,
+        adjustable = status == null && item.stepsInPlace(),
+        chevron = chevron,
+        selected = isSelected,
+        danger = confirmArmed,
+        accent = (item as? NestedScreenItem)?.accent?.let { Color(it) },
+        icon = item.icon,
+        onClick = onClick,
+        onLongClick = onLongClick,
+        onAdjust = onAdjust,
+        // The enclosing LazyColumn (CatalogPane, above) already runs
+        // `listState.keepInView` on every selection change -- see
+        // MenuRow's own `ownScrollKeeping` doc comment for why a second,
+        // independent scroll animation here was the real jank.
+        ownScrollKeeping = true,
+        uniformHeight = true,
+        uniformSummaryLines = 0,
+        // A system state an action opens (Airplane mode, Bluetooth, VPN) is the same switch.
+        switchOn = if (status == null) toggle?.current ?: (item as? ActionItem)?.state else null,
+        sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
+        progress = item.progress,
+    )
 }
 
 /** How long after a gated text is first shown its Accept opens even if the text was not scrolled to the end (owner, 2026-10-09). */
@@ -1354,11 +1378,11 @@ private fun catalogValueCandidates(item: CatalogItem, context: Context): List<St
  * selected row's whole text (title and value when the row had to cut
  * them, and its full summary), in a fixed-height area so the list above
  * never changes size. Four lines of the summary type scale; Y opens the
- * Info sheet for more. Settings has none: its rows' explanations are
- * their HintTips (docs/SPEC.md "Settings layout").
+ * Info sheet for more. Settings uses it with [lines] = 3 for the selected
+ * row's explanation ([CatalogTipStrip], docs/SPEC.md "Settings layout").
  */
 @Composable
-internal fun CatalogDetailStrip(text: String) {
+internal fun CatalogDetailStrip(text: String, lines: Int = 4) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val style = MaterialTheme.typography.bodySmall
     val lineHeight = with(density) {
@@ -1368,11 +1392,11 @@ internal fun CatalogDetailStrip(text: String) {
         text,
         color = MenuTokens.OnSurfaceMuted,
         style = style,
-        maxLines = 4,
+        maxLines = lines,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
             .fillMaxWidth()
-            .height(lineHeight * 4 + 16.dp)
+            .height(lineHeight * lines + 16.dp)
             .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
     )
 }

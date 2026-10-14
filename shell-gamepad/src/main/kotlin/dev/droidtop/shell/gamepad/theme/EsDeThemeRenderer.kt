@@ -2486,7 +2486,11 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
  */
 @Composable
 private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
-    val format = element.valueOrNull<EsDeThemeValue.Str>("format")?.value ?: "%H:%M"
+    // A theme that declares a format owns it; otherwise the clock follows
+    // Android's 12/24-hour setting like droidtop's own status pill
+    // (Droidtop/tracker#492).
+    val declaredFormat = element.valueOrNull<EsDeThemeValue.Str>("format")?.value
+    val systemClock = android.text.format.DateFormat.getTimeFormat(LocalContext.current)
     var now by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -2494,9 +2498,10 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
             delay(1000)
         }
     }
-    val formatted = remember(now, format) {
+    val formatted = remember(now, declaredFormat, systemClock) {
         runCatching {
-            SimpleDateFormat(strftimeToJavaPattern(format), Locale.getDefault()).format(now)
+            if (declaredFormat == null) systemClock.format(now)
+            else SimpleDateFormat(strftimeToJavaPattern(declaredFormat), Locale.getDefault()).format(now)
         }.getOrDefault("")
     }
     // Real `letterCase` -- clock is a DateTimeComponent, which derives from
