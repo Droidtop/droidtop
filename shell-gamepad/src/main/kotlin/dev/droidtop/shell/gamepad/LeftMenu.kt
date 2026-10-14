@@ -68,17 +68,27 @@ import dev.droidtop.shell.gamepad.input.onPad
  * is the same section showing the PC library's own Overview shelves and its
  * grid views (docs/SPEC.md 7i, "Home art").
  */
-internal data class LeftMenuEntry(val section: GamingSection, val label: String, val home: Boolean = false) {
-    val key: String get() = if (home) "home" else section.name
+internal data class LeftMenuEntry(val section: GamingSection, val label: String, val home: Boolean = false, val search: Boolean = false) {
+    val key: String get() = when {
+        search -> "search"
+        home -> "home"
+        else -> section.name
+    }
 
-    /** Whether this row is where the user is: [atHome] tells Home from PC Games. */
+    /** Whether this row is where the user is: [atHome] tells Home from PC Games. Search is an action, never a place. */
     fun isAt(current: GamingSection, atHome: Boolean): Boolean =
-        section == current && (section != GamingSection.PC_GAMES || home == atHome)
+        !search && section == current && (section != GamingSection.PC_GAMES || home == atHome)
 }
 
-/** The left menu's rows for the sections this UI mode allows (Kiosk and Kid hide Settings), Home first. */
+/**
+ * The left menu's rows for the sections this UI mode allows (Kiosk and Kid hide Settings): Home first, then
+ * Search (the global search, docs/SPEC.md 12a "One search: where it opens"), then the destinations.
+ */
 internal fun leftMenuEntries(sections: List<GamingSection>): List<LeftMenuEntry> = buildList {
-    if (GamingSection.PC_GAMES in sections) add(LeftMenuEntry(GamingSection.PC_GAMES, "Home", home = true))
+    if (GamingSection.PC_GAMES in sections) {
+        add(LeftMenuEntry(GamingSection.PC_GAMES, "Home", home = true))
+        add(LeftMenuEntry(GamingSection.PC_GAMES, dev.droidtop.shell.gamepad.query.SearchEntry.GLOBAL_LABEL, search = true))
+    }
     sections.forEach { add(LeftMenuEntry(it, it.displayName())) }
 }
 

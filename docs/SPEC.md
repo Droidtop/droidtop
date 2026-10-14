@@ -19788,6 +19788,14 @@ plugin had answered, then a row per plugin to open its own screen. The
 search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 (`shell-gamepad/query/LibraryQueryUi.kt`):
 
+**One search: where it opens (decided 2026-10-14, Droidtop/tracker#485 F7c; owner: "We also want per-console search items").** One runner (`UnifiedSearch`, drawn by `LibrarySearchDialog`), three kinds of entry (`SearchEntry`):
+
+- **Everything**: the left menu's **Search** row (second, under Home), **Y on Home**, and the search target in Home's top band. The device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope.
+- **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). Home's system tiles and the Quick Menu's Game section get the same row with Your library's systems (F7b) and the Quick Menu work.
+- **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
+
+The cursor never opens on Search in the left menu: it is an action, not a place.
+
 - **One list.** The device's rows (installed apps, library games; the caller
   matches them over lists it already holds in memory, no disk lookups per
   keystroke) and every `GameSourceProvider` (built-in or plugin) are rows of

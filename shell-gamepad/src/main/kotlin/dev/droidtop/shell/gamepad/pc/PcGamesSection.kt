@@ -102,6 +102,7 @@ import dev.droidtop.library.GameNaming
 import dev.droidtop.library.integrations.LocalSearchRow
 import dev.droidtop.library.integrations.SearchRowKind
 import dev.droidtop.shell.gamepad.query.LibrarySortKey
+import dev.droidtop.shell.gamepad.query.SearchEntry
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.UiSound
@@ -1271,7 +1272,33 @@ internal fun PcGamesSection(
                 dev.droidtop.library.integrations.SourceDestinations.consoleNamesOf(ConsoleSystemsRepository.allSystems(context))
             }
         }
-        LibrarySearchDialog(
+        if (state.home) {
+            // Home's search is the global one (docs/SPEC.md 12a, "One search: where it opens"): every library and the
+            // launcher's game apps, the system names ("snes" finds the system), and every source, with no system scope.
+            var text by remember { mutableStateOf("") }
+            LibrarySearchDialog(
+                query = LibraryQuery(text = text),
+                matchCount = 0,
+                totalCount = homeAll.size,
+                onTextChange = { text = it },
+                onDismiss = { state.searchOpen = false },
+                suggestions = suggestions,
+                localKey = homeAll to systemNames,
+                local = { q ->
+                    SearchEntry.matchingSystems(q, systemNames).map { (_, name) ->
+                        LocalSearchRow("system:$name", SearchRowKind.GAME, name, "System") {
+                            state.searchOpen = false
+                            onOpenSection(GamingSection.GAMES)
+                        }
+                    } + homeAll.filter { matchesSearchText(it, q) }.take(SEARCH_GAME_ROWS).map { game ->
+                        LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), badgeOf(game)?.text ?: "Game") {
+                            state.searchOpen = false
+                            openPage(game)
+                        }
+                    }
+                },
+            )
+        } else LibrarySearchDialog(
             query = state.query,
             matchCount = grid.size,
             totalCount = all.size,

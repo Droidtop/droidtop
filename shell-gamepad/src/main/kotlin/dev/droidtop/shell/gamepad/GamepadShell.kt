@@ -849,9 +849,10 @@ private fun GamepadShellBody(
             },
             onSelect = { entry ->
                 leftMenuOpen = false
-                // Home and PC Games are one section: the row says which view.
-                if (entry.section == GamingSection.PC_GAMES) pcGames.open(entry.home)
+                // Home and PC Games are one section: the row says which view. Search opens Home's global search.
+                if (entry.section == GamingSection.PC_GAMES) pcGames.open(entry.home || entry.search)
                 selectSection(entry.section)
+                if (entry.search) pcGames.searchOpen = true
             },
             onOpenQuickMenu = {
                 leftMenuOpen = false
