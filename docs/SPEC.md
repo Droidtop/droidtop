@@ -11673,7 +11673,7 @@ follows:
 ### Ownership is a fact (Droidtop/tracker#397 slice B)
 
 How the account holds a store row is `PcInfo.holding` (`StoreHolding`), the
-same four meanings for every store, never a name of its own (the old "Steam
+same five meanings for every store, never a name of its own (the old "Steam
 Family" and "Steam Free" groups, `PcStoreNames.groupOf`, and `PcInfo.source`
 are gone; where a game came from is `PcSource`, read from the store id):
 - **OWNED**: in the account's library on that store, however it got there. A
@@ -11682,6 +11682,7 @@ are gone; where a game came from is `PcSource`, read from the store id):
 - **FREE**: a free-to-play catalogue row the account holds a licence for but
   never added (today: Steam only). No store maps "free" or "claimed" to it.
 - **NOT_OWNED**: installed on the device but no longer held by the account.
+- **WISHLIST**: on the account's wishlist and not owned; see "Wishlist" below.
 - **One row per game per store.** When a store reports one game under more
   than one holding, its row carries the strongest: OWNED, then FAMILY, then
   FREE, then NOT_OWNED (`StoreHolding.strongest`; Steam's `SteamOwnership.statusOf`
@@ -11690,6 +11691,28 @@ Labels are one function (`StoreHolding.label`): "Owned", "Shared with you",
 "Free to play (not in your library)", "No longer in your library". Which
 lists show which holding is 7j's `listExclusion`. `STORE_LIST_RULES` 6 makes
 every store row read again with its holding.
+
+**Wishlist (decided 2026-10-14, Droidtop/tracker#134).** The games the person
+does not own come from the stores' wishlists, on a shelf of their own labelled
+not owned, never mixed into what they have. A fifth holding, **WISHLIST**
+("On your wishlist (not owned)", the weakest in `strongest`'s order), is a
+store row that is not installed and never will be from here. A store with a
+wishlist to read returns its rows from `StoreLibrary.wishlist`, from
+droidtop's own copy (`Wishlist`: a small file per store under `files/wishlist/`,
+written by the store's sync, so no network when the library is read);
+`PcLibrary.storeRead` adds them after every owned row and drops a wished game
+whose title is spelled the same way (`StoreIdentity.titleKey`) as one the person
+already has, in any store, so an owned game never folds into a wishlist card.
+`listExclusion` rule 6 keeps WISHLIST rows out of every ordinary list, count
+and search; the Ownership facet shows them, and PC Games' Overview ends with the
+shelf "Wishlist (not owned)" (`SHELF_WISHLIST`, not on Home). A wishlist card's
+corner says Wishlist and its primary button says "Find on <store>": A opens the
+store's own pages searched for the title (`StoreWeb.search`), where the person
+can buy it; nothing can be installed from here and nothing is added to or removed
+from the wishlist. GOG's wishlist is read (`GOGWishlist`: the ids at
+`embed.gog.com/user/wishlist.json` with the sign-in token, then a name and a
+cover for each id not already in the copy, at most 200). Steam's and Epic's
+are not read yet.
 
 **Recently added** means added since that source's first sync or scan
 (`SyncBaselines`, one record per `PcSource` id, stores and game folders
@@ -14078,13 +14101,16 @@ so each view keeps its own filters and sort. Pure and unit-tested
   5. A FREE row is in the library while it is installed or has been played:
      derived from facts the row has, never stored. To keep a tried free game
      out, the person hides it.
+  6. A WISHLIST row (a game on a store's wishlist that is not owned, 7g
+     "Wishlist") is out of every list; the Ownership facet and the Wishlist shelf
+     show it.
   **No silent disappearance:** when rule 4 keeps free rows out of a grid view,
   its last item is a row, "1,506 free-to-play games not in your library are not
   shown. Show them"; A turns the option on and the row reads "Showing 1,506
   free-to-play games not in your library. Hide them". Down from the last row
   reaches it, nothing wraps onto it, and no row speaks of Hidden games.
   **Ownership** is a PC facet (Owned, Shared with you, Free to play (not in your
-  library), No longer in your library) counted over every row that is not
+  library), No longer in your library, On your wishlist (not owned)) counted over every row that is not
   hidden, so its counts add up to the store rows; other facets count what the
   list shows. The launcher's **search** has two switches under its field,
   "Include hidden games" and "Include free-to-play games not in your library",

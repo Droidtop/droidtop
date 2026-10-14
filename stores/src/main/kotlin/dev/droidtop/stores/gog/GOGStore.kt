@@ -11,6 +11,7 @@ import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreSyncs
 import dev.droidtop.library.stores.StoreUpdateCheck
+import dev.droidtop.library.stores.Wishlist
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.db.StoresDatabase
 import dev.droidtop.stores.gog.api.GOGApiClient
@@ -75,11 +76,18 @@ class GOGStore : StoreLibrary {
         runCatching {
             check(GOGAuthManager.clearStoredCredentials(context)) { "GOG would not clear its sign-in" }
             dao(context).deleteAllNonInstalledGames()
+            Wishlist.clear(context, id)
         }
     }
 
     override suspend fun sync(context: Context): Result<Int> = withContext(Dispatchers.IO) {
         manager(context).refreshLibrary(context).map { dao(context).getAllAsList().size }
+            // The wishlist is a second read; its failure leaves the library read as it is and the old copy in place.
+            .also { GOGWishlist.refresh(context) }
+    }
+
+    override suspend fun wishlist(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
+        Wishlist.rows(id, Wishlist.read(context, id))
     }
 
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
@@ -180,7 +188,7 @@ class GOGStore : StoreLibrary {
         manager(context).primaryPlayTask(gameId)?.let { StoreLaunch(it.executable, it.workingDir, it.arguments) }
 
     override fun changeStamp(context: Context): Long =
-        StoreFiles.stamp(StoresDatabase.files(context) + File(GOGAuthManager.getAuthConfigPath(context)))
+        StoreFiles.stamp(StoresDatabase.files(context) + File(GOGAuthManager.getAuthConfigPath(context)) + Wishlist.file(context, id))
 
     /** The chunks a download keeps for resuming, in the app's own cache. */
     private fun dropChunkCache(context: Context, gameId: String) {
