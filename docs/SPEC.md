@@ -14503,6 +14503,10 @@ setting (section 7b), which is what lets it use the shell's own menu row anatomy
 tokens are absolute against the menu overlay surface and legible over a dark ground and
 nothing else.
 
+
+### The hint bar fits (decided 2026-10-14, Droidtop/tracker#485 F2a)
+
+The bar names every button that acts, and Start and R2 always sit first, on the left. When the hints do not fit on one line at the current text size (measured, not estimated), the bar gives up room in a fixed order (`HintFit`): first Start and R2 become their glyphs alone (a count such as "3 new" stays beside R2), then L1/R1 drop (the strip they step shows its own shoulder glyphs), then Select drops. **A and B never drop.** Whatever still does not fit wraps in a sheet's bar and scrolls in a full-width one, as before. A screen reader hears the whole set as the bar's description, however much was folded, and the bar offers the custom action **Read controls**. Long-press Select is not used for this: it is the Quick Menu fallback.
 ### Places: stores, friends, downloads, updates and plugins (directed 2026-10-01, Droidtop/tracker#258)
 
 The left menu is where things live. Beside the three tabs it lists five
@@ -14945,6 +14949,23 @@ Digits use the root locale, so a decimal point never becomes a comma inside Engl
 **The flash** (`Notices.flash`): a corner card at the bottom right above the hint row, at most 320 dp wide, the tone's glyph and up to two lines (four at font scale 1.3 and above) of 14 sp text, led by the plugin's name for a plugin's flash. It is drawn in a window that never takes focus, so the page's focus and hints are untouched; it stays for the longer of 4 s and Android's recommended accessibility timeout and never less than 1.5 s, and is announced politely. Nothing in a flash needs action; acknowledgements are past tense with no period ("Saved", "Copied").
 
 **Recent**: every flash is also kept in memory (the last 50, with time, source and tone) unless it was marked private, and shown as a "droidtop" group at the top of the Quick Menu's Notifications tab, with an unread dot on the group and the tab, and Copy all on Select. It is a source of its own, so it shows without notification access.
+### Page anatomy (decided 2026-10-14, Droidtop/tracker#485 F2a)
+
+Every catalog page is built the same way, top to bottom (the final design on tracker#485, section C.1):
+
+1. **The header** (`PageHeader`): the thing's picture (64 dp, its own art or a glyph), its name, a byline ("Droidtop · v1.4.0") and its fact chips. Not a stop of the cursor; a screen reader hears it as one heading.
+2. **A search field**, when the page has one, above the bar, reached with Up.
+3. **The button bar** (`ButtonBarItem`): at most three buttons that do the page's job, then **More** for the rest. It is the first stop and has the cursor when the page opens (on the primary button). One primary at most, drawn in the launch fill; destructive buttons sit in More or after a rule and always confirm, Cancel first. A button that cannot act says why in its label ("Needs Wi-Fi"), in full ink; only its plate dims. Buttons are at least 48 dp tall and 120 dp wide (the primary 160 dp), and a label is never cut: it wraps and the bar grows.
+4. **One page banner** at most (a notice, "Notices" above).
+5. **Sections**: a label, then rows.
+6. **The focus line** (`FocusLine`): the focused row's sentence in 16 sp under the list, with room kept for three lines so the list never changes size as the cursor moves; past three lines it ends "Y Info", never a silent cut. Not a live region.
+7. **The hint bar**, with its fit rule (section 7j, "The hint bar fits").
+
+The model is `CatalogPage(header, buttons, more, groups)`, built once per refresh by `pageScreen(...)`. Every renderer reads it through the `groups` it always read: the header and the bar become the first group's two rows (`PageHeaderItem`, `ButtonBarItem`), so search, the companion and Standard's Preference rows need no second loading path, and the search index skips both. Gaming draws them with its own cursor (Left and Right move along the bar), the companion by touch, Standard through `PageViews` in a ComposeView. `CatalogScreen.layout` says whether a screen is one list, the two-pane category layout (three or more sections) or a strip of views of one list.
+
+**Empty, loading and error** are one `StateBlock`: a 48 dp glyph, a title of at most 32 characters, one body line and a next action (an empty state always has one); loading names what is slow after two seconds, never a bare title or an endless spinner; an error is a caution notice with one action and the raw text in Details.
+
+**The focus ring** (`FocusRingInks`) is two opaque edges: a 3 dp outer edge in the theme's accent (4 dp with high contrast) and a 1 dp inner edge in black or white, whichever is farther from the accent. Whatever the ring lands on, pure white, pure black or the accent's own colour, one of the two edges stands out by at least 3:1 (`GamingThemeMappingTest`). It no longer fades or breathes: a 60 percent ring that breathed to 24 percent vanished over light capsule art (low-vision review, R.4 #7).
 
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 
@@ -15170,10 +15191,10 @@ theme's roles (section 7k2).
   cursor moves, the edge on the side it heads springs ahead and the trailing edge follows 30 ms
   later, so the ring stretches and snaps onto the new control's shape; a held direction (moves
   under 180 ms apart) runs it as one piece; a single move further than 360dp carries it across as a
-  drop. Its look is Steam's: 2dp in the theme's accent at 60 percent, landing from 12dp outside the
-  control over 400 ms when it appears, then breathing to 24 percent and back every 1.2 s, twenty
-  times, before it rests; a capsule carries it 2dp outside its edge. It draws in an overlay of its
-  own, so a moving or breathing ring redraws nothing under it, and it re-measures its control every
+  drop. Its look is two opaque edges (7k, "Page anatomy": the accent outside, black or white
+  inside), landing from 12dp outside the control over 400 ms when it appears and then staying at full
+  strength (it breathed once; a fading ring is one a low-vision eye loses); a capsule carries it 2dp
+  outside its edge. It draws in an overlay of its own, so a moving ring redraws nothing under it, and it re-measures its control every
   frame only for 450 ms after a change. A window with no host (a one-off dialog) draws a still ring
   on the control. With motion off the ring jumps. The per-control landing outline it replaces is
   gone. Buttons follow Steam in the theme's colours: a quiet chip turns solid (`Selected`) under

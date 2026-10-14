@@ -87,6 +87,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.settings.ActionItem
+import dev.droidtop.library.settings.ButtonBarItem
+import dev.droidtop.library.settings.ButtonRole
+import dev.droidtop.library.settings.ChoiceOption
+import dev.droidtop.library.settings.PageButton
+import dev.droidtop.library.settings.PageHeaderItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogChip
 import dev.droidtop.library.settings.CatalogGroup
@@ -123,7 +128,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.ui.shared.ButtonBarView
+import dev.droidtop.ui.shared.FocusLine
+import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.ui.shared.NoticeCard
+import dev.droidtop.ui.shared.PageColors
+import dev.droidtop.ui.shared.PageHeaderView
 
 /**
  * The in-shell (gamepad-first, dark-chrome) renderer for the shared
@@ -202,6 +212,11 @@ fun CatalogNavigator(
     val columnState = rememberLazyListState()
     // Live status text per item id (async progress/outcomes, pick errors).
     val statusById = remember { mutableStateMapOf<String, String>() }
+    // The button under the cursor on a page's bar (docs/SPEC.md 7k, "Page anatomy"), per depth like the row.
+    val barSlotByDepth = remember { mutableStateMapOf<Int, Int>() }
+    // A page's "More": its overflow buttons as a picker; and a button that asks first, as Cancel-first choices.
+    var moreBar by remember { mutableStateOf<ButtonBarItem?>(null) }
+    var confirmingButton by remember { mutableStateOf<PageButton?>(null) }
     // Read-gates (TextBlockItem.gate): true once the text was scrolled to its end or READ_GATE_MS after it was first shown.
     val readGates = remember { mutableStateMapOf<String, Boolean>() }
     val gateTimers = remember { mutableSetOf<String>() }
@@ -338,7 +353,12 @@ fun CatalogNavigator(
     }
     // A notice with nothing to press or read is passed over (docs/SPEC.md 7k, "Notices"), so the cursor
     // never rests where A does nothing.
-    fun isStop(index: Int): Boolean = (rows.getOrNull(index)?.item as? NoticeItem)?.notice?.takesFocus() ?: true
+    // A page's header is never a stop: the cursor opens on its button bar (docs/SPEC.md 7k, "Page anatomy").
+    fun isStop(index: Int): Boolean = when (val item = rows.getOrNull(index)?.item) {
+        is NoticeItem -> item.notice.takesFocus()
+        is PageHeaderItem -> false
+        else -> true
+    }
     fun nextStop(from: Int, direction: Int): Int? {
         var i = from + direction
         while (i in rows.indices) {
@@ -353,6 +373,10 @@ fun CatalogNavigator(
     fun refresh() {
         version++
     }
+
+    val selectedBar = rows.getOrNull(selected)?.item as? ButtonBarItem
+    val barSlot = (barSlotByDepth[depth] ?: selectedBar?.initialSlot() ?: 0)
+        .coerceIn(0, (selectedBar?.slots?.lastIndex ?: 0).coerceAtLeast(0))
 
     // A screen of live data (the friends, a conversation) says when it changed; its rows are read
     // again then. The first value is what the screen was just built from, so only later ones count.
@@ -465,6 +489,35 @@ fun CatalogNavigator(
         }
     }
 
+    // A page button: a disabled one bumps (its label already says why), one that asks first arms on the
+    // first press and runs on the second, as a row does; everything else runs and the page is re-read.
+    fun pressButton(button: PageButton) {
+        if (!button.enabled) {
+            EsDeNavigationSounds.play(UiSound.BUMP)
+            return
+        }
+        confirmArmedId = null
+        if (button.confirmTitle != null) {
+            confirmingButton = button
+            return
+        }
+        button.run(context)
+        refresh()
+    }
+
+    fun pressBar(bar: ButtonBarItem, slot: Int) {
+        val button = bar.slots.getOrNull(slot)
+        if (button != null) pressButton(button) else if (bar.more.isNotEmpty()) moreBar = bar
+    }
+
+    fun moveBar(direction: Int, repeat: Boolean) {
+        val bar = selectedBar ?: return
+        val next = barSlot + direction
+        val moved = next in bar.slots.indices
+        moveCue(moved, repeat)
+        if (moved) barSlotByDepth[depth] = next
+    }
+
     fun activate(item: CatalogItem) {
         if (item.id == SEARCH_ROW_ID) {
             searchOpen = true
@@ -497,7 +550,8 @@ fun CatalogNavigator(
                 pendingDocumentPick = item
                 documentPickLauncher.launch(item.pickerIntent())
             }
-            is TextBlockItem -> {}
+            is TextBlockItem, is PageHeaderItem -> {}
+            is ButtonBarItem -> pressBar(item, barSlot)
             // A notice's action, else its Info (Y is the other way there), else nothing.
             is NoticeItem -> when (item.notice.aPress()) {
                 NoticePress.ACTION -> if (item.opens != null) {
@@ -644,6 +698,46 @@ fun CatalogNavigator(
         return
     }
 
+    moreBar?.let { bar ->
+        CatalogChoicePicker(
+            item = ChoiceItem(
+                id = "${ButtonBarItem.ID}_more",
+                title = ButtonBarItem.MORE_LABEL,
+                options = bar.more.map { ChoiceOption(it.id, it.shownLabel) },
+                current = null,
+                onSelect = { _, _ -> },
+            ),
+            onPick = { id ->
+                moreBar = null
+                bar.more.firstOrNull { it.id == id }?.let { pressButton(it) }
+            },
+            onDismiss = { moreBar = null },
+        )
+        return
+    }
+    // A button that asks first: its question, Cancel first and under the cursor, then the button (docs/SPEC.md 7k,
+    // copy rule 9: in a modal the safe choice comes first).
+    confirmingButton?.let { button ->
+        CatalogChoicePicker(
+            item = ChoiceItem(
+                id = "${ButtonBarItem.ID}_confirm",
+                title = button.confirmTitle.orEmpty(),
+                options = listOf(ChoiceOption(CONFIRM_CANCEL, "Cancel"), ChoiceOption(button.id, button.label)),
+                current = CONFIRM_CANCEL,
+                onSelect = { _, _ -> },
+            ),
+            onPick = { picked ->
+                confirmingButton = null
+                if (picked == button.id) {
+                    button.run(context)
+                    refresh()
+                }
+            },
+            onDismiss = { confirmingButton = null },
+        )
+        return
+    }
+
     infoRow?.let { item ->
         CatalogInfoSheet(item = item, status = statusById[item.id], onDismiss = { infoRow = null })
     }
@@ -755,10 +849,16 @@ fun CatalogNavigator(
                 setSelected(previous)
             }
             GamepadAction.LEFT -> when {
+                // Along a page's bar first; from its first button Left goes where it always went.
+                row?.item is ButtonBarItem && barSlot > 0 -> moveBar(-1, press.repeat)
                 categoryMode && (row == null || !row.item.stepsInPlace()) -> inColumn = true
+                row?.item is ButtonBarItem -> moveCue(false, press.repeat)
                 row != null -> adjust(row.item, -1)
             }
-            GamepadAction.RIGHT -> if (row != null && (!categoryMode || row.item.stepsInPlace())) adjust(row.item, +1)
+            GamepadAction.RIGHT -> when {
+                row?.item is ButtonBarItem -> moveBar(+1, press.repeat)
+                row != null && (!categoryMode || row.item.stepsInPlace()) -> adjust(row.item, +1)
+            }
             GamepadAction.A -> row?.let {
                 // A toggle and a stepped choice make their own cue (adjust); everything else confirms.
                 if (it.item !is ToggleItem) EsDeNavigationSounds.play(UiSound.CONFIRM)
@@ -794,12 +894,22 @@ fun CatalogNavigator(
             )
         }
     }
+    // On a page's bar the hint row names the button under the cursor (and More), never a generic Select.
+    val barHints = remember(selectedBar, barSlot, paneActive) {
+        selectedBar?.takeIf { paneActive }?.let { bar ->
+            val button = bar.slots.getOrNull(barSlot)
+            listOf(
+                HintBinding(GamepadAction.A, button?.label ?: ButtonBarItem.MORE_LABEL) { button?.enabled ?: true },
+                HintBinding(GamepadAction.B, "Back"),
+            )
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { hostWidth = with(density) { it.width.toDp() } }
             .focusRequester(navFocus)
-            .then(noticeHints?.let { Modifier.declaresHints(it) } ?: Modifier)
+            .then((noticeHints ?: barHints)?.let { Modifier.declaresHints(it) } ?: Modifier)
             .focusable()
             .onPad { press -> if (categoryMode && inColumn) onColumnPad(press) else onPanePad(press) },
     ) {
@@ -809,6 +919,13 @@ fun CatalogNavigator(
                 hint = screen.subtitle,
                 rows = rows,
                 selected = selected,
+                barSlot = barSlot,
+                onBarPress = { index, slot ->
+                    inColumn = false
+                    setSelected(index)
+                    barSlotByDepth[depth] = slot
+                    (rows.getOrNull(index)?.item as? ButtonBarItem)?.let { pressBar(it, slot) }
+                },
                 active = paneActive,
                 state = listState,
                 confirmArmedId = confirmArmedId,
@@ -886,6 +1003,8 @@ private fun CatalogPane(
     hint: String?,
     rows: List<CatalogRow>,
     selected: Int,
+    barSlot: Int,
+    onBarPress: (Int, Int) -> Unit,
     active: Boolean,
     state: LazyListState,
     confirmArmedId: String?,
@@ -946,7 +1065,32 @@ private fun CatalogPane(
                     row.headerAbove?.let { header -> MenuSectionLabel(header) }
                     val block = row.item as? TextBlockItem
                     val notice = row.item as? NoticeItem
-                    if (block != null) {
+                    val header = row.item as? PageHeaderItem
+                    val bar = row.item as? ButtonBarItem
+                    if (header != null) {
+                        PageHeaderView(
+                            header = header.header,
+                            glyph = header.header.icon?.glyph(),
+                            image = header.header.imagePath?.let { path ->
+                                {
+                                    coil3.compose.AsyncImage(
+                                        model = java.io.File(path),
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
+                                    )
+                                }
+                            },
+                            colors = gamingPageColors(),
+                        )
+                    } else if (bar != null) {
+                        ButtonBarView(
+                            bar = bar,
+                            selected = barSlot.takeIf { isSelected },
+                            onPress = { slot -> onBarPress(index, slot) },
+                            ring = { on -> Modifier.focusRing(on && PadModality.showsFocus, RoundedCornerShape(6.dp)) },
+                            colors = gamingPageColors(),
+                        )
+                    } else if (block != null) {
                         TextBlockRow(block, isSelected, onShown = { onBlockShown(block) }, onClick = { onClick(index) })
                     } else if (notice != null) {
                         val page = notice.placement == NoticePlacement.Page
@@ -999,7 +1143,34 @@ private fun CatalogTipStrip(text: String?, immediate: Boolean) {
             settled = true
         }
     }
-    CatalogDetailStrip(if (settled) text.orEmpty() else "", lines = 3)
+    // The focus line (docs/SPEC.md 7k, "Page anatomy"): three lines' room kept, so the list above never
+    // changes size as the cursor moves; past three lines it ends "Y Info".
+    FocusLine(
+        if (settled) text.orEmpty() else "",
+        modifier = Modifier
+            .padding(horizontal = LocalShellWindow.current.edgePadding)
+            .heightIn(min = with(LocalDensity.current) { (20.sp * FOCUS_LINE_LINES).toDp() } + 8.dp),
+        colors = gamingPageColors(),
+    )
+}
+
+private const val FOCUS_LINE_LINES = 3
+
+/** The page pieces' colours in Gaming: the theme's own (the primary is the launch fill, danger the notice danger fill). */
+@Composable
+internal fun gamingPageColors(): PageColors {
+    val notices = LocalNoticePalette.current
+    return PageColors(
+        primary = MenuTokens.Launch,
+        onPrimary = MenuTokens.OnSurface,
+        secondary = MenuTokens.Surface,
+        onSecondary = MenuTokens.OnSurface,
+        danger = notices.dangerFill,
+        onDanger = notices.onDangerFill,
+        outline = MenuTokens.CardOutline,
+        text = MenuTokens.OnSurface,
+        muted = MenuTokens.OnSurfaceMuted,
+    )
 }
 
 /**
@@ -1407,6 +1578,7 @@ private fun CatalogRowView(
 }
 
 /** How long after a gated text is first shown its Accept opens even if the text was not scrolled to the end (owner, 2026-10-09). */
+private const val CONFIRM_CANCEL = "cancel"
 private const val READ_GATE_MS = 3000L
 
 /**

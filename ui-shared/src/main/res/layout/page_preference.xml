@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A page header or button bar in a Preference list (docs/SPEC.md 7k, Page anatomy): PageViews draws the shared Compose piece into this frame. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/page_frame"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp" />

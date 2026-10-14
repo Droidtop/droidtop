@@ -55,7 +55,8 @@ object NoticeViews {
         }
     }
 
-    private fun attr(context: Context, id: Int): Int? {
+    /** A colour attribute of a View surface's theme, opaque, or null when the theme has none. */
+    internal fun attr(context: Context, id: Int): Int? {
         val value = TypedValue()
         if (!context.theme.resolveAttribute(id, value, true)) return null
         return when {

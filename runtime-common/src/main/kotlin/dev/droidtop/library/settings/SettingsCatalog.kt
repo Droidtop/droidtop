@@ -334,6 +334,8 @@ class CatalogScreen(
      * used, which is every screen but the friends and their conversations.
      */
     val live: kotlinx.coroutines.flow.Flow<Any?>? = null,
+    /** How the screen is laid out (docs/SPEC.md 7k, "Page anatomy"); a page built by [pageScreen] names its own. */
+    val layout: CatalogLayout = CatalogLayout.LIST,
 )
 
 /**

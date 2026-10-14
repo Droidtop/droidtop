@@ -2,9 +2,9 @@ package dev.droidtop.shell.gamepad
 
 // Ported from DroidDeck (ui/FocusGlide.kt at 9310d19, GPL-3.0, see NOTICE.md). Changed for droidtop:
 // a source is claimed by droidtop's one cursor (`selected` while a pad drives, PadModality), not by
-// Compose focus or hover; the ring wears Steam's measured look (2dp, the theme's accent at 60
-// percent, landing from 12dp outside, breathing) instead of a fixed colour; capsules carry it a
-// little outside their edge; the ring draws in an overlay of its own so a moving or breathing ring
+// Compose focus or hover; the ring is two opaque edges, the theme's accent outside and black or white
+// inside (FocusRingInks), landing from 12dp outside, instead of a fixed colour; capsules carry it a
+// little outside their edge; the ring draws in an overlay of its own so a moving ring
 // redraws nothing but itself; and every spec comes from droidtop's Motion roles, so the Animations
 // switch turns it into a ring that simply moves.
 
@@ -35,11 +35,13 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -49,6 +51,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import dev.droidtop.library.theme.FocusRingInks
 import dev.droidtop.shell.gamepad.input.PadModality
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -133,18 +136,22 @@ internal fun Modifier.focusRing(shown: Boolean, shape: Shape, outset: Dp = 0.dp)
     val glide = LocalFocusGlide.current
     if (glide == null || glide.view !== LocalView.current) {
         if (!shown) return@composed Modifier
-        val color = MenuTokens.Accent
+        val accent = MenuTokens.Accent
+        val inner = Color(FocusRingInks.inner(accent.toArgb()))
+        val outerDp = FocusRingInks.outerDp(GamingTheme.palette.highContrast)
         return@composed Modifier.drawWithContent {
             drawContent()
-            val w = MenuTokens.FocusRingWidth.toPx()
             val o = outset.toPx()
-            val inner = Size(size.width + 2 * o - w, size.height + 2 * o - w)
-            translate(left = w / 2f - o, top = w / 2f - o) {
-                drawOutline(
-                    shape.createOutline(inner, layoutDirection, this),
-                    color.copy(alpha = color.alpha * FocusLook.RingAlpha),
-                    style = Stroke(w),
-                )
+            // The two edges, outer first: each stroke is drawn on the middle of its own band.
+            listOf(
+                Triple(accent, outerDp.dp.toPx(), 0f),
+                Triple(inner, FocusRingInks.INNER_DP.dp.toPx(), outerDp.dp.toPx()),
+            ).forEach { (ink, w, inset) ->
+                val band = Size(size.width + 2 * o - 2 * inset - w, size.height + 2 * o - 2 * inset - w)
+                if (band.width <= 0f || band.height <= 0f) return@forEach
+                translate(left = inset + w / 2f - o, top = inset + w / 2f - o) {
+                    drawOutline(shape.createOutline(band, layoutDirection, this), ink, style = Stroke(w))
+                }
             }
         }
     }
@@ -183,9 +190,8 @@ private fun follow(): AnimationSpec<Float> = Motion.sp(1f, 2400f)
  * slides in). The ring takes the theme's accent ([MenuTokens.Accent]).
  *
  * Work is bounded: the host re-measures its control every frame only for [Motion.GlideSettleMs]
- * after something changes (a lift or a slide moves a control without a relayout), and the
- * breath, which runs [Motion.RingBreathCycles] times and then rests, invalidates only the
- * overlay's own drawing, never the content under it.
+ * after something changes (a lift or a slide moves a control without a relayout), and a moving
+ * ring invalidates only the overlay's own drawing, never the content under it.
  */
 @Composable
 internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
@@ -198,11 +204,9 @@ internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable 
     /** How solid the ring is: 1 while it travels as a drop, 0 (an outline) on a control. */
     val solid = remember { Animatable(0f) }
     val alpha = remember { Animatable(0f) }
-    /** 0 is the ring at full strength, 1 the bottom of a breath. */
-    val breath = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    // An edge each, the corner, a droplet carrying all of them, and the breath.
-    val jobs = remember { arrayOfNulls<Job>(7) }
+    // An edge each, the corner, and a droplet carrying all of them.
+    val jobs = remember { arrayOfNulls<Job>(6) }
 
     LaunchedEffect(glide, Motion.enabled) {
         var shown: GlideSource? = null
@@ -221,19 +225,6 @@ internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable 
             jobs[i] = scope.launch {
                 if (wait > 0) delay(Motion.ms(wait.toInt()))
                 edges[i].animateTo(v, spec, initialVelocity = if (wait > 0) 0f else speed)
-            }
-        }
-        /** Once it has landed, the ring breathes a few times and then rests at full strength. */
-        fun breathe() {
-            jobs[6]?.cancel()
-            jobs[6] = scope.launch {
-                breath.snapTo(0f)
-                if (!Motion.enabled) return@launch
-                delay(Motion.ms(Motion.RingLandMs))
-                repeat(Motion.RingBreathCycles) {
-                    breath.animateTo(1f, Motion.tw(Motion.RingBreathMs / 2, easing = Motion.Glide))
-                    breath.animateTo(0f, Motion.tw(Motion.RingBreathMs / 2, easing = Motion.Glide))
-                }
             }
         }
         fun rectEdges(b: Rect) = listOf(b.left, b.top, b.right, b.bottom)
@@ -275,14 +266,12 @@ internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable 
                 // next takes it: wait a beat, so that reads as a move and not a fade out and in.
                 delay(60)
                 scope.launch { alpha.animateTo(0f, Motion.tw(Motion.RingFadeMs)) }
-                jobs[6]?.cancel()
                 shown = null
                 return@collectLatest
             }
             if (!Motion.enabled) {
                 jobs.forEach { it?.cancel() }
                 solid.snapTo(0f)
-                breath.snapTo(0f)
                 val b = glide.boundsOf(src, density)
                 if (b == null) {
                     alpha.snapTo(0f)
@@ -342,7 +331,6 @@ internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable 
                     }
                     movedAt = System.nanoTime()
                     if (!dropped) rectEdges(b).forEachIndexed { i, v -> go(i, v, dirSpecs[i], delays[i]) }
-                    breathe()
                     last = b
                 } else if (b != last && jobs[5]?.isActive != true) {
                     // It moved under the ring: keep the stretch while the move is fresh, else follow.
@@ -370,15 +358,15 @@ internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable 
                     val a = alpha.value
                     if (a <= 0.01f || !PadModality.showsFocus || glide.hidden) return@drawBehind
                     val accent = MenuTokens.Accent
-                    val ringAlpha = a * FocusLook.ringAlpha(breath.value)
-                    val w = MenuTokens.FocusRingWidth.toPx()
+                    // Two opaque edges (FocusRingInks): the accent outside, black or white inside, so
+                    // one of them stands out by 3:1 from whatever the ring lands on.
+                    val innerInk = Color(FocusRingInks.inner(accent.toArgb()))
+                    val outerW = FocusRingInks.outerDp(GamingTheme.palette.highContrast).dp.toPx()
+                    val innerW = FocusRingInks.INNER_DP.dp.toPx()
                     val l = edges[0].value
                     val t = edges[1].value
                     val r = edges[2].value
                     val b = edges[3].value
-                    val sw = (r - l - w).coerceAtLeast(0f)
-                    val sh = (b - t - w).coerceAtLeast(0f)
-                    val rad = (corner.value - w / 2f).coerceIn(0f, minOf(sw, sh) / 2f)
                     val f = solid.value
                     if (f > 0.01f) {
                         drawRoundRect(
@@ -386,18 +374,24 @@ internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable 
                             topLeft = Offset(l, t),
                             size = Size(r - l, b - t),
                             cornerRadius = CornerRadius(corner.value),
-                            alpha = ringAlpha * f,
+                            alpha = a * f,
                         )
                     }
                     if (f < 0.99f) {
-                        drawRoundRect(
-                            accent,
-                            topLeft = Offset(l + w / 2f, t + w / 2f),
-                            size = Size(sw, sh),
-                            cornerRadius = CornerRadius(rad),
-                            style = Stroke(w),
-                            alpha = ringAlpha,
-                        )
+                        // Each edge is a stroke on the middle of its own band, the inner band just inside the outer.
+                        listOf(Triple(accent, outerW, 0f), Triple(innerInk, innerW, outerW)).forEach { (ink, w, inset) ->
+                            val sw = (r - l - 2 * inset - w).coerceAtLeast(0f)
+                            val sh = (b - t - 2 * inset - w).coerceAtLeast(0f)
+                            val rad = (corner.value - inset - w / 2f).coerceIn(0f, minOf(sw, sh) / 2f)
+                            drawRoundRect(
+                                ink,
+                                topLeft = Offset(l + inset + w / 2f, t + inset + w / 2f),
+                                size = Size(sw, sh),
+                                cornerRadius = CornerRadius(rad),
+                                style = Stroke(w),
+                                alpha = a,
+                            )
+                        }
                     }
                 },
         )
