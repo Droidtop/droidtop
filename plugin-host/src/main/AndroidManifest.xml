@@ -52,9 +52,9 @@
           is NOT isolated, so it may open the graphics chip (an isolated process
           may not: sepolicy isolated_app_all.te). That is the one hole the
           gpu.render permission opens. A system-call filter keeps it off the
-          network, but it shares droidtop's UID, which an app on Android cannot
-          wall off, so its own native code could still open droidtop's files or
-          ask Android's services for things as droidtop. The approval line and
+          network and sends every path it names to a file broker in :app, but
+          it shares droidtop's UID, so its own native code could still ask
+          Android's services for things as droidtop. The approval line and
           the plugin's page warn about that in plain words (docs/plugin-api.md
           5.3). Eight slots, one plugin each.
         -->

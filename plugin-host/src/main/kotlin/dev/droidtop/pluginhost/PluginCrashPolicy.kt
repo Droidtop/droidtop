@@ -100,7 +100,7 @@ class PluginCrashPolicy(
             append(
                 when (PluginTiers.of(record, grants)) {
                     PluginTier.CONTAINED -> "Sealed in a process of its own: no network, no files, nothing but what droidtop does for it"
-                    PluginTier.GPU_RENDER -> "A process of its own with graphics access. droidtop's system-call filter keeps it off the network, but it shares droidtop's user id, which Android does not let an app wall off, so its own code could still read droidtop's files or ask Android's services for things as droidtop; everything it does through droidtop is still listed and limited"
+                    PluginTier.GPU_RENDER -> "A process of its own with graphics access. droidtop's system-call filter keeps it off the network and sends every file it opens through droidtop's checks, but it shares droidtop's user id, so its own code could still ask Android's services for things as droidtop; everything it does through droidtop is still listed and limited"
                     PluginTier.FULL_TRUST -> "Runs with droidtop's own access: it can do anything droidtop can"
                 },
             )
