@@ -120,6 +120,10 @@ Plugins add sources and tools: app catalogs, a RetroArch manager, Shizuku for el
 
 The plugin format is in [docs/plugin-api.md](docs/plugin-api.md).
 
+## Pythia, the desktop manager
+
+[Pythia](https://github.com/bi0shacker001/pythia) is the associated desktop manager: a multi-system game library manager (GPL-3.0). It does not run games. It keeps track of which games exist, where, on which of your systems and platforms, and what each one needs to run. Pythia can act as the computer's droidtop agent, so a handheld pairs with it directly.
+
 ## Status
 
 droidtop is in early development. Builds are named `0.2.0-dev.<number>`, where the number counts commits.
