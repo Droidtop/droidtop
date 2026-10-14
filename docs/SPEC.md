@@ -17850,6 +17850,11 @@ of what is built. The decisions, briefly:
     pending approval is represented by the tick boxes and Approve actions,
     not a no-op "Awaiting approval" action row. This replaces the rule that approval granted
     every listed point (cc3367c5). Details: `docs/plugin-api.md` 4.3.
+  - **The first-use sheet is the same in every mode** (Droidtop/tracker#128). A call in
+    `ask` state during a call the person started opens one window of droidtop's own
+    (`PluginGrantSheetActivity`) that draws the sheet over whatever is on screen, Gaming,
+    the Android home screen or the Desktop, as the mode switcher is drawn; it is not drawn
+    inside any one shell. Leaving it without a choice is Not now.
 
 The catalogue has 93 entries across ten areas (library and content,
 launch and runtime, UI, system and device, desktop, other apps,

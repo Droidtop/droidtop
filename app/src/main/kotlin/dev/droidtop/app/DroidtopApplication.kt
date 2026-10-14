@@ -81,6 +81,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
             val on = dev.droidtop.library.settings.Modes.enabled.map { it.id }.toSet() + dev.droidtop.pluginhost.PluginModes.STANDARD
             dev.droidtop.pluginhost.PluginModes.ALL.filter { it in on }
         }
+        // A plugin's first-use permission sheet (docs/plugin-api.md 4.3): one window, drawn over whatever is on screen
+        // in every mode, opened by the broker during a call the person started.
+        dev.droidtop.pluginhost.PluginGrantPrompts.setSurface { PluginGrantSheetActivity.open(this) }
         // Plugins in every mode (docs/plugin-api.md 1.9): "Plugins" on Standard's home-screen menu, and the plugin
         // services and schedules the person switched on (E8, E9). Both read manifests off the main thread.
         dev.droidtop.library.integrations.PluginStandardHooks.install(this)
