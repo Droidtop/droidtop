@@ -50,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -78,6 +79,7 @@ import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.ThemeDownloader
+import dev.droidtop.library.theme.ThemeOffer
 import dev.droidtop.library.theme.ThemePrefs as LibraryThemePrefs
 import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.ImageCatalogRole
@@ -744,11 +746,6 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
         Modes.setDefaultMode(context, default)
         Modes.setLastMode(context, default)
         GamesRootPrefs.markOnboardingComplete(context)
-        // An Art Book Next download still running at this point keeps
-        // running (OnboardingThemeDownload's own doc comment); only its
-        // late auto-activation is disowned here, since the person has
-        // already moved on to whatever theme resolved for Gaming mode.
-        OnboardingThemeDownload.disownIfIncomplete()
         // The modes are on from here (Modes.reload reads the finished
         // setup), so ModeStartup starts what they own now, not at the
         // next process start.
@@ -1806,14 +1803,15 @@ private fun controllerFacts(layout: FaceLayout): String {
  *
  * A successful download writes [LibraryThemePrefs] directly, the exact
  * call a row's own tap makes, but ONLY when nothing has been chosen yet
- * AND [disownIfIncomplete] was not called, so an explicit pick before or
- * after the download finishes always wins, and a download that finishes
- * after the person has already moved on to Gaming mode never swaps the
- * active theme out from under them. The clone itself still finishes and
- * shows up as installed in Browse themes either way.
+ * AND the Appearance step is on screen ([stepShown]), so an explicit pick
+ * always wins. Finishing anywhere else it is offered by [ThemeOffer] in
+ * Gaming ("Your theme is ready: Use it / Later"), never swapped in under
+ * a person who has moved on (Droidtop/tracker#532). The clone itself
+ * still finishes and shows up as installed in Browse themes either way.
  */
 private object OnboardingThemeDownload {
     const val RECOMMENDED_THEME_DIR = "art-book-next-es-de"
+    const val RECOMMENDED_THEME_NAME = "Art Book Next"
 
     enum class Status { NOT_STARTED, DOWNLOADING, SUCCEEDED, FAILED }
 
@@ -1850,8 +1848,11 @@ private object OnboardingThemeDownload {
                 // Drops ThemeAssets' own discovery/parse caches, the same
                 // signal a theme downloaded from Browse themes fires.
                 LibraryThemePrefs.notifyThemesChanged()
-                if (activateOnSuccess && LibraryThemePrefs.get(appContext) == null) {
-                    LibraryThemePrefs.set(appContext, RECOMMENDED_THEME_DIR)
+                // Made the active theme only while the person is looking at the Appearance step, where the row
+                // changes with it; anywhere else it is offered ("Your theme is ready"), never swapped in under them.
+                if (LibraryThemePrefs.get(appContext) == null) {
+                    if (stepShown) LibraryThemePrefs.set(appContext, RECOMMENDED_THEME_DIR)
+                    else ThemeOffer.offer(appContext, RECOMMENDED_THEME_DIR, RECOMMENDED_THEME_NAME)
                 }
                 mutableStatus.value = Status.SUCCEEDED
             } else {
@@ -1860,22 +1861,9 @@ private object OnboardingThemeDownload {
         }
     }
 
-    // Guards ONLY the auto-activation above, not the download itself.
+    /** Whether the Appearance step is on screen: the only place the download may choose the theme itself. */
     @Volatile
-    private var activateOnSuccess = true
-
-    /**
-     * Called once, from `finishOnboarding`, when a download is still
-     * running as setup finishes: the person has already moved on to
-     * whatever theme resolved for Gaming mode, so this download finishing
-     * later must not silently swap the active theme out from under them.
-     * The clone keeps running and shows up as installed in Browse themes,
-     * or as a real FAILED status there.
-     */
-    fun disownIfIncomplete() {
-        if (mutableStatus.value != Status.DOWNLOADING) return
-        activateOnSuccess = false
-    }
+    var stepShown = false
 }
 
 /**
@@ -1926,6 +1914,10 @@ private fun AppearanceStep(
     // droidtop's recommended default (SPEC.md 7f) downloads itself the
     // moment this step is shown; see [OnboardingThemeDownload].
     LaunchedEffect(Unit) { OnboardingThemeDownload.ensureStarted(context) }
+    DisposableEffect(Unit) {
+        OnboardingThemeDownload.stepShown = true
+        onDispose { OnboardingThemeDownload.stepShown = false }
+    }
     val downloadStatus by OnboardingThemeDownload.status.collectAsState()
     val stored = remember { LibraryThemePrefs.get(context) }
     var picked by remember { mutableStateOf<String?>(null) }

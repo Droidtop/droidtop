@@ -76,6 +76,8 @@ class GamingPalette internal constructor(
     internal val bodyFamily: FontFamily?,
     internal val displayFamily: FontFamily?,
     internal val textureBrush: Brush?,
+    /** The theme's UI font has no lower case (its small letters are drawn as capitals): see [withFamilies]. */
+    internal val bodyFamilyCapsOnly: Boolean = false,
     /** The theme draws its own clock or system status, so the shell's floating cluster yields (docs/SPEC.md 7k2). */
     internal val drawsOwnStatus: Boolean = false,
 ) {
@@ -146,16 +148,31 @@ class GamingPalette internal constructor(
     }
 
     /** droidtop's type scale in the theme's own typefaces; the scale itself is unchanged. */
-    val typography: Typography by lazy { DroidtopTypography.withFamilies(bodyFamily, displayFamily) }
+    val typography: Typography by lazy { DroidtopTypography.withFamilies(bodyFamily, displayFamily, bodyFamilyCapsOnly) }
 
     companion object {
         val Default = GamingPalette(GamingThemeColors.DEFAULT, null, null, null)
     }
 }
 
-private fun Typography.withFamilies(body: FontFamily?, display: FontFamily?): Typography {
+/**
+ * Whether a font draws no lower case: every small letter as wide as its capital, in a face that is not monospaced
+ * ([width] measures one character). A theme font like that (Art Book Next's) is fine for headings and labels but turns
+ * a URL, a plugin's name or a version into capitals, so the roles that carry data keep droidtop's own face
+ * (Droidtop/tracker#532). Pure, for the tests.
+ */
+internal fun isCapsOnlyFont(width: (Char) -> Float): Boolean =
+    ('a'..'z').all { width(it) == width(it.uppercaseChar()) } && width('i') != width('m')
+
+/**
+ * droidtop's type scale in the theme's faces. The theme's body face goes to the label and title roles (the chrome), and
+ * to the data roles (a row's name, its value, prose) too unless it is [capsOnly]: then those keep droidtop's own face, so
+ * data is never shown in capitals the person did not write.
+ */
+internal fun Typography.withFamilies(body: FontFamily?, display: FontFamily?, capsOnly: Boolean = false): Typography {
     if (body == null && display == null) return this
     fun TextStyle.inFamily(family: FontFamily?) = if (family == null) this else copy(fontFamily = family)
+    val data = if (capsOnly) null else body
     return copy(
         displayLarge = displayLarge.inFamily(display),
         displayMedium = displayMedium.inFamily(display),
@@ -164,11 +181,11 @@ private fun Typography.withFamilies(body: FontFamily?, display: FontFamily?): Ty
         headlineMedium = headlineMedium.inFamily(display),
         headlineSmall = headlineSmall.inFamily(display),
         titleLarge = titleLarge.inFamily(body),
-        titleMedium = titleMedium.inFamily(body),
+        titleMedium = titleMedium.inFamily(data),
         titleSmall = titleSmall.inFamily(body),
-        bodyLarge = bodyLarge.inFamily(body),
-        bodyMedium = bodyMedium.inFamily(body),
-        bodySmall = bodySmall.inFamily(body),
+        bodyLarge = bodyLarge.inFamily(data),
+        bodyMedium = bodyMedium.inFamily(data),
+        bodySmall = bodySmall.inFamily(data),
         labelLarge = labelLarge.inFamily(body),
         labelMedium = labelMedium.inFamily(body),
         labelSmall = labelSmall.inFamily(body),
@@ -236,22 +253,29 @@ object GamingTheme {
         val palette = when {
             !colors.declared && !drawsOwnStatus -> GamingPalette.Default
             !colors.declared -> GamingPalette(GamingThemeColors.DEFAULT, null, null, null, drawsOwnStatus = true)
-            else -> GamingPalette(
-                colors = colors,
-                bodyFamily = loadFamily(colors.bodyFontPath),
-                displayFamily = loadFamily(colors.displayFontPath),
-                textureBrush = loadTexture(colors.textureImagePath),
-                drawsOwnStatus = drawsOwnStatus,
-            )
+            else -> {
+                val bodyFace = loadTypeface(colors.bodyFontPath)
+                GamingPalette(
+                    colors = colors,
+                    bodyFamily = bodyFace?.let { FontFamily(it) },
+                    displayFamily = loadTypeface(colors.displayFontPath)?.let { FontFamily(it) },
+                    textureBrush = loadTexture(colors.textureImagePath),
+                    bodyFamilyCapsOnly = bodyFace?.let { face ->
+                        val paint = android.graphics.Paint().apply { typeface = face }
+                        isCapsOnlyFont { paint.measureText(it.toString()) }
+                    } == true,
+                    drawsOwnStatus = drawsOwnStatus,
+                )
+            }
         }
         cache[key] = palette
         return palette
     }
 
-    private fun loadFamily(path: String?): FontFamily? {
+    private fun loadTypeface(path: String?): android.graphics.Typeface? {
         if (path == null) return null
         return try {
-            FontFamily(android.graphics.Typeface.createFromFile(path))
+            android.graphics.Typeface.createFromFile(path)
         } catch (t: Throwable) {
             null
         }

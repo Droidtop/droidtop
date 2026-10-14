@@ -9332,17 +9332,18 @@ own Appearance step:
    not cancel the download.
 2. Progress is shown inline in the step (a status line above the theme list: downloading / failed)
    and does **not** block "Next" — the person can finish setup while it is still running.
-3. If the download succeeds — at any point up to and including after the person has moved past the
-   Appearance step — and no explicit theme choice has been stored yet (`ThemePrefs.get() == null`),
-   Art Book Next is written as the active theme (`ThemePrefs.set`), through the exact same call the
-   Appearance step's own row-tap uses. An explicit tap on any row, before or after the download
-   finishes, always wins — this is a pre-selected default, not a forced one.
-4. If setup finishes (`finishOnboarding`) while the download is still in flight, it is cancelled and
-   its partial clone removed (`OnboardingThemeDownload.cancelIfIncomplete`) rather than left to
-   finish and swap the theme out from under someone who is already looking at Gaming mode —
+3. If the download succeeds while the Appearance step is on screen and no explicit theme choice has been
+   stored yet (`ThemePrefs.get() == null`), Art Book Next is written as the active theme (`ThemePrefs.set`),
+   through the exact same call the Appearance step's own row-tap uses. An explicit tap on any row, before or
+   after the download finishes, always wins — this is a pre-selected default, not a forced one.
+4. If it finishes anywhere else (the person moved past the step, or setup is done and they are in Gaming), the
+   theme in use does not change: `ThemeOffer` (`:runtime-common`) keeps the offer and Gaming asks once, "Your
+   theme is ready: Art Book Next", Use it or Later (`ThemeReadyDialog`, restored after a restart, dropped when a
+   theme was chosen meanwhile; Droidtop/tracker#532). The look never changes under the person —
    `ThemeAssets.defaultThemeFor`'s own doc comment already states this rule for the portrait
    default ("the theme moving under the user is the one thing this rule must not do"); the same
-   rule applies here. A cancelled/failed/offline download leaves `ThemePrefs` unset, so
+   rule applies here. (An earlier version said the download is cancelled when setup finishes; the code
+   disowned only the activation and kept the clone, which is what is kept.) A cancelled/failed/offline download leaves `ThemePrefs` unset, so
    `ThemeAssets.resolveActiveTheme`'s existing fallback (DEcaffe, or Slate on a device upright in its natural orientation)
    applies exactly as it did before this section — no second fallback mechanism was added.
 5. "Browse themes" (Settings, and onboarding's own "Download more themes") offers Art Book Next exactly
@@ -15184,6 +15185,11 @@ the theme's typefaces on droidtop's own type scale (`GamingTheme`, the composabl
 ground colour as ES-DE tints an image, at 0.6 strength; the contrast guarantee is against the flat
 ground). The PC Games tab (Droidtop/tracker#183) consumes the same tokens and needs nothing of
 its own.
+
+**Data is not shown in capitals.** A theme's font can have no lower case (Art Book Next's draws every small
+letter as a capital). It is used for headings, labels, tabs and buttons, but when `isCapsOnlyFont` finds it so, the
+roles that carry data (a row's name, its value, prose, a tooltip) keep droidtop's own face, so a URL, a plugin's
+name or a version is never shown in capitals the person did not write (Droidtop/tracker#532).
 
 **Scope.** The palette applies only while a Gaming surface is started: `GamingTheme` holds it
 between the host's start and stop, so the standard launcher and the desktop, which share the

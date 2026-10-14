@@ -640,6 +640,19 @@ private fun GamepadShellBody(
         )
     }
 
+    // "Your theme is ready" (Droidtop/tracker#532): a theme that finished downloading while nobody was choosing one is
+    // offered here instead of replacing the look in use. An unanswered offer from an earlier process is restored.
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { dev.droidtop.library.theme.ThemeOffer.restore(context) }
+    }
+    dev.droidtop.library.theme.ThemeOffer.pending.collectAsState().value?.let { offer ->
+        ThemeReadyDialog(
+            name = offer.name,
+            onUse = { dev.droidtop.library.theme.ThemeOffer.respond(context, use = true) },
+            onLater = { dev.droidtop.library.theme.ThemeOffer.respond(context, use = false) },
+        )
+    }
+
     // The actual dispatch: unchanged for every entry, PC and engine games
     // included -- once something has decided this game IS ready, it
     // launches exactly the same way a console ROM does.
