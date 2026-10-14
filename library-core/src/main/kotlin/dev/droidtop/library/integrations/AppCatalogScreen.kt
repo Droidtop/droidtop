@@ -120,8 +120,8 @@ object AppCatalogScreen {
                 TextInputItem(
                     id = "apps_search_$id",
                     title = "Search ${record.manifest.label}",
-                    subtitle = "A name, a word from its description, or a package name",
                     value = query,
+                    search = true,
                     onChange = { _, value -> queries[id] = value.trim() },
                 ),
             )
@@ -131,7 +131,7 @@ object AppCatalogScreen {
                         if (rows.isEmpty()) add(ActionItem("apps_search_none_$id", "Nothing matches \"$query\"", run = {}))
                         rows.forEach { add(appRow(record, it)) }
                     },
-                    onFailure = { add(ActionItem("apps_search_failed_$id", "${record.manifest.label}: ${it.message}", run = {})) },
+                    onFailure = { add(ActionItem("apps_search_failed_$id", "${record.manifest.label}: ${SourceFailures.plain(it.message)}", run = {})) },
                 )
             }
         }

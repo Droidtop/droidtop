@@ -50,6 +50,20 @@ object PluginCatalogScreen {
     // Counts fetches, so a catalog fetched again must be read again: the read-gate of its notice is new each time.
     @Volatile private var proposalSerial = 0
 
+    // What was last searched for in each catalog's screen (by source id): kept while the app runs, like the address buffer above.
+    private val searches = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /**
+     * Whether [plugin], listed under [origin], answers a search: every word of [query] is somewhere in its name, id,
+     * description or origin, in any case. Pure, over the index already in memory: a search never asks the network.
+     */
+    internal fun matchesQuery(plugin: PluginCatalogPlugin, origin: String, query: String): Boolean {
+        val words = query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (words.isEmpty()) return true
+        val haystack = listOfNotNull(plugin.label, plugin.id, plugin.description, origin).joinToString(" ").lowercase()
+        return words.all { it in haystack }
+    }
+
     fun screen(): CatalogScreen = CatalogScreen(
         id = ID,
         title = "More catalogs",
@@ -307,6 +321,7 @@ object PluginCatalogScreen {
         val installed = PluginStore.installed(context).associateBy { it.manifest.id }
         val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
         val index = load.index
+        val query = searches[sourceId].orEmpty()
         val top = buildList<CatalogItem> {
             if (index != null && PluginCatalog.listable(current, index)) {
                 val installedList = installed.values.toList()
@@ -335,11 +350,22 @@ object PluginCatalogScreen {
                     )
                 }
             }
+            if (index != null && PluginCatalog.listable(current, index)) {
+                add(
+                    TextInputItem(
+                        id = "plugins_catalog_search",
+                        title = "Search",
+                        value = query,
+                        search = true,
+                        onChange = { _, value -> searches[sourceId] = value.trim() },
+                    ),
+                )
+            }
             add(
                 AsyncActionItem(
                     id = "plugins_catalog_refresh",
                     title = "Refresh catalog",
-                    subtitle = if (current.official) "Re-fetch the index from droidtop-platforms" else "Re-fetch the index from ${current.indexUrl}",
+                    subtitle = if (current.official) "Fetch the latest list from droidtop" else "Fetch the latest list from ${current.indexUrl}",
                     run = { ctx, _ -> PluginCatalog.refresh(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current) },
                 ),
             )
@@ -370,12 +396,17 @@ object PluginCatalogScreen {
             if (!current.official) {
                 originDecisions(current, index, userKeys)?.let { groups += it }
             }
+            val rows = index.origins.flatMap { origin ->
+                val state = PluginCatalog.originState(current, origin, userKeys)
+                origin.plugins.filter { matchesQuery(it, origin.origin, query) }.map { plugin -> rowFor(current, origin, state, plugin, installed[plugin.id]) }
+            }
             groups += CatalogGroup(
                 id = "plugins_catalog_list",
-                title = "Plugins",
-                items = index.origins.flatMap { origin ->
-                    val state = PluginCatalog.originState(current, origin, userKeys)
-                    origin.plugins.map { plugin -> rowFor(current, origin, state, plugin, installed[plugin.id]) }
+                title = if (query.isBlank()) "Plugins" else "Plugins matching \"$query\"",
+                items = if (rows.isEmpty() && query.isNotBlank()) {
+                    listOf(ActionItem(id = "plugins_catalog_search_none", title = "Nothing matches \"$query\"", run = {}))
+                } else {
+                    rows
                 },
             )
         }

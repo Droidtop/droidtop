@@ -572,6 +572,7 @@ fun CatalogNavigator(
             initial = textItem.value,
             multiline = textItem.multiline,
             secret = textItem.secret,
+            search = textItem.search,
             onCommit = { newValue ->
                 editingText = null
                 // Refresh after the write returns, so the re-read sees it.
@@ -1270,7 +1271,7 @@ private fun CatalogRowView(
     HintTip(text = tip, shown = tipShown || (confirmArmed && item.confirmText != null)) {
         MenuRow(
             title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
-            value = if (locked) "Read it first" else status ?: value ?: if (placeholder) "not set" else null,
+            value = if (locked) "Read it first" else status ?: value ?: if (placeholder) (if ((item as? TextInputItem)?.search == true) "Type to search" else "not set") else null,
             chip = item.chip,
             placeholder = placeholder,
             adjustable = status == null && item.stepsInPlace(),
@@ -1479,6 +1480,8 @@ internal fun TextEditDialog(
     onDismiss: () -> Unit,
     multiline: Boolean = false,
     secret: Boolean = false,
+    // A search box: the keyboard's Search key runs it, the button says Search, and there is nothing to paste.
+    search: Boolean = false,
 ) {
     var value by remember(title, initial) { mutableStateOf(initial) }
     Dialog(onDismissRequest = onDismiss) {
@@ -1501,9 +1504,13 @@ internal fun TextEditDialog(
                 // on-screen keyboard can cover the dialog's Save button
                 // (rig, dq-desk2-02, a container rename in landscape).
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    imeAction = if (multiline) androidx.compose.ui.text.input.ImeAction.Default else androidx.compose.ui.text.input.ImeAction.Done,
+                    imeAction = when {
+                        multiline -> androidx.compose.ui.text.input.ImeAction.Default
+                        search -> androidx.compose.ui.text.input.ImeAction.Search
+                        else -> androidx.compose.ui.text.input.ImeAction.Done
+                    },
                 ),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onCommit(value) }),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onCommit(value) }, onSearch = { onCommit(value) }),
                 visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
                 modifier = Modifier
@@ -1517,16 +1524,18 @@ internal fun TextEditDialog(
             OwnFieldKeyboard()
             val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(
-                    onClick = { clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let { value = it } },
-                    modifier = Modifier.keepsFieldFocusOnTouch(),
-                ) { Text("Paste", color = MenuTokens.Accent) }
+                if (!search) {
+                    TextButton(
+                        onClick = { clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let { value = it } },
+                        modifier = Modifier.keepsFieldFocusOnTouch(),
+                    ) { Text("Paste", color = MenuTokens.Accent) }
+                }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onDismiss, modifier = Modifier.keepsFieldFocusOnTouch()) {
                     Text("Cancel", color = MenuTokens.OnSurfaceMuted)
                 }
                 TextButton(onClick = { onCommit(value) }, modifier = Modifier.keepsFieldFocusOnTouch()) {
-                    Text("Save", color = MenuTokens.Accent)
+                    Text(if (search) "Search" else "Save", color = MenuTokens.Accent)
                 }
             }
         }

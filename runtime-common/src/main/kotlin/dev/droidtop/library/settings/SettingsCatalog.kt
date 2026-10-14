@@ -154,6 +154,11 @@ class TextInputItem(
     override val value: String,
     val secret: Boolean = false,
     val multiline: Boolean = false,
+    /**
+     * A search, not a setting: the row reads "Search" until something is typed, its dialog has the keyboard's Search
+     * key instead of a Save button and no Paste, and what [onChange] receives is the query the screen below filters by.
+     */
+    val search: Boolean = false,
     val onChange: suspend (Context, String) -> Unit,
 ) : CatalogItem
 

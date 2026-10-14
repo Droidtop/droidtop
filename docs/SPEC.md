@@ -18527,6 +18527,20 @@ what the index says is display data, never a trust decision.
     per-plugin) configuration lands here rather than back at the top
     level.
 
+  **Searching the store** (Droidtop/tracker#485): a catalog's screen has a
+  Search row above Refresh. Committing a query filters the rows by every word
+  being somewhere in a plugin's name, id, description or origin
+  (`PluginCatalogScreen.matchesQuery`), over the index already cached on the
+  device: a search never asks the network, and the catalog's own refresh rules
+  are unchanged. Nothing matching says so in a row. The Search row is a
+  `TextInputItem` with `search = true`: it reads "Type to search" until
+  something is typed, its dialog has the keyboard's Search key and a Search
+  button instead of Save, and has nothing to paste. Get apps' per-catalog search
+  uses the same row (a search is not a saved setting); a catalog that fails
+  shows `SourceFailures.plain` of its reason, not the plugin's text. The
+  installed plugins' list has no filter of its own; Settings search finds a
+  plugin by name.
+
   The catalog screen itself (opened from Add) is unchanged from the
   paragraph below: one row per catalog plugin — label, description and
   version, the row's own action being Install (not installed), Update to
