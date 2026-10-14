@@ -48,6 +48,29 @@ internal object FoldersCatalog {
         indexGroups = { emptyList() },
     )
 
+    /**
+     * The one "Add a folder" row (Game sources > Folders and Settings > Game folders): Android's folder picker, the
+     * folder stored as a game folder, and the row says what happened ("Added Games"), since the folder shows up in the
+     * list only after the picker has gone (Droidtop/tracker#537).
+     */
+    fun addFolderItem(id: String) = FolderPickItem(
+        id = id,
+        title = "Add a folder",
+        subtitle = "An SD card, a second internal folder, anywhere games live",
+        onPicked = { ctx, uri: Uri ->
+            val resolved = GamesRootPrefs.resolveStoragePath(uri)
+            if (resolved != null) {
+                GamesRootPrefs.addGamesRoot(ctx, resolved)
+                "Added " + folderName(resolved)
+            } else {
+                "Couldn't resolve that folder to a real path on this device. Not added"
+            }
+        },
+    )
+
+    /** A folder's name for a list: its last segment, or the whole path for a root. */
+    fun folderName(path: String): String = File(path).name.ifBlank { path }
+
     /** "3 folders · 412 games": the Folders row's value in Game sources. */
     fun summary(counts: FolderCounts): String {
         val folders = counts.roots.size
@@ -104,7 +127,7 @@ internal object FoldersCatalog {
                 items = counts.roots.map { root ->
                     ActionItem(
                         id = "folders_root_${root.path}",
-                        title = File(root.path).name.ifBlank { root.path },
+                        title = folderName(root.path),
                         subtitle = rootLine(root),
                         value = rootValue(root, now),
                         confirmTitle = "Stop looking in ${root.path}? Its games leave the library; adding it back restores them",
@@ -119,20 +142,7 @@ internal object FoldersCatalog {
                 title = null,
                 items = listOf(
                     GamingSettingsCatalog.rescanPcFoldersItem(),
-                    FolderPickItem(
-                        id = "folders_add",
-                        title = "Add a folder",
-                        subtitle = "An SD card, a second internal folder, anywhere games live",
-                        onPicked = { ctx, uri: Uri ->
-                            val resolved = GamesRootPrefs.resolveStoragePath(uri)
-                            if (resolved != null) {
-                                GamesRootPrefs.addGamesRoot(ctx, resolved)
-                                null
-                            } else {
-                                "Couldn't resolve that folder to a real path on this device. Not added"
-                            }
-                        },
-                    ),
+                    addFolderItem("folders_add"),
                     ActionItem(
                         // The Gaming shell opens PC Games on the Wine shortcuts (PcSource.LIBRARY_ITEM_PREFIX).
                         id = "${PcSource.LIBRARY_ITEM_PREFIX}${PcSource.WineShortcut.id}",

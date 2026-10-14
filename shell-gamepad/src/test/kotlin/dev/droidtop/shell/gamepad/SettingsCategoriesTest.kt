@@ -42,6 +42,20 @@ class SettingsCategoriesTest {
     }
 
     @Test
+    fun `untitled groups are one entry named after the screen, not the same label twice`() {
+        val groups = listOf(
+            CatalogGroup(id = "a", title = null, items = listOf(toggle("t1"))),
+            CatalogGroup(id = "b", title = "By path", items = listOf(toggle("t2"))),
+            CatalogGroup(id = "c", title = null, items = listOf(toggle("t3"))),
+        )
+
+        val categories = settingsCategories(groups, untitledLabel = "Game folders")
+
+        assertEquals(listOf("Game folders", "By path"), categories.map { it.label })
+        assertEquals(listOf("a", "c"), categories[0].groupIds)
+    }
+
+    @Test
     fun `any other group is one category, named by its title or the untitled label`() {
         val groups = listOf(
             CatalogGroup(id = "top", title = null, items = listOf(toggle("t1"), link("x", screen("sx")))),

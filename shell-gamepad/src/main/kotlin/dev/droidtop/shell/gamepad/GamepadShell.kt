@@ -2872,7 +2872,11 @@ private fun GamesSection(
                     val foldersScreen = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(GAME_FOLDERS_SCREEN_ID) }
                     var addingFolders by remember { mutableStateOf(false) }
                     if (addingFolders && foldersScreen != null) {
-                        CatalogNavigator(root = foldersScreen, onExit = { addingFolders = false })
+                        // The footer promises what this page does: A selects, B leaves it. Without this it kept
+                        // the Games tab's own Options hint, which opens nothing over an empty library (#537).
+                        Box(Modifier.fillMaxSize().declaresHints(EMPTY_FOLDERS_HINTS)) {
+                            CatalogNavigator(root = foldersScreen, onExit = { addingFolders = false })
+                        }
                     } else {
                         val emptyAction = remember { androidx.compose.ui.focus.FocusRequester() }
                         Column(
@@ -3410,6 +3414,12 @@ private fun GamesSection(
 }
 
 
+
+/** What the Game folders page promises while it is drawn in place of an empty library's Games tab. */
+private val EMPTY_FOLDERS_HINTS = listOf(
+    HintBinding(GamepadAction.A, "Select"),
+    HintBinding(GamepadAction.B, "Back"),
+)
 
 /**
  * What an app tile promises while it has the focus: A opens, X and Y open

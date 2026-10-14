@@ -93,6 +93,12 @@ internal fun settingsCategories(
                 )
             }
         } else {
+            // Untitled groups are named after the screen: two of them are one entry, not the same label twice.
+            val same = if (group.title == null) indexOfFirst { it.key.startsWith("group:") && it.label == untitledLabel } else -1
+            if (same >= 0) {
+                this[same] = this[same].copy(groupIds = this[same].groupIds + group.id)
+                continue
+            }
             add(
                 SettingsCategory(
                     key = "group:${group.id}",

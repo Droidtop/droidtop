@@ -2983,25 +2983,21 @@ object AppSettingsCatalogs {
             "PC and engine games can be anywhere under them. Rescan the library after a change",
         groups = { context ->
             listOf(
+                // One list: the folders and, under them, the row that adds one, so a folder just added shows
+                // where it was added (#537). Every group is titled: an untitled one is named after the screen in
+                // the category column, which listed "Game folders" twice.
                 CatalogGroup(
-                    id = "rom_folders_add",
-                    title = null,
-                    items = listOf(
-                        FolderPickItem(
-                            id = "rom_folders_pick",
-                            title = "Add a folder",
-                            subtitle = "An SD card, a second internal folder, anywhere ROMs live",
-                            onPicked = { ctx, uri: Uri ->
-                                val resolved = GamesRootPrefs.resolveStoragePath(uri)
-                                if (resolved != null) {
-                                    GamesRootPrefs.addGamesRoot(ctx, resolved)
-                                    null
-                                } else {
-                                    "Couldn't resolve that folder to a real path on this device — not added"
-                                }
-                            },
-                        ),
-                    ),
+                    id = "rom_folders_list",
+                    title = "Game folders",
+                    items = GamesRootPrefs.gamesRootPaths(context).sorted().map { path ->
+                        ActionItem(
+                            id = "rom_folder_$path",
+                            title = FoldersCatalog.folderName(path),
+                            subtitle = "$path. Select twice to stop scanning this folder",
+                            confirmTitle = "Remove $path?",
+                            run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, path) },
+                        )
+                    } + FoldersCatalog.addFolderItem("rom_folders_pick"),
                 ),
                 CatalogGroup(
                     id = "rom_folders_add_by_path",
@@ -3038,7 +3034,7 @@ object AppSettingsCatalogs {
                 ),
                 CatalogGroup(
                     id = "rom_folders_rescan",
-                    title = null,
+                    title = "Library",
                     // The same action Gaming settings offers, not a second
                     // one: this screen changes WHICH folders are scanned,
                     // so it is where a user wants to act on that change.
@@ -3070,21 +3066,6 @@ object AppSettingsCatalogs {
                             },
                         ),
                     ),
-                ),
-                CatalogGroup(
-                    id = "rom_folders_list",
-                    title = "Scanned folders",
-                    items = GamesRootPrefs.gamesRootPaths(context).sorted().map { path ->
-                        ActionItem(
-                            id = "rom_folder_$path",
-                            title = path,
-                            subtitle = "Select twice to stop scanning this folder",
-                            confirmTitle = "Remove $path?",
-                            run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, path) },
-                        )
-                    }.ifEmpty {
-                        listOf(ActionItem(id = "rom_folders_none", title = "No game folders configured", run = {}))
-                    },
                 ),
             )
         },

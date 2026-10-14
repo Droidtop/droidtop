@@ -10961,6 +10961,13 @@ action Gaming settings does — the same item, by id, so the in-shell
 renderer's real in-place rescan serves both rather than one screen getting
 a second, weaker mechanism.
 
+**The Game folders page is one list (Droidtop/tracker#537).** Group "Game folders" holds the folders, each named by
+its last segment with the path as its hint, and the "Add a folder" row under them (the one `FoldersCatalog
+.addFolderItem`, shared with Game sources > Folders); after the picker the row says "Added <name>" and the folder
+appears in the list above it. Then "Add a folder by path" and "Library" (rescan, rebuild). Every group is titled, and
+the category column joins untitled groups, so no name repeats. Drawn in place of an empty library's Games tab, the
+footer says A Select and B Back, not the tab's Options.
+
 ### Launch resolution: keep the default, expose it
 
 The Daijisho model stands: a candidate list per platform with a stated
