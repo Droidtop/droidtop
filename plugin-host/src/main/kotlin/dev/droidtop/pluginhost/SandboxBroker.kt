@@ -29,6 +29,8 @@ internal object SandboxBroker {
         listOf(
             "/system", "/system_ext", "/product", "/vendor", "/odm", "/apex", "/linkerconfig",
             "/data/dalvik-cache", "/data/fonts", "/data/resource-cache", "/proc", "/sys", "/dev/__properties__",
+            // libbinder reads which driver features the kernel has (extended_error) when it starts.
+            "/dev/binderfs/features",
             File(info.sourceDir).parent ?: info.sourceDir,
             info.nativeLibraryDir,
         ).forEach { rules[it] = READ }

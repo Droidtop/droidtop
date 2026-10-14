@@ -2752,7 +2752,10 @@ opens that one hole:
   re-checked parent directory, so a symlink swapped in cannot lead it out.
   Device files the kernel ties to their opener (hwbinder, kgsl, Mali, DRM
   render nodes) are opened by the process just before the lockdown and
-  duplicated afterwards; the process is made dumpable so the broker, under
+  duplicated afterwards, and a stat or access of their path is answered
+  from that descriptor (libhidl checks `/dev/hwbinder` with `access` before
+  it opens it; refused, it finds no gralloc mapper and the process aborts,
+  emulator-5560, 2026-10-14); the process is made dumpable so the broker, under
   the same UID, can answer for its own `/proc` entries (ptrace stays
   refused). The plugin's own files keep arriving as descriptors through
   the guarded hooks.
