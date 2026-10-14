@@ -2713,9 +2713,13 @@ device-encrypted `/data/user_de/<n>/<package>`). The broker maps those
 names to the plugin's own folder (`plugins/<id>/data/app-data` and
 `app-data-de`, beside its data store, removed with it), read and written.
 So `getFilesDir`, `getCacheDir`, `getDatabasePath`, Flutter's
-`path_provider` and `app_flutter`, SQLite and ART's own caches find real,
-writable folders, and droidtop's own files are not among them under any
-name. A contained process locks down in passthrough
+`path_provider` and `app_flutter` and SQLite find real folders, and
+droidtop's own files are not among them under any name. One limit in the
+contained tier (emulator-5560, 2026-10-14): SELinux lets an isolated
+process use a file the app hands it but not list a folder it hands it
+(`avc: denied { read } ... app-data/code_cache ... isolated_app`), so code
+that lists its folder fails there (ART then skips its vdex cache); a
+`gpu.render` process, under droidtop's UID, lists them. A contained process locks down in passthrough
 (`SBX_LOCK_PASSTHROUGH`): only those names go to the broker, and every
 other path is made by the handler with the kernel deciding, where the
 isolated UID and SELinux keep droidtop's files out as before. The

@@ -33,7 +33,8 @@ static int decide(void *context, const struct sbx_access *access) {
 }
 
 static void audit(void *context, const struct sbx_access *access, int result) {
-    if (result >= 0) return;
+    /* Refusals only: an allowed call that fails on its own (ENOENT for a file not made yet) is no refusal. */
+    if (result != -EACCES && result != -EPERM) return;
     __android_log_print(ANDROID_LOG_WARN, TAG, "%s: refused %s %s (%s): %s", (const char *) context, access->op,
                         access->asked, access->resolved[0] ? access->resolved : "unresolved", strerror(-result));
 }
