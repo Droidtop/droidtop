@@ -100,7 +100,7 @@ internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: St
     val own = entry.ownStore() != null
     return when (stage) {
         StoreStage.INSTALL -> {
-            val size = (entry.pcInfo?.sizeBytes ?: 0L).takeIf { it > 0 }?.let { "Downloads ${downloadSizeLabel(it)}" }
+            val size = (entry.pcInfo?.sizeBytes ?: 0L).takeIf { it > 0 }?.let { "Downloads ${dev.droidtop.library.format.ValueFormat.size(it)}" }
             PcPlayState(
                 "Install",
                 when {
@@ -129,10 +129,6 @@ internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: St
         )
     }
 }
-
-/** A download size as a person reads it: whole megabytes below a gigabyte, one decimal above. Pure. */
-internal fun downloadSizeLabel(bytes: Long): String =
-    if (bytes >= 1_000_000_000L) String.format("%.1f GB", bytes / 1_000_000_000.0) else "${(bytes / 1_000_000L).coerceAtLeast(1)} MB"
 
 /** The state before the runner has been worked out: nothing to press yet. */
 internal val PcPlayStateLoading = PcPlayState("…", "", pressable = false, ready = false)

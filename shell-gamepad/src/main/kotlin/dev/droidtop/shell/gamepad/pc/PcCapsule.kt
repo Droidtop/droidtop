@@ -479,6 +479,6 @@ internal fun focusLine(
     // The version-management fact a shelf or the grid owes the focused game:
     // a version a source knows of that this device does not have (docs/SPEC.md 7g).
     entry.availableUpdate?.let { add(GameUpdates.line(it)) }
-    entry.pcInfo?.sizeBytes?.takeIf { it > 0 }?.let { add(downloadSizeLabel(it)) }
+    entry.pcInfo?.sizeBytes?.takeIf { it > 0 }?.let { add(dev.droidtop.library.format.ValueFormat.size(it)) }
     if (parts > 1) add("$parts copies")
 }.joinToString(" · ")

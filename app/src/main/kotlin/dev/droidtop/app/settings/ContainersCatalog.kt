@@ -376,16 +376,9 @@ object ContainersCatalog {
     private fun storageItem(bytes: Long?): CatalogItem = ActionItem(
         id = "container_storage",
         title = "Storage used",
-        value = bytes?.let { formatBytes(it) } ?: "Unknown",
+        value = bytes?.let { dev.droidtop.library.format.ValueFormat.size(it) } ?: "Unknown",
         run = {},
     )
-
-    /** Human-readable size; GB once it passes a gigabyte, MB above a megabyte, KB below. */
-    private fun formatBytes(bytes: Long): String = when {
-        bytes >= 1_000_000_000L -> String.format("%.1f GB", bytes / 1_000_000_000.0)
-        bytes >= 1_000_000L -> String.format("%.0f MB", bytes / 1_000_000.0)
-        else -> "${bytes / 1_000} KB"
-    }
 
     // ---- sockets (docs/SPEC.md 3d) ----
 

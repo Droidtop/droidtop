@@ -79,11 +79,4 @@ object StoreContent {
     /** Whether applying [choice] changes what is chosen now. */
     fun differs(options: StoreContentOptions, choice: StoreContentChoice): Boolean =
         choice != current(options)
-
-    /** "1.2 GB" style size for the picker rows; blank for nothing. */
-    fun sizeLabel(bytes: Long): String = when {
-        bytes <= 0L -> ""
-        bytes >= 1_000_000_000L -> String.format(java.util.Locale.ROOT, "%.1f GB", bytes / 1_000_000_000.0)
-        else -> "${(bytes / 1_000_000L).coerceAtLeast(1)} MB"
-    }
 }

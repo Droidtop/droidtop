@@ -14923,7 +14923,20 @@ A condition the person should know about (an unofficial plugin, a feature that i
 9. In a modal the safe choice comes first (left) and has the focus.
 10. Never tell a person to do something they cannot do from where they are; give them the action.
 
-**Enforcement** (`scripts/check-ui-rules.sh`, run by `android-checks.yml`): `--check` fails on a site of a switched-on rule, `--inventory` lists every rule's remaining sites, and `scripts/test-check-ui-rules.sh` proves each rule catches its fixture. The rules: `Toast.makeText` outside `Notices`; `colorScheme.error` outside `:ui-shared`; `run = {}`; a `TextBlockItem` starting "WARNING" or a "(high risk)" suffix; hex colours in screens; the names the notice and text-entry work deletes (`MenuHint`, `SafeModeBanner`, `ReinitPill`, `MenuTokens.Danger`/`DangerPlate`, `OwnFieldKeyboard`); banned words in `Notice(` strings and in permission titles; and `TextField`/`OutlinedTextField`/`BasicTextField` outside `TextEntry`. Each rule is switched on in the commit that clears its last site.
+**Enforcement** (`scripts/check-ui-rules.sh`, run by `android-checks.yml`): `--check` fails on a site of a switched-on rule, `--inventory` lists every rule's remaining sites, and `scripts/test-check-ui-rules.sh` proves each rule catches its fixture. The rules: `Toast.makeText` outside `Notices`; `colorScheme.error` outside `:ui-shared`; `run = {}`; a `TextBlockItem` starting "WARNING" or a "(high risk)" suffix; hex colours in screens; the names the notice and text-entry work deletes (`MenuHint`, `SafeModeBanner`, `ReinitPill`, `MenuTokens.Danger`/`DangerPlate`, `OwnFieldKeyboard`); banned words in `Notice(` strings and in permission titles; `TextField`/`OutlinedTextField`/`BasicTextField` outside `TextEntry`; and byte, duration and relative-time formatting outside `ValueFormat` ("Values" below). Each rule is switched on in the commit that clears its last site.
+
+### Values: one formatter (decided 2026-10-14, Droidtop/tracker#485 F2a)
+
+Every value a person reads that is a size, a time or a state goes through one formatter, `ValueFormat` (`runtime-common`, `dev.droidtop.library.format`). It is in `runtime-common`, not `:ui-shared`, because `:library-core` formats too (store sizes, free space) and cannot depend on a Compose module. The rules:
+
+- **Sizes** are decimal, as storage is sold and as Android's Settings counts it: whole KB and MB (never "0 MB" for something that exists), one decimal for GB and TB ("12 KB", "420 MB", "1.5 GB"). Free space reads "12.3 GB free of 128.0 GB".
+- **Durations** leave out what is zero: "2 h 5 min", "2 h", "45 min", "Under a minute". The caller says what absence means ("Not played yet", or nothing); a duration never reads "0 min". A screen reader hears whole words ("2 hours 5 minutes").
+- **Time left** is never more exact than the rate behind it: whole minutes under an hour, quarter hours above ("About 8 min left").
+- **How long ago**: "today", "yesterday", "5 days ago", "3 weeks ago", "4 months ago", "over a year ago"; a recent check reads "Just now", "5 min ago", "2 h ago".
+- **Clock times** follow the device's 12 or 24 hour setting. **Percentages** are whole numbers. **Counts** are grouped ("1,234").
+- **States** have one word each: On, Off, Running, Stopped, Installed, Not installed, Connected, Disconnected, Waiting, Failed, Unknown. A plugin's typed `state` value maps onto these, and anything else reads Unknown.
+
+Digits use the root locale, so a decimal point never becomes a comma inside English copy. The per-screen copies this replaced (Containers' storage, the companion's sizes and play time, the PC game page's play time and "last played", the theme renderer's `playtime` text, the store content sheet's sizes, the download size on capsules, the companion's free space, and Android's `Formatter`/`DateUtils` calls) are deleted; `check-ui-rules.sh` rule `formatters` (on) fails a new one. The ported store code under `stores/` keeps its own.
 
 ### Asking before a change, and the flash (decided 2026-10-14, Droidtop/tracker#485)
 

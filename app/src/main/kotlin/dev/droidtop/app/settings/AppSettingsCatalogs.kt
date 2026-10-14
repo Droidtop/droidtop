@@ -1161,9 +1161,7 @@ object AppSettingsCatalogs {
     ): CatalogGroup {
         val checked = cached.maxOfOrNull { it.checked }?.takeIf { it > 0 }
         val checkedLine = checked?.let {
-            "Last checked " + android.text.format.DateUtils.getRelativeTimeSpanString(
-                it, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS,
-            )
+            "Last checked " + dev.droidtop.library.format.ValueFormat.ago(System.currentTimeMillis(), it).replaceFirstChar { c -> c.lowercase() }
         } ?: "Not checked yet"
         return CatalogGroup(
             id = "updates_android_apps",

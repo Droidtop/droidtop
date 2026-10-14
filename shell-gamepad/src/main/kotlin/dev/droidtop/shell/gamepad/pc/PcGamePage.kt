@@ -296,7 +296,7 @@ internal fun PcGamePage(
     val originText by produceState<String?>(null, entry.id) {
         value = withContext(Dispatchers.IO) { dev.droidtop.library.originLabel(entry, 1, roots = pcRootsOf(context)).full }
     }
-    val sizeLine = (folderSize ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) }
+    val sizeLine = (folderSize ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { dev.droidtop.library.format.ValueFormat.size(it) }
     val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers) {
         pageRows(
             entry, play, runner, siblings,
@@ -410,7 +410,6 @@ internal fun PcGamePage(
             folderSizeBytes = folderSize,
             installedVersion = installedVersions(entry, siblings, setVersion).firstOrNull(),
             runsWith = runner?.label,
-            formatSize = { android.text.format.Formatter.formatShortFileSize(context, it) },
         )
     }
 
@@ -1133,7 +1132,7 @@ internal fun cloudSavesLine(
     now: Long,
 ): Pair<String, String?> {
     if (!hasCloudSaves) return "Not supported" to "$store cloud saves are not supported"
-    val since = last?.okAt?.let { lastPlayedPhrase(now, it) }
+    val since = last?.okAt?.let { dev.droidtop.library.format.ValueFormat.daysAgo(now, it) }
     return when {
         !online -> "Offline" to (since?.let { "Not synced since $it" } ?: "Not synced yet")
         last?.failedAt != null -> "Last sync failed" to "Select to retry"
@@ -1372,7 +1371,7 @@ private fun folderSizeBytes(path: String): Long = dev.droidtop.library.FolderSiz
  */
 internal fun playtimeLine(seconds: Long, playCount: Int): String {
     if (seconds <= 0 && playCount <= 0) return "Never played"
-    val time = playtimeShort(seconds).takeIf { seconds > 0 }
+    val time = dev.droidtop.library.format.ValueFormat.duration(seconds).takeIf { seconds > 0 }
     val times = when (playCount) {
         0 -> null
         1 -> "played once"
@@ -1538,8 +1537,7 @@ internal fun versionFact(installed: String?, latest: String?): String? = when {
  * The page's quiet facts strip, label then value, only the facts that
  * exist: when it was last played, play time, the version installed against
  * the latest known, size on this device (or to download), and what runs
- * it. [formatSize] is the platform's byte formatter, passed in so this
- * stays pure.
+ * it. Pure; sizes read through the one formatter ([dev.droidtop.library.format.ValueFormat]).
  */
 internal fun factsStrip(
     entry: LibraryEntry,
@@ -1547,47 +1545,18 @@ internal fun factsStrip(
     folderSizeBytes: Long?,
     installedVersion: String?,
     runsWith: String?,
-    formatSize: (Long) -> String,
 ): List<Pair<String, String>> = listOfNotNull(
-    "Last played" to (entry.lastPlayedEpochMs?.let { lastPlayedPhrase(now, it).replaceFirstChar { c -> c.uppercase() } } ?: "Never"),
+    "Last played" to (entry.lastPlayedEpochMs?.let { dev.droidtop.library.format.ValueFormat.daysAgo(now, it).replaceFirstChar { c -> c.uppercase() } } ?: "Never"),
     "Play time" to playtimeLine(entry.playtimeSeconds, entry.playCount),
     versionFact(installedVersion, entry.availableUpdate)?.let { "Version" to it },
-    (folderSizeBytes ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { "Size" to formatSize(it) },
+    (folderSizeBytes ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { "Size" to dev.droidtop.library.format.ValueFormat.size(it) },
     runsWith?.takeIf { it.isNotBlank() }?.let { "Runs with" to it },
 )
 
-private const val DAY_MS = 24L * 60 * 60 * 1000
-
-/** "today", "yesterday", "5 days ago", "3 weeks ago", "4 months ago". Pure, for the tests and the hero card. */
-internal fun lastPlayedPhrase(now: Long, last: Long): String {
-    val days = ((now - last) / DAY_MS).coerceAtLeast(0)
-    return when {
-        days < 1 -> "today"
-        days == 1L -> "yesterday"
-        days < 14 -> "$days days ago"
-        days < 60 -> "${days / 7} weeks ago"
-        days < 365 -> "${days / 30} months ago"
-        else -> "over a year ago"
-    }
-}
-
-/** "2 h 5 min", "45 min", "Under a minute", "Not played yet": the short play time of the strip and the hero card. */
-internal fun playtimeShort(seconds: Long): String {
-    if (seconds <= 0) return "Not played yet"
-    val hours = seconds / 3600
-    val minutes = (seconds % 3600) / 60
-    return when {
-        hours > 0 && minutes > 0 -> "$hours h $minutes min"
-        hours > 0 -> "$hours h"
-        minutes > 0 -> "$minutes min"
-        else -> "Under a minute"
-    }
-}
-
 /** The one quiet line under the home's hero card: "Played yesterday · 2 h 5 min". */
 internal fun heroCaption(entry: LibraryEntry, now: Long): String {
-    val last = entry.lastPlayedEpochMs?.let { "Played ${lastPlayedPhrase(now, it)}" }
-    val time = playtimeShort(entry.playtimeSeconds).takeIf { entry.playtimeSeconds > 0 }
+    val last = entry.lastPlayedEpochMs?.let { "Played ${dev.droidtop.library.format.ValueFormat.daysAgo(now, it)}" }
+    val time = dev.droidtop.library.format.ValueFormat.duration(entry.playtimeSeconds).takeIf { entry.playtimeSeconds > 0 }
     return listOfNotNull(last, time).joinToString(" · ").ifEmpty { "Not played yet" }
 }
 

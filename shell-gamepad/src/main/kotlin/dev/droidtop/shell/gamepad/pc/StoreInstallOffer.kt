@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
-import android.text.format.Formatter
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -102,7 +101,7 @@ internal fun StoreInstallOfferSheet(
     // The folder the install would go to now: the remembered one when it
     // is still one of the person's game folders, otherwise the first.
     val current = places.indexOfFirst { it.path == rememberedPath }.takeIf { it >= 0 } ?: 0
-    val formatSize: (Long) -> String = { Formatter.formatShortFileSize(context, it) }
+    val formatSize: (Long) -> String = dev.droidtop.library.format.ValueFormat::size
     val window = LocalShellWindow.current
     var selected by remember(offer) { mutableIntStateOf(0) }
     // A folder row each (Steam: one "Open the store's screen" row; no game

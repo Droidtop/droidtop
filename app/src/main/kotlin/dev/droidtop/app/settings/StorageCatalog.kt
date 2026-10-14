@@ -1,7 +1,6 @@
 package dev.droidtop.app.settings
 
 import android.content.Context
-import android.text.format.Formatter
 import dev.droidtop.library.FolderSizes
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
@@ -131,7 +130,7 @@ internal object StorageCatalog {
     private const val SHOW_EVERY_MS = 400L
 
     private suspend fun groups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
-        val size = { bytes: Long -> Formatter.formatFileSize(context, bytes) }
+        val size = dev.droidtop.library.format.ValueFormat::size
         val volumes = installVolumes(context)
         val library = dev.droidtop.app.LibraryCore.library(context)
         val roms = runCatching { library.currentEntriesOf(setOf(LibraryEntryKind.CONSOLE_ROM)) }.getOrDefault(emptyList())

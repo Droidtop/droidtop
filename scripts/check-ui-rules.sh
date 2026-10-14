@@ -41,6 +41,7 @@ RULES=(
 "deleted-names @@ 0 @@ \bMenuHint\(|\bSafeModeBanner\(|\bReinitPill\(|MenuTokens\.Danger(Plate)?\b|\bOwnFieldKeyboard\( @@ - @@ these were replaced by the notice and text-entry components"
 "banned-words @@ 0 @@ Notice\([^)]*\"[^\"]*(${BANNED}) @@ - @@ notice titles, bodies and labels say what happens, not the machinery (details may)"
 "text-fields @@ 0 @@ \b(BasicTextField|OutlinedTextField|TextField)\( @@ /TextEntry\.kt$ @@ every text field is the one TextEntry"
+"formatters @@ 1 @@ %\.[0-9]f [KMGT]B|Formatter\.format(Short)?FileSize|getRelativeTimeSpanString @@ /ValueFormat\.kt$|^stores/ @@ sizes, durations and times go through ValueFormat, the one formatter (the ported store code keeps its own)"
 "permission-titles @@ 1 @@ PluginPermission\(\"[^\"]+\", [A-Za-z.]+, \"[^\"]*(${BANNED}) @@ - @@ a permission's title is plain words; its raw id is on Y Info"
 )
 

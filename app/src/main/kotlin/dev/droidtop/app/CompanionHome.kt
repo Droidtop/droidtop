@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import dev.droidtop.library.format.ValueFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -308,13 +309,9 @@ private fun FocusedGameCard(entry: LibraryEntry) {
         ).joinToString("  ·  ")
         if (details.isNotEmpty()) FactLine(details)
         val play = listOfNotNull(
-            entry.playtimeSeconds.takeIf { it >= 60 }?.let { playtimeLabel(it) },
+            entry.playtimeSeconds.takeIf { it >= 60 }?.let { "${ValueFormat.duration(it)} played" },
             entry.lastPlayedEpochMs?.let { lastPlayed ->
-                "Last played " + android.text.format.DateUtils.getRelativeTimeSpanString(
-                    lastPlayed,
-                    System.currentTimeMillis(),
-                    android.text.format.DateUtils.MINUTE_IN_MILLIS,
-                )
+                "Last played ${ValueFormat.daysAgo(System.currentTimeMillis(), lastPlayed)}"
             },
             player?.let { "Runs with $it" },
         ).joinToString("  ·  ")
@@ -326,7 +323,7 @@ private fun FocusedGameCard(entry: LibraryEntry) {
                 buildList {
                     dev.droidtop.library.PcSource.of(entry)?.let { add(it.detail()) }
                     if (!pc.installed) add("Not installed")
-                    if (pc.sizeBytes > 0) add(formatSize(pc.sizeBytes))
+                    if (pc.sizeBytes > 0) add(ValueFormat.size(pc.sizeBytes))
                     pc.compatibility?.let { add(it.summary()) }
                 }.joinToString("  ·  "),
             )
@@ -347,18 +344,6 @@ private fun FocusedGameCard(entry: LibraryEntry) {
 @Composable
 private fun FactLine(text: String) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-}
-
-/** "45 min played", "12 h played". Pure. */
-internal fun playtimeLabel(seconds: Long): String {
-    val minutes = seconds / 60
-    return if (minutes < 60) "$minutes min played" else "${minutes / 60} h played"
-}
-
-/** Human-readable install size; GB once it passes a gigabyte, MB below. */
-private fun formatSize(bytes: Long): String = when {
-    bytes >= 1_000_000_000L -> String.format("%.1f GB", bytes / 1_000_000_000.0)
-    else -> "${bytes / 1_000_000} MB"
 }
 
 @Composable
