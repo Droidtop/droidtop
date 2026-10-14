@@ -110,6 +110,12 @@ class NoticeItem(
     override val id: String,
     val notice: Notice,
     val placement: NoticePlacement = NoticePlacement.Row,
+    /**
+     * A screen the notice's action opens in the same surface, as a [NestedScreenItem] would (a plugin notice whose
+     * action is a `view`, a "not allowed" notice opening Permissions). When set, the action's [NoticeAction.run] is
+     * not called; the label still names the press.
+     */
+    val opens: CatalogScreen? = null,
 ) : CatalogItem {
     override val title: String get() = notice.title
     override val subtitle: String? get() = notice.body

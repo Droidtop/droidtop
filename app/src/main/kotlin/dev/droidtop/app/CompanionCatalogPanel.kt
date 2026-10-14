@@ -119,7 +119,7 @@ internal fun CompanionCatalogItems(
                     if (item.registryId == "social" && onOpenSocial != null) onOpenSocial() else nested = item.resolve()
                 }
                 is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged, asks(item))
-                is NoticeItem -> CompanionNotice(item, onChanged)
+                is NoticeItem -> CompanionNotice(item, onChanged, onOpen = { nested = it })
                 is TextBlockItem -> Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                     if (item.title.isNotBlank()) Text(item.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                     Text(item.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -312,7 +312,7 @@ private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst
  * as the companion's rows open in place.
  */
 @Composable
-private fun CompanionNotice(item: NoticeItem, onChanged: () -> Unit) {
+private fun CompanionNotice(item: NoticeItem, onChanged: () -> Unit, onOpen: (CatalogScreen) -> Unit) {
     val context = LocalContext.current
     var info by remember(item.id) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -320,7 +320,9 @@ private fun CompanionNotice(item: NoticeItem, onChanged: () -> Unit) {
         NoticeCard(
             notice = item.notice,
             placement = item.placement,
-            onAction = item.notice.action?.let { action -> { scope.launch { action.run(context); onChanged() } } },
+            onAction = item.notice.action?.let { action ->
+                { item.opens?.let(onOpen) ?: scope.launch { action.run(context); onChanged() } }
+            },
             onInfo = { info = !info },
         )
         val details = item.notice.details

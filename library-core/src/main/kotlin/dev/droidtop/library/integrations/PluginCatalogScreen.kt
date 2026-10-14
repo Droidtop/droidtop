@@ -1,5 +1,9 @@
 package dev.droidtop.library.integrations
 
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
 import android.content.Context
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -197,12 +201,18 @@ object PluginCatalogScreen {
             title = "Review before adding",
             chips = listOf(CatalogChip("Unofficial")),
             items = buildList {
+                // U2 (docs/SPEC.md 7k, "Notices"): the caution banner; the address and signature are the rows below.
                 add(
-                    TextBlockItem(
+                    NoticeItem(
                         id = "plugins_catalogs_proposal_who",
-                        title = proposal.info.name,
-                        text = "This catalog is not part of droidtop and droidtop has not checked it. " +
-                            "Add it only if you trust the people who run it. Nothing is added until you accept the notice below.",
+                        notice = Notice(
+                            tone = NoticeTone.Caution,
+                            title = "Unofficial list",
+                            body = "Add from it only if someone you trust pointed you to it.",
+                            details = "${proposal.info.name} is not part of droidtop and droidtop has not checked it. " +
+                                "Nothing is added until you accept the notice below.\nAddress: ${proposal.indexUrl}",
+                        ),
+                        placement = NoticePlacement.Page,
                     ),
                 )
                 addAll(noticeItems("plugins_catalogs_proposal_notice", "Notice from the catalog", proposal.disclaimer.text, gate))

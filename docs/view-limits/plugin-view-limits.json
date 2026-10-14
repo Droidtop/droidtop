@@ -1,0 +1,48 @@
+{
+  "$comment": "The one source of the plugin view limits (docs/plugin-api.md 1.6, docs/SPEC.md 7k Notices). droidtop's PluginViewLimits, plugin-common-py's gg.lint_view and the Kotlin PluginViewLint read this file; nothing restates a number. Over a length the host cuts with an ellipsis, over a count it drops, and either is logged as a plugin message.",
+  "version": 1,
+  "lengths": {
+    "title": 200,
+    "subtitle": 500,
+    "noticeTitle": 60,
+    "noticeSubtitle": 140,
+    "noticeDetails": 500,
+    "actionLabel": 20,
+    "toast": 80,
+    "argsBytes": 16384
+  },
+  "counts": {
+    "sections": 12,
+    "nodes": 200,
+    "options": 100,
+    "noticesPerSection": 2,
+    "noticesPerView": 3,
+    "bannersPerPage": 1,
+    "searchFieldsPerView": 1
+  },
+  "copyWarnings": {
+    "title": 40,
+    "body": 90
+  },
+  "tones": ["info", "caution"],
+  "placements": ["section", "banner"],
+  "reservedTitles": [
+    "Unofficial plugin",
+    "Unofficial list",
+    "Update made by someone else",
+    "Has full access",
+    "Safe mode",
+    "Allow full access?",
+    "Protection didn't start",
+    "Made by someone else",
+    "Emulator setup is off for safety",
+    "RetroArch setup is off for safety",
+    "Power controls are off for safety",
+    "Display controls are off for safety",
+    "Core installs are off for safety",
+    "Quick actions are off for safety",
+    "Typing in other apps is off",
+    "Typing in other apps",
+    "Needs full access to work"
+  ]
+}

@@ -135,6 +135,8 @@ object PluginGameSections {
         return nodes.map { node ->
             when (node) {
                 is ViewNode.Info -> Row(node.title, node.subtitle, node.value, RowAction.NONE)
+                // A game page's plugin rows are plain rows; the notice's action is reached in its section.
+                is ViewNode.Notice -> actionRow(node.title, node.subtitle, null, node.action, null)
                 is ViewNode.Progress -> Row(node.title, node.subtitle, if (node.percent >= 0) "${node.percent}%" else null, RowAction.NONE)
                 is ViewNode.Row -> actionRow(node.title, node.shownSubtitle(), node.shownValue(), node.action, null)
                 is ViewNode.Button -> actionRow(node.title, node.subtitle, node.value, node.action, node.confirm)

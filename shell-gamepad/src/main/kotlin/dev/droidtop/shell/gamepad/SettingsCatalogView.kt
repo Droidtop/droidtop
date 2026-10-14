@@ -500,7 +500,12 @@ fun CatalogNavigator(
             is TextBlockItem -> {}
             // A notice's action, else its Info (Y is the other way there), else nothing.
             is NoticeItem -> when (item.notice.aPress()) {
-                NoticePress.ACTION -> item.notice.action?.let { action ->
+                NoticePress.ACTION -> if (item.opens != null) {
+                    scrollByDepth[stack.lastIndex] = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+                    stack.add(item.opens ?: return)
+                    selectionByDepth[stack.lastIndex] = 0
+                    refresh()
+                } else item.notice.action?.let { action ->
                     scope.launch {
                         action.run(context)
                         refresh()
