@@ -3716,6 +3716,8 @@ on touch, rest the pointer for a mouse, a short focus dwell for the pad. A tip i
 only inside the topmost layer on the hint bar (`FocusedHints.tipsAllowedFor`): the page's tip goes while the Quick Menu,
 the Start menu or a dialog is open over it. Sentences are for real errors only;
 there are no "Info" links. The rest of the app follows the same rule.
+explanation that still has to exist is on the focus line and in Info (Y) (7k, "Explanations: no tooltips";
+the tooltip bubble was deleted 2026-10-14). Sentences are for real errors only; there are no "Info" links. The rest of the app follows the same rule.
 
 ### iiSU uses Android's own secondary-display home
 
@@ -7049,8 +7051,8 @@ owns it, found by the rig's new-user pass and fixed there.
 
 Use labels and short values across screens, dialogs, settings, launcher and desktop. No explanatory
 sentences on screens; row subtitles are values or 2–4 words. Remove "what this does" and "why"
-text. Put useful explanations in one shared tooltip: pointer hover, delayed pad focus or touch
-long-press. No Info links or parallel detail sheets. Hide Shizuku/Sui actions while unavailable.
+text. Put useful explanations on the focus line and in Info (Y); the tooltip this once named is gone
+(7k, "Explanations: no tooltips"). No Info links or parallel detail sheets. Hide Shizuku/Sui actions while unavailable.
 Errors and confirmations may use one short sentence; empty states use 2–3 words. Keep one-line
 warnings for deletion, trust and sign-in. Use sentence case, one name per concept, verb labels on
 buttons, no developer notation or backend errors. Keep ids, package names, URLs and paths out of
@@ -14966,6 +14968,10 @@ The model is `CatalogPage(header, buttons, more, groups)`, built once per refres
 **Empty, loading and error** are one `StateBlock`: a 48 dp glyph, a title of at most 32 characters, one body line and a next action (an empty state always has one); loading names what is slow after two seconds, never a bare title or an endless spinner; an error is a caution notice with one action and the raw text in Details.
 
 **The focus ring** (`FocusRingInks`) is two opaque edges: a 3 dp outer edge in the theme's accent (4 dp with high contrast) and a 1 dp inner edge in black or white, whichever is farther from the accent. Whatever the ring lands on, pure white, pure black or the accent's own colour, one of the two edges stands out by at least 3:1 (`GamingThemeMappingTest`). It no longer fades or breathes: a 60 percent ring that breathed to 24 percent vanished over light capsule art (low-vision review, R.4 #7).
+
+### Explanations: no tooltips (decided 2026-10-14, Droidtop/tracker#485 F2b)
+
+The tooltip bubble (`HintTip`) is deleted. A row's explanation is on the **focus line** under the list while the row is selected, and in **Info** (Y) with the rest; a row that has one shows a 20 dp info glyph, the hint row says `Y Info`, and a screen reader hears "More info available". **Accessibility > Info text** chooses where it shows: **Bottom line** (the default) or **Under each row** (`ReadingPrefs`; every renderer reads the one value). A screen's own explanation is the focus line's text when the selected row has none. The other bubbles moved to visible text: the PC game page's full paths and links are on its detail strip, the task manager's "not confirmed" reason shows under the selected row, the companion's heat card says "Battery temperature", and the key setup screens show their credit line and the current step's how-to. Every screen must make sense with every optional setting off and without pressing Y (rig check C11). The search index still reads the explanations. `check-ui-rules.sh` rule `hint-tip` (on) fails a new one.
 
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 

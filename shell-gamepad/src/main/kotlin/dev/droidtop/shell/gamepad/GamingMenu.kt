@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
@@ -383,12 +385,12 @@ internal fun MenuRow(
     // True for a row in a SCROLLING list that must scroll evenly (the
     // Settings catalog): the row is exactly [uniformRowHeight] tall, a
     // two-line title and a two-line summary fit, and what does not fit is
-    // ellipsized (the full text is in the row's HintTip and the Info
+    // ellipsized (the full text is on the focus line and in the Info
     // sheet). Never grows.
     uniformHeight: Boolean = false,
     // How many summary lines a [uniformHeight] row makes room for: two
     // where a page shows summaries, none for a settings row, whose
-    // explanation lives in its HintTip (docs/SPEC.md "Settings layout").
+    // explanation is on the focus line (docs/SPEC.md 7k, "Explanations").
     uniformSummaryLines: Int = 2,
     // A toggle drawn as a switch in the value column (on/off), instead of
     // a value text. Null: not a toggle.
@@ -425,6 +427,9 @@ internal fun MenuRow(
     leading: (@Composable () -> Unit)? = null,
     // A short tag on the row beside its title (CatalogItem.chip): "Unofficial". A fact, drawn on the row, not a tooltip.
     chip: String? = null,
+    // The row has Info (a sentence beyond its title): a 20dp glyph says so, and a screen reader hears
+    // "More info available" (docs/SPEC.md 7k, "Explanations").
+    info: Boolean = false,
 ) {
     val window = LocalShellWindow.current
     // Real bug this fixes (owner, 2026-09-27): every menu built from
@@ -592,6 +597,15 @@ internal fun MenuRow(
                 modifier = (LocalValueColumnWidth.current?.let { Modifier.width(it) } ?: Modifier).valueShare(),
                 contentAlignment = Alignment.CenterEnd,
             ) { ShellSwitch(switchOn) }
+        }
+        if (info) {
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                Icons.Outlined.Info,
+                contentDescription = "More info available",
+                tint = MenuTokens.OnSurfaceMuted,
+                modifier = Modifier.size(20.dp),
+            )
         }
         if (chevron) {
             Spacer(Modifier.width(8.dp))

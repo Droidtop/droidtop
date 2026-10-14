@@ -43,6 +43,7 @@ RULES=(
 "text-fields @@ 0 @@ \b(BasicTextField|OutlinedTextField|TextField)\( @@ /TextEntry\.kt$ @@ every text field is the one TextEntry"
 "formatters @@ 1 @@ %\.[0-9]f [KMGT]B|Formatter\.format(Short)?FileSize|getRelativeTimeSpanString @@ /ValueFormat\.kt$|^stores/ @@ sizes, durations and times go through ValueFormat, the one formatter (the ported store code keeps its own)"
 "permission-titles @@ 1 @@ PluginPermission\(\"[^\"]+\", [A-Za-z.]+, \"[^\"]*(${BANNED}) @@ - @@ a permission's title is plain words; its raw id is on Y Info"
+"hint-tip @@ 1 @@ \bHintTip\b @@ - @@ explanations live on the focus line and in Info (Y), never in a bubble"
 )
 
 failed=0

@@ -31,7 +31,6 @@ import dev.droidtop.runtime.systemstatus.AppCpu
 import dev.droidtop.runtime.systemstatus.PerfSample
 import dev.droidtop.runtime.systemstatus.PerformanceMonitor
 import dev.droidtop.runtime.tasks.TaskManager
-import dev.droidtop.shell.gamepad.HintTip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -121,9 +120,8 @@ internal fun CompanionPerformanceTab() {
             },
             {
                 CompanionCard("Heat") {
-                    HintTip("Battery sensor. Android gives apps no processor or GPU temperature.") {
-                        Text(PerformanceMonitor.tempText(latest.batteryTempTenthC), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
-                    }
+                    Text(PerformanceMonitor.tempText(latest.batteryTempTenthC), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                    CompanionNote("Battery temperature")
                     Sparkline(history.map { it.batteryTempTenthC?.let { t -> t / 10f } }, 20f, 60f, colors.error)
                     CompanionNote("Thermal state: ${PerformanceMonitor.thermalLabel(latest.thermalStatus)}")
                 }

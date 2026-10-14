@@ -23,6 +23,7 @@ fixture deleted-names shell-gamepad/src/main/kotlin/A.kt 'MenuHint("Working")'
 fixture banned-words app/src/main/kotlin/A.kt 'Notice(NoticeTone.Caution, "The sandbox did not start")'
 fixture text-fields app/src/main/kotlin/A.kt 'BasicTextField(value = v, onValueChange = {})'
 fixture formatters app/src/main/kotlin/A.kt 'val s = String.format("%.1f GB", b / 1e9)'
+fixture hint-tip shell-gamepad/src/main/kotlin/A.kt 'HintTip("Why") { Text("Row") }'
 fixture permission-titles plugin-host/src/main/kotlin/A.kt 'PluginPermission("x", PermissionTier.DANGEROUS, "Run adb commands")'
 
 status=0

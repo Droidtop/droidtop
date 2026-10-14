@@ -904,12 +904,22 @@ fun CatalogNavigator(
             )
         }
     }
+    val selectedRowItem = rows.getOrNull(selected)?.item?.takeIf { paneActive && it !is NoticeItem && it !is ButtonBarItem }
+    val rowHints = remember(selectedRowItem) {
+        selectedRowItem?.let { item ->
+            listOfNotNull(
+                HintBinding(GamepadAction.A, "Select").takeIf { item !is TextBlockItem },
+                HintBinding(GamepadAction.Y, "Info").takeIf { hasInfo(item) },
+                HintBinding(GamepadAction.B, "Back"),
+            )
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { hostWidth = with(density) { it.width.toDp() } }
             .focusRequester(navFocus)
-            .then((noticeHints ?: barHints)?.let { Modifier.declaresHints(it) } ?: Modifier)
+            .then((noticeHints ?: barHints ?: rowHints)?.let { Modifier.declaresHints(it) } ?: Modifier)
             .focusable()
             .onPad { press -> if (categoryMode && inColumn) onColumnPad(press) else onPanePad(press) },
     ) {
@@ -1022,10 +1032,15 @@ private fun CatalogPane(
     // the exact permission or file) in place of its hint, at once.
     val tipRow = rows.getOrNull(selected)?.takeIf { active && PadModality.showsFocus && it.item !is TextBlockItem }
     val tipArmed = tipRow != null && confirmArmedId == tipRow.item.id && tipRow.item.confirmText != null
-    val tip = tipRow?.let { catalogTip(it.item, statusById[it.item.id], confirmArmedId == it.item.id) }
-    val reserveTip = statusById.isNotEmpty() || rows.any { it.item.subtitle != null || it.item.confirmText != null }
+    // With "Info text: Under each row" a row's sentence is on the row itself, and the focus line keeps only
+    // what changes (a status, an armed confirmation); the screen's own explanation is the line's fallback.
+    val context = LocalContext.current
+    val underRows = remember(rows) { dev.droidtop.library.settings.ReadingPrefs.infoUnderRows(context) }
+    val tip = tipRow?.let { catalogTip(it.item, statusById[it.item.id], confirmArmedId == it.item.id, explanation = !underRows) }
+        ?: hint?.takeIf { active }
+    val reserveTip = hint != null || statusById.isNotEmpty() || rows.any { (!underRows && it.item.subtitle != null) || it.item.confirmText != null }
     Column(modifier) {
-        if (title != null) HintTip(hint) { MenuHeader(title) }
+        if (title != null) MenuHeader(title)
         LazyColumn(
             state = state,
             // The list ends above the explanation strip (when the page has any explanations) and
@@ -1107,6 +1122,7 @@ private fun CatalogPane(
                     } else {
                         CatalogRowView(
                             row = row,
+                            infoUnderRow = underRows,
                             locked = (row.item as? AsyncActionItem)?.gate?.let { readGates[it] != true } ?: false,
                             isSelected = isSelected,
                             confirmArmed = confirmArmedId == row.item.id,
@@ -1123,10 +1139,13 @@ private fun CatalogPane(
     }
 }
 
+/** Whether a row has Info: a sentence beyond its title (the glyph, the Y Info hint, "More info available"). */
+internal fun hasInfo(item: CatalogItem): Boolean = !item.subtitle.isNullOrBlank()
+
 /** What a row says about itself: the armed confirmation, else its live status and its explanation. */
-private fun catalogTip(item: CatalogItem, status: String?, confirmArmed: Boolean): String? =
+private fun catalogTip(item: CatalogItem, status: String?, confirmArmed: Boolean, explanation: Boolean = true): String? =
     (if (confirmArmed) item.confirmText else null)
-        ?: listOfNotNull(status, item.subtitle).joinToString("\n").ifEmpty { null }
+        ?: listOfNotNull(status, item.subtitle?.takeIf { explanation }).joinToString("\n").ifEmpty { null }
 
 /**
  * The selected row's explanation in the fixed-height strip under a settings list, so the list never
@@ -1531,6 +1550,7 @@ private const val SEARCH_ROW_ID = "__settings_search__"
 @Composable
 private fun CatalogRowView(
     row: CatalogRow,
+    infoUnderRow: Boolean,
     locked: Boolean,
     isSelected: Boolean,
     confirmArmed: Boolean,
@@ -1569,7 +1589,11 @@ private fun CatalogRowView(
         // independent scroll animation here was the real jank.
         ownScrollKeeping = true,
         uniformHeight = true,
-        uniformSummaryLines = 0,
+        // The row's sentence: under the row when the person chose that (Info text), else on the focus line,
+        // with the info glyph saying there is one (docs/SPEC.md 7k, "Explanations").
+        subtitle = item.subtitle.takeIf { infoUnderRow },
+        uniformSummaryLines = if (infoUnderRow && item.subtitle != null) 2 else 0,
+        info = !infoUnderRow && hasInfo(item),
         // A system state an action opens (Airplane mode, Bluetooth, VPN) is the same switch.
         switchOn = if (status == null) toggle?.current ?: (item as? ActionItem)?.state else null,
         sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
@@ -1577,9 +1601,13 @@ private fun CatalogRowView(
     )
 }
 
-/** How long after a gated text is first shown its Accept opens even if the text was not scrolled to the end (owner, 2026-10-09). */
 private const val CONFIRM_CANCEL = "cancel"
+
+/** How long after a gated text is first shown its Accept opens even if the text was not scrolled to the end (owner, 2026-10-09). */
 private const val READ_GATE_MS = 3000L
+
+/** How long the cursor rests on a row before the focus line shows its sentence (not at once, so a held direction does not flicker it). */
+private const val TIP_DELAY_MS = 600L
 
 /**
  * A paragraph of [TextBlockItem] in full: no cut, no value column, a heading when it has one. It is a stop of the pad

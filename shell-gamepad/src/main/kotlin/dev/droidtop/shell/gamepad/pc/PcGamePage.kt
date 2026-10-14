@@ -80,7 +80,6 @@ import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.scraper.FieldSources
 import dev.droidtop.shell.gamepad.CatalogDetailStrip
-import dev.droidtop.shell.gamepad.HintTip
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.LocalValueColumnWidth
 import dev.droidtop.shell.gamepad.MenuRow
@@ -697,8 +696,7 @@ internal fun PcGamePage(
                             }
                         } else {
                             itemsIndexed(current, key = { index, fact -> "$tab:$index:${fact.title}" }) { index, fact ->
-                                HintTip(
-                                    fact.tip,
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = window.edgePadding, vertical = MenuTokens.RowSpacing / 2),
@@ -732,6 +730,8 @@ internal fun PcGamePage(
                             listOfNotNull(
                                 fact.value?.takeIf { it.length > 14 },
                                 fact.subtitle,
+                                // The long form (a full path, a link) in full, for reading and Info's Copy.
+                                fact.tip,
                             ).joinToString("\n")
                         }.orEmpty(),
                     )
@@ -1157,7 +1157,7 @@ internal data class PageFact(
     val value: String? = null,
     val subtitle: String? = null,
     val onActivate: (() -> Unit)? = null,
-    /** The long form of the row (a full path, a link), in the tooltip only. */
+    /** The long form of the row (a full path, a link): on the detail strip while the row is selected. */
     val tip: String? = null,
     /** The tab this row lives on when its title cannot say ([pageTabOf]). */
     val tab: PageTab? = null,
