@@ -1,8 +1,11 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
+import dev.droidtop.library.GamesRoots
+import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.SystemFolders
+import dev.droidtop.library.consoles.canResolveFromFolder
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -276,30 +279,49 @@ object AcquireContentSources {
                     listOf(noSourceGroup(context, "all"))
                 } else {
                     val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-                    val targets = SystemFolders.all(context, systemsById)
-                        .distinctBy { (_, system) -> system.id }
-                        .sortedBy { (_, system) -> system.displayName.lowercase() }
-                    listOf(
+                    val (yours, others) = downloadTargets(
+                        existing = SystemFolders.all(context, systemsById),
+                        all = systemsById.values,
+                        root = GamesRoots.current(context).first(),
+                    )
+                    fun item(folder: File, system: ConsoleSystemDef) = NestedScreenItem(
+                        id = "acquire_pick_${system.id}",
+                        title = system.displayName,
+                        inline = systemScreen(system.id, system.displayName, folder),
+                    )
+                    listOfNotNull(
+                        yours.takeIf { it.isNotEmpty() }?.let { list ->
+                            CatalogGroup(id = "acquire_choose_systems", title = "Your systems", items = list.map { (folder, system) -> item(folder, system) })
+                        },
                         CatalogGroup(
-                            id = "acquire_choose_systems",
-                            title = null,
-                            items = if (targets.isEmpty()) {
-                                listOf(noFolderItem("acquire_choose_none", "No system folders yet"))
-                            } else {
-                                targets.map { (folder, system) ->
-                                    NestedScreenItem(
-                                        id = "acquire_pick_${system.id}",
-                                        title = system.displayName,
-                                        inline = systemScreen(system.id, system.displayName, folder),
-                                    )
-                                }
-                            },
+                            id = "acquire_choose_other",
+                            title = if (yours.isEmpty()) null else "Other systems",
+                            items = others.map { (folder, system) -> item(folder, system) },
                         ),
                     )
                 }
             }
         },
     )
+
+    /**
+     * The systems "Get games" offers to download for: those with a folder already ([existing], by name), then every
+     * other system a folder can mean ([all] without the store-owned ones), each with the folder a download would create
+     * under [root] (the first games folder) the first time one is placed there. Nothing is refused for lack of a system
+     * folder (Droidtop/tracker#536): "system folder" is ES-DE vocabulary a newcomer does not have. Pure.
+     */
+    internal fun downloadTargets(
+        existing: List<Pair<File, ConsoleSystemDef>>,
+        all: Collection<ConsoleSystemDef>,
+        root: File,
+    ): Pair<List<Pair<File, ConsoleSystemDef>>, List<Pair<File, ConsoleSystemDef>>> {
+        val yours = existing.distinctBy { (_, system) -> system.id }.sortedBy { (_, system) -> system.displayName.lowercase() }
+        val have = yours.map { (_, system) -> system.id }.toSet()
+        val others = all.filter { it.id !in have && it.canResolveFromFolder() }
+            .sortedBy { it.displayName.lowercase() }
+            .map { File(root, it.id) to it }
+        return yours to others
+    }
 
     /** [systemScreen] for a system known only by id: its name and folder are read when the screen opens, off the main thread. */
     private fun deepLinkedSystemScreen(systemId: String): CatalogScreen = CatalogScreen(
@@ -310,21 +332,12 @@ object AcquireContentSources {
             withContext(Dispatchers.IO) {
                 val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
                 val name = systemsById[systemId]?.displayName ?: systemId
+                // No folder for the system yet: the first games folder's own, made when a download is placed (#536).
                 val folder = SystemFolders.all(context, systemsById).firstOrNull { (_, system) -> system.id == systemId }?.first
-                if (folder == null) {
-                    listOf(CatalogGroup(id = "acquire_no_folder", title = null, items = listOf(noFolderItem("acquire_no_folder_$systemId", "No folder for $name in any games root"))))
-                } else {
-                    systemScreen(systemId, name, folder).groups(context)
-                }
+                    ?: File(GamesRoots.current(context).first(), systemId)
+                systemScreen(systemId, name, folder).groups(context)
             }
         },
-    )
-
-    private fun noFolderItem(id: String, title: String) = ActionItem(
-        id = id,
-        title = title,
-        subtitle = "Downloads go into a system's own folder. Add a games folder under Settings > Game folders first.",
-        run = {},
     )
 
     private fun jsonSourceItem(
@@ -483,6 +496,8 @@ object AcquireContentSources {
         onComplete: (AcquireDownloadOutcome) -> Unit,
     ): AcquireContentJob? {
         val startedAt = System.currentTimeMillis()
+        // A system whose folder does not exist yet (Get games offers every system): made now, under the games folder.
+        if (!systemFolder.isDirectory) withContext(Dispatchers.IO) { systemFolder.mkdirs() }
         val trackingId = PluginJobsCenter.start(
             context = context,
             record = source.record,

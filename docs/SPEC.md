@@ -20053,7 +20053,10 @@ without its runtime said "Running". Decisions:
   system id it asks which system to download for, then opens that system's
   own source screen; deep-linked at a console system id it opens that
   system's screen directly; with no source it says so in plain words and
-  leads to Plugins and App integrations. `GetGamesEntry` (`library-core`,
+  leads to Plugins and App integrations. The system list is the systems that have a folder under a games folder
+  ("Your systems"), then every other system a folder can mean ("Other systems", `downloadTargets`) with the folder
+  made under the first games folder when the first download is placed (`startDownload`); Get games is never a
+  dead end for lack of "system folders", ES-DE vocabulary a newcomer does not have (Droidtop/tracker#536). `GetGamesEntry` (`library-core`,
   pure) holds the label and the one rule for which contexts know their
   system (`systemFor`: a system's menu, a game's page, an empty state
   and a scoped search do; All games, a collection, PC Games, Apps ask; the PC list is never a destination). `getGamesScreen`,

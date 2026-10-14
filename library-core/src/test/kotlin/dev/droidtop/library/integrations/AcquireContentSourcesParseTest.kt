@@ -79,4 +79,32 @@ class AcquireContentSourcesParseTest {
     fun `malformed json returns no results rather than throwing`() {
         assertEquals(emptyList<AcquireContentResult>(), AcquireContentSources.parseResults("not json"))
     }
+
+    private fun system(id: String, name: String, ownedBy: String? = null) =
+        dev.droidtop.library.consoles.ConsoleSystemDef(id, name, setOf("rom"), null, ownedBy)
+
+    @Test
+    fun `with no system folder Get games still offers every system a folder can mean`() {
+        val root = java.io.File("/games")
+        val (yours, others) = AcquireContentSources.downloadTargets(
+            existing = emptyList(),
+            all = listOf(system("snes", "Super Nintendo"), system("gba", "Game Boy Advance"), system("steam", "Steam", ownedBy = "store")),
+            root = root,
+        )
+        assertTrue(yours.isEmpty())
+        assertEquals(listOf("gba", "snes"), others.map { it.second.id })
+        assertEquals(java.io.File("/games/gba"), others.first().first)
+    }
+
+    @Test
+    fun `a system that has a folder is listed once and first`() {
+        val snes = system("snes", "Super Nintendo")
+        val (yours, others) = AcquireContentSources.downloadTargets(
+            existing = listOf(java.io.File("/games/roms/snes") to snes, java.io.File("/other/snes") to snes),
+            all = listOf(snes, system("gba", "Game Boy Advance")),
+            root = java.io.File("/games"),
+        )
+        assertEquals(listOf(java.io.File("/games/roms/snes")), yours.map { it.first })
+        assertEquals(listOf("gba"), others.map { it.second.id })
+    }
 }
