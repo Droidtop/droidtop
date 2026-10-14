@@ -546,7 +546,7 @@ internal fun MenuRow(
             if (adjustable && onAdjust != null && window.touchFirst) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = (if (columnWidth != null) Modifier.width(columnWidth + window.minTouchTarget * 2) else Modifier).valueShare(),
+                    modifier = Modifier.valueShare().then(if (columnWidth != null) Modifier.width(columnWidth + window.minTouchTarget * 2) else Modifier),
                 ) {
                     AdjustArrow("‹") { onAdjust(-1) }
                     Text(
@@ -572,15 +572,15 @@ internal fun MenuRow(
                     textAlign = TextAlign.End,
                     maxLines = valueLines,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = (
+                    modifier = Modifier.valueShare().then(
                         if (columnWidth != null) {
                             // The shared width is a minimum, not a box: a value measured narrower than it draws
                             // (the rig wrapped "Review" as "Revie/w", Droidtop/tracker#480) still gets the room it needs.
                             Modifier.widthIn(min = columnWidth, max = MenuTokens.ValueColumnMaxWidth)
                         } else {
                             Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth, max = MenuTokens.ValueColumnMaxWidth)
-                        }
-                        ).valueShare(),
+                        },
+                    ),
                 )
             }
         }
@@ -589,7 +589,7 @@ internal fun MenuRow(
             // In the shared value column, so switches line up with the
             // values of the rows around them.
             Box(
-                modifier = (LocalValueColumnWidth.current?.let { Modifier.width(it) } ?: Modifier).valueShare(),
+                modifier = Modifier.valueShare().then(LocalValueColumnWidth.current?.let { Modifier.width(it) } ?: Modifier),
                 contentAlignment = Alignment.CenterEnd,
             ) { ShellSwitch(switchOn) }
         }
@@ -605,7 +605,9 @@ internal fun MenuRow(
  * column is up to [MenuTokens.ValueColumnMaxWidth] wide, and the Quick Menu's pane is about as wide as that, so a
  * long value pushed the title to zero width and an info row read as a bare value (rig, build 1715, Quick Menu >
  * Plugins > Sample, Droidtop/tracker#316). Capping the outer constraint leaves the inner width modifiers to settle
- * inside it.
+ * inside it, so it must come FIRST in the chain: after a fixed width it capped that width instead of the row's, and
+ * a touch row's arrows (two 48 dp targets) left its value one letter wide ("A", "B" on a plugin's Permissions
+ * screen at 1920x1080, rig, build 1768).
  */
 private fun Modifier.valueShare(): Modifier = layout { measurable, constraints ->
     val cap = if (constraints.hasBoundedWidth) (constraints.maxWidth * MenuTokens.ValueMaxShare).toInt() else constraints.maxWidth
