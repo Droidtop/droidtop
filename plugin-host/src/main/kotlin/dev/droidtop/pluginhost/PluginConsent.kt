@@ -61,7 +61,7 @@ object PluginConsent {
     private const val MODE_GAMING = "Gaming"
     private const val MODE_ANDROID = "Android"
     private const val MODE_DESKTOP = "Desktop"
-    private const val MODE_ANY = "Wherever it fits"
+    const val MODE_ANY = "Wherever it fits"
     private val MODE_ORDER = listOf(MODE_GAMING, MODE_ANDROID, MODE_DESKTOP, MODE_ANY)
 
     /** The mode a surface id belongs to (`gaming.quick_menu` is Gaming), or null for an id with no known mode prefix. */

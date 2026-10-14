@@ -2355,17 +2355,20 @@ unticked, the others start ticked.
 Each (plugin, permission) pair is in one of three states:
 
 - **granted**;
-- **denied**, which is what an unticked normal permission, extension
-  point or export becomes at approval;
+- **denied**, which is what an unticked normal or optional permission,
+  extension point or export becomes at approval;
 - **ask**, which is what a dangerous or critical permission the user did
-  not tick at approval becomes, and what an update's new items start as.
+  not tick at approval becomes when the plugin declares it `required`
+  (the list says "Needed" and that droidtop asks when it is first used),
+  and what an update's new items start as. An optional one left unticked is
+  denied: the tick box really declines it (Droidtop/tracker#512).
 
 When they are asked:
 
 - **At approval ("Approval is a list").** One screen, and every line
   below with a tick box can be unticked before approving, high-risk ones
   included:
-  - "Adds": each extension point, grouped by Gaming / Android / Desktop,
+  - "Adds": each extension point, with the mode it shows in (Gaming / Android / Desktop) beside it and nothing beside a point that has no particular place,
     with one plain sentence on what it lets the plugin do (high-risk ones
     marked "high risk");
   - "Can": normal permissions, each with its plain-language line;
@@ -2922,8 +2925,8 @@ arrays under the manifest's own keys (`V2Declarations`).
   - `PluginGrants` keeps `plugin-grants/<id>.json`: an explicit state per
     permission id, plus `provide:<point>` for a high-risk point and
     `export:<api>` for an export. Approval writes it from the ticked
-    subset (a ticked item is granted; an unticked dangerous permission is
-    `ask`, any other unticked item `denied`); a contract 1 plugin keeps the
+    subset (a ticked item is granted; an unticked dangerous permission the
+    plugin declares `required` is `ask`, any other unticked item `denied`); a contract 1 plugin keeps the
     permissions it could already do, its points follow the ticks, and its
     root tick is the `priv.shell.root` grant. A file that cannot be read is `ask` for
     everything, never `granted`. The approval screen's tick boxes are

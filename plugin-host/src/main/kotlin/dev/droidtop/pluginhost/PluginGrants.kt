@@ -166,8 +166,8 @@ class PluginGrants(private val dir: File) {
      * The state written when the user approves [record] with the items in
      * [ticked] (docs/plugin-api.md 4.3): a ticked item is granted and an
      * unticked one is not. An unticked dangerous or critical permission
-     * stays `ask` (the first-use sheet can still ask for it); every other
-     * unticked item, a normal permission, an extension point or an export,
+     * the plugin declares `required` stays `ask` (the first-use sheet can still ask for it); every other
+     * unticked item, an optional permission, a normal permission, an extension point or an export,
      * is `denied`. Null [ticked] is the list as first shown
      * ([defaultTicked]). A contract 1 plugin keeps the permissions it always
      * had (its root tick becomes the `priv.shell.root` grant); its points
@@ -178,7 +178,7 @@ class PluginGrants(private val dir: File) {
         val states = linkedMapOf<String, GrantState>()
         for (declared in record.manifest.v2.permissions) {
             if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) continue
-            states[declared.id] = if (record.manifest.contractVersion < 2) defaultFor(record, declared) else answerFor(declared.id, tierOf(declared), on)
+            states[declared.id] = if (record.manifest.contractVersion < 2) defaultFor(record, declared) else answerFor(declared.id, tierOf(declared), on, declared.required)
         }
         for (entry in record.manifest.v2.provides) {
             if (ExtensionPoints.find(entry.point) == null) continue
@@ -199,8 +199,8 @@ class PluginGrants(private val dir: File) {
         val snap = readLocked(id)
         val states = snap.states.toMutableMap()
         for (item in ids) {
-            val tier = record.manifest.v2.permissions.firstOrNull { it.id == item }?.let { tierOf(it) } ?: PermissionTier.NORMAL
-            states[item] = answerFor(item, tier, ticked)
+            val declared = record.manifest.v2.permissions.firstOrNull { it.id == item }
+            states[item] = answerFor(item, declared?.let { tierOf(it) } ?: PermissionTier.NORMAL, ticked, declared?.required ?: false)
         }
         writeLocked(id, snap.copy(states = states, wanted = snap.wanted - ids, fresh = snap.fresh - ids, corrupt = false))
     }
@@ -274,10 +274,15 @@ class PluginGrants(private val dir: File) {
 
         fun forContext(context: Context): PluginGrants = forPluginsRoot(PluginStore.root(context))
 
-        /** A ticked item is granted; an unticked dangerous or critical permission waits for the first-use sheet, anything else unticked is denied. */
-        private fun answerFor(item: String, tier: PermissionTier, ticked: Set<String>): GrantState = when {
+        /**
+         * A ticked item is granted. An unticked dangerous or critical permission the plugin declares as
+         * required still waits for the first-use sheet (it cannot work without it, and the list says
+         * so); every other unticked item, an optional permission included, is denied, so the tick box
+         * really declines it (Droidtop/tracker#512).
+         */
+        private fun answerFor(item: String, tier: PermissionTier, ticked: Set<String>, required: Boolean = false): GrantState = when {
             item in ticked -> GrantState.GRANTED
-            tier != PermissionTier.NORMAL -> GrantState.ASK
+            tier != PermissionTier.NORMAL && required -> GrantState.ASK
             else -> GrantState.DENIED
         }
 

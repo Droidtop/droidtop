@@ -44,7 +44,7 @@ class PluginGrantsTest {
 
     @Test
     fun `approval grants what was ticked, asks for an unticked dangerous one and denies an unticked normal one`() {
-        val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any"), obj("id" to "clipboard.read"), obj("id" to "containers.exec"))
+        val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any", "required" to true), obj("id" to "clipboard.read"), obj("id" to "containers.exec", "required" to true))
         grants.initialiseOnApproval(record, ticked = setOf("net.state", "clipboard.read"))
         val snap = grants.read("acme.tool")
         assertEquals(GrantState.GRANTED, PluginGrants.stateOf(record, snap, "net.state"))
@@ -55,8 +55,19 @@ class PluginGrantsTest {
     }
 
     @Test
+    fun `an unticked optional dangerous permission is declined, a required one still asks`() {
+        val record = plugin(2, "acme.tool", obj("id" to "net.any"), obj("id" to "containers.exec", "required" to true), obj("id" to "clipboard.read"))
+        grants.initialiseOnApproval(record, ticked = emptySet())
+        val snap = grants.read("acme.tool")
+        assertEquals("optional: the box declines it", GrantState.DENIED, PluginGrants.stateOf(record, snap, "net.any"))
+        assertEquals("required: asked when it first uses it", GrantState.ASK, PluginGrants.stateOf(record, snap, "containers.exec"))
+        grants.initialiseOnApproval(record, ticked = setOf("net.any"))
+        assertEquals(GrantState.GRANTED, PluginGrants.stateOf(record, grants.read("acme.tool"), "net.any"))
+    }
+
+    @Test
     fun `a provider's own permission is asked like a dangerous one`() {
-        val record = plugin(2, "acme.tool", obj("id" to "acme.sync.status.read"))
+        val record = plugin(2, "acme.tool", obj("id" to "acme.sync.status.read", "required" to true))
         grants.initialiseOnApproval(record)
         assertEquals(GrantState.ASK, PluginGrants.stateOf(record, grants.read("acme.tool"), "acme.sync.status.read"))
     }
@@ -81,7 +92,7 @@ class PluginGrantsTest {
 
     @Test
     fun `the list starts ticked except dangerous permissions and high-risk points`() {
-        val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any")) {
+        val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any", "required" to true)) {
             it.put("provides", arr(obj("point" to "library.sources"), obj("point" to "ui.status_tile")))
             it.put("exports", arr(obj("api" to "acme.tool.status", "version" to "1.0")))
         }
@@ -149,7 +160,7 @@ class PluginGrantsTest {
     fun `an update keeps the old grants and the new dangerous items wait at ask`() {
         val old = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any"))
         grants.initialiseOnApproval(old, ticked = setOf("net.any"))
-        val new = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any"), obj("id" to "clipboard.read"), obj("id" to "vibrate")) {
+        val new = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any"), obj("id" to "clipboard.read", "required" to true), obj("id" to "vibrate")) {
             it.put("provides", arr(obj("point" to "ui.status_tile"), obj("point" to "library.sources")))
             it.put("exports", arr(obj("api" to "acme.tool.status", "version" to "1.0")))
         }
@@ -181,9 +192,9 @@ class PluginGrantsTest {
 
     @Test
     fun `an update that adds nothing changes nothing`() {
-        val old = plugin(2, "acme.tool", obj("id" to "net.any"))
+        val old = plugin(2, "acme.tool", obj("id" to "net.any", "required" to true))
         grants.initialiseOnApproval(old)
-        val new = plugin(2, "acme.tool", obj("id" to "net.any"))
+        val new = plugin(2, "acme.tool", obj("id" to "net.any", "required" to true))
         assertTrue(grants.applyUpdate(old, new).isEmpty)
         val snap = grants.read("acme.tool")
         assertEquals("still ask, not silently granted", GrantState.ASK, PluginGrants.stateOf(new, snap, "net.any"))

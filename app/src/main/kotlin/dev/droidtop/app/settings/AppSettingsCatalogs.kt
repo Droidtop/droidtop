@@ -2608,7 +2608,7 @@ object AppSettingsCatalogs {
             },
             group(
                 "adds", "Adds",
-                view.adds.flatMap { (mode, lines) -> lines.mapIndexed { i, l -> line("adds_${mode}_$i", l, lead = mode.takeIf { ticks != null }, value = mode.takeIf { ticks == null }) } },
+                view.adds.flatMap { (mode, lines) -> lines.mapIndexed { i, l -> line("adds_${mode}_$i", l, lead = placementWords(mode).takeIf { ticks != null }, value = placementWords(mode).takeIf { ticks == null }) } },
             ),
             group("can", "Can", view.can.mapIndexed { i, l -> line("can_$i", l) }),
             group(
@@ -2616,7 +2616,7 @@ object AppSettingsCatalogs {
                 view.asks.mapIndexed { i, a ->
                     line(
                         "asks_$i", a.line,
-                        trail = if (a.needed) "Needed" else null,
+                        trail = if (a.needed) "Needed: if you leave it off, droidtop asks when the plugin first uses it" else null,
                         value = if (a.tier == PermissionTier.CRITICAL) "Critical" else "Asks first",
                     )
                 },
@@ -2635,6 +2635,9 @@ object AppSettingsCatalogs {
             group("unsupported", "Not supported by this version of droidtop", view.unsupported.mapIndexed { i, t -> info("unsupported_$i", t) }),
         )
     }
+
+    /** Where a plugin's extension point shows, in plain words, or null when it has no particular place (nothing is shown rather than a placeholder). */
+    internal fun placementWords(mode: String): String? = mode.takeIf { it != PluginConsent.MODE_ANY }
 
     /** The most activity lines one plugin's Activity screen shows; the log keeps up to 2,000. */
     private const val ACTIVITY_SHOWN = 200
