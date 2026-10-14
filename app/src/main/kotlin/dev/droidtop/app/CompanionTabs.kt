@@ -606,7 +606,17 @@ internal fun CompanionTip(text: String, onDismiss: () -> Unit) {
 /** The task manager's own row (reused from the first slice, not rebuilt) in a scrolling page, with a line for nothing running. */
 @Composable
 private fun CompanionTasksTab() {
-    Column(modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp)) {
+    // Open an app: the picker takes the tab's place until Back (the running list underneath is untouched).
+    var picking by remember { mutableStateOf(false) }
+    if (picking) {
+        CompanionAppPicker(onClose = { picking = false })
+        return
+    }
+    Column(
+        modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        CompanionPill("Open an app") { picking = true }
         CompanionTasks()
     }
 }

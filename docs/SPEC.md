@@ -3457,6 +3457,22 @@ row of recent apps, became Home's Recent apps section for every mode.
   Clear all (`ProtectedApps`, Droidtop/tracker#252). Clear all always asks first ("Close 4 apps?", with Keep
   them first and the two answers well apart), and leaves alone what is protected and whatever is open on the
   companion's own screen (`TaskPolicy.clearAllTargets(..., keepDisplays)`).
+  **Open an app (the app picker, Droidtop/tracker#488 item 3).** The pill at the top of Apps replaces the tab with
+  `CompanionAppPicker` until Back: a search field typed with droidtop's own keyboard (`DraftField` and
+  `DroidtopKeyboard`, the Social composer's pieces; no input method and no window focus, so a game on the other
+  screen keeps its focus), a Games filter (Android's own filing of an app as a game), and the list of every
+  launchable app with its icon. With no search the list is Pinned (the apps pinned to Home, in pin order), Recent
+  (the launcher's own history, `RecentAppsStore`, at most eight, most recent first), then the rest by name; a search
+  lists one flat list, best match first (name starts with it, a word of it, contains it, then the package), ties
+  pinned, then recent, then by name (`AppPicker.sections`, pure and tested). A tap on a row opens the app on the
+  companion's own screen (the row's `Intent` with `ActivityOptions.setLaunchDisplayId` of the window's display, the
+  one path Home's Recent apps and pins use: `AppPins.open`); Main screen opens it on the shell's screen; Pin and Unpin
+  pin it to Home (`PinnedControls`). All three are TalkBack actions on the row, and a line under the search says where
+  the app went or why it did not open. Opening from the picker records the launch in `RecentAppsStore`, as the drawer
+  does. App labels come from one package-manager query off the main thread (`AppPins.launchableApps`, which the Home
+  pin editor also uses); icons are decoded off the main thread when a row first scrolls into view and kept in a small
+  cache; the list is lazy. Library games (ROMs, PC games) are not in the picker: they launch through the library's
+  one launch path from Home's rails and the game's own page.
 - **Performance** (`CompanionPerformanceTab`) reads `PerformanceMonitor` in `:runtime-common`, the one shared
   sampler and history (a 90-entry ring buffer, two seconds apart, three minutes) that the Quick Menu's
   performance section also reads. Sampling runs only while the tab is composed and its window is started

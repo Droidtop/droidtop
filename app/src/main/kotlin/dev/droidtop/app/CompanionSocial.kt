@@ -342,7 +342,7 @@ private fun MessageBubble(context: Context, message: SocialMessage, friendName: 
  * opens the keyboard. It never takes focus (the companion's tree denies it); the keyboard below types into it.
  */
 @Composable
-private fun DraftField(draft: CompanionDraft, modifier: Modifier, onTap: (Int) -> Unit) {
+internal fun DraftField(draft: CompanionDraft, modifier: Modifier, onTap: (Int) -> Unit, placeholder: String = "Message") {
     val colors = MaterialTheme.colorScheme
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val caretColor = colors.primary
@@ -362,7 +362,7 @@ private fun DraftField(draft: CompanionDraft, modifier: Modifier, onTap: (Int) -
         contentAlignment = Alignment.CenterStart,
     ) {
         if (draft.text.isEmpty()) {
-            Text("Message", style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+            Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
         }
         Text(
             draft.text,
@@ -381,7 +381,7 @@ private fun DraftField(draft: CompanionDraft, modifier: Modifier, onTap: (Int) -
 private val virtualKeys: KeyCharacterMap by lazy { KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD) }
 
 /** The character [keyCode] types on Android's built-in virtual keyboard map, with or without Shift; null for none. */
-private fun virtualChar(keyCode: Int, shift: Boolean): Char? {
+internal fun virtualChar(keyCode: Int, shift: Boolean): Char? {
     val unicode = virtualKeys.get(keyCode, if (shift) KeyEvent.META_SHIFT_ON else 0)
     if (unicode == 0 || unicode and KeyCharacterMap.COMBINING_ACCENT != 0) return null
     return unicode.toChar()

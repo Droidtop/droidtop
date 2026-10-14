@@ -47,18 +47,7 @@ internal fun CompanionAppsSection(layout: CompanionHomeLayout) {
     val context = LocalContext.current
     // The launcher records each launch in its own preferences file; re-read when it does, so an app opened from the
     // launcher shows up here while Home is on screen (it was read once, and Recent apps never appeared, #347).
-    var launches by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    androidx.compose.runtime.DisposableEffect(Unit) {
-        val prefs = context.getSharedPreferences(
-            com.android.launcher3.LauncherFiles.SHARED_PREFERENCES_KEY,
-            android.content.Context.MODE_PRIVATE,
-        )
-        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (RecentAppsStore.isRecentKey(key)) launches++
-        }
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-    }
+    val launches by rememberRecentLaunchCount()
     val apps by produceState(initialValue = emptyList<RecentApp>(), launches) {
         value = withContext(Dispatchers.IO) {
             val pm = context.packageManager
@@ -79,6 +68,28 @@ internal fun CompanionAppsSection(layout: CompanionHomeLayout) {
             items(apps, key = { it.component.flattenToString() }) { app -> RecentAppTile(app) }
         }
     }
+}
+
+/**
+ * A count that goes up each time the launcher's recent-apps list changes (a preference listener, no polling), for a
+ * surface that re-reads the list when it does: Home's Recent apps and the picker's Recent.
+ */
+@Composable
+internal fun rememberRecentLaunchCount(): androidx.compose.runtime.State<Int> {
+    val context = LocalContext.current
+    val count = remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val prefs = context.getSharedPreferences(
+            com.android.launcher3.LauncherFiles.SHARED_PREFERENCES_KEY,
+            android.content.Context.MODE_PRIVATE,
+        )
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (RecentAppsStore.isRecentKey(key)) count.intValue++
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return count
 }
 
 private data class RecentApp(val component: ComponentName, val label: String, val icon: Drawable)
