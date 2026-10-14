@@ -185,6 +185,12 @@ project(":SettingsLib-MainSwitchPreference").projectDir = file("shell-default/Se
 include(":systemUIPluginCore")
 project(":systemUIPluginCore").projectDir = file("shell-default/systemUIPluginCore")
 
+// The Compose pieces every surface draws alike (docs/SPEC.md 7k, "Notices"):
+// the notice card and its palette. Gaming, Desktop, the companion and
+// Standard all draw them; Standard (the forked Launcher3, a separate module
+// graph) cannot depend on :shell-gamepad, which is why this is its own module.
+include(":ui-shared")
+
 // Gaming mode's shell (docs/SPEC.md §7f): real ES-DE theme rendering,
 // gamepad navigation, and the full library/settings surface.
 include(":shell-gamepad")

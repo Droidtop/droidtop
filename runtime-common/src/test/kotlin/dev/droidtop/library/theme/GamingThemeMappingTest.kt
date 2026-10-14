@@ -1,5 +1,6 @@
 package dev.droidtop.library.theme
 
+import dev.droidtop.notices.ColorMath
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -43,7 +44,7 @@ class GamingThemeMappingTest {
 
     /** Every text role over every surface it is drawn on. */
     private fun assertAccessible(c: GamingThemeColors) {
-        val m = ThemeColorMath
+        val m = ColorMath
         val surfaces = listOf(c.ground, c.overlaySurface, c.card, c.cardFocused, c.cardInset, c.hintBar)
         for (surface in surfaces) {
             listOf(
@@ -110,7 +111,7 @@ class GamingThemeMappingTest {
             ),
         )
         val c = GamingThemeMapping.map(t)
-        assertEquals(0xFF, ThemeColorMath.alpha(c.overlaySurface))
+        assertEquals(0xFF, ColorMath.alpha(c.overlaySurface))
         assertEquals(argb("101010"), c.overlaySurface)
     }
 
@@ -149,11 +150,11 @@ class GamingThemeMappingTest {
         )
         val c = GamingThemeMapping.map(t)
         assertTrue(c.isLight)
-        assertTrue(ThemeColorMath.luminance(c.overlaySurface) > 0.5)
-        assertTrue(ThemeColorMath.luminance(c.card) > 0.5)
+        assertTrue(ColorMath.luminance(c.overlaySurface) > 0.5)
+        assertTrue(ColorMath.luminance(c.card) > 0.5)
         // Fills are the ink at low alpha, so they show on a light ground too.
-        assertEquals(0x0D, ThemeColorMath.alpha(c.rowFill))
-        assertTrue(ThemeColorMath.luminance(c.rowFill) < 0.2)
+        assertEquals(0x0D, ColorMath.alpha(c.rowFill))
+        assertTrue(ColorMath.luminance(c.rowFill) < 0.2)
         assertAccessible(c)
     }
 
@@ -191,10 +192,10 @@ class GamingThemeMappingTest {
         )
         val c = GamingThemeMapping.map(t)
         assertNotEquals(argb("C59A6F"), c.onSurface)
-        assertTrue(ThemeColorMath.ratio(c.onSurface, c.ground) >= GamingThemeMapping.TEXT_FLOOR)
+        assertTrue(ColorMath.ratio(c.onSurface, c.ground) >= GamingThemeMapping.TEXT_FLOOR)
         assertAccessible(c)
 
-        val math = ThemeColorMath
+        val math = ColorMath
         // Already readable: untouched.
         assertEquals(argb("FFFFFF"), math.ensure(argb("FFFFFF"), listOf(argb("000000")), 4.5))
         // Mid grey on a mid grey cannot be fixed without leaving the grey axis.
@@ -211,9 +212,9 @@ class GamingThemeMappingTest {
             ),
         )
         val c = GamingThemeMapping.map(t)
-        assertTrue(ThemeColorMath.ratio(c.danger, c.ground) >= 4.5)
-        assertTrue(ThemeColorMath.ratio(c.favourite, c.ground) >= 4.5)
-        assertTrue(ThemeColorMath.ratio(c.affirmative, c.ground) >= 4.5)
+        assertTrue(ColorMath.ratio(c.danger, c.ground) >= 4.5)
+        assertTrue(ColorMath.ratio(c.favourite, c.ground) >= 4.5)
+        assertTrue(ColorMath.ratio(c.affirmative, c.ground) >= 4.5)
     }
 
     @Test
@@ -255,7 +256,7 @@ class GamingThemeMappingTest {
     @Test
     fun `droidtop's own palette is itself accessible`() {
         val d = GamingThemeColors.DEFAULT
-        val m = ThemeColorMath
+        val m = ColorMath
         listOf(d.onSurface, d.value, d.accent, d.danger, d.favourite).forEach {
             assertTrue(m.ratio(it, d.ground) >= 4.5)
             assertTrue(m.ratio(it, d.overlaySurface) >= 4.5)

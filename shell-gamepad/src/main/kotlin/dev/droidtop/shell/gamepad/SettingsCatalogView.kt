@@ -83,6 +83,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.settings.ActionItem
@@ -97,6 +98,9 @@ import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticePress
 import dev.droidtop.library.settings.SettingsSearchIndex
 import dev.droidtop.library.settings.SettingsSearchResult
 import dev.droidtop.library.settings.SettingsScreenRegistry
@@ -110,6 +114,7 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.input.PadPress
+import dev.droidtop.shell.gamepad.input.declaresHints
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import dev.droidtop.shell.gamepad.theme.UiSound
@@ -118,6 +123,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.ui.shared.NoticeCard
 
 /**
  * The in-shell (gamepad-first, dark-chrome) renderer for the shared
@@ -330,7 +336,19 @@ fun CatalogNavigator(
             built
         }
     }
+    // A notice with nothing to press or read is passed over (docs/SPEC.md 7k, "Notices"), so the cursor
+    // never rests where A does nothing.
+    fun isStop(index: Int): Boolean = (rows.getOrNull(index)?.item as? NoticeItem)?.notice?.takesFocus() ?: true
+    fun nextStop(from: Int, direction: Int): Int? {
+        var i = from + direction
+        while (i in rows.indices) {
+            if (isStop(i)) return i
+            i += direction
+        }
+        return null
+    }
     val selected = (selectionByDepth[depth] ?: 0).coerceIn(0, (rows.lastIndex).coerceAtLeast(0))
+        .let { if (isStop(it)) it else nextStop(it, +1) ?: nextStop(it, -1) ?: it }
 
     fun refresh() {
         version++
@@ -480,6 +498,15 @@ fun CatalogNavigator(
                 documentPickLauncher.launch(item.pickerIntent())
             }
             is TextBlockItem -> {}
+            // A notice's action, else its Info (Y is the other way there), else nothing.
+            is NoticeItem -> when (item.notice.aPress()) {
+                NoticePress.ACTION -> {
+                    item.notice.action?.run?.invoke(context)
+                    refresh()
+                }
+                NoticePress.INFO -> infoRow = item
+                NoticePress.NONE -> {}
+            }
             is ActionItem -> {
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
                     confirmArmedId = item.id
@@ -705,8 +732,9 @@ fun CatalogNavigator(
             GamepadAction.Y -> row?.let { infoRow = it.item }
             GamepadAction.DOWN -> {
                 heldStep = press.repeat
-                moveCue(selected < rows.lastIndex, press.repeat)
-                setSelected((selected + 1).coerceAtMost(rows.lastIndex))
+                val next = nextStop(selected, +1)
+                moveCue(next != null, press.repeat)
+                if (next != null) setSelected(next)
             }
             // Owned only while the selection can really move: a fresh Up at
             // the first row reaches Compose's focus search, which in safe
@@ -714,10 +742,10 @@ fun CatalogNavigator(
             // otherwise finds nothing -- the top bar cannot take focus
             // (docs/SPEC.md 7j). A held Up stops at the first row.
             GamepadAction.UP -> {
-                if (selected == 0) return press.repeat.also { moveCue(false, press.repeat) }
+                val previous = nextStop(selected, -1) ?: return press.repeat.also { moveCue(false, press.repeat) }
                 heldStep = press.repeat
                 moveCue(true, press.repeat)
-                setSelected(selected - 1)
+                setSelected(previous)
             }
             GamepadAction.LEFT -> when {
                 categoryMode && (row == null || !row.item.stepsInPlace()) -> inColumn = true
@@ -744,11 +772,27 @@ fun CatalogNavigator(
         else -> null
     }
     val density = LocalDensity.current
+    // A notice under the cursor names only the presses it answers (docs/SPEC.md 7k, "Notices").
+    val selectedNotice = (rows.getOrNull(selected)?.item as? NoticeItem)?.notice?.takeIf { paneActive }
+    val noticeHints = remember(selectedNotice) {
+        selectedNotice?.let { notice ->
+            listOfNotNull(
+                when (notice.aPress()) {
+                    NoticePress.ACTION -> notice.action?.let { HintBinding(GamepadAction.A, it.label) }
+                    NoticePress.INFO -> HintBinding(GamepadAction.A, "Info")
+                    NoticePress.NONE -> null
+                },
+                HintBinding(GamepadAction.Y, "Info").takeIf { !notice.details.isNullOrBlank() && notice.action != null },
+                HintBinding(GamepadAction.B, "Back"),
+            )
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { hostWidth = with(density) { it.width.toDp() } }
             .focusRequester(navFocus)
+            .then(noticeHints?.let { Modifier.declaresHints(it) } ?: Modifier)
             .focusable()
             .onPad { press -> if (categoryMode && inColumn) onColumnPad(press) else onPanePad(press) },
     ) {
@@ -894,8 +938,21 @@ private fun CatalogPane(
                     if (row.chipsAbove.isNotEmpty()) CatalogChipRow(row.chipsAbove)
                     row.headerAbove?.let { header -> MenuSectionLabel(header) }
                     val block = row.item as? TextBlockItem
+                    val notice = row.item as? NoticeItem
                     if (block != null) {
                         TextBlockRow(block, isSelected, onShown = { onBlockShown(block) }, onClick = { onClick(index) })
+                    } else if (notice != null) {
+                        val page = notice.placement == NoticePlacement.Page
+                        NoticeCard(
+                            notice = notice.notice,
+                            placement = notice.placement,
+                            modifier = Modifier
+                                // The banner sits under the header with room below it (docs/SPEC.md 7k, "Notices").
+                                .padding(bottom = if (page) 12.dp else 0.dp)
+                                .focusRing(isSelected && PadModality.showsFocus, RoundedCornerShape(if (page) 6.dp else 3.dp)),
+                            onAction = notice.notice.action?.let { { onClick(index) } },
+                            onInfo = { onLongClick(index) },
+                        )
                     } else {
                         CatalogRowView(
                             row = row,
@@ -1428,6 +1485,10 @@ internal fun CatalogDetailStrip(text: String, lines: Int = 4) {
  */
 @Composable
 private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -> Unit) {
+    if (item is NoticeItem) {
+        NoticeInfoSheet(item, onDismiss)
+        return
+    }
     Dialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
@@ -1452,6 +1513,65 @@ private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -
                 Text(it, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
             }
             status?.let { Text(it, color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
+        }
+    }
+}
+
+/**
+ * A notice's Info sheet (docs/SPEC.md 7k, "Notices"): its title, its body and its details, which may name
+ * exact technical terms, and a Copy chip on Select that puts the details on the clipboard so a person can
+ * paste them into a report. B, A or Y close it.
+ */
+@Composable
+internal fun NoticeInfoSheet(item: NoticeItem, onDismiss: () -> Unit) {
+    val notice = item.notice
+    val details = notice.details?.takeIf { it.isNotBlank() }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember(item.id) { mutableStateOf(false) }
+    val copy = {
+        if (details != null) {
+            clipboard.setText(androidx.compose.ui.text.AnnotatedString(details))
+            copied = true
+        }
+    }
+    val hints = remember(details != null) {
+        listOfNotNull(
+            HintBinding(GamepadAction.SELECT, "Copy").takeIf { details != null },
+            HintBinding(GamepadAction.B, "Close"),
+        )
+    }
+    Dialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
+        MenuPanel(
+            modifier = Modifier.width(LocalShellWindow.current.panelWidth(520.dp)),
+            focusLabel = "Notice info",
+            hints = hints,
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.SELECT -> copy()
+                    GamepadAction.B, GamepadAction.A, GamepadAction.Y -> onDismiss()
+                    else -> {}
+                }
+                true
+            },
+        ) {
+            Text(notice.title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            notice.source?.let { Text("from $it", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall) }
+            notice.body?.let { Text(it, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp)) }
+            if (details != null) {
+                Text(
+                    details,
+                    color = MenuTokens.OnSurface,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 20.sp),
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                StatusChip(
+                    text = if (copied) "Copied" else "Copy",
+                    ink = MenuTokens.OnSurface,
+                    fill = MenuTokens.SurfaceSelected,
+                    modifier = Modifier.padding(top = 12.dp).clickable { copy() },
+                )
+            }
         }
     }
 }

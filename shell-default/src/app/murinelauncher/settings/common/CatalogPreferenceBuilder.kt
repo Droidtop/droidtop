@@ -44,6 +44,8 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.NoticePress
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.SettingsSearchIndex
 import dev.droidtop.library.settings.SettingsSearchResult
@@ -56,6 +58,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.ui.shared.NoticeViews
 
 /**
  * The Preference-surface renderer for the shared settings catalogs
@@ -502,6 +505,26 @@ class CatalogPreferenceNavigator(
     }
 
     /** Runs [action] at once, or after an OK when [confirmTitle] asks for one. */
+    /** A notice's Info: its body and details, with Copy for the details (docs/SPEC.md 7k, "Notices"). */
+    private fun showNoticeInfo(context: Context, item: NoticeItem) {
+        val notice = item.notice
+        val details = notice.details?.takeIf { it.isNotBlank() }
+        val message = listOfNotNull(notice.source?.let { "from $it" }, notice.body, details).joinToString("\n\n")
+        AlertDialog.Builder(context)
+            .setTitle(notice.title)
+            .setMessage(message)
+            .apply {
+                if (details != null) {
+                    setNeutralButton("Copy") { _, _ ->
+                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                        clipboard?.setPrimaryClip(android.content.ClipData.newPlainText(notice.title, details))
+                    }
+                }
+            }
+            .setPositiveButton("Close", null)
+            .show()
+    }
+
     private fun confirmThen(context: Context, confirmTitle: String?, action: () -> Unit) {
         if (confirmTitle == null) {
             action()
@@ -652,6 +675,36 @@ class CatalogPreferenceNavigator(
                 confirmThen(context, item.confirmTitle) {
                     item.run(context)
                     rebuild()
+                }
+                true
+            }
+        }
+        // The shared notice card (docs/SPEC.md 7k, "Notices"), drawn into the row by a ComposeView. A notice
+        // with nothing to press or read is not a stop of the list.
+        is NoticeItem -> object : Preference(context) {
+            override fun onBindViewHolder(holder: PreferenceViewHolder) {
+                super.onBindViewHolder(holder)
+                NoticeViews.bind(
+                    holder.itemView as ViewGroup,
+                    item.notice,
+                    item.placement,
+                    onAction = item.notice.action?.let { action -> { action.run(context); rebuild() } },
+                    onInfo = { showNoticeInfo(context, item) },
+                )
+            }
+        }.apply {
+            key = item.id
+            layoutResource = NoticeViews.LAYOUT
+            isSelectable = item.notice.takesFocus()
+            isIconSpaceReserved = false
+            setOnPreferenceClickListener {
+                when (item.notice.aPress()) {
+                    NoticePress.ACTION -> {
+                        item.notice.action?.run?.invoke(context)
+                        rebuild()
+                    }
+                    NoticePress.INFO -> showNoticeInfo(context, item)
+                    NoticePress.NONE -> {}
                 }
                 true
             }

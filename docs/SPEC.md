@@ -14896,6 +14896,33 @@ provides `social.provider` sees its own service only, and no capability for
 other apps' conversations exists); the list is emptied when notification access
 is lost.
 
+### Notices: one component for every warning (decided 2026-10-14, Droidtop/tracker#485)
+
+A condition the person should know about (an unofficial plugin, a feature that is off for safety, a source that did not answer) is one **notice**, drawn the same way on every surface. It replaces grey paragraphs, "(high risk)" suffixes, red banners and per-screen hint lines. The design went through the society review on Droidtop/tracker#485 (final design, comment 6178078991).
+
+**Model** (`runtime-common`, `dev.droidtop.library.settings.Notice`): a tone (`Info`, `Caution`, `Danger`; Danger is droidtop's own and only appears in the danger dialog), a title (at most 40 characters, the condition, no period), a body (at most 90, the outcome), a recommendation (danger only), details (the exact terms, copyable, shown in Info), one action (a label of three words or fewer), and the plugin it is from (`source`, from the approval record; null for droidtop). `NoticeItem` puts a notice in a catalog screen as a row, a group notice (under the group's label) or the page banner (under the header, at most one per page). A notice cannot be dismissed: it is state from code and goes away with its condition.
+
+**Colours** (`NoticeColors`, in the shared library `vendor/notices` (Droidtop/notices, GPL-3.0, pinned as a submodule like the sandbox library; Enginehost adopts it too), derived once per palette from the theme's own `GamingThemeColors`, never in a composition): per tone an ink (glyph, title, edge bar), an opaque plate mixed from the ground toward the ink (0.14 info, 0.20 caution, 0.24 danger) and a body colour, plus the danger fill and its label for the risky button and the Full access chip. Info is the theme accent, unless the accent is within 20 L* and 30 degrees of hue of caution under normal vision or simulated deuteranopia, protanopia or tritanopia; then it is the neutral text colour and the glyph tells the tones apart. Caution is a fixed amber (`#FFC56B` on a dark ground, `#8A5A00` on a light one); danger is the palette's danger. Both keep their hue and move only in lightness: to reach 4.5:1 (7:1 while Android's high-contrast text is on) and, for danger, to stay 20 L* from caution under the three simulations; contrast wins when both cannot hold (on some grounds no readable pair of lightnesses is 20 L* apart, as on Slate's dark scheme; the glyphs then tell caution from danger). Material's error roles are set from these. `:ui-shared` (`NoticePalette`, `LocalNoticePalette`) turns them into Compose colours; the Gaming palette provides the active theme's, and a View surface derives its own from its theme's background, text and accent.
+
+**The card** (`:ui-shared`, `NoticeCard`): the plate with a 4 dp ink bar on the leading edge, a 20 dp glyph (circle i, triangle !, octagon !), the title at 16/20 semibold in the ink, "from <plugin>" at 14 sp muted after it, the body at 15/19, and trailing either the action as a chip (at least 32 dp, 14 sp) or a chevron when there is more in Info. Rows and group notices have 3 dp corners and are at least 48 dp tall (56 with a body); the banner has 6 dp corners and 12 dp below it. It fades in over 150 ms with a 4 dp rise, scaled by the system animator scale; nothing pulses or blinks. Gaming, the companion and Standard draw this one card; Standard's Preference rows host it through a ComposeView (`NoticeViews`), because the forked Launcher3 cannot depend on `:shell-gamepad` -- which is why `:ui-shared` is a module of its own.
+
+**Behaviour.** A notice is a stop of the pad only when something happens there (an action, details, or text cut on the row); otherwise the cursor passes over it. A runs the action, or opens Info when details are all it has (so a screen where Y is already bound, Games' Sort By, still reaches Info). Y is Info, the existing verb. The hint row names only what the notice answers. Info is a sheet with the title, body and details and a Copy chip on Select. A screen reader hears one node, tone first ("Caution, Unofficial plugin, ..."), as a polite live region for a group notice or a banner, with the custom actions Info and the action's label.
+
+**Copy rules** (every string a person reads in a notice, a dialog or a field; also in DESIGN-LANGUAGE "Copy"):
+
+1. Labels are three words or fewer: verbs for actions, nouns for settings.
+2. Notice titles are 40 characters or fewer and state the condition. Never "Warning:".
+3. Bodies are 90 characters or fewer and state the outcome, not the mechanism.
+4. The why goes in Info (Y). A hint that only restates its title is deleted.
+5. A field's label is its row title; placeholders are noun phrases; fields hold no instructions.
+6. No banned word in a title, body, recommendation or label: sandbox, root, Shizuku (except inside the Shizuku plugin, the integration the person chose), signing, key (cryptographic), fingerprint, helper, host, index, catalog, digest, IME, provider, tier, seccomp, adb. Details may be exact.
+7. A recommendation is one "We recommend <button>." sentence, on danger only, and names a button.
+8. An input error says what is allowed.
+9. In a modal the safe choice comes first (left) and has the focus.
+10. Never tell a person to do something they cannot do from where they are; give them the action.
+
+**Enforcement** (`scripts/check-ui-rules.sh`, run by `android-checks.yml`): `--check` fails on a site of a switched-on rule, `--inventory` lists every rule's remaining sites, and `scripts/test-check-ui-rules.sh` proves each rule catches its fixture. The rules: `Toast.makeText` outside `Notices`; `colorScheme.error` outside `:ui-shared`; `run = {}`; a `TextBlockItem` starting "WARNING" or a "(high risk)" suffix; hex colours in screens; the names the notice and text-entry work deletes (`MenuHint`, `SafeModeBanner`, `ReinitPill`, `MenuTokens.Danger`/`DangerPlate`, `OwnFieldKeyboard`); banned words in `Notice(` strings and in permission titles; and `TextField`/`OutlinedTextField`/`BasicTextField` outside `TextEntry`. Each rule is switched on in the commit that clears its last site.
+
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 
 The owner could not read some settings items: rows were one line with
