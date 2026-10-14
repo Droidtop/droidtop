@@ -5962,6 +5962,17 @@ believable), rounded to a quarter and never below 1: 2x on the console, 1x
 on a desktop monitor. The viewport sends it with every size, so a change
 applies the next time the desktop is shown.
 
+**Desktop resolution (decided 2026-10-14, Droidtop/tracker#426).** Beside the
+scale, "Desktop resolution" (`DesktopScale.RESOLUTION_KEY`): Full (default),
+75% or 50% of each side of the surface. The output is asked for the smaller
+size (`DesktopScale.outputSize`, even sides) and the output scale is
+multiplied by the same fraction (`outputScale`), so the layout keeps its
+logical size and only gets blurrier; the present path already scales the
+buffer to fill the view, and the pointer transform takes the smaller output
+size, so input lands where it is drawn. Faster because the compositor draws,
+and screencopy delivers, fewer pixels. Applies the next time the desktop is
+shown.
+
 **The frame path's threading (rebuilt 2026-09-24).** `:host-bridge`'s native
 client has one dispatch thread, and it owns everything the compositor's
 events touch: the capture loop and the output configuration. It waits on

@@ -269,6 +269,7 @@ object DroidtopWideSettings {
                             onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_TASKBAR_TOP, on).apply() },
                         ),
                         desktopScaleChoice(context),
+                        desktopResolutionChoice(context),
                         ToggleItem(
                             id = "pref_desktop_keep_running",
                             title = "Keep the desktop running in the background",
@@ -342,6 +343,25 @@ object DroidtopWideSettings {
             },
             current = CatalogPrefs.prefs(context).getString(dev.droidtop.runtime.DesktopScale.KEY, dev.droidtop.runtime.DesktopScale.AUTOMATIC),
             onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(dev.droidtop.runtime.DesktopScale.KEY, value).apply() },
+        )
+    }
+
+    /**
+     * How many of the screen's pixels the Linux desktop draws (Droidtop/tracker#426): fewer is faster and
+     * blurrier. Beside [desktopScaleChoice], which sets how large things are, not how sharp.
+     */
+    private fun desktopResolutionChoice(context: Context): ChoiceItem {
+        val key = dev.droidtop.runtime.DesktopScale.RESOLUTION_KEY
+        return ChoiceItem(
+            id = key,
+            title = "Desktop resolution",
+            subtitle = "Lower is faster and blurrier",
+            options = listOf(ChoiceOption(dev.droidtop.runtime.DesktopScale.FULL_RESOLUTION, "Full")) +
+                dev.droidtop.runtime.DesktopScale.RESOLUTION_CHOICES.map { value ->
+                    ChoiceOption(value, "${(value.toDouble() * 100).toInt()}%")
+                },
+            current = CatalogPrefs.prefs(context).getString(key, dev.droidtop.runtime.DesktopScale.FULL_RESOLUTION),
+            onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(key, value).apply() },
         )
     }
 
