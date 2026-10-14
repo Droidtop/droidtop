@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -115,7 +114,7 @@ fun PcLaunchOfferSheet(launch: PcLaunch) {
 }
 
 private fun say(context: Context, line: String?) {
-    line?.let { dev.droidtop.shell.gamepad.theme.shellToast(context, it, long = true) }
+    line?.let { dev.droidtop.library.settings.Notices.flash(it, context = context) }
 }
 
 /**

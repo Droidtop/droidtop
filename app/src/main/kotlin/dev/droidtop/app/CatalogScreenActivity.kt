@@ -2,7 +2,6 @@ package dev.droidtop.app
 
 import dev.droidtop.shell.gamepad.groundBackground
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Box
@@ -58,7 +57,7 @@ class CatalogScreenActivity : AppCompatActivity() {
         // notification must not be a way around that.
         val place = Place.byScreenId(screenId)
         if (place != null && place !in Place.visible(UiModePrefs.get(this))) {
-            Toast.makeText(this, "${place.title} is hidden in this UI mode", Toast.LENGTH_SHORT).show()
+            dev.droidtop.library.settings.Notices.flash("${place.title} is hidden in this UI mode", context = this)
             finish()
             return
         }

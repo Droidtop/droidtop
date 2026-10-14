@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.view.Display
 import android.view.Gravity
 import android.widget.TextView
-import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -193,7 +192,7 @@ private fun identifyScreens(context: Context, cards: List<DisplayCard>) {
     val shown = cards.mapIndexedNotNull { index, card ->
         val number = index + 1
         if (card.id == Display.DEFAULT_DISPLAY) {
-            Toast.makeText(context.applicationContext, "Screen $number: ${card.name}", Toast.LENGTH_LONG).show()
+            dev.droidtop.library.settings.Notices.flash("Screen $number: ${card.name}", context = context.applicationContext)
             null
         } else {
             manager.getDisplay(card.id)?.let { display ->
@@ -204,7 +203,7 @@ private fun identifyScreens(context: Context, cards: List<DisplayCard>) {
     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ shown.forEach { runCatching { it.dismiss() } } }, IDENTIFY_MS)
     // TalkBack hears every screen's number and name.
     if (context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)?.isEnabled == true) {
-        Toast.makeText(context.applicationContext, cards.mapIndexed { i, c -> "Screen ${i + 1}: ${c.name}" }.joinToString(". "), Toast.LENGTH_LONG).show()
+        dev.droidtop.library.settings.Notices.flash(cards.mapIndexed { i, c -> "Screen ${i + 1}: ${c.name}" }.joinToString(". "), context = context.applicationContext)
     }
 }
 

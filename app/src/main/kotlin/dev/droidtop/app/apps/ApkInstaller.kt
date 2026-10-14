@@ -167,7 +167,7 @@ class ApkInstallStatusReceiver : BroadcastReceiver() {
                         (intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "it gave no reason") + "."
                 }
                 ApkInstaller.reportOutcome(sessionId, message)
-                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                dev.droidtop.library.settings.Notices.flash(message, context = context)
             }
         }
     }

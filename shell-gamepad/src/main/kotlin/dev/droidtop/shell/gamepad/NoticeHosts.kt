@@ -150,10 +150,20 @@ internal fun NoticeFlashHost() {
     val flash = flashes.firstOrNull() ?: return
     val context = LocalContext.current
     val density = LocalDensity.current
+    // A sheet or a menu is a window of its own above the shell's: a card drawn in the shell's window would sit under
+    // it, so while one is open the flash is Android's own toast, which is drawn above every window.
+    val layerOpen = dev.droidtop.shell.gamepad.input.LocalFocusedHints.current?.layerOpen == true
     LaunchedEffect(flash) {
+        dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.play(dev.droidtop.shell.gamepad.theme.UiSound.TOAST)
+        if (layerOpen) {
+            Notices.platformToast(context, flash)
+            Notices.shown(flash)
+            return@LaunchedEffect
+        }
         delay(flashMillis(context))
         Notices.shown(flash)
     }
+    if (layerOpen) return
     val fontScale = LocalDensity.current.fontScale
     val offset = with(density) { IntOffset(-16.dp.roundToPx(), -(MenuTokens.HintBarRoom + 8.dp).roundToPx()) }
     Popup(alignment = Alignment.BottomEnd, offset = offset) {

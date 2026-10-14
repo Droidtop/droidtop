@@ -33,6 +33,8 @@ dependencies {
     // The shell's shared pieces (Gaming's game page, menu and install offer), wired out
     // to Desktop rather than written twice (docs/SPEC.md 2b, Droidtop/tracker#349).
     implementation(project(":shell-gamepad"))
+    // The notice card every surface shares (docs/SPEC.md 7k, "Notices").
+    implementation(project(":ui-shared"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
 

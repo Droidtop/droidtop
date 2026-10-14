@@ -6,7 +6,6 @@ import android.content.ContextWrapper
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
-import android.widget.Toast
 import androidx.preference.Preference
 import androidx.preference.PreferenceViewHolder
 import com.android.launcher3.BuildConfig
@@ -27,7 +26,7 @@ class RestartPreference @JvmOverloads constructor(context: Context, attrs: Attri
                         else recoveryHandler.uncaughtException(Thread.currentThread(), testException)
                     }, 250)
                 } else {
-                    Toast.makeText(context, "${crashCountdown}...", Toast.LENGTH_SHORT).show()
+                    dev.droidtop.library.settings.Notices.flash("${crashCountdown}...", context = context)
                     crashCountdown--
                 }
                 true

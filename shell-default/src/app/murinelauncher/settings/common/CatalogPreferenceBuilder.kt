@@ -199,7 +199,7 @@ class CatalogPreferenceNavigator(
             // onPicked reads or writes the document: never on the main thread.
             fragment.lifecycleScope.launch {
                 val outcome = withContext(Dispatchers.IO) { item.onPicked(context, uri) }
-                android.widget.Toast.makeText(context, outcome, android.widget.Toast.LENGTH_LONG).show()
+                dev.droidtop.library.settings.Notices.flash(outcome, context = context)
                 rebuild()
             }
         }

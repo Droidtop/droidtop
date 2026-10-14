@@ -1,6 +1,5 @@
 package app.murinelauncher.settings
 
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.preference.EditTextPreference
@@ -137,7 +136,7 @@ public final class SettingsQsbFragment: AbstractSettingsFragment() {
                         .setMessage(R.string.pref_qsb_clear_history_confirm_message)
                         .setPositiveButton(android.R.string.ok) { _, _ ->
                             MurineSearchBoxView.clearHistory(requireContext())
-                            Toast.makeText(requireContext(), R.string.pref_qsb_clear_history_toast, Toast.LENGTH_SHORT).show()
+                            dev.droidtop.library.settings.Notices.flash(requireContext().getString(R.string.pref_qsb_clear_history_toast), context = requireContext())
                         }
                         .setNegativeButton(android.R.string.cancel, null)
                         .show()

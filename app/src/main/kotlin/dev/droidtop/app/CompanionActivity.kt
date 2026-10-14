@@ -1,5 +1,8 @@
 package dev.droidtop.app
 
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
@@ -300,7 +303,7 @@ private fun DisplayFallbackNotice() {
     Text(
         displayFallbackMessage(degraded),
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.error,
+        color = LocalNoticePalette.current.ink(NoticeTone.Caution),
         modifier = Modifier.padding(top = 8.dp),
     )
 }

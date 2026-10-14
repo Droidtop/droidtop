@@ -1,5 +1,10 @@
 package dev.droidtop.app
 
+import dev.droidtop.library.settings.NoticeAction
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.ui.shared.NoticeCard
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import androidx.compose.foundation.background
@@ -113,14 +118,18 @@ fun CompanionSurface(
 private fun LaunchErrorLine() {
     val launchError by CompanionState.launchError.collectAsState()
     val message = launchError ?: return
-    Text(
-        message,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.error,
+    NoticeCard(
+        Notice(
+            NoticeTone.Caution,
+            "Didn't open",
+            body = message.take(Notice.BODY_MAX),
+            details = message,
+            action = NoticeAction("Dismiss") { CompanionState.launchError.value = null },
+        ),
+        NoticePlacement.Row,
+        onAction = { CompanionState.launchError.value = null },
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable { CompanionState.launchError.value = null }
             .padding(top = 8.dp),
     )
 }

@@ -43,13 +43,13 @@ internal fun ReinitializeDisplaysPill(onClick: () -> Unit, modifier: Modifier = 
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.errorContainer)
+            .background(dev.droidtop.ui.shared.LocalNoticePalette.current.plate(dev.droidtop.library.settings.NoticeTone.Caution))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Text(
             "Reinitialize displays",
-            color = MaterialTheme.colorScheme.onErrorContainer,
+            color = dev.droidtop.ui.shared.LocalNoticePalette.current.ink(dev.droidtop.library.settings.NoticeTone.Caution),
             style = MaterialTheme.typography.labelLarge,
         )
     }

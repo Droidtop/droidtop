@@ -43,5 +43,9 @@ mkdir -p "$tmp/clean/app"
 printf 'val x = 1\n' > "$tmp/clean/app/A.kt"
 if ! "$check" --check --all --root "$tmp/clean" >/dev/null; then echo "FAIL: a clean tree failed"; status=1; fi
 
-[ "$status" = 0 ] && echo "check-ui-rules: every rule fails on its fixture"
+if [ "$status" = 0 ]; then
+    echo "check-ui-rules: every rule fails on its fixture"
+else
+    echo "check-ui-rules: fixture test failed" >&2
+fi
 exit "$status"

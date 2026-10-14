@@ -1,5 +1,9 @@
 package dev.droidtop.app
 
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.ui.shared.NoticeCard
 import android.content.Context
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
@@ -285,7 +289,7 @@ internal fun CompanionComposer(key: Any?, startWithKeyboard: Boolean = false, on
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        failure?.let { Text("Not sent: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        failure?.let { NoticeCard(Notice(NoticeTone.Caution, "Not sent", body = it.take(Notice.BODY_MAX), details = it), NoticePlacement.Row) }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DraftField(
                 draft = draft,

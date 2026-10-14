@@ -8,7 +8,6 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import android.widget.Toast
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -82,7 +81,7 @@ class PluginScreenActivity : Activity(), SurfaceHolder.Callback {
     }
 
     private fun close(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        dev.droidtop.library.settings.Notices.flash(message, context = this)
         finish()
     }
 

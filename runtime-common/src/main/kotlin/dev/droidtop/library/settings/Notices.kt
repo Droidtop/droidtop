@@ -55,16 +55,21 @@ object Notices {
         require(tone != NoticeTone.Danger) { "a flash needs no action; danger is a dialog" }
         val id = synchronized(this) { nextId++ }
         if (hosts.value.isEmpty() && context != null) {
-            val shown = if (source != null) "$source: $text" else text
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                Toast.makeText(context.applicationContext, shown, Toast.LENGTH_SHORT).show()
-            }
+            platformToast(context, Flash(text, tone, source, id))
         } else {
             _flashes.update { it + Flash(text, tone, source, id) }
         }
         if (!private) {
             _recent.update { (listOf(RecentNotice(text, tone, source, System.currentTimeMillis())) + it).take(RECENT_MAX) }
             _unread.update { (it + 1).coerceAtMost(RECENT_MAX) }
+        }
+    }
+
+    /** [flash] as Android's own toast, led by its source: where no droidtop surface can draw the card above what is open. */
+    fun platformToast(context: Context, flash: Flash) {
+        val shown = if (flash.source != null) "${flash.source}: ${flash.text}" else flash.text
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            Toast.makeText(context.applicationContext, shown, Toast.LENGTH_SHORT).show()
         }
     }
 

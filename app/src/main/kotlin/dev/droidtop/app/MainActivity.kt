@@ -21,6 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -463,10 +468,40 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             val safeMode by dev.droidtop.library.theme.ThemeSafeMode.activeFlow.collectAsState()
             val bannerFocus = remember { FocusRequester() }
             if (mode == Mode.GAMING && safeMode) {
-                SafeModeBanner(
-                    onRetry = { dev.droidtop.library.diagnostics.CrashRecovery.retryTheme(this@MainActivity) },
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    focusRequester = bannerFocus,
+                // U5 (docs/SPEC.md 7k, "Notices"; 10c): the caution banner, a pad stop of its own above the shell's lists
+                // (the tab bar never takes focus, so Up from the top row reaches it), A, Enter or a tap use the theme again.
+                val retry = { dev.droidtop.library.diagnostics.CrashRecovery.retryTheme(this@MainActivity) }
+                var bannerFocused by remember { mutableStateOf(false) }
+                dev.droidtop.ui.shared.NoticeCard(
+                    notice = dev.droidtop.library.settings.Notice(
+                        tone = dev.droidtop.library.settings.NoticeTone.Caution,
+                        title = "Safe mode",
+                        body = "The theme is off after two failed starts.",
+                        details = "droidtop crashed twice while starting, so the Gaming shell is drawn without the theme. " +
+                            "Your theme choice is kept; Use theme draws it again.",
+                        action = dev.droidtop.library.settings.NoticeAction("Use theme") { retry() },
+                    ),
+                    placement = dev.droidtop.library.settings.NoticePlacement.Page,
+                    onAction = retry,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .then(
+                            if (bannerFocused) {
+                                Modifier.border(3.dp, androidx.compose.material3.MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .onFocusChanged { bannerFocused = it.isFocused }
+                        .focusRequester(bannerFocus)
+                        .onPreviewKeyEvent { event ->
+                            val press = event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                                event.nativeKeyEvent.keyCode in setOf(KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_CENTER)
+                            if (press) retry()
+                            press
+                        }
+                        .focusable(),
                 )
                 LaunchedEffect(safeMode) {
                     if (safeMode) bannerFocus.requestFocus()

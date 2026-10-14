@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.preference.Preference
 import app.murinelauncher.backup.BackupHelper
@@ -43,8 +42,11 @@ public final class SettingsMiscFragment: AbstractSettingsFragment() {
         MODEL_EXECUTOR.execute {
             val status = BackupHelper.backup(app, uri)
             MAIN_EXECUTOR.execute {
-                Toast.makeText(app, if (status) app.getString(R.string.backup_export_done)
-                    else getFailedString(app), Toast.LENGTH_SHORT).show()
+                dev.droidtop.library.settings.Notices.flash(
+                    if (status) app.getString(R.string.backup_export_done) else getFailedString(app),
+                    tone = if (status) dev.droidtop.library.settings.NoticeTone.Info else dev.droidtop.library.settings.NoticeTone.Caution,
+                    context = app,
+                )
             }
         }
     }
@@ -63,7 +65,7 @@ public final class SettingsMiscFragment: AbstractSettingsFragment() {
                         exitProcess(0)
                     }
                     else MAIN_EXECUTOR.execute {
-                        Toast.makeText(app, getFailedString(app), Toast.LENGTH_SHORT).show()
+                        dev.droidtop.library.settings.Notices.flash(getFailedString(app), tone = dev.droidtop.library.settings.NoticeTone.Caution, context = app)
                     }
                 }
             }.show()

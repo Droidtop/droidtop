@@ -726,17 +726,6 @@ private fun AdjustArrow(glyph: String, onPress: () -> Unit) {
     }
 }
 
-/** The button-hint line every menu ends with, so controls are never a guess. */
-@Composable
-internal fun MenuHint(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        color = MenuTokens.OnSurfaceMuted,
-        style = MaterialTheme.typography.labelSmall,
-        modifier = modifier.padding(top = 10.dp),
-    )
-}
-
 /** What the footer says while a [MenuPanel] is open and has no hints of its own to give. */
 private val PANEL_HINTS = listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, "Back"))
 

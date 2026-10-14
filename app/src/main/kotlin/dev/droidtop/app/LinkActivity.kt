@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import dev.droidtop.library.integrations.LinkRouter
@@ -25,7 +24,7 @@ class LinkActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val link = linkOf(intent)
         if (link == null) {
-            Toast.makeText(this, "That isn't a link droidtop can open", Toast.LENGTH_LONG).show()
+            dev.droidtop.library.settings.Notices.flash("That isn't a link droidtop can open", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = this)
             finish()
             return
         }
@@ -40,10 +39,10 @@ class LinkActivity : ComponentActivity() {
             }
             when (result) {
                 is LinkRouter.Result.Open -> {
-                    result.message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+                    result.message?.let { dev.droidtop.library.settings.Notices.flash(it, context = context) }
                     startActivity(CatalogScreenLink.intent(context, result.screenId))
                 }
-                is LinkRouter.Result.Message -> Toast.makeText(context, result.text, Toast.LENGTH_LONG).show()
+                is LinkRouter.Result.Message -> dev.droidtop.library.settings.Notices.flash(result.text, context = context)
                 is LinkRouter.Result.Browser -> toBrowser(result.link)
             }
             finish()
@@ -78,6 +77,6 @@ class LinkActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 24) {
             chooser.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(ComponentName(this, LinkActivity::class.java)))
         }
-        runCatching { startActivity(chooser) }.onFailure { Toast.makeText(this, "No browser is installed to open $link", Toast.LENGTH_LONG).show() }
+        runCatching { startActivity(chooser) }.onFailure { dev.droidtop.library.settings.Notices.flash("No browser is installed to open $link", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = this) }
     }
 }

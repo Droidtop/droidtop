@@ -1,5 +1,9 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.ui.shared.NoticeCard
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.menuMove
 import androidx.activity.compose.BackHandler
@@ -37,7 +41,6 @@ import dev.droidtop.library.scraper.LutrisGameResult
 import dev.droidtop.library.scraper.LutrisScraperClient
 import dev.droidtop.library.scraper.ScrapeLookup
 import dev.droidtop.shell.gamepad.LocalShellWindow
-import dev.droidtop.shell.gamepad.MenuHint
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuSectionLabel
@@ -214,9 +217,9 @@ internal fun LutrisImportScreen(
                 fontWeight = FontWeight.SemiBold,
             )
             when (current) {
-                ImportStage.Searching -> MenuHint("Searching lutris.net for $name…")
-                is ImportStage.Loading -> MenuHint(current.line)
-                is ImportStage.Message -> MenuHint(current.line)
+                ImportStage.Searching -> NoticeCard(Notice(NoticeTone.Info, "Searching lutris.net for $name…"), NoticePlacement.Group)
+                is ImportStage.Loading -> NoticeCard(Notice(NoticeTone.Info, current.line), NoticePlacement.Group)
+                is ImportStage.Message -> NoticeCard(Notice(NoticeTone.Info, current.line), NoticePlacement.Group)
                 else -> Unit
             }
             rows.forEachIndexed { index, row ->
@@ -236,7 +239,7 @@ internal fun LutrisImportScreen(
                 )
             }
             if (current is ImportStage.Preview) PreviewBody(current)
-            if (current is ImportStage.Preview) MenuHint("Nothing in the script is run.")
+            if (current is ImportStage.Preview) NoticeCard(Notice(NoticeTone.Info, "Nothing in the script is run"), NoticePlacement.Group)
         }
     }
 }
@@ -246,7 +249,7 @@ private fun PreviewBody(preview: ImportStage.Preview) {
     MenuSectionLabel("For this game")
     val game = preview.game
     if (game == null) {
-        MenuHint("Nothing: droidtop keeps choosing this game's program itself.")
+        NoticeCard(Notice(NoticeTone.Info, "Nothing changes for this game", body = "droidtop keeps choosing its program itself."), NoticePlacement.Group)
     } else {
         Lines(
             listOfNotNull(
@@ -260,9 +263,9 @@ private fun PreviewBody(preview: ImportStage.Preview) {
     if (prefix != null && (prefix.lines.isNotEmpty() || prefix.alreadySet.isNotEmpty())) {
         MenuSectionLabel("On the prefix ${preview.prefixName}")
         if (preview.prefixShared) {
-            MenuHint("Every Windows game without a prefix of its own runs in this one, so these change them too.")
+            NoticeCard(Notice(NoticeTone.Caution, "Changes other games too", body = "Every Windows game without a prefix of its own runs in this one."), NoticePlacement.Group)
         }
-        if (prefix.lines.isEmpty()) MenuHint("Nothing to change.") else Lines(prefix.lines)
+        if (prefix.lines.isEmpty()) NoticeCard(Notice(NoticeTone.Info, "Nothing to change"), NoticePlacement.Group) else Lines(prefix.lines)
     }
     val covered = preview.covered + prefix?.alreadySet.orEmpty()
     if (covered.isNotEmpty()) {

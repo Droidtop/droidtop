@@ -5,7 +5,6 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import dev.droidtop.runtime.tasks.RunningApp
 import dev.droidtop.runtime.tasks.TaskManager
 import dev.droidtop.runtime.tasks.TaskPolicy
@@ -70,7 +69,7 @@ class ClearAllAppsActivity : Activity() {
     }
 
     private fun say(message: String) {
-        Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+        dev.droidtop.library.settings.Notices.flash(message, context = applicationContext)
         if (!isFinishing) finish()
     }
 }

@@ -73,7 +73,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import android.widget.Toast
 import coil3.compose.AsyncImage
 import dev.droidtop.library.settings.CatalogPrefs
 import dev.droidtop.library.settings.GamingSettingsCatalog
@@ -3527,10 +3526,7 @@ private fun AppsSection(
         hiddenNow = hiddenNow + (entry.id to nowHidden)
         coroutineScope.launch {
             withContext(Dispatchers.IO) { dev.droidtop.library.AppHiding.set(context, entry.id, nowHidden) }
-            dev.droidtop.shell.gamepad.theme.shellToast(
-                context,
-                if (nowHidden) "${entry.title} hidden" else "${entry.title} shown",
-            )
+            dev.droidtop.library.settings.Notices.flash(if (nowHidden) "${entry.title} hidden" else "${entry.title} shown", context = context)
         }
     }
 
@@ -3542,10 +3538,7 @@ private fun AppsSection(
             coroutineScope.launch {
                 withContext(Dispatchers.IO) { AppGameMarks.set(context, entry.id, nowGame) }
                 marksTick++
-                dev.droidtop.shell.gamepad.theme.shellToast(
-                    context,
-                    if (nowGame) "${entry.title} marked as a game" else "${entry.title} is not a game",
-                )
+                dev.droidtop.library.settings.Notices.flash(if (nowGame) "${entry.title} marked as a game" else "${entry.title} is not a game", context = context)
             }
         }
     }
