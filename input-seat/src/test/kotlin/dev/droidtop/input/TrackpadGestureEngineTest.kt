@@ -351,7 +351,8 @@ class TrackpadGestureEngineTest {
     @Test
     fun `momentum coasts on after a fast scroll, slowing, and a finger stops it`() {
         val out = Recorder()
-        val engine = TrackpadGestureEngine(out, TrackpadConfig(momentum = true))
+        // Long press off: the finger that stops the coast would otherwise arm its own timer, which this test is not about.
+        val engine = TrackpadGestureEngine(out, TrackpadConfig(momentum = true, longPressRightClick = false))
         engine.onFrame(listOf(touch(0, 10f, 10f), touch(1, 20f, 10f)), 0L)
         engine.onFrame(listOf(touch(0, 10f, 20f), touch(1, 20f, 20f)), 20L)
         engine.onFrame(listOf(touch(0, 10f, 30f), touch(1, 20f, 30f)), 40L)
@@ -377,5 +378,67 @@ class TrackpadGestureEngineTest {
         engine.onFrame(listOf(touch(0, 10f, 30f), touch(1, 20f, 30f)), 40L)
         engine.onFrame(emptyList(), 50L)
         assertNull(engine.nextTimeoutAtMs())
+    }
+
+    @Test
+    fun `a finger held still for the long-press time is a right click, and lifting it clicks nothing more`() {
+        val out = Recorder()
+        val engine = TrackpadGestureEngine(out)
+
+        engine.onFrame(listOf(touch(0, 10f, 10f)), 0L)
+        assertEquals(600L, engine.nextTimeoutAtMs())
+        engine.tick(599L)
+        assertTrue(out.buttons.isEmpty())
+        engine.tick(600L)
+        assertEquals(
+            listOf(Event.Button(EvdevKeys.BTN_RIGHT, true), Event.Button(EvdevKeys.BTN_RIGHT, false)),
+            out.buttons,
+        )
+        engine.onFrame(emptyList(), 700L)
+        assertEquals(2, out.buttons.size)
+        assertNull(engine.nextTimeoutAtMs())
+    }
+
+    @Test
+    fun `jitter inside the tap slop still long-presses, a real move or a second finger does not`() {
+        val jitter = Recorder()
+        val a = TrackpadGestureEngine(jitter)
+        a.onFrame(listOf(touch(0, 10f, 10f)), 0L)
+        a.onFrame(listOf(touch(0, 10.5f, 10.4f)), 300L)
+        a.tick(600L)
+        assertEquals(2, jitter.buttons.size)
+
+        val moved = Recorder()
+        val b = TrackpadGestureEngine(moved)
+        b.onFrame(listOf(touch(0, 10f, 10f)), 0L)
+        b.onFrame(listOf(touch(0, 30f, 10f)), 100L)
+        b.tick(800L)
+        assertTrue(moved.buttons.isEmpty())
+        assertNull(b.nextTimeoutAtMs())
+
+        val two = Recorder()
+        val c = TrackpadGestureEngine(two)
+        c.onFrame(listOf(touch(0, 10f, 10f)), 0L)
+        c.onFrame(listOf(touch(0, 10f, 10f), touch(1, 30f, 10f)), 100L)
+        c.tick(800L)
+        assertTrue(two.buttons.isEmpty())
+    }
+
+    @Test
+    fun `a tap-and-hold drag is not a long press, and the setting turns long press off`() {
+        val drag = Recorder()
+        val a = TrackpadGestureEngine(drag)
+        a.onFrame(listOf(touch(0, 10f, 10f)), 0L)
+        a.onFrame(emptyList(), 50L)
+        a.onFrame(listOf(touch(1, 10f, 10f)), 120L)
+        a.tick(1000L)
+        assertEquals(listOf(Event.Button(EvdevKeys.BTN_LEFT, true)), drag.buttons)
+
+        val off = Recorder()
+        val b = TrackpadGestureEngine(off, TrackpadConfig(longPressRightClick = false))
+        b.onFrame(listOf(touch(0, 10f, 10f)), 0L)
+        assertNull(b.nextTimeoutAtMs())
+        b.tick(2000L)
+        assertTrue(off.buttons.isEmpty())
     }
 }

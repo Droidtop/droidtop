@@ -68,6 +68,7 @@ data class TrackpadSettings(
     val dragWindowMs: Int = 300,
     val twoFingerScroll: Boolean = true,
     val twoFingerRightClick: Boolean = true,
+    val longPressRightClick: Boolean = true,
     val threeFingerMiddleClick: Boolean = true,
     val naturalScroll: Boolean = true,
     val momentum: Boolean = false,
@@ -178,6 +179,7 @@ object CompanionPrefs {
                 dragWindowMs = all[TP + "drag_ms"] as? Int ?: d.dragWindowMs,
                 twoFingerScroll = all[TP + "two_scroll"] as? Boolean ?: d.twoFingerScroll,
                 twoFingerRightClick = all[TP + "two_right"] as? Boolean ?: d.twoFingerRightClick,
+                longPressRightClick = all[TP + "long_press"] as? Boolean ?: d.longPressRightClick,
                 threeFingerMiddleClick = all[TP + "three_middle"] as? Boolean ?: d.threeFingerMiddleClick,
                 naturalScroll = all[TP + "natural"] as? Boolean ?: d.naturalScroll,
                 momentum = all[TP + "momentum"] as? Boolean ?: d.momentum,
@@ -223,6 +225,7 @@ object CompanionPrefs {
             .putInt(TP + "drag_ms", next.dragWindowMs)
             .putBoolean(TP + "two_scroll", next.twoFingerScroll)
             .putBoolean(TP + "two_right", next.twoFingerRightClick)
+            .putBoolean(TP + "long_press", next.longPressRightClick)
             .putBoolean(TP + "three_middle", next.threeFingerMiddleClick)
             .putBoolean(TP + "natural", next.naturalScroll)
             .putBoolean(TP + "momentum", next.momentum)

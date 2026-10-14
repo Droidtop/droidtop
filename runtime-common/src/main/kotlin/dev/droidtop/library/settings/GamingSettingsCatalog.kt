@@ -1360,6 +1360,7 @@ object GamingSettingsCatalog {
                         ),
                         toggle("two_scroll", "Two-finger scroll", "Two fingers moving scroll the page", t.twoFingerScroll) { s, on -> s.copy(twoFingerScroll = on) },
                         toggle("two_right", "Two-finger tap right-clicks", "A tap with two fingers opens the menu a right click opens", t.twoFingerRightClick) { s, on -> s.copy(twoFingerRightClick = on) },
+                        toggle("long_press", "Long press right-clicks", "Holding one finger still opens the menu a right click opens", t.longPressRightClick) { s, on -> s.copy(longPressRightClick = on) },
                         toggle("three_middle", "Three-finger tap middle-clicks", "A tap with three fingers pastes or opens a link in a new tab", t.threeFingerMiddleClick) { s, on -> s.copy(threeFingerMiddleClick = on) },
                         toggle("natural", "Natural scrolling", "The page moves with your fingers, as on a phone", t.naturalScroll) { s, on -> s.copy(naturalScroll = on) },
                         toggle("momentum", "Scroll keeps going", "After a quick scroll the page coasts and slows down", t.momentum) { s, on -> s.copy(momentum = on) },
@@ -1521,7 +1522,7 @@ object GamingSettingsCatalog {
         add(
             ActionItem(
                 id = ID_DISPLAY_KEYBOARD_ACCESSIBILITY,
-                title = "Keyboard through accessibility",
+                title = "Keyboard and pointer through accessibility",
                 value = if (accessibility) "On" else "Off",
                 run = { ctx -> dev.droidtop.runtime.keyboard.AccessibilityKeyboard.openSettings(ctx) },
             ),

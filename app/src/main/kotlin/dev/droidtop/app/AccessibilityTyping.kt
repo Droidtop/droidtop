@@ -42,6 +42,7 @@ class TypingAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         AccessibilityTyping.connect(this)
+        AccessibilityPointer.connect(this)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -51,6 +52,7 @@ class TypingAccessibilityService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: Intent?): Boolean {
+        AccessibilityPointer.disconnect(this)
         AccessibilityTyping.disconnect(this)
         return super.onUnbind(intent)
     }

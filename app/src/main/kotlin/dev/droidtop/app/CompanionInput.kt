@@ -50,6 +50,7 @@ internal fun trackpadConfig(settings: TrackpadSettings): TrackpadConfig = Trackp
     tapToClick = settings.tapToClick,
     twoFingerScroll = settings.twoFingerScroll,
     twoFingerRightClick = settings.twoFingerRightClick,
+    longPressRightClick = settings.longPressRightClick,
     threeFingerMiddleClick = settings.threeFingerMiddleClick,
     dragLock = settings.dragLock,
     momentum = settings.momentum,

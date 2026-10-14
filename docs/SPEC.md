@@ -3556,8 +3556,33 @@ row of recent apps, became Home's Recent apps section for every mode.
   (`KeyboardSink.repeatsAtSource` false: Desktop's seat, the compositor's own repeat; the elevated `input` route, which
   starts a process per key). The trackpad's settings (Companion group > Trackpad,
   `TrackpadSettings`) are libinput's options with libinput's defaults: pointer speed, tap to click, tap time, hold
-  to drag (the tap-and-drag window), two-finger scroll, two-finger tap right-click, three-finger tap middle-click,
-  natural scrolling on; scroll momentum and drag lock off. Connected controllers show with their batteries
+  to drag (the tap-and-drag window), two-finger scroll, two-finger tap right-click, long press right-click (one finger
+  held still for 600 ms, a touch screen's own gesture, on by default), three-finger tap middle-click, natural scrolling
+  on; scroll momentum and drag lock off.
+  **The trackpad is a pointer on the main screen (Droidtop/tracker#486 item 3).** Outside Desktop it drives the target
+  screen (above), by `TrackpadRoute` chosen as each gesture starts and kept until its left button is let go: while
+  droidtop's shell is what that screen shows it moves the shell's selection (focus steps, confirm, back:
+  `FocusNavTrackpadSink`; pointer and focus are one selection in the shell, and a hover is how a mouse moves focus there,
+  so a cursor over droidtop's own chrome would only be a second selection), and in any other app it is a pointer.
+  Android lets an ordinary app no system cursor (`INJECT_EVENTS` is a signature permission), so the pointer is built from
+  what an accessibility service has, with no root: a cursor drawn in an accessibility overlay on that screen (never
+  touchable, gone after five seconds without moving, `PointerCursor`) shows where the next touch lands, and a click, a
+  long press, a drag and a scroll are touches played there with `dispatchGesture`, on any screen from Android 11
+  (`GestureDescription.Builder.setDisplayId`) and on the default screen before (`AccessibilityPointer`, droidtop's
+  existing accessibility service, which now also declares `canPerformGestures`; a build that adds the capability reaches
+  an already-enabled service only when it is turned off and on, and the Input tab says so). The logic is pure and tested
+  in `:input-seat` (`PointerInjection.kt`): `PointerTrackpadSink` keeps the position (the screen's middle at first,
+  clamped to it, moved by the engine's accelerated travel: `PointerAcceleration` with the Pointer speed setting, the
+  gain from the screen's width over 160 mm of travel, the same for every panel); a one-finger tap is a tap where the
+  left button went down (it lands after the tap-and-drag window, as on every trackpad), a tap-and-hold that moves is a
+  drag from where it went down, a two-finger tap or a long press is a long press where the pointer is (what a right
+  click is to a touch screen), two fingers moving are swipes that follow the fingers (natural scrolling) or oppose them,
+  gathered into 40 px steps. `PointerGestureQueue` plays one gesture at a time (the platform plays one), keeps a drag as
+  one stroke continued by each next gesture, collapses moves and scrolls that wait behind a gesture to the newest, and drops
+  the rest of a drag another touch interrupted. Middle click does nothing: a touch screen has none. Without the service
+  (or on Android 10 and earlier for a second screen) the Input tab says "Pointer needs the accessibility service" with a
+  button that opens Android's accessibility settings. A shell-command route (`input -d <display> tap`/`swipe` through the
+  helper app) could play the same touches without the service; it is not built, and `GestureRunner` is where it would go. Connected controllers show with their batteries
   (`InputDevice.getBatteryState`, Android 12 and later), and Home's status line names the one in hand ("Pad 80%")
   when exactly one reports a battery.
 - **One screen (slice C13, owner question 2's default).** A device with no second screen gets the same
@@ -3614,7 +3639,7 @@ row of recent apps, became Home's Recent apps section for every mode.
   apps that used the camera, microphone or location in the last 24 hours (`PrivacyAccess`, from Android's own record,
   `dumpsys appops --op CAMERA|RECORD_AUDIO|FINE_LOCATION`, each package's latest access), each opening its App info
   (Android has no public page for one permission of one app). Then "What droidtop can access": notification access,
-  Usage access, the accessibility service (its two jobs, typing and screenshots), Bluetooth and the helper app, each
+  Usage access, the accessibility service (its three jobs, typing, screenshots and the pointer), Bluetooth and the helper app, each
   with whether droidtop holds it and why it asks, opening droidtop's own App info.
 - **Logs (slice C18).** Performance has a Logs card (not in Kid or Kiosk): Android's log through the helper app
   (`logcat -d -v threadtime`, the last lines, then every two seconds only what is newer, only while the card shows and
@@ -4222,8 +4247,9 @@ rig check in the commit message.
 
 - **Other apps while another keyboard is selected: droidtop's accessibility service.** With Gboard
   (or any keyboard but droidtop's) selected and no elevated access, nothing of droidtop's is bound
-  to the editor, so droidtop has its own accessibility service, `TypingAccessibilityService` (two jobs: typing, and
-screenshots for the companion through `Capture`, `canTakeScreenshot`; window changes also nudge `PipMover`), which
+  to the editor, so droidtop has its own accessibility service, `TypingAccessibilityService` (three jobs: typing, and
+screenshots for the companion through `Capture`, `canTakeScreenshot`; window changes also nudge `PipMover`; and the
+companion trackpad's pointer, `canPerformGestures`, see "Input (slice C12)"), which
   the user turns on (Displays, "Keyboard through accessibility"). It is kept minimal: the event types
   are a view gaining focus, a view tapped and a window changing; the flags are the interactive-window
   list (a field's window names its display, `AccessibilityWindowInfo.getDisplayId`, Android 11+;

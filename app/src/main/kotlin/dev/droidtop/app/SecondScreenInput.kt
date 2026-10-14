@@ -21,10 +21,13 @@ import dev.droidtop.input.DesktopInputRouter
 import dev.droidtop.input.FocusNavTrackpadSink
 import dev.droidtop.input.InputSeats
 import dev.droidtop.input.NavKey
+import dev.droidtop.input.PointerTrackpadSink
+import dev.droidtop.input.RoutedTrackpadOutput
 import dev.droidtop.input.SeatTrackpadSink
 import dev.droidtop.input.TRACKPAD_TRAVEL_MM_PER_SCREEN_WIDTH
 import dev.droidtop.input.TrackpadGestureEngine
 import dev.droidtop.input.TrackpadOutput
+import dev.droidtop.input.TrackpadRoute
 import dev.droidtop.input.TrackpadView
 import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
 import dev.droidtop.shell.gamepad.ChromeColors
@@ -42,8 +45,10 @@ import kotlinx.coroutines.launch
  * `Activity.dispatchKeyEvent` is an ordinary public call into droidtop's
  * OWN window; it needs no permission and reaches the same Compose focus
  * machinery a real D-pad reaches. Reaching another app's window would need
- * `INJECT_EVENTS`, a signature permission, which is why the Gaming
- * trackpad navigates droidtop and nothing else -- see `FocusNavTrackpadSink`.
+ * `INJECT_EVENTS`, a signature permission, which is why the trackpad
+ * navigates droidtop by key and plays touches in other apps through the
+ * accessibility service instead -- see `FocusNavTrackpadSink` and
+ * `AccessibilityPointer`.
  *
  * Weak, because holding an Activity from a process-wide object is the
  * classic leak, and a stale reference would deliver keys to a destroyed
@@ -156,11 +161,13 @@ object ForegroundShell {
  * - **Desktop**: the pointer and the keys go into the primary container
  *   through the one `InputSeat`, exactly as the main desktop surface's own
  *   touch and keyboard do. A real trackpad and a real keyboard.
- * - **Gaming / Standard**: there is no pointer to move, so the trackpad
- *   drives the shell's focus navigation, and the keyboard types into
- *   whatever Android editor has focus through droidtop's own IME. Both
- *   limits are the platform's, and both are stated on the surface rather
- *   than failing quietly.
+ * - **Gaming / Standard**: the trackpad drives the screen the shell is
+ *   drawn on (the pinned one, or the first other): while droidtop's shell
+ *   is in front there it moves the shell's selection (pointer and focus
+ *   are one selection), in any other app it is a pointer drawn and played
+ *   by the accessibility service (`AccessibilityPointer`); the keyboard
+ *   types into whatever Android editor has focus. What each needs is
+ *   stated on the surface rather than failing quietly.
  */
 class SecondScreenInputView(
     context: Context,
@@ -170,6 +177,11 @@ class SecondScreenInputView(
     private val trackpad = TrackpadView(context)
     private val status = TextView(context)
     private val imePicker = Button(context)
+
+    // Outside Desktop the trackpad is a pointer on the main screen, which needs droidtop's accessibility service.
+    private val pointerHelp = Button(context)
+    private var pointerSink: PointerTrackpadSink? = null
+    private var lastRoute: TrackpadRoute? = null
 
     // The header (slice C12): where the keys go, Pin for that screen, and Tabs, which brings the companion's bar back
     // over Input; then the chord keys and the controllers with their batteries.
@@ -240,6 +252,11 @@ class SecondScreenInputView(
         }
         addView(imePicker, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
+        pointerHelp.gravity = Gravity.CENTER
+        pointerHelp.setOnClickListener { AccessibilityKeyboard.openSettings(context) }
+        pointerHelp.visibility = View.GONE
+        addView(pointerHelp, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+
         controllers.setTextColor(ChromeColors.DarkOnSurfaceVariant.toArgb())
         controllers.textSize = 13f
         controllers.gravity = Gravity.CENTER
@@ -260,6 +277,8 @@ class SecondScreenInputView(
                 controllers.text = Controllers.line(pads)?.let { "Controllers: $it" }.orEmpty()
                 controllers.visibility = if (pads.isEmpty()) View.GONE else View.VISIBLE
                 syncTarget()
+                syncPointerHelp()
+                status.text = statusText()
             }
         }.apply { isDaemon = true }.start()
     }
@@ -303,6 +322,7 @@ class SecondScreenInputView(
         status.text = statusText()
         refreshFacts()
         syncImePicker()
+        syncPointerHelp()
         Thread {
             elevated = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
         }.apply { isDaemon = true }.start()
@@ -316,6 +336,7 @@ class SecondScreenInputView(
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         syncImePicker()
+        syncPointerHelp()
         status.text = statusText()
         if (hasWindowFocus) refreshFacts()
     }
@@ -329,7 +350,65 @@ class SecondScreenInputView(
 
     override fun onDetachedFromWindow() {
         trackpad.engine = null
+        pointerSink?.cancel()
+        PointerCursor.hide()
         super.onDetachedFromWindow()
+    }
+
+    /** The display droidtop's shell is drawn on, when it is in front. */
+    private fun shellDisplayId(): Int? = ForegroundShell.current()?.window?.decorView?.display?.displayId
+
+    /**
+     * What the trackpad drives outside Desktop right now: droidtop's own selection while the shell is what the target
+     * screen shows (pointer and focus are one selection there), else a pointer on that screen when droidtop's
+     * accessibility service can play touches on it, else nothing.
+     */
+    private fun currentRoute(): TrackpadRoute {
+        val id = targetId()
+        return TrackpadRoute.of(
+            shellOnTarget = id != null && shellDisplayId() == id,
+            pointerReachable = id != null && AccessibilityPointer.canReach(id),
+        )
+    }
+
+    private fun syncPointerHelp() {
+        val missing = mode != SecondaryDisplayContent.Mode.DESKTOP && targetId() != null && currentRoute() == TrackpadRoute.UNAVAILABLE
+        pointerHelp.visibility = if (missing) View.VISIBLE else View.GONE
+        pointerHelp.text = if (AccessibilityKeyboard.connected) "Turn the accessibility service off and on" else "Turn on the pointer"
+    }
+
+    /** The trackpad outside Desktop: the shell's selection or a pointer on the target screen, chosen as a gesture starts. */
+    private fun routedOutput(): TrackpadOutput {
+        val settings = dev.droidtop.library.settings.CompanionPrefs.settings.value.trackpad
+        val focus = FocusNavTrackpadSink(emit = ForegroundShell::send)
+        val pointer = PointerTrackpadSink(
+            injector = AccessibilityPointer.injector(context) { targetId() },
+            screenPx = { targetId()?.let { AccessibilityPointer.screenSize(context, it) } },
+            userSpeed = trackpadSpeed(settings),
+            naturalScroll = settings.naturalScroll,
+        )
+        pointerSink = pointer
+        var lastTarget: Int? = null
+        return RoutedTrackpadOutput {
+            val id = targetId()
+            if (id != lastTarget) {
+                lastTarget = id
+                pointer.reset()
+            }
+            val route = currentRoute()
+            if (route != lastRoute) {
+                lastRoute = route
+                post {
+                    syncPointerHelp()
+                    status.text = statusText()
+                }
+            }
+            when (route) {
+                TrackpadRoute.FOCUS -> focus
+                TrackpadRoute.POINTER -> pointer
+                TrackpadRoute.UNAVAILABLE -> null
+            }
+        }
     }
 
     private fun trackpadOutput(): TrackpadOutput {
@@ -346,7 +425,7 @@ class SecondScreenInputView(
                 naturalScroll = settings.naturalScroll,
             )
         }
-        return FocusNavTrackpadSink(emit = ForegroundShell::send)
+        return routedOutput()
     }
 
     private fun keyboardSink(): KeyboardSink =
@@ -404,24 +483,29 @@ class SecondScreenInputView(
      * silently: an IME that is not the selected one is never bound, and a
      * container that is not connected has no pointer.
      */
-    private fun statusText(): String = when {
-        mode == SecondaryDisplayContent.Mode.DESKTOP ->
-            if (DesktopSessionService.state.value is DesktopSessionState.Connected) {
+    private fun statusText(): String {
+        if (mode == SecondaryDisplayContent.Mode.DESKTOP) {
+            return if (DesktopSessionService.state.value is DesktopSessionState.Connected) {
                 "Trackpad and keyboard"
             } else {
                 "No desktop session"
             }
+        }
+        val keys = when {
+            KeyboardTargets.companion.value != null -> "Typing"
+            !SecondScreenKeyboard.imeRunning && !AccessibilityKeyboard.connected && !elevated -> "Keyboard off"
+            !SecondScreenKeyboard.androidTargetAvailable() && !AccessibilityKeyboard.hasEditor() && !elevated -> "No text field"
+            else -> null
+        }
+        return listOfNotNull(keys, padLine()).joinToString(" · ")
+    }
 
-        KeyboardTargets.companion.value != null ->
-            "Typing"
-
-        !SecondScreenKeyboard.imeRunning && !AccessibilityKeyboard.connected && !elevated ->
-            "Keyboard off"
-
-        !SecondScreenKeyboard.androidTargetAvailable() && !AccessibilityKeyboard.hasEditor() && !elevated ->
-            "No text field"
-
-        else -> "Touchpad"
+    /** What the trackpad is doing outside Desktop, in a few words. */
+    private fun padLine(): String = when (currentRoute()) {
+        TrackpadRoute.FOCUS -> "Trackpad moves the selection"
+        TrackpadRoute.POINTER -> "Trackpad is a pointer"
+        TrackpadRoute.UNAVAILABLE ->
+            if (targetId() == null) "No other screen" else "Pointer needs the accessibility service"
     }
 }
 

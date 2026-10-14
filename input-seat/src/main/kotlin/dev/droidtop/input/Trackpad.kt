@@ -126,6 +126,12 @@ data class TrackpadConfig(
     val dragLock: Boolean = false,
     /** A two-finger scroll coasts on after the fingers lift, slowing down; off by default. */
     val momentum: Boolean = false,
+    /**
+     * One finger held still for [longPressMs] right-clicks, as a long press does on a touch screen (not libinput's,
+     * which a laptop's two-finger tap covers; droidtop's trackpad is a touch screen first).
+     */
+    val longPressRightClick: Boolean = true,
+    val longPressMs: Long = 600L,
 )
 
 /**
@@ -202,14 +208,26 @@ class TrackpadGestureEngine(
     /** Non-null while a tap's button is down waiting either for a drag or for its release. */
     private var pendingClickReleaseAtMs: Long? = null
 
+    /** When the one still finger on the pad becomes a right click; null when no gesture could become one. */
+    private var longPressAtMs: Long? = null
+
     private var smoothedSpeed = 0f
 
     /** When [tick] must next be called, or null if nothing is pending. */
-    fun nextTimeoutAtMs(): Long? = listOfNotNull(pendingClickReleaseAtMs, coastAtMs?.plus(COAST_FRAME_MS)).minOrNull()
+    fun nextTimeoutAtMs(): Long? =
+        listOfNotNull(pendingClickReleaseAtMs, longPressAtMs, coastAtMs?.plus(COAST_FRAME_MS)).minOrNull()
 
     /** Delivers any timeout that has come due. Safe to call at any rate, including not at all. */
     fun tick(nowMs: Long) {
         coast(nowMs)
+        val pressDue = longPressAtMs
+        if (pressDue != null && nowMs >= pressDue) {
+            longPressAtMs = null
+            // Still one finger, still in place, not scrolling or dragging: the touch is a long press.
+            if (maxFingers == 1 && previous.size == 1 && !movedBeyondTapSlop && !scrolling && !dragging) {
+                click(EvdevKeys.BTN_RIGHT)
+            }
+        }
         val due = pendingClickReleaseAtMs ?: return
         if (nowMs >= due) {
             pendingClickReleaseAtMs = null
@@ -250,6 +268,7 @@ class TrackpadGestureEngine(
         dragLocked = false
         resumedFromLock = false
         pendingClickReleaseAtMs = null
+        longPressAtMs = null
         stopCoast()
         previous = emptyMap()
         resetGesture()
@@ -290,6 +309,7 @@ class TrackpadGestureEngine(
         scrollVelY = 0f
         // A finger on the pad stops a coasting scroll, as on every trackpad with momentum.
         stopCoast()
+        longPressAtMs = null
 
         // Drag lock: the button is still down from the last drag; a finger picks the drag up again, and a tap ends it.
         if (dragLocked && current.size == 1) {
@@ -306,6 +326,9 @@ class TrackpadGestureEngine(
             pendingClickReleaseAtMs = null
             dragging = true
         }
+
+        // A single finger that is not picking up a drag may become a long press.
+        if (config.longPressRightClick && current.size == 1 && !dragging) longPressAtMs = nowMs + config.longPressMs
     }
 
     private fun continueGesture(current: Map<Int, TrackpadTouch>, nowMs: Long) {
@@ -329,6 +352,7 @@ class TrackpadGestureEngine(
         if (hypot(centroid.first - gestureStartCentroidX, centroid.second - gestureStartCentroidY) > config.tapSlopMm) {
             movedBeyondTapSlop = true
         }
+        if (movedBeyondTapSlop || current.size > 1) longPressAtMs = null
 
         when (current.size) {
             1 -> {
@@ -364,6 +388,7 @@ class TrackpadGestureEngine(
     }
 
     private fun endGesture(nowMs: Long) {
+        longPressAtMs = null
         val wasTap = !movedBeyondTapSlop &&
             !scrolling &&
             (nowMs - gestureStartMs) <= config.tapTimeoutMs
@@ -603,17 +628,15 @@ class DirectionalStepper(private val stepMm: Float = 10f) {
 }
 
 /**
- * Trackpad output for the Gaming shell, which has no pointer at all.
- *
- * Stated plainly, because it is the decision this class exists to record:
- * a cursor is not available to droidtop in Gaming mode. Moving a system
- * cursor over another app's window needs `INJECT_EVENTS`, a signature
- * permission no ordinary app holds, and the Gaming shell is Compose
- * focus navigation driven by a D-pad -- a drawn arrow would have nothing
- * to click even if droidtop drew one. So the trackpad drives what the
- * shell actually understands: focus steps, confirm and back. It is a
- * navigation surface here and a pointer there, and pretending the two are
- * the same thing would ship something that silently does nothing.
+ * Trackpad output for droidtop's own shell, which is Compose focus
+ * navigation driven by a D-pad: pointer and focus are one selection there,
+ * so the trackpad drives what the shell understands, focus steps, confirm
+ * and back, and a drawn arrow would have nothing to click. In any other
+ * app the trackpad is a real pointer instead ([PointerTrackpadSink],
+ * chosen by [TrackpadRoute]); moving a system cursor needs `INJECT_EVENTS`,
+ * a signature permission no ordinary app holds, so that pointer is a
+ * cursor drawn by an accessibility overlay and touches played by an
+ * accessibility service.
  *
  * Scroll folds into the same stepper with a coarser step, so two fingers
  * page through a long list faster than one finger walks it.

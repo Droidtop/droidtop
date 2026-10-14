@@ -38,6 +38,8 @@ class CompanionInputTest {
         assertEquals("Typing to: no other screen", InputTarget.label(desktop = false, target = null, pinned = false))
     }
 
+    private fun defaultsLongPress() = trackpadConfig(TrackpadSettings()).longPressRightClick
+
     @Test fun `the trackpad settings reach the gesture engine`() {
         val config = trackpadConfig(
             TrackpadSettings(tapToClick = false, tapMs = 250, dragWindowMs = 500, twoFingerRightClick = false, threeFingerMiddleClick = false, dragLock = true, momentum = true, twoFingerScroll = false),
@@ -47,6 +49,8 @@ class CompanionInputTest {
         assertEquals(500L, config.tapDragTimeoutMs)
         assertFalse(config.twoFingerRightClick || config.threeFingerMiddleClick || config.twoFingerScroll)
         assertTrue(config.dragLock && config.momentum)
+        assertTrue("long press right-clicks unless switched off", defaultsLongPress())
+        assertFalse(trackpadConfig(TrackpadSettings(longPressRightClick = false)).longPressRightClick)
         // Defaults are libinput's: tap, two- and three-finger taps and scroll on, drag lock and momentum off.
         val defaults = trackpadConfig(TrackpadSettings())
         assertTrue(defaults.tapToClick && defaults.twoFingerScroll && defaults.twoFingerRightClick && defaults.threeFingerMiddleClick)
