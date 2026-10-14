@@ -38,4 +38,11 @@ class SetVersionsTest {
     fun `a folder that names no version and has none set shows none`() {
         assertNull(SetVersions.shown(folder("/sd/Games/Far Cry 5"), null))
     }
+
+    @Test
+    fun `the game's files speak only when the folder name names no version`() {
+        assertEquals("0.9" to SetVersions.Origin.FILES, SetVersions.shown(folder("/sd/Games/Some Game"), null, "0.9"))
+        assertEquals("0.5" to SetVersions.Origin.FOLDER, SetVersions.shown(folder("/sd/Games/Game v0.5"), null, "0.9"))
+        assertEquals("1.0" to SetVersions.Origin.SET, SetVersions.shown(folder("/sd/Games/Some Game"), "1.0", "0.9"))
+    }
 }

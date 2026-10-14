@@ -12726,7 +12726,15 @@ its sentence; a game that left the library reads "This game left your library.
 <Store> may refuse to start it"), Size, Cloud saves and DLC, then the rest, then
 **More**, which folds the technical facts until selected: the store id, the
 installed build, the install location and where the version came from ("set by
-you", "from the store's installer", "from the folder name"). **Cloud saves**:
+you", "from the store's installer", "from the folder name", "from the game's
+files"). **The game's files (2026-10-14, Droidtop/tracker#406):** a folder game
+whose name carries no version shows the one its own files declare, read by
+`GameFileVersions` once when its page opens (never while a list is drawn):
+Ren'Py's `define config.version` in `game/options.rpy`, and the `version` of an
+RPG Maker MV/MZ `package.json` (root or `www/`; the editor's template has
+none, so a value there is the developer's). It ranks last (set, store
+installer, folder name, files), so it never contradicts the folder versions
+that grouping and update checks compare. **Cloud saves**:
 a store copy whose store keeps cloud saves droidtop reaches (Steam) says when
 they last synced (`StoreSaves.lastSync`, kept by every sync), "Last sync
 failed" with A to retry, or offline "Not synced since <when>"; a store with

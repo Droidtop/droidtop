@@ -246,6 +246,10 @@ internal fun PcGamePage(
     val setVersion by produceState<String?>(null, entry.id, versionToken) {
         value = withContext(Dispatchers.IO) { dev.droidtop.library.SetVersions.get(context, entry.id) }
     }
+    // What the game's own files declare (Ren'Py options.rpy, RPG Maker package.json), read once per page open.
+    val fileVersion by produceState<String?>(null, entry.id) {
+        value = if (entry.groupingPath() != null) withContext(Dispatchers.IO) { dev.droidtop.library.GameFileVersions.read(entry) } else null
+    }
     var cloudToken by remember(entry.id) { mutableIntStateOf(0) }
     var cloudStatus by remember(entry.id) { mutableStateOf<String?>(null) }
     val cloudStore = remember(entry) {
@@ -297,13 +301,14 @@ internal fun PcGamePage(
         value = withContext(Dispatchers.IO) { dev.droidtop.library.originLabel(entry, 1, roots = pcRootsOf(context)).full }
     }
     val sizeLine = (folderSize ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) }
-    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers) {
+    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources, setVersion, fileVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers) {
         pageRows(
             entry, play, runner, siblings,
             origin = originText,
             size = sizeLine,
             cloudSaves = cloudRow,
             setVersion = setVersion,
+            fileVersion = fileVersion,
             onSetVersion = if (isFolder) ({ editingVersion = true }) else null,
             onClearVersion = {
                 scope.launch {
@@ -341,7 +346,7 @@ internal fun PcGamePage(
                 emptyList()
             } + elsewhereRows(
                 elsewhere,
-                here = dev.droidtop.library.SetVersions.shown(entry, setVersion)?.first,
+                here = dev.droidtop.library.SetVersions.shown(entry, setVersion, fileVersion)?.first,
                 computers = pairedComputers,
                 onGet = if (entry.groupingPath() != null) {
                     { computer, version -> dev.droidtop.library.computers.ComputerGames.get(context, computer, entry, version) }
@@ -403,12 +408,12 @@ internal fun PcGamePage(
             parts,
         )
     }
-    val strip = remember(entry, runner, folderSize, siblings, setVersion) {
+    val strip = remember(entry, runner, folderSize, siblings, setVersion, fileVersion) {
         factsStrip(
             entry = entry,
             now = System.currentTimeMillis(),
             folderSizeBytes = folderSize,
-            installedVersion = installedVersions(entry, siblings, setVersion).firstOrNull(),
+            installedVersion = installedVersions(entry, siblings, setVersion, fileVersion).firstOrNull(),
             runsWith = runner?.label,
             formatSize = { android.text.format.Formatter.formatShortFileSize(context, it) },
         )
@@ -788,7 +793,7 @@ internal fun PcGamePage(
         TextEditDialog(
             title = "Set version",
             subtitle = "Blank uses the folder's name",
-            initial = setVersion ?: dev.droidtop.library.SetVersions.shown(entry, null)?.first.orEmpty(),
+            initial = setVersion ?: dev.droidtop.library.SetVersions.shown(entry, null, fileVersion)?.first.orEmpty(),
             onCommit = { text ->
                 editingVersion = false
                 scope.launch {
@@ -1227,6 +1232,8 @@ private fun pageRows(
     size: String? = null,
     cloudSaves: PageFact? = null,
     setVersion: String? = null,
+    // The version the game's own files declare ([dev.droidtop.library.GameFileVersions]), used when nothing else names one.
+    fileVersion: String? = null,
     onSetVersion: (() -> Unit)? = null,
     onClearVersion: (() -> Unit)? = null,
     moreOpen: Boolean = false,
@@ -1256,8 +1263,8 @@ private fun pageRows(
 
     // A version comes from a folder's own name (docs/SPEC.md 7m); a store
     // row has none to derive.
-    val availableVersions = installedVersions(entry, siblings, setVersion)
-    val shownVersion = dev.droidtop.library.SetVersions.shown(entry, setVersion)
+    val availableVersions = installedVersions(entry, siblings, setVersion, fileVersion)
+    val shownVersion = dev.droidtop.library.SetVersions.shown(entry, setVersion, fileVersion)
     if (availableVersions.isNotEmpty()) {
         add(
             PageFact(
@@ -1514,8 +1521,13 @@ internal fun partFacts(siblings: List<LibraryEntry>): List<PageFact> {
  * derive. The ONE place the page reads "installed version" from, for the
  * Version row and the facts strip alike.
  */
-internal fun installedVersions(entry: LibraryEntry, siblings: List<LibraryEntry>, setVersion: String? = null): List<String> {
-    val own = dev.droidtop.library.SetVersions.shown(entry, setVersion)?.first
+internal fun installedVersions(
+    entry: LibraryEntry,
+    siblings: List<LibraryEntry>,
+    setVersion: String? = null,
+    fileVersion: String? = null,
+): List<String> {
+    val own = dev.droidtop.library.SetVersions.shown(entry, setVersion, fileVersion)?.first
     val others = siblings.mapNotNull { it.groupingPath() }
         .mapNotNull { GameNaming.derive(it).version.takeIf { v -> v.isNotBlank() } }
     return (listOfNotNull(own) + others).distinct()

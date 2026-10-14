@@ -12,8 +12,13 @@ import android.content.Context
 object SetVersions {
     private const val PREFS = "droidtop_set_versions"
 
-    /** Where a game's shown version comes from, for the page's More: "set by you", the store's installer, or the folder's name. */
-    enum class Origin(val words: String) { SET("set by you"), STORE("from the store's installer"), FOLDER("from the folder name") }
+    /** Where a game's shown version comes from, for the page's More: "set by you", the store's installer, the folder's name, or the game's files. */
+    enum class Origin(val words: String) {
+        SET("set by you"),
+        STORE("from the store's installer"),
+        FOLDER("from the folder name"),
+        FILES("from the game's files"),
+    }
 
     fun get(context: Context, entryId: String): String? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(entryId, null)?.takeIf { it.isNotBlank() }
@@ -29,13 +34,17 @@ object SetVersions {
     /**
      * The version a folder game shows and where it came from: the one the
      * person set, else the build a store's marker names, else the folder
-     * name's ([GameTitleParser], the same parse the title is stripped by);
+     * name's ([GameTitleParser], the same parse the title is stripped by),
+     * else what the game's own files declare ([fromFiles], read by
+     * [GameFileVersions] when the page opens; last, so a folder name the
+     * grouping and update checks already compare by is never contradicted);
      * null when none says one. Pure.
      */
-    fun shown(entry: LibraryEntry, set: String?): Pair<String, Origin>? {
+    fun shown(entry: LibraryEntry, set: String?, fromFiles: String? = null): Pair<String, Origin>? {
         set?.takeIf { it.isNotBlank() }?.let { return it to Origin.SET }
         entry.pcInfo?.marker?.buildId?.takeIf { it.isNotBlank() }?.let { return it to Origin.STORE }
         val path = entry.groupingPath() ?: return null
-        return GameNaming.derive(path).version.takeIf { it.isNotBlank() }?.let { it to Origin.FOLDER }
+        GameNaming.derive(path).version.takeIf { it.isNotBlank() }?.let { return it to Origin.FOLDER }
+        return fromFiles?.takeIf { it.isNotBlank() }?.let { it to Origin.FILES }
     }
 }
