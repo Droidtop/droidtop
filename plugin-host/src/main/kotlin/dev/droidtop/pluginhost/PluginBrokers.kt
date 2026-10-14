@@ -16,13 +16,53 @@ import org.json.JSONObject
 
 /** The binder object one plugin holds: it can only ever speak as [core]'s plugin. */
 class PluginHostBroker(private val core: BrokerCore) : IPluginHostBroker.Stub() {
-    override fun call(requestJson: String?): String = core.call(requestJson.orEmpty())
+    override fun call(requestJson: String?): String {
+        val request = requestJson.orEmpty()
+        val reply = core.call(request)
+        if (request.length > BrokerTraffic.LARGE_CHARS || reply.length > BrokerTraffic.LARGE_CHARS) {
+            BrokerTraffic.note(core.pluginId, request, reply.length)
+        }
+        return reply
+    }
 
     // The descriptor goes back as the return value, which the binder closes on droidtop's side once it is sent.
     override fun open(requestJson: String?, reply: Array<String?>?): android.os.ParcelFileDescriptor? {
         val (text, fd) = core.open(requestJson.orEmpty())
         if (reply != null && reply.isNotEmpty()) reply[0] = text
         return fd
+    }
+}
+
+/**
+ * Names the plugin and the op behind bursts of large broker calls. Android warns "Large reply transaction" for
+ * anything over about 200 KB without saying whose it is (the one search showed dozens of 320 KB replies a second,
+ * Droidtop/tracker#485): this logs, at most once every [WINDOW_MS] per plugin, how many large calls it made and the
+ * last one's api, op and sizes, so a rig run's logcat names the plugin and the op instead of leaving it a guess.
+ */
+internal object BrokerTraffic {
+    /** A request or reply of more characters than this (two bytes each in a Parcel) is large. */
+    const val LARGE_CHARS = 64 * 1024
+    private const val WINDOW_MS = 5_000L
+
+    private class Window(var lastLog: Long, var count: Int)
+
+    private val windows = ConcurrentHashMap<String, Window>()
+    private val API_OP = Regex("\"api\"\\s*:\\s*\"([^\"]*)\".{0,120}?\"op\"\\s*:\\s*\"([^\"]*)\"")
+
+    fun note(pluginId: String, request: String, replyChars: Int, now: Long = System.currentTimeMillis()) {
+        val window = windows.getOrPut(pluginId) { Window(0L, 0) }
+        synchronized(window) {
+            window.count++
+            if (now - window.lastLog < WINDOW_MS) return
+            val match = API_OP.find(request.take(300))
+            android.util.Log.w(
+                "droidtop.broker",
+                "$pluginId made ${window.count} large broker calls since the last note; last " +
+                    "${match?.groupValues?.get(1) ?: "?"} ${match?.groupValues?.get(2) ?: "?"}, request ${request.length} chars, reply $replyChars chars",
+            )
+            window.lastLog = now
+            window.count = 0
+        }
     }
 }
 
