@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,11 +69,15 @@ class PairComputerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
-                Column(Modifier.fillMaxSize().groundBackground()) {
-                    Box(Modifier.weight(1f)) {
-                        PairScreen(onDone = { finish() }, holdMulticast = ::holdMulticast)
+                // This screen has no Surface, whose job is to set the text colour: without it every Text is
+                // black, on the ground's black (Droidtop/tracker#527).
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+                    Column(Modifier.fillMaxSize().groundBackground()) {
+                        Box(Modifier.weight(1f)) {
+                            PairScreen(onDone = { finish() }, holdMulticast = ::holdMulticast)
+                        }
+                        HintRow(bindings = listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, "Back")))
                     }
-                    HintRow(bindings = listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, "Back")))
                 }
             }
         }

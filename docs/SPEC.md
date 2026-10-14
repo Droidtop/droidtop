@@ -15862,6 +15862,9 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   remembers the address that answered.
 - **Pairing** (`PairComputerActivity`, opened from Settings > Accounts and
   sources > Computers > Pair a computer):
+  - the screens draw their text in the theme's text colour
+    (`onBackground`): they have no Surface to set it, and the default is
+    black on the ground (Droidtop/tracker#527);
   - the screen shows windowcast's 6-digit SPAKE2 code, and a QR code of the
     same invitation (`droidtop-pair:1?code=…&id=…&name=…&at=ip:port`);
   - the person types `droidtop-agent pair <code>` on the computer;
@@ -15937,7 +15940,17 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
 - A game's key on every device is:
   - its store id (`steam:440`);
   - for a ROM, its system and file name (`rom:snes/<name>`);
-  - otherwise its title in lower case, letters and digits only.
+  - otherwise its title in lower case, letters and digits only. A folder
+    named as one run of words is read as its words, on both ends:
+    `DtSyncTest v1.0` is "Dt Sync Test" here (`GameTitleParser`) and the
+    agent's scanner (`split_run_together`) reads the computer's
+    `DtSyncTest v1.1` the same way. Otherwise one folder is two games, and a
+    computer's newer version or a mark never reaches the other
+    (Droidtop/tracker#529, #531).
+- A computer that lost its library (a restore, a reinstall) is noticed: its
+  sequence number is lower than the one this device pulled up to, so the core
+  sends everything again and pulls everything, newest-wins
+  (Droidtop/tracker#531).
 - Changes carry a hybrid logical clock. Each side pulls only what changed
   after its cursor, so a sync costs what changed.
 - The state, with every device's games, is the core's

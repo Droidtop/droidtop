@@ -16,6 +16,19 @@ class ComputerKeysTest {
         assertEquals("title:super game usa", ComputerLibrary.titleKey("Super Game (USA)"))
     }
 
+    /**
+     * A folder named as one run of words is read as its words here
+     * ([dev.droidtop.library.GameTitleParser]), so the agent's scanner reads it
+     * the same way (`split_run_together`): "DtSyncTest v1.0" here and "DtSyncTest v1.1"
+     * on the computer are one game, `title:dt sync test` (Droidtop/tracker#529).
+     */
+    @Test
+    fun `a folder game is the same key here and on the computer`() {
+        val here = dev.droidtop.library.GameTitleParser.parseName("DtSyncTest v1.0")
+        assertEquals("Dt Sync Test", here.title)
+        assertEquals("title:dt sync test", ComputerLibrary.titleKey(here.title))
+    }
+
     @Test
     fun `file keys match the agent's`() {
         assertEquals("steam_440", ComputerSaves.fileKey("steam:440"))
