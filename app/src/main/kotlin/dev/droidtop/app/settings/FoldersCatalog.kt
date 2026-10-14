@@ -61,7 +61,7 @@ internal object FoldersCatalog {
             val resolved = GamesRootPrefs.resolveStoragePath(uri)
             if (resolved != null) {
                 GamesRootPrefs.addGamesRoot(ctx, resolved)
-                "Added " + folderName(resolved)
+                "Added " + folderName(resolved.path)
             } else {
                 "Couldn't resolve that folder to a real path on this device. Not added"
             }
