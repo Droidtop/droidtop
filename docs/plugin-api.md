@@ -2628,8 +2628,9 @@ with it:
   `PluginSyscallFilter`). The
   BlueStacks rig runs with SELinux disabled (`getenforce`: Disabled) and its
   isolated UID could open a socket; with the filter the check reads
-  "Network: refused" there as on stock Android. Where the filter cannot be
-  installed the isolated process still stands, so a contained plugin runs.
+  "Network: refused" there as on stock Android. Since 2026-10-14 the filter
+  also answers the plugin's own files (see "Guarded hooks"), so a process
+  that cannot take it does not run the plugin.
 - **The 10 s "Waiting for permission service" on BlueStacks (Android 13).**
   Timed step by step: it is the first load of an app library into the
   isolated process (droidtop's own `libdroidtoppy.so`, which links only
@@ -2686,17 +2687,42 @@ included, for two reasons in how droidtop drove the engine:
 locked down, we have to fix how WE handle them, maybe guarded hooks").**
 `SandboxFiles` and `native/src/sandbox_hooks.c`: every file a contained
 plugin's code loads by path gets a virtual path under `/droidtop-sandbox/`
-for a descriptor `:app` handed over. The import slots (PLT/GOT) of the
-system libraries that open such paths (`libnativeloader`, `libjavacore`,
-`libopenjdk`, `libandroidfw`, `libziparchive`, and the Flutter engine once
-loaded) are rewritten, the bytehook technique: `open`/`openat` and the
-`stat`/`access` family answer a virtual path from its descriptor (read
-only), `dlopen`/`android_dlopen_ext` map it from the memfd copy with
-`ANDROID_DLEXT_USE_LIBRARY_FD` added to the caller's own flags (so a
-library ART loads keeps its class-loader namespace and its JNI binding).
-A virtual path nobody registered is `ENOENT`; every other path reaches libc
-unchanged. The Containment check reports which libraries were hooked and how
+for a descriptor `:app` handed over. Since 2026-10-14 (Droidtop/tracker#470,
+"merge, not replace") each one is a local file of the sandbox library
+(`sbx_local_add`): the process's lockdown traps every call that names a
+path, and an `open`, `stat` or `access` of a virtual path is answered from
+its descriptor (read only) at the system-call level, whichever library
+makes it. Before, only the import slots of the libraries droidtop knew
+about were rewritten (`libjavacore`, `libopenjdk`, `libandroidfw`,
+`libziparchive`), so a library they missed could not see the files. What
+stays a hook (PLT/GOT, the bytehook technique) is code: `dlopen` and
+`android_dlopen_ext` in `libnativeloader` and in the Flutter engine once
+loaded map a virtual path from the memfd copy with
+`ANDROID_DLEXT_USE_LIBRARY_FD` added to the caller's own flags (so a library
+ART loads keeps its class-loader namespace and its JNI binding), and the
+engine's `dlsym` and window hooks. A virtual path nobody registered is
+`ENOENT`. The Containment check reports which libraries were hooked and how
 many import slots.
+
+**The plugin's own folder by path (2026-10-14, Droidtop/tracker#470).**
+Every plugin process loaded from descriptors, contained or `gpu.render`,
+gets a file broker in :app (`SandboxBroker`, `native/src/plugin_broker.c`),
+and its lockdown sends droidtop's private folder to it under every name
+code uses for it (`/data/user/<n>/<package>`, `/data/data/<package>`, the
+device-encrypted `/data/user_de/<n>/<package>`). The broker maps those
+names to the plugin's own folder (`plugins/<id>/data/app-data` and
+`app-data-de`, beside its data store, removed with it), read and written.
+So `getFilesDir`, `getCacheDir`, `getDatabasePath`, Flutter's
+`path_provider` and `app_flutter`, SQLite and ART's own caches find real,
+writable folders, and droidtop's own files are not among them under any
+name. A contained process locks down in passthrough
+(`SBX_LOCK_PASSTHROUGH`): only those names go to the broker, and every
+other path is made by the handler with the kernel deciding, where the
+isolated UID and SELinux keep droidtop's files out as before. The
+Containment check's "droidtop's files" line looks for droidtop's
+`files/plugins` folder by its own name, which in a plugin process is the
+plugin's folder, where there is none. Writes there do not count against
+the data store's quota yet.
 **The graphics tier (`gpu.render`, built plugin-enforce-4, 2026-10-09;
 narrowed plugin-enforce-6, 2026-10-09).**
 Some plugins need the GPU and nothing else: a Flutter screen that janks in
@@ -2717,8 +2743,9 @@ opens that one hole:
   sign-in is held in memory beside the plugin's code.
 - **What is still locked down.** The plugin's code is loaded exactly as a
   contained plugin's is: from descriptors through `InMemoryDexClassLoader`
-  and the guarded hooks, with a broker-only `PluginContext` (no private
-  folder, no root, no Shizuku). Every host API it uses goes through the
+  and the guarded hooks, with a broker-only `PluginContext` (no root, no
+  Shizuku; droidtop's private folder is the plugin's own, as in the
+  contained tier). Every host API it uses goes through the
   broker with the same grant, scope, quota and audit. It draws into a
   droidtop-owned `Surface` (`PluginScreenActivity`), with hardware instead
   of `--enable-software-rendering`.
@@ -2727,8 +2754,8 @@ opens that one hole:
   loads, the process installs a seccomp-bpf filter on every thread
   (`native/src/plugin_filter.c`, `PluginSyscallFilter`). It is the
   lockdown of the sandbox library droidtop shares with Enginehost
-  (`vendor/sandbox`, bi0shacker001/sandbox, GPL-3.0), in its unbrokered form
-  (`SBX_LOCK_UNBROKERED`: path calls stay the kernel's), with
+  (`vendor/sandbox`, bi0shacker001/sandbox, GPL-3.0), brokered (every path
+  call traps; see "The plugin's own folder by path"), with
   `SECCOMP_FILTER_FLAG_TSYNC` after `PR_SET_NO_NEW_PRIVS`, so nothing in the
   process can lift it. It refuses `socket()` for every family but
   `AF_UNIX`, and `AF_UNIX` for everything but datagrams (liblog's socket to

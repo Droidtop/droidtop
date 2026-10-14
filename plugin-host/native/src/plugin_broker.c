@@ -1,14 +1,15 @@
 /*
- * The file broker of a gpu.render plugin's process, in :app (docs/plugin-api.md
- * 5.3, "The graphics tier"). That process runs under droidtop's UID, so a
- * path it opened itself could reach droidtop's own files; once it is locked
- * down (plugin_filter.c) every path call it makes comes here instead, over
- * a socket :app handed it with the plugin's descriptors, and is answered
- * from the rules [SandboxBroker] gives: the system's read-only code and
- * data, droidtop's APK, and the device nodes a graphics driver opens later.
- * Nothing of droidtop's private data is in them. Every refusal is logged
- * under droidtop.sandbox with the plugin's id, so a driver's lazy open the
- * rules missed is named on the rig.
+ * The file broker of a plugin process, in :app (docs/plugin-api.md 5.3,
+ * "Files by path"). Once the process is locked down (plugin_filter.c), the
+ * path calls it makes that are the broker's come here, over a socket :app
+ * handed it with the plugin's descriptors, and are answered from the rules
+ * and aliases [SandboxBroker] gives: droidtop's private folder, by any of
+ * its names, is the plugin's own folder; a gpu.render process (droidtop's
+ * UID, every path brokered) also gets the system's read-only code and
+ * data, droidtop's APK and the device nodes a graphics driver opens later.
+ * Nothing of droidtop's own private data is in them. Every refusal is
+ * logged under droidtop.sandbox with the plugin's id, so an open the rules
+ * missed is named on the rig.
  *
  * The broker is the sandbox library's (vendor/sandbox, Droidtop/tracker#470).
  */
@@ -40,10 +41,12 @@ static void audit(void *context, const struct sbx_access *access, int result) {
 /* Starts a broker under the given rules on a new socket pair; returns the plugin process's end, or -errno. */
 JNIEXPORT jint JNICALL
 Java_dev_droidtop_pluginhost_SandboxBroker_nativeServe(JNIEnv *env, jclass clazz, jstring plugin, jobjectArray paths,
-                                                      jintArray modes) {
+                                                      jintArray modes, jobjectArray alias_from, jobjectArray alias_to) {
     (void) clazz;
     jsize count = (*env)->GetArrayLength(env, paths);
     if (count != (*env)->GetArrayLength(env, modes)) return -EINVAL;
+    jsize aliases = (*env)->GetArrayLength(env, alias_from);
+    if (aliases != (*env)->GetArrayLength(env, alias_to)) return -EINVAL;
     struct sbx_policy *policy = sbx_policy_new();
     if (!policy) return -ENOMEM;
     jint *mode = (*env)->GetIntArrayElements(env, modes, NULL);
@@ -56,6 +59,18 @@ Java_dev_droidtop_pluginhost_SandboxBroker_nativeServe(JNIEnv *env, jclass clazz
         (*env)->DeleteLocalRef(env, path);
     }
     (*env)->ReleaseIntArrayElements(env, modes, mode, JNI_ABORT);
+    for (jsize i = 0; i < aliases; i++) {
+        jstring from = (jstring) (*env)->GetObjectArrayElement(env, alias_from, i);
+        jstring to = (jstring) (*env)->GetObjectArrayElement(env, alias_to, i);
+        const char *from_chars = (*env)->GetStringUTFChars(env, from, NULL);
+        const char *to_chars = (*env)->GetStringUTFChars(env, to, NULL);
+        int added = sbx_policy_alias(policy, from_chars, to_chars);
+        if (added != 0) __android_log_print(ANDROID_LOG_WARN, TAG, "alias %s not added: %s", from_chars, strerror(-added));
+        (*env)->ReleaseStringUTFChars(env, from, from_chars);
+        (*env)->ReleaseStringUTFChars(env, to, to_chars);
+        (*env)->DeleteLocalRef(env, from);
+        (*env)->DeleteLocalRef(env, to);
+    }
     const char *id = (*env)->GetStringUTFChars(env, plugin, NULL);
     char *tag = strdup(id ? id : "plugin");  /* lives as long as the process: one per plugin start */
     (*env)->ReleaseStringUTFChars(env, plugin, id);

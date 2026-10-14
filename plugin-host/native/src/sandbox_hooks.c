@@ -1,33 +1,34 @@
 /*
- * Guarded hooks for a contained plugin's isolated process (docs/plugin-api.md
- * 5.3, "Guarded hooks"). The process can open none of droidtop's files: the
- * isolated_app SELinux domain is never allowed to open app_data_file, and
- * never allowed to execute any data file at all (AOSP sepolicy,
- * private/isolated_app_all.te and private/app.te). Code that loads by path
- * (ART's System.loadLibrary, a Flutter engine opening libapp.so, Android's
- * AssetManager opening an asset zip) would therefore fail.
+ * Guarded hooks for a plugin process loaded from descriptors
+ * (docs/plugin-api.md 5.3, "Guarded hooks"). The isolated process can open
+ * none of droidtop's files: the isolated_app SELinux domain is never
+ * allowed to open app_data_file, and never allowed to execute any data
+ * file at all (AOSP sepolicy, private/isolated_app_all.te and
+ * private/app.te). Code that loads by path (ART's System.loadLibrary, a
+ * Flutter engine opening libapp.so, Android's AssetManager opening an
+ * asset zip) would therefore fail.
  *
  * :app hands every file a plugin needs over as a descriptor, and this file
- * gives each one a virtual path under /droidtop-sandbox/. It then rewrites
- * the import slots (PLT/GOT) of the few system libraries that open those
- * paths, so a call that names a virtual path is answered from its
- * descriptor and every other call goes straight to libc as before:
+ * gives each one a virtual path under /droidtop-sandbox/:
  *
- * - open/openat and the stat/access family: a duplicate of the descriptor;
- * - dlopen/android_dlopen_ext: the library is mapped from a private memfd
+ * - open, stat and access of a virtual path, by any library, are answered
+ *   from its descriptor at the system-call level: each one is a local file
+ *   of the sandbox library (sbx_local_add, vendor/sandbox), which the
+ *   process's lockdown (plugin_filter.c) traps every path call through;
+ * - dlopen/android_dlopen_ext, in the libraries this file rewrites the
+ *   import slots (PLT/GOT) of: the library is mapped from a private memfd
  *   copy (the isolated domain may execute its own tmpfs files,
- *   appdomain_tmpfs, never droidtop's files), with ANDROID_DLEXT_USE_LIBRARY_FD
- *   added to whatever the caller passed, so ART still registers the library
- *   with the plugin's class loader and its JNI methods bind as usual.
+ *   appdomain_tmpfs, never droidtop's files), with
+ *   ANDROID_DLEXT_USE_LIBRARY_FD added to whatever the caller passed, so ART
+ *   still registers the library under its virtual name with the plugin's
+ *   class loader and its JNI methods bind as usual.
  *
  * Only registered paths are reachable: a virtual path nobody registered is
- * ENOENT, and writing to one is EACCES. Nothing outside /droidtop-sandbox/
- * is changed. The rewrite is the bytehook technique (ByteDance, MIT),
- * written here for the two 64-bit ABIs droidtop ships.
+ * ENOENT, and writing to one is EACCES. The rewrite is the bytehook
+ * technique (ByteDance, MIT), written here for the two 64-bit ABIs droidtop
+ * ships; it also carries the Flutter engine's dlsym and window hooks.
  */
 #define _GNU_SOURCE
-/* The replacements call libc's own open/stat by address; FORTIFY's overloaded inline wrappers have none. */
-#undef _FORTIFY_SOURCE
 #include <jni.h>
 #include <dlfcn.h>
 #include <elf.h>
@@ -35,7 +36,6 @@
 #include <fcntl.h>
 #include <link.h>
 #include <pthread.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,6 +46,8 @@
 #include <android/dlext.h>
 #include <android/log.h>
 
+#include "sbx.h"
+
 #define TAG "droidtop.sandbox"
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
 
@@ -55,7 +57,7 @@
 typedef struct {
     char *path;
     char *base; /* the file name, for a bare-name dlopen ("libapp.so") */
-    int fd;     /* the descriptor :app handed over */
+    int fd;     /* the descriptor :app handed over (the library's local file holds a duplicate) */
     int exec_fd; /* a memfd copy, made the first time the file is mapped as code */
 } VFile;
 
@@ -78,12 +80,6 @@ static int find(const char *path, int by_base) {
     }
     pthread_mutex_unlock(&g_lock);
     return found;
-}
-
-static int dup_at_start(int i) {
-    int fd = fcntl(g_files[i].fd, F_DUPFD_CLOEXEC, 0);
-    if (fd >= 0) lseek(fd, 0, SEEK_SET);
-    return fd;
 }
 
 /* A private memfd copy of entry [i], made once: what the isolated domain may map as code. */
@@ -119,93 +115,6 @@ static int exec_fd(int i) {
 }
 
 /* ---- The replacements ---- */
-
-static int h_open_common(const char *path, int flags, mode_t mode, int (*real)(const char *, int, ...)) {
-    if (!is_virtual(path)) return real(path, flags, mode);
-    int i = find(path, 0);
-    if (i < 0) {
-        errno = ENOENT;
-        return -1;
-    }
-    if ((flags & O_ACCMODE) != O_RDONLY || (flags & (O_CREAT | O_TRUNC)) != 0) {
-        errno = EACCES;
-        return -1;
-    }
-    return dup_at_start(i);
-}
-
-static int h_open(const char *path, int flags, ...) {
-    mode_t mode = 0;
-    if (flags & O_CREAT) {
-        va_list ap;
-        va_start(ap, flags);
-        mode = (mode_t) va_arg(ap, int);
-        va_end(ap);
-    }
-    return h_open_common(path, flags, mode, open);
-}
-
-static int h_open_2(const char *path, int flags) {
-    return h_open_common(path, flags, 0, open);
-}
-
-static int h_openat(int dirfd, const char *path, int flags, ...) {
-    mode_t mode = 0;
-    if (flags & O_CREAT) {
-        va_list ap;
-        va_start(ap, flags);
-        mode = (mode_t) va_arg(ap, int);
-        va_end(ap);
-    }
-    if (is_virtual(path)) return h_open_common(path, flags, mode, open);
-    return openat(dirfd, path, flags, mode);
-}
-
-static int h_openat_2(int dirfd, const char *path, int flags) {
-    if (is_virtual(path)) return h_open_common(path, flags, 0, open);
-    return openat(dirfd, path, flags, 0);
-}
-
-static int vstat(const char *path, struct stat *st) {
-    int i = find(path, 0);
-    if (i < 0) {
-        errno = ENOENT;
-        return -1;
-    }
-    return fstat(g_files[i].fd, st);
-}
-
-static int h_stat(const char *path, struct stat *st) {
-    return is_virtual(path) ? vstat(path, st) : stat(path, st);
-}
-
-static int h_lstat(const char *path, struct stat *st) {
-    return is_virtual(path) ? vstat(path, st) : lstat(path, st);
-}
-
-static int h_fstatat(int dirfd, const char *path, struct stat *st, int flags) {
-    return is_virtual(path) ? vstat(path, st) : fstatat(dirfd, path, st, flags);
-}
-
-static int vaccess(const char *path, int mode) {
-    if (find(path, 0) < 0) {
-        errno = ENOENT;
-        return -1;
-    }
-    if (mode & W_OK) {
-        errno = EACCES;
-        return -1;
-    }
-    return 0;
-}
-
-static int h_access(const char *path, int mode) {
-    return is_virtual(path) ? vaccess(path, mode) : access(path, mode);
-}
-
-static int h_faccessat(int dirfd, const char *path, int mode, int flags) {
-    return is_virtual(path) ? vaccess(path, mode) : faccessat(dirfd, path, mode, flags);
-}
 
 static void *vdlopen(int i, const char *name, int flags, const android_dlextinfo *caller) {
     int fd = exec_fd(i);
@@ -275,20 +184,6 @@ static const Hook SYMBOL_HOOKS[] = {
 };
 
 static const Hook HOOKS[] = {
-    {"open", (void *) h_open},
-    {"open64", (void *) h_open},
-    {"__open_2", (void *) h_open_2},
-    {"openat", (void *) h_openat},
-    {"openat64", (void *) h_openat},
-    {"__openat_2", (void *) h_openat_2},
-    {"stat", (void *) h_stat},
-    {"stat64", (void *) h_stat},
-    {"lstat", (void *) h_lstat},
-    {"lstat64", (void *) h_lstat},
-    {"fstatat", (void *) h_fstatat},
-    {"fstatat64", (void *) h_fstatat},
-    {"access", (void *) h_access},
-    {"faccessat", (void *) h_faccessat},
     {"dlopen", (void *) h_dlopen},
     {"android_dlopen_ext", (void *) h_android_dlopen_ext},
 };
@@ -432,6 +327,10 @@ Java_dev_droidtop_pluginhost_SandboxFiles_nativeRegister(JNIEnv *env, jclass cla
         ok = JNI_TRUE;
     }
     pthread_mutex_unlock(&g_lock);
+    if (ok) {
+        int local = sbx_local_add(path, fcntl(fd, F_DUPFD_CLOEXEC, 0));
+        if (local != 0) LOGW("%s is not a local file: %s", path, strerror(-local));
+    }
     (*env)->ReleaseStringUTFChars(env, jPath, path);
     if (!ok) close(fd);
     return ok;

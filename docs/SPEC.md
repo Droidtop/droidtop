@@ -17472,7 +17472,9 @@ Advanced.
 - **Contained**, the default for a contract 2 plugin: an isolated process
   of its own (`android:isolatedProcess="true"`), with a random UID, no
   permissions, no network and no access to droidtop's files or shared
-  storage. Its code arrives as file descriptors, and everything it does
+  storage; droidtop's private folder, by whatever name its code uses, is a
+  folder of the plugin's own (since 2026-10-14, Droidtop/tracker#470). Its
+  code arrives as file descriptors, and everything it does
   beyond its process goes through its broker, where the caller's grant, the
   parameters it declared, the quota and the activity log apply. **For a
   contained plugin the permission model is a security boundary.** The
@@ -17488,8 +17490,18 @@ Advanced.
   thin layer for its tiers, its permission wording and its broker
   operations. Its file broker keeps every file access going through
   droidtop's permission system (the owner: "merge, not replace": a
-  decider callback sees every access droidtop asks it to), and the
-  migration of the guarded hooks onto it follows.
+  decider callback sees every access droidtop asks it to). **The guarded
+  hooks' file job is the library's** (2026-10-14): every plugin process
+  loaded from descriptors locks down with a broker in :app; the plugin's
+  own files answer at their virtual paths at the system-call level (local
+  files), so every library that opens them is covered, and only the
+  `dlopen` hooks (code mapped from memory under its virtual name) and the
+  Flutter engine's stay hooks. A contained process sends only droidtop's
+  private folder to its broker, which maps it to the plugin's own; every
+  other path stays the kernel's (passthrough), where the isolated UID
+  already decides. A process that cannot take the lockdown does not run
+  the plugin (an unsandboxed run waits for its red warning,
+  Droidtop/tracker#481).
 - **The graphics tier** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
   a plugin that needs the GPU and nothing else declares `gpu.render` and the
   person ticks it. Granting it runs the plugin in a droidtop-owned process
@@ -17507,7 +17519,8 @@ Advanced.
   2026-10-09: "no sandboxing is perfectly effective ... if it's not
   mitigatable, make the warning more explicit"): every call it makes that
   names a path goes to a file broker in :app whose rules hold none of
-  droidtop's private data (since 2026-10-10, the sandbox library's broker,
+  droidtop's private data, and droidtop's private folder is the plugin's
+  own there too (since 2026-10-10, the sandbox library's broker,
   Droidtop/tracker#470), but a filter cannot look inside binder, so its own
   code could still ask Android's services for things as droidtop. The approval line's detail
   says "A plugin with this could reach past droidtop's checks, so only allow

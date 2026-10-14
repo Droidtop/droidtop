@@ -125,8 +125,8 @@ class NativePluginRunner(
     }
 
     /**
-     * Opens what the contained plugin needs, hands it over and closes droidtop's own copies of the descriptors. A
-     * `gpu.render` process also gets the socket to a file broker started for it here ([SandboxBroker]).
+     * Opens what the contained plugin needs, hands it over and closes droidtop's own copies of the descriptors, with the
+     * socket to a file broker started for its process here ([SandboxBroker]).
      */
     private fun loadContained(runtime: IPluginRuntime, record: PluginRecord, tier: PluginTier): Boolean {
         val id = record.manifest.id
@@ -141,15 +141,13 @@ class NativePluginRunner(
         val names = files.map { it.first }.toMutableList()
         try {
             files.forEach { (_, file) -> opened += ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY) }
-            if (tier == PluginTier.GPU_RENDER) {
-                val broker = SandboxBroker.serve(appContext, id)
-                if (broker == null) {
-                    loadFailures[id] = "its file broker could not be started"
-                    return false
-                }
-                opened += broker
-                names += ContainedFiles.BROKER
+            val broker = SandboxBroker.serve(appContext, id, tier)
+            if (broker == null) {
+                loadFailures[id] = "its file broker could not be started"
+                return false
             }
+            opened += broker
+            names += ContainedFiles.BROKER
             val manifest = JSONObject(java.io.File(PluginStore.payloadDirFor(appContext, id), "manifest.json").readText()).toString()
             return runtime.loadContained(id, manifest, opened.toTypedArray(), names.toTypedArray(), PluginBrokers.binderFor(appContext, id))
         } finally {

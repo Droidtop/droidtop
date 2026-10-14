@@ -3,13 +3,13 @@ package dev.droidtop.pluginhost
 import android.os.ParcelFileDescriptor
 
 /**
- * The guarded hooks of a contained plugin's isolated process (docs/plugin-api.md 5.3, "Guarded hooks";
+ * The plugin's own files in a plugin process loaded from descriptors (docs/plugin-api.md 5.3, "Guarded hooks";
  * `native/src/sandbox_hooks.c`). The process may open none of droidtop's files and may execute no data file, so a
  * plugin's native libraries, a Flutter engine and its app snapshot and assets, which all load by path, are handed over
- * as descriptors and given virtual paths under [ROOT]. [ensureHooks] rewrites the imports of the system libraries that
- * open by path (ART's native loader, libcore's file calls, the asset manager and its zip reader) so such a path is
- * answered from its descriptor, and a library is mapped from a private in-memory copy the isolated domain may execute.
- * Only registered paths answer; everything else reaches libc unchanged.
+ * as descriptors and given virtual paths under [ROOT]. [register] makes each one a local file of the sandbox library: an
+ * open, stat or access of its path, by any library, is answered from its descriptor at the system-call level.
+ * [ensureHooks] rewrites the dlopen imports of ART's native loader, and [hook] the Flutter engine's, so a library at a
+ * virtual path is mapped from a private in-memory copy the isolated domain may execute, under its virtual name.
  */
 internal object SandboxFiles {
     const val ROOT = "/droidtop-sandbox/"
@@ -24,10 +24,8 @@ internal object SandboxFiles {
         System.loadLibrary("droidtoppy")
     }
 
-    // The system libraries that open a plugin's files by path: libnativeloader (System.load / loadLibrary maps the
-    // library), libjavacore and libopenjdk (the class loader's findLibrary checks a file opens), libandroidfw and
-    // libziparchive (AssetManager.addAssetPath reads an asset zip).
-    private val SYSTEM = arrayOf("/libnativeloader.so", "/libjavacore.so", "/libopenjdk.so", "/libandroidfw.so", "/libziparchive.so")
+    // The system library that maps a plugin's native library by path: libnativeloader (System.load / loadLibrary).
+    private val SYSTEM = arrayOf("/libnativeloader.so")
 
     @Volatile private var systemReport: String? = null
 
@@ -39,7 +37,7 @@ internal object SandboxFiles {
 
     @JvmStatic private external fun nativeBridgeScreen(suffix: String): String
 
-    /** Gives [fd] the virtual [path] (under [ROOT]); the descriptor becomes the hooks' own. */
+    /** Gives [fd] the virtual [path] (under [ROOT]); the descriptor becomes the hooks' and the library's own. */
     fun register(path: String, fd: ParcelFileDescriptor): Boolean = nativeRegister(path, fd.detachFd())
 
     /** Hooks the system libraries once per process; returns which ones and how many import slots, for the containment check. */

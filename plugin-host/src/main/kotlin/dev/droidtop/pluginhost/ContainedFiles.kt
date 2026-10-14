@@ -24,7 +24,7 @@ internal object ContainedFiles {
     const val PYTHON_DEP = "python/dep/"
     const val PYTHON_EXT = "python/ext/"
 
-    /** A `gpu.render` process's end of the socket to its file broker in :app ([SandboxBroker]). */
+    /** The plugin process's end of the socket to its file broker in :app ([SandboxBroker]). */
     const val BROKER = "sandbox/broker"
 
     sealed interface Result {

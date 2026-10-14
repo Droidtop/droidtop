@@ -306,7 +306,9 @@ abstract class PluginProcessService : Service() {
                 "a socket opened"
             }.getOrElse { "refused (${it.message})" },
         )
-        out.put("droidtopFiles", runCatching { listing(File(applicationInfo.dataDir, "files")) }.getOrElse { "refused (${it.message})" })
+        // droidtop's plugins folder, which every droidtop with a plugin has: in a plugin process droidtop's private folder
+        // is the plugin's own ([SandboxBroker]), where there is no such folder, so seeing it means seeing droidtop's.
+        out.put("droidtopFiles", runCatching { listing(File(applicationInfo.dataDir, "files/plugins")) }.getOrElse { "refused (${it.message})" })
         // A fixed path, not Environment.getExternalStorageDirectory(): that asks StorageManager over binder for the volume
         // list, and an isolated process may not look up the "mount" service (sepolicy isolated_app_all.te), so the call
         // threw inside the binder stub and the check read "did not answer" (rig, v0.2.0-dev.1649, Android 13 and 14).

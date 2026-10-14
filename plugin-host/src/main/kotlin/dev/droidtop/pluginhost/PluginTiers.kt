@@ -2,16 +2,16 @@ package dev.droidtop.pluginhost
 
 /** docs/plugin-api.md 5.3: where a plugin's code runs, and so what it can reach without asking droidtop. */
 enum class PluginTier {
-    /** An isolated process of its own: no permissions, no network, no files. Everything goes through the broker. */
+    /** An isolated process of its own: no permissions, no network, no files but a folder of its own. Everything goes through the broker. */
     CONTAINED,
 
     /**
      * A process of its own under droidtop's UID, kept to the broker-only context and the sandbox class loader like a
      * contained plugin, but NOT an isolated process, so the graphics chip is reachable (an isolated process may not open
      * it: sepolicy isolated_app_all.te). The one hole `gpu.render` opens. A system-call filter takes the network away
-     * ([PluginSyscallFilter]); what the process still shares with droidtop's UID (its own native code could open droidtop's
-     * files or ask Android's services for things as droidtop) cannot be walled off by an app on Android, so the
-     * permission carries a plain warning ([PluginTiers.caution], docs/plugin-api.md 5.3).
+     * ([PluginSyscallFilter]) and sends every path to a file broker ([SandboxBroker]); what the process still shares
+     * with droidtop's UID (its own native code could ask Android's services for things as droidtop) cannot be walled off
+     * by an app on Android, so the permission carries a plain warning ([PluginTiers.caution], docs/plugin-api.md 5.3).
      */
     GPU_RENDER,
 

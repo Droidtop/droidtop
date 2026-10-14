@@ -50,24 +50,20 @@ open class PluginSandboxService : PluginProcessService() {
     override fun loadFromFiles(pluginId: String, manifest: PluginManifest, files: Map<String, ParcelFileDescriptor>, broker: IPluginHostBroker): Boolean {
         if (requiresIsolation && !dev.droidtop.runtime.util.IsolatedProcess.isIsolated()) return failLoad(pluginId, "the contained process is not isolated; refusing to run the plugin here")
         // The same seccomp filter for both kinds of plugin process, before any plugin code (docs/plugin-api.md 5.3). In a
-        // graphics process it is the only network wall, so a process that cannot take it does not run the plugin. In the
-        // isolated sandbox Android's own rules already refuse sockets, except where a device does not enforce them: the
-        // BlueStacks rig runs with SELinux disabled and let an isolated UID open a socket (rig, v0.2.0-dev.1649). There the
-        // filter is the wall; where it cannot be installed, the isolated process still stands, so the plugin runs.
+        // graphics process it is the only network wall; in the isolated sandbox Android's own rules already refuse sockets,
+        // except where a device does not enforce them (the BlueStacks rig runs with SELinux disabled and let an isolated UID
+        // open a socket, rig, v0.2.0-dev.1649). In both it is also what answers the plugin's own files at their virtual
+        // paths and turns droidtop's private folder into the plugin's own ([SandboxBroker]), so a process that cannot take
+        // it does not run the plugin (an unsandboxed run waits for its warning, Droidtop/tracker#481).
         // The first native call of the process, which loads droidtop's own libdroidtoppy.so; timed in logcat because on the
         // BlueStacks rig that first library load waits 10 s inside its native bridge (docs/plugin-api.md 5.3, "The rigs").
         val before = android.os.SystemClock.uptimeMillis()
-        // A graphics process runs under droidtop's UID, so its path calls go to the broker :app started for it
-        // ([SandboxBroker]); the isolated sandbox's files are already out of its UID's reach.
-        val brokerFd = if (requiresIsolation) {
-            -1
-        } else {
-            files[ContainedFiles.BROKER]?.detachFd() ?: return failLoad(pluginId, "droidtop did not hand over its file broker")
-        }
-        val report = PluginSyscallFilter.install(brokerFd).also { filter = it }
+        val brokerFd = files[ContainedFiles.BROKER]?.detachFd() ?: return failLoad(pluginId, "droidtop did not hand over its file broker")
+        val claims = if (requiresIsolation) SandboxBroker.claims(applicationInfo) else null
+        val report = PluginSyscallFilter.install(brokerFd, claims).also { filter = it }
         android.util.Log.i("droidtop.plugin", "$pluginId: system-call filter ${report.substringBefore(':')} in ${android.os.SystemClock.uptimeMillis() - before} ms (first native call)")
-        if (!requiresIsolation && !PluginSyscallFilter.isOn(report)) {
-            return failLoad(pluginId, "its process could not take droidtop's system-call filter ($report), so it is not run with the graphics chip")
+        if (!PluginSyscallFilter.isOn(report)) {
+            return failLoad(pluginId, "its process could not take droidtop's system-call filter ($report), so it is not run")
         }
         val context = BrokerPluginContext(broker)
         return when (manifest.kind) {
@@ -194,16 +190,18 @@ class PluginGpuSlot7 : PluginGpuService()
  * The seccomp-bpf filter of every plugin process droidtop loads from descriptors, the isolated sandbox and a
  * `gpu.render` process alike (docs/plugin-api.md 5.3; `native/src/plugin_filter.c`, the sandbox library's lockdown in
  * `vendor/sandbox`): no socket but a local datagram one (so no internet and no DNS), no programs, no io_uring, no ptrace,
- * no namespaces and no signals to other processes, on every thread and for good. In a `gpu.render` process every call
- * that names a path also goes to its broker in :app ([SandboxBroker]). An app may add such a filter to its own process (Chrome does for its renderers); it
- * cannot filter by path or look inside a binder call, which is what the permission's warning is about.
+ * no namespaces and no signals to other processes, on every thread and for good. Every call that names a path traps:
+ * the plugin's own files answer at their virtual paths ([SandboxFiles]), droidtop's private folder goes to its broker in
+ * :app ([SandboxBroker]), which makes it the plugin's own, and in a `gpu.render` process every other path goes there
+ * too. An app may add such a filter to its own process (Chrome does for its renderers); it cannot look inside a binder
+ * call, which is what the `gpu.render` permission's warning is about.
  */
 internal object PluginSyscallFilter {
     init {
         System.loadLibrary("droidtoppy")
     }
 
-    @JvmStatic private external fun nativeInstall(brokerFd: Int, ownOpens: Array<String>): String
+    @JvmStatic private external fun nativeInstall(brokerFd: Int, ownOpens: Array<String>, claims: Array<String>?): String
 
     /**
      * Device files a graphics process opens itself before the lockdown: the kernel ties binder and some GPU drivers'
@@ -214,10 +212,13 @@ internal object PluginSyscallFilter {
 
     /**
      * Installs the filter once per process; returns what happened, starting "on:" or "error:". [brokerFd] is the
-     * process's end of its broker's socket (taken), or -1 for the isolated sandbox, which keeps its own path calls.
+     * process's end of its broker's socket (taken). [claims] are the folders the broker answers for in the isolated
+     * sandbox ([SandboxBroker.claims]), whose other paths stay the kernel's; null in a graphics process, whose every path
+     * goes to the broker.
      */
     @Synchronized
-    fun install(brokerFd: Int): String = nativeInstall(brokerFd, if (brokerFd < 0) emptyArray() else OWN_OPENS)
+    fun install(brokerFd: Int, claims: Array<String>?): String =
+        nativeInstall(brokerFd, if (claims == null) OWN_OPENS else emptyArray(), claims)
 
     fun isOn(report: String): Boolean = report.startsWith("on:")
 }
