@@ -18,6 +18,7 @@ import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.pluginhost.PluginWebAccount
 import dev.droidtop.pluginhost.LegacyManifest
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginErrorCode
@@ -418,6 +419,7 @@ private class PluginPage(
      * declared permission opens Permissions.
      */
     private fun noticeItem(screenId: String, itemId: String, node: ViewNode.Notice): CatalogItem {
+        accountNotice(itemId, node)?.let { return it }
         val action = node.action
         val opens: CatalogScreen? = when {
             node.opensPermissions -> SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, record.manifest.id)
@@ -443,6 +445,32 @@ private class PluginPage(
             ),
             placement = if (node.banner) NoticePlacement.Page else NoticePlacement.Group,
             opens = opens,
+        )
+    }
+
+    /**
+     * A SIGN_IN_REQUIRED or BROWSER_CHECK_REQUIRED notice as droidtop's own action (docs/plugin-api.md 1.3, Droidtop/tracker#544):
+     * Sign in or Open the site in the plugin's session, then the page is read again. Null when the plugin declares no
+     * `web.session` site, and its own action (if any) is offered as before.
+     */
+    private fun accountNotice(itemId: String, node: ViewNode.Notice): CatalogItem? {
+        val need = node.opensAccount ?: return null
+        if (PluginWebAccount.checkUrl(record) == null) return null
+        val label = if (need == PluginWebAccount.Need.SIGN_IN) "Sign in" else "Open the site"
+        return NoticeItem(
+            id = itemId,
+            notice = Notice(
+                tone = NoticeTone.Caution,
+                title = node.title,
+                body = node.subtitle,
+                details = node.details,
+                action = NoticeAction(label) { context ->
+                    val kept = withContext(Dispatchers.IO) { PluginWebAccount.open(context, record, need) }
+                    if (kept) stale = op != null else notice = PluginWebAccount.notKept(record.manifest.label, need)
+                },
+                source = record.manifest.label,
+            ),
+            placement = if (node.banner) NoticePlacement.Page else NoticePlacement.Group,
         )
     }
 

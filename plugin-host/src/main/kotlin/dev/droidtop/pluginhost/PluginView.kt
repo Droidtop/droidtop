@@ -211,6 +211,11 @@ sealed interface ViewNode {
         val action: ViewAction?,
         /** Set by the host only (an error reply's declared permission): the notice opens the plugin's Permissions. */
         val opensPermissions: Boolean = false,
+        /**
+         * Set by the host only (a SIGN_IN_REQUIRED or BROWSER_CHECK_REQUIRED reply): droidtop's own Sign in or Open the
+         * site in the plugin's session ([PluginWebAccount]), when the plugin declares a `web.session` site.
+         */
+        val opensAccount: PluginWebAccount.Need? = null,
     ) : ViewNode
 
     companion object {
@@ -320,14 +325,17 @@ object PluginViewCall {
     /**
      * An error reply as the caution notice droidtop draws for it (docs/plugin-api.md 1.3): the error's own title and
      * subtitle in plain words when it gave them, its code and message in Info. PERMISSION_DENIED naming a permission
-     * the plugin [declared] opens its Permissions; naming one it did not is logged, not trusted. SIGN_IN_REQUIRED
-     * offers the error's action as "Sign in".
+     * the plugin [declared] opens its Permissions; naming one it did not is logged, not trusted. SIGN_IN_REQUIRED and
+     * BROWSER_CHECK_REQUIRED become droidtop's own Sign in / Open the site ([ViewNode.Notice.opensAccount]); an older
+     * SIGN_IN_REQUIRED's own action is kept for a plugin that declares no `web.session` site. Info shows the error's
+     * `detail` when it gave one, else its message.
      */
     fun errorNotice(reply: PluginReply, declared: Set<String>, fallbackTitle: String, messages: MutableList<String>? = null): ViewNode.Notice {
         val title = (reply.title ?: fallbackTitle).cut(PluginViewLimits.length("noticeTitle"))
         val body = (reply.subtitle ?: reply.message?.takeIf { reply.title == null && it.isNotBlank() })?.cut(PluginViewLimits.length("noticeSubtitle"))
         var opensPermissions = false
         var action: ViewAction? = null
+        var opensAccount: PluginWebAccount.Need? = null
         when (reply.code) {
             PluginErrorCode.PERMISSION_DENIED -> reply.permission?.let { permission ->
                 if (permission in declared) {
@@ -336,11 +344,19 @@ object PluginViewCall {
                     messages?.add("an error named the permission \"$permission\", which this plugin does not declare")
                 }
             }
-            PluginErrorCode.SIGN_IN_REQUIRED -> action = ViewAction.parse(reply.action)?.copy(title = "Sign in")
+            PluginErrorCode.SIGN_IN_REQUIRED -> {
+                opensAccount = PluginWebAccount.Need.SIGN_IN
+                action = ViewAction.parse(reply.action)?.copy(title = "Sign in")
+            }
+            PluginErrorCode.BROWSER_CHECK_REQUIRED -> opensAccount = PluginWebAccount.Need.BROWSER_CHECK
             else -> Unit
         }
-        val details = listOfNotNull(reply.code?.name, reply.message?.takeIf { it.isNotBlank() }).joinToString(": ")
-        return ViewNode.Notice("error", title, body, details.cut(PluginViewLimits.length("noticeDetails")), "caution", banner = false, action = action, opensPermissions = opensPermissions)
+        val said = (reply.detail ?: reply.message)?.takeIf { it.isNotBlank() }
+        val details = listOfNotNull(reply.code?.name, said).joinToString(": ")
+        return ViewNode.Notice(
+            "error", title, body, details.cut(PluginViewLimits.length("noticeDetails")), "caution", banner = false, action = action,
+            opensPermissions = opensPermissions, opensAccount = opensAccount,
+        )
     }
 
     /**

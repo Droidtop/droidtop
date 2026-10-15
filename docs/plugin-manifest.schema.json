@@ -58,7 +58,9 @@
           "job": { "type": "boolean" },
           "tab": { "enum": ["overview", "versions", "extras", "details"], "description": "ui.game_section only: the PC game page tab its rows go under; Extras when absent." },
           "entrypoint": { "type": "string", "minLength": 1, "description": "ui.main only (flutter_embed): the Dart function started on the hosted engine; annotate it @pragma('vm:entry-point')." },
-          "library": { "type": "string", "description": "ui.main only: the library URI of entrypoint when it is not the root library." }
+          "library": { "type": "string", "description": "ui.main only: the library URI of entrypoint when it is not the root library." },
+          "gamePackages": { "type": "array", "items": { "type": "string" }, "description": "ui.panel: the apps its Game rows are for. ui.quick_tile / ui.status_tile: the tile is shown only while one of these apps runs the game (docs/plugin-api.md C2)." },
+          "whileGame": { "type": "boolean", "description": "ui.quick_tile / ui.status_tile: shown only while a game is running (docs/plugin-api.md C2)." }
         },
         "allOf": [
           { "if": { "properties": { "point": { "const": "ui.main" } }, "required": ["point"] }, "then": { "required": ["entrypoint"] } }
@@ -77,7 +79,8 @@
           "domains": { "type": "array", "items": { "type": "string" } },
           "packages": { "type": "array", "items": { "type": "string" } },
           "paths": { "type": "array", "items": { "type": "string" }, "description": "files.shared.read / files.shared.write: folders relative to a storage volume, or \"*\" for all of it." },
-          "scope": { "type": "string" }
+          "scope": { "type": "string" },
+          "signIn": { "type": "string", "description": "web.session only: the https sign-in page on one of its domains; droidtop's own Sign in opens it (docs/plugin-api.md G3)." }
         }
       }
     },

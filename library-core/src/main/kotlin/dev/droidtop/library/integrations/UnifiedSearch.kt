@@ -62,6 +62,7 @@ class SourceStatus(
     val failure: String? get() = outcome?.failure
     val runtimeNeed: RuntimeNeed? get() = outcome?.runtimeNeed
     val technical: String? get() = outcome?.technical
+    val access: dev.droidtop.pluginhost.PluginWebAccount.Need? get() = outcome?.access
 }
 
 /**

@@ -58,6 +58,12 @@ interface BrokerEnvironment {
      */
     fun openLink(uri: String, title: String?): String?
 
+    /**
+     * droidtop's own fallback for a link it could not hand on (docs/plugin-api.md 3 F2, Droidtop/tracker#544 item 3):
+     * the link is put on the clipboard and droidtop says, in its own words, why and what to do. True when copied.
+     */
+    fun linkFallback(pluginLabel: String, uri: String, why: String): Boolean = false
+
     /** Shows [text] as a short message attributed to [pluginLabel], on whatever surface is in front; false when it could not. */
     fun toast(pluginLabel: String, text: String): Boolean
 
@@ -231,6 +237,8 @@ class HostOp(
     val alwaysAudit: Boolean = false,
     /** The Android permission droidtop needs for this op; asked of Android on first use during a call the person started. */
     val android: AndroidNeed? = null,
+    /** droidtop's own answer to the person when the op is refused for a permission (the plugin still gets the error). */
+    val onRefused: ((env: BrokerEnvironment, record: PluginRecord, args: JSONObject, reason: String) -> Unit)? = null,
     /** For an op that hands the plugin a file ([IPluginHostBroker.open]) instead of JSON. */
     val open: ((env: BrokerEnvironment, record: PluginRecord, args: JSONObject) -> android.os.ParcelFileDescriptor)? = null,
     val exec: ((env: BrokerEnvironment, record: PluginRecord, args: JSONObject) -> JSONObject)? = null,
@@ -364,12 +372,21 @@ object HostApis {
             userOnly = true,
             alwaysAudit = true,
             target = { AppLinks.target(it.optString("uri")) },
-        ) { env, _, args ->
+            // Opening links turned off: droidtop says so and copies the link, so no plugin builds its own copy page.
+            onRefused = { env, record, args, _ ->
+                val uri = args.optString("uri").trim()
+                if (AppLinks.refusal(uri) == null) {
+                    env.linkFallback(record.manifest.label, uri, "${record.manifest.label} may not open links in other apps; you can allow it in its Permissions")
+                }
+            },
+        ) { env, record, args ->
             val uri = args.optString("uri").trim()
             AppLinks.refusal(uri)?.let { invalid(it) }
             val title = args.optString("title").trim().take(MAX_LINK_TITLE).takeIf { it.isNotEmpty() }
             val reason = env.openLink(uri, title)
-            JSONObject().put("opened", reason == null).also { if (reason != null) it.put("reason", reason) }
+            // No app takes it: droidtop's own fallback, the link on the clipboard and why (docs/plugin-api.md 3 F2).
+            val copied = reason != null && env.linkFallback(record.manifest.label, uri, reason.replaceFirstChar { it.uppercase() })
+            JSONObject().put("opened", reason == null).also { if (reason != null) it.put("reason", reason).put("copied", copied) }
         },
         HostOp(
             "apps", "send_intent",
@@ -759,6 +776,7 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
             return run()
         } catch (e: BrokerException) {
             result = e.code.name
+            if (e.code == PluginErrorCode.PERMISSION_DENIED && permission != null) runCatching { hostOp.onRefused?.invoke(env, record, request.args, e.message.orEmpty()) }
             throw e
         } catch (t: Throwable) {
             result = PluginErrorCode.FAILED.name

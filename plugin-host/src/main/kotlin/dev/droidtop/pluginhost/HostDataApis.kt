@@ -98,8 +98,17 @@ class PluginDataStore(val root: File) {
 }
 
 internal object HostDataApis {
-    /** The most one `data.read` returns; it travels as text inside the 256 KiB reply cap. Larger files are opened (`data.open`). */
+    /** The most one write takes; it travels as text inside the call. Larger files are appended or opened (`data.open`). */
     const val MAX_CHUNK = 128 * 1024
+
+    /**
+     * The most one `data.read` (and `files.read`) returns: 48 KiB (docs/plugin-api.md 3 H1, Droidtop/tracker#544 item 4).
+     * The reply crosses the broker as UTF-16 text, and base64 adds a third: 120 KiB came back as a 327808-byte binder
+     * reply ("Large reply transaction"). 48 KiB is about 130 KB on the binder, well under it. A longer `length` is
+     * answered with this much and `eof: false`, so a reader that loops until `eof` reads every file as before; a large
+     * file is better opened (`data.open`, a descriptor).
+     */
+    const val MAX_READ = 48 * 1024
 
     private fun invalid(message: String): Nothing = throw BrokerException(PluginErrorCode.INVALID_ARGS, message)
 
@@ -119,7 +128,7 @@ internal object HostDataApis {
             JSONObject().put("size", size)
         },
         HostOp("data", "read", target = { it.optString("name") }) { env, record, args ->
-            val length = args.optInt("length", MAX_CHUNK).coerceIn(0, MAX_CHUNK)
+            val length = args.optInt("length", MAX_READ).coerceIn(0, MAX_READ)
             val offset = args.optLong("offset", 0L)
             val (bytes, size) = storeOf(env, record).read(args.optString("name"), offset, length)
             val out = JSONObject().put("size", size).put("eof", offset + bytes.size >= size)

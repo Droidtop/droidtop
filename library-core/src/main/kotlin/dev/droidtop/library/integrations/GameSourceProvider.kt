@@ -107,7 +107,7 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         val args = org.json.JSONObject().put("query", query).put("values", org.json.JSONObject(values as Map<*, *>)).put("context", hostContext)
         limit?.let { args.put("limit", it) }
         val reply = PluginViews.call(context, source.record, "library.sources", "search", args)
-        if (!reply.ok) return Result.failure(IllegalStateException(reply.message ?: "Search failed"))
+        if (!reply.ok) return Result.failure(SourceReplyFailure(reply.code ?: dev.droidtop.pluginhost.PluginErrorCode.FAILED, reply.message, reply.detail))
         return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).let { rows -> if (limit != null) rows.take(limit) else rows }.map { row ->
             AcquireContentResult(row.id, row.title, row.subtitle, null, row.platform, null, emptyList(), row.refJson, row.columns, row.badges)
         })

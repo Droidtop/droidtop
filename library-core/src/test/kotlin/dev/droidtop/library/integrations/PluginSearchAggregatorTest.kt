@@ -143,4 +143,19 @@ class PluginSearchAggregatorTest {
 
     /** No fake source above reads anything off the Context it is handed; a bare ContextWrapper is enough to satisfy the interface's non-null Context parameter without instantiating a real Android Context. */
     private fun mockContext(): Context = object : ContextWrapper(null) {}
+
+    @Test
+    fun `a sign-in or browser-check answer is droidtop's sentence and action, a detail goes behind Technical details`() {
+        val source = fakeSource("Site")
+        val signIn = PluginSearchAggregator.failureOutcome(source, SourceReplyFailure(dev.droidtop.pluginhost.PluginErrorCode.SIGN_IN_REQUIRED, "whatever", null))
+        assertEquals(SourceFailures.NEEDS_SIGN_IN, signIn.failure)
+        assertEquals(dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN, signIn.access)
+        val check = PluginSearchAggregator.failureOutcome(source, SourceReplyFailure(dev.droidtop.pluginhost.PluginErrorCode.BROWSER_CHECK_REQUIRED, null, "<p>Just a moment</p>"))
+        assertEquals(SourceFailures.NEEDS_BROWSER_CHECK, check.failure)
+        assertEquals("Just a moment", check.technical)
+        val plain = PluginSearchAggregator.failureOutcome(source, SourceReplyFailure(dev.droidtop.pluginhost.PluginErrorCode.FAILED, "The site did not answer", "socket closed after 3 s"))
+        assertEquals("The site did not answer", plain.failure)
+        assertEquals("socket closed after 3 s", plain.technical)
+        assertEquals(null, plain.access)
+    }
 }
