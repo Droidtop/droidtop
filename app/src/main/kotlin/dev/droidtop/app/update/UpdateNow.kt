@@ -27,20 +27,13 @@ import kotlinx.coroutines.flow.update
  * signing-key check) is the only prompt that remains.
  *
  * Reached two ways, both through [start]: the "Check now" row on Settings > Software updates
- * ([startAndAwait]), and the UPDATE_NOW broadcast (dev.droidtop.app.UpdateNowReceiver). The pass
- * itself is short: it reads the feed and hands the APK transfer to Android's DownloadManager
- * ([UpdateDownload]), which goes on whatever happens to droidtop's process and wakes droidtop to
- * install when it ends (Droidtop/tracker#445). Only the Check now row waits for that end, to narrate it.
+ * ([startAndAwait]), and the UPDATE_NOW broadcast (dev.droidtop.app.UpdateNowReceiver). The APK is
+ * fetched by droidtop's own downloader as a job in Downloads ([UpdateDownload], Droidtop/tracker#226) and
+ * installed by that job's post step; the pass narrates the job and ends with it.
  */
 object UpdateNow {
     const val ACTION = "dev.droidtop.UPDATE_NOW"
     const val TAG = "DroidtopUpdateNow"
-
-    /** How long the Check now row waits on the installer's answer. */
-    private const val OUTCOME_WAIT_MS = 10 * 60 * 1000L
-
-    /** How long a watching pass waits for the receiver that claimed the finished download to ask the installer. */
-    private const val CLAIM_WAIT_MS = 2 * 60 * 1000L
 
     /** What a forced pass decides, once it knows what is published. */
     enum class Verdict { ALREADY_CURRENT, INSTALL }
@@ -72,12 +65,13 @@ object UpdateNow {
     /**
      * Starts a pass on a thread of its own and returns at once; a pass already running is joined, not
      * doubled. [onHandedOff] runs once this caller no longer needs droidtop's process for it: when the
-     * pass ends (for UPDATE_NOW that is as soon as the download is with DownloadManager), or at once
-     * when an earlier pass is joined. The UPDATE_NOW receiver finishes its broadcast there.
+     * pass ends, or at once when an earlier pass is joined. The UPDATE_NOW receiver finishes its broadcast there
+     * (or at its own hold limit, [broadcastHoldMs]); the download job goes on in Downloads either way and is
+     * resumed from its partial file if the process was lost meanwhile.
      */
-    fun start(context: Context, waitForOutcome: Boolean = false, onHandedOff: () -> Unit = {}) {
+    fun start(context: Context, onHandedOff: () -> Unit = {}) {
         val application = context.applicationContext
-        launch({ runPass(application, waitForOutcome) }, onHandedOff)
+        launch({ runPass(application) }, onHandedOff)
     }
 
     /** [start]'s bookkeeping, apart from the context so it can be tested. False when an earlier pass was joined. */
@@ -102,7 +96,7 @@ object UpdateNow {
 
     /** Starts a pass (or joins the one running) and waits for it, narrating through [onStatus]: the Check now row. */
     suspend fun startAndAwait(context: Context, onStatus: (String) -> Unit): String {
-        start(context, waitForOutcome = true)
+        start(context)
         val done = pass
             .onEach { if (it.line.isNotEmpty()) onStatus(it.line) }
             .first { !it.running }
@@ -113,9 +107,9 @@ object UpdateNow {
      * [runNow] as the pass that [start] began: its narration kept in [pass], and always ending with [pass]
      * not running and the outcome set.
      */
-    private fun runPass(context: Context, waitForOutcome: Boolean): String {
+    private fun runPass(context: Context): String {
         val outcome = try {
-            runNow(context, waitForOutcome) { line -> passState.update { it.copy(line = line) } }
+            runNow(context) { line -> passState.update { it.copy(line = line) } }
         } catch (error: Throwable) {
             log("Update failed: " + (error.message ?: error.javaClass.simpleName))
         }
@@ -129,12 +123,10 @@ object UpdateNow {
      * [TAG] so the adb path can be read back with logcat. Throws nothing;
      * a failed check or download comes back as its message.
      *
-     * Without [waitForOutcome] it returns once the APK download is with DownloadManager (or the
-     * installer was asked for a copy already on disk); the install then happens when the download
-     * ends ([UpdateDownloadReceiver]). With it, it watches the download and waits for the installer's
-     * answer.
+     * The APK comes from droidtop's own downloader ([UpdateDownload]); the pass stays with the download job to its
+     * end, which is the installer's answer.
      */
-    private fun runNow(context: Context, waitForOutcome: Boolean, onStatus: (String) -> Unit): String {
+    private fun runNow(context: Context, onStatus: (String) -> Unit): String {
         val application = context.applicationContext
         val installed = AppSelfUpdate.installedVersionCode(application)
         onStatus("Checking for a newer build...")
@@ -156,37 +148,39 @@ object UpdateNow {
         log("newer build published: " + info.versionName + " (build " + info.versionCode + "), installed " + installed)
         // A newer build than one already half fetched supersedes it.
         UpdateFiles.clean(application, installed, target = info.versionCode)
-        val label = info.versionName + " (build " + info.versionCode + ")"
-        val result = try {
+        // The relaunch after the install is decided by what the person is doing now (UpdateRelaunch).
+        UpdateRelaunch.arm(application)
+        val outcome = try {
             AppSelfUpdate.requireInstallAllowed(application)
-            when (val found = UpdateDownload.obtain(application, info)) {
-                is UpdateDownload.Found.Ready -> UpdateDownload.install(application, found.pending)
-                is UpdateDownload.Found.BeingInstalled ->
-                    UpdateDownload.awaitInstall(found.id, CLAIM_WAIT_MS)
-                        ?: return log("the download of $label has finished and is being handed to Android's installer")
+            when (val found = UpdateDownload.find(application, info)) {
+                is UpdateDownload.Found.Ready -> {
+                    val session = AppSelfUpdate.install(application, found.apk, info.versionCode, info.versionName, info.apkSha256)
+                    onStatus("Waiting for you to confirm the install in Android's installer...")
+                    log(
+                        AppSelfUpdate.awaitOutcome(session, INSTALL_WAIT_MS)
+                            ?: "asked Android's installer to install ${info.versionName}; it has not answered yet. If nothing was asked, press Check now again.",
+                    )
+                }
                 is UpdateDownload.Found.Downloading -> {
-                    if (!waitForOutcome) {
-                        val how = if (found.joined) "is already downloading" else "is downloading"
-                        return log("Android's download manager $how $label; droidtop asks the installer when it completes")
-                    }
+                    log("the download of ${info.versionName} is already going; joining it")
+                    log(UpdateDownload.await(found.jobId, onStatus))
+                }
+                UpdateDownload.Found.Missing -> {
                     onStatus("Downloading ${info.versionName}...")
-                    UpdateDownload.watch(application, found.id, info.versionName, onStatus)
-                    UpdateDownload.complete(application, found.id, CLAIM_WAIT_MS)
-                        ?: return log("the download of $label ended; droidtop asked Android's installer when it did")
+                    log(kotlinx.coroutines.runBlocking { UpdateDownload.download(application, info, onStatus) })
                 }
             }
         } catch (error: Exception) {
-            return log("Update install failed: " + (error.message ?: error.javaClass.simpleName))
+            log("Update install failed: " + (error.message ?: error.javaClass.simpleName))
         }
-        val sessionId = result.first ?: return result.second
-        if (!waitForOutcome) return log("${result.second}; its answer is logged under $TAG")
-        // The row reports what the installer really did, not that it
-        // was asked: "handed to the installer" read the same after the
-        // person had pressed Cancel (rig, dq-shell2-01).
-        onStatus("Waiting for you to confirm the install in Android's installer...")
-        return AppSelfUpdate.awaitOutcome(sessionId, OUTCOME_WAIT_MS)?.let { log(it) }
-            ?: log("${result.second}; it has not answered yet. If nothing was asked, press Check now again.")
+        // A failed update leaves nothing to come back from. A merely unanswered confirmation stays armed: the person may
+        // still press Install, and the record expires by itself.
+        if (outcome.startsWith("Update download failed") || outcome.startsWith("Update install failed")) UpdateRelaunch.disarm(application)
+        return outcome
     }
+
+    /** How long a copy of the APK already on disk waits for the installer's answer. */
+    private const val INSTALL_WAIT_MS = 10 * 60 * 1000L
 
     private fun log(message: String): String {
         Log.i(TAG, message)

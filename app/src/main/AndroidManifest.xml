@@ -760,17 +760,14 @@
                 android:resource="@xml/typing_accessibility_service" />
         </service>
         <!--
-          Android's DownloadManager reports the end of the self-update's APK download here; droidtop then
-          verifies it and asks the installer (docs/SPEC.md 10b, Droidtop/tracker#445). Exported because the
-          downloads provider is another app; only a sender holding SEND_DOWNLOAD_COMPLETED_INTENTS (the
-          provider itself, a signature permission) can deliver it.
+          The new build's first word after droidtop replaced itself: opens Home again when the update was asked
+          for (docs/SPEC.md 10b, Droidtop/tracker#202). The system sends MY_PACKAGE_REPLACED to this package only.
         -->
         <receiver
-            android:name="dev.droidtop.app.update.UpdateDownloadReceiver"
-            android:exported="true"
-            android:permission="android.permission.SEND_DOWNLOAD_COMPLETED_INTENTS">
+            android:name="dev.droidtop.app.update.UpdateRelaunchReceiver"
+            android:exported="false">
             <intent-filter>
-                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
         <!-- PackageInstaller reports the verdict on every APK droidtop installs here (ApkInstaller). -->

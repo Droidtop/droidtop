@@ -34,14 +34,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * which adb's `am broadcast` never does -- so a uid check would reject the
  * one caller this receiver exists for.
  *
- * The broadcast is held open (goAsync) only while the pass reads the feed and
- * hands the APK download to Android's DownloadManager, a few seconds, and never
- * past [UpdateNow.broadcastHoldMs]: while it is held droidtop's process is not
- * cached, so Android does not freeze it. The download itself runs in the
- * system's downloads provider, and droidtop is woken to install when it ends
- * (Droidtop/tracker#445). Holding the broadcast for the whole download ANRed;
- * a bare thread after it returned was frozen mid-download; and a foreground
- * service started from here is refused on Android 12+ (rig, Android 14).
+ * The broadcast is held open (goAsync) while the pass runs, never past [UpdateNow.broadcastHoldMs]: while
+ * it is held droidtop's process is not cached, so Android does not freeze it. The APK download is a job in
+ * droidtop's own Downloads (Droidtop/tracker#226), which carries on after the broadcast is released while
+ * the process lives and resumes from its partial file if the process was lost; the install and the return
+ * to Home afterwards are [dev.droidtop.app.update.UpdateRelaunchReceiver]'s (Droidtop/tracker#202).
  */
 class UpdateNowReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

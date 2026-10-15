@@ -379,8 +379,8 @@ object AppSelfUpdate {
      * Blocking; call from a worker context. Throws on failure, including
      * bytes that do not match the digest, whatever served them. The system
      * takes over from the commit: either a silent update where it allows
-     * one, or its confirmation UI. The APK itself comes from Android's
-     * DownloadManager ([UpdateDownload]).
+     * one, or its confirmation UI. The APK itself comes from droidtop's own
+     * download runner ([UpdateDownload]).
      */
     fun install(context: Context, apk: File, versionCode: Long, versionName: String, digest: String): Int {
         requireInstallAllowed(context)

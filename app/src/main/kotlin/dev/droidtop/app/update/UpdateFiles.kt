@@ -8,8 +8,8 @@ import java.io.File
 
 /**
  * The self-update's files in the downloads folder (docs/SPEC.md 10b): `droidtop-<versionCode>.apk`,
- * which Android's DownloadManager writes ([UpdateDownload]), and the `.apk.part` (and its
- * `.part.meta`) that builds before it left from droidtop's own download runner. Each build's
+ * which droidtop's own download runner writes ([UpdateDownload]), its `.apk.part` (and `.part.meta`)
+ * while it is being fetched, and the same from the builds before it. Each build's
  * APK is about 130 MB and the folder otherwise keeps every one ever fetched, so this decides which
  * to delete: everything for a build that is installed or older, and, once a newer build is being
  * fetched, everything older than that one. A partial file of an older build is never resumed
@@ -33,12 +33,11 @@ internal object UpdateFiles {
         fileNames.filter { name -> buildOf(name)?.let { isStale(it, installed, target) } == true }
 
     /**
-     * Deletes the stale files, removes DownloadManager's download of a stale build, and cancels any
+     * Deletes the stale files and cancels any
      * download job still holding one (a job restored from a previous run would otherwise fetch the old
      * build again). Blocking file work: call from a worker thread. Never throws; returns how many files went.
      */
     fun clean(context: Context, installed: Long, target: Long?): Int = runCatching {
-        runCatching { UpdateDownload.dropIfStale(context, installed, target) }
         val folder = DownloadJobs.fileFor(context, "droidtop-0.apk").parentFile ?: return@runCatching 0
         PluginJobsCenter.entries().value
             .filter { it.nativeKind == DownloadJobs.KIND && !it.done }

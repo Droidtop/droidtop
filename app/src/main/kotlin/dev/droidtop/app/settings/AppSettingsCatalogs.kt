@@ -985,8 +985,8 @@ object AppSettingsCatalogs {
                                 } ?: "Not checked yet") + ". Installs a newer build if there is one; Android asks you to confirm",
                                 value = update.installedVersionName(context),
                                 run = { ctx, onStatus ->
-                                    // The same pass the adb trigger runs: Android's DownloadManager does
-                                    // the download, so it goes on if the person leaves the screen (tracker#445).
+                                    // The same pass the adb trigger runs: droidtop's own downloader (a job in Downloads, tracker#226)
+                                    // does the download, so it goes on if the person leaves the screen.
                                     dev.droidtop.app.update.UpdateNow.startAndAwait(ctx, onStatus)
                                 },
                             ),

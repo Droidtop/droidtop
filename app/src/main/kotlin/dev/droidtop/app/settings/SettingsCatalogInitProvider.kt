@@ -62,6 +62,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.library.integrations.PluginBios.registerDownloadPost()
         // The one APK install path's post step: a catalog's app is checked, then installed (docs/SPEC.md 10b).
         dev.droidtop.app.apps.ApkInstaller.registerDownloadPost()
+        // droidtop's own update: the same download job, finished by asking the installer (docs/SPEC.md 10b).
+        dev.droidtop.app.update.UpdateDownload.register()
         // Links (docs/SPEC.md 12a "Links", "Action links"): droidtop's own action links are the router's built-in
         // handler, an app catalog's link opens its source review, and the scheme aliases follow what the installed
         // plugins register.
