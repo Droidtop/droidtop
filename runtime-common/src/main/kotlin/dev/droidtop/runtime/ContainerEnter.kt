@@ -43,8 +43,8 @@ object ContainerEnter {
 
     fun hostCommandsDir(filesDir: File): File = File(ContainerLauncher.hostDir(filesDir), "commands")
 
-    /** Whether [name] can be exported: a plain program name, and none of droidtop's own helpers. */
-    fun validName(name: String): Boolean = NAME.matches(name) && !name.startsWith("droidtop-")
+    /** Whether [name] can be exported: a plain program name, and none of droidtop's own helpers or commands. */
+    fun validName(name: String): Boolean = NAME.matches(name) && !name.startsWith("droidtop-") && name != DockerCli.NAME
 
     /** The file droidtop makes in a request directory the moment it sees it, which the helper waits for. */
     const val TAKEN = "taken"
@@ -177,14 +177,15 @@ object ContainerEnter {
         writeWrappers(filesDir, commands)
     }
 
-    /** The wrappers for [commands], stale ones removed, and the helper; run at every desktop start and after each change. */
+    /** The wrappers for [commands] and the docker command, stale ones removed, and the helper; run at every desktop start and after each change. */
     fun writeWrappers(filesDir: File, commands: List<ExportedCommand>) {
         val helper = hostHelper(filesDir)
         helper.parentFile?.mkdirs()
         writeIfChanged(helper, helperScript())
         val dir = hostCommandsDir(filesDir)
         dir.mkdirs()
-        val wanted = commands.associate { it.name to wrapperScript(it) }
+        // droidtop's own docker command lives beside them (docs/SPEC.md 3d "The docker command").
+        val wanted = commands.associate { it.name to wrapperScript(it) } + (DockerCli.NAME to DockerCli.wrapperScript())
         dir.listFiles()?.forEach { if (it.isFile && it.name !in wanted) it.delete() }
         wanted.forEach { (name, text) ->
             val file = File(dir, name)
