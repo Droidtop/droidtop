@@ -112,4 +112,20 @@ class ContainerApplicationsTest {
         assertEquals(listOf("alpha", "Foot (local)"), apps.map { it.name })
         assertTrue(apps.all { it.command.isNotEmpty() })
     }
+
+    @Test
+    fun `another container's exported app is listed, launches through the helper and is known as exported`() {
+        val token = "0123456789abcdef"
+        val listing = buildString {
+            append("\n@@droidtop-desktop-file /usr/share/applications/foot.desktop\n")
+            append("[Desktop Entry]\nType=Application\nName=Foot\nExec=foot\n")
+            append("\n@@droidtop-desktop-file ${ContainerLauncher.DATA_DIR}/applications/${ContainerExports.ENTRY_PREFIX}$token.desktop\n")
+            append("[Desktop Entry]\nType=Application\nName=GIMP (on Arch)\nExec=sh ${ContainerLauncher.HELPER} $token\n")
+        }
+        val apps = ContainerApplications.parseListing(listing)
+        val gimp = apps.single { it.name == "GIMP (on Arch)" }
+        assertEquals(listOf("sh", ContainerLauncher.HELPER, token), gimp.command)
+        assertTrue(ContainerApplications.isExported(gimp))
+        assertEquals(listOf("Foot"), apps.filterNot { ContainerApplications.isExported(it) }.map { it.name })
+    }
 }
