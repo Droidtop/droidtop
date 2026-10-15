@@ -28,8 +28,9 @@ internal data class SessionObservation(
  * When a running-game session is over, with no Android in it so it is tested (docs/SPEC.md "The running game's
  * session"). Only what droidtop can see counts: the force-stopped flag (Android says it to any app), and with the
  * privileged helper the system's task list, where an app whose last task is gone has ended however it ended (crash,
- * Cancel on Enginehost's warning, the person closing it). Without a helper there is no evidence of a death, so no
- * claim is made; Quit and Kill then settle it ([Library.quitRunning], [Library.killRunning]).
+ * Cancel on Enginehost's warning, the person closing it); for Enginehost's games, its own answer to the same question,
+ * which needs no helper. For any other app without a helper there is no evidence of a death, so no claim is made;
+ * Quit settles it ([Library.quitRunning]).
  */
 internal object SessionLiveness {
     /** How often a young session is looked at: a launch that was cancelled or crashed dies in its first minute. */
@@ -104,9 +105,15 @@ object SessionMonitor {
         }
     }
 
-    /** Whether the task list holds [packageName]; null when it cannot be read exactly (no privileged helper running). */
+    /**
+     * Whether [packageName] still holds a task: from the system's task list with the privileged helper; without one, from
+     * Enginehost itself for Enginehost's games ([EnginehostCapabilities.holdsTask]), the one app that can say; null when
+     * nothing can say.
+     */
     private suspend fun taskListed(app: Context, packageName: String): Boolean? {
-        if (!TaskManager.privileges().shell) return null
+        if (!TaskManager.privileges().shell) {
+            return if (packageName == EngineHost.PACKAGE_NAME) EnginehostCapabilities.holdsTask(app) else null
+        }
         val snapshot = TaskManager.snapshotWithin(app, maxAgeMs = 2_000L)
         return if (snapshot.fidelity == Fidelity.EXACT) snapshot.apps.any { it.packageName == packageName } else null
     }

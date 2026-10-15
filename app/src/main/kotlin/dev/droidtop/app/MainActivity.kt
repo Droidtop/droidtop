@@ -181,7 +181,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     // can identity-check before clearing the process-wide hook.
     private var companionLaunchSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
     private var companionQuitSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
-    private var companionKillSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
 
     /**
      * Re-runs orchestration from scratch: drops the parked display and the
@@ -318,7 +317,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // Quit from the companion's Now card: the one quit path (Library.quitRunning), and a quit that could
         // not end the game says why where the tap was made.
         companionQuitSeam = { entry ->
-            lifecycleScope.launch {
+            // The process scope, not this activity's: ending a game opens a sheet or moves the game off the screen, either
+            // of which can recreate the activity, and a cancelled scope lost the answer (rig, build 1809).
+            CompanionState.scope.launch {
                 CompanionState.launchError.value = when (val outcome = library.quitRunning(applicationContext, entry)) {
                     dev.droidtop.library.QuitResult.Ended -> null
                     is dev.droidtop.library.QuitResult.NotEnded -> outcome.message
@@ -327,20 +328,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             }
         }
         CompanionState.onQuitEntry = companionQuitSeam
-        // Kill from the Game tab: the same outcome on the same banner, so a kill that could not be confirmed says why
-        // (no helper, Shizuku not allowed, the plugin waiting for approval) instead of the tab just going away.
-        companionKillSeam = { entry ->
-            lifecycleScope.launch {
-                CompanionState.launchError.value = when (val outcome = library.killRunning(applicationContext, entry)) {
-                    dev.droidtop.library.QuitResult.Ended -> null
-                    is dev.droidtop.library.QuitResult.NotEnded -> outcome.message
-                    is dev.droidtop.library.QuitResult.Unresolvable -> outcome.message
-                }
-            }
-        }
-        CompanionState.onKillEntry = companionKillSeam
         CompanionState.onRestartEntry = { entry ->
-            lifecycleScope.launch {
+            CompanionState.scope.launch {
                 when (val outcome = library.quitRunning(applicationContext, entry)) {
                     dev.droidtop.library.QuitResult.Ended -> CompanionState.onLaunchEntry?.invoke(entry)
                     is dev.droidtop.library.QuitResult.NotEnded -> CompanionState.launchError.value = outcome.message
@@ -905,9 +894,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         }
         if (CompanionState.onQuitEntry === companionQuitSeam) {
             CompanionState.onQuitEntry = null
-        }
-        if (CompanionState.onKillEntry === companionKillSeam) {
-            CompanionState.onKillEntry = null
         }
         clipboardBridge?.stop()
         clipboardBridge = null

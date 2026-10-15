@@ -2959,28 +2959,34 @@ the stack. One mechanism serves every surface: `TaskManager` in `:runtime-common
 a close path of its own. Every call works off the main thread.
 
 - **Ending an app: one path, strongest first** (`TaskPolicy.closeSteps`, `AppCloser`):
-  1. The active `PrivilegedShell` backend force-stops the package (the Shizuku app or Sui, or a
-     `priv.packages` provider plugin such as the official Shizuku plugin or a root provider: all are
-     reached through `PrivilegedShell`, never code in the task manager, and root is only ever an
-     enhancement behind the same interface).
-  2. Enginehost only: droidtop asks Enginehost to end its running game (`dev.enginehost.END_GAME`,
+  1. Enginehost only, asked first: droidtop asks Enginehost to end its running game (`dev.enginehost.END_GAME`,
      Enginehost's SPEC "Ending the running game"; answered to droidtop alone, by Android's record of the
      caller and droidtop's signing certificate). Android records the caller only for
      `startActivityForResult`, so an invisible activity of droidtop's (`EnginehostEndGame`, its own task,
      not in Recents) starts it and waits up to 4 s for the answer. "A game was running and has ended" is a
      confirmed close. "None was running" is `CloseOutcome.NotRunning`: droidtop's session for it is
-     stale (a launch cancelled on Enginehost's warning, or one that crashed), so the session ends, and the
-     next step is still asked because Enginehost's own screens may be open. An Enginehost without
+     stale (a launch cancelled on Enginehost's warning, or one that crashed), so the session ends and nothing
+     further is asked. An Enginehost without
      END_GAME and a blocked start fall through to the next step with nothing claimed. So Kill on an
      engine game is confirmed without Shizuku (Droidtop/tracker#289: it said "cannot confirm" after the
-     game had gone), and Quit on a stale one clears it.
+     game had gone), and Quit on a stale one clears it. It is asked before the helper because it needs none:
+     with the Shizuku plugin installed but not allowed full access, Quit on a cancelled launch used to open the
+     plugin's "run with droidtop's full access" sheet for a game that was not running (rig, build 1809).
+  2. The active `PrivilegedShell` backend force-stops the package (the Shizuku app or Sui, or a
+     `priv.packages` provider plugin such as the official Shizuku plugin or a root provider: all are
+     reached through `PrivilegedShell`, never code in the task manager, and root is only ever an
+     enhancement behind the same interface). A plugin that has not been allowed full access asks for it on
+     the first-use sheet because ending a game is the person's own action (Droidtop/tracker#378); Not now
+     fails this step with the plugin's own refusal and the next step is still tried.
   3. `ActivityManager.killBackgroundProcesses` (the `KILL_BACKGROUND_PROCESSES` normal permission),
      always tried last. It ends a process only while it is cached, and nothing confirms the result, so
      it is never reported as a close. It spares an app that is on screen, which is where a game is, so
      just before it droidtop presses Home on the display the app was opened on (`TaskManager.sendToBackground`,
      from `LaunchLedger`; an app droidtop did not open has no known display and is not moved) and gives
-     the app 1.2 s to stop (Droidtop/tracker#412: RetroArch kept running after Kill on the console). A
-     helper's force-stop needs none of this and is never preceded by it.
+     the app 1.2 s to stop. This is a best effort and it is not known to work: on the console (build 1809) RetroArch
+     was still in `ps` after it, hidden but alive (Droidtop/tracker#412), so the result stays "cannot confirm" and the
+     person is told that only a helper's force-stop ends an app for sure. A helper's force-stop needs none of
+     this and is never preceded by it.
   `ActivityManager.getAppTasks` / `AppTask.finishAndRemoveTask` is deliberately not a step: Android
   lists only tasks whose root activity is droidtop's own, so it can never find another package's task
   (this was the dead leg of the old `ConsoleRomProvider.quit`), and droidtop never closes its own tasks
@@ -3008,11 +3014,13 @@ a close path of its own. Every call works off the main thread.
   asks the provider again for a binder whose broadcast was missed. A
   surface never does nothing silently, and only a close that ended the session (`sessionOver`) is the Quick Menu's
   `QuitResult.Ended` (droidtop's running-game state clears on that alone, as the rule above already says).
-  The companion's Game tab Kill goes through `Library.killRunning`, the same path as Quit with one difference:
-  a close that could only reach `Requested` also ends the session, because the person said stop it at once and
-  droidtop has done all it can (a dead launch must not stay "Playing"), while the result still carries the plain
-  reason to the companion's banner. A helper that tried and `Failed` leaves the session standing. Before this the
-  Kill button discarded the outcome, cleared the session whatever happened, and the tab simply went away with no
+  Quit and the companion's Kill are one path, `Library.quitRunning`, run so that it finishes even when the
+  surface that asked is recreated (the helper's sheet or the Home press can do that; the banner read "Quit failed:
+  Job was cancelled" on build 1809): the companion's seams run in `CompanionState.scope`, not the activity's. A
+  close that only reached `Requested` or `Failed` leaves the session standing and puts the reason on the banner:
+  the game may well still be running (RetroArch was), so nothing may say it ended. A helper that was refused
+  reads "Couldn't end it: <its refusal>" and adds that Android was also asked and cannot say. Before this the Kill
+  button discarded the outcome, cleared the session whatever happened, and the tab simply went away with no
   word (Droidtop/tracker#412).
 - **The running game's session ends in one place** (`SessionMonitor`, `SessionLiveness`, Droidtop/tracker#289,
   #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, Quick Menu Game section,
@@ -3023,10 +3031,12 @@ a close path of its own. Every call works off the main thread.
   on two looks in a row after the 9 s a launch is given to appear (the same data and grace as the launch
   watchdog; the list is shared within 2 s, `TaskManager.snapshotWithin`). A game screen of droidtop's own
   (Windows) is never judged by the task list and reports its own end. A launch whose dispatch throws never
-  becomes a session (`LaunchDisplay.startOn` clears it). Without a helper there is no evidence a process
-  died, so nothing is claimed: the session stands until Quit or Kill settles it, and Enginehost's END_GAME
-  "none running" answer settles it honestly. A non-destructive Enginehost state query would let the monitor
-  end an engine session by itself without a helper (open follow-up, tracked on Droidtop/tracker#289).
+  becomes a session (`LaunchDisplay.startOn` clears it). Enginehost's games need no helper: Enginehost
+  answers its `state` call (Enginehost SPEC "Reporting whether anything is open") with the number of tasks it
+  holds, and none on two looks ends the session, so Cancel on the no-sandbox warning, or Back on a startup
+  error screen, clears it within seconds (`EnginehostCapabilities.holdsTask`; an Enginehost without `state`
+  says nothing). For any other app without a helper there is no evidence a process died, so nothing is
+  claimed: the session stands until Quit settles it.
 - **The app in front is what droidtop last started.** `LaunchDisplay.dispatch`, the one point every
   droidtop launch passes, notes the package and display in `LaunchLedger` (process memory; a
   restart forgets it, which is the honest direction). The Quick Menu's Quit row closes
