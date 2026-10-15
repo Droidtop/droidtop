@@ -31,16 +31,13 @@ object WindowsInstallCatalog {
     /** The path typed into "Path to the installer", until it is run. */
     @Volatile private var typedInstaller: String = ""
 
-    /** The path typed into "Path to an installer to unpack", until it is run. */
-    @Volatile private var typedUnpack: String = ""
-
     /** The folder chosen to install into, or null: inside the new prefix. */
     @Volatile private var target: File? = null
 
     fun screen(): CatalogScreen = CatalogScreen(
         id = SCREEN_ID,
         title = "Install a Windows game",
-        subtitle = "Run an installer in a new Windows prefix, then add the game it installed to your library",
+        subtitle = "Unpack an installer, or run it in a new Windows prefix, and add the game to your library",
         groups = { context ->
             val started = WindowsInstalls.pending(context)
             val chosen = target
@@ -79,13 +76,13 @@ object WindowsInstallCatalog {
                             DocumentPickItem(
                                 id = "windows_install_pick",
                                 title = "Choose the installer",
-                                subtitle = "A GOG offline installer (setup_*.exe) or any setup program, .exe or .msi. It runs where it is; " +
-                                    "nothing is copied or moved, and its folder is shown to the installer as a drive so it finds its data files",
+                                subtitle = "A GOG offline installer (setup_*.exe) or any setup program. Its files are taken out without " +
+                                    "running it; a program that cannot be unpacked runs in a new Windows prefix. Nothing is copied or moved",
                                 mimeType = "*/*",
                                 onPicked = { ctx, uri ->
                                     val file = withContext(Dispatchers.IO) { PickedFiles.fileOf(uri) }
                                         ?: return@DocumentPickItem "Couldn't get that file's real path on this device; pick one on this device's storage, or type its path below"
-                                    WindowsInstalls.begin(ctx, file, target) {}
+                                    WindowsInstalls.install(ctx, file, target) {}
                                 },
                             ),
                         )
@@ -106,7 +103,7 @@ object WindowsInstallCatalog {
                                     if (typedInstaller.isEmpty()) {
                                         "Type the path first"
                                     } else {
-                                        WindowsInstalls.begin(ctx, File(typedInstaller), target, onStatus).also { if (it.startsWith("Started")) typedInstaller = "" }
+                                        WindowsInstalls.install(ctx, File(typedInstaller), target, onStatus).also { if (it.startsWith("Unpacked") || it.contains("Started ")) typedInstaller = "" }
                                     }
                                 },
                             ),
@@ -115,39 +112,8 @@ object WindowsInstallCatalog {
                 ),
                 CatalogGroup(
                     id = "windows_unpack",
-                    title = "Unpack an installer",
+                    title = "Unpacker",
                     items = listOf(
-                        DocumentPickItem(
-                            id = "windows_unpack_pick",
-                            title = "Choose an installer to unpack",
-                            subtitle = "Takes the game's files out of a GOG or Inno Setup installer without running it, into a new folder: " +
-                                "inside the folder chosen above if there is one, else in droidtop's own storage. The installer is only read, " +
-                                "and the game is added to your library, in the shared Windows prefix",
-                            mimeType = "*/*",
-                            onPicked = { ctx, uri ->
-                                val file = withContext(Dispatchers.IO) { PickedFiles.fileOf(uri) }
-                                    ?: return@DocumentPickItem "Couldn't get that file's real path on this device; pick one on this device's storage, or type its path below"
-                                unpackAndAdd(ctx, file) {}
-                            },
-                        ),
-                        TextInputItem(
-                            id = "windows_unpack_path",
-                            title = "Path to an installer to unpack",
-                            subtitle = "For a file the picker cannot reach, such as a shared folder",
-                            value = typedUnpack,
-                            onChange = { _, text -> typedUnpack = text.trim() },
-                        ),
-                        AsyncActionItem(
-                            id = "windows_unpack_typed",
-                            title = "Unpack the installer at that path",
-                            run = { ctx, onStatus ->
-                                if (typedUnpack.isEmpty()) {
-                                    "Type the path first"
-                                } else {
-                                    unpackAndAdd(ctx, File(typedUnpack), onStatus).also { if (it.startsWith("Unpacked")) typedUnpack = "" }
-                                }
-                            },
-                        ),
                         AsyncActionItem(
                             id = "windows_unpack_check",
                             title = "Check the unpacker",
@@ -177,14 +143,6 @@ object WindowsInstallCatalog {
         // Per-install rows belong to the screen, not to settings search.
         indexGroups = { _ -> emptyList() },
     )
-
-    /** Unpacks [installer] and, when that worked, adds the folder it made to the library. Returns the line the row shows. */
-    private suspend fun unpackAndAdd(context: android.content.Context, installer: File, onStatus: (String) -> Unit): String =
-        withContext(Dispatchers.IO) {
-            val parent = target ?: context.getExternalFilesDir("Unpacked") ?: File(context.filesDir, "unpacked")
-            val (folder, line) = InnoExtract.unpack(context, installer, parent, onStatus)
-            if (folder == null) line else line + ". " + WindowsInstalls.addFolderGame(context, folder)
-        }
 
     private fun pendingScreen(pending: WindowsInstalls.Pending): CatalogScreen = CatalogScreen(
         id = "windows_install_" + pending.id,

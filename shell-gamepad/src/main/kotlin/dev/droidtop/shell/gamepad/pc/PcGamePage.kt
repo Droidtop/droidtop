@@ -1120,6 +1120,7 @@ internal fun ownershipSentence(entry: LibraryEntry): Pair<String, String>? {
         dev.droidtop.library.stores.StoreHolding.FAMILY -> holding.label to "Shared by another account in your $store family"
         dev.droidtop.library.stores.StoreHolding.FREE -> holding.label to "Free to play on $store. It counts as yours once you install it or play it"
         dev.droidtop.library.stores.StoreHolding.NOT_OWNED -> holding.label to "This game left your library. $store may refuse to start it"
+        dev.droidtop.library.stores.StoreHolding.WISHLIST -> holding.label to "On your $store wishlist. A finds it on $store"
     }
 }
 

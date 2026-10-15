@@ -80,6 +80,7 @@ fun rememberPcLaunch(onLaunch: (LibraryEntry) -> Unit, onOpenDownloads: () -> Un
             launch = { entry ->
                 when (val stage = storeStageOf(entry, entry.downloadKey()?.let { downloads[it] })) {
                     StoreStage.INSTALL, StoreStage.UPDATE -> offer.value = StoreInstallOffer(entry, stage)
+                    StoreStage.WISHLIST -> say(context, openOnStore(context, entry))
                     null -> currentLaunch(entry)
                     else -> say(context, continueStoreDownload(context, entry, stage) { currentOpenDownloads() })
                 }

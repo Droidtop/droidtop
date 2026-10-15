@@ -7,6 +7,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.PcSource
 import dev.droidtop.library.displayName
+import dev.droidtop.library.stores.StoreHolding
 import dev.droidtop.shell.gamepad.query.FAVOURITES_YES
 import dev.droidtop.shell.gamepad.query.INSTALLED_YES
 import dev.droidtop.shell.gamepad.query.LibraryFacet
@@ -14,6 +15,7 @@ import dev.droidtop.shell.gamepad.query.LibraryQuery
 import dev.droidtop.shell.gamepad.query.LibraryQueryScope
 import dev.droidtop.shell.gamepad.query.ListPlace
 import dev.droidtop.shell.gamepad.query.OwnershipOptions
+import dev.droidtop.shell.gamepad.query.holding
 import dev.droidtop.shell.gamepad.query.listExclusion
 import dev.droidtop.shell.gamepad.query.NamedLibraryView
 import dev.droidtop.shell.gamepad.query.StripTabs
@@ -43,6 +45,9 @@ internal const val SHELF_UPDATES = "updates"
 internal const val SHELF_FAVOURITES = "favourites"
 internal const val SHELF_INSTALLED = "installed"
 internal const val SHELF_NOT_PLAYED = "not-played"
+
+/** The shelf of games on a store's wishlist that the person does not own (docs/SPEC.md 7g, "Wishlist"); PC Games' Overview only. */
+internal const val SHELF_WISHLIST = "wishlist"
 
 /**
  * The shelves Home's games row can be (docs/SPEC.md 7i, "Home"): Continue playing, else Recently added. The
@@ -197,6 +202,9 @@ internal fun pcShelves(
                 .sortedWith(compareByDescending<Map.Entry<String, List<LibraryEntry>>> { it.value.size }.thenBy { it.key })
                 .forEach { (family, rows) -> shelf("kind:$family", family, rows)?.let(::add) }
         }
+        // Games on a store's wishlist, apart from everything the person has and labelled not owned; last,
+        // so it is a place to look for something new and never in the way of what they play.
+        shelf(SHELF_WISHLIST, "Wishlist (not owned)", games.filter { it.holding() == StoreHolding.WISHLIST && !it.hidden })?.let(::add)
     }
 }
 

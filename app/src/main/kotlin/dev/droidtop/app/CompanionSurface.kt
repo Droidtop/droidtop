@@ -82,6 +82,7 @@ fun CompanionSurface(
             CompanionSystemBar()
             LaunchErrorLine()
             if (shows(dev.droidtop.library.settings.ControlRow.LIBRARY)) CompanionSearchPill()
+            if (shows(dev.droidtop.library.settings.ControlRow.PLAY_TIME)) CompanionPlayTimeLine()
             if (shows(dev.droidtop.library.settings.ControlRow.PINS)) CompanionPinsSection()
             if (shows(dev.droidtop.library.settings.ControlRow.NOW_PLAYING)) CompanionNowPlayingCard()
             val library = shows(dev.droidtop.library.settings.ControlRow.LIBRARY)
@@ -128,6 +129,31 @@ private fun CompanionSearchPill() {
             }
         }
     }
+}
+
+/**
+ * "Today 45 min of 2 h · This week 3 h 10 min of 10 h" (docs/SPEC.md 7f "Play-time limits", Droidtop/tracker#421),
+ * under the status line, while a play-time limit is set. Read off the main thread, again every half minute.
+ */
+@Composable
+private fun CompanionPlayTimeLine() {
+    val context = LocalContext.current
+    val summary by androidx.compose.runtime.produceState<String?>(null) {
+        while (true) {
+            value = withContext(Dispatchers.IO) {
+                val (limits, today, week) = dev.droidtop.library.settings.PlayTimePrefs.snapshot(context.applicationContext)
+                if (limits.any) dev.droidtop.library.settings.PlayTime.summary(limits, today, week) else null
+            }
+            kotlinx.coroutines.delay(30_000)
+        }
+    }
+    val line = summary ?: return
+    Text(
+        line,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 8.dp),
+    )
 }
 
 /**

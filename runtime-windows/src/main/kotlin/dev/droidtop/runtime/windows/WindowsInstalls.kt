@@ -52,6 +52,29 @@ object WindowsInstalls {
     }
 
     /**
+     * Whether [installer] is worth handing to the unpacker first: Inno Setup installers (GOG's offline ones among
+     * them) are programs, so a .msi, .bat or .cmd goes straight to Wine.
+     */
+    internal fun unpackable(installer: File): Boolean = installer.extension.equals("exe", ignoreCase = true)
+
+    /**
+     * Installs from [installer] the way the owner chose (docs/SPEC.md 7c, Droidtop/tracker#405): the files are taken
+     * out of it without running it ([InnoExtract], into a new folder inside [target] if one was chosen, else in
+     * droidtop's own storage) and the folder becomes a library game in the shared prefix; only when that cannot be
+     * done, because it is not an Inno Setup installer or the unpacker could not be had, is it run in a new prefix of
+     * its own ([begin]). Returns the line the settings row shows; a fallback says why the unpack did not do.
+     */
+    suspend fun install(context: Context, installer: File, target: File?, onStatus: (String) -> Unit): String {
+        if (!unpackable(installer)) return begin(context, installer, target, onStatus)
+        val parent = withContext(Dispatchers.IO) {
+            target ?: context.getExternalFilesDir("Unpacked") ?: File(context.filesDir, "unpacked")
+        }
+        val (folder, line) = InnoExtract.unpack(context, installer, parent, onStatus)
+        if (folder != null) return line + ". " + addFolderGame(context, folder)
+        return "$line. Running it in Windows instead. " + begin(context, installer, target, onStatus)
+    }
+
+    /**
      * Makes a new prefix from the shared one's settings and runs [installer] in it. Returns the line the
      * settings row shows. [target] is the person's folder to install into, null for inside the prefix.
      */

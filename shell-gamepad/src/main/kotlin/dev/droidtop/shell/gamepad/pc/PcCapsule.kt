@@ -116,7 +116,7 @@ internal const val CAPSULE_TIER_WIDE_MIN_DP = 1280f
  * folder that went missing, or a store game that is installed. Null for the
  * rest (a folder game on this device needs no badge).
  */
-internal enum class CapsuleStatus { DOWNLOADING, PAUSED, UPDATE, NOT_INSTALLED, MISSING, INSTALLED }
+internal enum class CapsuleStatus { DOWNLOADING, PAUSED, UPDATE, NOT_INSTALLED, MISSING, INSTALLED, WISHLIST }
 
 /** The [CapsuleStatus] of [entry]; pure, and built on the same [storeStageOf] the primary button reads. */
 internal fun capsuleStatusOf(entry: LibraryEntry, download: StoreDownloads.Progress?): CapsuleStatus? {
@@ -126,6 +126,7 @@ internal fun capsuleStatusOf(entry: LibraryEntry, download: StoreDownloads.Progr
         StoreStage.PAUSED -> CapsuleStatus.PAUSED
         StoreStage.UPDATE -> CapsuleStatus.UPDATE
         StoreStage.INSTALL -> CapsuleStatus.NOT_INSTALLED
+        StoreStage.WISHLIST -> CapsuleStatus.WISHLIST
         // A folder game whose update source names a newer version.
         null -> when {
             entry.availableUpdate != null -> CapsuleStatus.UPDATE
@@ -390,6 +391,7 @@ internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: StoreDow
         CapsuleStatus.DOWNLOADING -> Triple("${download?.percent ?: 0}%", MenuTokens.Selected, MenuTokens.OnSelected)
         CapsuleStatus.PAUSED -> Triple("Paused", MenuTokens.Scrim, MenuTokens.OnSurface)
         CapsuleStatus.NOT_INSTALLED -> Triple("Not installed", MenuTokens.Scrim, MenuTokens.OnSurface)
+        CapsuleStatus.WISHLIST -> Triple("Wishlist", MenuTokens.Scrim, MenuTokens.OnSurface)
         CapsuleStatus.MISSING -> Triple("Missing", MenuTokens.Scrim, MenuTokens.Danger)
         CapsuleStatus.INSTALLED -> Triple("✓", MenuTokens.Scrim, MenuTokens.Affirmative)
     }

@@ -126,4 +126,18 @@ class ListExclusionTest {
         assertEquals("Showing 1,506 free-to-play games not in your library. Hide them", freeRowText(1506, showing = true))
         assertEquals("1 free-to-play game not in your library is not shown. Show them", freeRowText(1, showing = false))
     }
+
+
+    @Test
+    fun `a wishlist game is in no ordinary list and shows under the Ownership facet`() {
+        val wished = row(StoreHolding.WISHLIST)
+        assertEquals(Exclusion.WISHLIST, listExclusion(wished, ListPlace.LIST, OwnershipOptions()))
+        assertEquals(Exclusion.WISHLIST, listExclusion(wished, ListPlace.LIST, OwnershipOptions(showShared = true, showFree = true)))
+        val asked = LibraryQuery(facets = mapOf(LibraryFacet.OWNERSHIP.key to setOf(StoreHolding.WISHLIST.name)))
+        assertEquals(null, listExclusion(wished, ListPlace.LIST, OwnershipOptions(), asked))
+        // hidden still wins
+        assertEquals(Exclusion.HIDDEN, listExclusion(row(StoreHolding.WISHLIST, hidden = true), ListPlace.LIST, OwnershipOptions()))
+        assertEquals(StoreHolding.OWNED, StoreHolding.strongest(listOf(StoreHolding.WISHLIST, StoreHolding.OWNED)))
+        assertEquals(StoreHolding.NOT_OWNED, StoreHolding.strongest(listOf(StoreHolding.WISHLIST, StoreHolding.NOT_OWNED)))
+    }
 }

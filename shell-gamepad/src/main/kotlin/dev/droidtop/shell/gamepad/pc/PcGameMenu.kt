@@ -825,6 +825,7 @@ internal fun PcGameMenu(
                                     // store's screen opens (Droidtop/tracker#227).
                                     StoreStage.INSTALL, StoreStage.UPDATE ->
                                         storeOffer = StoreInstallOffer(entry, checkNotNull(store))
+                                    StoreStage.WISHLIST -> status = openOnStore(context, entry)
                                     // Downloading, Paused: the download is already
                                     // in flight; a paused one resumes, a running one
                                     // is in Downloads.

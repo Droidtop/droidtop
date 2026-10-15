@@ -175,6 +175,22 @@ object PcLibrary {
                         .map { (item, path) -> item.toGame(context, folderPath = path) }
                 }.onFailure { failed += "folders outside the roots" }.getOrDefault(emptyList()),
             )
+        }.let { games ->
+            // The games on the stores' wishlists that the person does not have, held as WISHLIST
+            // (Droidtop/tracker#134): from each store's own copy, no network.
+            val owned = games.filter { it.holding != dev.droidtop.library.stores.StoreHolding.WISHLIST }
+            val ownedRows = owned.map {
+                StoreGame(
+                    store = it.source.id, gameId = it.nativeId, title = it.title,
+                    installed = it.installed, installPath = it.installPath, sizeBytes = it.sizeBytes, artUrl = it.artUrl,
+                )
+            }
+            val wished = StoreLibraries.all().flatMap { store ->
+                runCatching { store.wishlist(context) }
+                    .onFailure { if (it is CancellationException) throw it }
+                    .getOrDefault(emptyList())
+            }
+            games + dev.droidtop.library.stores.Wishlist.notOwned(wished, ownedRows).map { it.toGame() }
         }.sortedBy { it.title.lowercase() }
             .also { games ->
                 storeSourceInstalls = games.mapNotNull { it.toStoreInstall() }

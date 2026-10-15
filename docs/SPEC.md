@@ -6005,6 +6005,17 @@ believable), rounded to a quarter and never below 1: 2x on the console, 1x
 on a desktop monitor. The viewport sends it with every size, so a change
 applies the next time the desktop is shown.
 
+**Desktop resolution (decided 2026-10-14, Droidtop/tracker#426).** Beside the
+scale, "Desktop resolution" (`DesktopScale.RESOLUTION_KEY`): Full (default),
+75% or 50% of each side of the surface. The output is asked for the smaller
+size (`DesktopScale.outputSize`, even sides) and the output scale is
+multiplied by the same fraction (`outputScale`), so the layout keeps its
+logical size and only gets blurrier; the present path already scales the
+buffer to fill the view, and the pointer transform takes the smaller output
+size, so input lands where it is drawn. Faster because the compositor draws,
+and screencopy delivers, fewer pixels. Applies the next time the desktop is
+shown.
+
 **The frame path's threading (rebuilt 2026-09-24).** `:host-bridge`'s native
 client has one dispatch thread, and it owns everything the compositor's
 events touch: the capture loop and the output configuration. It waits on
@@ -7397,6 +7408,12 @@ Two concrete references to build from rather than design blind:
     scanner was told about by hand outside the roots with the store part, which reads those folders). The
     folder stays where the installer put it. `addGame` is the function #407's flow calls to make a
     row; it takes a prefix made here.
+  - **Unpack first, Wine second (decided 2026-10-14, Droidtop/tracker#405).** Choosing an installer (picked or
+    typed) takes its files out without running it, as below, and only when that cannot be done does the screen run
+    it in a new prefix of its own: `WindowsInstalls.install` tries `InnoExtract` for a `.exe` and falls back to
+    `begin` (the new-prefix route above) when the installer is not an Inno Setup one or the unpacker cannot be had,
+    saying why in the row's line. A `.msi`, `.bat` or `.cmd` goes straight to Wine. There is one set of rows for
+    it, not one for unpacking and one for installing.
   - **Unpack an installer (2026-10-09, Droidtop/tracker#10).** The same screen takes the files out of
     an Inno Setup installer (GOG's offline installers are) without running it: `InnoExtract` runs
     innoextract 1.9 over the installer into a NEW folder (the installer's name, never an existing
@@ -9724,8 +9741,7 @@ System tab.
 
 **UI modes and ControlAccess (decided 2026-10-09, Droidtop/tracker#414).**
 `ControlAccess` (`:runtime-common`) is the one restriction model. It takes
-the UI mode as a value (Full, Kid, Kiosk; Guest is reserved and gets its
-rules when it is defined, Droidtop/tracker#420) and answers, for the
+the UI mode as a value (Full, Kid, Kiosk, Guest) and answers, for the
 companion and the Quick Menu alike: which panels show (`ControlPanel`, the
 companion's tabs and the Quick Menu's sections named once), which panels
 are read-only, which non-catalog rows show inside them (`ControlRow`),
@@ -9745,17 +9761,53 @@ sets, so an added mode fails until its sets are written.
   companion's own preferences (the Companion catalog group), Kid's volume
   cap, the passkey and the UI mode choice. The way out (Leave Kid, Leave
   Kiosk on the Quick Menu's System section) stays.
+- **Guest (decided 2026-10-14, Droidtop/tracker#420).** For somebody else's
+  hands on the owner's handheld. Kid's limits, but the whole library
+  (`kidGamesOnly` off) and none of Kid's own parts: no volume cap and no
+  play-time limit (7f "Play-time limits"), and no passkey of its own. Settings
+  and the places (Game sources, Social, Downloads and installs, Updates,
+  Plugins) are hidden as in Kid, so there are no stores, accounts or plugin
+  installs, and the companion shows Home, Game and Performance as in Kid.
+  Because the owner's private things are on the Quick Menu, Guest drops its
+  Notifications, Social, Plugins and Downloads sections (Kid and Kiosk keep
+  every section, as before). It is chosen from the UI mode choice like the
+  others, and leaving it is the same Leave row: with the Kid and Kiosk
+  passkey set it asks for it, with none it asks yes or no.
 - **Passkey (decided 2026-10-09, Droidtop/tracker#414 owner question 4,
   on its default).** ES-DE asks for a passkey to leave its Kid and Kiosk
   modes (`UIModeController`); droidtop had chosen no passcode. Now an
   optional one, none by default (`UiModePasskey`): Settings > "Passkey to
-  leave Kid and Kiosk" takes 4 to 8 digits, stored as a salted SHA-256,
+  leave Kid, Kiosk and Guest" takes 4 to 8 digits, stored as a salted SHA-256,
   never the digits, and its row says only whether one is set, with the
   recovery line "Forgot it? Android Settings > Apps > droidtop > Clear
   storage resets droidtop's settings." With none set, Leave asks yes or no
   as before. With one set, Leave opens a keypad (`UiModePasskeyActivity`)
   worked by touch or by pad (D-pad between keys, A presses, B cancels): a
   wrong passkey says "Wrong passkey" and stays, the right one leaves.
+
+**Play-time limits (decided 2026-10-14, Droidtop/tracker#421).** Settings >
+Play time (`PlayTimeSettings`, hidden in Kid, Kiosk and Guest like the other
+items that control the restriction) sets a limit per day and one per week, in
+minutes, none by default. They count all play together, not one game's, and
+they belong to Kid mode, the mode that is handed to a child: play is counted,
+and the limits hold, only while Kid is on (the owner said "for all play" and
+asked that Guest lack the play-time part). `PlayTimeLimiter` (`:app`, started
+in `DroidtopApplication`) watches `LaunchDisplay.running`: every 15 s while a
+game runs in Kid it adds the elapsed time to the ledger (`PlayTimePrefs`,
+seconds per local day, kept two weeks; the week starts on Monday) and asks
+`PlayEnforcer` for the step. Five minutes before the tighter limit it warns
+once, at the limit it says the game closes in 60 seconds, and then it quits the
+game through `Library.quitRunning`, the one quit path, so the player saves the
+way a Quit from the Quick Menu does; a quit that did not end the game is asked
+again every tick. A warning is a toast (it shows over any app) and, where
+notifications are allowed, a notification that returns to droidtop. A game
+started after the limit is told and closed after the same minute. The
+companion's Home shows "Today 45 min of 2 h · This week 3 h 10 min of 10 h"
+under the status line in Full and Kid while a limit is set
+(`ControlRow.PLAY_TIME`, Kid's alone among the restricted modes). Real play
+time is not stored per game (7g): this ledger is the only measure, and counts
+droidtop's own running-game state, so a game droidtop never saw start is not
+counted.
 
 **Screensaver.** ES-DE's four kinds — dim, black, slideshow and video —
 after Off/2/5/10/15/30 minutes (today: the slideshow only), with the
@@ -11677,7 +11729,7 @@ follows:
 ### Ownership is a fact (Droidtop/tracker#397 slice B)
 
 How the account holds a store row is `PcInfo.holding` (`StoreHolding`), the
-same four meanings for every store, never a name of its own (the old "Steam
+same five meanings for every store, never a name of its own (the old "Steam
 Family" and "Steam Free" groups, `PcStoreNames.groupOf`, and `PcInfo.source`
 are gone; where a game came from is `PcSource`, read from the store id):
 - **OWNED**: in the account's library on that store, however it got there. A
@@ -11686,6 +11738,7 @@ are gone; where a game came from is `PcSource`, read from the store id):
 - **FREE**: a free-to-play catalogue row the account holds a licence for but
   never added (today: Steam only). No store maps "free" or "claimed" to it.
 - **NOT_OWNED**: installed on the device but no longer held by the account.
+- **WISHLIST**: on the account's wishlist and not owned; see "Wishlist" below.
 - **One row per game per store.** When a store reports one game under more
   than one holding, its row carries the strongest: OWNED, then FAMILY, then
   FREE, then NOT_OWNED (`StoreHolding.strongest`; Steam's `SteamOwnership.statusOf`
@@ -11694,6 +11747,28 @@ Labels are one function (`StoreHolding.label`): "Owned", "Shared with you",
 "Free to play (not in your library)", "No longer in your library". Which
 lists show which holding is 7j's `listExclusion`. `STORE_LIST_RULES` 6 makes
 every store row read again with its holding.
+
+**Wishlist (decided 2026-10-14, Droidtop/tracker#134).** The games the person
+does not own come from the stores' wishlists, on a shelf of their own labelled
+not owned, never mixed into what they have. A fifth holding, **WISHLIST**
+("On your wishlist (not owned)", the weakest in `strongest`'s order), is a
+store row that is not installed and never will be from here. A store with a
+wishlist to read returns its rows from `StoreLibrary.wishlist`, from
+droidtop's own copy (`Wishlist`: a small file per store under `files/wishlist/`,
+written by the store's sync, so no network when the library is read);
+`PcLibrary.storeRead` adds them after every owned row and drops a wished game
+whose title is spelled the same way (`StoreIdentity.titleKey`) as one the person
+already has, in any store, so an owned game never folds into a wishlist card.
+`listExclusion` rule 6 keeps WISHLIST rows out of every ordinary list, count
+and search; the Ownership facet shows them, and PC Games' Overview ends with the
+shelf "Wishlist (not owned)" (`SHELF_WISHLIST`, not on Home). A wishlist card's
+corner says Wishlist and its primary button says "Find on <store>": A opens the
+store's own pages searched for the title (`StoreWeb.search`), where the person
+can buy it; nothing can be installed from here and nothing is added to or removed
+from the wishlist. GOG's wishlist is read (`GOGWishlist`: the ids at
+`embed.gog.com/user/wishlist.json` with the sign-in token, then a name and a
+cover for each id not already in the copy, at most 200). Steam's and Epic's
+are not read yet.
 
 **Recently added** means added since that source's first sync or scan
 (`SyncBaselines`, one record per `PcSource` id, stores and game folders
@@ -11725,7 +11800,15 @@ listing of a game folder says whether a marker is there
 folder reads nothing). GOG's is `goggame-<id>.info` (the file whose
 `rootGameId` is its own `gameId` is the game, every other one is DLC;
 `buildId` is the build); Epic's is `.egstore/<install id>.mancpn`, whose
-`CatalogItemId` is the id droidtop's Epic rows are keyed by. What it found is
+`CatalogItemId` is the id droidtop's Epic rows are keyed by; Battle.net's
+(decided 2026-10-14, Droidtop/tracker#404, low priority) is `.build.info`, the
+plain-text table Blizzard's installer leaves: a header of `Name!TYPE:size`
+columns and a row per branch, whose active row names the game's product code
+(`wow`, `pro`, `d3`) and its `Version`. Battle.net has no store droidtop signs
+in to, so it is a marker with the id `battle.net` and nothing more: the Source
+facet and the focus line say "Battle.net", the build is the installed version,
+and nothing asks it for updates. The game's name stays its folder's; droidtop
+keeps no table of product codes. What it found is
 written on the row (`PcInfo.marker`: store id, game id, build, DLC ids) and the
 build is the row's installed version, beating anything a folder name says.
 Consumers read the row; nothing else opens these files. A folder with a marker
@@ -14101,13 +14184,16 @@ so each view keeps its own filters and sort. Pure and unit-tested
   5. A FREE row is in the library while it is installed or has been played:
      derived from facts the row has, never stored. To keep a tried free game
      out, the person hides it.
+  6. A WISHLIST row (a game on a store's wishlist that is not owned, 7g
+     "Wishlist") is out of every list; the Ownership facet and the Wishlist shelf
+     show it.
   **No silent disappearance:** when rule 4 keeps free rows out of a grid view,
   its last item is a row, "1,506 free-to-play games not in your library are not
   shown. Show them"; A turns the option on and the row reads "Showing 1,506
   free-to-play games not in your library. Hide them". Down from the last row
   reaches it, nothing wraps onto it, and no row speaks of Hidden games.
   **Ownership** is a PC facet (Owned, Shared with you, Free to play (not in your
-  library), No longer in your library) counted over every row that is not
+  library), No longer in your library, On your wishlist (not owned)) counted over every row that is not
   hidden, so its counts add up to the store rows; other facets count what the
   list shows. The launcher's **search** has two switches under its field,
   "Include hidden games" and "Include free-to-play games not in your library",

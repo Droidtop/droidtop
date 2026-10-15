@@ -318,4 +318,25 @@ class PcShelvesTest {
         assertEquals(listOf("/c", "/a"), shelves.single().entries.map { it.id })
         assertTrue("no built-in shelf id starts like a plugin's", HOME_SHELF_IDS.none { it.startsWith("plugin:") })
     }
+
+
+    @Test
+    fun `games on a wishlist have a shelf of their own, last, and are in no other shelf`() {
+        fun wished(id: String) = game(
+            id,
+            kind = LibraryEntryKind.WINE_PROFILE,
+            pcInfo = PcInfo(storeId = "gog:$id", installed = false, holding = dev.droidtop.library.stores.StoreHolding.WISHLIST),
+        )
+        val owned = game("/a", lastPlayed = now - 10, firstSeen = now - 100)
+        val shelves = pcShelves(listOf(owned, wished("1"), wished("2")), now)
+        assertEquals(SHELF_WISHLIST, shelves.last().id)
+        assertEquals("Wishlist (not owned)", shelves.last().title)
+        assertEquals(listOf("1", "2"), shelves.last().entries.map { it.id })
+        // Nowhere else: not in Recently added or any source or kind shelf.
+        assertTrue(shelves.dropLast(1).none { shelf -> shelf.entries.any { it.id == "1" || it.id == "2" } })
+        // No wishlist, no shelf.
+        assertTrue(pcShelves(listOf(owned), now).none { it.id == SHELF_WISHLIST })
+        // and Home never carries it
+        assertTrue(homeShelves(listOf(owned, wished("1")), emptyList(), now).none { it.id == SHELF_WISHLIST })
+    }
 }

@@ -1996,6 +1996,17 @@ class Library(
         }
 
     /**
+     * [quitRunning] for the game droidtop believes is running, for a caller that holds no entry (the play-time
+     * limit, Droidtop/tracker#421): the entry is looked up by the running session's game id. Null when nothing is running.
+     */
+    suspend fun quitRunningGame(context: android.content.Context): QuitResult? {
+        val id = LaunchDisplay.running.value?.context?.gameId ?: return null
+        val entry = withContext(Dispatchers.IO) { find(id) }
+            ?: return QuitResult.NotEnded("The running game is not in the library")
+        return quitRunning(context, entry)
+    }
+
+    /**
      * Launches the game with [id], for a caller that holds only the id (a
      * pinned icon, the Desktop's Start menu). Never throws: whatever goes
      * wrong comes back as [LaunchResult.Refused] with a reason to show.

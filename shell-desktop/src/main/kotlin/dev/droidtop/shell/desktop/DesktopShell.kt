@@ -436,12 +436,17 @@ private fun BoxScope.DesktopViewport(
                         ) {
                             val metrics = context.resources.displayMetrics
                             val scale = DesktopScale.resolve(DesktopPrefs.scale(context), metrics.xdpi, metrics.densityDpi)
-                            val sized = hostBridge.setOutputSize(width, height, scale)
+                            // Below full resolution the output is asked for fewer pixels than the view
+                            // has and SurfaceFlinger scales the buffer up (Droidtop/tracker#426); the
+                            // scale shrinks with it so the layout keeps its size.
+                            val factor = DesktopScale.resolutionFactor(DesktopPrefs.resolution(context))
+                            val (outW, outH) = DesktopScale.outputSize(width, height, factor)
+                            val sized = hostBridge.setOutputSize(outW, outH, DesktopScale.outputScale(scale, factor))
                             router.transform = PointerTransform(
                                 viewWidth = width,
                                 viewHeight = height,
-                                outputWidth = if (sized) width else primaryOutput.widthPx,
-                                outputHeight = if (sized) height else primaryOutput.heightPx,
+                                outputWidth = if (sized) outW else primaryOutput.widthPx,
+                                outputHeight = if (sized) outH else primaryOutput.heightPx,
                             )
                         }
 
@@ -1072,6 +1077,10 @@ private object DesktopPrefs {
     /** The Desktop scale setting as stored ([DesktopScale.KEY]); null when never set. */
     fun scale(context: Context): String? =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(DesktopScale.KEY, null)
+
+    /** The Desktop resolution setting as stored ([DesktopScale.RESOLUTION_KEY]); null when never set. */
+    fun resolution(context: Context): String? =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(DesktopScale.RESOLUTION_KEY, null)
 }
 
 // The container manager in droidtop's screen host (CatalogScreenLink): an
