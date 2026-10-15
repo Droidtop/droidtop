@@ -30,6 +30,7 @@ import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.CompositorProvisioning
@@ -47,6 +48,7 @@ import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.ExportedApp
 import dev.droidtop.runtime.ExtraMount
 import dev.droidtop.runtime.HomeChoice
+import dev.droidtop.runtime.ImageRunConfig
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.ImageTags
 import dev.droidtop.runtime.KnownImageRepository
@@ -271,6 +273,9 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "vpn", title = "VPN", items = vpnItems(context, runtime, info))
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
+        runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
+            ?.takeIf { it.program().isNotEmpty() }
+            ?.let { groups += CatalogGroup(id = "program", title = "Its own program", items = programItems(it)) }
         val mounts = runCatching { runtime.mounts(info.container) }.getOrDefault(EnvironmentMounts())
         groups += CatalogGroup(id = "home", title = "Home", items = homeItems(runtime, info, mounts))
         groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info, mounts))
@@ -457,6 +462,20 @@ object ContainersCatalog {
                 }
             },
         )
+    }
+
+    // ---- the image's own program (docs/SPEC.md 3, "The image's own program", Droidtop/tracker#555 D6a) ----
+
+    /** What the image says it runs, read from its config and kept with the container: shown, not yet run. */
+    private fun programItems(config: ImageRunConfig): List<CatalogItem> = buildList {
+        add(TextBlockItem(id = "container_program", title = "Program", text = ImageRunConfig.shellWords(config.program())))
+        config.workingDir?.let { add(TextBlockItem(id = "container_program_dir", title = "Working folder", text = it)) }
+        if (config.env.isNotEmpty()) {
+            add(TextBlockItem(id = "container_program_env", title = "Environment", text = config.env.joinToString("\n")))
+        }
+        if (!config.runsAsRoot) {
+            add(TextBlockItem(id = "container_program_user", title = "User", text = "The image asks for ${config.user}; containers here run everything as root"))
+        }
     }
 
     // ---- exported apps (docs/SPEC.md 3d "Exported apps", Droidtop/tracker#555 D5) ----
