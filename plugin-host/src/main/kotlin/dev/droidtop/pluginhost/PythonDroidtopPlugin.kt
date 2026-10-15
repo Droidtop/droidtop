@@ -109,8 +109,19 @@ class PythonDroidtopPlugin(
             put("job_id", jobId)
             put("call", runCatching { JSONObject(callJson) }.getOrElse { JSONObject() })
         }.toString()
+        // start_job only registers the job, so the first poll below always finds it. The job itself runs on a Java
+        // thread, which ART already knows: a thread Python made is attached to and detached from the JVM around every
+        // host call, and a sandboxed plugin process running a job that way died of its own seccomp trap
+        // (Droidtop/tracker#558).
         PythonBridge.nativeCallFunction(uniqueName, "start_job", payload)
+        val run = JSONObject().put("job_id", jobId).toString()
+        val failed = java.util.concurrent.atomic.AtomicReference<String?>(null)
+        Thread({
+            runCatching { PythonBridge.nativeCallFunction(uniqueName, "run_job", run) }
+                .onFailure { failed.set(it.message ?: it::class.java.simpleName) }
+        }, "python-job").apply { isDaemon = true }.start()
         while (true) {
+            failed.get()?.let { progress.complete(PluginResult.failure("python plugin job failed: $it")); return }
             val result = JSONObject(PythonBridge.nativeCallFunction(uniqueName, "poll_job", JSONObject().put("job_id", jobId).toString()))
             val reports = result.optJSONArray("progress")
             if (reports != null) for (index in 0 until reports.length()) {
