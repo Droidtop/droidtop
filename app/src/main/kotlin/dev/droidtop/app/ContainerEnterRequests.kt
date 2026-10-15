@@ -4,7 +4,12 @@ import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import dev.droidtop.runtime.ContainerEnter
+import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLauncher
+import dev.droidtop.runtime.ContainerProgram
+import dev.droidtop.runtime.DockerCli
+import dev.droidtop.runtime.DockerCommand
+import dev.droidtop.runtime.OciImageStore
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineScope
@@ -39,27 +44,42 @@ internal object ContainerEnterRequests {
 
     private suspend fun run(app: Context, dir: File, token: String, seenAt: Long) {
         val writtenAt = dir.name.split('.').getOrNull(3)?.toLongOrNull()
-        val command = ContainerEnter.forToken(ContainerEnter.read(app.filesDir), token)
-        if (command == null) {
-            refuse(dir, "droidtop-enter: that command is not exported (any more)", 127)
-            return
-        }
-        if (!ContainerEnter.allowed(app.filesDir, command.containerId)) {
-            refuse(dir, "droidtop-enter: ${command.containerName} does not run commands from the desktop (its page in Containers)", 126)
-            return
-        }
         val args = runCatching { File(dir, "args").readBytes() }.getOrNull()?.let(ContainerEnter::parseArgs)
         if (args == null) {
             refuse(dir, "droidtop-enter: the arguments could not be read (at most ${ContainerEnter.MAX_ARGS_BYTES} bytes)", 2)
             return
         }
         val cwd = runCatching { File(dir, "cwd").readText().trim() }.getOrNull()
+        if (token == DockerCli.TOKEN) {
+            docker(app, dir, DockerCli.parse(args), cwd, seenAt, writtenAt)
+            return
+        }
+        val command = ContainerEnter.forToken(ContainerEnter.read(app.filesDir), token)
+        if (command == null) {
+            refuse(dir, "droidtop-enter: that command is not exported (any more)", 127)
+            return
+        }
+        enter(app, dir, Target(command.containerId, command.containerName, "droidtop-enter"), listOf(command.name) + args, cwd, emptyMap(), seenAt, writtenAt)
+    }
+
+    /** Which container a request runs in, and the program name its refusals start with. */
+    private data class Target(val containerId: String, val containerName: String, val who: String)
+
+    /**
+     * Runs [argv] in [target]'s container with its streams on the request's FIFOs, when the container still exists and
+     * runs commands from the desktop, starting it first where the backend needs that.
+     */
+    private suspend fun enter(app: Context, dir: File, target: Target, argv: List<String>, cwd: String?, env: Map<String, String>, seenAt: Long, writtenAt: Long?) {
+        if (!ContainerEnter.allowed(app.filesDir, target.containerId)) {
+            refuse(dir, "${target.who}: ${target.containerName} does not run commands from the desktop (its page in Containers)", 126)
+            return
+        }
         // The path is the same inside every container: the request channel is under the app storage they all bind.
         val inContainer = "${ContainerLauncher.REQUESTS_DIR}/${dir.name}"
         val started = DesktopSessionService.runInPrimary { runtime, _ ->
-            val info = runtime.listContainers().firstOrNull { it.container.id == command.containerId }
+            val info = runtime.listContainers().firstOrNull { it.container.id == target.containerId }
             if (info == null) {
-                refuse(dir, "droidtop-enter: ${command.containerName} no longer exists", 127)
+                refuse(dir, "${target.who}: ${target.containerName} no longer exists", 127)
                 return@runInPrimary null
             }
             val startAt = SystemClock.elapsedRealtime()
@@ -67,20 +87,109 @@ internal object ContainerEnterRequests {
             val startMs = SystemClock.elapsedRealtime() - startAt
             val runAt = SystemClock.elapsedRealtime()
             val result = runCatching {
-                runtime.exec(info.container, ContainerEnter.execCommand(inContainer, command.name, args, cwd), ContainerEnter.execEnvironment(cwd))
+                runtime.exec(
+                    info.container,
+                    ContainerEnter.execCommand(inContainer, argv.first(), argv.drop(1), cwd),
+                    env + ContainerEnter.execEnvironment(cwd),
+                )
             }
             val runMs = SystemClock.elapsedRealtime() - runAt
             val code = result.getOrNull()?.exitCode ?: 125
             Log.i(
                 TAG,
-                "${command.name} in ${command.containerName}: seen ${writtenAt?.let { "${seenAt - it} ms after" } ?: "?"} the request, " +
+                "${argv.first()} in ${target.containerName}: seen ${writtenAt?.let { "${seenAt - it} ms after" } ?: "?"} the request, " +
                     "sibling start $startMs ms, ran $runMs ms, exit $code",
             )
-            result.exceptionOrNull()?.let { refuse(dir, "droidtop-enter: ${it.message ?: it.javaClass.simpleName}", 125) }
+            result.exceptionOrNull()?.let { refuse(dir, "${target.who}: ${it.message ?: it.javaClass.simpleName}", 125) }
                 ?: writeStatus(dir, code)
             null
         }
-        if (!started) refuse(dir, "droidtop-enter: the desktop is not running", 125)
+        if (!started) refuse(dir, "${target.who}: the desktop is not running", 125)
+    }
+
+    /**
+     * Answers a `docker` request (docs/SPEC.md 3d "The docker command", Droidtop/tracker#555 D6c) from droidtop's own
+     * state: the containers, their programs and the image store. Containers are named by their name or their id.
+     */
+    private suspend fun docker(app: Context, dir: File, command: DockerCommand, cwd: String?, seenAt: Long, writtenAt: Long?) {
+        if (command is DockerCommand.Answer) {
+            if (command.code == 0) answer(dir, command.text, "", 0) else answer(dir, "", command.text, command.code)
+            return
+        }
+        val runtime = (DesktopSessionService.state.value as? DesktopSessionState.Connected)?.runtime ?: run {
+            refuse(dir, "docker: the desktop is not running", 125)
+            return
+        }
+        val containers = runCatching { runtime.listContainers() }.getOrElse {
+            refuse(dir, "docker: ${it.message ?: it.javaClass.simpleName}", 1)
+            return
+        }
+        fun find(name: String): ContainerInfo? = containers.firstOrNull { it.displayName == name } ?: containers.firstOrNull { it.container.id == name }
+        when (command) {
+            is DockerCommand.Ps -> {
+                val rows = containers.map { info ->
+                    val state = ContainerPrograms.state(info.container.id)
+                    val programUp = ContainerPrograms.isRunning(info.container.id)
+                    DockerCli.PsRow(
+                        name = info.displayName,
+                        image = info.image ?: "",
+                        status = dockerStatus(state, programUp, info.running),
+                        up = programUp || (info.running && runtime.siblingsNeedStart),
+                        ports = runCatching { runtime.imageRunConfig(info.container)?.ports }.getOrNull().orEmpty(),
+                    )
+                }
+                answer(dir, DockerCli.formatPs(rows, command), "", 0)
+            }
+            is DockerCommand.Images -> {
+                val images = runCatching { OciImageStore.of(app).entries() }.getOrElse {
+                    refuse(dir, "docker images: ${it.message ?: it.javaClass.simpleName}", 1)
+                    return
+                }
+                answer(dir, DockerCli.formatImages(images, command), "", 0)
+            }
+            is DockerCommand.Logs -> {
+                val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
+                val lines = ContainerProgram.lastLines(ContainerProgram.hostLogFile(app.filesDir, info.container.id), command.tail)
+                answer(dir, lines.joinToString("") { it + "\n" }, "", 0)
+            }
+            is DockerCommand.Start, is DockerCommand.Stop -> {
+                val names = if (command is DockerCommand.Start) command.containers else (command as DockerCommand.Stop).containers
+                val out = StringBuilder()
+                val err = StringBuilder()
+                for (name in names) {
+                    val info = find(name)
+                    when {
+                        info == null -> err.append("Error: No such container: $name\n")
+                        command is DockerCommand.Stop -> {
+                            ContainerPrograms.stop(info.container.id)
+                            out.append(name).append('\n')
+                        }
+                        runCatching { runtime.imageRunConfig(info.container) }.getOrNull()?.program().isNullOrEmpty() ->
+                            err.append("Error: $name has no program of its own to start (its image names none)\n")
+                        else -> {
+                            ContainerPrograms.start(app, runtime, info.container)
+                            out.append(name).append('\n')
+                        }
+                    }
+                }
+                answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
+            }
+            is DockerCommand.Exec -> {
+                val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
+                enter(app, dir, Target(info.container.id, info.displayName, "docker exec"), command.command, command.workdir ?: cwd, command.env, seenAt, writtenAt)
+            }
+            is DockerCommand.Answer -> Unit
+        }
+    }
+
+    /** What `docker ps` says a container is doing, from its program first: that is what Docker's STATUS describes. */
+    private fun dockerStatus(state: ContainerPrograms.State, programUp: Boolean, running: Boolean): String = when {
+        programUp && state is ContainerPrograms.State.Waiting -> "Restarting (${state.lastExit})"
+        programUp -> "Up"
+        state is ContainerPrograms.State.Ended -> "Exited (${state.exitCode})"
+        state is ContainerPrograms.State.Failed -> "Exited (couldn't start)"
+        running -> "Running (no program)"
+        else -> "Created"
     }
 
     /**
@@ -89,8 +198,16 @@ internal object ContainerEnterRequests {
      */
     private fun refuse(dir: File, message: String, code: Int) {
         Log.w(TAG, message)
-        runCatching { FileOutputStream(File(dir, "err")).use { it.write((message + "\n").toByteArray()) } }
-        runCatching { FileOutputStream(File(dir, "out")).close() }
+        answer(dir, "", message + "\n", code)
+    }
+
+    /**
+     * Ends a request droidtop answered itself: [err] and [out] written whole (each FIFO opened, written and closed, so
+     * the helper's readers end), then [code] as its status.
+     */
+    private fun answer(dir: File, out: String, err: String, code: Int) {
+        runCatching { FileOutputStream(File(dir, "err")).use { it.write(err.toByteArray()) } }
+        runCatching { FileOutputStream(File(dir, "out")).use { it.write(out.toByteArray()) } }
         writeStatus(dir, code)
     }
 
