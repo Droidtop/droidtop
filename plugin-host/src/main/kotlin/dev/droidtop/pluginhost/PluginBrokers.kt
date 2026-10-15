@@ -303,6 +303,34 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
             .put("vpn", caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) == true)
     }
 
+    override fun netLinks(): List<NetLinks.Link> {
+        val cm = appContext.getSystemService(android.net.ConnectivityManager::class.java) ?: return emptyList()
+        val active = cm.activeNetwork
+        @Suppress("DEPRECATION") // allNetworks is the one call that lists every network up, not only the default.
+        val networks = runCatching { cm.allNetworks.toList() }.getOrDefault(listOfNotNull(active))
+        return networks.mapNotNull { network ->
+            val props = cm.getLinkProperties(network) ?: return@mapNotNull null
+            val caps = cm.getNetworkCapabilities(network)
+            val type = when {
+                caps == null -> "other"
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) -> "vpn"
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+                else -> "other"
+            }
+            NetLinks.Link(
+                name = props.interfaceName.orEmpty(),
+                type = type,
+                active = network == active,
+                metered = caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED) != true,
+                addresses = props.linkAddresses.mapNotNull { la -> la.address.hostAddress?.let { NetLinks.Address(it.substringBefore('%'), la.prefixLength) } },
+                dns = props.dnsServers.mapNotNull { it.hostAddress?.substringBefore('%') },
+                searchDomains = props.domains?.split(' ', ',')?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty(),
+            )
+        }
+    }
+
     override fun addressesOf(host: String): List<java.net.InetAddress> =
         runCatching { java.net.InetAddress.getAllByName(host).toList() }.getOrDefault(emptyList())
 

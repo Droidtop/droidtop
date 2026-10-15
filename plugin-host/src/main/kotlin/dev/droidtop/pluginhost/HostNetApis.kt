@@ -186,6 +186,9 @@ internal object HostNetApis {
     val ops: List<HostOp> = listOf(
         // D1: whether the device is online, and how.
         HostOp("net", "get_state", permission = "net.state") { env, _, _ -> env.netState() },
+        // D12: the interfaces, addresses and DNS servers a plugin with its own sockets needs (docs/plugin-api.md 5.3,
+        // "Open processes"): the filter keeps netlink and Android's resolver out of its reach.
+        HostOp("net", "get_links", permission = PluginTiers.NET_SOCKETS) { env, _, _ -> NetLinks.toJson(env.netLinks()) },
         // D2: one request and its answer, at most 128 KiB each way.
         HostOp(
             "net", "request",

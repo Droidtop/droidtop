@@ -2272,6 +2272,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | D7 | Power and battery | defer work on low battery; power profiles | `power.state()` → {level, charging, saver}; `power.keep_awake {≤10 min}` (only while a job runs); events `power.low`, `power.charging` | data | `power.state` (normal) / `power.keep_awake` (normal, quota) | low | not built |
 | D8 | Display | know the displays (internal, companion, external) to place content | `display.list()` → [{id, role, size, density, hdr}]; events `display.added` / `removed`; `display.set {brightness}` | data; C15 renders | `display.info` (normal) / `display.control` (dangerous) | low / medium | not built |
 | D9 | Audio routing | route or duck audio per session | `audio.routes()`, `audio.set_route {id}`, `audio.volume {stream, level}`; event `audio.route_changed` | G Quick Menu | `audio.control` (normal); **no microphone API** (P2 decision: `audio.record` would be critical and needs a real use) | medium | not built |
+| D12 | Network links | a plugin with its own sockets (`net.sockets`, §5.3 "Open processes") binds, announces and resolves names itself | `net.get_links()` → {links: [{name, type, active, metered, addresses: [{address, prefixLength}], dns: [...], searchDomains: [...]}], dns: [...]}; the active link first, top-level `dns` its servers | data | `net.sockets` (dangerous) | low | built (2026-10-15, Droidtop/tracker#553; `NetLinks`, read from Android's `LinkProperties` of every network up) |
 | D10 | Media session | now playing / transport control (Spotify-style, §7e) | `media.sessions()`, `media.control {id, action}`; event `media.changed`; EP `media.source` for a plugin that *is* a player | G companion; A widget | `media.sessions` (dangerous: sees what other apps play) | medium | built-in only (§7e) |
 | D11 | Input devices | controllers, keyboards, mice: which are connected, their layout | `input.devices()` → [{id, name, vendor, kind}]; events `input.connected` / `disconnected` | data | `input.devices` (normal) | low | not built |
 | D12 | Input injection | synthetic input (macros, remapping without Key Mapper) | `input.inject {events}`: **not offered by the host**; only through a `priv.*` provider's `input.remap` | — | provider permission (critical) | critical | not built, by design |
@@ -3007,10 +3008,11 @@ the plugin declared and the person granted (`PluginTiers.holes`):
   stream sockets, which stay refused, so a networked plugin resolves names
   itself against the DNS servers of the active network (Go's pure resolver)
   and makes its system calls directly, as Go does. Interface listing
-  through netlink stays refused. Handing the plugin the DNS servers and the
-  interfaces it needs for local discovery is a host API still to build (the
-  next #553 step), so until then a networked plugin dials addresses it
-  already knows.
+  through netlink stays refused, so droidtop hands the plugin both:
+  `net.get_links` (D12) lists each network's interface, addresses, DNS
+  servers and search domains from Android's own view of it, and the
+  plugin resolves names against those servers (Go's pure resolver, its
+  dialer pointed at them) and binds and announces on those addresses.
 - **The Containment check** names the holes ("A process of its own with
   graphics access and its own internet connections ...") and its network
   line shows what the filter reported.
@@ -3540,6 +3542,8 @@ version was bumped.
 
 **Changelog (additive changes; no version moved).**
 
+- 2026-10-15 (Droidtop/tracker#553): `net.get_links` (D12), under
+  `net.sockets`.
 - 2026-10-15 (Droidtop/tracker#553): the `net.sockets` permission, the
   network hole of the open process type that `gpu.render` now shares
   (§5.3, "Open processes: one hole per permission").
