@@ -74,7 +74,6 @@ object ComponentCatalog {
             catalogBytes = bytes,
             jws = anchor?.let { runCatching { RuntimeDownloads.bytes(SIGNATURE_URL).toString(Charsets.UTF_8) }.getOrNull() },
             anchor = anchor,
-            nowEpochSeconds = System.currentTimeMillis() / 1000,
         )
         if (verdict is CatalogSignature.Verdict.Refused) error("the component catalog was refused: ${verdict.reason}")
         val text = bytes.toString(Charsets.UTF_8)

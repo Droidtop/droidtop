@@ -42,10 +42,10 @@ data class RevocationList(
 
         /**
          * The list in [jws] when it verifies under [anchor], its signer names [catalogId] and its payload says the
-         * same; otherwise null. [nowEpochSeconds] checks the signer's validity when the list is first accepted.
+         * same; otherwise null.
          */
-        fun parse(jws: String, anchor: ChainSignature.Anchor, catalogId: String, nowEpochSeconds: Long?): RevocationList? {
-            val verified = ChainSignature.verify(jws, ChainSignature.Purpose.REVOCATIONS, anchor, null, nowEpochSeconds)
+        fun parse(jws: String, anchor: ChainSignature.Anchor, catalogId: String): RevocationList? {
+            val verified = ChainSignature.verify(jws, ChainSignature.Purpose.REVOCATIONS, anchor, null)
                 as? ChainSignature.Result.Verified ?: return null
             if (!ChainSignature.names(verified.leaf, ChainSignature.CATALOG_URN, catalogId)) return null
             return runCatching {
