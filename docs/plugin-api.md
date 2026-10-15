@@ -381,8 +381,13 @@ card (docs/SPEC.md 7k, "Notices") and named "from <plugin>":
   "action": { "kind": "view", "op": "signin", "title": "Sign in" } }
 ```
 
-- `tone` is `info` or `caution`; a plugin has no danger. Any other value
-  is drawn as info and logged.
+- `tone` is `info`, `caution` or `danger` (danger since 2026-10-15,
+  Droidtop/tracker#521 item 1: the owner wants each notice to carry its
+  real weight, "We need to surface appropriate contextual stuff"). Danger
+  is for what the person is about to lose or risk now (a save that will be
+  overwritten, an account that will be signed out everywhere); a
+  plugin's danger notice is drawn in droidtop's danger colours and still
+  says "from <plugin>". Any other value is drawn as info and logged.
 - `placement` is `section` (the default) or `banner`, at most one banner
   a page; a second becomes a section notice and is logged.
 - Lengths (title 60, subtitle 140, details 500, the action's label 20) and
@@ -441,7 +446,7 @@ still renders on an older droidtop):
 | `slider` | `title`, `subtitle?`, `min`, `max`, `value`, `action?` | an integer stepper |
 | `text` | `title`, `subtitle?`, `value`, `action?` | a text field (controller and touch text entry). **Never secret**: there is no password field; secrets wait for the vault (G1, #69) |
 | `progress` | `title`, `value` (0 to 100, or -1 for unknown), `subtitle?` | a read-only status row ("45%") |
-| `notice` | `title`, `subtitle?`, `details?`, `tone` (`info`, `caution`), `placement?` (`section`, `banner`), `action?` | droidtop's notice card, "from <plugin>" (see "Notices" above) |
+| `notice` | `title`, `subtitle?`, `details?`, `tone` (`info`, `caution`, `danger`), `placement?` (`section`, `banner`), `action?` | droidtop's notice card, "from <plugin>" (see "Notices" above) |
 
 **Typed values (Droidtop/tracker#521 item 7).** An `info` or `row`
 `value` may be an object instead of a string, and droidtop writes it the
@@ -1922,7 +1927,7 @@ Risk low.
 **C6b Confirm.** API `ui.prompt@1`, op `confirm`. Risk low.
 - **For:** a yes-or-no question before a plugin does something the person
   should agree to.
-- **Ops:** `confirm {title, subtitle?, details?, tone: info|caution,
+- **Ops:** `confirm {title, subtitle?, details?, tone: info|caution|danger,
   proceed, cancel?}` returns `{confirmed}`. Drawn on droidtop's confirm
   card (the danger dialog's shape with no danger: Cancel first and
   focused), named after the plugin, with no second press to arm.
@@ -3435,6 +3440,8 @@ version was bumped.
 
 **Changelog (additive changes; no version moved).**
 
+- 2026-10-15 (Droidtop/tracker#521 item 1): the `danger` tone for a
+  view's `notice` and for `ui.prompt confirm`.
 - 2026-10-15 (Droidtop/tracker#521 items 2 and 8): manifest presentation
   fields `summary`, `publisher`, `homepage`, `category`, `icon`,
   `screenshots` (1.2), drawn by droidtop in an "About" group, with

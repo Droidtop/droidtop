@@ -24,7 +24,7 @@
     "title": 40,
     "body": 90
   },
-  "tones": ["info", "caution"],
+  "tones": ["info", "caution", "danger"],
   "placements": ["section", "banner"],
   "reservedTitles": [
     "Unofficial plugin",

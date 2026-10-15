@@ -408,13 +408,14 @@ object HostApis {
             JSONObject().put("launched", env.launchAppWithExtras(pkg, extras, action))
         },
         // docs/plugin-api.md 3 C6b: a yes-or-no question on droidtop's own confirm card, during a call the person started.
-        // A plugin has no danger tone and cannot use droidtop's own notice titles; the card names the plugin.
+        // A plugin cannot use droidtop's own notice titles; the card names the plugin. Danger is the card's red shape (#521 item 1).
         HostOp("ui.prompt", "confirm", userOnly = true) { env, record, args ->
             val title = args.optString("title").trim().takeIf { it.isNotEmpty() } ?: invalid("title is required")
             val proceed = args.optString("proceed").trim().takeIf { it.isNotEmpty() } ?: invalid("proceed is required")
             if (title.lowercase() in PluginViewLimits.reservedTitles) invalid("\"$title\" is one of droidtop's own titles")
             val tone = when (args.optString("tone", "info")) {
                 "caution" -> dev.droidtop.library.settings.NoticeTone.Caution
+                "danger" -> dev.droidtop.library.settings.NoticeTone.Danger
                 else -> dev.droidtop.library.settings.NoticeTone.Info
             }
             fun text(key: String, limit: Int) = args.optString(key).trim().takeIf { it.isNotEmpty() }?.take(limit)
