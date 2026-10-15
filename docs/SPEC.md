@@ -5768,6 +5768,8 @@ compositor only ever sees one logical pointer and keyboard.
 
 ## 6a. Keyboard ownership (directed 2026-09-01)
 
+**Embedded and standalone (owner, 2026-10-14, Droidtop/tracker#344: "yes, yes, and yes. It's embedded, but some people will want to just use a rebirth of HK").** The Hacker's Keyboard fork is both embedded in droidtop and a standalone app in its own repo, Droidtop/hacker-keyboard-reborn, for people who just want a rebirth of Hacker's Keyboard. The keyboard series (Droidtop/tracker#336-#343) builds one keyboard that serves both.
+
 droidtop ships **Hacker's Keyboard** — `:input-keyboard`, forked from
 klausw/hackerskeyboard (`org.pocketworkstation.pckeyboard`). Its main
 class is named `LatinIME` because Hacker's Keyboard is itself an AOSP
@@ -12981,6 +12983,7 @@ own games, in droidtop's own treatment:
   as the row's detail instead of "Game". Social friends are not library
   entries (a friend's game is a name from the service, not a card), so they
   carry no badge; the service is already named on the row.
+  **A badge is a plain fact, shown only when it is useful** (owner, 2026-10-14, Droidtop/tracker#496: "Sounds somewhat good. We need to show info when useful, not when it's extraneous"): it shows a plain fact ("PC", "Retro", "Engine", the store name) only when the fact helps the user decide or act, never a folder name or an implementation category. No badge when it is extraneous: a fact that is obvious from context, or the same on every card in that view.
 - **Art that does not load is no art** (console, build 1386: three empty
   frames on Recently added). A card whose art fails to load (`AsyncImage`
   `onError`) draws the plate with the name, the same as a card with no art.
@@ -14567,8 +14570,7 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   (`PcLaunchers.viaByEntry`); a store row reads "Signed in · 1,193 games" or
   "Not signed in", Folders "3 folders · 412 games". The column can be scanned by glyph: the
   stores keep the globe, Folders the folder, Add a game and Imported the game controller, Storage the
-  disk (Droidtop/tracker#503); a store's own mark needs brand art droidtop does not ship, which is the
-  owner's call, not drawn from memory. A store page's holding rows
+  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. A store page's holding rows
   ("Shared with you · 573", Free to play) are pressable like Open library:
   the shell opens PC Games filtered to that store and that holding
   (`PcSource.holdingItemId`), and the pill says so. **Folders**
@@ -16379,6 +16381,8 @@ The order work lands in, where one piece depends on another:
    `:runtime-windows` carries Winlator's runtime as GameNative ships it and
    presents a Wine guest in its X server view, so Wine for games does not
    wait on anything in the container stack.
+
+**Priority of work (owner, 2026-10-14):** "priority is determined by user and implementation impact". Work is ordered by how much it changes what the user can do on the device and by how much it unblocks in implementation, not by area or age.
 
 ## 10a. Build environment
 
