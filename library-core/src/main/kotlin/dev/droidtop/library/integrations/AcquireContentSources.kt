@@ -11,6 +11,11 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.CatalogItem
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.library.settings.NoticeItem
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.pluginhost.GrantState
@@ -410,6 +415,54 @@ object AcquireContentSources {
             ),
         ),
     )
+
+    /**
+     * What a source that cannot give games yet opens from Game sources: why, in one notice, and the one way on, at
+     * the top: Allow it to get games (the point sheet, [askRow]) when only the point waits, else its page in Plugins
+     * to review and approve it. It used to open that page straight away, whose approval list is permission rows only,
+     * so the source looked empty, with no systems and no reason (RP5, build 1908, Droidtop/tracker#270). Null for a
+     * source that is ready and allowed.
+     */
+    fun blockedScreen(context: Context, listing: SourceListing): CatalogScreen? {
+        val point = pointState(listing.record, PluginGrants.forContext(context))
+        if (listing.state == SourceState.READY && point == GrantState.GRANTED) return null
+        val label = listing.label
+        val page = SettingsScreenRegistry.get(PLUGINS_SCREEN_ID, listing.pluginId)
+        val (title, body) = when {
+            listing.state == SourceState.WAITING_FOR_APPROVAL -> "Waiting for your approval" to "Approve it to see its systems and search them."
+            listing.state == SourceState.DENIED -> "You denied it" to "Approve it on its page to use it as a source."
+            listing.state == SourceState.DISABLED -> "It is disabled" to (listing.record.disabledReason ?: "It stopped after a failure.").take(90)
+            listing.state == SourceState.TURNED_OFF -> "It is turned off" to "Turn it on on its page to use it as a source."
+            point == GrantState.DENIED -> "Not allowed to get games" to "Allow Get games from a source on its Permissions page."
+            else -> "Not allowed to get games yet" to "Allow it to search and download games for you."
+        }
+        val way: CatalogItem = if (listing.state == SourceState.READY && point == GrantState.ASK) {
+            askRow("source_blocked_ask_${listing.pluginId}", UnavailableSource(label, "is waiting for your approval", listing.pluginId, true, askable = true))
+        } else {
+            NestedScreenItem(
+                id = "source_blocked_page_${listing.pluginId}",
+                title = if (listing.state == SourceState.WAITING_FOR_APPROVAL) "Review and approve $label" else "Open $label's page",
+                subtitle = "In Settings, Plugins",
+                inline = page,
+                registryId = if (page == null) PLUGINS_SCREEN_ID else null,
+            )
+        }
+        val items = listOf(
+            NoticeItem(
+                id = "source_blocked_${listing.pluginId}",
+                notice = Notice(tone = NoticeTone.Caution, title = title, body = body, source = label),
+                placement = NoticePlacement.Page,
+            ),
+            way,
+        )
+        return CatalogScreen(
+            id = "source_blocked_${listing.pluginId}",
+            title = label,
+            subtitle = "Not ready to give games",
+            groups = { listOf(CatalogGroup("source_blocked_group_${listing.pluginId}", null, items)) },
+            indexGroups = { emptyList() },
+        )
+    }
 
     /**
      * The row for one source that only waits for the `library.sources` point: pressing it asks on the first-use sheet

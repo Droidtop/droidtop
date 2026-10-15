@@ -305,7 +305,7 @@ internal object StoresCatalog {
             CatalogGroup(
                 id = "stores_sources_group",
                 title = "Get games",
-                items = sources.map { sourceRow(it, sourceEntry) }.ifEmpty {
+                items = sources.map { sourceRow(context, it, sourceEntry) }.ifEmpty {
                     listOf(
                         NestedScreenItem(
                             id = "stores_no_sources",
@@ -391,10 +391,14 @@ internal object StoresCatalog {
      * approval, turned off or disabled, it opens the plugin's own page in Plugins, where that is fixed. The state is
      * the row's value, so a source is a detail of where games come from and not a screen of its own.
      */
-    private fun sourceRow(listing: dev.droidtop.library.integrations.SourceListing, entry: SourceScreens.EntryContext?): CatalogItem {
+    /** One source's row; reads its grants, so on IO like the rest of [rootGroups]. */
+    private fun sourceRow(context: Context, listing: dev.droidtop.library.integrations.SourceListing, entry: SourceScreens.EntryContext?): CatalogItem {
         val id = "source_${listing.pluginId}"
-        val ready = listing.state == SourceState.READY && entry != null
-        val value: (Context) -> String? = { listing.stateLabel }
+        // Why it is not ready (or not allowed to give games) and the one way on, not its approval list straight away
+        // (Droidtop/tracker#270).
+        val blocked = AcquireContentSources.blockedScreen(context, listing)
+        val ready = blocked == null && entry != null
+        val value: (Context) -> String? = { if (blocked != null && listing.state == SourceState.READY) "Not allowed yet" else listing.stateLabel }
         if (ready) {
             val source = AcquireContentSource.Plugin(listing.record)
             return NestedScreenItem(
@@ -410,9 +414,9 @@ internal object StoresCatalog {
         return NestedScreenItem(
             id = id,
             title = listing.label,
-            subtitle = "Open its page in Plugins to get it ready",
-            inline = page,
-            registryId = if (page == null) AcquireContentSources.PLUGINS_SCREEN_ID else null,
+            subtitle = "Not ready to give games. Open it to see why",
+            inline = blocked ?: page,
+            registryId = if (blocked == null && page == null) AcquireContentSources.PLUGINS_SCREEN_ID else null,
             valueLabel = value,
             icon = CatalogIcon.GLOBAL,
         )
