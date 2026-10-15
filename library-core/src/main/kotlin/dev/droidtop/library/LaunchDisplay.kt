@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.util.Log
-import android.view.Display
 import dev.droidtop.runtime.AudioHandOff
 import dev.droidtop.runtime.LaunchSoundExperiment
 import dev.droidtop.runtime.tasks.LaunchLedger
@@ -78,6 +77,13 @@ internal object LaunchReplace {
 object LaunchDisplay {
     @Volatile
     var targetDisplayId: Int? = null
+
+    /**
+     * The screen droidtop's shell is on, where a launch with no screen chosen goes
+     * ([LaunchScreenResolution.resolveDisplay]). Null before the shell has said.
+     */
+    @Volatile
+    var shellDisplayId: Int? = null
 
     /**
      * The current second/addon display, for resolving a remembered
@@ -334,21 +340,11 @@ object LaunchDisplay {
             redeliver = LaunchReplace.redeliver(packageName, ended)
         }
         coverVacatedDisplays?.invoke(displayId)
-        // Always pin an explicit display, even for the "default display"
-        // decision (displayId == null): leaving ActivityOptions off
-        // entirely lets Android resolve the launch against whatever
-        // display is AMBIENTLY current rather than the built-in panel --
-        // confirmed live on the console (2026-09-25): coverVacatedDisplays had
-        // just placed SecondaryDisplayActivity on the addon a moment
-        // earlier in this same call, and the following no-options
-        // startActivity landed the GAME there too, while parkedDisplayId
-        // was set to the requested null and so never matched the addon's
-        // real display id -- the live companion Presentation was never
-        // told the addon was taken and stayed shown, on top of the game,
-        // holding real input focus, until the user pressed Back on it.
-        // An explicit DEFAULT_DISPLAY closes the ambiguity: the game
-        // lands where we actually asked, and parkedDisplayId tracks it.
-        val resolvedDisplayId = displayId ?: Display.DEFAULT_DISPLAY
+        // Always pin an explicit display. Leaving ActivityOptions off lets Android resolve the launch against
+        // whatever display is ambiently current (console, 2026-09-25: the game landed on the add-on behind the
+        // companion cover). A launch with no screen chosen goes to the shell's own screen, and only an explicit
+        // choice of the built-in one goes there (docs/SPEC.md 4c "Where a game opens").
+        val resolvedDisplayId = LaunchScreenResolution.resolveDisplay(displayId, shellDisplayId)
         val launchedAtMs = System.currentTimeMillis()
         AudioHandOff.mark("startActivity called (${packageName ?: "unresolved package"}, display $resolvedDisplayId)")
         context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(resolvedDisplayId).toBundle())
