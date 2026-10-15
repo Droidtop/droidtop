@@ -1,0 +1,11 @@
+# PLACEHOLDER: Droidtop Core's public key is not committed yet (Droidtop/tracker#550).
+#
+# The coordinator replaces this whole file with Droidtop Core's PUBLIC key
+# (public material) as a PEM block, "-----BEGIN PUBLIC KEY-----" ...
+# "-----END PUBLIC KEY-----", e.g. the output of
+#   openssl x509 -in droidtop-core.crt -noout -pubkey
+# Never the certificate's private key, never anything from the UCM root above
+# it. While this file holds no key, the build pins no Droidtop Core
+# (DroidtopCore.key() is null): no certificate-format official bundle
+# installs, and the component catalog is accepted unsigned. docs/SPEC.md 12a
+# "Signatures: certificate chains to Droidtop Core".
