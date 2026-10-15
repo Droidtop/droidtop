@@ -1183,14 +1183,7 @@ internal fun SettingsCatalogView(
         return
     }
 
-    val root = remember(placeScreenIds) {
-        CatalogScreen(
-            id = "gaming_settings",
-            title = "Settings",
-            categoryOrder = GamingSettingsCatalog.CATEGORY_ORDER,
-            groups = { ctx -> withoutPlaceLinks(GamingSettingsCatalog.settingsGroups(ctx), placeScreenIds) },
-        )
-    }
+    val root = remember(placeScreenIds) { gamingSettingsRoot(placeScreenIds) }
     CatalogNavigator(
         root = root,
         onExit = onBack,
@@ -1200,6 +1193,18 @@ internal fun SettingsCatalogView(
         showSearch = true,
     )
 }
+
+/**
+ * The Gaming shell's Settings, as one screen: what the Settings page opens and what the one search indexes, so a
+ * setting the search finds is a setting the page shows. [placeScreenIds] are the places the left menu already has,
+ * which Settings does not repeat.
+ */
+internal fun gamingSettingsRoot(placeScreenIds: Set<String> = emptySet()): CatalogScreen = CatalogScreen(
+    id = "gaming_settings",
+    title = "Settings",
+    categoryOrder = GamingSettingsCatalog.CATEGORY_ORDER,
+    groups = { ctx -> withoutPlaceLinks(GamingSettingsCatalog.settingsGroups(ctx), placeScreenIds) },
+)
 
 /**
  * A place from the left menu (Stores, Downloads and jobs, Updates,

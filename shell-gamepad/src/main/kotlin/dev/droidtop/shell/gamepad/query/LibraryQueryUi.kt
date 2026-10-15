@@ -488,6 +488,9 @@ internal fun LibrarySearchDialog(
     // What the sources are asked for when it is not a console system (the PC library asks for PC games), so they can
     // narrow their own answer. A console list leaves it null and asks for its [systemId].
     sourcePlatform: String? = null,
+    // The settings of this surface: matching ones follow the rows as a section called Settings, and a press opens the
+    // screen the setting lives on. Null where the surface has no settings of its own to search.
+    settingsRoot: CatalogScreen? = null,
 ) {
     // The field reopens with what was typed and the caret at its END, so Backspace deletes the last letter
     // (Droidtop/tracker#376: a plain String field put the caret at the start).
@@ -534,6 +537,20 @@ internal fun LibrarySearchDialog(
     var focusKey by remember { mutableStateOf<String?>(null) }
     val currentLocal by rememberUpdatedState(local)
     val currentFilter by rememberUpdatedState(sourceFilter)
+    // The settings index is built once, off the main thread, the first time the text is long enough to match one
+    // (SettingsSearchIndex.search wants two letters); typing afterwards only filters it in memory.
+    val settingsIndex by produceState<List<dev.droidtop.library.settings.SettingsSearchResult>?>(null, settingsRoot, text.length >= 2) {
+        if (settingsRoot != null && text.length >= 2 && value == null) {
+            value = try {
+                withContext(Dispatchers.IO) { dev.droidtop.library.settings.SettingsSearchIndex.build(context, settingsRoot) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("droidtop.search", "settings index failed: ${e.message}")
+                emptyList()
+            }
+        }
+    }
 
     // Typing puts the cursor back in the field.
     LaunchedEffect(text) { focusKey = null }
@@ -608,9 +625,18 @@ internal fun LibrarySearchDialog(
                     },
                 )
             }
+            // Settings are a different thing being searched (docs/SPEC.md 7k), so they are a section of their own after the
+            // rows, a few at most; the full list is the Settings page's own search.
+            val settingsHits = settingsIndex?.let { dev.droidtop.library.settings.SettingsSearchIndex.search(it, text).take(MAX_SETTINGS_ROWS) }.orEmpty()
+            if (settingsHits.isNotEmpty()) {
+                add(SearchLine.Header("Settings"))
+                settingsHits.forEach { hit ->
+                    add(SearchLine.Entry("setting:${hit.itemId}", hit.itemTitle, subtitle = hit.screenTitle) { activeCatalog = hit.target })
+                }
+            }
             when {
                 !state.settled -> add(SearchLine.Note("Searching"))
-                state.rows.isEmpty() -> add(SearchLine.Note("No match"))
+                state.rows.isEmpty() && settingsHits.isEmpty() -> add(SearchLine.Note("No match"))
             }
             if (state.settled) {
                 // Sources that wait for the person: one row that opens the approval, not a line per plugin.
@@ -801,6 +827,9 @@ internal fun LibrarySearchDialog(
         }
     }
 }
+
+/** The most settings the search lists; a person who wants more opens Settings. */
+private const val MAX_SETTINGS_ROWS = 5
 
 /** A switch under the search field: its label, whether it is on, and what pressing it does. */
 internal data class SearchSwitch(val label: String, val on: Boolean, val toggle: () -> Unit)

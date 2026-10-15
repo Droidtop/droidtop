@@ -13920,8 +13920,10 @@ view strip, the game page's tabs, the Quick Menu's rail). The D-pad never reache
 a header or status cluster. The hint row and the left menu are touch routes to
 their corresponding actions.
 
-The left menu's order is Home, PC Games, Retro Games, Apps, the places, then
-Settings. Home (the PC section's shelves, §7i "Home art") is the first row;
+The left menu's order is a Search row (not in Kiosk and Kid), Home, PC Games, Retro Games,
+Apps, the places, then Settings. Search opens the one search (12a "One search"), is
+not a destination, and carries no "you are here" mark; while a game runs, Resume leads
+and Search follows it. Home (the PC section's shelves, §7i "Home art") is the first row;
 the current-destination mark follows which of Home and PC Games is showing.
 
 The left menu is Steam's main menu, measured (Droidtop/tracker#273 slice 4;
@@ -19956,9 +19958,25 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   stays open; the PC Games tab keeps its own query, 7i); the launcher has no
   list under it, so the device's rows are in the one list; so are Desktop's
   (its Start menu and R1 open it, with the library and the container's apps as
-  the device's rows, 2b "Desktop chrome with a pad"). Settings has its own search over
-  settings rows (`SettingsSearchIndex`, 7k), which is a different thing being
-  searched, not a plugin mode.
+  the device's rows, 2b "Desktop chrome with a pad"). **Every mode has a normal way in**
+  (Droidtop/tracker#12, #315, #351): Gaming's left menu has a **Search** row right
+  under Resume (Start, then A; a tap works too), which opens the dialog with the
+  shell's games and apps as the device's rows (`LauncherSearchScreen`, so the
+  shell and Standard share the one wiring); Kiosk and Kid have no such row, as they
+  have no downloads or settings. Standard's drawer search field, Desktop's Start menu,
+  and the companion's Home (a **Search** pill under the status line, touch only, which
+  starts the same search window on the companion's screen) open the same dialog.
+  Settings has its own full search over settings rows (`SettingsSearchIndex`, 7k),
+  a different thing being searched, not a plugin mode; where a surface has settings
+  of its own (Gaming, Standard's Global settings, Desktop's) the one search also
+  shows the matching ones, at most five, as a **Settings** section after the
+  rows (`LibrarySearchDialog.settingsRoot`; the index is built once, off the main
+  thread, when the text first reaches two letters). A press opens the screen the
+  setting lives on, in the window a source's page uses. The rows of the library,
+  the apps and the sources stay one ranked list told apart by their detail line,
+  as decided on 2026-10-07; the one separate section is the one that searches
+  another kind of thing. The PC library and a console list do not offer Settings:
+  they search their own games.
 - **Picking.** A device row opens the app or plays the game (the PC library's
   opens the game's page). A source row always opens its detail
   (`GameSourceProvider.detailScreen`); the destination is worked out when it is

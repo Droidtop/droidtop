@@ -795,6 +795,8 @@ private fun DesktopSearch(
             }
         },
         onPlay = onPlay,
+        // Desktop's own settings are searched with the rest.
+        settingsRoot = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get("desktop_settings") },
         onDismiss = onDismiss,
     )
 }

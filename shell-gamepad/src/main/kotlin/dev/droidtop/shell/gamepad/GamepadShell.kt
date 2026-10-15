@@ -484,6 +484,8 @@ private fun GamepadShellBody(
     // The left menu (Start; docs/SPEC.md 7j "Gaming controls") closes for
     // the same reason.
     var leftMenuOpen by remember { mutableStateOf(false) }
+    // The one search over the library, the apps, the download sources and the settings (the left menu's Search row).
+    var globalSearchOpen by remember { mutableStateOf(false) }
     // The game screen of a Windows game sends Back here with openQuickMenu set (OwnGameScreens): the
     // menu opens on its Game section, since the game is running.
     LaunchedEffect(deepLinkToken) {
@@ -830,7 +832,36 @@ private fun GamepadShellBody(
                 leftMenuOpen = false
                 quickMenuOpen = true
             },
+            // Kiosk and Kid keep the library and leave out what manages the device, downloads and settings with it.
+            onSearch = if (menuSectionsFor(uiMode).any { it.managesDevice }) {
+                {
+                    leftMenuOpen = false
+                    globalSearchOpen = true
+                }
+            } else {
+                null
+            },
             onDismiss = { leftMenuOpen = false },
+        )
+    }
+    if (globalSearchOpen) {
+        dev.droidtop.shell.gamepad.query.LauncherSearchScreen(
+            initialText = "",
+            games = gameEntries,
+            // The apps are the shell's own list, matched in memory by the same text rule every list uses.
+            findApps = { text ->
+                appEntries.orEmpty().filter { !it.missing && dev.droidtop.shell.gamepad.query.matchesSearchText(it, text) }.take(20).map { app ->
+                    dev.droidtop.shell.gamepad.query.LauncherSearchApp(
+                        key = app.id,
+                        title = dev.droidtop.library.GameNaming.displayName(app.title),
+                        icon = null,
+                        open = { onLaunch(app) },
+                    )
+                }
+            },
+            onPlay = onLaunch,
+            settingsRoot = remember(uiMode) { gamingSettingsRoot(menuSectionsFor(uiMode).filter { it.isPlace }.mapNotNull { it.placeScreenId }.toSet()) },
+            onDismiss = { globalSearchOpen = false },
         )
     }
     // A store's cloud-save sync asks here when a game's saves differ (docs/SPEC.md 7g, "Stores").

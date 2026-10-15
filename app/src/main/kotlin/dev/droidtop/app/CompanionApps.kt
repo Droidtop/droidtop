@@ -131,7 +131,7 @@ private fun RecentAppTile(app: RecentApp) {
 }
 
 @Suppress("DEPRECATION") // Display via WindowManager is the only route below API 30
-private fun displayIdOf(context: android.content.Context): Int =
+internal fun displayIdOf(context: android.content.Context): Int =
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
         context.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
     } else {
