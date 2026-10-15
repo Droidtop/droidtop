@@ -139,6 +139,11 @@ internal fun CompanionGameTab() {
         cancelled?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
         }
+        // What the last Quit or Kill came to, here where it was pressed: "Ending…", then why it did not end.
+        val stopStatus by CompanionState.stopStatus.collectAsState()
+        stopStatus?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        }
         var overlayVersion by remember { mutableIntStateOf(0) }
         val overlay by PerformanceOverlay.level.collectAsState()
         val performanceItem by produceState<dev.droidtop.library.settings.AsyncActionItem?>(null, overlayVersion) {
@@ -155,9 +160,9 @@ internal fun CompanionGameTab() {
             val label = GameControls.label(row, runner)
             when (row) {
                 GameRow.RESUME -> GameButton(label, primary = true) { CompanionState.onLaunchEntry?.invoke(entry) }
-                GameRow.QUIT -> GameButton(label) { act(row) { CompanionState.onQuitEntry?.invoke(entry) } }
+                GameRow.QUIT -> GameButton(label) { act(row) { CompanionState.quit(context, entry) } }
                 GameRow.RESTART -> GameButton(label) { act(row) { CompanionState.onRestartEntry?.invoke(entry) } }
-                GameRow.KILL -> GameButton(label) { act(row) { CompanionState.onQuitEntry?.invoke(entry) } }
+                GameRow.KILL -> GameButton(label) { act(row) { CompanionState.quit(context, entry) } }
                 GameRow.EMULATOR -> CompanionEmulatorChoice(entry)
                 GameRow.OVERLAY -> GameButton("$label: ${overlay.label}") {
                     if (PerformanceOverlay.canDraw(context)) PerformanceOverlay.setLevel(context, overlay.next())

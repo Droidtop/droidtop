@@ -3109,7 +3109,11 @@ a close path of its own. Every call works off the main thread.
   the game may well still be running (RetroArch was), so nothing may say it ended. A helper that was refused
   reads "Couldn't end it: <its refusal>" and adds that Android was also asked and cannot say. Before this the Kill
   button discarded the outcome, cleared the session whatever happened, and the tab simply went away with no
-  word (Droidtop/tracker#412).
+  word (Droidtop/tracker#412). The companion runs the stop itself (`CompanionState.quit`, 2026-10-15): it
+  was a seam MainActivity installed, so with no MainActivity alive a press did nothing at all (rig, build 1888:
+  Kill and Quit left RetroArch's pid unchanged and nothing anywhere said why). The Game tab and the Now card show
+  "Ending <game>…" at once, then nothing when it ended or the reason where it was pressed, as well as on the
+  banner; after 15 s without an outcome they say it has not ended yet, and the stop goes on.
 - **The running game's session ends in one place** (`SessionMonitor`, `SessionLiveness`, Droidtop/tracker#289,
   #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, Quick Menu Game section,
   companion Game tab and Now card, keep-awake) follows it and none polls for itself. `SessionMonitor` looks

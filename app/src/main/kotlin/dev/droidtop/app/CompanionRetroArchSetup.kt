@@ -192,7 +192,7 @@ private suspend fun turnOnNetworkCommands(context: android.content.Context, entr
         EmulatorSetup.Reach.NONE -> return "Not turned on: droidtop cannot reach RetroArch's settings. In RetroArch: Settings, Network, Network Commands"
         else -> Unit
     }
-    CompanionState.onQuitEntry?.invoke(entry) ?: return "Not turned on: droidtop could not quit the game"
+    CompanionState.quit(context, entry)
     var waited = 0
     while (LaunchDisplay.running.value != null && waited < QUIT_WAIT_MS) {
         delay(250)

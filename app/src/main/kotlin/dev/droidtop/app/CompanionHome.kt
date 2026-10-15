@@ -231,6 +231,8 @@ private val NOW_ART_WIDTH = 88.dp
 @Composable
 internal fun NowRunningCard(entry: LibraryEntry, sinceEpochMs: Long) {
     val nav = LocalCompanionNav.current
+    val context = LocalContext.current
+    val stopStatus by CompanionState.stopStatus.collectAsState()
     val played by produceState(sessionLabel(sinceEpochMs, System.currentTimeMillis()), sinceEpochMs) {
         while (true) {
             value = sessionLabel(sinceEpochMs, System.currentTimeMillis())
@@ -244,9 +246,11 @@ internal fun NowRunningCard(entry: LibraryEntry, sinceEpochMs: Long) {
         PillRow {
             // Resume is a relaunch of the entry, the Quick Menu's own resume (the one launch path).
             CompanionPill("Resume", selected = true) { CompanionState.onLaunchEntry?.invoke(entry) }
-            CompanionPill("Quit") { CompanionState.onQuitEntry?.invoke(entry) }
+            CompanionPill("Quit") { CompanionState.quit(context, entry) }
             if (nav != null) CompanionPill("Controls") { nav.openTab(CompanionTab.SYSTEM) }
         }
+        // What Quit came to, under the button that was pressed (Droidtop/tracker#412).
+        stopStatus?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface) }
     }
 }
 
