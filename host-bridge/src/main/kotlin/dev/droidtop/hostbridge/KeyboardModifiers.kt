@@ -104,7 +104,9 @@ class XkbModifierMap private constructor(
         private val KEYCODE = Regex("""<([^>\s]+)>\s*=\s*(\d+)\s*;""")
         private val ALIAS = Regex("""alias\s*<([^>\s]+)>\s*=\s*<([^>\s]+)>\s*;""")
         private val KEY = Regex("""key\s*<([^>\s]+)>\s*\{(.*?)\}\s*;""", RegexOption.DOT_MATCHES_ALL)
-        private val FIRST_SYMBOL = Regex("""\[\s*([A-Za-z0-9_]+)""")
+        // The first symbol list: at the start of the key's block ("{ [ Shift_L ] }") or after "=" ("symbols[Group1]= [ Alt_R ]"),
+        // never the group index inside "symbols[Group1]".
+        private val FIRST_SYMBOL = Regex("""(?:^|=)\s*\[\s*([A-Za-z0-9_]+)""")
         private val MODIFIER_MAP = Regex("""modifier_map\s+(\w+)\s*\{([^}]*)\}\s*;""")
 
         /** Reads [keymap]. A text with no modifier map in it gives [EMPTY], never an error. */
