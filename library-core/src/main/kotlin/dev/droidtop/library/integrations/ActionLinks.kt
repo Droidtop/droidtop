@@ -7,6 +7,9 @@ import dev.droidtop.library.settings.CatalogChip
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.pluginhost.GrantState
@@ -680,11 +683,18 @@ object ActionLinks {
                 review.notice?.let { notice ->
                     val paragraphs = notice.trim().split(Regex("\\n+")).map { it.trim() }.filter { it.isNotEmpty() }
                     val lastNotice = noticeSteps.lastOrNull()?.number == step.number
+                    // The catalog's text under droidtop's own caution card (Droidtop/tracker#521 item 10), as on the catalog's page.
+                    add(
+                        NoticeItem(
+                            id = "links_actions_${step.number}_notice_card",
+                            notice = Notice(tone = NoticeTone.Caution, title = PluginCatalogScreen.NOTICE_TITLE),
+                        ),
+                    )
                     paragraphs.forEachIndexed { i, text ->
                         add(
                             TextBlockItem(
                                 id = "links_actions_${step.number}_notice_$i",
-                                title = if (i == 0) "Notice from the catalog" else "",
+                                title = "",
                                 text = text,
                                 gate = if (step.number in refused) null else gate,
                                 last = lastNotice && i == paragraphs.lastIndex,

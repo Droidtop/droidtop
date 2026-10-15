@@ -147,6 +147,11 @@ meaning, and a v1 manifest is translated into this shape by one function
   check every host call goes through (`PluginGrants.pointRefusal`) refuses
   a point the manifest does not declare at a version this build serves,
   before the plugin is loaded, whatever its grants say.
+  An entry's `label` is its own title, which droidtop shows **after** the
+  point's name, never instead of it: "Status tiles and widgets: VPN" on the
+  approval list and the Permissions screen (`ProvidedPoint.titled`, at most
+  40 characters of the label, cut with an ellipsis; Droidtop/tracker#521
+  item 3). A label the same as the point's name is dropped.
 - **`permissions`** lists every host-API permission the plugin may use.
   Each entry has an optional plain-language `reason`, which is shown on
   the grant screen. `required: true` means the plugin cannot do its main
@@ -464,7 +469,12 @@ jobs too (2026-10-07): the capability handed to `startJob` is `settings_rows`,
 a label only, and the plugin reads the point and op from the envelope. The
 host checks the grant of the envelope's point, never the label's. Progress
 and completion are the existing `jobProgress`/`jobComplete` shape; a
-completion's `values` may carry `message`.
+completion's `values` may carry `message`, and `notice` (a notice node as
+JSON text, drawn like a reply's `data.notice`). A job that finishes with no
+`notice` gets droidtop's own Info notice "Finished" on the page that
+started it, with the job's `message` as its body unless it only says
+"Done" (Droidtop/tracker#521 item 9); a plugin does not draw its own "it
+worked" row.
 
 For a resumable native job, `PluginJobProgress.checkpoint(percent,
 statusLine, resumePayload)` reports an opaque checkpoint of at most 4096
@@ -481,8 +491,8 @@ title or the plugin's label. A view cannot set droidtop's title bar, hint
 row, colours or buttons.
 
 **Errors.** A view call that fails (the plugin's own FAILED, a timeout, a
-crash under the usual crash policy) renders as one `info` row with the
-reason, plus a way out where the host knows one (a source's "Open <plugin>
+crash under the usual crash policy) renders as droidtop's caution notice
+"Couldn't show this page" with the plugin's sentence and its code in Info, plus a way out where the host knows one (a source's "Open <plugin>
 settings" when it provides `ui.settings`). droidtop never shows a blank
 page for a plugin.
 
@@ -669,7 +679,12 @@ host draws its standard empty state with the plugin's name and the
 one-line reason (the shape `SourceOutcome` already uses for search,
 2026-09-30), never a blank area and never a spinner that does not end.
 When an op succeeds with nothing to show (no results, an empty view),
-the host draws "<plugin>: nothing here" in the same place. A tile that
+the host draws its own Info notice "Nothing here yet", from the plugin,
+with Refresh (Droidtop/tracker#521 item 6). A view may give the one
+sentence that notice says under its title with the top-level `empty`
+("Saves you make appear here"; at most the notice subtitle length, cut
+beyond); without it droidtop's words stand alone. A plugin does not add
+its own "No items" row. A tile that
 misses its budget keeps its last value and says it is stale. Each
 surface's budget is §8's table.
 
@@ -3382,6 +3397,14 @@ version was bumped.
   plugin still works.
 
 **Changelog (additive changes; no version moved).**
+
+- 2026-10-15 (Droidtop/tracker#521 items 3, 6, 9, 10): a `provides`
+  entry's `label` follows the point's name ("Status tiles and widgets:
+  VPN"); a view's optional top-level `empty` sentence under droidtop's own
+  "Nothing here yet" notice with Refresh; a job's completion `notice`, and
+  droidtop's "Finished" notice when there is none; a catalog's
+  `disclaimer` is drawn under droidtop's caution card "Notice from the
+  list" (reserved, with "The list's notice changed").
 
 - 2026-10-15 (Droidtop/tracker#544): the error code `BROWSER_CHECK_REQUIRED`
   and the error field `detail`; a failure `message` is one plain sentence

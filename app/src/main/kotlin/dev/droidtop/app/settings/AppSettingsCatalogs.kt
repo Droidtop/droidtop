@@ -2519,7 +2519,7 @@ object AppSettingsCatalogs {
                 dev.droidtop.pluginhost.PointRisk.HIGH -> PermissionTier.DANGEROUS
                 else -> PermissionTier.NORMAL
             }
-            rows += PermissionRow(id, point.label, point.lets.ifEmpty { null }, tier, PluginGrants.provideState(record, snap, entry.point))
+            rows += PermissionRow(id, entry.titled(point.label), point.lets.ifEmpty { null }, tier, PluginGrants.provideState(record, snap, entry.point))
         }
         for (export in m.v2.exports) {
             rows += PermissionRow(PluginGrants.EXPORT_PREFIX + export.grantKey, export.offerLabel(), null, PermissionTier.NORMAL, PluginGrants.exportState(snap, export.grantKey))

@@ -100,6 +100,23 @@ object PluginViews {
     /** The fallback title of a failed action's notice. */
     internal const val FAILED_TITLE = "Couldn't finish"
 
+    /** The title of droidtop's notice for a job that finished and sent no notice of its own (Droidtop/tracker#521 item 9). */
+    internal const val FINISHED_TITLE = "Finished"
+
+    /** droidtop's notice for a finished job: [FINISHED_TITLE], and the plugin's `message` as its body unless it only says "Done". */
+    internal fun finishedNotice(message: String?): ViewNode.Notice {
+        val said = message?.trim()?.takeIf { it.isNotEmpty() && !it.equals("Done", ignoreCase = true) }
+        return ViewNode.Notice("job_finished", FINISHED_TITLE, said?.let { cutBody(it) }, null, "info", banner = false, action = null)
+    }
+
+    private fun cutBody(text: String): String {
+        val max = dev.droidtop.pluginhost.PluginViewLimits.length("noticeSubtitle")
+        return if (text.length <= max) text else text.take(max - 1).trimEnd() + "\u2026"
+    }
+
+    /** The title of droidtop's notice on a plugin page with nothing in it (Droidtop/tracker#521 item 6). */
+    internal const val EMPTY_TITLE = "Nothing here yet"
+
     /**
      * Runs a `call` or `job` action of a view (docs/plugin-api.md 1.6, "Actions") on [point], with [values] and the
      * host-filled [hostContext] written after the action's own args so they cannot be spoofed. The one path every
@@ -153,7 +170,10 @@ object PluginViews {
                 val replaced = result.values["view"]?.let { text -> runCatching { PluginView.parse(JSONObject(text), messages) }.getOrNull() }
                 val message = if (result.ok) result.values["message"] ?: "Done" else "${record.manifest.label}: ${result.error ?: "failed"}"
                 val notice = if (result.ok) {
+                    // The plugin's own notice when it sent one; otherwise droidtop's (#521 item 9), so a finished job always
+                    // says so on the page that started it, with the plugin's sentence when it gave one.
                     result.values["notice"]?.let { text -> runCatching { PluginViewCall.replyNotice(JSONObject().put("notice", JSONObject(text)), messages) }.getOrNull() }
+                        ?: finishedNotice(result.values["message"])
                 } else {
                     PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.FAILED, result.error ?: "failed"), emptySet(), FAILED_TITLE, messages)
                 }
@@ -342,9 +362,21 @@ private class PluginPage(
                 }
             }
             view?.subtitle?.let { add(ActionItem(id = "pv_${screenId}_about", title = it, run = {})) }
-            // The empty-state contract (docs/plugin-api.md 1.6, #179): never a blank page.
+            // The empty-state contract (docs/plugin-api.md 1.6, #179; #521 item 6): never a blank page, and droidtop's own
+            // notice, not a plugin's row: "Nothing here yet" from the plugin, its one sentence if it gave one, and Refresh.
             if (error == null && view?.sections?.all { it.nodes.isEmpty() } != false) {
-                add(ActionItem(id = "pv_${screenId}_empty", title = "${record.manifest.label}: nothing here", run = {}))
+                add(
+                    NoticeItem(
+                        id = "pv_${screenId}_empty",
+                        notice = Notice(
+                            tone = NoticeTone.Info,
+                            title = PluginViews.EMPTY_TITLE,
+                            body = view?.empty,
+                            action = if (op != null) NoticeAction("Refresh") { stale = true } else null,
+                            source = record.manifest.label,
+                        ),
+                    ),
+                )
             }
         }
         val current = view
