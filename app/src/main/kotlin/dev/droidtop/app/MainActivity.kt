@@ -118,7 +118,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     // Desktop hands the pad to the container, but Start, Select, R2 and L1 are droidtop's chrome there
     // (docs/SPEC.md 2b "Desktop chrome with a pad"): the Start menu, the Quick Menu and the windows list.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-        (mode == Mode.DESKTOP && DesktopPadRoutes.claim(event)) || padGate.dispatchKey(event)
+        (mode == Mode.DESKTOP && DesktopPadRoutes.claim(event, DesktopSessionService.state.value is DesktopSessionState.Connected)) ||
+            padGate.dispatchKey(event)
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         padGate.noteTouch(event)

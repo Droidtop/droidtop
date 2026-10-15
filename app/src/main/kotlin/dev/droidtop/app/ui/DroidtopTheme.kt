@@ -52,9 +52,13 @@ fun DroidtopTheme(
     )
 }
 
-/** Whether droidtop was last in Gaming mode, which is when a screen it opens takes the Gaming theme. */
+/**
+ * Whether a screen droidtop opens takes the Gaming theme: when droidtop was last in Gaming, or in Desktop, whose
+ * chrome wears the Gaming theme too (docs/SPEC.md 2b "One bar, in droidtop's look"; rig 2026-10-15: the Switch mode
+ * sheet opened from Desktop was in the plain face).
+ */
 @Composable
 fun rememberGamingThemed(): Boolean {
     val context = LocalContext.current
-    return remember(context) { Modes.lastMode(context) == Mode.GAMING.id }
+    return remember(context) { Modes.lastMode(context) in setOf(Mode.GAMING.id, Mode.DESKTOP.id) }
 }
