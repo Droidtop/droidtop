@@ -112,6 +112,8 @@ data class PluginManifest(
      * so everything above the parser sees one model.
      */
     val v2: V2Declarations = V2Declarations.EMPTY,
+    /** Summary, publisher, home page, category, icon and screenshots ([PluginPresentation], Droidtop/tracker#521 item 2). */
+    val presentation: PluginPresentation = PluginPresentation(),
 ) {
     companion object {
         private val REQUIRED_ABIS = setOf("arm64-v8a", "x86_64")
@@ -187,6 +189,7 @@ data class PluginManifest(
                 boundServiceTargets = boundServiceTargets,
                 subscribedEvents = subscribedEvents,
                 v2 = declaredV2,
+                presentation = PluginPresentation.fromJson(json, payload.map { it.path }.toSet()),
             )
             return manifest.withDerivedV2()
         }

@@ -37,6 +37,9 @@ data class PluginCatalogPlugin(
     val label: String,
     val description: String?,
     val releases: List<PluginCatalogRelease>,
+    /** The manifest's `summary` and `publisher`, repeated in the index so the list can show them before install (#521 item 2). */
+    val summary: String? = null,
+    val publisher: String? = null,
 )
 
 data class PluginCatalogOrigin(
@@ -187,7 +190,8 @@ object PluginCatalogIndexParser {
                     )
                 }
                 if (releases.isEmpty()) return null
-                plugins.add(PluginCatalogPlugin(id, label, description, releases))
+                val presentation = dev.droidtop.pluginhost.PluginPresentation.fromJson(pluginJson, emptySet())
+                plugins.add(PluginCatalogPlugin(id, label, description, releases, presentation.summary, presentation.publisher))
             }
             origins.add(PluginCatalogOrigin(origin, trust, keySha256, plugins, keyDocument?.second))
         }

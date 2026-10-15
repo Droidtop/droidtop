@@ -7,6 +7,7 @@ import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.pluginhost.CompanionAbilities
 import dev.droidtop.pluginhost.ContextTarget
 import dev.droidtop.pluginhost.PluginCapability
@@ -245,6 +246,16 @@ object PluginPanels {
             if (PluginCapability.APP_STATUS in m.capabilities) {
                 add(NestedScreenItem(id = "plugin_panel_${m.id}_app_status", title = "App status", inline = PluginAppStatus.screenFor(record)))
             }
+            // Every panel's frame ends with the way to what the plugin may do (Droidtop/tracker#521 item 8): droidtop's own
+            // row on every host, so no plugin adds a "permissions" or "about" row of its own.
+            add(
+                NestedScreenItem(
+                    id = "plugin_panel_${m.id}_permissions",
+                    title = "Permissions",
+                    subtitle = "What ${m.label} may do, and its page",
+                    inline = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, m.id),
+                ),
+            )
         }
         return if (items.isEmpty()) emptyList() else listOf(CatalogGroup(id = "plugin_panel_${m.id}_more", title = null, items = items))
     }
