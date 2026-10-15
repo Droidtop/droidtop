@@ -3274,7 +3274,10 @@ arrays under the manifest's own keys (`V2Declarations`).
     the UI declining to wait (`crashOnTimeout = false`). The wait runs on
     the IO dispatcher, so a hung plugin does not hold the timeout up.
   - A point the plugin provides at high risk needs its `provide:<point>`
-    grant, or the call is refused.
+    grant, or the call is refused. Set to Ask first (or not answered yet),
+    a call the person started shows the first-use sheet for the point
+    (`PluginGrants.askPoint`) and keeps the answer; from the background it
+    is refused with a "wanted" note (Droidtop/tracker#270).
 - **Resolution and calls between plugins.**
   - `PluginApiResolver` recomputes the graph on a change of `PluginEpoch`
     (every record write, grant write and uninstall), never per call, to a

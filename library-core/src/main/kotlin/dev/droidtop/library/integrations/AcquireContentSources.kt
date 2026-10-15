@@ -173,6 +173,12 @@ data class UnavailableSource(
     val pluginId: String,
     /** True while the plugin only waits for the person's approval (the sentence "is waiting for your approval"). */
     val waitingForApproval: Boolean,
+    /**
+     * True when the one thing missing is the `library.sources` point, set to Ask first or not answered yet: the row then
+     * asks right there ([PluginGrants.askPoint]) instead of opening a page that would only show Ask first again
+     * (Droidtop/tracker#270).
+     */
+    val askable: Boolean = false,
 ) {
     companion object {
         /**
@@ -200,7 +206,8 @@ data class UnavailableSource(
                 point == GrantState.DENIED -> "was not allowed to give games"
                 else -> return null
             }
-            return UnavailableSource(label, reason, pluginId, waiting)
+            val askable = trust == PluginTrustState.APPROVED && enabled && disabledReason == null && point == GrantState.ASK
+            return UnavailableSource(label, reason, pluginId, waiting, askable)
         }
 
         /** The one row that stands for every source waiting for the person, in the search and in Get games alike. */
@@ -357,7 +364,10 @@ object AcquireContentSources {
                     ),
                 )
                 // Every source waiting for the person is ONE row that leads to where they are approved, however many there are.
-                if (waiting.isNotEmpty()) {
+                val ask = waiting.singleOrNull()?.takeIf { it.askable }
+                if (ask != null) {
+                    add(askRow("acquire_empty_waiting_$key", ask))
+                } else if (waiting.isNotEmpty()) {
                     add(pluginsLink("acquire_empty_waiting_$key", UnavailableSource.waitingTitle(waiting), UnavailableSource.waitingSubtitle(waiting), waiting.singleOrNull()?.pluginId))
                 }
                 others.forEach { off -> add(pluginsLink("acquire_empty_off_${off.pluginId}_$key", "${off.label} ${off.reason}", "Open its page", off.pluginId)) }
@@ -400,6 +410,26 @@ object AcquireContentSources {
             ),
         ),
     )
+
+    /**
+     * The row for one source that only waits for the `library.sources` point: pressing it asks on the first-use sheet
+     * ([askSource]); once allowed, the source is in every Get games list and search from then on.
+     */
+    fun askRow(id: String, source: UnavailableSource): AsyncActionItem = AsyncActionItem(
+        id = id,
+        title = UnavailableSource.waitingTitle(listOf(source)),
+        subtitle = "Press to allow it to get games",
+        run = { ctx, _ ->
+            if (askSource(ctx, source)) "${source.label} can get games now. Go back and open Get games again"
+            else "${source.label} is still not allowed to get games"
+        },
+    )
+
+    /** Asks whether [source] may give games; true when it may afterwards. Off the main thread inside. */
+    suspend fun askSource(context: Context, source: UnavailableSource): Boolean = withContext(Dispatchers.IO) {
+        val record = PluginStore.installed(context).firstOrNull { it.manifest.id == source.pluginId } ?: return@withContext false
+        PluginGrants.askPoint(context, record, SOURCES_POINT)
+    }
 
     /**
      * A row that opens Plugins, at [pluginId]'s own page when it names one and the page is known, else at the list.

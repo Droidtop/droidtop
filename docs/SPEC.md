@@ -20556,7 +20556,9 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   are waiting for your approval" row. The "Get games" screens say the same thing
   the same way (`UnavailableSource.waitingTitle`): when no source can answer, ONE
   row names the waiting ones and opens Plugins (the plugin's own page when it is
-  one), never a block per plugin. "Get apps" with a catalog plugin installed but
+  one), never a block per plugin. When that row is ONE plugin missing only the
+  point (`UnavailableSource.askable`), pressing it asks on the first-use sheet
+  right there; its page would only show "Ask first" again (Droidtop/tracker#270). "Get apps" with a catalog plugin installed but
   not allowed is a row that opens that plugin's page, and with none installed
   has a Plugins row, so neither is a dead end.
   **A failure is a sentence the person can act on** (`SourceFailures.plain`,

@@ -48,6 +48,15 @@ class SourceReadinessTest {
     }
 
     @Test
+    fun `only a source missing just the point is asked about in place`() {
+        assertTrue(of(point = GrantState.ASK)!!.askable)
+        // Not approved yet: the whole plugin waits, which its page answers, not the point sheet.
+        assertFalse(of(trust = PluginTrustState.PENDING, point = GrantState.ASK)!!.askable)
+        assertFalse(of(point = GrantState.DENIED)!!.askable)
+        assertFalse(of(enabled = false, point = GrantState.ASK)!!.askable)
+    }
+
+    @Test
     fun `all the sources waiting are one row, named by count`() {
         val one = listOf(of(point = GrantState.ASK)!!)
         assertEquals("Nyaa is waiting for your approval", UnavailableSource.waitingTitle(one))
