@@ -877,6 +877,8 @@ class Library(
     private val links: GameLinksStore = NoOpGameLinksStore,
     /** Where a linked record's newest version is asked: the `library.updates` plugins (docs/SPEC.md 7g, "Where an update comes from"). */
     private val updateSources: UpdateSources = NoUpdateSources,
+    /** The ids a game is known by and the save rule it was matched to; they follow a game when it is folded into another (docs/SPEC.md 7o "Saves"). */
+    private val saveRecords: dev.droidtop.library.saves.SaveRecordStore = dev.droidtop.library.saves.NoOpSaveRecordStore,
 ) {
     private val updates = SourceUpdateCheck(links, updateSources)
 
@@ -1814,6 +1816,7 @@ class Library(
         playHistory.moveTo(missing.id, replacement.id)
         favorites.moveTo(missing.id, replacement.id)
         links.moveTo(missing.id, replacement.id)
+        saveRecords.moveTo(missing.id, replacement.id)
         changedFactIds += listOf(missing.id, replacement.id)
         providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(missing.id, replacement.id, keepSource = false) }
         for (provider in providers.filter { it.indexed }) {
@@ -1883,6 +1886,7 @@ class Library(
         for (source in setOf(game.displayEntry.id, other.displayEntry.id) - target) {
             playHistory.moveTo(source, target)
             favorites.moveTo(source, target)
+            saveRecords.moveTo(source, target)
             providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(source, target, keepSource = true) }
         }
         changedFactIds += keep + fold

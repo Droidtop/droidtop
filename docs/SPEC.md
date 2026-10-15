@@ -15962,6 +15962,57 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   person started the sync. After a game ends, with a cloud folder set, the
   saves are left there for it instead ("Transports" below).
 
+### Detected saves (Droidtop/tracker#546)
+
+Owner, 2026-10-14: "Gotta fix ALL of that. We also need to be able to index against the other games we detect,
+especially with metadata scrapers. some games (especially engine ones) are easier (for instance, renpy), and we need
+to be able to sync between handhelds." And the same day, for this part: "Let's also get all the saves detected."
+
+- **Every game page says where its saves are**, in the one "Saves" row of the game page and of a console game's
+  detail screen, with a page of details behind it. The row is worked out off the main thread when the page opens
+  (`SaveDetector`), never while a list draws, and it has four honest answers:
+  - **No rule known** ("No rule known"): nothing says where this game keeps saves, and the row says what would give
+    one.
+  - **A rule that cannot be applied yet** ("Not known yet"): the rule exists, but this game's own name for its folder
+    could not be read (a Ren'Py `config.save_directory` inside an archive, a Godot project inside a `.pck`, an AGS
+    game's folder name), or the emulator keeps its saves in a folder droidtop may not list. Never shown as "none".
+  - **None found**: the places searched are named.
+  - **Found**: how many files, in which folder, and how long ago the newest was written.
+- **Rules come from data, not code.** Engines carry a `saves` object in droidtop-platforms' engines database, and
+  emulators one on their players-database rows, in the form `docs/FORMAT.md` of that repository describes. A rule
+  names its source (the engine's or emulator's own code, or a shipped game) and the generator refuses one that does
+  not. The tokens are the agent core's (`crates/core/src/saves.rs`, Ludusavi's), plus `<engineData>`, `<emuSaves>`
+  and `<emuStates>`. A name the rule needs from the game (`facts`) is read from the game's own files by a reader
+  droidtop has; a name that cannot be read leaves that place unsearched and is said, never guessed.
+- **Where an engine game is searched** (all of them that apply, and the answer names the one it found them in): the
+  game's own folder (`beside`, which is where Enginehost also keeps the saves of KiriKiri, Buriko, CMVS, NScripter
+  and RPG Maker 2000/2003/XP/VX/VX Ace), Enginehost's save folder (`<volume>/Enginehost/saves`, with the game's own
+  directory inside it where the engine names one, the game's folder name where Enginehost names it: MV and MZ,
+  CatSystem2), and the Windows setup the game would run in. A rule does not say where an engine *should* save; it
+  says where the engine does, so droidtop changes no save logic ("we don't change save logic, we just make system
+  locations mean somewhere different"). Enginehost's per-family folders are Enginehost's own choice: droidtop uses the
+  default until the Enginehost adapter plugin tells it the real ones (`saves.roots@1`).
+- **Emulator saves are per emulator and per system**, following the `setup` convention: droidtop takes the first row
+  of the emulator's package that carries a rule, a `systems` entry replaces its patterns for one system, and the
+  emulator's own config file names its real folder (`folderKey`). **Memory cards shared by every game are a set of
+  their own** (`cards`), never part of a game's saves. **Save states are separate and not counted** as the game's
+  saves (`states`): a state only loads in the emulator version that wrote it, so syncing them is the person's choice
+  and belongs to the sync, not to detection.
+- **Matching a game to a rule** (`SaveMatcher`), strongest first, never fuzzy: a Steam id, a GOG id, an id a scraper
+  learned (`game_ids`), the install folder's name, the exact title key. Engine games match their engine's row and
+  console games the emulator that would launch them. A match is kept in `save_rules` (`kind`, `name`, `how`,
+  `checked_at`; the rule itself is read when used, never copied) so the page can say "This game is matched by its
+  Steam id". The scrapes now keep the ids they learned (`game_ids`, one row per kind); they were thrown away before.
+  The person's correction ("Don't look for this game's saves", and the row that takes it back) is stored with
+  `how=you` and is never replaced by an automatic match; both tables follow a game when it is folded into another.
+- **Where PC games get their rule today.** A paired computer's answer is the Ludusavi data droidtop has: the agent
+  core keeps the templates it answered with beside each game's baseline (`saves/<game>.spec.json`), and `ComputerSpecs`
+  reads them. It is a `SaveIndex`, the seam the agent core's own Ludusavi index will fill (Droidtop/tracker#546,
+  slice 1), so a game a computer has never been synced with reads "no rule known" until then. A rule in Windows
+  places is searched in the game's Wine prefix by the agent core's own layout (`prefix_roots`).
+- **Searching is bounded and read-only.** A walk never follows a link, goes at most 12 folders deep, and reports at
+  most 4096 files; a game with more says so. Nothing here writes, moves or deletes a save.
+
 ### Library
 
 - Each device is the authority on what it has installed. droidtop sends its

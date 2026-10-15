@@ -119,6 +119,8 @@ object LibraryCore {
             // answers (docs/SPEC.md 7g, 7m): the library's own facts, in
             // the same database as play history.
             links = RoomGameLinksStore(app),
+            // The ids a game is known by and the save rule it was matched to (docs/SPEC.md 7o "Saves").
+            saveRecords = dev.droidtop.library.saves.RoomSaveRecordStore(app),
             // Update checks are asked of the `library.updates` plugins
             // (docs/plugin-api.md 3 A6).
             updateSources = dev.droidtop.library.integrations.PluginUpdateSources(app),

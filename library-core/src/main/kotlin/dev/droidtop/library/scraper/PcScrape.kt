@@ -116,6 +116,15 @@ data class PcGameIds(
         lutrisSlug = lutrisSlug ?: other.lutrisSlug,
     )
 
+    /** These ids as `game_ids` rows (docs/SPEC.md 7o "Saves"): the scrape learned them and nothing kept them. */
+    fun asSaveIds(): Map<String, String> = buildMap {
+        steamAppId?.let { put(dev.droidtop.library.saves.GameIdKind.STEAM, it.toString()) }
+        gogId?.let { put(dev.droidtop.library.saves.GameIdKind.GOG, it) }
+        igdbId?.let { put(dev.droidtop.library.saves.GameIdKind.IGDB, it.toString()) }
+        steamGridDbId?.let { put(dev.droidtop.library.saves.GameIdKind.STEAMGRIDDB, it.toString()) }
+        lutrisSlug?.let { put(dev.droidtop.library.saves.GameIdKind.LUTRIS, it) }
+    }
+
     /** The store id IGDB is asked by: Steam first, then GOG. */
     val storeId: PcStoreId?
         get() = steamAppId?.let { PcStoreId(PcStoreId.STEAM, it.toString()) }
@@ -717,6 +726,8 @@ object PcScraper {
             iconPath = iconPath ?: row?.iconPath,
         )
         dao.upsertGameMetadata(updated.copy(fieldSources = FieldSources.merge(had, sources)))
+        // The ids the scrape learned for this game, kept for the save-rule match (docs/SPEC.md 7o "Saves").
+        runCatching { dev.droidtop.library.saves.RoomSaveRecordStore(context).putIds(entry.id, record.ids.asSaveIds()) }
         // Which source answered and what it wrote, for someone asking why a game shows what it shows.
         dev.droidtop.library.ScanLog.write(
             "scrape: ${entry.title} [pc] ($confidence): " +
