@@ -1330,9 +1330,9 @@ object AppSettingsCatalogs {
                     )
                 } else {
                     // The SAME assignment provision writes -- one rule in
-                    // WineDriveMapping, so this preview cannot drift from
-                    // what a game actually sees.
-                    dev.droidtop.library.WineDriveMapping.assign(roots).map { (letter, path) ->
+                    // EnvironmentMounts.wineDrives, so this preview cannot
+                    // drift from what a game actually sees.
+                    dev.droidtop.runtime.EnvironmentMounts.ofFolders(roots).wineDrives().map { (letter, path) ->
                         ActionItem(
                             id = "windows_drive_$letter",
                             title = "$letter:  $path",

@@ -160,29 +160,6 @@ data class PcPrefixState(
     val dllOverrides: Map<String, String>,
 )
 
-/**
- * Which Wine drive letter each games root gets.
- *
- * One rule, used by both the runtime that creates the container and the
- * settings screen that previews the mapping -- the screen promises to
- * show what a game will actually see, and a second, slightly different
- * implementation there is exactly how that promise would quietly break.
- *
- * D onwards: A/B are historically floppies and C: is the Windows drive
- * inside the container itself. A path containing `:` is skipped rather
- * than encoded, because the container's drive string finds each letter
- * by the character before a `:` -- one such path would corrupt every
- * mapping after it. exFAT already rejects `:` in names, so this is
- * near-unreachable, but a silently malformed drive list is far harder to
- * diagnose than a missing entry. Stops at Z.
- */
-object WineDriveMapping {
-    fun assign(gamesRoots: List<String>): List<Pair<Char, String>> {
-        val usable = gamesRoots.filterNot { it.contains(':') }.distinct()
-        return usable.take('Z' - 'D' + 1).mapIndexed { index, path -> ('D' + index) to path }
-    }
-}
-
 /** Set once by `:app` at startup; read by every `library-core` launch path. */
 object PcGameRuntimeRegistry {
     @Volatile

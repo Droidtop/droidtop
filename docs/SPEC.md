@@ -2279,9 +2279,13 @@ the `ContainerRuntime` interface that already exists (§3):
   home. A missing folder or chosen home is left out at start, not a
   failed start. Recreate from the image keeps the home and folders. The
   container page shows the three choices as a Home section above Mounts;
-  a change applies from the next start. Next in D3: an app container
-  (D6) defaults to Private, and the Wine prefix's home and drive letters
-  come from the same description.
+  a change applies from the next start. A Wine prefix reads the same
+  description: its games roots are its folders, and
+  `EnvironmentMounts.wineDrives` gives each a drive letter from D to Y
+  (C: is the prefix, Z: gamenative's link to the image root; a path with
+  a colon is left out). Setup and the settings preview of the letters use
+  that one rule. A prefix's home is its own `xuser-<id>` (Private). Next
+  in D3: an app container (D6) defaults to Private.
   **Restart, Recreate from the image, storage used, Sockets and Mounts
   (built 2026-09-27).** `ContainerRuntime` gained `restart` (stop then
   start; a default every backend shares), `recreateFromImage` (destroy

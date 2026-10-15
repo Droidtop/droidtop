@@ -17,12 +17,12 @@ import dev.droidtop.library.PcLaunchResult
 import dev.droidtop.library.PcPrefixState
 import dev.droidtop.library.GameLaunchOptions
 import dev.droidtop.library.PcProvisionResult
-import dev.droidtop.library.WineDriveMapping
 import dev.droidtop.library.WineGameSettingsPrefs
 import dev.droidtop.library.lutris.DllOverrides
 import dev.droidtop.library.lutris.WinePrefixChanges
 import dev.droidtop.runtime.NativeLinuxGameSession
 import dev.droidtop.runtime.PrimaryContainerSession
+import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.SafeDelete
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -396,7 +396,7 @@ class DroidtopPcGameRuntime(
     /**
      * Wine drive mappings, as `<letter>:<path>` entries concatenated --
      * the format [Container.drivesIterator] parses. The assignment
-     * itself lives in [WineDriveMapping] so the settings screen previews
+     * itself is [EnvironmentMounts.wineDrives] so the settings screen previews
      * the same letters this actually writes.
      *
      * Deliberately not [Container.DEFAULT_DRIVES]: that hardcodes
@@ -407,7 +407,7 @@ class DroidtopPcGameRuntime(
      * SD card were exactly the case upstream never handled.
      */
     private fun drivesFor(gamesRoots: List<File>): String =
-        WineDriveMapping.assign(gamesRoots.map { it.absolutePath })
+        EnvironmentMounts.ofFolders(gamesRoots.map { it.absolutePath }).wineDrives()
             .joinToString("") { (letter, path) -> "$letter:$path" }
 
     override suspend fun launchWindows(

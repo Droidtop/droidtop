@@ -43,9 +43,27 @@ data class EnvironmentMounts(
         folders.filter { isDirectory(it.hostPath) }.forEach { add(it.hostPath to it.containerPath) }
     }
 
+    /**
+     * The same folders as a Wine prefix sees them: one drive letter each, in order from D (docs/SPEC.md 3d "Home and
+     * folders"). A path with a colon is left out rather than encoded, because the container's drive string finds each
+     * letter by the character before a `:` and one such path would corrupt every drive after it. Letters stop at Y:
+     * C: is the prefix and Z: is gamenative's own link to the image root (WineUtils.createDosdevicesSymlinks).
+     */
+    fun wineDrives(): List<Pair<Char, String>> =
+        folders.map { it.hostPath }.filterNot { it.contains(':') }.distinct()
+            .zip(WINE_DRIVE_LETTERS.toList())
+            .map { (path, letter) -> letter to path }
+
     companion object {
         /** The guest's home: every container runs as root, so HOME is `/root` (ProotRuntime's guest environment). */
         const val HOME_GUEST_PATH = "/root"
+
+        /** The letters a prefix's folders are reached at: after C: (the prefix), before Z: (the image root). */
+        val WINE_DRIVE_LETTERS: CharRange = 'D'..'Y'
+
+        /** An environment that sees [paths] as its extra folders, each named by its last segment (a Wine prefix's games roots). */
+        fun ofFolders(paths: List<String>): EnvironmentMounts =
+            EnvironmentMounts(folders = paths.map { ExtraMount(it, File(it).name.ifBlank { "folder" }) })
 
         /** What a new container starts with: the shared home, as distrobox does. */
         val NEW_CONTAINER = EnvironmentMounts(home = HomeChoice.Shared)
