@@ -246,17 +246,15 @@ class ChainSignatureTest {
     }
 
     @Test
-    fun `the pinned Core is a public key resource, and a placeholder pins none`() {
-        // The repository ships a placeholder until the coordinator commits Core's public key.
-        val shipped = DroidtopCore::class.java.classLoader!!.getResourceAsStream(DroidtopCore.RESOURCE)!!.use { it.readBytes().toString(Charsets.US_ASCII) }
-        if (!shipped.contains("BEGIN PUBLIC KEY")) assertNull(DroidtopCore.key())
-        assertNull(DroidtopCore.parse(shipped.lines().filter { it.startsWith("#") }.joinToString("\n")))
+    fun `the pinned signing root is a public key resource, and a placeholder pins none`() {
+        // The repository ships a placeholder until the coordinator commits the root's public key.
+        val shipped = DroidtopSigningRoot::class.java.classLoader!!.getResourceAsStream(DroidtopSigningRoot.RESOURCE)!!.use { it.readBytes().toString(Charsets.US_ASCII) }
+        if (!shipped.contains("BEGIN PUBLIC KEY")) assertNull(DroidtopSigningRoot.key())
+        assertNull(DroidtopSigningRoot.parse(shipped.lines().filter { it.startsWith("#") }.joinToString("\n")))
         val pem = "-----BEGIN PUBLIC KEY-----\n" + java.util.Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(core.publicKey.encoded) + "\n-----END PUBLIC KEY-----\n"
-        assertEquals(Sha256.hex(core.publicKey.encoded), Sha256.hex(DroidtopCore.parse(pem)!!.encoded))
-        DroidtopCore.withPinned(core.publicKey) {
-            assertEquals(Sha256.hex(core.publicKey.encoded), DroidtopCore.keySha256())
-            assertTrue(DroidtopCore.issued(leaf))
-            assertFalse(DroidtopCore.issued(core))
+        assertEquals(Sha256.hex(core.publicKey.encoded), Sha256.hex(DroidtopSigningRoot.parse(pem)!!.encoded))
+        DroidtopSigningRoot.withPinned(core.publicKey) {
+            assertEquals(Sha256.hex(core.publicKey.encoded), DroidtopSigningRoot.keySha256())
         }
     }
 }

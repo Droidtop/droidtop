@@ -1,7 +1,7 @@
 package dev.droidtop.pluginhost
 
 import dev.droidtop.runtime.util.ChainSignature
-import dev.droidtop.runtime.util.DroidtopCore
+import dev.droidtop.runtime.util.DroidtopSigningRoot
 import dev.droidtop.runtime.util.Sha256
 import dev.droidtop.testpki.TestPki
 import java.io.File
@@ -43,7 +43,7 @@ class PluginRevocationsTest {
     @Test
     fun `droidtop's list is kept only under Core, newer, and re-verified on every read`() {
         val root = tmp.newFolder("plugins")
-        DroidtopCore.withPinned(core.publicKey) {
+        DroidtopSigningRoot.withPinned(core.publicKey) {
             assertTrue(PluginRevocations.accept(root, list(2, keys = listOf("a".repeat(64)))))
             assertTrue(PluginRevocations.load(root).revokesKey("a".repeat(64)))
             // Not newer, another catalog's signer, or a chain to another key: nothing changes.
@@ -55,8 +55,8 @@ class PluginRevocationsTest {
             assertEquals(2L, PluginRevocations.load(root).sequence)
         }
         // Under another pinned Core (or none) the stored list no longer verifies, so it counts as none.
-        DroidtopCore.withPinned(TestPki.rsa().public) { assertEquals(0L, PluginRevocations.load(root).sequence) }
-        DroidtopCore.withPinned(null) { assertFalse(PluginRevocations.accept(root, list(5))) }
+        DroidtopSigningRoot.withPinned(TestPki.rsa().public) { assertEquals(0L, PluginRevocations.load(root).sequence) }
+        DroidtopSigningRoot.withPinned(null) { assertFalse(PluginRevocations.accept(root, list(5))) }
     }
 
     @Test

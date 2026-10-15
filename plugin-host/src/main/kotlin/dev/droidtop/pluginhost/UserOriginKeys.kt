@@ -1,7 +1,6 @@
 package dev.droidtop.pluginhost
 
 import dev.droidtop.runtime.util.ChainSignature
-import dev.droidtop.runtime.util.DroidtopCore
 import dev.droidtop.runtime.util.Sha256
 
 import android.content.Context
@@ -13,8 +12,8 @@ import org.json.JSONObject
 /**
  * One origin the USER chose to trust (docs/SPEC.md 12a "Keys you trust"):
  * the origin's own id, the anchor key its signatures' certificate chains
- * must end at (SPKI, base64: P-256 or RSA; Droidtop Core's own key for an
- * origin Core certified, [UserOriginKeys.anchorKey]), and
+ * must end at (SPKI, base64: P-256 or RSA; the publisher's root key,
+ * [UserOriginKeys.anchorKey]), and
  * the source URL the key was fetched from when it was, so the row can
  * show provenance. Never the official origin: [UserOriginKeys.add]
  * refuses that id outright, and nothing here ever feeds
@@ -134,11 +133,13 @@ object UserOriginKeys {
      * The anchor key to store for [origin] from what a source publishes or a
      * person pastes (docs/SPEC.md 12a "Keys you trust"): a certificate (PEM or
      * base64 DER) or a bare SubjectPublicKeyInfo, P-256 or RSA of 2048 bits or
-     * more, lenient about the line breaks a paste carries. A certificate that
-     * Droidtop Core issued and that names [origin] gives Core's own key: that
-     * origin's chains then end at Core, which certified it, while the person
-     * still chose to trust it. Any other certificate gives its own key, and
-     * must name [origin] when it names origins at all. The result is single-line
+     * more, lenient about the line breaks a paste carries. A certificate gives
+     * its own key: the publisher's root (gamegrab's, a third party's), which
+     * that origin's chains then end at. Who issued the certificate is never
+     * read, so no origin is anchored anywhere but at the key the person chose
+     * (owner, 2026-10-15: "The gamegrab repo and plugins obviously get their
+     * own keys"). A certificate must name [origin] when it names origins at
+     * all. The result is single-line
      * base64, so the store only ever holds one form of a key and comparisons
      * can be exact. Null when nothing usable is there.
      */
@@ -147,12 +148,7 @@ object UserOriginKeys {
         val key = if (certificate != null) {
             val names = ChainSignature.uris(certificate).filter { it.startsWith(ChainSignature.ORIGIN_URN) }
             if (names.isNotEmpty() && ChainSignature.ORIGIN_URN + origin !in names) return null
-            if (DroidtopCore.issued(certificate)) {
-                if (names.isEmpty()) return null
-                DroidtopCore.key()!!
-            } else {
-                certificate.publicKey.takeIf(ChainSignature::acceptableKey)
-            }
+            certificate.publicKey.takeIf(ChainSignature::acceptableKey)
         } else {
             PluginOriginKeys.parseSpki(text)
         } ?: return null

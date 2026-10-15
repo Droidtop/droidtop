@@ -32,7 +32,7 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
 /**
- * Throwaway certificates and JWS signatures for tests: a "Droidtop Core" stand-in, leaves with the droidtop
+ * Throwaway certificates and JWS signatures for tests: a signing-root stand-in (droidtop's or a publisher's), leaves with the droidtop
  * extensions, and signatures in the format docs/SPEC.md 12a describes. Every key is generated inside the test run.
  */
 public final class TestPki {
@@ -169,9 +169,9 @@ public final class TestPki {
         return new Cert(cn, key);
     }
 
-    /** A Droidtop Core stand-in: a self-signed RSA CA certificate. */
+    /** A signing-root stand-in: a self-signed RSA CA certificate. */
     public static X509Certificate core(KeyPair pair) {
-        return cert("Droidtop Core (test)", pair.getPublic()).ca(0).selfSigned(pair.getPrivate()).build();
+        return cert("signing root (test)", pair.getPublic()).ca(0).selfSigned(pair.getPrivate()).build();
     }
 
     /** A plugin-signing leaf for [origin], issued by [issuer]. */

@@ -46,7 +46,7 @@ object PluginCatalog {
     /** Relative to the platform-database base URL (SPEC 12a "The index"). */
     const val INDEX_RELATIVE_PATH = "droidtop-plugins/index.json"
 
-    /** droidtop's revocation list, signed under Droidtop Core, beside the index (SPEC 12a "Revocation"). */
+    /** droidtop's revocation list, signed under droidtop's signing root, beside the index (SPEC 12a "Revocation"). */
     const val REVOCATIONS_RELATIVE_PATH = "droidtop-plugins/" + RevocationList.FILE_NAME
 
     /** The only stream droidtop offers (SPEC 12a "What the catalog offers"). */
@@ -165,7 +165,7 @@ object PluginCatalog {
      * Whether this build of droidtop will accept bundles for [origin] from
      * the OFFICIAL catalog: it is the official origin AND the index's key
      * document for it names one of the official anchors this build knows --
-     * Droidtop Core, or a legacy one (SPEC 12a "The index": "the key block
+     * droidtop's signing root, or a legacy one (SPEC 12a "The index": "the key block
      * is cross-checked, not trusted"). A tampered index cannot
      * rebind the origin to a new key, and an origin this build does not pin
      * is not installable no matter what the index says.
@@ -490,7 +490,7 @@ object PluginCatalog {
     /**
      * droidtop's revocation list, published beside the index (SPEC 12a
      * "Revocation") and fetched with it. [PluginRevocations.accept] keeps it
-     * only when it verifies under Droidtop Core and its sequence is newer
+     * only when it verifies under droidtop's signing root and its sequence is newer
      * than the one on file; a missing, unreadable or unsigned list changes
      * nothing, and never fails the catalog fetch it rides along with.
      */
