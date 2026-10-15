@@ -65,10 +65,13 @@ data class PluginView(
                 for (i in 0 until minOf(sectionsJson.length(), MAX_SECTIONS)) {
                     val s = sectionsJson.optJSONObject(i) ?: continue
                     val items = s.optJSONArray("items") ?: JSONArray()
+                    val needs = HashMap<String, String>()
                     val parsed = buildList {
                         for (j in 0 until items.length()) {
                             if (budget <= 0) break
-                            val node = ViewNode.parse(items.optJSONObject(j), messages) ?: continue
+                            val raw = items.optJSONObject(j)
+                            val node = ViewNode.parse(raw, messages) ?: continue
+                            raw?.text("needs")?.let { needs[node.id] = it }
                             add(node)
                             budget--
                         }
@@ -99,7 +102,7 @@ data class PluginView(
                         }
                     }
                     val nodes = notices + parsed.filterNot { it is ViewNode.Notice }
-                    add(ViewSection(id = s.text("id") ?: "s$i", title = s.text("title")?.cut(MAX_TITLE), nodes = nodes))
+                    add(ViewSection(id = s.text("id") ?: "s$i", title = s.text("title")?.cut(MAX_TITLE), nodes = nodes, needs = needs))
                 }
             }
             return PluginView(
@@ -112,7 +115,12 @@ data class PluginView(
     }
 }
 
-data class ViewSection(val id: String, val title: String?, val nodes: List<ViewNode>)
+/**
+ * One section of a view. [needs] maps a node's id to the permission it declared with `needs` (docs/plugin-api.md 1.6,
+ * Droidtop/tracker#521 item 5): while the person has that permission turned off, droidtop draws the node as an inert
+ * row saying so instead of the node, and the rest of the page is untouched.
+ */
+data class ViewSection(val id: String, val title: String?, val nodes: List<ViewNode>, val needs: Map<String, String> = emptyMap())
 
 /**
  * What a node does when used: [Kind.VIEW] opens the reply as a page, [Kind.CALL]
@@ -233,12 +241,12 @@ sealed interface ViewNode {
             val subtitle = json.text("subtitle")?.cut(PluginView.MAX_SUBTITLE)
             val action = ViewAction.parse(json.optJSONObject("action"))
             return when (json.optString("type")) {
-                "info" -> Info(id, title, subtitle, json.text("value")?.cut(PluginView.MAX_TITLE))
+                "info" -> Info(id, title, subtitle, ViewValue.format(json.opt("value"))?.cut(PluginView.MAX_TITLE))
                 "row" -> Row(
                     id, title, subtitle,
                     columns = json.strings("columns").map { it.cut(PluginView.MAX_TITLE) },
                     badges = json.strings("badges").map { it.cut(PluginView.MAX_TITLE) },
-                    value = json.text("value")?.cut(PluginView.MAX_TITLE),
+                    value = ViewValue.format(json.opt("value"))?.cut(PluginView.MAX_TITLE),
                     action = action,
                 )
                 "button" -> Button(id, title, subtitle, json.text("value")?.cut(PluginView.MAX_TITLE), json.text("confirm")?.cut(PluginView.MAX_TITLE), action ?: return null)

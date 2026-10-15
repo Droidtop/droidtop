@@ -425,6 +425,27 @@ still renders on an older droidtop):
 | `slider` | `title`, `subtitle?`, `min`, `max`, `value`, `action?` | an integer stepper |
 | `text` | `title`, `subtitle?`, `value`, `action?` | a text field (controller and touch text entry). **Never secret**: there is no password field; secrets wait for the vault (G1, #69) |
 | `progress` | `title`, `value` (0 to 100, or -1 for unknown), `subtitle?` | a read-only status row ("45%") |
+| `notice` | `title`, `subtitle?`, `details?`, `tone` (`info`, `caution`), `placement?` (`section`, `banner`), `action?` | droidtop's notice card, "from <plugin>" (see "Notices" above) |
+
+**Typed values (Droidtop/tracker#521 item 7).** An `info` or `row`
+`value` may be an object instead of a string, and droidtop writes it the
+way it writes its own values: `{"bool": true}` is "On" / "Off";
+`{"number": n, "unit": "bytes"}` is a size ("1.5 GB"), `"seconds"` a
+duration ("2 h 5 min"), `"percent"` (0 to 100) "42%", no unit a number
+with separators ("1,500"), and any other unit is written after the number
+("60 fps", at most 12 characters); `{"enum": "eu", "options":
+[{"value": "eu", "label": "Europe"}]}` is the option's label. An object
+droidtop cannot read shows no value. A plugin sends the number, not its
+own "1.5 GB".
+
+**`needs` (Droidtop/tracker#521 item 5).** Any node may name one of the
+plugin's declared permissions with `needs`. While the person has that
+permission turned off, droidtop draws the node as an inert row with the
+node's title and "Off: turn on <permission> in its Permissions to use
+this", opening the plugin's Permissions; the rest of the page is drawn as
+usual. A permission still unanswered is asked when the node is used, as
+any call is; a permission the plugin did not declare is ignored. A page
+whose whole point is refused still gets "Not allowed to show this" (4.3).
 
 Text is plain (no markup, no links, no colours, no icons, no images yet).
 Limits: 12 sections, 200 items, 100 options per choice, 200 characters per
@@ -3398,6 +3419,10 @@ version was bumped.
 
 **Changelog (additive changes; no version moved).**
 
+- 2026-10-15 (Droidtop/tracker#521 items 5 and 7): typed `info` and
+  `row` values (`bool`, `number` with `unit`, `enum`) written by droidtop;
+  `needs` on any view node, drawn as an inert "Off" row while that
+  permission is turned off.
 - 2026-10-15 (Droidtop/tracker#521 items 3, 6, 9, 10): a `provides`
   entry's `label` follows the point's name ("Status tiles and widgets:
   VPN"); a view's optional top-level `empty` sentence under droidtop's own
