@@ -11,6 +11,8 @@ import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Renders a plugin's declared [PluginCapability.APP_STATUS] as a real
@@ -36,10 +38,10 @@ import dev.droidtop.pluginhost.PluginStore
  *   other job. A plugin that doesn't offer one simply omits these three
  *   keys.
  *
- * `invoke(APP_STATUS, {"action": "launch"})` is offered as a plain
- * "Launch" action whenever `installed` is true -- every `app_status`
- * plugin is expected to support it (droidtop never enforces this by
- * signature; a plugin returning a failure just shows that failure).
+ * "Launch" is offered whenever `installed` is true. For an app Android knows
+ * (`package` installed, with a launcher entry) droidtop opens it itself; only
+ * otherwise does it send `invoke(APP_STATUS, {"action": "launch"})`, and a
+ * plugin returning a failure just shows that failure.
  */
 object PluginAppStatus {
     /** The fields droidtop reads itself; anything else a plugin sends is technical detail. */
@@ -149,12 +151,21 @@ object PluginAppStatus {
                                         title = "Launch",
                                         subtitle = "Opens the app this plugin manages",
                                         run = { ctx, _ ->
-                                            val launchPolicy = PluginCrashPolicy(ctx.applicationContext)
-                                            try {
-                                                val launchResult = launchPolicy.invoke(record, PluginCapability.APP_STATUS, mapOf("action" to "launch"))
-                                                if (launchResult.ok) "Launched" else (launchResult.error ?: "Couldn't launch")
-                                            } finally {
-                                                launchPolicy.shutdown()
+                                            // An app Android knows is opened by droidtop itself, the way it opens any app; the
+                                            // plugin is asked only for one it installs some other way (Droidtop/tracker#558:
+                                            // the Shizuku plugin answers no "launch" action).
+                                            val intent = pkg?.takeIf { app != null }?.let { ctx.packageManager.getLaunchIntentForPackage(it) }
+                                            if (intent != null) {
+                                                withContext(Dispatchers.Main) { dev.droidtop.library.LaunchDisplay.start(ctx, intent) }
+                                                "Opened ${app?.first ?: pkg}"
+                                            } else {
+                                                val launchPolicy = PluginCrashPolicy(ctx.applicationContext)
+                                                try {
+                                                    val launchResult = launchPolicy.invoke(record, PluginCapability.APP_STATUS, mapOf("action" to "launch"))
+                                                    if (launchResult.ok) "Launched" else (launchResult.error ?: "Couldn't launch")
+                                                } finally {
+                                                    launchPolicy.shutdown()
+                                                }
                                             }
                                         },
                                     ),
