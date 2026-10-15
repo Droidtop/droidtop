@@ -650,8 +650,19 @@ internal fun LibrarySearchDialog(
                         SearchLine.Entry(
                             "waiting",
                             UnavailableSource.waitingTitle(waiting),
-                            subtitle = UnavailableSource.waitingSubtitle(waiting),
-                        ) { openPlugin(waiting.singleOrNull()?.pluginId) },
+                            subtitle = if (waiting.singleOrNull()?.askable == true) "Press to allow it to get games" else UnavailableSource.waitingSubtitle(waiting),
+                        ) {
+                            // One source missing only the library.sources point: ask here, and search again once allowed (Droidtop/tracker#270).
+                            val ask = waiting.singleOrNull()?.takeIf { it.askable }
+                            if (ask == null) {
+                                openPlugin(waiting.singleOrNull()?.pluginId)
+                            } else {
+                                coroutineScope.launch {
+                                    if (AcquireContentSources.askSource(context, ask)) searchTick++
+                                    else statusLine = "${ask.label} is still not allowed to get games"
+                                }
+                            }
+                        },
                     )
                 }
                 state.unavailable.filter { !it.waitingForApproval }.forEach { off ->

@@ -148,7 +148,9 @@ class PluginCrashPolicy(
         if (record.manifest.kind !in RUNNABLE_KINDS) {
             return PluginResult.failure("no runner for kind ${record.manifest.kind.id} yet")
         }
-        capabilityRefusal(record, capability)?.let { return PluginResult.failure(it) }
+        LegacyManifest.CAPABILITY_POINTS[capability]?.let { point ->
+            pointGate(record, point, userInitiated)?.let { return PluginResult.failure(it) }
+        }
         gateOnVerification(record)?.let { return it }
         missingRuntime(record)?.let { return PluginResult.failure(it.message) }
         loadFor(record, userInitiated)?.let { return PluginResult.failure(it) }
@@ -189,9 +191,7 @@ class PluginCrashPolicy(
         if (record.manifest.kind !in RUNNABLE_KINDS) {
             return PluginReply.error(PluginErrorCode.UNSUPPORTED, "no runner for kind ${record.manifest.kind.id} yet")
         }
-        PluginGrants.pointRefusal(record, PluginGrants.forContext(context).read(record.manifest.id), call.point)?.let {
-            return PluginReply.error(PluginErrorCode.PERMISSION_DENIED, it)
-        }
+        pointGate(record, call.point, userInitiated)?.let { return PluginReply.error(PluginErrorCode.PERMISSION_DENIED, it) }
         gateOnVerification(record)?.let { return PluginReply.error(PluginErrorCode.FAILED, it.error ?: "plugin failed verification") }
         missingRuntime(record)?.let { return PluginReply.error(PluginErrorCode.FAILED, it.message) }
         loadFor(record, userInitiated)?.let { return PluginReply.error(PluginErrorCode.FAILED, it) }
@@ -200,10 +200,24 @@ class PluginCrashPolicy(
         }
     }
 
-    /** The refusal for a contract 1 [capability] whose extension point the user did not allow ([PluginGrants.pointRefusal]); null when it may run. */
-    private fun capabilityRefusal(record: PluginRecord, capability: PluginCapability): String? {
-        val point = LegacyManifest.CAPABILITY_POINTS[capability] ?: return null
-        return PluginGrants.pointRefusal(record, PluginGrants.forContext(context).read(record.manifest.id), point)
+    /**
+     * Why a call to [point] must not be made ([PluginGrants.pointRefusal]), or null when it may. A point set to Ask first
+     * (or not answered yet) is asked about on the first-use sheet during a call the person started, and the answer is
+     * kept: Allow turns it on, Never blocks it, Not now leaves it to be asked again (Droidtop/tracker#270). From the
+     * background it stays refused, with a note that the plugin wanted it.
+     */
+    private suspend fun pointGate(record: PluginRecord, point: String, userInitiated: Boolean): String? = withContext(Dispatchers.IO) {
+        val id = record.manifest.id
+        val store = PluginGrants.forContext(context)
+        val snapshot = store.read(id)
+        val refusal = PluginGrants.pointRefusal(record, snapshot, point) ?: return@withContext null
+        if (!ExtensionPoints.declares(record.manifest, point)) return@withContext refusal
+        if (PluginGrants.provideState(record, snapshot, point) != GrantState.ASK) return@withContext refusal
+        if (!userInitiated) {
+            store.noteWanted(id, PluginPermissions.PROVIDE_PREFIX + point)
+            return@withContext refusal
+        }
+        if (PluginGrants.askPoint(context, record, point)) PluginGrants.pointRefusal(record, store.read(id), point) else refusal
     }
 
     /** Why [record] cannot be called right now although it is approved and enabled: a required API of another plugin has no provider (docs/plugin-api.md 2.3). Null when it can. */

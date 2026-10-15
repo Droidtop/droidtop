@@ -371,6 +371,38 @@ class PluginGrants(private val dir: File) {
         }
 
         /**
+         * Asks the person on the first-use sheet whether [record] may provide [point], a point it declares that is set to
+         * Ask first or not answered yet, and keeps the answer: Allow turns it on, Never blocks it, Not now leaves it to be
+         * asked again (Droidtop/tracker#270). True when it is allowed afterwards. Blocks until answered: off the main
+         * thread, and only for something the person just did.
+         */
+        fun askPoint(context: Context, record: PluginRecord, point: String): Boolean {
+            val id = record.manifest.id
+            val store = forContext(context)
+            if (!ExtensionPoints.declares(record.manifest, point)) return false
+            when (provideState(record, store.read(id), point)) {
+                GrantState.GRANTED -> return true
+                GrantState.DENIED -> return false
+                GrantState.ASK -> Unit
+            }
+            val known = ExtensionPoints.find(point)
+            val key = PluginPermissions.PROVIDE_PREFIX + point
+            val label = known?.label?.replaceFirstChar { it.lowercase() } ?: point
+            val tier = if (known?.risk == PointRisk.CRITICAL) PermissionTier.CRITICAL else PermissionTier.DANGEROUS
+            return when (PluginGrantPrompts.ask(GrantPromptRequest(id, record.manifest.label, key, label, known?.lets?.ifEmpty { null }, tier))) {
+                GrantAnswer.ALLOW -> {
+                    store.set(id, key, GrantState.GRANTED)
+                    true
+                }
+                GrantAnswer.NEVER -> {
+                    store.set(id, key, GrantState.DENIED)
+                    false
+                }
+                GrantAnswer.NOT_NOW -> false
+            }
+        }
+
+        /**
          * Why a job must not start, or null when it may. A contract 2 job names its point in the envelope it carries
          * (`args["call"]`) and is checked as that point; a contract 1 job has no envelope and is checked as the point
          * its [capability] replaced.
