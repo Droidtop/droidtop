@@ -41,7 +41,10 @@ import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.CraneImageCatalogResolver
+import dev.droidtop.runtime.ContainerApplications
+import dev.droidtop.runtime.ContainerExports
 import dev.droidtop.runtime.EnvironmentMounts
+import dev.droidtop.runtime.ExportedApp
 import dev.droidtop.runtime.ExtraMount
 import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.ImageCatalogRole
@@ -271,6 +274,9 @@ object ContainersCatalog {
         val mounts = runCatching { runtime.mounts(info.container) }.getOrDefault(EnvironmentMounts())
         groups += CatalogGroup(id = "home", title = "Home", items = homeItems(runtime, info, mounts))
         groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info, mounts))
+        if (info.container.role == ContainerRole.SIBLING) {
+            groups += CatalogGroup(id = "exports", title = "In the desktop's menus", items = exportItems(context, runtime, info))
+        }
         groups += CatalogGroup(id = "backup", title = "Backup", items = backupItems(runtime, info, running))
         groups += CatalogGroup(id = "delete", title = null, items = listOf(deleteItem(info, runtime, running)))
         return groups
@@ -453,6 +459,49 @@ object ContainersCatalog {
         )
     }
 
+    // ---- exported apps (docs/SPEC.md 3d "Exported apps", Droidtop/tracker#555 D5) ----
+
+    /** One switch per app of this sibling: shown in the desktop's menus as "<app> (on <container>)", or not. */
+    private suspend fun exportItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
+        val container = info.container
+        val filesDir = context.filesDir
+        val apps = runCatching { withContext(Dispatchers.IO) { ContainerApplications.ownApps(runtime, container) } }
+        val exported = withContext(Dispatchers.IO) { ContainerExports.read(filesDir) }
+            .filter { it.containerId == container.id }.map { it.app.id }.toSet()
+        return apps.fold(
+            onSuccess = { list ->
+                if (list.isEmpty()) {
+                    listOf(ActionItem(id = "container_exports_none", title = "No apps installed in it yet", subtitle = "An app installed here can then be shown on the desktop", run = {}))
+                } else {
+                    list.map { app ->
+                        ToggleItem(
+                            id = "container_export:${app.id}",
+                            title = app.name,
+                            subtitle = "Shown in the desktop's menus as \"${app.name} (on ${info.displayName})\"",
+                            current = app.id in exported,
+                            onToggle = { _, on ->
+                                withContext(Dispatchers.IO) {
+                                    val export = ExportedApp(container.id, info.displayName, app)
+                                    ContainerExports.save(filesDir, ContainerExports.with(ContainerExports.read(filesDir), export, on))
+                                }
+                            },
+                        )
+                    }
+                }
+            },
+            onFailure = { error ->
+                listOf(
+                    ActionItem(
+                        id = "container_exports_unreadable",
+                        title = "Couldn't read its apps",
+                        subtitle = if (runtime.siblingsNeedStart && !info.running) "Start it, then come back" else userFacingErrorMessage(error),
+                        run = {},
+                    ),
+                )
+            },
+        )
+    }
+
     // ---- home (docs/SPEC.md 3d "Home and folders") ----
 
     /** Which home the container's programs see at /root: one row per choice, the current one marked. */
@@ -593,8 +642,12 @@ object ContainersCatalog {
             title = "Delete",
             subtitle = "Removes the container and everything installed in it",
             confirmTitle = "Delete ${info.displayName} and everything in it?",
-            run = { _, _ ->
+            run = { ctx, _ ->
                 runtime.destroy(info.container)
+                // What it exported into the desktop goes with it (docs/SPEC.md 3d "Exported apps").
+                withContext(Dispatchers.IO) {
+                    ContainerExports.save(ctx.filesDir, ContainerExports.without(ContainerExports.read(ctx.filesDir), info.container.id))
+                }
                 "Deleted. Go back to Containers."
             },
         )
