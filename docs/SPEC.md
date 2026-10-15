@@ -2698,16 +2698,13 @@ the `ContainerRuntime` interface that already exists (§3):
   tab). A **Game** tab now exists while the most recent launch is parked
   rather than explicitly reclaimed (`LaunchDisplay.parkedDisplayId`/
   `runningGame`; an explicit shell entry clears both together,
-  `LaunchDisplay.clearRunning`). While the menu is open, it resolves the
-  launch intent's package and checks that package on an IO thread. If
-  Android reports `ApplicationInfo.FLAG_STOPPED`, droidtop clears the
-  parked launch. This catches a force-stopped game without
-  `runningAppProcesses`, which does not expose other apps' processes on
-  Android 11 and later. Android provides no general third-party process
-  or task liveness query to this ordinary app: a crash, normal process
-  eviction, or a task removed from Recents without force-stop can leave
-  the tab present until an explicit shell entry or successful quit. An
-  unresolved implicit launch also cannot be checked. When
+  `LaunchDisplay.clearRunning`). Whether the session is still alive is
+  decided in one place, `SessionMonitor` (see "The running game's session"
+  under the task manager); the tab only follows `LaunchDisplay.running`.
+  Android provides no general third-party process or task liveness query
+  to this ordinary app, so without the privileged helper a crash or a
+  cancelled launch can leave the tab present until Quit or Kill settles
+  it. An unresolved implicit launch also cannot be checked. When
   present it is the tab that opens first, not something shoulder-cycled
   to: the point of a distinct in-game menu is that it greets you. Three
   rows (a **Restart** row, quit then launch again only once the quit
@@ -3017,6 +3014,19 @@ a close path of its own. Every call works off the main thread.
   reason to the companion's banner. A helper that tried and `Failed` leaves the session standing. Before this the
   Kill button discarded the outcome, cleared the session whatever happened, and the tab simply went away with no
   word (Droidtop/tracker#412).
+- **The running game's session ends in one place** (`SessionMonitor`, `SessionLiveness`, Droidtop/tracker#289,
+  #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, Quick Menu Game section,
+  companion Game tab and Now card, keep-awake) follows it and none polls for itself. `SessionMonitor` looks
+  at the game's package while a session stands (every 3 s in the first minute after a start, where launches
+  die, then every 15 s) and ends it (`clearRunning`) when the force-stopped flag is set or the app is
+  uninstalled, or, with the privileged helper, when the system's task list has held no task of the package
+  on two looks in a row after the 9 s a launch is given to appear (the same data and grace as the launch
+  watchdog; the list is shared within 2 s, `TaskManager.snapshotWithin`). A game screen of droidtop's own
+  (Windows) is never judged by the task list and reports its own end. A launch whose dispatch throws never
+  becomes a session (`LaunchDisplay.startOn` clears it). Without a helper there is no evidence a process
+  died, so nothing is claimed: the session stands until Quit or Kill settles it, and Enginehost's END_GAME
+  "none running" answer settles it honestly. A non-destructive Enginehost state query would let the monitor
+  end an engine session by itself without a helper (open follow-up, tracked on Droidtop/tracker#289).
 - **The app in front is what droidtop last started.** `LaunchDisplay.dispatch`, the one point every
   droidtop launch passes, notes the package and display in `LaunchLedger` (process memory; a
   restart forgets it, which is the honest direction). The Quick Menu's Quit row closes
@@ -3429,8 +3439,8 @@ row of recent apps, became Home's Recent apps section for every mode.
      uses, now an observable flow carrying when the session started): art, name, this session's time, Resume
      (a relaunch of the entry, the Quick Menu's resume), Quit (`Library.quitRunning`, the one quit path both
      surfaces call, which clears the running state only on a confirmed end) and Controls (the System tab).
-     While it shows a running game, Home checks the package's force-stop flag every five seconds, the one
-     liveness signal Android gives, as the open Quick Menu does. With nothing running it is the game focused
+     It follows `LaunchDisplay.running`, so a session `SessionMonitor` ends disappears from it with no check of its
+     own. With nothing running it is the game focused
      in the shell: system, title, developer, publisher, year, genre, playtime, last played, the player that
      will run it (`resolvePlayer`, read off the main thread), PC store facts, an available update, three lines
      of description, and Play. Achievements are on a game's own detail screen (7h, "RetroAchievements"), not here.
@@ -9748,8 +9758,8 @@ sleeps on idle, by the system's own timer; the screensaver keeps its own timer a
   game, and the shell is not the window in front on the display the game runs on. The shell reports its
   own front state (`MainActivity.onTopResumedActivityChanged`), so the lock is released the moment the
   shell comes in front and nothing polls the task list. A game on the other screen of a dual-screen
-  handheld keeps the lock while the shell shows on the first. A game that ended unseen is found by
-  Android's force-stopped flag, checked every 30 seconds while the lock is held. Droidtop's own Windows
+  handheld keeps the lock while the shell shows on the first. A game that ended unseen ends the session in
+  `SessionMonitor`, which releases the lock like any other end; the lock has no check of its own. Droidtop's own Windows
   game screen no longer sets `FLAG_KEEP_SCREEN_ON`: it ignored the setting, and this is the one mechanism.
 - **Return to the game.** With a game running, a HOME press (the warm HOME Launcher forwards with the
   reinit extra) and a wake with the shell in front (`MainActivity` sees `ACTION_SCREEN_OFF`, and its next

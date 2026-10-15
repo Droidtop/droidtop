@@ -9,7 +9,6 @@ import dev.droidtop.library.settings.GameAwakePrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
@@ -28,11 +27,10 @@ import kotlinx.coroutines.launch
  * - the shell is not the window in front on the display the game runs on ([shellInFront]).
  *
  * The shell reports where it is; nothing here polls the task list. A game that ended without droidtop
- * hearing of it is noticed by Android's force-stopped flag, checked every [CHECK_MS] while the lock is held.
+ * hearing of it ends the session ([SessionMonitor]), which releases the lock like any other end.
  */
 object GameWakeLock {
     private const val TAG = "droidtop.GameWakeLock"
-    private const val CHECK_MS = 30_000L
 
     /** The display the shell's window is in front on, or null when it is not the window in front anywhere. */
     private val shellFront = MutableStateFlow<Int?>(null)
@@ -73,11 +71,6 @@ object GameWakeLock {
                         return@collectLatest
                     }
                     acquire(lock)
-                    // Held only for a game droidtop believes is running: look for one that ended unseen.
-                    while (true) {
-                        delay(CHECK_MS)
-                        if (LaunchDisplay.isRunningPackageForceStopped(app)) LaunchDisplay.clearRunning()
-                    }
                 }
         }
     }

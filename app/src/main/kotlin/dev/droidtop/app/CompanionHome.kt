@@ -191,23 +191,11 @@ internal fun CompanionCapsuleArt(entry: LibraryEntry, width: androidx.compose.ui
  */
 @Composable
 internal fun CompanionNowSection(focused: LibraryEntry?, layout: CompanionHomeLayout) {
-    val context = LocalContext.current
     val running by LaunchDisplay.running.collectAsState()
     val entries by CompanionState.libraryEntries.collectAsState()
     val runningId = running?.context?.gameId
     val runningEntry = remember(runningId, entries) { runningId?.let { id -> entries.firstOrNull { it.id == id } } }
-    // Android tells an app nothing when another app's process ends; the one thing it does say, the package's
-    // force-stop flag, is checked here as the Quick Menu checks it, so a closed game does not linger as Now.
-    LaunchedEffect(runningId) {
-        if (runningId == null) return@LaunchedEffect
-        while (LaunchDisplay.runningGame != null) {
-            if (LaunchDisplay.isRunningPackageForceStopped(context)) {
-                LaunchDisplay.clearRunning()
-                break
-            }
-            delay(RUNNING_CHECK_MS)
-        }
-    }
+    // A game that ended unseen ends the session in SessionMonitor, which `running` already follows.
     val session = running
     val entry = runningEntry ?: focused ?: return
     CompanionHomeSectionFrame(CompanionHomeSection.NOW, layout, summary = entry.title) {
@@ -219,7 +207,6 @@ internal fun CompanionNowSection(focused: LibraryEntry?, layout: CompanionHomeLa
     }
 }
 
-private const val RUNNING_CHECK_MS = 5_000L
 
 
 @Composable

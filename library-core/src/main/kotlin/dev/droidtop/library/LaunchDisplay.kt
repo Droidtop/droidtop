@@ -306,6 +306,9 @@ object LaunchDisplay {
             } catch (e: Exception) {
                 Log.e("droidtop.LaunchDisplay", "Launch failed", e)
                 AudioHandOff.reopen("launch failed")
+                // A launch that never started is not a running game: without this the left menu offered Resume for it
+                // and the Game tab named it (docs/SPEC.md "The running game's session", Droidtop/tracker#171, #289).
+                clearRunning()
                 onLaunchFailed?.invoke(e)
             }
         }

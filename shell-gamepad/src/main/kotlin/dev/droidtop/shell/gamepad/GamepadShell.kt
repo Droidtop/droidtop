@@ -740,40 +740,18 @@ private fun GamepadShellBody(
     }
 
     // The Quick Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82):
-    // which entry the most recent still-parked launch was for, resolved
-    // fresh each time the menu opens -- LaunchDisplay.runningGame is
-    // plain process state, not a flow, read the same "ask when you need
-    // it" way LaunchDisplay's chooser/askOptions already are elsewhere
-    // in this file, rather than a second observable copy of it. The left
-    // menu's Resume row reads the same answer (docs/SPEC.md 7j).
+    // which entry the running session (LaunchDisplay.running) is for,
+    // resolved when a menu is open. The left menu's Resume row reads the
+    // same answer (docs/SPEC.md 7j). A game that ended unseen ends the
+    // session in SessionMonitor, which this follows, so a menu never
+    // offers a dead launch.
     val sideMenuOpen = quickMenuOpen || leftMenuOpen
-    val forceStoppedLaunch by produceState(
-        initialValue = false,
-        sideMenuOpen,
-        dev.droidtop.library.LaunchDisplay.runningPackageName,
-    ) {
-        value = false
-        while (
-            sideMenuOpen &&
-            dev.droidtop.library.LaunchDisplay.runningGame != null &&
-            dev.droidtop.library.LaunchDisplay.runningPackageName != null
-        ) {
-            val stopped = dev.droidtop.library.LaunchDisplay.isRunningPackageForceStopped(context)
-            if (stopped) {
-                dev.droidtop.library.LaunchDisplay.clearRunning()
-                value = true
-                break
-            }
-            kotlinx.coroutines.delay(1_000)
-        }
-    }
-    val runningEntry = remember(sideMenuOpen, forceStoppedLaunch, gameEntries, appEntries) {
+    val runningSession by dev.droidtop.library.LaunchDisplay.running.collectAsState()
+    val runningEntry = remember(sideMenuOpen, runningSession, gameEntries, appEntries) {
         if (!sideMenuOpen) {
             null
-        } else if (forceStoppedLaunch) {
-            null
         } else {
-            dev.droidtop.library.LaunchDisplay.runningGame?.gameId?.let { id ->
+            runningSession?.context?.gameId?.let { id ->
                 gameEntries.orEmpty().firstOrNull { it.id == id } ?: appEntries.orEmpty().firstOrNull { it.id == id }
             }
         }

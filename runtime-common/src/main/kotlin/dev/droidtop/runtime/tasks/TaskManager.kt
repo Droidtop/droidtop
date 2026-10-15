@@ -79,6 +79,9 @@ object TaskManager {
     val snapshot: StateFlow<RunningSnapshot?> = snapshotFlow
 
     private val refreshLock = Mutex()
+
+    @Volatile
+    private var snapshotAtMs = 0L
     private val labels = ConcurrentHashMap<String, String>()
 
     /** An installed app's name, cached; null when the package is not installed. A package-manager lookup, so not for the main thread's hot path. */
@@ -122,6 +125,13 @@ object TaskManager {
     /** What the user can do right now, so a surface can say what is missing. Asks the plugin registry, so not for the main thread. */
     fun privileges(): TaskPrivileges = shell.capabilities()
 
+    /** The list as it was read within [maxAgeMs], else a fresh read: two watchers a few seconds apart then share one task dump. */
+    suspend fun snapshotWithin(context: Context, maxAgeMs: Long): RunningSnapshot =
+        withContext(Dispatchers.IO) {
+            val current = snapshotFlow.value
+            if (current != null && System.currentTimeMillis() - snapshotAtMs <= maxAgeMs) current else refreshNow(context)
+        }
+
     /** Reads the list once and publishes it. */
     suspend fun refresh(context: Context) {
         withContext(Dispatchers.IO) { refreshNow(context) }
@@ -145,7 +155,10 @@ object TaskManager {
 
     private suspend fun refreshNow(context: Context): RunningSnapshot =
         refreshLock.withLock {
-            load(context.applicationContext).also { snapshotFlow.value = it }
+            load(context.applicationContext).also {
+                snapshotFlow.value = it
+                snapshotAtMs = System.currentTimeMillis()
+            }
         }
 
     private fun load(context: Context): RunningSnapshot {
