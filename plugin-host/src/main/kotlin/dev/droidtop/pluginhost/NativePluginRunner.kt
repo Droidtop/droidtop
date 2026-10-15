@@ -101,9 +101,9 @@ class NativePluginRunner(
                         PluginTier.FULL_TRUST ->
                             // entryClass is null for any kind but native_bundle; the AIDL parameter is a non-null placeholder there.
                             runtime.loadPlugin(id, installDir, record.manifest.entryClass ?: "", record.rootApproved, PluginBrokers.binderFor(appContext, id))
-                        // A gpu.render process loads the plugin from the same descriptors as a contained one; it differs only
-                        // in being a non-isolated, GPU-capable process (docs/plugin-api.md 5.3, "The graphics tier").
-                        PluginTier.CONTAINED, PluginTier.GPU_RENDER -> loadContained(runtime, record, tier)
+                        // An open process loads the plugin from the same descriptors as a contained one; it differs only in
+                        // being non-isolated, with the holes the person granted (docs/plugin-api.md 5.3, "Open processes").
+                        PluginTier.CONTAINED, PluginTier.OPEN -> loadContained(runtime, record, tier)
                     }
                 }
             }
@@ -141,17 +141,20 @@ class NativePluginRunner(
         val names = files.map { it.first }.toMutableList()
         try {
             files.forEach { (_, file) -> opened += ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY) }
-            val broker = SandboxBroker.serve(appContext, id, tier)
+            val holes = if (tier == PluginTier.OPEN) PluginTiers.holes(record, PluginGrants.forContext(appContext).read(id)) else emptySet()
+            val broker = SandboxBroker.serve(appContext, id, tier, holes)
             if (broker == null) {
                 loadFailures[id] = "its file broker could not be started"
                 return false
             }
             opened += broker
             names += ContainedFiles.BROKER
-            // The run-anyway mark is droidtop's alone: a plugin's own manifest can never carry it.
+            // The run-anyway mark and the holes are droidtop's alone: a plugin's own manifest can never carry them.
             val manifest = JSONObject(java.io.File(PluginStore.payloadDirFor(appContext, id), "manifest.json").readText()).apply {
                 remove(PluginDangers.RUN_UNPROTECTED_KEY)
                 if (PluginDangers.allowedThisRun(id)) put(PluginDangers.RUN_UNPROTECTED_KEY, true)
+                remove(PluginTiers.HOLES_KEY)
+                if (holes.isNotEmpty()) put(PluginTiers.HOLES_KEY, org.json.JSONArray(holes.toList()))
             }.toString()
             return runtime.loadContained(id, manifest, opened.toTypedArray(), names.toTypedArray(), PluginBrokers.binderFor(appContext, id))
         } finally {

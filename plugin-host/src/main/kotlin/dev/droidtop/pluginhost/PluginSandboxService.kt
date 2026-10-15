@@ -32,14 +32,17 @@ open class PluginSandboxService : PluginProcessService() {
     @Volatile private var pythonReport: JSONObject? = null
 
     /**
-     * True for the isolated sandbox, false for a `gpu.render` process ([PluginGpuService]). A GPU process is the same
-     * broker-only loader in a process of droidtop's own UID that is NOT `android:isolatedProcess`, the only process an
-     * app may run that can open the graphics chip (docs/plugin-api.md 5.3).
+     * True for the isolated sandbox, false for an open process ([PluginOpenService]): the same broker-only loader in a
+     * process of droidtop's own UID that is NOT `android:isolatedProcess`, the only process an app may run that can open
+     * the graphics chip or a socket, each only with its hole granted (docs/plugin-api.md 5.3, "Open processes").
      */
     protected open val requiresIsolation: Boolean get() = true
 
-    /** The contained default draws in software (an isolated process may not open the GPU); a `gpu.render` process draws with hardware. */
-    protected open val softwareRendering: Boolean get() = true
+    /**
+     * Whether a Flutter plugin draws in software: always in the isolated sandbox (an isolated process may not open the
+     * GPU), and in an open process unless it was given the `gpu.render` hole. Set by the load.
+     */
+    @Volatile private var softwareRendering: Boolean = true
 
     override fun loadFromFolder(pluginId: String, dir: File, entryClass: String, rootApproved: Boolean, broker: IPluginHostBroker): Boolean =
         failLoad(pluginId, "a contained plugin is loaded from the files droidtop hands it, never from a folder")
@@ -61,13 +64,16 @@ open class PluginSandboxService : PluginProcessService() {
         val before = android.os.SystemClock.uptimeMillis()
         val brokerFd = files[ContainedFiles.BROKER]?.detachFd() ?: return failLoad(pluginId, "droidtop did not hand over its file broker")
         val claims = if (requiresIsolation) SandboxBroker.claims(applicationInfo) else null
-        val report = PluginSyscallFilter.install(brokerFd, claims).also { filter = it }
+        val granted = if (requiresIsolation) emptySet() else holes[pluginId].orEmpty()
+        val gpu = PluginTiers.GPU_RENDER in granted
+        softwareRendering = !gpu
+        val report = PluginSyscallFilter.install(brokerFd, claims, gpu = gpu, network = PluginTiers.NET_SOCKETS in granted).also { filter = it }
         android.util.Log.i("droidtop.plugin", "$pluginId: system-call filter ${report.substringBefore(':')} in ${android.os.SystemClock.uptimeMillis() - before} ms (first native call)")
         if (requiresIsolation && !PluginSyscallFilter.isOn(report) && pluginId !in runUnprotected) {
             return failLoad(pluginId, PluginDangers.PROTECTION_FAILED + report)
         }
         if (!requiresIsolation && !PluginSyscallFilter.isOn(report)) {
-            return failLoad(pluginId, "its process could not take droidtop's system-call filter ($report), so it is not run with the graphics chip")
+            return failLoad(pluginId, "its process could not take droidtop's system-call filter ($report), so it is not run outside the sandbox")
         }
         val context = BrokerPluginContext(broker)
         return when (manifest.kind) {
@@ -171,44 +177,54 @@ class PluginSandboxSlot5 : PluginSandboxService()
 class PluginSandboxSlot6 : PluginSandboxService()
 class PluginSandboxSlot7 : PluginSandboxService()
 
-// A `gpu.render` plugin's process (docs/plugin-api.md 5.3): the same broker-only loader as the sandbox, but in a process
-// of droidtop's own UID that is NOT isolated, so the graphics chip is reachable and Flutter draws with hardware. Eight
-// slots `:plugin_gpu0` to `:plugin_gpu7` in this module's manifest; there is no API 29 per-instance form because
-// bindIsolatedService is for isolated processes only. Before any of the plugin's code loads, the process takes
-// droidtop's system-call filter ([PluginSyscallFilter]), which takes away the network droidtop's UID would otherwise give
-// it; a process that cannot take the filter does not run the plugin.
-open class PluginGpuService : PluginSandboxService() {
+// An open process (docs/plugin-api.md 5.3, "Open processes: one hole per permission"): the same broker-only loader as the
+// sandbox, but in a process of droidtop's own UID that is NOT isolated, so the holes the person granted can be opened:
+// the graphics chip for gpu.render, internet sockets for net.sockets, and nothing else. Eight slots `:plugin_open0` to
+// `:plugin_open7` in this module's manifest; there is no API 29 per-instance form because bindIsolatedService is for
+// isolated processes only. Before any of the plugin's code loads, the process takes droidtop's system-call filter
+// ([PluginSyscallFilter]) with exactly those holes; a process that cannot take the filter does not run the plugin.
+//
+// One process serves one plugin and ends with it: its filter, its broker and its holes are that plugin's for good
+// (nothing can lift a seccomp filter), so a slot is never shared ([PluginProcesses]) and the process exits when :app
+// unbinds it, so the next plugin in the slot starts in a fresh process.
+open class PluginOpenService : PluginSandboxService() {
     override val requiresIsolation: Boolean get() = false
-    override val softwareRendering: Boolean get() = false
+
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        android.util.Log.i("droidtop.plugin", "open process ${android.os.Process.myPid()}: unbound, ending with its plugin")
+        android.os.Process.killProcess(android.os.Process.myPid())
+        return false
+    }
 }
-class PluginGpuSlot0 : PluginGpuService()
-class PluginGpuSlot1 : PluginGpuService()
-class PluginGpuSlot2 : PluginGpuService()
-class PluginGpuSlot3 : PluginGpuService()
-class PluginGpuSlot4 : PluginGpuService()
-class PluginGpuSlot5 : PluginGpuService()
-class PluginGpuSlot6 : PluginGpuService()
-class PluginGpuSlot7 : PluginGpuService()
+class PluginOpenSlot0 : PluginOpenService()
+class PluginOpenSlot1 : PluginOpenService()
+class PluginOpenSlot2 : PluginOpenService()
+class PluginOpenSlot3 : PluginOpenService()
+class PluginOpenSlot4 : PluginOpenService()
+class PluginOpenSlot5 : PluginOpenService()
+class PluginOpenSlot6 : PluginOpenService()
+class PluginOpenSlot7 : PluginOpenService()
 
 /**
- * The seccomp-bpf filter of every plugin process droidtop loads from descriptors, the isolated sandbox and a
- * `gpu.render` process alike (docs/plugin-api.md 5.3; `native/src/plugin_filter.c`, the sandbox library's lockdown in
- * `vendor/sandbox`): no socket but a local datagram one (so no internet and no DNS), no programs, no io_uring, no ptrace,
+ * The seccomp-bpf filter of every plugin process droidtop loads from descriptors, the isolated sandbox and an open
+ * process alike (docs/plugin-api.md 5.3; `native/src/plugin_filter.c`, the sandbox library's lockdown in
+ * `vendor/sandbox`): no socket but a local datagram one (so no internet and no DNS; an open process with the
+ * `net.sockets` hole gets internet sockets instead, and then no other socket), no programs, no io_uring, no ptrace,
  * no namespaces and no signals to other processes, on every thread and for good. Every call that names a path traps:
  * the plugin's own files answer at their virtual paths ([SandboxFiles]), droidtop's private folder goes to its broker in
- * :app ([SandboxBroker]), which makes it the plugin's own, and in a `gpu.render` process every other path goes there
- * too. An app may add such a filter to its own process (Chrome does for its renderers); it cannot look inside a binder
- * call, which is what the `gpu.render` permission's warning is about.
+ * :app ([SandboxBroker]), which makes it the plugin's own, and in an open process every other path goes there too. An
+ * app may add such a filter to its own process (Chrome does for its renderers); it cannot look inside a binder call or
+ * read a socket address, which is what the hole permissions' warnings are about.
  */
 internal object PluginSyscallFilter {
     init {
         System.loadLibrary("droidtoppy")
     }
 
-    @JvmStatic private external fun nativeInstall(brokerFd: Int, ownOpens: Array<String>, claims: Array<String>?): String
+    @JvmStatic private external fun nativeInstall(brokerFd: Int, ownOpens: Array<String>, claims: Array<String>?, network: Boolean): String
 
     /**
-     * Device files a graphics process opens itself before the lockdown: the kernel ties binder and some GPU drivers'
+     * Device files a process with the `gpu.render` hole opens itself before the lockdown: the kernel ties binder and some GPU drivers'
      * state to the process that opened them, so the broker's descriptor would not do (Droidtop/tracker#26, the
      * Enginehost lockdown on emulator-5560: a broker-opened /dev/hwbinder failed to map).
      */
@@ -217,12 +233,13 @@ internal object PluginSyscallFilter {
     /**
      * Installs the filter once per process; returns what happened, starting "on:" or "error:". [brokerFd] is the
      * process's end of its broker's socket (taken). [claims] are the folders the broker answers for in the isolated
-     * sandbox ([SandboxBroker.claims]), whose other paths stay the kernel's; null in a graphics process, whose every path
-     * goes to the broker.
+     * sandbox ([SandboxBroker.claims]), whose other paths stay the kernel's; null in an open process, whose every path
+     * goes to the broker. [gpu] and [network] are an open process's granted holes: the graphics devices opened first,
+     * and internet sockets.
      */
     @Synchronized
-    fun install(brokerFd: Int, claims: Array<String>?): String =
-        nativeInstall(brokerFd, if (claims == null) OWN_OPENS else emptyArray(), claims)
+    fun install(brokerFd: Int, claims: Array<String>?, gpu: Boolean = false, network: Boolean = false): String =
+        nativeInstall(brokerFd, if (claims == null && gpu) OWN_OPENS else emptyArray(), claims, claims == null && network)
 
     fun isOn(report: String): Boolean = report.startsWith("on:")
 }

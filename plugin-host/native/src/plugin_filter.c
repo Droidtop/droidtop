@@ -6,7 +6,7 @@
  * (SECCOMP_FILTER_FLAG_TSYNC) before any of the plugin's code is loaded;
  * nothing can lift it afterwards.
  *
- * Both kinds of plugin process refuse:
+ * Every plugin process refuses (an open process's network hole aside):
  * - socket() for any family but AF_UNIX, and AF_UNIX for anything but
  *   datagrams (liblog's socket to logd, which connect may still reach):
  *   no internet, no DNS (netd's dnsproxyd is a stream socket), no stream
@@ -29,10 +29,15 @@
  *   private folder, by its names (claims), goes to the broker, which maps
  *   it to the plugin's own folder; every other path is the kernel's, where
  *   the isolated UID and SELinux keep droidtop's files out as before.
- * - A gpu.render process runs under droidtop's UID, so every path goes to
- *   the broker, whose rules hold none of droidtop's private data. The GPU
- *   and hwbinder device nodes, which the kernel ties to the process that
- *   opens them, are opened here first and duplicated later. The process
+ * - An open process (docs/plugin-api.md 5.3, "Open processes: one hole per
+ *   permission") runs under droidtop's UID, so every path goes to the
+ *   broker, whose rules hold none of droidtop's private data. With the
+ *   gpu.render hole the GPU and hwbinder device nodes, which the kernel ties
+ *   to the process that opens them, are opened here first (own_opens) and
+ *   duplicated later. With the net.sockets hole the lockdown takes
+ *   SBX_LOCK_INET: inet sockets, bind and connect, and no other socket; the
+ *   library refuses that flag with the log's Unix socket (a Unix socket
+ *   could bind a name), so a networked process has no logd socket. The process
  *   is made dumpable first so the broker, under the same UID, can answer
  *   for its own /proc entries; ptrace stays refused to every plugin
  *   process. What it still cannot refuse is a binder call to a system
@@ -72,7 +77,8 @@ static void release_strings(JNIEnv *env, const char **strings, jstring *refs, un
 
 JNIEXPORT jstring JNICALL
 Java_dev_droidtop_pluginhost_PluginSyscallFilter_nativeInstall(JNIEnv *env, jclass clazz, jint broker_fd,
-                                                               jobjectArray own_opens, jobjectArray claims) {
+                                                               jobjectArray own_opens, jobjectArray claims,
+                                                               jboolean network) {
     (void) clazz;
     if (installed) {
         /* A second plugin in a process already locked down: the first one's broker serves it. */
@@ -90,8 +96,10 @@ Java_dev_droidtop_pluginhost_PluginSyscallFilter_nativeInstall(JNIEnv *env, jcla
     unsigned open_count = take_strings(env, own_opens, opens, open_refs, SBX_OWN_OPENS_MAX);
     unsigned claim_count = take_strings(env, claims, claimed, claim_refs, SBX_CLAIMS_MAX);
     int contained = claims != NULL;
+    /* The network hole only in an open process; the isolated sandbox is outside the inet group anyway. */
+    int inet = network && !contained;
     struct sbx_lockdown_options options = {
-        .flags = SBX_LOCK_LOG_SOCKET | (contained ? SBX_LOCK_PASSTHROUGH : 0),
+        .flags = (inet ? SBX_LOCK_INET : SBX_LOCK_LOG_SOCKET) | (contained ? SBX_LOCK_PASSTHROUGH : 0),
         .own_opens = opens,
         .own_open_count = open_count,
         .claims = claimed,
@@ -108,8 +116,9 @@ Java_dev_droidtop_pluginhost_PluginSyscallFilter_nativeInstall(JNIEnv *env, jcla
         return (*env)->NewStringUTF(env, report);
     }
     installed = 1;
-    snprintf(report, sizeof(report), "on: %s, no sockets but local datagrams, no programs, no io_uring, no ptrace, "
+    snprintf(report, sizeof(report), "on: %s, %s, no programs, no io_uring, no ptrace, "
              "no namespaces, no signals to other processes (every thread)",
-             contained ? "its own folder through droidtop's broker" : "files only through droidtop's broker");
+             contained ? "its own folder through droidtop's broker" : "files only through droidtop's broker",
+             inet ? "internet sockets (net.sockets) and no other socket" : "no sockets but local datagrams");
     return (*env)->NewStringUTF(env, report);
 }
