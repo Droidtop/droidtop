@@ -143,8 +143,9 @@ static DroidtopPy g_py = {0};
 /* droidtop.host.call and droidtop.host.open (docs/plugin-api.md 1.3): Python calls these with (plugin id, request
  * JSON) and gets the broker's reply JSON back. The Java ends are PythonBridge.hostCall and hostOpen, which route to the
  * calling plugin's own broker, so every permission check, quota and audit is the one a native plugin's call meets. A
- * call can arrive on any Python thread (a job worker, a thread the plugin started), so the JVM is reached through a
- * cached JavaVM and the thread is attached for the duration if it is not a Java thread already. The GIL is released
+ * call can arrive on any thread (a job runs on a Java thread droidtop starts, Droidtop/tracker#558; a thread the plugin
+ * started itself is not one), so the JVM is reached through a cached JavaVM and the thread is attached for the duration
+ * if it is not a Java thread already. The GIL is released
  * across the Java call: a broker call can block on the user (the first-use sheet) and other plugins and jobs must keep
  * running meanwhile. */
 static JavaVM *g_vm = NULL;
@@ -338,16 +339,20 @@ static const char *BOOTSTRAP_SOURCE =
     "        if func is None: raise RuntimeError(\"plugin has no function start_job\")\n"
     "        request = json.loads(arg_json)\n"
     "        job_id, call = request['job_id'], request.get('call', {})\n"
-    "        job = {'progress': [], 'done': False, 'result': None}\n"
+    "        job = {'progress': [], 'done': False, 'result': None, 'func': func, 'call': call}\n"
+    "        with _droidtop_jobs_lock: _droidtop_jobs[job_id] = job\n"
+    "        return '{}'\n"
+    "    if func_name == 'run_job':\n"
+    "        job_id = json.loads(arg_json)['job_id']\n"
+    "        with _droidtop_jobs_lock: job = _droidtop_jobs.get(job_id)\n"
+    "        if job is None or 'func' not in job: return '{}'\n"
+    "        func, call = job.pop('func'), job.pop('call')\n"
     "        def report(percent=-1, status=''):\n"
     "            with _droidtop_jobs_lock: job['progress'].append({'percent': int(percent), 'status': str(status)})\n"
-    "        def run():\n"
-    "            try: job['result'] = func(job_id, call, report)\n"
-    "            except BaseException as error: job['result'] = json.dumps({'ok': False, 'error': str(error)})\n"
-    "            finally:\n"
-    "                with _droidtop_jobs_lock: job['done'] = True\n"
-    "        with _droidtop_jobs_lock: _droidtop_jobs[job_id] = job\n"
-    "        threading.Thread(target=run, daemon=True).start()\n"
+    "        try: job['result'] = func(job_id, call, report)\n"
+    "        except BaseException as error: job['result'] = json.dumps({'ok': False, 'error': str(error)})\n"
+    "        finally:\n"
+    "            with _droidtop_jobs_lock: job['done'] = True\n"
     "        return '{}'\n"
     "    if func_name == 'poll_job':\n"
     "        job_id = json.loads(arg_json)['job_id']\n"
