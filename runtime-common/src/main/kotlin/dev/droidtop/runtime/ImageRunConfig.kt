@@ -8,6 +8,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 /**
  * How an image says its own program runs, from the image config's `config` object (OCI image spec,
@@ -20,6 +21,8 @@ data class ImageRunConfig(
     val cmd: List<String> = emptyList(),
     val workingDir: String? = null,
     val user: String? = null,
+    /** `ExposedPorts`: the ports the image's program says it listens on, as notes (Droidtop/tracker#555 D6). */
+    val ports: List<ExposedPort> = emptyList(),
 ) {
     /**
      * The program and its arguments, as Docker runs them: the entrypoint followed by [args] when given, else by
@@ -55,6 +58,7 @@ data class ImageRunConfig(
                 cmd = config.strings("Cmd"),
                 workingDir = config.string("WorkingDir")?.takeIf { it.isNotBlank() },
                 user = config.string("User")?.takeIf { it.isNotBlank() },
+                ports = (config["ExposedPorts"] as? JsonObject)?.keys?.mapNotNull(ExposedPort::parse)?.distinct()?.sorted().orEmpty(),
             )
         }
 
@@ -66,6 +70,7 @@ data class ImageRunConfig(
                 putJsonArray("Cmd") { config.cmd.forEach { add(JsonPrimitive(it)) } }
                 config.workingDir?.let { put("WorkingDir", it) }
                 config.user?.let { put("User", it) }
+                if (config.ports.isNotEmpty()) putJsonObject("ExposedPorts") { config.ports.forEach { put(it.toString(), buildJsonObject {}) } }
             })
         }.toString()
 
@@ -74,5 +79,47 @@ data class ImageRunConfig(
         /** A JSON array of strings; `null` (Docker writes `"Cmd": null`) or anything else is empty. */
         private fun JsonObject.strings(key: String): List<String> =
             (this[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
+    }
+}
+
+/**
+ * One `ExposedPorts` key (`8080/tcp`, `53/udp`; no protocol means tcp, as Docker reads it). There are no network
+ * namespaces here: the program listens on the device's own port, so a port is where to reach it, not a mapping.
+ */
+data class ExposedPort(val number: Int, val protocol: String = TCP) : Comparable<ExposedPort> {
+    /** Where a browser on the device reaches it; only a tcp port is a web address. */
+    val url: String? get() = if (protocol == TCP) "http://localhost:$number" else null
+
+    /** Below 1024 a port needs root to listen on, which a proot container does not have. */
+    val needsRoot: Boolean get() = number < FIRST_UNPRIVILEGED
+
+    override fun compareTo(other: ExposedPort): Int = compareValuesBy(this, other, { it.number }, { it.protocol })
+
+    override fun toString(): String = "$number/$protocol"
+
+    companion object {
+        const val TCP = "tcp"
+        private const val FIRST_UNPRIVILEGED = 1024
+
+        fun parse(key: String): ExposedPort? {
+            val number = key.substringBefore('/').toIntOrNull()?.takeIf { it in 1..65535 } ?: return null
+            val protocol = key.substringAfter('/', TCP).lowercase().takeIf { it in setOf(TCP, "udp", "sctp") } ?: return null
+            return ExposedPort(number, protocol)
+        }
+
+        /**
+         * Why [name]'s program must not start while the programs in [running] (container name to its ports) are up:
+         * the first port it shares with one of them, as a sentence naming both, or null when none clash. Every
+         * program listens on the device's own ports, so two on one port would have the second fail, or worse, the
+         * person reach the wrong one.
+         */
+        fun clash(name: String, ports: List<ExposedPort>, running: Map<String, List<ExposedPort>>): String? {
+            for ((other, theirs) in running) {
+                if (other == name) continue
+                val shared = ports.firstOrNull { it in theirs } ?: continue
+                return "$name and $other both use port ${shared.number}; stop $other's program first"
+            }
+            return null
+        }
     }
 }
