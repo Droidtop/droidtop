@@ -337,13 +337,63 @@ each plugin:
 
 | Stage | What happens | Existing code |
 | --- | --- | --- |
-| **Install** | Picker or catalog download → `PluginBundleInstaller` checks: `manifest.jws`, whose certificate chain must end at Droidtop Core (official) or at the key the person trusts for the origin, with a plugin-signing leaf that names the origin (and, when it names plugins, this id), nothing in it revoked, every payload hash, the manifest schema, the namespace, the ABIs, the contract version. **v2 adds:** every `provides`/`permissions`/`exports`/`requires` entry is checked against the host registries, and a `requires` on `priv.*` must be `optional` (§2.7). The record lands PENDING. No plugin code runs before approval, not even to describe itself. | `PluginBundleInstaller`, `PluginStore` |
+| **Install** | Picker or catalog download → `PluginBundleInstaller` checks: `manifest.jws`, whose certificate chain must end at droidtop's signing root (official) or at the root the person trusts for the origin, with a plugin-signing leaf that names the origin (and, when it names plugins, this id), nothing in it revoked, every payload hash, the manifest schema, the namespace, the ABIs, the contract version. **v2 adds:** every `provides`/`permissions`/`exports`/`requires` entry is checked against the host registries, and a `requires` on `priv.*` must be `optional` (§2.7). The record lands PENDING. No plugin code runs before approval, not even to describe itself. | `PluginBundleInstaller`, `PluginStore` |
 | **Approve** | The approval screen shows, in plain language: what the plugin adds and where (grouped by mode), what it can access (normal permissions as a short list; each dangerous permission and high-risk extension point as its own line), what it needs from other plugins, and its trust badge (Official / Added by you). Every item is a tick box and **the plugin runs with the ticked subset** (decided 2026-10-01, §4.3 "Approval is a list"). Unticked dangerous permissions stay at `ask` (§4.3). | the approval screen in `AppSettingsCatalogs.pluginsScreen` |
 | **Enable** | An approved plugin is enabled by default. Disabling stops every call to it and hides its contributions everywhere, because `PluginStore.runnableFor` is the only iterator (checklist point 6). | `PluginStore.setEnabled` |
 | **Resolve** | On every install, approve, enable, disable, uninstall or crash, the `requires` graph is recomputed (§2.3). A plugin whose *required* API has no runnable provider is **Waiting**. It is not disabled, and it resumes by itself when a provider appears. | new: `PluginApiResolver` |
 | **Run** | Loading is lazy: a plugin is loaded on its first call, and its process is let go 60 s after the last use (built 2026-10-08, `PluginProcesses`); a job or a running background service (§3 E8) keeps it in use. A crash, an uncaught exception, a native crash, a timeout or process death disables that plugin with a reason, and the user re-enables it by hand (12a checklist point 6). **Kept as is:** crash containment is the one rule `PluginCrashPolicy` exists for. | `PluginCrashPolicy`, `NativePluginRunner` |
 | **Update** | Same key: approval carries over (12a "Trust over updates"). **v2 adds a permission diff.** An update that adds any permission, extension point or `exports` entry keeps running with its *old* grants; the new items wait at `ask`, and the plugin's page asks about those items only, on the same list as at approval ("Wants new access", §4.3). An update never gains dangerous access silently. A different key, or a previously DENIED plugin, goes back to PENDING (unchanged). | `PluginStore`, `PluginRecord.approvedKeySha256` |
 | **Uninstall** | `onUnload` runs, and the payload, data directory, vault entries, grants and scheduled work are deleted. The audit log for the plugin is kept for 7 days (labelled "removed plugin") so that "what did it do" can still be answered. Dependents are re-resolved (§2.5). | `PluginStore.uninstall` |
+
+**Signing a plugin (keys and certificates; docs/SPEC.md 12a,
+Droidtop/tracker#550).** Every bundle carries `manifest.jws`: a detached
+JWS (RFC 7515) over the exact `manifest.json` bytes, its protected header
+`{"alg": "ES256" | "RS256", "typ": "droidtop-plugin+jws", "x5c": [leaf, ...]}`
+with standard-base64 DER certificates, leaf first, the anchor left out. The
+signing input is `BASE64URL(header) "." BASE64URL(manifest bytes)`, ES256
+signatures are raw R||S, and the file is `header..signature` (the payload
+part empty). Certificate dates are never checked; only a signed revocation
+list stops a signature.
+
+The keys form a hierarchy, and droidtop trusts exactly one level of it per
+origin:
+
+| Level | Key | Who holds it | What droidtop does with it |
+| --- | --- | --- | --- |
+| 1 | Droidtop Core | the owner's CA; only ever derived from | nothing: never pinned, never read |
+| 2 | Per-app roots, each derived from Core separately: droidtop's signing root, Enginehost's, gamegrab's | offline, with the owner (a third party's root with that publisher) | droidtop pins its own root (`DroidtopSigningRoot`); any other root is an anchor the person chose in Keys you trust |
+| 3 | Leaves issued by a root: one per plugin repository (EKU `...946.1`), per catalog (`.2`) and for a revocation list (`.3`) | the repository's CI secrets (`PLUGIN_SIGNING_KEY` and `PLUGIN_SIGNING_CERT`; `CATALOG_SIGNING_KEY` and `CATALOG_SIGNING_CERT`) | the chain from the leaf must end at the origin's root |
+
+A plugin-signing leaf is CA:FALSE with keyUsage digitalSignature, the EKU
+`2.25.230248497294207031301727532441854392946.1`, and subjectAltName URIs
+`urn:droidtop:origin:<origin>` (the plain origin id, matching the
+manifest's `origin`) plus, to bind a repository to its own plugins,
+`urn:droidtop:plugin:<id>` or `urn:droidtop:plugin:<prefix>.*`. Only the
+`droidtop` origin under droidtop's signing root is Official.
+
+**A third-party publisher** (any origin but `droidtop`) sets up its own:
+1. **A root:** a P-256 or RSA (2048 bits or more) key and a self-signed CA
+   certificate (CA:TRUE, keyUsage keyCertSign), optionally naming
+   `urn:droidtop:origin:<origin>`. Keep the private key offline.
+2. **A signing leaf** issued by that root with the profile above, its key
+   and certificate in the repository's CI secrets.
+3. **Publish the root certificate** as `droidtop-plugin-key.json` in the
+   repository or as a release asset: `{"origin": "<origin>",
+   "certificate": "<root PEM>"}`. A person who adds the repository (or a
+   catalog listing it) confirms that root once; droidtop stores the root's
+   own key, never the key of whoever issued it, and refuses a later
+   different key unless the person replaces it.
+4. **Sign each bundle** into `manifest.jws` with the leaf in `x5c`.
+5. **Optionally, a catalog of your own:** a `.2` leaf naming
+   `urn:droidtop:catalog:<owner>/<name>` signs `index.json` into
+   `index.json.jws`, and the index's `catalog.key` names the root
+   (`algorithm` `droidtop-chain-v1`, `publicKeySpki`, `keySha256`). A `.3`
+   leaf naming the same catalog signs its `revocations.jws`.
+
+A single self-signed signing certificate (root and leaf in one) is also
+accepted for a small publisher. gamegrab follows these steps with a root
+the owner derived from Core; that derivation gives it no special standing
+in droidtop.
 
 ### 1.6 UI extensions: the view schema
 
@@ -2674,13 +2724,14 @@ Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
 **Enforced for every plugin:**
 
 - **Install integrity.** Signature (`manifest.jws`, a JWS carrying the
-  signing certificate chain), per-repository keys certified by the pinned
-  Droidtop Core public key (with revocation), the key the person trusts
-  for any other origin, the trust tiers,
+  signing certificate chain), per-repository keys certified by droidtop's
+  pinned signing root (with revocation), the root the person trusts for
+  any other origin, the trust tiers,
   every payload hash, re-verification before every activation, id
   namespacing and ABI coverage. Official bundles are signed by CI
   (repo secrets `PLUGIN_SIGNING_KEY` and `PLUGIN_SIGNING_CERT`); see
-  docs/SPEC.md 12a, "Signatures: certificate chains to Droidtop Core".
+  docs/SPEC.md 12a, "Signatures: certificate chains to droidtop's signing
+  root", and "Signing a plugin" in §1.5.
 - **Consent.** Nothing runs before approval. Approval binds to the digest
   and key. A plugin that cannot run contained must declare
   `host.full_trust`, or it is refused at install, and it is not called

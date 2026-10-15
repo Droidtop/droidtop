@@ -68,8 +68,8 @@ data class PluginCatalogInfo(
     val trust: String,
     /**
      * The catalog's anchor key, SPKI base64, or null for a catalog without one: trusted on first use as its own
-     * origin's key ([origin]); its index signature and revocation list chain to it. For a catalog Droidtop Core
-     * certified it is Core's own key.
+     * origin's key ([origin]); its index signature and revocation list chain to it. It is the publisher's own
+     * root (gamegrab's for gamegrab-sources/catalog).
      */
     val keyBase64: String?,
     /** The organisation's own origin id (e.g. "gamegrab"), listed under [keyBase64]; null without a master. */
@@ -105,9 +105,10 @@ object PluginCatalogIndexParser {
     private val HEX_64 = Regex("^[0-9a-fA-F]{64}$")
 
     /**
-     * A key block's `algorithm`: `droidtop-chain-v1` names the anchor certificate chains end at (P-256 or RSA,
-     * Droidtop Core's own key for an origin Core certified; docs/SPEC.md 12a "Signatures: certificate chains to
-     * Droidtop Core"); `SHA256withECDSA` is the older spelling for a P-256 key, read the same way.
+     * A key block's `algorithm`: `droidtop-chain-v1` names the anchor certificate chains end at (P-256 or RSA:
+     * droidtop's signing root for the official origin, a publisher's own root otherwise; docs/SPEC.md 12a
+     * "Signatures: certificate chains to droidtop's signing root"); `SHA256withECDSA` is the older spelling for a
+     * P-256 key, read the same way.
      */
     private val KEY_ALGORITHMS = setOf("droidtop-chain-v1", "SHA256withECDSA")
     private val STREAMS = setOf("stable", "testing", "unstable")

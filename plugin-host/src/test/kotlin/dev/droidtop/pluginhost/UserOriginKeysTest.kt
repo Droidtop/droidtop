@@ -196,7 +196,7 @@ class UserOriginKeysTest {
         assertFalse(UserOriginKeys.attachCatalog(file, "missing", "someone/catalog"))
     }
 
-    // ----- Adding an origin as a certificate (docs/SPEC.md 12a "Signatures: certificate chains to Droidtop Core") -----
+    // ----- Adding an origin as a certificate (docs/SPEC.md 12a "Signatures: certificate chains to droidtop's signing root") -----
 
     @Test
     fun `a publisher's certificate stores its own key, and must name the origin if it names any`() {
@@ -213,17 +213,14 @@ class UserOriginKeysTest {
     }
 
     @Test
-    fun `a certificate Droidtop Core issued for the origin anchors it at Core`() {
-        val coreKey = dev.droidtop.testpki.TestPki.rsa()
-        val core = dev.droidtop.testpki.TestPki.core(coreKey)
-        val leaf = dev.droidtop.testpki.TestPki.pluginLeaf(freshKeyPair(), "gamegrab", core, coreKey.private)
-        dev.droidtop.runtime.util.DroidtopCore.withPinned(core.publicKey) {
-            assertEquals(Base64.getEncoder().encodeToString(core.publicKey.encoded), UserOriginKeys.anchorKey("gamegrab", dev.droidtop.testpki.TestPki.pem(leaf)))
-            assertNull(UserOriginKeys.anchorKey("romgi", dev.droidtop.testpki.TestPki.pem(leaf)))
-        }
-        // With no Core pinned it is just a certificate: its own key.
-        dev.droidtop.runtime.util.DroidtopCore.withPinned(null) {
+    fun `a certificate anchors at its own key whoever issued it`() {
+        // No automatic anchoring at droidtop's root: gamegrab is trusted only at the root it publishes.
+        val rootKey = dev.droidtop.testpki.TestPki.rsa()
+        val root = dev.droidtop.testpki.TestPki.core(rootKey)
+        val leaf = dev.droidtop.testpki.TestPki.pluginLeaf(freshKeyPair(), "gamegrab", root, rootKey.private)
+        dev.droidtop.runtime.util.DroidtopSigningRoot.withPinned(root.publicKey) {
             assertEquals(Base64.getEncoder().encodeToString(leaf.publicKey.encoded), UserOriginKeys.anchorKey("gamegrab", dev.droidtop.testpki.TestPki.pem(leaf)))
+            assertNull(UserOriginKeys.anchorKey("romgi", dev.droidtop.testpki.TestPki.pem(leaf)))
         }
     }
 }

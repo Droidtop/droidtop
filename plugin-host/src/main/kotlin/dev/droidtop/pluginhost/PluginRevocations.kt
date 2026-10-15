@@ -1,7 +1,7 @@
 package dev.droidtop.pluginhost
 
 import dev.droidtop.runtime.util.ChainSignature
-import dev.droidtop.runtime.util.DroidtopCore
+import dev.droidtop.runtime.util.DroidtopSigningRoot
 import dev.droidtop.runtime.util.RevocationList
 import java.io.File
 import java.security.cert.X509Certificate
@@ -10,8 +10,8 @@ import org.json.JSONObject
 
 /**
  * The revocation lists in force (docs/SPEC.md 12a "Revocation"): droidtop's
- * own, signed under Droidtop Core, which applies to every chain that ends at
- * Core, and per user-trusted origin the list of the catalog the person
+ * own, signed under droidtop's signing root, which applies to every chain that
+ * ends at that root, and per user-trusted origin the list of the catalog the person
  * trusted it through ([byOrigin]), which applies to that origin alone.
  */
 data class PluginRevocationList(
@@ -25,7 +25,7 @@ data class PluginRevocationList(
     /** Lowercase hex SHA-256 of an SPKI: a certified key, or a legacy key ([LegacyBundleSignature]). */
     fun revokesKey(sha256: String): Boolean = list.revokesKey(sha256)
 
-    /** The list that applies to the user-trusted [origin], or [NONE]: droidtop's own list never reaches outside Core-anchored chains. */
+    /** The list that applies to the user-trusted [origin], or [NONE]: droidtop's own list never reaches outside chains anchored at its signing root. */
     fun forOrigin(origin: String): PluginRevocationList = byOrigin[origin]?.let { PluginRevocationList(it) } ?: NONE
 
     companion object {
@@ -37,7 +37,7 @@ data class PluginRevocationList(
  * Stores and reads the accepted revocation lists. droidtop's list is
  * `droidtop-plugins/revocations.jws` beside the plugin index (fetched with it);
  * it is kept in the plugins root as [FILE_NAME] only when it verifies under
- * Droidtop Core, its signer names droidtop's catalog ([OFFICIAL_CATALOG_ID]),
+ * droidtop's signing root, its signer names droidtop's catalog ([OFFICIAL_CATALOG_ID]),
  * and its sequence is higher than the one on file, and it is verified again
  * every time it is read: the signature is what makes it count, not the fact
  * that it was stored. An added catalog's lists are kept per origin in
@@ -55,13 +55,13 @@ object PluginRevocations {
     const val OFFICIAL_CATALOG_ID = "droidtop"
 
     /**
-     * The lists in force ([PluginRevocationList.NONE] parts when there is none, no Core is pinned, or the stored
+     * The lists in force ([PluginRevocationList.NONE] parts when there is none, no signing root is pinned, or the stored
      * file no longer verifies).
      */
     fun load(pluginsRoot: File): PluginRevocationList = PluginRevocationList(official(pluginsRoot), originLists(pluginsRoot))
 
     private fun official(pluginsRoot: File): RevocationList {
-        val anchor = DroidtopCore.anchor() ?: return RevocationList.NONE
+        val anchor = DroidtopSigningRoot.anchor() ?: return RevocationList.NONE
         val file = File(pluginsRoot, FILE_NAME)
         if (!file.isFile) return RevocationList.NONE
         val text = runCatching { file.readText() }.getOrNull() ?: return RevocationList.NONE
@@ -69,12 +69,12 @@ object PluginRevocations {
     }
 
     /**
-     * Stores [jws] as droidtop's list when it verifies under Droidtop Core and its sequence is higher than the
+     * Stores [jws] as droidtop's list when it verifies under droidtop's signing root and its sequence is higher than the
      * stored one's. Returns whether it replaced the stored list. Written via a temp file and rename, so a failed
      * write leaves the previous list in force.
      */
     fun accept(pluginsRoot: File, jws: String): Boolean {
-        val anchor = DroidtopCore.anchor() ?: return false
+        val anchor = DroidtopSigningRoot.anchor() ?: return false
         val offered = RevocationList.parse(jws, anchor, OFFICIAL_CATALOG_ID) ?: return false
         if (offered.sequence <= official(pluginsRoot).sequence) return false
         pluginsRoot.mkdirs()

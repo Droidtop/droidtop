@@ -1,7 +1,7 @@
 package dev.droidtop.pluginhost
 
 import dev.droidtop.runtime.util.ChainSignature
-import dev.droidtop.runtime.util.DroidtopCore
+import dev.droidtop.runtime.util.DroidtopSigningRoot
 import dev.droidtop.runtime.util.RevocationList
 import dev.droidtop.runtime.util.Sha256
 import dev.droidtop.testpki.TestPki
@@ -37,7 +37,7 @@ class BundleSignatureTest {
         pluginId: String = "$origin.sample",
         userKeys: Map<String, String> = emptyMap(),
         revocations: PluginRevocationList = PluginRevocationList.NONE,
-    ) = DroidtopCore.withPinned(core.publicKey) { BundleSignature.verifyBundle(manifest, jws, origin, pluginId, userKeys, revocations) }
+    ) = DroidtopSigningRoot.withPinned(core.publicKey) { BundleSignature.verifyBundle(manifest, jws, origin, pluginId, userKeys, revocations) }
 
     @Test
     fun `an official bundle verifies through a leaf Core issued for the official origin`() {
@@ -64,11 +64,11 @@ class BundleSignatureTest {
     }
 
     @Test
-    fun `with no Core pinned an official bundle is refused, saying so`() {
+    fun `with no signing root pinned an official bundle is refused, saying so`() {
         val leafKey = TestPki.ec()
         val leaf = TestPki.pluginLeaf(leafKey, "droidtop", core, coreKey.private)
-        val result = DroidtopCore.withPinned(null) { BundleSignature.verifyBundle(manifest, jws(listOf(leaf), leafKey), "droidtop", "droidtop.sample") }
-        assertTrue((result as BundleVerdict.Refused).reason.contains("Droidtop Core"))
+        val result = DroidtopSigningRoot.withPinned(null) { BundleSignature.verifyBundle(manifest, jws(listOf(leaf), leafKey), "droidtop", "droidtop.sample") }
+        assertTrue((result as BundleVerdict.Refused).reason.contains("signing root"))
     }
 
     @Test
@@ -83,14 +83,18 @@ class BundleSignatureTest {
     }
 
     @Test
-    fun `an origin trusted at Core's key verifies a Core leaf for that origin`() {
+    fun `a third-party root the person trusts anchors its own leaves, never droidtop's`() {
+        // gamegrab has its own root (owner, 2026-10-15: "The gamegrab repo and plugins obviously get their own keys").
+        val rootKey = TestPki.ec()
+        val root = TestPki.cert("gamegrab root", rootKey.public).ca(0).selfSigned(rootKey.private).build()
         val leafKey = TestPki.ec()
-        val gamegrab = TestPki.pluginLeaf(leafKey, "gamegrab", core, coreKey.private)
-        val keys = mapOf("gamegrab" to Base64.getEncoder().encodeToString(core.publicKey.encoded))
-        val result = verdict(jws(listOf(gamegrab), leafKey), "gamegrab", userKeys = keys)
-        assertEquals(Sha256.hex(core.publicKey.encoded), (result as BundleVerdict.Verified).anchorSha256)
-        // Through Core's own anchor, the chain may not carry Core.
-        assertTrue(verdict(jws(listOf(gamegrab, core), leafKey), "gamegrab", userKeys = keys) is BundleVerdict.Refused)
+        val leaf = TestPki.pluginLeaf(leafKey, "gamegrab", root, rootKey.private)
+        val keys = mapOf("gamegrab" to b64(rootKey))
+        val result = verdict(jws(listOf(leaf), leafKey), "gamegrab", userKeys = keys)
+        assertEquals(Sha256.hex(rootKey.public.encoded), (result as BundleVerdict.Verified).anchorSha256)
+        // A gamegrab leaf droidtop's own root issued does not verify under gamegrab's root.
+        val byDroidtop = TestPki.pluginLeaf(leafKey, "gamegrab", core, coreKey.private)
+        assertTrue(verdict(jws(listOf(byDroidtop), leafKey), "gamegrab", userKeys = keys) is BundleVerdict.Refused)
     }
 
     @Test
@@ -119,7 +123,7 @@ class BundleSignatureTest {
 
     @Test
     fun `approval carries across official anchors, not across other keys`() {
-        DroidtopCore.withPinned(core.publicKey) {
+        DroidtopSigningRoot.withPinned(core.publicKey) {
             val coreSha = Sha256.hex(core.publicKey.encoded)
             val legacy = LegacyBundleSignature.officialFingerprints()
             assertTrue(legacy.isNotEmpty())

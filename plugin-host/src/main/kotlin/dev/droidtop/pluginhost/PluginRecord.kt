@@ -17,7 +17,7 @@ data class PluginRecord(
     /**
      * The fingerprint ([BundleVerdict.Verified.anchorSha256]) of the trust
      * anchor this bundle verified under when it was (re)installed:
-     * Droidtop Core for an official bundle (or, for one installed before
+     * droidtop's signing root for an official bundle (or, for one installed before
      * the certificate format, the legacy official key or old plugin
      * master), or the user-trusted key. What approval is bound to, alongside
      * the digest (docs/SPEC.md 12a checklist point 4, "Trust over

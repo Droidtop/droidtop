@@ -5,7 +5,7 @@ import dev.droidtop.runtime.util.Sha256
 import java.io.ByteArrayOutputStream
 import java.io.File
 import dev.droidtop.runtime.util.ChainSignature
-import dev.droidtop.runtime.util.DroidtopCore
+import dev.droidtop.runtime.util.DroidtopSigningRoot
 import dev.droidtop.testpki.TestPki
 import java.security.KeyPair
 import java.security.PrivateKey
@@ -389,11 +389,11 @@ class PluginBundleInstallerTest {
         val leaf = TestPki.pluginLeaf(leafKey, "droidtop", core, coreKey.private)
         val pluginsRoot = tmp.newFolder("plugins")
         val bundle = buildBundle("droidtop", leafKey, chain = listOf(leaf))
-        DroidtopCore.withPinned(null) {
+        DroidtopSigningRoot.withPinned(null) {
             val refused = install(bundle, pluginsRoot)
             assertTrue((refused as PluginInstallResult.Refused).error.reason.contains("Droidtop Core"))
         }
-        DroidtopCore.withPinned(core.publicKey) {
+        DroidtopSigningRoot.withPinned(core.publicKey) {
             val record = (install(bundle, pluginsRoot) as PluginInstallResult.Installed).record
             assertEquals(Sha256.hex(core.publicKey.encoded), record.approvedKeySha256)
             assertTrue(File(pluginsRoot, "droidtop.statustile/manifest.jws").isFile)

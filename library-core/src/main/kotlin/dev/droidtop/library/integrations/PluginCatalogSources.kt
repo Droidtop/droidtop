@@ -29,8 +29,7 @@ data class PluginCatalogSource(
     /**
      * The catalog's anchor key (SPKI, base64; its "master"), trusted on first use when the person accepted the
      * catalog; null for a catalog without one. It is also its own origin's trusted key, and the chains of that
-     * origin's bundles, of its index signature and of its revocation list end at it (Droidtop Core's own key for
-     * a catalog Core certified).
+     * origin's bundles, of its index signature and of its revocation list end at it (the publisher's own root).
      */
     val masterKeyBase64: String? = null,
     /** Whether an index signature has verified; from then on an unsigned copy is refused. */

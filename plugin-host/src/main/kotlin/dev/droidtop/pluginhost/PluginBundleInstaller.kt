@@ -26,7 +26,7 @@ sealed interface PluginInstallResult {
  * before every activation too (checklist point 1's "not only at
  * install"), not just here. `userKeys` carries the user-trusted origin
  * anchors ("Keys you trust", [UserOriginKeys.loadBase64]): signature
- * verification resolves the official origin to Droidtop Core first, then
+ * verification resolves the official origin to droidtop's signing root first, then
  * those, so a bundle from an origin the user trusted verifies here exactly
  * like an official one and an origin no anchor resolves for is still
  * refused outright.
@@ -169,7 +169,7 @@ object PluginBundleInstaller {
             userKeys, PluginRevocations.load(pluginsRoot),
         )
         // The fingerprint approval binds to: the anchor the chain ended at,
-        // Droidtop Core's or the user-trusted key's ([BundleVerdict.Verified.anchorSha256]).
+        // the signing root's or the user-trusted key's ([BundleVerdict.Verified.anchorSha256]).
         val verified = when (verdict) {
             is BundleVerdict.Refused -> return PluginInstallResult.Refused(PluginInstallError(verdict.reason))
             is BundleVerdict.Verified -> verdict
@@ -237,7 +237,7 @@ object PluginBundleInstaller {
         // whatever state it had, and a different digest keeps APPROVED --
         // with its enabled and root-approved bits -- when it verifies under
         // that same anchor: the same user-trusted key, or for the official
-        // origin droidtop's own anchors (Droidtop Core, or the legacy key or
+        // origin droidtop's own anchors (its signing root, or the legacy key or
         // old plugin master it was approved under, [PluginOriginKeys.sameTrustAnchor]). Everything else
         // starts PENDING: a first install, an update of a plugin that was
         // only ever PENDING, an update signed by a different user key (a
