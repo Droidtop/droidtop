@@ -162,6 +162,22 @@ meaning, and a v1 manifest is translated into this shape by one function
 - **`subscribes`** lists the events the plugin wants, each with a
   version. An unknown id is ignored, not refused, as today.
 - **`exports`** and **`requires`** cover plugin-provided APIs (§2).
+- **Presentation** (Droidtop/tracker#521 item 2; `PluginPresentation`):
+  `summary` (one line, at most 80 characters, under the plugin's name on
+  its page and in the list), `publisher` (at most 60, "Made by"),
+  `homepage` (https only, "Its page"), `category` (`sources`,
+  `emulators`, `games`, `tools`, `system`, `themes`, `social`, `other`;
+  anything else is `other`), `icon` (a payload path of a square PNG or
+  WebP) and `screenshots` (up to six payload paths of PNG or WebP). All
+  optional and never refused: text is cut, a home page that is not https
+  is dropped, and an image is kept only when it is an entry of the signed
+  payload, so droidtop draws only files whose hash it checked. droidtop
+  draws them on the plugin's page in its own "About" group; a catalog
+  index may repeat `summary` and `publisher` on its plugin entry for the
+  list before install. A plugin no longer puts its maker, site or a "what
+  it is" line into `description`. `icon` and `screenshots` are read and
+  checked now; they are drawn once droidtop's settings screens have an
+  image row.
 - Unknown top-level fields are ignored, so a newer manifest still parses
   on an older build. Unknown ids *inside* `provides` and `permissions`
   are also ignored. The approval screen lists them as "Not supported by
@@ -3419,6 +3435,11 @@ version was bumped.
 
 **Changelog (additive changes; no version moved).**
 
+- 2026-10-15 (Droidtop/tracker#521 items 2 and 8): manifest presentation
+  fields `summary`, `publisher`, `homepage`, `category`, `icon`,
+  `screenshots` (1.2), drawn by droidtop in an "About" group, with
+  `summary` and `publisher` also on a catalog index's plugin entry; every
+  plugin panel ends with droidtop's own Permissions row.
 - 2026-10-15 (Droidtop/tracker#521 items 5 and 7): typed `info` and
   `row` values (`bool`, `number` with `unit`, `enum`) written by droidtop;
   `needs` on any view node, drawn as an inert "Off" row while that
