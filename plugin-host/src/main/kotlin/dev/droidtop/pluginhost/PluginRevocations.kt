@@ -65,7 +65,7 @@ object PluginRevocations {
         val file = File(pluginsRoot, FILE_NAME)
         if (!file.isFile) return RevocationList.NONE
         val text = runCatching { file.readText() }.getOrNull() ?: return RevocationList.NONE
-        return RevocationList.parse(text, anchor, OFFICIAL_CATALOG_ID, null) ?: RevocationList.NONE
+        return RevocationList.parse(text, anchor, OFFICIAL_CATALOG_ID) ?: RevocationList.NONE
     }
 
     /**
