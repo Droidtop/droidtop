@@ -54,7 +54,7 @@ object PluginStore {
             }.getOrDefault(false)
             if (!copied) return "Couldn't read that file"
             val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
-            when (val result = PluginBundleInstaller.install(tmp, root(context), userKeys, hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context))) {
+            when (val result = PluginBundleInstaller.install(tmp, root(context), userKeys, hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context), succeeds = dev.droidtop.pluginhost.UserOriginKeys.successorCheck(context))) {
                 is PluginInstallResult.Installed ->
                     "Installed ${result.record.manifest.label} -- approve it below before it runs"
                 is PluginInstallResult.Refused -> "Refused: ${result.error.reason}"
@@ -88,6 +88,32 @@ object PluginStore {
         PluginBundleInstaller.writeRecord(dir, updated)
         runCatching { PluginProcesses.retire(pluginId) }
         if (approved) PluginGrants.forContext(context).initialiseOnApproval(updated, ticked)
+    }
+
+    /**
+     * After the person confirmed [origin]'s new key in place of its old one ([UserOriginKeys.replace]): every plugin of
+     * that origin an update had sent back to waiting only because it was signed by the new key, approved before under
+     * the key it replaced, is approved again with the grants it had (new items wait at Ask first, as in any update), so
+     * a publisher's key change is one decision, not one per plugin (Droidtop/tracker#270). Root, which needs its own
+     * yes, is not restored. Returns how many came back.
+     */
+    fun keyReplaced(context: Context, origin: String): Int {
+        val dir = root(context)
+        val keys = UserOriginKeys.storeFile(context)
+        var restored = 0
+        for (record in installed(context)) {
+            if (record.manifest.origin != origin || record.trust != PluginTrustState.PENDING) continue
+            val replaced = record.replacedKeySha256 ?: continue
+            if (record.replacedOrigin != null && record.replacedOrigin != origin) continue
+            if (!UserOriginKeys.succeeds(keys, origin, replaced, record.approvedKeySha256)) continue
+            val back = record.copy(trust = PluginTrustState.APPROVED, enabled = true, disabledReason = null, replacedKeySha256 = null, replacedOrigin = null)
+            PluginBundleInstaller.writeRecord(dir, back)
+            // The grants file still holds what the person answered for this plugin; kept as an update keeps it.
+            PluginGrants.forContext(context).applyUpdate(back, back)
+            runCatching { PluginProcesses.retire(record.manifest.id) }
+            restored++
+        }
+        return restored
     }
 
     fun setEnabled(context: Context, pluginId: String, enabled: Boolean) {

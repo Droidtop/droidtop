@@ -478,13 +478,18 @@ object PluginCatalogScreen {
                     confirmTitle = "Trust origin \"${origin.origin}\" ($fingerprint) from \"${source.name}\"?",
                     run = { ctx, _ -> PluginCatalog.trustOrigin(ctx, source, origin.origin, origin.keyBase64) },
                 )
-                is PluginCatalog.OriginState.KeyChanged -> ActionItem(
-                    id = "plugins_catalog_changed_${origin.origin}",
-                    title = "\"${origin.origin}\": a different key",
-                    subtitle = "You trust ${UserOriginKeys.fingerprint(state.stored.keyBase64)}; this catalog now names $fingerprint. " +
-                        "Its plugins here are not offered and nothing was changed. Compare the two under Keys you trust",
-                    run = {},
-                )
+                is PluginCatalog.OriginState.KeyChanged -> {
+                    val trusted = UserOriginKeys.fingerprint(state.stored.keyBase64) ?: "unreadable"
+                    AsyncActionItem(
+                        id = "plugins_catalog_changed_${origin.origin}",
+                        title = "\"${origin.origin}\" has a new key",
+                        subtitle = "You trust $trusted; this catalog now names $fingerprint. Its plugins here are not offered " +
+                            "until you decide. Trust the new key only if its publisher said it changed it",
+                        confirmTitle = "Trust \"${origin.origin}\"'s new key $fingerprint in place of $trusted? Its plugins keep " +
+                            "their approval and permissions." + if (source.indexSigned) "" else " This catalog's index is not signed.",
+                        run = { ctx, _ -> PluginCatalog.replaceOriginKey(ctx, source, origin.origin, origin.keyBase64) },
+                    )
+                }
 
                 else -> null
             }
