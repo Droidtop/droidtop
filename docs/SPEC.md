@@ -4097,8 +4097,22 @@ fallback:
   levels: per game and per system. Resolution priority, pure and
   unit-tested (`LaunchScreenResolution`): **per-game > per-system >
   ask > global target.** A remembered SECOND with no second display
-  attached degrades to the default display — a preference never fails
+  attached degrades to the shell's screen — a preference never fails
   a launch.
+- **Where a game opens when nothing chose a screen (2026-10-15, rig on
+  droidtop 0.2.0-dev.1908, Droidtop/tracker#270, #271).** A launch with
+  no screen chosen (no memory, no question, no global target) opens on
+  the screen droidtop's shell is on, which the orchestrator publishes
+  (`LaunchDisplay.shellDisplayId`), never on the built-in screen by
+  default (`LaunchScreenResolution.resolveDisplay`). The built-in screen
+  is used when it is the one chosen: a remembered BUILT_IN, the global
+  "Built-in" target and the chooser's built-in row all name display 0
+  explicitly, so "nothing chosen" (null) and "the built-in screen" (0)
+  are no longer the same value. Before, they were: on the console with
+  its shell and pad on the external display 4, NetherSX2 and RetroArch
+  opened on display 0, the companion's screen, captured black, and
+  RetroArch went on to an ANR. The launch watchdog's "Return to
+  droidtop" brings the shell back to its own screen the same way.
 - The chooser dialog carries iiSU's own row vocabulary: a plain
   "launch here" pair for this one launch, then an **"Always"** pair
   that remembers for this game. Asking is still the first-launch
@@ -4236,7 +4250,8 @@ ambient placement onto the addon. Meanwhile `parkedDisplayId` recorded
 the *requested* `null`, never the addon's real id, so the role
 orchestration never learned the addon was taken and kept showing the
 companion there. **Fixed**: `startOn` now always resolves an explicit
-display (`displayId ?: Display.DEFAULT_DISPLAY`) and always passes
+display (`LaunchScreenResolution.resolveDisplay`: the chosen display,
+else the shell's, since 2026-10-15) and always passes
 `ActivityOptions.setLaunchDisplayId` -- the launch, and `parkedDisplayId`,
 now always land where droidtop actually asked, never wherever Android's
 ambient default happens to be.

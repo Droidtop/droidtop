@@ -47,6 +47,7 @@ interface SecondScreenHost {
 
     /** Mirrors the resolved state into dev.droidtop.library.LaunchDisplay. */
     fun publishLaunchTargeting(
+        shellDisplayId: Int,
         secondDisplayId: Int?,
         targetDisplayId: Int?,
         askOptions: List<DualScreenOrchestration.ChooserCandidate>?,
@@ -353,7 +354,10 @@ class SecondScreenOrchestrator(
 
                 val launchTarget = if (gaming && second != null) DisplayRolePrefs.gameLaunchTarget(context) else null
                 val targetDisplayId = when (launchTarget) {
-                    null, DisplayRolePrefs.GameLaunchTarget.ASK, DisplayRolePrefs.GameLaunchTarget.BUILT_IN -> null
+                    // No preference is the shell's own screen (LaunchScreenResolution.resolveDisplay); the built-in
+                    // screen only when it is the one chosen.
+                    null, DisplayRolePrefs.GameLaunchTarget.ASK -> null
+                    DisplayRolePrefs.GameLaunchTarget.BUILT_IN -> Display.DEFAULT_DISPLAY
                     DisplayRolePrefs.GameLaunchTarget.FOLLOW_SHELL ->
                         if (shellOnSecondNow) second!!.androidDisplayId else null
                     DisplayRolePrefs.GameLaunchTarget.SECOND -> second!!.androidDisplayId
@@ -373,7 +377,7 @@ class SecondScreenOrchestrator(
                 } else {
                     null
                 }
-                host.publishLaunchTargeting(second?.androidDisplayId, targetDisplayId, askOptions)
+                host.publishLaunchTargeting(currentDisplay, second?.androidDisplayId, targetDisplayId, askOptions)
 
                 val presentationDisplayId = if (showCompanion) DualScreenOrchestration.companionPresentationDisplayId(
                     shellDisplayId = currentDisplay,

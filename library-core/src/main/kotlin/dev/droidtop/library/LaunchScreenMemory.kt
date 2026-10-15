@@ -98,11 +98,23 @@ object LaunchScreenResolution {
         askable: Boolean,
         globalTarget: Int?,
     ): Decision = when {
-        remembered == LaunchScreen.BUILT_IN -> Decision.Start(null)
+        remembered == LaunchScreen.BUILT_IN -> Decision.Start(BUILT_IN_DISPLAY)
         remembered == LaunchScreen.SECOND -> Decision.Start(secondDisplayId)
         askable -> Decision.Ask
         else -> Decision.Start(globalTarget)
     }
+
+    /** Android's id of the built-in screen (`Display.DEFAULT_DISPLAY`): a choice of it is always this, never null. */
+    const val BUILT_IN_DISPLAY = 0
+
+    /**
+     * The display a launch goes to: [displayId] when a choice named one, else the screen droidtop's shell is on
+     * ([shellDisplayId]), else the built-in one. No choice means "where the person is", never the built-in screen
+     * by default: on a console whose shell is on the external display, the built-in screen is the companion's, and
+     * every game started there was off screen (rig, droidtop 0.2.0-dev.1908: NetherSX2 and RetroArch on display 0
+     * while the shell and the pad were on display 4).
+     */
+    fun resolveDisplay(displayId: Int?, shellDisplayId: Int?): Int = displayId ?: shellDisplayId ?: BUILT_IN_DISPLAY
 
     /** The [LaunchScreen] a chosen display id means, for remembering it. */
     fun screenFor(displayId: Int?, secondDisplayId: Int?): LaunchScreen =

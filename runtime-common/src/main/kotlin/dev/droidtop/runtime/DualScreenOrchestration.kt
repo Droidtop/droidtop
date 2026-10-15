@@ -200,7 +200,7 @@ object DualScreenOrchestration {
                 else -> ""
             }
             ChooserCandidate(
-                displayId = id.takeIf { it != DEFAULT_DISPLAY_ID },
+                displayId = id,
                 label = name + relation,
                 rememberable = id == DEFAULT_DISPLAY_ID || id == secondDisplayId,
             )
