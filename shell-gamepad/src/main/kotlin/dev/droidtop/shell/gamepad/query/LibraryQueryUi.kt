@@ -70,6 +70,7 @@ import dev.droidtop.library.integrations.UnifiedState
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
+import dev.droidtop.pluginhost.PluginWebAccount
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.MenuPanel
@@ -659,6 +660,23 @@ internal fun LibrarySearchDialog(
                 state.sources.filter { it.failure != null }.forEach { status ->
                     val source = status.source
                     add(SearchLine.Note("${source.label}: ${status.failure}"))
+                    // A source that needs the person in its site: droidtop's own Sign in / Open the site, then search again.
+                    val record = (source as? PluginGameSource)?.source?.record
+                    val access = status.access
+                    if (record != null && access != null && PluginWebAccount.checkUrl(record) != null) {
+                        add(
+                            SearchLine.Entry(
+                                "access:${source.id}",
+                                if (access == PluginWebAccount.Need.SIGN_IN) "Sign in" else "Open the site",
+                                subtitle = "${source.label}. Searches again after",
+                            ) {
+                                coroutineScope.launch {
+                                    val kept = withContext(Dispatchers.IO) { PluginWebAccount.open(context, record, access) }
+                                    if (kept) searchTick++ else statusLine = PluginWebAccount.notKept(record.manifest.label, access)
+                                }
+                            },
+                        )
+                    }
                     val shown = technicalDetails[source.id]
                     if (shown != null) {
                         add(SearchLine.Note(shown))

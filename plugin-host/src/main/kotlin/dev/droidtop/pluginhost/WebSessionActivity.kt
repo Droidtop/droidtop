@@ -79,6 +79,7 @@ class WebSessionActivity : Activity() {
         titles.addView(TextView(this).apply {
             text = when (asked.mode) {
                 WebSessionRequest.Mode.SIGN_IN -> "Sign in for ${asked.label}"
+                WebSessionRequest.Mode.CHECK -> "${asked.label}: open the site"
                 WebSessionRequest.Mode.OPEN -> "${asked.label}: open in your session"
                 WebSessionRequest.Mode.BROWSE -> asked.label
             }
@@ -91,7 +92,7 @@ class WebSessionActivity : Activity() {
         }
         titles.addView(location)
         bar.addView(titles, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        if (asked.mode == WebSessionRequest.Mode.SIGN_IN) {
+        if (asked.mode.endsWithDone) {
             bar.addView(Button(this).apply {
                 text = "Done"
                 setOnClickListener { finishWith(completed = true, download = null) }
@@ -99,12 +100,13 @@ class WebSessionActivity : Activity() {
         }
         bar.addView(Button(this).apply {
             text = "Close"
-            setOnClickListener { finishWith(completed = asked.mode != WebSessionRequest.Mode.SIGN_IN, download = null) }
+            setOnClickListener { finishWith(completed = !asked.mode.endsWithDone, download = null) }
         })
         root.addView(bar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         root.addView(TextView(this).apply {
             text = when (asked.mode) {
                 WebSessionRequest.Mode.SIGN_IN -> "Sign in on the site's own page. Press Done when you are signed in. B goes back a page."
+                WebSessionRequest.Mode.CHECK -> "Let the site finish its check and show its page, then press Done. B goes back a page."
                 WebSessionRequest.Mode.OPEN -> "Choose the download on the page; droidtop takes the file into Downloads. B goes back a page."
                 WebSessionRequest.Mode.BROWSE ->
                     "${asked.label}'s own pages. Paying happens on them; droidtop never sees or keeps payment details. B goes back a page."
@@ -171,7 +173,7 @@ class WebSessionActivity : Activity() {
             if (view != null && view.canGoBack()) {
                 view.goBack()
             } else {
-                finishWith(completed = request?.mode != WebSessionRequest.Mode.SIGN_IN, download = null)
+                finishWith(completed = request?.mode?.endsWithDone != true, download = null)
             }
             return true
         }

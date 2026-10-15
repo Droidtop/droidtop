@@ -1,7 +1,9 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
+import dev.droidtop.pluginhost.PluginErrorCode
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
+import dev.droidtop.pluginhost.PluginWebAccount
 import dev.droidtop.pluginhost.RuntimeNeed
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -30,9 +32,21 @@ data class SourceOutcome(
     val runtimeNeed: RuntimeNeed? = null,
     /** What the source itself said when it failed, markup removed and bounded: behind "Technical details", never on a row. */
     val technical: String? = null,
+    /**
+     * Set when the source needs the person in its site first (SIGN_IN_REQUIRED, BROWSER_CHECK_REQUIRED): droidtop draws
+     * Sign in or Open the site under the source's name ([PluginWebAccount]), never the plugin (Droidtop/tracker#544).
+     */
+    val access: PluginWebAccount.Need? = null,
 ) {
     val hits: List<SourceHit> get() = results.map { SourceHit(source, it) }
 }
+
+/**
+ * A source's error reply kept whole (docs/plugin-api.md 1.3): its [code], its one plain sentence [message] for the
+ * person and the [detail] it gave for "Technical details". What a source's search fails with, so the search can draw
+ * droidtop's own action for the code instead of a sentence the plugin wrote about it.
+ */
+class SourceReplyFailure(val code: PluginErrorCode, message: String?, val detail: String?) : Exception(message?.takeIf { it.isNotBlank() } ?: "Search failed")
 
 /** Every result of every outcome, in source order: what a caller that only wants rows (not reasons) reads. */
 fun List<SourceOutcome>.hits(): List<SourceHit> = flatMap { it.hits }
@@ -104,13 +118,28 @@ object PluginSearchAggregator {
                 }
                 answer.fold(
                     onSuccess = { SourceOutcome(source, it) },
-                    onFailure = {
-                        val said = describe(it)
-                        SourceOutcome(source, emptyList(), failure = SourceFailures.plain(said), technical = SourceFailures.technical(said))
-                    },
+                    onFailure = { failureOutcome(source, it) },
                 )
             }
         }.map { it.await() }
+    }
+
+    /** What a failed [source] shows: droidtop's sentence for a code it acts on, else the source's plain sentence, guarded. */
+    internal fun failureOutcome(source: GameSourceProvider, failure: Throwable): SourceOutcome {
+        val said = describe(failure)
+        val reply = failure as? SourceReplyFailure
+        val technical = SourceFailures.technical(reply?.detail ?: said)
+        val access = when (reply?.code) {
+            PluginErrorCode.SIGN_IN_REQUIRED -> PluginWebAccount.Need.SIGN_IN
+            PluginErrorCode.BROWSER_CHECK_REQUIRED -> PluginWebAccount.Need.BROWSER_CHECK
+            else -> null
+        }
+        val sentence = when (access) {
+            PluginWebAccount.Need.SIGN_IN -> SourceFailures.NEEDS_SIGN_IN
+            PluginWebAccount.Need.BROWSER_CHECK -> SourceFailures.NEEDS_BROWSER_CHECK
+            null -> SourceFailures.plain(said)
+        }
+        return SourceOutcome(source, emptyList(), failure = sentence, technical = technical, access = access)
     }
 
     /** [fanOutOutcomes] for a fetcher that has no failure channel of its own (the lookup composition): a throw or timeout is simply no results. */

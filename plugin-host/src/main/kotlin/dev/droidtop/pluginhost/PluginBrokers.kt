@@ -214,6 +214,17 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         }
     }
 
+    override fun linkFallback(pluginLabel: String, uri: String, why: String): Boolean {
+        val copied = runCatching {
+            val clipboard = appContext.getSystemService(android.content.ClipboardManager::class.java) ?: return@runCatching false
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText(pluginLabel, uri))
+            true
+        }.getOrDefault(false)
+        val sentence = if (copied) "$why. droidtop copied the link: paste it where you want it" else "$why. The link is: $uri"
+        dev.droidtop.library.settings.Notices.flash(sentence, tone = dev.droidtop.library.settings.NoticeTone.Caution, context = appContext)
+        return copied
+    }
+
     override fun toast(pluginLabel: String, text: String): Boolean {
         // A flash led by the plugin's name, so it is never mistaken for droidtop's own words (docs/SPEC.md 7k, "Notices");
         // the whole text goes to Recent. Over a game, where no droidtop surface is on screen, it is a platform toast.

@@ -129,6 +129,18 @@ data class WebSessionRequest(
     /** [Mode.BROWSE]: told the address of each page the view finishes showing, on the main thread. Nothing else of a page is read. */
     val onPage: ((String) -> Unit)? = null,
 ) {
-    /** A plugin's sign-in, a plugin's protected link, or a store's own pages (docs/SPEC.md 7g, "A store's own pages"). */
-    enum class Mode { SIGN_IN, OPEN, BROWSE }
+    /**
+     * A plugin's sign-in, a site's browser check passed in the plugin's session (docs/plugin-api.md 1.3
+     * `BROWSER_CHECK_REQUIRED`), a plugin's protected link, or a store's own pages (docs/SPEC.md 7g, "A store's own pages").
+     */
+    enum class Mode {
+        SIGN_IN,
+        CHECK,
+        OPEN,
+        BROWSE,
+        ;
+
+        /** The person ends it with Done; backing out stores nothing. */
+        val endsWithDone: Boolean get() = this == SIGN_IN || this == CHECK
+    }
 }
