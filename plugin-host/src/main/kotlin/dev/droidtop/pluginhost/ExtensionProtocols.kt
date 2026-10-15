@@ -223,7 +223,7 @@ object PluginTileProtocol {
      * runs the game. A tile with neither shows whatever runs. Pure: [gameRunning] and [runningPackage] are the host's.
      */
     fun forGame(entry: ProvidedPoint, gameRunning: Boolean, runningPackage: String?): Boolean {
-        val packages = PluginCompanion.gamePackages(entry)
+        val packages = CompanionAbilities.gamePackages(entry)
         val whileGame = runCatching { JSONObject(entry.extra).optBoolean("whileGame", false) }.getOrDefault(false)
         if (packages.isEmpty() && !whileGame) return true
         if (!gameRunning) return false
