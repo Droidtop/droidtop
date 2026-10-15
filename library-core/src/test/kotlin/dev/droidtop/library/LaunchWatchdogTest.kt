@@ -1,6 +1,7 @@
 package dev.droidtop.library
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -119,5 +120,16 @@ class LaunchWatchdogTest {
             assertTrue(text, text.startsWith("Example Emu"))
             assertTrue(text, "try again" in text.lowercase() || "close it" in text.lowercase())
         }
+    }
+
+    @Test
+    fun enginehostReturningAtOnceIsLeavingNotFailing() {
+        // Cancel on Enginehost's no-sandbox warning hands straight back (Droidtop/tracker#289): not a crash.
+        assertTrue(LaunchWatchPolicy.leftBeforePlaying(EngineHost.PACKAGE_NAME, LaunchTrouble.EXITED_AT_ONCE))
+        // Anything else of Enginehost's is still trouble, and an emulator returning at once still is.
+        for (trouble in LaunchTrouble.entries - LaunchTrouble.EXITED_AT_ONCE) {
+            assertFalse(LaunchWatchPolicy.leftBeforePlaying(EngineHost.PACKAGE_NAME, trouble))
+        }
+        assertFalse(LaunchWatchPolicy.leftBeforePlaying("com.retroarch.aarch64", LaunchTrouble.EXITED_AT_ONCE))
     }
 }

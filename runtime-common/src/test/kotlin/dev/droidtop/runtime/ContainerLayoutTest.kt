@@ -50,6 +50,11 @@ class ContainerLayoutTest {
     }
 
     @Test
+    fun `exported commands are on the path, after the container's own`() {
+        assertEquals("${ContainerLayout.GUEST_PATH}:${ContainerEnter.COMMANDS_DIR}", ContainerLayout.clientEnvironment(null)["PATH"])
+    }
+
+    @Test
     fun `the time zone is a POSIX rule a stock image reads without tzdata`() {
         val summer = java.time.Instant.parse("2026-07-01T12:00:00Z")
         assertEquals("<-05>5<-04>,M3.2.0,M11.1.0", ContainerLayout.posixTimeZone(java.time.ZoneId.of("America/New_York"), summer))

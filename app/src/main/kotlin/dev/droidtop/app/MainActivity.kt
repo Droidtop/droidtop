@@ -118,7 +118,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     // Desktop hands the pad to the container, but Start, Select, R2 and L1 are droidtop's chrome there
     // (docs/SPEC.md 2b "Desktop chrome with a pad"): the Start menu, the Quick Menu and the windows list.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-        (mode == Mode.DESKTOP && DesktopPadRoutes.claim(event)) || padGate.dispatchKey(event)
+        (mode == Mode.DESKTOP && DesktopPadRoutes.claim(event, DesktopSessionService.state.value is DesktopSessionState.Connected)) ||
+            padGate.dispatchKey(event)
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         padGate.noteTouch(event)
@@ -185,7 +186,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     // This instance's companion tap-to-launch seam -- kept so onDestroy
     // can identity-check before clearing the process-wide hook.
     private var companionLaunchSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
-    private var companionQuitSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
 
     /**
      * Re-runs orchestration from scratch: drops the parked display and the
@@ -310,6 +310,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         companionLaunchSeam = { entry ->
             lifecycleScope.launch {
                 CompanionState.launchError.value = null
+                CompanionState.stopStatus.value = null
                 runCatching { library.launch(entry) }
                     .onFailure {
                         android.util.Log.e("droidtop.MainActivity", "Companion launch of ${entry.title} failed", it)
@@ -319,20 +320,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             }
         }
         CompanionState.onLaunchEntry = companionLaunchSeam
-        // Quit from the companion's Now card: the one quit path (Library.quitRunning), and a quit that could
-        // not end the game says why where the tap was made.
-        companionQuitSeam = { entry ->
-            // The process scope, not this activity's: ending a game opens a sheet or moves the game off the screen, either
-            // of which can recreate the activity, and a cancelled scope lost the answer (rig, build 1809).
-            CompanionState.scope.launch {
-                CompanionState.launchError.value = when (val outcome = library.quitRunning(applicationContext, entry)) {
-                    dev.droidtop.library.QuitResult.Ended -> null
-                    is dev.droidtop.library.QuitResult.NotEnded -> outcome.message
-                    is dev.droidtop.library.QuitResult.Unresolvable -> outcome.message
-                }
-            }
-        }
-        CompanionState.onQuitEntry = companionQuitSeam
         CompanionState.onRestartEntry = { entry ->
             CompanionState.scope.launch {
                 when (val outcome = library.quitRunning(applicationContext, entry)) {
@@ -358,8 +345,10 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             // capture, 2026-09-11: the OS bar read 5:14 and the theme's
             // own clock 17:14). A themed view owns its whole surface, so
             // in Gaming mode droidtop goes immersive and the theme's clock
-            // is the only one. Every other mode keeps the system bars: a
-            // home screen and a desktop both want them.
+            // is the only one. Desktop is immersive too: its sheets hid the
+            // bars and closing one showed them again, so the desktop resized
+            // under the person (Droidtop/tracker#555 D4); its own bar carries
+            // what the status bar did. Standard keeps the system bars.
             LaunchedEffect(mode) { applySystemBars(mode) }
             // Signed-in stores last read longer ago than the person's interval are read again as
             // the Gaming shell opens, on an unmetered network only (SPEC 7g, "Stores"); no timer.
@@ -540,7 +529,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     private fun applySystemBars(mode: Mode?) {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
-        if (mode == Mode.GAMING) {
+        if (mode == Mode.GAMING || mode == Mode.DESKTOP) {
             WindowCompat.setDecorFitsSystemWindows(window, false)
             controller.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -926,9 +915,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // and the old one must not tear the new one's seam down.
         if (CompanionState.onLaunchEntry === companionLaunchSeam) {
             CompanionState.onLaunchEntry = null
-        }
-        if (CompanionState.onQuitEntry === companionQuitSeam) {
-            CompanionState.onQuitEntry = null
         }
         clipboardBridge?.stop()
         clipboardBridge = null

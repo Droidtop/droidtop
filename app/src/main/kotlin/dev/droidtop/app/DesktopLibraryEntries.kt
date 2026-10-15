@@ -10,9 +10,13 @@ import android.util.Log
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryKinds
+import dev.droidtop.runtime.ContainerApplications
+import dev.droidtop.runtime.ContainerEnter
+import dev.droidtop.runtime.ContainerExports
 import dev.droidtop.runtime.ContainerLauncher
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.DesktopLaunchRequests
+import dev.droidtop.runtime.ExportedApp
 import dev.droidtop.runtime.SharedVolume
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
@@ -78,8 +82,16 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
         writeIfChanged(ContainerLauncher.hostViewHelper(filesDir), ContainerLauncher.viewHelperScript())
         writeIfChanged(File(applicationsDir, ContainerLauncher.VIEW_ENTRY), ContainerLauncher.viewEntry())
         writeIfChanged(File(applicationsDir, "mimeapps.list"), ContainerLauncher.mimeApps())
+        // Other containers' apps exported into the desktop (Droidtop/tracker#555 D5): their entries, stale ones gone.
+        ContainerExports.writeEntries(filesDir, ContainerExports.read(filesDir))
+        // Other containers' exported commands and the enter helper they run through (Droidtop/tracker#555 D5, D7).
+        ContainerEnter.writeWrappers(filesDir, ContainerEnter.read(filesDir))
         // Requests from a session that has ended are not this session's to answer.
-        requestsDir.listFiles()?.forEach { it.delete() }
+        // An enter request is a folder of FIFOs and small files; it is emptied first (one level, no walk), then removed.
+        requestsDir.listFiles()?.forEach { request ->
+            if (request.isDirectory) request.listFiles()?.forEach { it.delete() }
+            request.delete()
+        }
     }
 
     @Suppress("DEPRECATION") // FileObserver(File, Int) needs API 29; the String form works on every level.
@@ -87,6 +99,8 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
         val watched = object : FileObserver(requestsDir.absolutePath, FileObserver.MOVED_TO) {
             override fun onEvent(event: Int, path: String?) {
                 val name = path ?: return
+                // A command of another container, run with its streams on the request's FIFOs (docs/SPEC.md 3d).
+                if (ContainerEnterRequests.handle(context, requestsDir, name)) return
                 if (ContainerLauncher.isViewRequest(name)) {
                     openOnAndroid(File(requestsDir, name))
                     return
@@ -94,14 +108,32 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
                 val token = ContainerLauncher.requestToken(name) ?: return
                 File(requestsDir, name).delete()
                 val id = published.get()[token]
-                when {
-                    id == null -> Log.w(TAG, "A launch request named $token, which droidtop has not published; ignored")
-                    !DesktopLaunchRequests.offer(id) -> Log.w(TAG, "No Desktop shell is showing to launch $id; request dropped")
+                if (id == null) {
+                    // An app another container exported (docs/SPEC.md 3d "Exported apps"); the list is a few lines.
+                    val export = ContainerExports.forToken(ContainerExports.read(filesDir), token)
+                    if (export != null) launchExport(export) else Log.w(TAG, "A launch request named $token, which droidtop has not published; ignored")
+                    return
                 }
+                if (!DesktopLaunchRequests.offer(id)) Log.w(TAG, "No Desktop shell is showing to launch $id; request dropped")
             }
         }
         watched.startWatching()
         observer = watched
+    }
+
+    /**
+     * Runs an exported app in its own container, started first where the backend needs that, the same way the
+     * container page's Terminal reaches a sibling; its window appears on the shared desktop. A failure is the
+     * session's launch failure line, as for any other app.
+     */
+    private fun launchExport(export: ExportedApp) {
+        val started = DesktopSessionService.runInPrimary { runtime, _ ->
+            val info = runtime.listContainers().firstOrNull { it.container.id == export.containerId }
+                ?: return@runInPrimary "${export.containerName} no longer exists, so ${export.app.name} can't start"
+            if (runtime.siblingsNeedStart && !info.running) runtime.start(info.container)
+            ContainerApplications.launch(runtime, info.container, export.app)
+        }
+        if (!started) Log.w(TAG, "No desktop session to run ${export.title} in; request dropped")
     }
 
     private fun writeIfChanged(file: File, text: String) {

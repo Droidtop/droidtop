@@ -8,6 +8,7 @@ import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.net.VpnService
 import android.provider.Settings
+import dev.droidtop.app.ContainerPrograms
 import dev.droidtop.app.ContainerRuntimeFactory
 import dev.droidtop.app.DesktopSessionService
 import dev.droidtop.app.DesktopSessionState
@@ -30,6 +31,7 @@ import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.CompositorProvisioning
@@ -41,9 +43,16 @@ import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.CraneImageCatalogResolver
+import dev.droidtop.runtime.ContainerApplications
+import dev.droidtop.runtime.ContainerEnter
+import dev.droidtop.runtime.ContainerExports
+import dev.droidtop.runtime.ContainerProgram
 import dev.droidtop.runtime.EnvironmentMounts
+import dev.droidtop.runtime.ExportedApp
+import dev.droidtop.runtime.ExportedCommand
 import dev.droidtop.runtime.ExtraMount
 import dev.droidtop.runtime.HomeChoice
+import dev.droidtop.runtime.ImageRunConfig
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.ImageTags
 import dev.droidtop.runtime.KnownImageRepository
@@ -268,9 +277,16 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "vpn", title = "VPN", items = vpnItems(context, runtime, info))
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
+        runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
+            ?.takeIf { it.program().isNotEmpty() }
+            ?.let { groups += CatalogGroup(id = "program", title = "Its own program", items = programItems(context, runtime, info, it)) }
         val mounts = runCatching { runtime.mounts(info.container) }.getOrDefault(EnvironmentMounts())
         groups += CatalogGroup(id = "home", title = "Home", items = homeItems(runtime, info, mounts))
         groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info, mounts))
+        if (info.container.role == ContainerRole.SIBLING) {
+            groups += CatalogGroup(id = "exports", title = "In the desktop's menus", items = exportItems(context, runtime, info))
+            groups += CatalogGroup(id = "commands", title = "Commands in the desktop's terminal", items = commandItems(context, info))
+        }
         groups += CatalogGroup(id = "backup", title = "Backup", items = backupItems(runtime, info, running))
         groups += CatalogGroup(id = "delete", title = null, items = listOf(deleteItem(info, runtime, running)))
         return groups
@@ -453,6 +469,177 @@ object ContainersCatalog {
         )
     }
 
+    // ---- the image's own program (docs/SPEC.md 3, "The image's own program", Droidtop/tracker#555 D6a) ----
+
+    /**
+     * What the image says it runs, read from its config and kept with the container, and droidtop running it: Start or
+     * Stop with what it is doing, restart when it fails, start with the desktop, and its log (D6b).
+     */
+    private suspend fun programItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo, config: ImageRunConfig): List<CatalogItem> = buildList {
+        val container = info.container
+        val app = context.applicationContext
+        val state = ContainerPrograms.state(container.id)
+        val running = ContainerPrograms.isRunning(container.id)
+        add(
+            AsyncActionItem(
+                id = "container_program_run",
+                title = if (running) "Stop it" else "Start it",
+                value = programStateLabel(state),
+                confirmTitle = if (running) "Stop ${info.displayName}'s program?" else null,
+                run = { ctx, _ ->
+                    if (running) {
+                        ContainerPrograms.stop(container.id)
+                        "Stopped."
+                    } else {
+                        ContainerPrograms.start(ctx, runtime, container)
+                        "Started; its output is in the log below."
+                    }
+                },
+            ),
+        )
+        add(
+            ToggleItem(
+                id = "container_program_restart",
+                title = "Restart when it fails",
+                subtitle = "Waits longer after each quick failure, and stops trying after ${ContainerProgram.MAX_FAILURES_IN_A_ROW}",
+                current = withContext(Dispatchers.IO) { ContainerPrograms.restartOnFailure(app, container.id) },
+                onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerPrograms.setRestartOnFailure(app, container.id, on) } },
+            ),
+        )
+        add(
+            ToggleItem(
+                id = "container_program_autostart",
+                title = "Start with the desktop",
+                current = withContext(Dispatchers.IO) { ContainerPrograms.autostart(app, container.id) },
+                onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerPrograms.setAutostart(app, container.id, on) } },
+            ),
+        )
+        add(TextBlockItem(id = "container_program", title = "Program", text = ImageRunConfig.shellWords(config.program())))
+        config.workingDir?.let { add(TextBlockItem(id = "container_program_dir", title = "Working folder", text = it)) }
+        if (config.env.isNotEmpty()) {
+            add(TextBlockItem(id = "container_program_env", title = "Environment", text = config.env.joinToString("\n")))
+        }
+        if (!config.runsAsRoot) {
+            add(TextBlockItem(id = "container_program_user", title = "User", text = "The image asks for ${config.user}; containers here run everything as root"))
+        }
+        val log = withContext(Dispatchers.IO) { ContainerProgram.lastLines(ContainerProgram.hostLogFile(app.filesDir, container.id)) }
+        add(TextBlockItem(id = "container_program_log", title = "Log", text = log.joinToString("\n").ifEmpty { "Nothing yet" }, last = true))
+    }
+
+    private fun programStateLabel(state: ContainerPrograms.State): String = when (state) {
+        ContainerPrograms.State.Stopped -> "Stopped"
+        is ContainerPrograms.State.Running -> "Running"
+        is ContainerPrograms.State.Waiting -> "Restarting in ${state.restartInMs / 1000} s (it exited with ${state.lastExit})"
+        is ContainerPrograms.State.Ended -> if (state.gaveUp) "Stopped after failing ${ContainerProgram.MAX_FAILURES_IN_A_ROW} times (exit ${state.exitCode})" else "Exited with ${state.exitCode}"
+        is ContainerPrograms.State.Failed -> "Couldn't start: ${state.message}"
+    }
+
+    // ---- exported commands (docs/SPEC.md 3d "Exported commands", Droidtop/tracker#555 D5, D7) ----
+
+    /** Why the last command name typed on a container's page was not exported, by container id; shown once, under the field. */
+    private val commandProblems = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /**
+     * Whether the desktop may run this container's commands, the commands it exports by name (each then runs in the
+     * desktop's terminal as if installed there, through droidtop-enter), and a field to add one.
+     */
+    private suspend fun commandItems(context: Context, info: ContainerInfo): List<CatalogItem> {
+        val container = info.container
+        val filesDir = context.filesDir
+        val (allowed, exported) = withContext(Dispatchers.IO) {
+            ContainerEnter.allowed(filesDir, container.id) to ContainerEnter.read(filesDir).filter { it.containerId == container.id }
+        }
+        return buildList {
+            add(
+                ToggleItem(
+                    id = "container_enter_allowed",
+                    title = "Run its commands from the desktop",
+                    subtitle = "Commands shown below run here when typed in the desktop's terminal",
+                    current = allowed,
+                    onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerEnter.setAllowed(filesDir, container.id, on) } },
+                ),
+            )
+            add(
+                TextInputItem(
+                    id = "container_command_add",
+                    title = "Add a command",
+                    subtitle = commandProblems.remove(container.id) ?: "A program's name, for example htop; it then runs from the desktop's terminal",
+                    value = "",
+                    onChange = { _, value ->
+                        val name = value.trim()
+                        if (!ContainerEnter.validName(name)) {
+                            commandProblems[container.id] = "Not added: \"$name\" is not a program's name"
+                        } else {
+                            withContext(Dispatchers.IO) {
+                                val command = ExportedCommand(container.id, info.displayName, name)
+                                ContainerEnter.save(filesDir, ContainerEnter.with(ContainerEnter.read(filesDir), command, true))
+                            }
+                        }
+                    },
+                ),
+            )
+            exported.forEach { command ->
+                add(
+                    AsyncActionItem(
+                        id = "container_command:${command.name}",
+                        title = command.name,
+                        subtitle = "Runs in ${info.displayName} from the desktop's terminal",
+                        confirmTitle = "Stop offering ${command.name} on the desktop?",
+                        run = { ctx, _ ->
+                            withContext(Dispatchers.IO) {
+                                ContainerEnter.save(ctx.filesDir, ContainerEnter.with(ContainerEnter.read(ctx.filesDir), command, false))
+                            }
+                            "Removed."
+                        },
+                    ),
+                )
+            }
+        }
+    }
+
+    // ---- exported apps (docs/SPEC.md 3d "Exported apps", Droidtop/tracker#555 D5) ----
+
+    /** One switch per app of this sibling: shown in the desktop's menus as "<app> (on <container>)", or not. */
+    private suspend fun exportItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
+        val container = info.container
+        val filesDir = context.filesDir
+        val apps = runCatching { withContext(Dispatchers.IO) { ContainerApplications.ownApps(runtime, container) } }
+        val exported = withContext(Dispatchers.IO) { ContainerExports.read(filesDir) }
+            .filter { it.containerId == container.id }.map { it.app.id }.toSet()
+        return apps.fold(
+            onSuccess = { list ->
+                if (list.isEmpty()) {
+                    listOf(ActionItem(id = "container_exports_none", title = "No apps installed in it yet", subtitle = "An app installed here can then be shown on the desktop", run = {}))
+                } else {
+                    list.map { app ->
+                        ToggleItem(
+                            id = "container_export:${app.id}",
+                            title = app.name,
+                            subtitle = "Shown in the desktop's menus as \"${app.name} (on ${info.displayName})\"",
+                            current = app.id in exported,
+                            onToggle = { _, on ->
+                                withContext(Dispatchers.IO) {
+                                    val export = ExportedApp(container.id, info.displayName, app)
+                                    ContainerExports.save(filesDir, ContainerExports.with(ContainerExports.read(filesDir), export, on))
+                                }
+                            },
+                        )
+                    }
+                }
+            },
+            onFailure = { error ->
+                listOf(
+                    ActionItem(
+                        id = "container_exports_unreadable",
+                        title = "Couldn't read its apps",
+                        subtitle = if (runtime.siblingsNeedStart && !info.running) "Start it, then come back" else userFacingErrorMessage(error),
+                        run = {},
+                    ),
+                )
+            },
+        )
+    }
+
     // ---- home (docs/SPEC.md 3d "Home and folders") ----
 
     /** Which home the container's programs see at /root: one row per choice, the current one marked. */
@@ -593,8 +780,14 @@ object ContainersCatalog {
             title = "Delete",
             subtitle = "Removes the container and everything installed in it",
             confirmTitle = "Delete ${info.displayName} and everything in it?",
-            run = { _, _ ->
+            run = { ctx, _ ->
                 runtime.destroy(info.container)
+                // What it exported into the desktop goes with it (docs/SPEC.md 3d "Exported apps").
+                withContext(Dispatchers.IO) {
+                    ContainerExports.save(ctx.filesDir, ContainerExports.without(ContainerExports.read(ctx.filesDir), info.container.id))
+                    ContainerEnter.save(ctx.filesDir, ContainerEnter.without(ContainerEnter.read(ctx.filesDir), info.container.id))
+                    ContainerPrograms.forget(ctx, info.container.id)
+                }
                 "Deleted. Go back to Containers."
             },
         )

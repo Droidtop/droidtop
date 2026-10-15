@@ -72,9 +72,6 @@ import kotlinx.coroutines.withContext
 import dev.droidtop.library.integrations.PluginHub
 import dev.droidtop.library.integrations.PluginPanels
 import dev.droidtop.pluginhost.PluginModes
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.library.settings.CatalogScreenLink
 import dev.droidtop.library.settings.Place
@@ -256,6 +253,9 @@ fun DesktopShell(
         }
     }
 
+    // Desktop's chrome wears the Gaming theme (Droidtop/tracker#555 D4): the bar, its sheets and the Quick Menu
+    // read the same palette Gaming does, through MaterialTheme and MenuTokens alike, instead of stock Material.
+    dev.droidtop.shell.gamepad.GamingTheme {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup)
 
@@ -269,10 +269,6 @@ fun DesktopShell(
             windows = windows,
             onOpenStartMenu = { startMenuOpen = true },
             onOpenQuickMenu = { quickMenuOpen = true },
-            // Absent rather than disabled when there is no live session:
-            // a Terminal button that cannot open a terminal is a lie about
-            // what the desktop can do right now.
-            onOpenTerminal = onOpenTerminal,
         )
 
         launchFailure?.let { message ->
@@ -337,6 +333,7 @@ fun DesktopShell(
             )
         }
         PcLaunchOfferSheet(pcLaunch)
+    }
     }
 }
 
@@ -556,16 +553,8 @@ private fun BoxScope.Taskbar(
     windows: DesktopWindows?,
     onOpenStartMenu: () -> Unit,
     onOpenQuickMenu: () -> Unit,
-    onOpenTerminal: (() -> Unit)?,
 ) {
     val context = LocalContext.current
-    var clockText by remember { mutableStateOf(formatClock()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            clockText = formatClock()
-            delay(30_000)
-        }
-    }
     val atTop = DesktopPrefs.taskbarAtTop(context)
     // With a pad in hand the bar names the four buttons that reach droidtop's chrome (the activity
     // answers them, see DesktopPadRoutes), on a strip of its own so the bar keeps its width for the
@@ -595,7 +584,7 @@ private fun BoxScope.Taskbar(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .background(MaterialTheme.colorScheme.surface),
+                .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TaskbarButton(onClick = onOpenStartMenu) {
@@ -604,33 +593,17 @@ private fun BoxScope.Taskbar(
             Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
             TaskbarPinChips(pins, onOpenPin, onUnpin)
             TaskbarWindowList(hostBridge, toplevels, androidApps, windows, modifier = Modifier.weight(1f))
-            if (onOpenTerminal != null) {
-                TaskbarButton(onClick = onOpenTerminal) {
-                    Text("Terminal")
-                }
-            }
-            TaskbarButton(onClick = { openContainers(context) }) {
-                Text("Containers")
-            }
-            // The mode switcher, by name: Desktop's only other route to the
-            // Android home or Gaming was a long-press of Back (SPEC 2c).
+            // What only Android can do stays on droidtop's bar (Droidtop/tracker#555 D4): Terminal, Containers
+            // and Settings are Start's System rows, and the clock is the panel's (Waybar's custom/clock, or
+            // swaybar's status line), so the screen has one. The mode switcher stays, by name: Desktop's only
+            // other route to the Android home or Gaming is a long-press of Back (SPEC 2c).
             TaskbarButton(onClick = { openModes(context) }) {
                 Text("Modes")
-            }
-            TaskbarButton(onClick = { openSettings(context) }) {
-                Text("Settings")
             }
             PluginTaskbarItems()
             CompanionTaskbarItem()
             ClipboardNotice()
             SystemTray(onClick = onOpenQuickMenu)
-            Text(
-                clockText,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                softWrap = false,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
         }
         if (atTop) legend()
     }
@@ -644,11 +617,18 @@ private fun BoxScope.Taskbar(
  */
 @Composable
 private fun TaskbarButton(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Button(
+    // A flat chip in the Gaming palette, not Material's filled pill (Droidtop/tracker#555 D4).
+    androidx.compose.material3.Surface(
         onClick = onClick,
-        modifier = Modifier.padding(horizontal = 3.dp),
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-    ) { content() }
+        modifier = Modifier.padding(horizontal = 3.dp).heightIn(min = 36.dp),
+        shape = dev.droidtop.shell.gamepad.MenuTokens.RowShape,
+        color = dev.droidtop.shell.gamepad.MenuTokens.Card,
+        contentColor = dev.droidtop.shell.gamepad.MenuTokens.OnSurface,
+    ) {
+        Box(modifier = Modifier.padding(PaddingValues(horizontal = 12.dp, vertical = 8.dp)), contentAlignment = Alignment.Center) {
+            content()
+        }
+    }
 }
 
 /**
@@ -1109,9 +1089,6 @@ internal fun openSettings(context: Context) {
     }
     context.startActivity(intent)
 }
-
-private fun formatClock(): String =
-    SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
 
 /**
  * "Companion" on the taskbar while the device has one screen (docs/SPEC.md "The companion's tabs", One screen): the

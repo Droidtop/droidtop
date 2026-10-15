@@ -1,6 +1,8 @@
 package com.winlator.winhandler;
 
 import android.content.Context;
+import android.system.ErrnoException;
+import android.system.Os;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.SystemClock;
@@ -137,12 +139,28 @@ public class WinHandler {
         BOTH
     }
 
-    static {
+    private static boolean evshimLoaded;
+
+    /**
+     * Loads libevshim once, with EVSHIM_BASE_PATH set first to this app's files directory. The library maps its
+     * controller files (base/gamepad_shm) in its load-time constructor, which reads that variable and otherwise
+     * falls back to app.gamenative's directory, not ours: every slot then stays unmapped and each rumble poller
+     * spins a core. Setting it before the load is the one way that works for both halves of the APK: the arm64
+     * library is GameNative's prebuilt, which has no other entry for the path, and the x86_64 one is built from
+     * the same source (Droidtop/tracker#249: a separate attachSharedMemory call existed only in the x86_64 build,
+     * so on the arm64 console every Windows launch failed with UnsatisfiedLinkError).
+     */
+    private static synchronized void loadEvshim(Context context) {
+        if (evshimLoaded) return;
+        try {
+            Os.setenv("EVSHIM_BASE_PATH", context.getApplicationContext().getFilesDir().getAbsolutePath(), true);
+        } catch (ErrnoException e) {
+            Log.e(TAG, "Could not set EVSHIM_BASE_PATH; controller shared memory falls back to the library default", e);
+        }
         System.loadLibrary("evshim");
+        evshimLoaded = true;
     }
 
-    /** Maps the controller files under [basePath]/gamepad_shm natively; false if a slot could not be mapped. */
-    private static native boolean attachSharedMemory(String basePath);
     private static native void notifyStateChanged(int playerIndex);
     public static native int waitForRumble(int idx, int lastSeq);
     public static native void rumbleTeardown(int idx);
@@ -167,6 +185,8 @@ public class WinHandler {
         this.xServerView = xServerView;
         this.controllerManager = ControllerManager.getInstance();
         this.activity = xServerView.getContext();
+        // Before any native call of this instance's (notifyStateChanged, waitForRumble, rumbleTeardown).
+        loadEvshim(this.activity);
         this.currentControllerId = -1;
         for (int i = 0; i < rumbleDeviceIds.length; i++) {
             rumbleDeviceIds[i] = -1;
@@ -713,6 +733,9 @@ public class WinHandler {
     }
 
     public void start() {
+        // The same files libevshim mapped when it loaded (loadEvshim); if they cannot be mapped here either,
+        // a rumble poller's wait would return at once and spin a core, so no poller starts.
+        boolean sharedMemory = true;
         try {
             this.localhost = InetAddress.getLocalHost();
             Context context = activity.getApplicationContext();
@@ -743,15 +766,13 @@ public class WinHandler {
                 extraGamepadBuffers[i].order(ByteOrder.LITTLE_ENDIAN);
             }
         } catch (IOException e) {
+            sharedMemory = false;
             Log.e("EVSHIM_HOST", "FATAL: Failed to create memory-mapped file(s).", e);
             try {
                 this.localhost = InetAddress.getByName("127.0.0.1");
             } catch (UnknownHostException e2) {
             }
         }
-        // The native side needs the same files for its futex words; without
-        // them a rumble poller's wait returns at once and spins a core.
-        boolean sharedMemory = attachSharedMemory(activity.getApplicationContext().getFilesDir().getAbsolutePath());
         refreshControllerMappings();
         this.running = true;
         activeInstance = this;

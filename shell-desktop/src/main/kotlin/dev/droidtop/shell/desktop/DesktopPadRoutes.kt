@@ -36,10 +36,12 @@ object DesktopPadRoutes {
     /**
      * Takes [event] when it is one of those buttons on a gamepad: the press raises its route once (a held
      * button does not repeat it) and the whole press, release included, is consumed so nothing else
-     * sees half of it. True when taken.
+     * sees half of it. True when taken. With no live session ([sessionLive] false) there is no container to
+     * give a keyboard's keys to, so the same buttons are taken from any source (rig 2026-10-15: on a Desktop
+     * still to be set up, Start and R2 sent as key events did nothing while touch worked).
      */
-    fun claim(event: KeyEvent): Boolean {
-        if (!event.isFromSource(InputDevice.SOURCE_GAMEPAD)) return false
+    fun claim(event: KeyEvent, sessionLive: Boolean = true): Boolean {
+        if (sessionLive && !event.isFromSource(InputDevice.SOURCE_GAMEPAD)) return false
         val route = routeFor(event.keyCode) ?: return false
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) routes.tryEmit(route)
         return true

@@ -13,6 +13,7 @@ import dev.droidtop.runtime.ContainerDiskUsage
 import dev.droidtop.runtime.ContainerExecResult
 import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.EnvironmentMounts
+import dev.droidtop.runtime.ImageRunConfig
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
@@ -167,8 +168,9 @@ class ProotRuntime(
         stopProcess(name)
         val rootfs = rootfsOf(name)
         log.line("creating $name from ${image.reference}${image.digest?.let { "@$it" } ?: ""}")
-        rootfsPuller.pullAndUnpack(image, rootfs.absolutePath, cachePolicy)
+        val runConfig = rootfsPuller.pullAndUnpack(image, rootfs.absolutePath, cachePolicy)
         withContext(Dispatchers.IO) {
+            runConfig?.let { runConfigOf(name).writeText(ImageRunConfig.encode(it)) }
             val config = Properties()
             config[KEY_ROLE] = role.name
             config[KEY_IMAGE] = image.reference
@@ -357,6 +359,10 @@ class ProotRuntime(
 
     /** Where tar's own complaints go, read back into the error the person sees. */
     private fun backupLog(): File = File(context.cacheDir, "container-backup.log")
+
+    override suspend fun imageRunConfig(container: Container): ImageRunConfig? = withContext(Dispatchers.IO) {
+        runConfigOf(container.id).takeIf { it.isFile }?.let { ImageRunConfig.fromImageConfig(it.readText()) }
+    }
 
     override suspend fun mounts(container: Container): EnvironmentMounts = withContext(Dispatchers.IO) {
         readMounts(container.id)
@@ -626,6 +632,7 @@ class ProotRuntime(
     private fun containerDir(name: String) = File(containersDir, name)
     private fun rootfsOf(name: String) = File(containerDir(name), "rootfs")
     private fun configOf(name: String) = File(containerDir(name), "container.properties")
+    private fun runConfigOf(name: String) = File(containerDir(name), "image-config.json")
     private fun mountsFile(name: String) = File(containerDir(name), "mounts.list")
 
     /** Synchronous read for [startSession], which already runs on Dispatchers.IO via its callers. */
@@ -832,7 +839,7 @@ class ProotRuntime(
             "HOME" to "/root",
             "USER" to "root",
             "LOGNAME" to "root",
-            "PATH" to "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "PATH" to ContainerLayout.GUEST_PATH,
             "TERM" to "xterm-256color",
             "LANG" to "C.UTF-8",
             "TMPDIR" to "/tmp",

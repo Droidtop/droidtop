@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad.hosted
 
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -151,6 +152,8 @@ fun HostedListSheet(
     extraBindings: List<HintBinding> = emptyList(),
     cursor: HostedCursor = remember { HostedCursor() },
     onTyped: ((String) -> Unit)? = null,
+    // A shorter row than Gaming's [MenuTokens.RowMinHeight] for a dense list (Desktop's Start menu); null keeps it.
+    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
 ) {
     val window = currentShellWindow()
     val currentRows by rememberUpdatedState(rows)
@@ -176,6 +179,9 @@ fun HostedListSheet(
         // The platform's default dialog width (440dp on the emulator rig) would cap the sheet below its own width.
         Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
             GatePadInThisDialog()
+            // Desktop is immersive (Droidtop/tracker#555 D4): a sheet that let its own window show the bars made the
+            // desktop under it resize as it opened and closed, unlike the Quick Menu's frame, which already hid them.
+            HideSystemBarsInThisDialog()
             MenuPanel(
                 // Wide enough for A, X, Y and B on one line (rig emulator-5560, 2026-10-09: at 440dp "B Close"
                 // ran off the edge); a narrower window wraps them (TouchHintBar).
@@ -237,6 +243,7 @@ fun HostedListSheet(
                                     onLongClick = item.row.onDetail ?: item.row.onToggle,
                                     ownScrollKeeping = true,
                                     leading = item.row.leading,
+                                    minHeight = rowMinHeight,
                                 )
                             }
                         }

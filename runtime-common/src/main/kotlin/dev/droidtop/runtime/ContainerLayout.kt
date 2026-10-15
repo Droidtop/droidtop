@@ -89,6 +89,9 @@ object ContainerLayout {
      * person adds one at a time, not the one device-wide set every
      * container gets automatically.
      */
+    /** The standard search path every guest program starts with. */
+    const val GUEST_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
     const val EXTRA_MOUNTS_DIR = "/run/droidtop-mounts"
 
     /**
@@ -172,6 +175,9 @@ object ContainerLayout {
         put("XDG_RUNTIME_DIR", SOCKET_DIR)
         put("TZ", posixTimeZone(ZoneId.systemDefault()))
         put("XDG_DATA_DIRS", "/usr/local/share:/usr/share:${ContainerLauncher.DATA_DIR}")
+        // The standard PATH, then other containers' exported commands, last so a container's own program of the
+        // same name wins (docs/SPEC.md 3d "Exported commands").
+        put("PATH", "$GUEST_PATH:${ContainerEnter.COMMANDS_DIR}")
         // The primary's session bus. Until it is up (or with none), a program finds nothing listening there,
         // the same as a desktop with no bus, and no longer tries to autolaunch one of its own.
         put("DBUS_SESSION_BUS_ADDRESS", "unix:path=$SOCKET_DIR/$SESSION_BUS_SOCKET")

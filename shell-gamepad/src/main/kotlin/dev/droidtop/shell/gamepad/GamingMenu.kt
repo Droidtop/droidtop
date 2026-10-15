@@ -392,6 +392,9 @@ internal fun MenuRow(
     // where a page shows summaries, none for a settings row, whose
     // explanation is on the focus line (docs/SPEC.md 7k, "Explanations").
     uniformSummaryLines: Int = 2,
+    // The row's least height when it is not [uniformHeight]; null is [MenuTokens.RowMinHeight]. Still at least one
+    // touch target where fingers are the input.
+    minHeight: Dp? = null,
     // A toggle drawn as a switch in the value column (on/off), instead of
     // a value text. Null: not a toggle.
     switchOn: Boolean? = null,
@@ -465,7 +468,7 @@ internal fun MenuRow(
                 if (uniformHeight) {
                     Modifier.height(uniformRowHeight(uniformSummaryLines))
                 } else {
-                    Modifier.heightIn(min = maxOf(MenuTokens.RowMinHeight, if (window.touchFirst) window.minTouchTarget else 0.dp))
+                    Modifier.heightIn(min = maxOf(minHeight ?: MenuTokens.RowMinHeight, if (window.touchFirst) window.minTouchTarget else 0.dp))
                 },
             )
             .clip(MenuTokens.RowShape)

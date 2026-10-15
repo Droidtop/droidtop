@@ -411,7 +411,11 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   6b has it. Start opens the Start menu (Gaming's left menu), R2 the Quick Menu (Gaming's R2; Select stays the
   container's, coordinator, 2026-10-08), L1 the list of windows, R1 the search.
   `DesktopPadRoutes` (`:shell-desktop`) claims them in `MainActivity.dispatchKeyEvent`, before any view,
-  and only from a gamepad: a keyboard's keys are the container's. `DesktopShell` collects them.
+  and only from a gamepad: a keyboard's keys are the container's. With no live session (a desktop still to
+  be set up or started) there is no container to give them to, so the four are taken from any source
+  (rig 2026-10-15). `DesktopShell` collects them. A screen droidtop opens from Desktop (the Switch mode
+  sheet, a plugin's permission sheet, a settings page of its own) takes the Gaming theme as Desktop's chrome
+  does (`rememberGamingThemed`: last mode Gaming or Desktop).
 - **Each is a sheet that is a window of its own** (a Dialog), so the one input pipeline (6e) runs in it.
   `HostedListSheet` (`:shell-gamepad`, `hosted/`) is `MenuPanel` over a lazy list of `MenuRow`s with
   Gaming's sliding focus ring: Up and Down stop at the ends and keep the row on screen, A takes the row,
@@ -429,6 +433,13 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   width for the window list on a 768 dp console. The bar's buttons stay for touch and a mouse. The Start
   button only opens now: the menu is modal, so the "Close" label it wore while the menu floated over the
   bar is gone.
+- **Desktop is immersive, one layout** (Droidtop/tracker#555 D4, 2026-10-15). Android's status and
+  navigation bars are hidden while Desktop shows (`MainActivity.applySystemBars`, as Gaming), and every
+  hosted sheet hides them in its own window (`HostedListSheet` calls `HideSystemBarsInThisDialog`, as the
+  Quick Menu's frame already did). Before, the activity showed them, the Quick Menu hid them, the Start
+  menu, windows list and search left them, and focus coming back showed them again, so the desktop
+  resized under the person as sheets opened and closed. A swipe from the edge shows them for a moment.
+  Standard keeps the system bars.
 - **One listener feeds the container's window list.** The bridge has room for one change listener, so the
   taskbar and the windows sheet read the same list.
 - **Android apps and games started from Desktop are in the bar** (Droidtop/tracker#352). A game or an app
@@ -441,6 +452,21 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
 - **The Start menu reaches the bar's buttons.** A System section (Terminal while a session runs, Containers,
   Modes, Settings) is the bar's own four buttons as rows, so a pad with no way to the bar can still open
   Settings or the mode switcher and then give the pad back to the container by closing the sheet.
+- **One bar, in droidtop's look** (Droidtop/tracker#555 D4, 2026-10-15). The whole Desktop shell is
+  wrapped in `GamingTheme {}`, so the bar, its sheets and the Quick Menu read the palette Gaming reads (the
+  active theme's), through `MaterialTheme` and `MenuTokens` alike; the bar's ground is `MenuTokens.Ground`
+  and its buttons are flat chips (`MenuTokens.Card`, `RowShape`), not Material's filled pills. droidtop's bar
+  keeps what only Android can do: Start, pins, the running windows and Android apps, Modes, the plugin,
+  companion and clipboard items, and the tray (network, VPN, battery, notifications), which opens the Quick
+  Menu. Terminal, Containers and Settings are Start's System rows, not bar buttons. There is no second clock:
+  the clock is the panel's (Waybar's `custom/clock`, or swaybar's status line from the stock sway config),
+  and the panel choice is unchanged. The container's windows stay in the bar's list, because Waybar's
+  config has no window list and a finger needs a way to raise, minimise and close one.
+- **Start's order and density** (Droidtop/tracker#555 D4, 2026-10-15). Top to bottom: the search row,
+  Pinned, Linux apps (what the desktop runs, right after the pins), System, droidtop's places, plugin shelves,
+  then the library. Its rows are 56 dp (`START_ROW_HEIGHT`, passed to `HostedListSheet`'s `rowMinHeight` and
+  on to `MenuRow`'s `minHeight`), never under a 48 dp touch target, so about twice as many fit as at Gaming's
+  72 dp; a row with more text still grows.
 - **Search is the one search** (12a "One search"; Droidtop/tracker#351). The Start menu's first row, and R1,
   open `LauncherSearchScreen`, the dialog the launcher's drawer and Standard use, with the local rows of this
   surface: the library's entries (the scan the Start menu observes, collected only while the search is open)
@@ -1523,7 +1549,7 @@ differ only in the `RootfsUnpacker` that writes the tree.
   `blobs/sha256/`), which `crane pull --format=oci --platform <this ABI>`
   appends to. Blobs are content-addressed, so a layer shared by two images
   is downloaded and stored once, and the image config (Env, User,
-  Entrypoint) is kept; nothing reads it yet. It replaced a `.tar` per image
+  Entrypoint) is kept (read since 2026-10-15, below). It replaced a `.tar` per image
   from `crane export`, which duplicated every shared layer and threw the
   config away; the old `files/image-cache` is deleted on first use. Each
   `index.json` entry is annotated with the digest it was pulled by (for a
@@ -1535,6 +1561,38 @@ differ only in the `RootfsUnpacker` that writes the tree.
   including an interrupted pull's leftovers; all layout changes run under
   one process-wide lock, since a collection beside a pull would delete the
   layers it just wrote.
+- *The image's own program* (Droidtop/tracker#555 D6a, 2026-10-15). After
+  unpacking, `CraneRootfsPuller.pullAndUnpack` reads the image config's
+  `config` object (`ImageRunConfig`: Env, Entrypoint, Cmd, WorkingDir,
+  User) before the cache policy can evict it, and the container keeps it
+  beside its own config (proot `image-config.json`, droidspaces
+  `<name>.imageconfig`), read back through `ContainerRuntime.imageRunConfig`.
+  The program is the entrypoint followed by the command, and arguments
+  replace the command, never the entrypoint, as Docker runs it. A base
+  image (alpine, debian) names none. The container page shows a section
+  "Its own program" (the program as a shell line, its working folder and
+  environment, and a note when the image asks for a user other than root,
+  since containers here run everything as root) when the image names one.
+  **Running it** (D6b, 2026-10-15). The section has **Start it** / **Stop
+  it** with what the program is doing (running, restarting in N s,
+  exited with a code, stopped after failing, couldn't start), **Restart
+  when it fails** (on by default: a server is expected to stay up; the
+  wait doubles from 2 s to a minute after each failure that came sooner
+  than 30 s after its start, and after 5 such failures in a row it stays
+  stopped and says so), **Start with the desktop** (off by default;
+  `ContainerPrograms.startWithDesktop` once the session is up), and the
+  log's last 40 lines. `ContainerPrograms` runs each program as one job in
+  the process scope (`ContainerProgram.command`: `/bin/sh` changes to the
+  working folder, marks the start in the log and execs the program with
+  its output appended to `files/container-logs/<id>.log`, which every
+  container sees under app storage; the image's `Env` is its
+  environment). Stop cancels the job, which ends the program's session.
+  The log is kept under 1 MB, trimmed every 30 s to its last 512 KB in
+  place (`ContainerProgram.trim`; the running program's append lands at
+  the new end). A program ends with droidtop's process. Not yet: an image
+  without `/bin/sh` (a distroless one), the user an image asks for, its
+  ports as links (the next D6 step), and app containers made from the
+  create screen with Private homes.
 - *The flattener* reads the layers top first, so the first time a path is
   seen is its final version, and applies whiteouts (`.wh.<name>`, and
   `.wh..wh..opq` for an opaque directory) to the layers below theirs. What
@@ -2286,6 +2344,62 @@ the `ContainerRuntime` interface that already exists (§3):
   a colon is left out). Setup and the settings preview of the letters use
   that one rule. A prefix's home is its own `xuser-<id>` (Private). Next
   in D3: an app container (D6) defaults to Private.
+  **Exported apps (built 2026-10-15, Droidtop/tracker#555 D5).** A
+  sibling's apps can be shown in the desktop's menus, distrobox-export
+  style: its page has "In the desktop's menus", one switch per app it has
+  installed (`ContainerApplications.ownApps`, which leaves out what other
+  containers exported). An exported app (`ExportedApp`, kept in
+  `desktop-launcher/exports.list` by `ContainerExports`) is a desktop
+  entry `dtexport-<token>.desktop` in droidtop's data directory (on every
+  container's `XDG_DATA_DIRS`), named "<app> (on <container>)" as
+  distrobox-export names it, whose `Exec` is the launch helper with the
+  export's token. So the panel's launcher (wofi) shows it, and so does
+  droidtop's Start menu, whose Linux apps listing reads these entries
+  beside the primary's own. A launch comes back over the one request
+  channel (2a); droidtop looks the token up in its own list, starts the
+  sibling where the backend needs that, and runs the app there
+  (`ContainerApplications.launch`), its window on the shared desktop.
+  Nothing the container wrote is run: the token only names an export
+  droidtop published. Deleting a container removes its exports; each
+  desktop start rewrites the entries from the list. Command-line programs
+  are not exported yet: a request carries no arguments and no terminal,
+  so they wait for the container-enter path (D7). An export keeps the
+  container name it had when it was switched on.
+  **Entering another container and exported commands (built 2026-10-15,
+  Droidtop/tracker#555 D7 and D5).** The enter path is the plan's
+  shared-binds option, built before its measuring spike on the owner's go
+  (coordinator, 2026-10-15): droidtop runs the command in the other
+  container as its own session, and the two containers meet in a folder
+  both already see. `droidtop-enter <token> [arguments]`
+  (`ContainerEnter.HELPER`, in droidtop's launcher directory) makes a
+  request directory in the request channel (2a) holding three FIFOs (the
+  command's stdin, stdout and stderr), its arguments (NUL-ended, at most
+  64 KB) and the working folder, and renames it into place. droidtop marks
+  it taken at once (the helper gives up after 10 s with "droidtop did not
+  answer" when nobody does), looks the token up in its own list, starts
+  the other container where the backend needs that, and runs the command
+  there by name with its arguments as argv entries and its streams on the
+  FIFOs (`ContainerEnter.execCommand`); then it writes the exit status,
+  which the helper exits with. The bytes go from container to container;
+  nothing passes through Android and nothing the container wrote is run by
+  Android. A refused request (a token droidtop did not publish, a
+  container whose commands are switched off, no session) says why on the
+  command's stderr and exits 127, 126 or 125. Pipes, not a terminal: a
+  program that needs a terminal (an editor, `top`) does not get one yet.
+  Every request is logged with its timing (tag `droidtop.Enter`: seen how
+  long after it was written, the other container's start, the run), so the
+  option can be measured on a rig.
+  A sibling's page has **Commands in the desktop's terminal**: **Run its
+  commands from the desktop** (on by default, per container,
+  `ContainerEnter.allowed`), **Add a command** (a program's name), and one
+  row per exported command (`ExportedCommand`, kept in
+  `desktop-launcher/commands.list`). Each is a wrapper of that name in
+  `desktop-launcher/commands`, which is on every container's `PATH` after
+  the standard directories (`ContainerLayout.clientEnvironment`), so a
+  container's own program of the same name wins; the wrapper runs the
+  helper with the command's token, as distrobox-export `--bin` writes one.
+  One name belongs to one container. Deleting a container removes its
+  commands; each desktop start rewrites the wrappers from the list.
   **Restart, Recreate from the image, storage used, Sockets and Mounts
   (built 2026-09-27).** `ContainerRuntime` gained `restart` (stop then
   start; a default every backend shares), `recreateFromImage` (destroy
@@ -3053,7 +3167,11 @@ a close path of its own. Every call works off the main thread.
   the game may well still be running (RetroArch was), so nothing may say it ended. A helper that was refused
   reads "Couldn't end it: <its refusal>" and adds that Android was also asked and cannot say. Before this the Kill
   button discarded the outcome, cleared the session whatever happened, and the tab simply went away with no
-  word (Droidtop/tracker#412).
+  word (Droidtop/tracker#412). The companion runs the stop itself (`CompanionState.quit`, 2026-10-15): it
+  was a seam MainActivity installed, so with no MainActivity alive a press did nothing at all (rig, build 1888:
+  Kill and Quit left RetroArch's pid unchanged and nothing anywhere said why). The Game tab and the Now card show
+  "Ending <game>…" at once, then nothing when it ended or the reason where it was pressed, as well as on the
+  banner; after 15 s without an outcome they say it has not ended yet, and the stop goes on.
 - **The running game's session ends in one place** (`SessionMonitor`, `SessionLiveness`, Droidtop/tracker#289,
   #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, Quick Menu Game section,
   companion Game tab and Now card, keep-awake) follows it and none polls for itself. `SessionMonitor` looks
@@ -5563,13 +5681,19 @@ from the upstream package name (`/data/data/app.gamenative`): the gamepad
 shared memory (`EVSHIM_BASE_PATH`), the DXVK state cache and the default E:
 drive. Under the upstream package these resolve to the same folders, so the
 change goes upstream as it is. The gamepad memory has two sides: Wine
-processes read `EVSHIM_BASE_PATH`, and droidtop's own process, where
-`libevshim` is loaded before any variable could be set, gets the files
-directory from `WinHandler.attachSharedMemory`. Until 2026-10-03 that side
-fell back to the upstream path, mapped nothing, and the four rumble pollers
-spun a core each for as long as a game ran (3.2 of the rig's 4 cores,
-Droidtop/tracker#304); a session whose memory cannot be mapped now runs
-without rumble instead.
+processes read `EVSHIM_BASE_PATH`, and so does droidtop's own process:
+`WinHandler.loadEvshim` sets it to the files directory before it loads
+`libevshim`, whose load-time constructor maps the files. Until 2026-10-03
+that side fell back to the upstream path, mapped nothing, and the four
+rumble pollers spun a core each for as long as a game ran (3.2 of the rig's
+4 cores, Droidtop/tracker#304); a session whose memory cannot be mapped now
+runs without rumble instead. A separate JNI call (`attachSharedMemory`,
+2026-10-03 to 2026-10-15) did the same from Java, but only the x86_64
+library is built from this source; the arm64 one is GameNative's prebuilt,
+which has no such symbol, so every Windows launch on the console failed with
+`UnsatisfiedLinkError` (Droidtop/tracker#249, rig 2026-10-15). A native
+method droidtop adds is only callable where the library is built from
+source; the arm64 set must be rebuilt first.
 
 **Milestone 1 is met.** On build 388 the ImageFs rootfs installs for the
 first time: 175MB base system downloaded and extracted to a 947MB rootfs
@@ -8032,6 +8156,15 @@ often quits cleanly), is shown with Wine's
 exit code, how long it ran and the last 12 lines Wine printed. A game that ran and quit with code 0 just
 returns to the shell. A prefix tool (§7c, Prefix tools) is reported only for a non-zero exit, however soon it
 ended, and the words say "program".
+
+**Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
+first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
+on screens of its own (its failure screen, its crash watch, its problem report). So an Enginehost launch that
+hands straight back with none of them open (`EXITED_AT_ONCE`) was left there, by Cancel, B or Back:
+`LaunchWatchPolicy.leftBeforePlaying` makes it no alert, a scan-log line, and the end of the session
+(`LaunchDisplay.clearRunning`), since no game ever ran. Before, Cancel raised "Enginehost closed straight after
+it started", pointed at the scan log, and left a Playing session with Resume and Kill. Every other trouble of
+Enginehost's, and an emulator that returns at once, is still an alert.
 
 Considered and not built (Droidtop/tracker#270): a timed "taking a long time" notice for an emulator that is open
 and responsive but never draws. Time alone does not tell it from a healthy long-running game, so it would fire on
