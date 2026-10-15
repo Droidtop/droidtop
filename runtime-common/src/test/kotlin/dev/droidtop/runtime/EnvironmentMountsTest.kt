@@ -68,4 +68,36 @@ class EnvironmentMountsTest {
     fun `the shared home sits in app storage, beside the image trees`() {
         assertEquals(File("/data/user/0/dev.droidtop.app/files/desktop-home"), ContainerLayout.sharedHomeDir(File("/data/user/0/dev.droidtop.app/files")))
     }
+
+    // ---- the same folders as Wine drive letters (one rule for setup and the settings preview) ----
+
+    @Test
+    fun `folders are drive letters from D onward in order`() {
+        assertEquals(
+            listOf('D' to "/storage/7EF7-E477/Roms", 'E' to "/storage/emulated/0/Games"),
+            EnvironmentMounts.ofFolders(listOf("/storage/7EF7-E477/Roms", "/storage/emulated/0/Games")).wineDrives(),
+        )
+    }
+
+    @Test
+    fun `a path containing a colon is skipped, not encoded`() {
+        assertEquals(listOf('D' to "/clean/path"), EnvironmentMounts.ofFolders(listOf("/bad:path", "/clean/path")).wineDrives())
+    }
+
+    @Test
+    fun `duplicates collapse and letters stay dense`() {
+        assertEquals(listOf('D' to "/a", 'E' to "/b"), EnvironmentMounts.ofFolders(listOf("/a", "/a", "/b")).wineDrives())
+    }
+
+    @Test
+    fun `letters stop at Y, because Z is the image root`() {
+        val assigned = EnvironmentMounts.ofFolders((1..30).map { "/root/$it" }).wineDrives()
+        assertEquals('Y' - 'D' + 1, assigned.size)
+        assertEquals('Y', assigned.last().first)
+    }
+
+    @Test
+    fun `no folders means no drives`() {
+        assertEquals(emptyList<Pair<Char, String>>(), EnvironmentMounts.ofFolders(emptyList()).wineDrives())
+    }
 }
